@@ -98,7 +98,7 @@ from _assembly_postbuild import (
     load_dof_manifest,
 )
 from _common import (  # component iteration helpers (read-only)
-    _flag_only,
+    _early_bound,
     _read_member,
 )
 
@@ -305,9 +305,9 @@ def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
             components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
             over = []
             for comp in components:
-                # Flag ONLY GetConstrainedStatus (zero-arg); Name2 is a property
-                # read (issue #87 -- not the 165-method IComponent2 flag).
-                _flag_only(comp, "GetConstrainedStatus")
+                # Wrap once as IComponent2 so GetConstrainedStatus invokes its
+                # known DISPID; Name2 remains a property read.
+                comp = _early_bound(comp, "IComponent2", "GetConstrainedStatus")
                 status = int(
                     adapter._attempt(lambda c=comp: c.GetConstrainedStatus(), default=-1)
                 )
@@ -685,7 +685,7 @@ def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
     seen: set[str] = set()
     components = adapter._attempt(lambda: top.GetComponents(False), default=None) or []
     for component in components:
-        _flag_only(component, "GetModelDoc2")
+        component = _early_bound(component, "IComponent2", "GetModelDoc2")
         instance = str(_read_member(component, "Name2") or "?")
         if "/" in instance:
             continue

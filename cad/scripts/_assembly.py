@@ -22,8 +22,7 @@ from _common import (
     _CHAIN_LINK_PREFIXES,
     _FEATURE_ERROR,
     _MATE_TOL_MM,
-    _flag,
-    _flag_only,
+    _early_bound,
     _read_member,
     check,
     log,
@@ -401,7 +400,7 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
     feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
     if feat is None:
         return 0
-    _flag_only(feat, "GetErrorCode2")
+    feat = _early_bound(feat, "IFeature", "GetErrorCode2")
     warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_BOOL, False)
     code = int(adapter._attempt(lambda: feat.GetErrorCode2(warn), default=0) or 0)
     if code and bool(warn.value):
@@ -1075,10 +1074,11 @@ class PatternDirection(StrEnum):
 
 
 def _top_features(model: Any) -> list[Any]:
+    model = _early_bound(model, "IModelDoc2", "FirstFeature")
     features = []
     feature = _read_member(model, "FirstFeature")
     while feature is not None:
-        _flag(feature, "IFeature")
+        feature = _early_bound(feature, "IFeature", "GetNextFeature")
         features.append(feature)
         feature = feature.GetNextFeature()
     return features
@@ -1239,12 +1239,13 @@ async def linear_component_pattern(
         axis=axis.lower(), instances=instances, spacing_mm=spacing_mm,
     ):
         _select_pattern_inputs(adapter, seeds, direction_name, "AXIS")
-        manager = model.FeatureManager
-        _flag(manager, "IFeatureManager")
+        manager = _early_bound(
+            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+        )
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
         if definition is None:
             raise RuntimeError("cannot create local linear pattern definition")
-        _flag(definition, "ILocalLinearPatternFeatureData")
+        definition = _early_bound(definition, "ILocalLinearPatternFeatureData")
         definition.D1ReverseDirection = direction is PatternDirection.REVERSE
         definition.D1Spacing = spacing_mm / 1000.0
         definition.D1TotalInstances = instances
@@ -1257,7 +1258,7 @@ async def linear_component_pattern(
         model.ClearSelection2(True)
         if feature is None:
             raise RuntimeError(f"SOLIDWORKS rejected {label}")
-        _flag(feature, "IFeature")
+        feature = _early_bound(feature, "IFeature")
         feature.Name = label
 
         created = _new_pattern_components(model, before)
@@ -1268,7 +1269,7 @@ async def linear_component_pattern(
             )
         names = []
         for component in created:
-            _flag_only(component, "IsPatternInstance")
+            component = _early_bound(component, "IComponent2", "IsPatternInstance")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
@@ -1305,12 +1306,13 @@ async def circular_component_pattern(
         axis=axis_name, instances=instances,
     ):
         _select_pattern_inputs(adapter, seeds, axis_name, "AXIS")
-        manager = model.FeatureManager
-        _flag(manager, "IFeatureManager")
+        manager = _early_bound(
+            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+        )
         definition = manager.CreateDefinition(_LOCAL_CIRCULAR_PATTERN)
         if definition is None:
             raise RuntimeError("cannot create local circular pattern definition")
-        _flag(definition, "ILocalCircularPatternFeatureData")
+        definition = _early_bound(definition, "ILocalCircularPatternFeatureData")
         definition.TotalInstances = instances
         definition.EqualSpacing = True
         definition.ReverseDirection = direction is PatternDirection.REVERSE
@@ -1319,7 +1321,7 @@ async def circular_component_pattern(
         model.ClearSelection2(True)
         if feature is None:
             raise RuntimeError(f"SOLIDWORKS rejected {label}")
-        _flag(feature, "IFeature")
+        feature = _early_bound(feature, "IFeature")
         feature.Name = label
 
         created = _new_pattern_components(model, before)
@@ -1330,7 +1332,7 @@ async def circular_component_pattern(
             )
         names = []
         for component in created:
-            _flag_only(component, "IsPatternInstance")
+            component = _early_bound(component, "IComponent2", "IsPatternInstance")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
@@ -1431,8 +1433,9 @@ async def place_components_batch(
         expected_rows.append([c for row in rows for c in row])
         grounds.append(bool(spec.get("ground", True)))
 
-    asm = adapter.currentModel
-    _flag(asm, "IAssemblyDoc")
+    raw_model = adapter.currentModel
+    asm = _early_bound(raw_model, "IAssemblyDoc", "AddComponents3")
+    model_doc = _early_bound(raw_model, "IModelDoc2", "ClearSelection2")
     names_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, names)
     xforms_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, transforms)
     coordsys_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, [""] * len(names))
@@ -1534,7 +1537,7 @@ async def place_components_batch(
         # bool/int -- nothing to marshal -- so it is the late-binding-safe path.
         if grounded_comps:
             with _telemetry.span("batch.fix", grounded=len(grounded_comps)):
-                adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
+                adapter._attempt(lambda: model_doc.ClearSelection2(True), default=None)
                 n_sel = sum(
                     1
                     for comp in grounded_comps
@@ -1546,7 +1549,7 @@ async def place_components_batch(
                         f"grounded components"
                     )
                 adapter._attempt(lambda: asm.FixComponent(), default=None)
-                adapter._attempt(lambda: asm.ClearSelection2(True), default=None)
+                adapter._attempt(lambda: model_doc.ClearSelection2(True), default=None)
 
     _telemetry.success(
         f"{label}: inserted {len(specs)} components"
@@ -1565,9 +1568,8 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
     instances (chain pattern beads) report under-constrained even though
     the owning feature drives their transforms -- ``IsPatternInstance``
     exempts them; their actual positions are gate-asserted by the pattern
-    creator. ``GetComponents`` hands back unflagged dispatches, so the
-    IComponent2 methods must be flagged first or the call resolves as a
-    property and raises.
+    creator. ``GetComponents`` hands back transient dispatches, so each is
+    wrapped as ``IComponent2`` before its zero-argument methods are invoked.
     """
     asm = adapter.currentModel
     # Inserting/fixing a component marks the mate solver dirty: until the
@@ -1598,9 +1600,11 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
         # this gate's span records. Same de-noising as health.whats_wrong below.
         fixed = pattern = 0
         for component in components:
-            # Flag ONLY the two zero-arg methods called below; Name2/IsFixed are
-            # property reads (issue #87 -- not the 165-method IComponent2 flag).
-            _flag_only(component, "IsPatternInstance", "GetConstrainedStatus")
+            # Wrap once as IComponent2 so both zero-arg methods invoke known
+            # DISPIDs; Name2/IsFixed remain property reads.
+            component = _early_bound(
+                component, "IComponent2", "IsPatternInstance", "GetConstrainedStatus"
+            )
             comp_name = str(_read_member(component, "Name2"))
             if bool(_read_member(component, "IsFixed")):
                 fixed += 1
@@ -1830,7 +1834,9 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     under = []
     for component in components:
-        _flag_only(component, "IsPatternInstance", "GetConstrainedStatus")
+        component = _early_bound(
+            component, "IComponent2", "IsPatternInstance", "GetConstrainedStatus"
+        )
         comp_name = str(_read_member(component, "Name2"))
         if bool(_read_member(component, "IsFixed")):
             continue
@@ -1943,7 +1949,7 @@ def assert_free_dof_necessity(
 
 def component_names(adapter: Any) -> list[str]:
     """Top-level component names (``Name2``) of the active assembly."""
-    asm = adapter.currentModel
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc", "GetComponents")
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     names = []
     for component in components:
@@ -1986,15 +1992,19 @@ def check_no_interference(adapter: Any) -> None:
     way the gate already tolerates face-flush and tangent contacts). Any link
     touching a NON-link part is still a hard fault.
     """
-    asm = adapter.currentModel
+    asm = _early_bound(
+        adapter.currentModel,
+        "IAssemblyDoc",
+        "ToolsCheckInterference",
+        "InterferenceDetectionManager",
+    )
     with _telemetry.span("gate.interference") as isp:
         log("interference detection: starting ...")
-        _flag(asm, "IAssemblyDoc")
         adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
         mgr = _read_member(asm, "InterferenceDetectionManager")
         if mgr is None:
             raise RuntimeError("InterferenceDetectionManager unavailable")
-        _flag(mgr, "IInterferenceDetectionMgr")
+        mgr = _early_bound(mgr, "IInterferenceDetectionMgr", "GetInterferences")
         mgr.TreatCoincidenceAsInterference = False
         mgr.TreatSubAssembliesAsComponents = True
         mgr.IncludeMultibodyPartInterferences = True
@@ -2008,7 +2018,7 @@ def check_no_interference(adapter: Any) -> None:
         chain_contacts = []
         chain_mesh_contacts = []
         for interference in list(interferences or []):
-            _flag(interference, "IInterference")
+            interference = _early_bound(interference, "IInterference")
             names = []
             configs = []
             for comp in list(_read_member(interference, "Components") or []):
@@ -2093,7 +2103,7 @@ def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
     for i, feat in enumerate(feats):
         name = "?"
         if feat is not None:
-            _flag(feat, "IFeature")
+            feat = _early_bound(feat, "IFeature")
             name = str(_read_member(feat, "Name"))
         code = int(codes[i]) if i < len(codes) else -1
         warn = bool(warns[i]) if i < len(warns) else False
@@ -2121,8 +2131,9 @@ def assert_model_healthy(
     also checked -- a flexible subassembly's internal mate error does NOT appear
     in the parent's What's Wrong, only in the sub document's.
     """
-    model = model or adapter.currentModel
-    _flag(model, "IModelDoc2")
+    raw_model = model or adapter.currentModel
+    model_doc = _early_bound(raw_model, "IModelDoc2", "ForceRebuild3")
+    asm_doc = _early_bound(raw_model, "IAssemblyDoc", "GetComponents")
     with _telemetry.span("gate.health", label=label or "top", deep=deep) as hsp:
         # The deep ForceRebuild3 + sub-document collection is the bulk of the
         # gate's wall-clock; span it so it is not an unspanned leading gap before
@@ -2133,20 +2144,24 @@ def assert_model_healthy(
             # ForceRebuild3 here when it was NOT (standalone/build/motion callers).
             # A False result -- from either path -- is still a hard health fault.
             if rebuilt is _REBUILD_UNSET:
-                rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+                rebuilt = adapter._attempt(
+                    lambda: model_doc.ForceRebuild3(False), default=None
+                )
 
-            targets = [(label or "top", model)]
+            targets = [(label or "top", model_doc)]
             if deep:
-                comps = adapter._attempt(lambda: model.GetComponents(False), default=None) or []
+                comps = adapter._attempt(
+                    lambda: asm_doc.GetComponents(False), default=None
+                ) or []
                 for comp in comps:
-                    # Flag ONLY GetModelDoc2 (zero-arg); Name2 is a property
-                    # read (issue #87 -- not the 165-method IComponent2 flag).
-                    _flag_only(comp, "GetModelDoc2")
+                    # Wrap once as IComponent2 so GetModelDoc2 invokes its known
+                    # DISPID; Name2 remains a property read.
+                    comp = _early_bound(comp, "IComponent2", "GetModelDoc2")
                     name = str(_read_member(comp, "Name2"))
                     if "/" in name:  # top-level instances only; their docs cover nested parts
                         continue
                     sub = adapter._attempt(lambda c=comp: c.GetModelDoc2(), default=None)
-                    if sub is not None and sub is not model:
+                    if sub is not None and sub is not raw_model:
                         targets.append((name, sub))
 
         errors: list[str] = []
@@ -2198,11 +2213,11 @@ def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
     for body in bodies:
         if body is None:
             continue
-        _flag(body, "IBody2")
+        body = _early_bound(body, "IBody2")
         fault = adapter._attempt(lambda b=body: b.Check3, default=None)
         if fault is None:
             continue
-        _flag(fault, "IFaultEntity")
+        fault = _early_bound(fault, "IFaultEntity")
         count = int(_read_member(fault, "Count") or 0)
         if count > 0:
             faults.append((str(_read_member(body, "Name")), count))
@@ -2223,8 +2238,7 @@ def remap_front_to_machine_front(adapter: Any) -> None:
     change. Leaves Front active so the saved document opens on the machine front.
     """
     SW_FRONT, SW_BACK = 1, 2  # swStandardViews_e
-    model = adapter.currentModel
-    _flag(model, "IModelDoc2")
+    model = _early_bound(adapter.currentModel, "IModelDoc2", "ShowNamedView2")
     model.ShowNamedView2("", SW_BACK)  # orient to the machine front
     ok = model.Extension.UpdateStandardViews("", SW_FRONT)
     if not ok:
@@ -2523,17 +2537,26 @@ def select_mates_folder(adapter: Any, model: Any = None) -> bool:
     tail."""
     if model is None:
         model = adapter.currentModel
+    model = _early_bound(
+        model,
+        "IModelDoc2",
+        "GetFeatureCount",
+        "FeatureByPositionReverse",
+        "FirstFeature",
+    )
     count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
     for i in range(min(count, 8)):  # MateGroup is the last top-level feature (i=0)
         feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
         if feat is None:
             continue
-        _flag(feat, "IFeature")
+        feat = _early_bound(feat, "IFeature", "GetTypeName2", "Select2")
         if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
             return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
     feat = adapter._attempt(lambda: model.FirstFeature(), default=None)
     while feat is not None:
-        _flag(feat, "IFeature")
+        feat = _early_bound(
+            feat, "IFeature", "GetTypeName2", "Select2", "GetNextFeature"
+        )
         if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
             return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
         feat = adapter._attempt(lambda f=feat: f.GetNextFeature(), default=None)
@@ -2556,9 +2579,13 @@ def repair_dangling_mates(adapter: Any, model: Any = None) -> int:
     successful heal -- so the CALLER must judge success from a fresh ``whats_wrong``
     + the standard DOF/interference/health gates, never from this code.
     """
-    asm = adapter.currentModel if model is None else model
-    _flag(asm, "IAssemblyDoc")
-    if not select_mates_folder(adapter, asm):
+    raw_model = adapter.currentModel if model is None else model
+    asm = _early_bound(
+        raw_model,
+        "IAssemblyDoc",
+        "AutoMateRepair",
+    )
+    if not select_mates_folder(adapter, raw_model):
         log("AutoMateRepair: could not select the Mates folder -- skipping repair")
         return 0
     processed, failed = _byref_variant(), _byref_variant()

@@ -194,10 +194,14 @@ def add_datum_feature(
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
-    tag = _sw_type_info.flagged(tag, "IDatumTag")
+    tag = _sw_type_info.early_bound_or_flag(
+        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel"
+    )
     if not tag.SetLabel(datum):
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
-    annotation = _sw_type_info.flagged(tag.GetAnnotation(), "IAnnotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        tag.GetAnnotation(), "IAnnotation", "SetPosition2"
+    )
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
     if str(tag.GetLabel()) != datum:
@@ -227,7 +231,9 @@ def add_feature_control_frame(
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
-    gtol = _sw_type_info.flagged(gtol, "IGtol")
+    gtol = _sw_type_info.early_bound_or_flag(
+        gtol, "IGtol", "GetFrameCount", "AddFrame", "GetFrame", "GetAnnotation"
+    )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
         if not gtol.AddFrame():
@@ -274,7 +280,9 @@ def add_feature_control_frame(
         raise RuntimeError(
             f"current feature-control frame is unavailable after migration ({label})"
         )
-    frame = _sw_type_info.flagged(frame, "IGtolFrame")
+    frame = _sw_type_info.early_bound_or_flag(
+        frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
+    )
     xml = _gtol_frame_xml(
         characteristic, tolerance, datums=datums, diameter=diameter
     )
@@ -290,7 +298,13 @@ def add_feature_control_frame(
             raise RuntimeError(f"failed to add feature quantity {quantity!r} ({label})")
         if str(gtol.GetBelowFrameTextAt(1) or "") != quantity:
             raise RuntimeError(f"feature quantity did not persist ({label})")
-    annotation = _sw_type_info.flagged(gtol.GetAnnotation(), "IAnnotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        gtol.GetAnnotation(),
+        "IAnnotation",
+        "GetAttachedEntityCount3",
+        "SetAttachedEntities",
+        "SetPosition2",
+    )
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
@@ -339,14 +353,18 @@ def add_surface_finish(
     )
     if symbol is None:
         raise RuntimeError(f"failed to insert Ra {roughness_ra} symbol ({label})")
-    symbol = _sw_type_info.flagged(symbol, "ISFSymbol")
+    symbol = _sw_type_info.early_bound_or_flag(
+        symbol, "ISFSymbol", "SetText", "GetSymbol", "GetText", "GetAnnotation"
+    )
     if not symbol.SetText(8, f"Ra {roughness_ra}"):  # current-profile roughness value
         raise RuntimeError(f"failed to set Ra {roughness_ra} ({label})")
     if int(symbol.GetSymbol()) != 1:
         raise RuntimeError(f"surface-finish symbol type did not persist ({label})")
     if str(symbol.GetText(8) or "").strip() != f"Ra {roughness_ra}":
         raise RuntimeError(f"surface-finish roughness did not persist ({label})")
-    annotation = _sw_type_info.flagged(symbol.GetAnnotation(), "IAnnotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        symbol.GetAnnotation(), "IAnnotation", "SetPosition2"
+    )
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position surface-finish symbol ({label})")
     draw.ClearSelection2(True)
@@ -384,11 +402,19 @@ def add_property_linked_callout(
     note = draw.InsertNote(property_link(property_name))
     if note is None:
         raise RuntimeError(f"failed to insert linked callout {property_name!r}")
-    note = _sw_type_info.flagged(note, "INote")
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
     annotation = note.GetAnnotation()
     if annotation is None:
         raise RuntimeError(f"linked callout has no annotation: {property_name!r}")
-    annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation,
+        "IAnnotation",
+        "GetAttachedEntityCount3",
+        "SetAttachedEntities",
+        "SetLeader3",
+        "SetPosition2",
+        "GetLeaderCount",
+    )
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach linked callout {property_name!r}")
@@ -428,10 +454,14 @@ def add_native_hole_callout(
     # the documented swCommands_PmOK command so doit remains unattended.
     if not adapter.swApp.RunCommand(-2, ""):  # swCommands_e.swCommands_PmOK
         raise RuntimeError(f"failed to accept native hole callout ({label})")
-    display = _sw_type_info.flagged(display, "IDisplayDimension")
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "IsHoleCallout", "GetAnnotation"
+    )
     if not display.IsHoleCallout():
         raise RuntimeError(f"inserted annotation is not a hole callout ({label})")
-    annotation = _sw_type_info.flagged(display.GetAnnotation(), "IAnnotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        display.GetAnnotation(), "IAnnotation", "SetPosition2"
+    )
     if not annotation.SetPosition2(callout_xy[0], callout_xy[1], 0.0):
         raise RuntimeError(f"failed to position native hole callout ({label})")
     draw.ClearSelection2(True)
@@ -459,7 +489,9 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     ``GetCThreadCount`` counts seed objects, while each
     ``ICThread.GetPatternedTransformsCount`` supplies its repeated instances.
     """
-    view = _sw_type_info.flagged(view, "IView")
+    view = _sw_type_info.early_bound_or_flag(
+        view, "IView", "GetCThreadCount", "GetFirstCThread"
+    )
     draw = adapter.currentModel
     name = view_name(adapter, view)
     draw.ActivateView(name)
@@ -488,7 +520,9 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
         visited += 1
         if visited > 10_000:
             raise RuntimeError("cosmetic-thread traversal exceeded 10,000 entries")
-        thread = _sw_type_info.flagged(thread, "ICThread")
+        thread = _sw_type_info.early_bound_or_flag(
+            thread, "ICThread", "GetPatternedTransformsCount", "GetNext"
+        )
         patterns = int(
             adapter._get_attr_or_call(thread, "GetPatternedTransformsCount") or 0
         )
@@ -707,11 +741,19 @@ def add_hole_group_tags(
         note = draw.InsertNote(tag)
         if note is None:
             raise RuntimeError(f"failed to insert hole group tag {tag!r}")
-        note = _sw_type_info.flagged(note, "INote")
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
         annotation = note.GetAnnotation()
         if annotation is None:
             raise RuntimeError(f"hole group tag has no annotation: {tag!r}")
-        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation,
+            "IAnnotation",
+            "GetAttachedEntityCount3",
+            "SetAttachedEntities",
+            "SetLeader3",
+            "SetPosition2",
+            "GetLeaderCount",
+        )
         if int(annotation.GetAttachedEntityCount3()) != 1:
             if not annotation.SetAttachedEntities(dispatch_array([edge])):
                 raise RuntimeError(f"failed to attach hole group tag {tag!r}")
@@ -762,7 +804,10 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     if not result or isinstance(result, str):
         return []
     annotations = [
-        _sw_type_info.flagged(annotation, "IAnnotation") for annotation in result
+        _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        for annotation in result
     ]
     names = sorted(
         name
@@ -781,7 +826,9 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
     draw = adapter.currentModel
     survivors: list[Any] = []
     for annotation in annotations:
-        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "Select2"
+        )
         if dimension_name(adapter, annotation):
             survivors.append(annotation)
             continue
@@ -837,7 +884,9 @@ def set_dimension_callouts(
     """
     remaining = dict(below_text)
     for annotation in annotations:
-        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
         name = dimension_name(adapter, annotation)
         text = remaining.pop(name, None)
         if text is None:
@@ -845,7 +894,9 @@ def set_dimension_callouts(
         display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
         if display is None:
             raise RuntimeError(f"dimension {name!r} has no display annotation")
-        display = _sw_type_info.flagged(display, "IDisplayDimension")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText"
+        )
         adapter._attempt(
             lambda d=display, s=text: d.SetText(4, s)  # swDimensionTextCalloutBelow
         )
@@ -873,7 +924,9 @@ def set_dimension_precision(
     do_not_change = -1
     remaining = dict(precision)
     for annotation in annotations:
-        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
         name = dimension_name(adapter, annotation)
         digits = remaining.pop(name, None)
         if digits is None:
@@ -881,7 +934,9 @@ def set_dimension_precision(
         display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
         if display is None:
             raise RuntimeError(f"dimension {name!r} has no display annotation")
-        display = _sw_type_info.flagged(display, "IDisplayDimension")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetPrecision3", "GetPrimaryPrecision2"
+        )
         result = adapter._attempt(
             lambda d=display, n=digits: d.SetPrecision3(
                 n, do_not_change, do_not_change, do_not_change
@@ -947,8 +1002,12 @@ def add_edge_dimension(
 
 def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
     """Box a drawing-native locating dimension as BASIC and verify the result."""
-    display = _sw_type_info.flagged(dimension, "IDisplayDimension")
-    model_dimension = _sw_type_info.flagged(display.GetDimension(), "IDimension")
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "GetDimension"
+    )
+    model_dimension = _sw_type_info.early_bound_or_flag(
+        display.GetDimension(), "IDimension", "SetToleranceType", "GetToleranceType"
+    )
     if not model_dimension.SetToleranceType(TOL_BASIC):
         raise RuntimeError(f"failed to make {label} dimension BASIC")
     if int(model_dimension.GetToleranceType()) != TOL_BASIC:
@@ -1023,20 +1082,20 @@ def insert_hole_table(
     draw.ClearSelection2(True)
     if table is None:
         raise RuntimeError(f"SolidWorks failed to create the {label} hole table")
-    table = _sw_type_info.flagged(table, "IHoleTableAnnotation")
+    table = _sw_type_info.early_bound_or_flag(table, "IHoleTableAnnotation")
     feature = table.HoleTable
     if feature is None:
         raise RuntimeError("native hole table annotation has no feature")
-    feature = _sw_type_info.flagged(feature, "IHoleTable")
+    feature = _sw_type_info.early_bound_or_flag(feature, "IHoleTable")
     feature.CombineSameSize = False
     feature.CombineTags = False
     adapter.currentModel.EditRebuild3()
-    table = _sw_type_info.flagged(table, "ITableAnnotation")
+    table = _sw_type_info.early_bound(table, "ITableAnnotation")
     # Indexed COM properties such as Text2 are omitted by the late-bound
     # dispatch returned from IHoleTableAnnotation.  Wrap the same dispatch in
     # its generated early-bound interface before using the setter.
-    _sw_type_info._ensure_loaded()
-    table = _sw_type_info._wrapper_module.ITableAnnotation(table._oleobj_)
+    if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
+        raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
     if basic_locations:
         for column, heading in ((1, "X LOC (BASIC)"), (2, "Y LOC (BASIC)")):
             if not table.IsCellTextEditable(0, column):
@@ -1085,7 +1144,7 @@ def insert_hole_table(
 
 def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:
     """Write and read-verify the drawing document summary metadata."""
-    model_doc = _sw_type_info.flagged(drawing_model, "IModelDoc2")
+    model_doc = _sw_type_info.early_bound_or_flag(drawing_model, "IModelDoc2")
     for field, value in fields.items():
         model_doc.SummaryInfo(field, value)
         if model_doc.SummaryInfo(field) != value:
@@ -1140,11 +1199,13 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     note / table / title block (and any off-sheet placement) is still audited.
     """
     leadered = int(adapter._get_attr_or_call(annotation, "GetLeaderCount") or 0) > 0
-    note = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+    note = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
+    )
     if note is None:
         return None
-    note = _sw_type_info.flagged(note, "INote")
-    extent = adapter._attempt(lambda: note.GetExtent())
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetExtent")
+    extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
     if not extent:
         return None
     x0, y0, _z0, x1, y1, _z1 = (float(v) for v in extent)
@@ -1167,12 +1228,20 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     table's underlying ``IAnnotation``) is the top-left corner and the box grows
     right and DOWN from it.
     """
-    table = _sw_type_info.flagged(table, "ITableAnnotation")
-    inner = adapter._attempt(lambda: table.GetAnnotation())
+    table = _sw_type_info.early_bound_or_flag(
+        table, "ITableAnnotation", "GetAnnotation"
+    )
+    inner = adapter._attempt(
+        lambda: adapter._get_attr_or_call(table, "GetAnnotation")
+    )
     if inner is None:
         return None
-    inner = _sw_type_info.flagged(inner, "IAnnotation")
-    position = adapter._attempt(lambda: inner.GetPosition())
+    inner = _sw_type_info.early_bound_or_flag(
+        inner, "IAnnotation", "GetPosition"
+    )
+    position = adapter._attempt(
+        lambda: adapter._get_attr_or_call(inner, "GetPosition")
+    )
     if not position:
         return None
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
@@ -1198,7 +1267,9 @@ def _gdt_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
     box is too coarse to assert an overlap (a datum tag placed beside its own
     control frame would self-collide), so the symbol is overflow-checked only.
     """
-    position = adapter._attempt(lambda: annotation.GetPosition())
+    position = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetPosition")
+    )
     if not position:
         return None
     x, y = float(position[0]), float(position[1])
@@ -1215,7 +1286,9 @@ def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
     the geometry it measures, so it is overflow-checked and title-block-keep-out
     checked only -- never overlap-checked against a view (Codex #269 thread 1).
     """
-    position = adapter._attempt(lambda: annotation.GetPosition())
+    position = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetPosition")
+    )
     if not position:
         return None
     x, y = float(position[0]), float(position[1])
@@ -1234,9 +1307,19 @@ def _iter_view_annotations(adapter: Any, view: Any):
     callouts (swDisplayDimension) become elements. Tables come from
     ``GetTableAnnotations`` instead.
     """
-    annotations = adapter._attempt(lambda: view.GetAnnotations()) or []
+    annotations = adapter._attempt(
+        lambda: adapter._get_attr_or_call(view, "GetAnnotations")
+    ) or []
     for annotation in annotations:
-        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation,
+            "IAnnotation",
+            "GetType",
+            "GetName",
+            "GetSpecificAnnotation",
+            "GetPosition",
+            "GetLeaderCount",
+        )
         kind = int(adapter._get_attr_or_call(annotation, "GetType") or 0)
         name = str(adapter._get_attr_or_call(annotation, "GetName") or "")
         if kind == _ANNOT_NOTE:
@@ -1253,12 +1336,22 @@ def _iter_view_annotations(adapter: Any, view: Any):
 
 def _iter_tables(adapter: Any, view: Any):
     """Yield each table ``LayoutElement`` owned by ``view`` (or the sheet view)."""
-    tables = adapter._attempt(lambda: view.GetTableAnnotations()) or []
+    tables = adapter._attempt(
+        lambda: adapter._get_attr_or_call(view, "GetTableAnnotations")
+    ) or []
     for table in tables:
-        table = _sw_type_info.flagged(table, "ITableAnnotation")
-        inner = adapter._attempt(lambda: table.GetAnnotation())
+        table = _sw_type_info.early_bound_or_flag(
+            table, "ITableAnnotation", "GetAnnotation"
+        )
+        inner = adapter._attempt(
+            lambda: adapter._get_attr_or_call(table, "GetAnnotation")
+        )
+        if inner is not None:
+            inner = _sw_type_info.early_bound_or_flag(
+                inner, "IAnnotation", "GetName"
+            )
         name = (
-            str(adapter._get_attr_or_call(_sw_type_info.flagged(inner, "IAnnotation"), "GetName") or "")
+            str(adapter._get_attr_or_call(inner, "GetName") or "")
             if inner is not None
             else "table"
         )
@@ -1306,7 +1399,9 @@ def collect_layout_elements(
     tables: dict[str, LayoutElement] = {}
     for view in iter_views(adapter):
         name = view_name(adapter, view)
-        outline = adapter._attempt(lambda v=view: v.GetOutline())
+        outline = adapter._attempt(
+            lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
+        )
         view_box: tuple[float, float, float, float] | None = None
         if outline:
             view_box = tuple(float(v) for v in outline)  # xmin,ymin,xmax,ymax
@@ -1345,7 +1440,7 @@ def collect_layout_elements(
     # tables only (its notes are the sheet-format frame + title block).
     sheet_view = adapter._attempt(lambda: drawing_model.GetFirstView())
     if sheet_view is not None:
-        for table in _iter_tables(adapter, _sw_type_info.flagged(sheet_view, "IView")):
+        for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
 
     elements.extend(tables.values())

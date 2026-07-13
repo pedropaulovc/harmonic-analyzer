@@ -79,11 +79,15 @@ def _delete_native_sheet_annotations(adapter: Any) -> int:
     sheet_view = adapter._attempt(lambda: draw.GetFirstView())
     if sheet_view is None:
         raise RuntimeError("native drawing has no sheet view")
-    sheet_view = _sw_type_info.flagged(sheet_view, "IView")
+    sheet_view = _sw_type_info.early_bound_or_flag(
+        sheet_view, "IView", "GetFirstAnnotation3"
+    )
     annotations: list[Any] = []
     annotation = adapter._attempt(lambda: sheet_view.GetFirstAnnotation3())
     while annotation is not None:
-        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetNext3", "Select2"
+        )
         next_annotation = adapter._attempt(lambda item=annotation: item.GetNext3())
         annotations.append(annotation)
         annotation = next_annotation
@@ -101,14 +105,21 @@ def _strip_native_template(adapter: Any) -> int:
     """Retain only native border/zone sketch segments."""
     draw = adapter.currentModel
     sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
-    sheet = _sw_type_info.flagged(sheet, "ISheet")
+    sheet = _sw_type_info.early_bound_or_flag(sheet, "ISheet", "GetTemplateSketch")
     sheet.SheetFormatVisible = True
     sketch = adapter._get_attr_or_call(sheet, "GetTemplateSketch")
-    sketch = _sw_type_info.flagged(sketch, "ISketch")
+    sketch = _sw_type_info.early_bound_or_flag(sketch, "ISketch", "GetSketchSegments")
     segments = list(adapter._get_attr_or_call(sketch, "GetSketchSegments") or [])
     delete_segments: list[Any] = []
     for segment in segments:
-        segment = _sw_type_info.flagged(segment, "ISketchSegment")
+        segment = _sw_type_info.early_bound_or_flag(
+            segment,
+            "ISketchSegment",
+            "GetStartPoint2",
+            "GetEndPoint2",
+            "GetCenterPoint2",
+            "Select4",
+        )
         if not _is_native_border_segment(_segment_points(adapter, segment)):
             delete_segments.append(segment)
 
@@ -126,7 +137,13 @@ def _strip_native_template(adapter: Any) -> int:
     )
     remaining_interior = []
     for segment in remaining_segments:
-        segment = _sw_type_info.flagged(segment, "ISketchSegment")
+        segment = _sw_type_info.early_bound_or_flag(
+            segment,
+            "ISketchSegment",
+            "GetStartPoint2",
+            "GetEndPoint2",
+            "GetCenterPoint2",
+        )
         if not _is_native_border_segment(_segment_points(adapter, segment)):
             remaining_interior.append(segment)
     if remaining_interior:
@@ -210,14 +227,19 @@ def _assert_no_banned_sheet_text(adapter: Any) -> None:
     if sheet_view is None:
         raise RuntimeError("drawing has no sheet view")
     banned = ("proprietary", "confidential", "insert company", "approval")
+    sheet_view = _sw_type_info.early_bound_or_flag(
+        sheet_view, "IView", "GetFirstAnnotation3"
+    )
     annotation = adapter._attempt(lambda: sheet_view.GetFirstAnnotation3())
     found: list[str] = []
     while annotation is not None:
-        annotation = _sw_type_info.flagged(annotation, "IAnnotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation", "GetNext3"
+        )
         specific = adapter._attempt(lambda item=annotation: item.GetSpecificAnnotation())
         text = ""
         if specific is not None:
-            specific = _sw_type_info.flagged(specific, "INote")
+            specific = _sw_type_info.early_bound_or_flag(specific, "INote", "GetText")
             value = adapter._attempt(lambda item=specific: item.GetText())
             text = value if isinstance(value, str) else ""
         if any(token in text.lower() for token in banned):
@@ -240,7 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
     sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("native drawing has no current sheet")
-    sheet = _sw_type_info.flagged(sheet, "ISheet")
+    sheet = _sw_type_info.early_bound_or_flag(sheet, "ISheet")
     assert_asme_b_sheet(adapter, sheet, phase="native B template")
     sheet.SheetFormatVisible = True
     removed_annotations = _delete_native_sheet_annotations(adapter)
