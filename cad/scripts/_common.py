@@ -676,15 +676,11 @@ def feature_name_by_type(adapter: Any, type_name: str) -> str:
     """
     from solidworks_mcp.adapters import sw_type_info
 
-    def _flag(obj: Any, iface: str) -> None:
-        try:
-            sw_type_info.flag_methods(obj, iface)
-        except Exception:
-            pass
-
-    _flag(adapter.currentModel, "IModelDoc2")
+    model = sw_type_info.early_bound_or_flag(
+        adapter.currentModel, "IModelDoc2", "FirstFeature"
+    )
     found = ""
-    feat = _read_member(adapter.currentModel, "FirstFeature")
+    feat = _read_member(model, "FirstFeature")
     for _ in range(5000):
         if not feat:
             break
@@ -694,7 +690,9 @@ def feature_name_by_type(adapter: Any, type_name: str) -> str:
         # GetNextFeature), which taxed every extrude_at_offset with an
         # O(features) flag storm. GetTypeName2 must stay method-dispatched
         # or the comparison below silently never matches.
-        _flag_only(feat, "GetTypeName2", "GetNextFeature")
+        feat = sw_type_info.early_bound_or_flag(
+            feat, "IFeature", "GetTypeName2", "GetNextFeature"
+        )
         try:
             if _read_member(feat, "GetTypeName2") == type_name:
                 found = str(_read_member(feat, "Name"))
@@ -999,7 +997,7 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
     mgr = adapter._attempt(lambda: ext.CustomPropertyManager(""), default=None)
     if mgr is None:
         raise RuntimeError("CustomPropertyManager unavailable")
-    _flag(mgr, "ICustomPropertyManager")
+    mgr = _early_bound(mgr, "ICustomPropertyManager", "Add3")
     written = []
     for name, value in props.items():
         if value in (None, ""):
@@ -1073,12 +1071,8 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
         raise RuntimeError(f"colour readback mismatch: set {rgb}, got {back}")
     n_bodies = 0
     try:
-        from solidworks_mcp.adapters import sw_type_info
-
-        sw_type_info.flag_methods(doc, "IPartDoc")
         bodies = doc.GetBodies2(0, True) or []  # solid bodies
         for body in bodies:
-            sw_type_info.flag_methods(body, "IBody2")
             body.MaterialPropertyValues2 = values
             n_bodies += 1
     except Exception as exc:
@@ -1153,36 +1147,30 @@ async def bbox_extent_check(
     that varies after rebuilds, so a 0.05 mm gate on it can pass/fail
     nondeterministically (codex review #9).
     """
-    import pythoncom
-    from win32com.client import VARIANT
-
-    from solidworks_mcp.adapters import sw_type_info
-
     index = {"x": 0, "y": 1, "z": 2}[axis]
     pos = [1.0 if i == index else 0.0 for i in range(3)]
     neg = [-v for v in pos]
 
     def _extreme(body: Any, direction: list[float]) -> float:
-        # IBody2::GetExtremePoint(Px,Py,Pz, &X,&Y,&Z): direction in, the extreme
-        # point comes back through three [out] byref doubles (metres). Returns the
-        # axis coordinate in mm.
-        out = [VARIANT(pythoncom.VT_BYREF | pythoncom.VT_R8, 0.0) for _ in range(3)]
+        # IBody2::GetExtremePoint(Px,Py,Pz): direction in, the extreme point
+        # comes back through three [out] doubles (metres). The early-bound makepy
+        # wrapper collects the [out] params into the return tuple
+        # (retval_bool, X, Y, Z), so pass only the 3 [in] direction components --
+        # NOT the late-binding byref VARIANTs. Returns the axis coord in mm.
+        body = _early_bound(body, "IBody2")
         res = adapter._attempt(
-            lambda: body.GetExtremePoint(
-                direction[0], direction[1], direction[2], out[0], out[1], out[2]),
-            default="__err__")
-        if res == "__err__":
+            lambda: body.GetExtremePoint(direction[0], direction[1], direction[2]),
+            default=None)
+        if not res or len(res) < 4:
             raise RuntimeError(f"bbox {label}: GetExtremePoint failed")
-        return out[index].value * 1000.0
+        return res[1 + index] * 1000.0
 
-    doc = adapter.currentModel
-    sw_type_info.flag_methods(doc, "IPartDoc")
+    doc = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = adapter._attempt(lambda: doc.GetBodies2(0, False)) or []  # solid
     if not bodies:
         raise RuntimeError(f"bbox {label}: part has no solid bodies")
     lo, hi = float("inf"), float("-inf")
     for body in bodies:
-        sw_type_info.flag_methods(body, "IBody2")
         lo = min(lo, _extreme(body, neg))
         hi = max(hi, _extreme(body, pos))
     extent = hi - lo
@@ -1222,6 +1210,22 @@ def _flag(obj: Any, interface: str) -> None:
         sw_type_info.flag_methods(obj, interface)
     except Exception:
         pass
+
+
+def _early_bound(obj: Any, interface: str, *method_names: str) -> Any:
+    """Return a generated interface wrapper, selectively flagging as fallback.
+
+    Early-bound wrappers invoke known DISPIDs directly and avoid the repeated
+    ``GetIDsOfNames`` calls paid by whole-interface method flagging.  The exact
+    names are used only when makepy metadata is unavailable, preserving support
+    for deliberately minimal test doubles and unusual SolidWorks installs.
+    """
+    from solidworks_mcp.adapters import sw_type_info
+
+    try:
+        return sw_type_info.early_bound_or_flag(obj, interface, *method_names)
+    except Exception:
+        return obj
 
 
 def _flag_only(obj: Any, *method_names: str) -> None:
@@ -1272,18 +1276,21 @@ def _flag_only(obj: Any, *method_names: str) -> None:
 def _iter_features(adapter: Any):
     """Yield every top-level feature of the active doc in tree order.
 
-    NO method flagging here: this walks the SHARED ``adapter.currentModel``, and
-    ``_FlagAsMethod`` mutates that instance in place. Flipping ``FirstFeature`` /
+    No in-place method flagging here: this walks the SHARED
+    ``adapter.currentModel``, and ``_FlagAsMethod`` mutates that instance in
+    place.  A generated early-bound wrapper supplies the DISPIDs without
+    touching the adapter-owned dispatch. Flipping ``FirstFeature`` /
     ``GetNextFeature`` to method dispatch would break the adapter's OWN bare
     property reads -- its ``create_cut_extrude`` walks ``FirstFeature`` as a
     property to find the profile to cut, and a flagged model silently yields no
     profile (``FeatureCut3 ... Parameter not optional``). ``_read_member`` reads
     these accessors property-style whether or not they are flagged."""
-    model = adapter.currentModel
+    model = _early_bound(adapter.currentModel, "IModelDoc2", "FirstFeature")
     feat = _read_member(model, "FirstFeature")
     for _ in range(5000):
         if not feat:
             return
+        feat = _early_bound(feat, "IFeature", "GetNextFeature")
         yield feat
         feat = _read_member(feat, "GetNextFeature")
 
@@ -1328,8 +1335,9 @@ def _display_dimensions(feat: Any, owner: str | None = None):
     recorded-count guard -- proven live on cone-pivot-screw's HeadTop driver
     slot. Pass the feature's (post-rename) name to see only its own dims.
 
-    NO method flagging -- ``_FlagAsMethod`` mutates the gen_py type-shared
-    dispatch repr, so flagging one ``IFeature`` instance flips ``GetTypeName2``
+    No in-place method flagging -- generated early-bound wrappers provide the
+    DISPIDs without mutating the gen_py type-shared dispatch repr. Flagging one
+    ``IFeature`` instance flips ``GetTypeName2``
     to method dispatch on EVERY ``IFeature`` wrapper, including the fresh ones
     the adapter's ``create_cut_extrude`` walk reads as bare properties (the
     "Parameter not optional" cut failure). The adapter itself calls arg-taking
@@ -1337,11 +1345,18 @@ def _display_dimensions(feat: Any, owner: str | None = None):
     arg-taking ``GetNextDisplayDimension`` / ``GetDimension2`` need no flag, and
     the zero-arg ``GetFirstDisplayDimension`` resolves to its value via
     ``_read_member``."""
+    feat = _early_bound(
+        feat,
+        "IFeature",
+        "GetFirstDisplayDimension",
+        "GetNextDisplayDimension",
+    )
     disp = _read_member(feat, "GetFirstDisplayDimension")
     for _ in range(1000):
         if not disp:
             return
-        idim = disp.GetDimension2(0)
+        disp = _early_bound(disp, "IDisplayDimension", "GetDimension2")
+        idim = _early_bound(disp.GetDimension2(0), "IDimension")
         if owner is None or _dim_owner_feature(idim) == owner:
             yield idim
         disp = feat.GetNextDisplayDimension(disp)
@@ -1627,10 +1642,9 @@ def set_isometric_view(adapter: Any) -> None:
     of an empty just-created document -- the orient + zoom-to-fit are best-effort.
     """
     SW_ISOMETRIC = 7  # swStandardViews_e.swIsometricView
-    model = adapter.currentModel
+    model = _early_bound(adapter.currentModel, "IModelDoc2", "ShowNamedView2")
     if model is None:
         return
-    _flag(model, "IModelDoc2")
     adapter._attempt(lambda: model.ShowNamedView2("", SW_ISOMETRIC), default=None)
     adapter._zoom_to_fit(model)
     log("view set to isometric")

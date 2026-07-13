@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _common import _flag_only  # noqa: E402
+from _common import _early_bound, _flag_only  # noqa: E402
 
 
 class _Flaggable:
@@ -55,6 +55,23 @@ def test_unknown_names_are_skipped() -> None:
     obj = _Picky()
     _flag_only(obj, "GetConstrainedStatus", "Unknown")
     assert obj.flagged == ["GetConstrainedStatus"]
+
+
+def test_early_bound_delegates_with_selective_fallback_names(monkeypatch) -> None:
+    """Shared helpers request a typed wrapper and retain an exact-name fallback."""
+    from solidworks_mcp.adapters import sw_type_info
+
+    original = object()
+    typed = object()
+    calls = []
+
+    def wrap(obj, interface, *methods):
+        calls.append((obj, interface, methods))
+        return typed
+
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", wrap)
+    assert _early_bound(original, "IComponent2", "GetModelDoc2") is typed
+    assert calls == [(original, "IComponent2", ("GetModelDoc2",))]
 
 
 if __name__ == "__main__":

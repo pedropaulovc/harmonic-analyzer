@@ -39,7 +39,6 @@ from build_motion_study import (
     ANGLE, ASM, DURATION_S, FLEXIBLE, _comp_xform, _entity_ref, _find_one,
     _read_member, _rot_angle, _sub_model, _suppress_named, _world,
 )
-from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 RATIO_SUM_WHEEL = [1.0, 1.0]
 SUM_RPM = 1.0
@@ -95,7 +94,7 @@ async def _rim_point(adapter):
     part = adapter._attempt(lambda: wh.GetModelDoc2(), default=None)
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
     name = None
     for ep in RIM_EDGE_CANDIDATES:
@@ -108,7 +107,7 @@ async def _rim_point(adapter):
             break
         log(f"    edge_point={ep} failed: {res.error}")
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
     adapter.currentModel = top
     if not name:
         raise RuntimeError("could not create rim RefPoint on the wheel")

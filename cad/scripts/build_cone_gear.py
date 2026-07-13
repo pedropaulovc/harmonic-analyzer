@@ -75,6 +75,7 @@ import _config
 from _common import (
     OUT_PNG,
     SketchDims,
+    _early_bound,
     _read_member,
     apply_material,
     check,
@@ -278,13 +279,7 @@ def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) ->
     the count dimension is the one reading ``expected`` (the seed count must
     differ from the 360-degree angle for this to be unambiguous).
     """
-    from solidworks_mcp.adapters import sw_type_info
-
-    model = adapter.currentModel
-    try:
-        sw_type_info.flag_methods(model, "IModelDoc2")
-    except Exception:
-        pass
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     for dim in ("D1", "D2", "D3", "D4"):
         full = f"{dim}@{feature_name}"
         param = adapter._attempt(lambda f=full: model.Parameter(f), default=None)

@@ -161,7 +161,7 @@ def test_final_rebuild_accepts_fully_rebuilt_state() -> None:
 def test_in_place_save_rebuilds_at_the_save_chokepoint() -> None:
     source = inspect.getsource(save_assembly_in_place)
     rebuild = source.index("final_rebuild_before_save(adapter, asm_name, asm)")
-    save = source.index("asm.Save3(options, err, warn)")
+    save = source.index("asm.Save3(options, 0, 0)")
     assert rebuild < source.index("asm.GetSaveFlag()") < save
 
 
