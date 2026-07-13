@@ -124,8 +124,16 @@ def _strip_native_template(adapter: Any) -> int:
 
     for segment in delete_segments:
         draw.ClearSelection2(True)
+        # Sketch segments select via ISketchSegment.Select4 (DISPID 65562), NOT
+        # IEntity.Select4 (65556) — the two DISPIDs collide (IEntity.Select4 ==
+        # ISketchSegment.Select2), so binding a segment to IEntity invokes the
+        # wrong method. `segment` is a derived ISketchLine/ISketchArc (from
+        # concrete_sketch_segment) which declares no Select*, so rebind to the
+        # base ISketchSegment that does.
         selected = adapter._attempt(
-            lambda item=segment: _early_bound(item, "IEntity").Select4(False, null_callout()),
+            lambda item=segment: _early_bound(item, "ISketchSegment").Select4(
+                False, null_callout()
+            ),
             default=False,
         )
         if not selected:
