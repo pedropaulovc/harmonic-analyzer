@@ -391,19 +391,22 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
     replay authored "OK", left the wire at pose, and the closure gate found the
     corpse (2026-07-05). One FeatureByName + GetErrorCode2 per mate; warnings
     (e.g. legitimate over-define co-flags) stay tolerated."""
-    import pythoncom
-    from win32com.client import VARIANT
-
     if not name:
         return 0
     model = adapter.currentModel
     feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
     if feat is None:
         return 0
-    feat = _early_bound(feat, "IFeature", "GetErrorCode2")
-    warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_BOOL, False)
-    code = int(adapter._attempt(lambda: feat.GetErrorCode2(warn), default=0) or 0)
-    if code and bool(warn.value):
+    # Early-bound IFeature::GetErrorCode2 returns the [out] IsWarning in the tuple
+    # (code, is_warning) -- pass nothing, consume the tuple. The old byref-VARIANT
+    # arg is a dynamic-dispatch idiom; under InvokeTypes the call returns the tuple
+    # regardless, so int(result) would crash on it.
+    feat = _early_bound(feat, "IFeature")
+    result = adapter._attempt(lambda: feat.GetErrorCode2(), default=None)
+    if not result:
+        return 0
+    code = int(result[0] or 0)
+    if code and bool(result[1]):
         return 0
     return code
 
@@ -2065,37 +2068,25 @@ def check_no_interference(adapter: Any) -> None:
             )
         _telemetry.success("interference check: none found")
 
-def _byref_variant() -> Any:
-    """An in/out ``VT_BYREF | VT_VARIANT`` for ``out object`` COM params.
-
-    ``IModelDocExtension::GetWhatsWrong`` takes three ``out object`` arrays;
-    under pywin32 late binding a bare call RAISES and bare ``None`` mis-types.
-    Mirrors :func:`com_variant.byref_long`; read the filled value via ``.value``.
-    """
-    import pythoncom
-    from win32com.client import VARIANT
-
-    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
-
 def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
     """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
 
-    Reads the What's Wrong dialog via ``GetWhatsWrong`` (byref out-params).
-    Empty when the model is clean or the call is unavailable.
+    Reads the What's Wrong dialog via ``GetWhatsWrong``. Early-bound
+    ``IModelDocExtension::GetWhatsWrong`` collects its three ``out object`` arrays
+    into the return tuple ``(retval, features, codes, warnings)`` -- pass nothing
+    and consume the tuple. The old byref-VARIANT idiom leaves those VARIANTs
+    UNWRITTEN under InvokeTypes, so it silently reported every model clean (a
+    broken assembly would slip the deep-health gate). Empty when the model is
+    clean or the call is unavailable.
     """
     ext = _read_member(model, "Extension")
     if ext is None:
         return []
-    f, e, w = _byref_variant(), _byref_variant(), _byref_variant()
-
-    def _call() -> tuple[Any, Any, Any]:
-        ext.GetWhatsWrong(f, e, w)
-        return f.value, e.value, w.value
-
-    res = adapter._attempt(_call, default=None)
+    ext = _early_bound(ext, "IModelDocExtension")
+    res = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
     if not res:
         return []
-    feats, codes, warns = res
+    _retval, feats, codes, warns = res
     feats = list(feats or [])
     codes = list(codes or [])
     warns = list(warns or [])
@@ -2588,10 +2579,12 @@ def repair_dangling_mates(adapter: Any, model: Any = None) -> int:
     if not select_mates_folder(adapter, raw_model):
         log("AutoMateRepair: could not select the Mates folder -- skipping repair")
         return 0
-    processed, failed = _byref_variant(), _byref_variant()
-    ret = adapter._attempt(lambda: asm.AutoMateRepair(processed, failed), default=-1)
-    n_proc = len(list(processed.value or [])) if processed.value is not None else 0
-    n_fail = len(list(failed.value or [])) if failed.value is not None else 0
+    # Early-bound IAssemblyDoc::AutoMateRepair returns its two [out] arrays in the
+    # tuple (retval, processed, failed) -- pass nothing, consume the tuple.
+    result = adapter._attempt(lambda: asm.AutoMateRepair(), default=None)
+    ret, processed, failed = result if result else (-1, None, None)
+    n_proc = len(list(processed or [])) if processed is not None else 0
+    n_fail = len(list(failed or [])) if failed is not None else 0
     log(f"AutoMateRepair: ret={ret} (1=PartialSuccess is normal) "
         f"re-bound {n_proc} mate(s), {n_fail} already-valid skipped")
     return n_proc
@@ -2648,10 +2641,7 @@ def save_assembly_in_place(
     can read false): ``SetSaveFlag`` + ``Save3`` push the new geometry's md5 to the
     parent (codex review #5).
     """
-    import pythoncom
-    from win32com.client import VARIANT
-
-    asm = adapter.currentModel if model is None else model
+    asm = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
     if not geometry_changed:
         # No-op refresh: resolved geometry identical to the last save. Do NOT
@@ -2668,18 +2658,21 @@ def save_assembly_in_place(
         adapter._attempt(lambda: asm.SetSaveFlag(), default=None)
 
     before = sldasm.stat().st_mtime
-    err = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-    warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
     options = 1 | 8  # swSaveAsOptions_Silent | swSaveAsOptions_AvoidRebuildOnSave
-    ret = adapter._attempt(lambda: asm.Save3(options, err, warn), default=False)
+    # Early-bound IModelDoc2::Save3 returns its two [out] codes in the tuple
+    # (retval, errors, warnings) -- pass literal 0 for the [out] slots and consume
+    # the tuple (mirrors io.py's in-place Save3). The byref-VARIANT idiom leaves
+    # err/warn unwritten and makes `ret` a truthy tuple under InvokeTypes.
+    result = adapter._attempt(lambda: asm.Save3(options, 0, 0), default=None)
+    ret, err, warn = result if result else (False, None, None)
 
     after = sldasm.stat().st_mtime
     if after <= before:
         raise RuntimeError(
             f"{sldasm.name} mtime unchanged after Save3(Silent) "
-            f"(ret={ret}, err={err.value}, warn={warn.value})")
-    log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err.value}, "
-        f"warn={warn.value})")
+            f"(ret={ret}, err={err}, warn={warn})")
+    log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, "
+        f"warn={warn})")
 async def refresh_assembly(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
