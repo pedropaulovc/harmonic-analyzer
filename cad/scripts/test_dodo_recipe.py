@@ -199,6 +199,13 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     assert stores[0][1] == [output]
 
 
+def test_cache_status_covers_drawings():
+    dodo = _load_dodo()
+    rows = dict(dodo._cache_rows())
+    stem = dodo._drawing_order()[0]
+    assert rows[f"drawing:{stem}"] == dodo._drawing_file_deps(stem)
+
+
 def test_content_checker_digest_ignores_yaml_noise(tmp_path):
     """Option A: ContentChecker digests the PARSED yaml, so comment / whitespace /
     numeric-reflow edits to a shared cad/config/*.yaml leave the digest unchanged
