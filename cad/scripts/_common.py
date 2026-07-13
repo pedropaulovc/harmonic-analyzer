@@ -74,6 +74,19 @@ IN = 25.4  # inch -> mm
 _CHAIN_LINK_PREFIXES = ("chain-inner-link", "chain-outer-link")
 
 DEFAULT_VIEWS = ("isometric",)
+_ROUTINE_PART_VIEWS = frozenset(
+    (
+        "front",
+        "back",
+        "left",
+        "right",
+        "top",
+        "bottom",
+        "isometric",
+        "trimetric",
+        "dimetric",
+    )
+)
 
 
 _T0 = time.perf_counter()
@@ -988,10 +1001,7 @@ async def save_part_and_images(
     png_dir = OUT_PNG / part_name
     png_dir.mkdir(parents=True, exist_ok=True)
     views = list(views)
-    requested = {f"{part_name}_{view}.png" for view in views}
-    for stale in png_dir.glob(f"{part_name}_*.png"):
-        if stale.name not in requested:
-            stale.unlink()
+    _prune_stale_part_views(png_dir, part_name, views)
     apply_custom_properties(adapter, part_properties(part_name))
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
@@ -1015,6 +1025,17 @@ async def save_part_and_images(
         )
         artefacts[view] = str(img_path)
     return artefacts
+
+
+def _prune_stale_part_views(
+    png_dir: Path, part_name: str, views: Iterable[str]
+) -> None:
+    """Remove obsolete routine views without deleting configuration renders."""
+    requested = {f"{part_name}_{view}.png" for view in views}
+    for view in _ROUTINE_PART_VIEWS:
+        stale = png_dir / f"{part_name}_{view}.png"
+        if stale.name not in requested:
+            stale.unlink(missing_ok=True)
 
 
 def active_configuration_name(adapter: Any, model: Any = None) -> str:
