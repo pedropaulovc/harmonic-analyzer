@@ -31,7 +31,6 @@ from _assembly import (
 from build_motion_study import (
     _by_z_rank, _comp_xform, _components, _find_one, _iter_mates, _rot_angle,
 )
-from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 TIMES = [0.0, 0.375, 0.75, 1.125, 1.5]
 STUDY = "Motion Study 2"
@@ -85,13 +84,13 @@ async def main():
     log(f"  rod part doc = {part_title!r}")
     # selection in a component's part doc needs that doc ACTIVE.
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
     pt = check("create ring-centre RefPoint", await adapter.create_reference_point(
         CreateReferencePointParameters(mode="arc_center", edge_point=BORE_EDGE_MM)))
     point_name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
     adapter.currentModel = top
     log(f"  ring-centre point feature = {point_name!r}")
     if not point_name:

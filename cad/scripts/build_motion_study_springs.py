@@ -47,7 +47,6 @@ from build_motion_study import (
     _components, _entity_ref, _family, _find_one, _iter_mates, _k_helical,
     _lone_real, _mate_value, _read_member, _sub_model, _suppress_named,
 )
-from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 # Part-local points ON each eye hole's circular edge (mm) -> arc_center -> centre.
 CH_LEVER_EYE = [179.8, 0.0, 0.0]       # channel-lever tab hole Ø4.0 @ (177.8,0,0)
@@ -80,13 +79,13 @@ async def _eye_point(adapter, comp_needle, edge_point, label, comps=None):
         raise RuntimeError(f"{comp_needle} part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
     pt = check(f"eye point {label}", await adapter.create_reference_point(
         CreateReferencePointParameters(mode="arc_center", edge_point=edge_point)))
     name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
     adapter.currentModel = top
     if not name:
         raise RuntimeError(f"eye point {label} returned no name")
@@ -201,7 +200,7 @@ async def _rim_point(adapter, comps=None):
         raise RuntimeError("magnifying-wheel part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
     adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
     name = None
     for ep in RIM_EDGE_CANDIDATES:
@@ -213,7 +212,7 @@ async def _rim_point(adapter, comps=None):
             log(f"  rim RefPoint edge_point={ep} -> {name!r}")
             break
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
     adapter.currentModel = top
     if not name:
         raise RuntimeError("rim RefPoint creation failed on the wheel")

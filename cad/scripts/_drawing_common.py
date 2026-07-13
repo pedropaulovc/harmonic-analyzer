@@ -1146,7 +1146,10 @@ def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, st
     """Write and read-verify the drawing document summary metadata."""
     model_doc = _sw_type_info.early_bound_or_flag(drawing_model, "IModelDoc2")
     for field, value in fields.items():
-        model_doc.SummaryInfo(field, value)
+        # SummaryInfo is a property: early binding splits it into a getter
+        # (SummaryInfo(field)) and a setter (SetSummaryInfo(field, value)).
+        # A 2-arg SummaryInfo(field, value) put only worked under late binding.
+        model_doc.SetSummaryInfo(field, value)
         if model_doc.SummaryInfo(field) != value:
             raise RuntimeError(f"drawing summary field {field} did not persist")
 
