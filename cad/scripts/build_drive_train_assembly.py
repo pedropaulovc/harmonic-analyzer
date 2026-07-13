@@ -151,18 +151,21 @@ from _assembly import (
     assert_pattern_targets,
     check_no_interference,
     coincident_mate,
-    component_names,
     component_transform,
     distance_driver,
     gear_mate,
+    gear_mates_batch,
     linear_component_pattern,
+    grid_component_pattern,
     lock_mate,
     named_ref,
     parallel_mate,
+    PatternDirection,
     place_component,
     reledger_to_solved,
     reset_dof_manifest,
     save_assembly_and_images,
+    suspend_automatic_assembly_rebuilds,
     write_dof_manifest,
 )
 
@@ -173,8 +176,6 @@ from _cwm import (  # noqa: E402
     component_mate_count,
     component_mate_dump,
     copy_with_mates,
-    external_mate_rows,
-    mates_with_owners,
     put_component_pose,
     resolve_entity,
 )
@@ -720,7 +721,7 @@ if PSCREW_HEAD_DIA / 2.0 > (
 
 
 # --- cone lock knob (v4_t00411; clamps the swing plate through its notch) ----
-# The knob is a base-bolted STATIC (pedestal pattern: located to the machine
+# The knob is a base-bolted STATIC (pedestal pattern: locked to the static
 # datums); the plate's open lock notch sweeps around its stationary stud and,
 # past the mouth, clear of it (t00417: the bolt stands past the plate edge
 # when disengaged). Its machine position is DERIVED from the platform's
@@ -1365,27 +1366,21 @@ def _org(adapter, name: str) -> list[float]:
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 
-async def _locate_to_datum(adapter, name: str) -> None:
-    """Locate a static mount to the machine datum planes (three orthogonal plane
-    distances), replacing an explicit fix for a part with no in-subassembly
-    contact partner. A free-space position relative to the machine origin
-    (strictly necessary) -- the frame-column idiom. The mount is inserted at
-    IDENTITY, so its principal planes are parallel to the assembly's and the
-    three distances are just its origin coordinates."""
-    o = _org(adapter, name)
-    for axis, plane, coord in (
-        ("Y", "Top Plane", o[1]),
-        ("X", "Right Plane", o[0]),
-        ("Z", "Front Plane", o[2]),
-    ):
-        await distance_driver(
-            adapter,
-            named_ref(f"{plane}@{name}", "PLANE"),
-            named_ref(plane, "PLANE"),
-            coord,
-            label=f"{name} datum {axis} d={abs(coord):.2f}",
-            verify=(name, o),
-        )
+async def _lock_static(adapter, name: str, reference: str) -> None:
+    """Rigidly retain an authored static pose with one mate.
+
+    These base-bolted mounts have no contact partner inside this subassembly.
+    Their exact machine-frame transform is already authored at insertion, so
+    three assembly-datum distance mates only make the solver rediscover six
+    coordinates it already has. Locking each mount to the fixed seed arbor
+    preserves the same relative transform in one branch-free relationship.
+    """
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{name}", "PLANE"),
+        named_ref(f"Front Plane@{reference}", "PLANE"),
+        label=f"{name} fixed to static reference",
+    )
 
 
 async def _key_to_shaft(
@@ -1483,7 +1478,7 @@ async def build(adapter) -> dict[str, str]:
     reset_dof_manifest()
     check("create_assembly", await adapter.create_assembly())
 
-    # =================== structure (located, not fixed) ====================
+    # =================== structure (static lock + moving joints) ===========
     # The stationary arbor is the reference frame the moving train mates
     # against. Inserted FIRST, so SolidWorks auto-fixes it as the seed (the one
     # allowed fixed component, mirroring frame's harmonic-base) -- no explicit fix.
@@ -1493,10 +1488,9 @@ async def build(adapter) -> dict[str, str]:
         [90.0, 0.0, 0.0], ROT_X_POS90, ground=False, label="cylinder arbor (seed)",
     )
     # The arbor-pedestal is a static mount bolted to the (absent) base. With
-    # no in-subassembly contact partner, it is LOCATED to the machine datum
-    # planes by three orthogonal plane distances (a free-space machine-frame
-    # position, strictly necessary) -- the frame-column pattern, replacing the
-    # explicit fix. (The old separate crank-pedestal is GONE: the merged green
+    # no in-subassembly contact partner, its authored machine-frame pose is
+    # retained by one lock to the fixed seed arbor. (The old separate
+    # crank-pedestal is GONE: the merged green
     # column below rides the swing platform.)
     # South arbor pedestal only (2026-06-19): the rocker support's arbor-clamp
     # boss is gone with the portal unification, AND the now-solid portal north
@@ -1510,7 +1504,7 @@ async def build(adapter) -> dict[str, str]:
         [X_DRUM, Y_BASE_TOP, -ARBOR_PEDESTAL_Z], [0.0, 0.0, 0.0], IDENTITY, ground=False,
         label=f"arbor-pedestal z={-ARBOR_PEDESTAL_Z:g}",
     )
-    await _locate_to_datum(adapter, arbor_pedestal)
+    await _lock_static(adapter, arbor_pedestal, arbor)
     # NORTH pedestal (PR8, ch12 img09): the same casting rotated 180 about Y
     # so its strap face looks south at the drum's north end; the arbor's +97
     # end seats 7.5 into its bore band. Base-bolted static like the south one.
@@ -1520,7 +1514,7 @@ async def build(adapter) -> dict[str, str]:
         [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]], ground=False,
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
-    await _locate_to_datum(adapter, north_pedestal)
+    await _lock_static(adapter, north_pedestal, arbor)
     # The cone SWING PLATFORM is the swing bracket (ch.12, p.18 "pivot"):
     # floated so the whole cone set can swing horizontally out of mesh about
     # its tip-end vertical pivot (p1). Pinned at the engaged rest pose by a
@@ -1585,7 +1579,7 @@ async def build(adapter) -> dict[str, str]:
         [KNOB_X, Y_BASE_TOP + PLAT_T, KNOB_Z], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="cone-lock-knob (platform clamp, engaged end)",
     )
-    await _locate_to_datum(adapter, lock_knob)
+    await _lock_static(adapter, lock_knob, arbor)
     # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC
     # like the knob -- head seated on the plate top at the swing pivot, its
     # shoulder dropping through the plate's clearance hole into the base's
@@ -1595,7 +1589,7 @@ async def build(adapter) -> dict[str, str]:
         [ppivot[0], Y_BASE_TOP + PLAT_T, ppivot[2]], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="cone-pivot-screw (p1 pivot pin)",
     )
-    await _locate_to_datum(adapter, pivot_screw)
+    await _lock_static(adapter, pivot_screw, arbor)
     # The swing-stop screw (item 6): a base-threaded STATIC just past the
     # DISENGAGED pose -- the plate's west edge bumps its proud shank, limiting
     # the p1 swing to exactly the knob-clear travel (STOP_X/STOP_Z derived at
@@ -1605,12 +1599,12 @@ async def build(adapter) -> dict[str, str]:
         [STOP_X, Y_BASE_TOP, STOP_Z], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="swing-stop-screw (p1 travel limit)",
     )
-    await _locate_to_datum(adapter, stop_screw)
+    await _lock_static(adapter, stop_screw, arbor)
 
     # ============ alignment pinion swing group (ch.25, p.66; p2) ============
     # Floated straps + drum, joined and parked DISENGAGED in the joints
     # section. The pivot blocks and torque shaft are base-bolted statics
-    # (located to the machine datums below); the lift rod is a REVOLUTE in
+    # (locked to the fixed seed arbor below); the lift rod is a REVOLUTE in
     # the blocks' dropped west bores carrying the two eccentric cams and the
     # lever (PR8 -- all semantically mated, spinning as one family on the
     # freed pinion_cam DOF). The tee handle is LOCKED to the arbor in
@@ -1702,14 +1696,12 @@ async def build(adapter) -> dict[str, str]:
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
-    block_screws: list[str] = []
-    for k, (sx, sz) in enumerate(_BLOCK_SCREW_XZ[:2]):
-        scr = await place_component(
-            adapter, "slotted-screw",
-            [sx, BLOCK_TOP_Y, sz], [0.0, 0.0, 0.0], IDENTITY,
-            ground=False, label=f"slotted-screw block hold-down {k}",
-        )
-        block_screws.append(scr)
+    sx, sz = _BLOCK_SCREW_XZ[0]
+    block_screw = await place_component(
+        adapter, "slotted-screw",
+        [sx, BLOCK_TOP_Y, sz], [0.0, 0.0, 0.0], IDENTITY,
+        ground=False, label="slotted-screw block hold-down seed",
+    )
     foot_screws: list[str] = []
     for tag, (sx, sz), seat_y in (
         ("spring foot", _FOOT_SCREW_XZ[0], Y_BASE_TOP + SPRING_T),
@@ -2126,24 +2118,21 @@ async def build(adapter) -> dict[str, str]:
         adapter, seed_cg, "Axis1", cone_axis, cone_shaft, cone_o, cone_axis_dir,
         f"cone-gear T{seed_teeth:03d}",
     )
-    # Slot audit (once, the only MateGroup tree walk): the seed slice must be
-    # exactly the 3 _key_to_shaft mates with ONE external dim -- the axial
-    # seat -- authored on the False side at the seed station's distance. A
-    # mate-scheme change that mis-slots the ladder would re-value a live dim
-    # to 0.0 (the _cwm contract), so drift here fails the build loud.
-    seed_rows = [r for r in mates_with_owners(
-        adapter, {"cone-gear", "cone-gear-shaft"}) if seed_cg in r["instances"]]
-    if len(seed_rows) != 3:
+    # Cheap slot-shape audit (one IComponent2::GetMates, not a 48-second full
+    # MateGroup tree walk): _key_to_shaft just authored [coaxial, axial dim,
+    # anti-spin], all external to the shared shaft.  GetMates order is not by
+    # itself the CopyWithMates2 slot contract, so the first copy's pre-config
+    # landing below is the decisive runtime tripwire for the slot/side map.
+    seed_dump = component_mate_dump(adapter, seed_cg)
+    if len(seed_dump) != 3:
         raise RuntimeError(
-            f"cone seed slice carries {len(seed_rows)} mates, expected 3:"
-            f" {[r['name'] for r in seed_rows]}")
-    seed_ext = external_mate_rows(seed_rows, {seed_cg})
-    dims = [(i, r) for i, r in enumerate(seed_ext)
-            if r["type"] == "MateDistanceDim"]
-    if len(seed_ext) != 3 or len(dims) != 1:
+            f"cone seed slice carries {len(seed_dump)} mates, expected 3:"
+            f" {seed_dump}")
+    dims = [(i, row) for i, row in enumerate(seed_dump) if row["mm"] is not None]
+    if len(dims) != 1 or dims[0][0] != 1:
         raise RuntimeError(
-            f"cone seed slice: {len(seed_ext)} external mates / {len(dims)}"
-            f" dims, expected 3 / 1: {[r['name'] for r in seed_ext]}")
+            "cone seed slice drifted: expected [coaxial, axial dim, anti-spin],"
+            f" got {seed_dump}; re-derive the CopyWithMates2 slot map")
     dim_slot, seed_dim = dims[0]
     seed_arr = list(component_transform(adapter, seed_cg))
     d_seed = sum((seed_arr[9 + k] * 1000.0 - cone_o[k]) * cone_axis_dir[k]
@@ -2165,7 +2154,7 @@ async def build(adapter) -> dict[str, str]:
     # FlipDimension=seed_flip on that slot directly -- so each copy lands on the
     # seed's side in the copy call itself, no post-copy ModifyDefinition heal
     # (measured 2026-07-10, MIXED Repeat array; _cwm.py module doc).
-    seed_flip = bool(seed_dim["flip"])
+    seed_flip = bool(seed_dim["flipped"])
     shaft_front = resolve_entity(
         adapter, named_ref(f"Front Plane@{cone_shaft}", "PLANE"))
     seed_mates = component_mate_count(adapter, seed_cg)
@@ -2193,14 +2182,29 @@ async def build(adapter) -> dict[str, str]:
             new_ents[dim_slot] = shaft_front
             flips = [False] * 3
             flips[dim_slot] = seed_flip
-            before = set(component_names(adapter))
             copy_with_mates(adapter, [seed_cg], 3, values, flips=flips,
                             repeat=repeat, new_entities=new_ents)
-            new = sorted(set(component_names(adapter)) - before)
-            if len(new) != 1:
+            cg = f"cone-gear-{j + 1}"
+            if adapter.currentModel.GetComponentByName(cg) is None:
                 raise RuntimeError(
-                    f"cone-gear copy {j}: expected 1 new component, got {new}")
-            cg = new[0]
+                    f"cone-gear copy {j}: expected deterministic instance {cg!r}"
+                    " after CopyWithMates2, but it is absent")
+            # Validate the CopyWithMates2 slot map before a configuration swap
+            # or later solve can obscure its landing.  Wrong slot/side maps put
+            # copy 1 at the seed station or two axial distances away.
+            got = list(component_transform(adapter, cg))
+            target = [
+                seed_arr[9 + k] * 1000.0 + j * SEAT_PITCH * cone_axis_dir[k]
+                for k in range(3)
+            ]
+            err = math.dist([v * 1000.0 for v in got[9:12]], target)
+            if err > 0.05:
+                raise RuntimeError(
+                    f"cone-gear copy {j} landed {err:.3f} mm off its station"
+                    " pre-config -- the CopyWithMates2 slot order on this"
+                    " seat/model does not match [coaxial, axial dim, anti-spin]"
+                    " (or the flip side moved); re-derive the slot map"
+                )
             model = adapter.currentModel
             model.GetComponentByName(cg).ReferencedConfiguration = cfg
             if teeth in TIP_TEETH:  # the four hard yellow tip gears
@@ -2313,25 +2317,25 @@ async def build(adapter) -> dict[str, str]:
     # 2 * the dim off and fails the pose assert below.
     seed_front = resolve_entity(
         adapter, named_ref(f"Front Plane@{seed_cyl}", "PLANE"))
+    pending_cylinder_puts: list[tuple[str, list[float]]] = []
     with _telemetry.span("cylinder.replicate",
                          copies=_config.active_count() - 1):
         for j in range(1, _config.active_count()):
-            before = set(component_names(adapter))
             copy_with_mates(
                 adapter, [seed_cyl], 2, [0.0, j * Z_PITCH / 1000.0],
                 flips=[False, True], repeat=[True, False],
                 new_entities=[None, seed_front])
-            new = sorted(set(component_names(adapter)) - before)
-            if len(new) != 1:
+            new_name = f"cylinder-gear-{j + 1}"
+            if adapter.currentModel.GetComponentByName(new_name) is None:
                 raise RuntimeError(
-                    f"cylinder-gear copy {j}: expected 1 new component,"
-                    f" got {new}")
+                    f"cylinder-gear copy {j}: expected deterministic instance"
+                    f" {new_name!r} after CopyWithMates2, but it is absent")
             # Layer-2 slot validation, BEFORE the put (which would mask the
             # translation until the closing solve snapped it back): the copy
             # must land translation-exact on its station off the re-valued
             # axial dim alone. A wrong slot/side lands it on station 0 or
             # 2 * the dim off -- fail on copy 1, naming the cause.
-            got = list(component_transform(adapter, new[0]))
+            got = list(component_transform(adapter, new_name))
             err = math.dist(
                 [v * 1000.0 for v in got[9:12]],
                 [seed_cyl_arr[9] * 1000.0, seed_cyl_arr[10] * 1000.0,
@@ -2345,20 +2349,29 @@ async def build(adapter) -> dict[str, str]:
                     " re-derive the slot map (external_mate_rows)")
             put = list(seed_cyl_arr)
             put[11] += j * Z_PITCH / 1000.0
-            put_component_pose(adapter, new[0], put)
-            cyl_gears.append(new[0])
-    for j, cyl in enumerate(cyl_gears):
-        teeth, cg = cone_gears[j]
-        await gear_mate(
-            adapter,
-            named_ref(f"Axis1@{cg}", "AXIS"),
-            named_ref(f"Axis2@{cyl}", "AXIS"),
-            [teeth, 120], label=f"cone T{teeth:03d}:cyl120 ch{j:02d}",
-        )
-    if not bool(adapter._attempt(lambda: adapter.currentModel.EditRebuild3(),
-                                 default=False)):
-        raise RuntimeError(
-            "closing EditRebuild3 after cylinder-gear replication failed")
+            pending_cylinder_puts.append((new_name, put))
+            cyl_gears.append(new_name)
+        # Let every CopyWithMates2 call finish before correcting the copies'
+        # unconstrained spin. A later copy used to wake the solver and wander
+        # earlier transforms, so the v0.20.0 ladder paid for repeated corrections.
+        # Transform the complete bank once, then author the fresh gear mates below.
+        with _telemetry.span("cylinder.pose_bank", copies=len(pending_cylinder_puts)):
+            with suspend_automatic_assembly_rebuilds(adapter):
+                for name, put in pending_cylinder_puts:
+                    put_component_pose(adapter, name, put)
+    gear_mates_batch(
+        adapter,
+        (
+            (
+                named_ref(f"Axis1@{cone_gears[j][1]}", "AXIS"),
+                named_ref(f"Axis2@{cyl}", "AXIS"),
+                [cone_gears[j][0], 120],
+                f"cone T{cone_gears[j][0]:03d}:cyl120 ch{j:02d}",
+            )
+            for j, cyl in enumerate(cyl_gears)
+        ),
+        label="cylinder.mesh_bank",
+    )
     # Validate the production way and re-anchor the pose ledger (copies were
     # never place_component'd): pose on the seed's transform one stack pitch
     # per station -- rotation included, the put-held tooth phase -- full mate
@@ -2402,32 +2415,34 @@ async def build(adapter) -> dict[str, str]:
     # The two straps + the pinion drum swing as ONE group on the torque shaft to
     # mesh the cylinder train (ch.25, p.66); parked DISENGAGED (p.68 "gap").
     # Statics first: the pivot blocks and torque shaft are base-bolted mounts at
-    # IDENTITY -> located to the machine datums (the frame-column idiom). The
+    # their authored transforms -> locked once to the fixed seed arbor. The
     # lift rod is NOT static any more (PR8): it journals in the blocks' dropped
     # west bores as a revolute below, carrying the cams + lever.
     for blk in pinion_blocks:
-        await _locate_to_datum(adapter, blk)
-    await _locate_to_datum(adapter, pivot_shaft)
-    await _locate_to_datum(adapter, spring)
-    for scr in block_screws + foot_screws:
-        await _locate_to_datum(adapter, scr)
-    block_targets = [
-        [sx, BLOCK_TOP_Y, sz] for sx, sz in _BLOCK_SCREW_XZ[2:]
-    ]
-    block_instances = await linear_component_pattern(
+        await _lock_static(adapter, blk, arbor)
+    await _lock_static(adapter, pivot_shaft, arbor)
+    await _lock_static(adapter, spring, arbor)
+    for scr in [block_screw, *foot_screws]:
+        await _lock_static(adapter, scr, arbor)
+    block_instances = await grid_component_pattern(
         adapter,
-        block_screws,
-        axis="z",
-        spacing_mm=_BLOCK_SCREW_XZ[2][1] - _BLOCK_SCREW_XZ[0][1],
-        instances=2,
-        label="pinion block-screw pattern",
+        [block_screw],
+        axis1="x",
+        spacing1_mm=_BLOCK_SCREW_XZ[1][0] - _BLOCK_SCREW_XZ[0][0],
+        instances1=2,
+        axis2="z",
+        spacing2_mm=_BLOCK_SCREW_XZ[2][1] - _BLOCK_SCREW_XZ[0][1],
+        instances2=2,
+        direction1=PatternDirection.REVERSE,
+        direction2=PatternDirection.FORWARD,
+        label="pinion block-screw grid",
     )
     assert_pattern_targets(
         adapter,
         block_instances,
-        block_targets,
+        [[x, BLOCK_TOP_Y, z] for x, z in _BLOCK_SCREW_XZ[1:]],
         IDENTITY,
-        "pinion block-screw pattern",
+        "pinion block-screw grid",
     )
     pedestal_target = [
         _FOOT_SCREW_XZ[2][0],

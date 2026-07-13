@@ -74,6 +74,7 @@ import truth_model
 import _telemetry
 from _common import (
     OUT_SLDASM,
+    active_configuration_name,
     check,
     log,
     run_build,
@@ -892,7 +893,7 @@ async def _verify_static_one(
             lambda: assert_saved_rebuild_clean(adapter, name),
         )
         configs = check("list configurations", await adapter.list_configurations())
-        if REST in (configs or []):
+        if REST in (configs or []) and active_configuration_name(adapter) != REST:
             check(f"activate {REST}", await adapter.set_active_configuration(REST))
     log(f"--- verifying {name} ({REST} pose) ---")
 

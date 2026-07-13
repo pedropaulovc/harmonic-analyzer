@@ -16,39 +16,11 @@ from _drawing_common import _gtol_frame_xml, property_link, sanitize_pdf_metadat
 from _holes import CLEARANCE_MM, TAP_DRILL_MM
 
 
-class _ViewExtension:
-    def __init__(self) -> None:
-        self.updated: list[tuple[str, int]] = []
-
-    def UpdateStandardViews(self, name: str, view_id: int) -> bool:
-        self.updated.append((name, view_id))
-        return True
-
-
-class _ViewModel:
-    def __init__(self) -> None:
-        self.Extension = _ViewExtension()
-        self.shown: list[tuple[str, int]] = []
-
-    def ShowNamedView2(self, name: str, view_id: int) -> None:
-        self.shown.append((name, view_id))
-
-
-class _ViewAdapter:
-    def __init__(self) -> None:
-        self.currentModel = _ViewModel()
-        self.zoomed: list[object] = []
-
-    def _zoom_to_fit(self, model: object) -> None:
-        self.zoomed.append(model)
-
-
-def test_platen_guide_rebases_back_as_standard_front() -> None:
-    adapter = _ViewAdapter()
-    guide._make_back_view_front(adapter)
-    assert adapter.currentModel.shown == [("", 2), ("", 1)]
-    assert adapter.currentModel.Extension.updated == [("", 1)]
-    assert adapter.zoomed == [adapter.currentModel]
+def test_platen_guide_native_front_is_hole_entry_face() -> None:
+    source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert "reverse_direction=True" in source
+    assert "(0.0, 0.0, 1.0)" in source
+    assert "UpdateStandardViews" not in source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"*Front", 0.190, FRONT_VIEW_Y_M' in source
 

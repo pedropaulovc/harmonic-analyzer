@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import asyncio
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from _assembly import (
     assert_pose_ledger,
     circular_component_pattern,
     ensure_global_pattern_axis,
+    grid_component_pattern,
     linear_component_pattern,
 )
 
@@ -126,6 +128,22 @@ def test_circular_pattern_rejects_single_instance_before_com() -> None:
         )
 
 
+def test_grid_pattern_rejects_repeated_axis_before_com() -> None:
+    with pytest.raises(ValueError, match="axes must differ"):
+        asyncio.run(
+            grid_component_pattern(
+                None,
+                ["seed-1"],
+                axis1="x",
+                spacing1_mm=10.0,
+                instances1=2,
+                axis2="X",
+                spacing2_mm=20.0,
+                instances2=2,
+            )
+        )
+
+
 def test_pattern_targets_join_final_pose_ledger(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -152,6 +170,16 @@ def test_pattern_targets_join_final_pose_ledger(
         assert_pose_ledger(None)
 
 
+def test_pattern_helpers_do_not_reference_removed_flag_helpers() -> None:
+    tree = ast.parse(Path(_assembly.__file__).read_text(encoding="utf-8"))
+    loaded_names = {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+    }
+    assert loaded_names.isdisjoint({"_flag", "_flag_only"})
+
+
 @pytest.mark.parametrize(
     "builder",
     [
@@ -165,5 +193,6 @@ def test_every_native_pattern_records_authored_targets(builder: str) -> None:
     source = (Path(__file__).parent / builder).read_text(encoding="utf-8")
     pattern_calls = source.count("linear_component_pattern(")
     pattern_calls += source.count("circular_component_pattern(")
+    pattern_calls += source.count("grid_component_pattern(")
     assert pattern_calls > 0
     assert source.count("assert_pattern_targets(") == pattern_calls

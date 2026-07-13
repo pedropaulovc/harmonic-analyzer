@@ -286,7 +286,8 @@ for i, x in enumerate(p.CLAMP_HOLE_X):
 expect(PD, "platen-1", [p.PLATE_X0, p.PLATE_Y0, p.PLATE_FRONT_Z], IDENTITY, "platen", **_SOLV)
 expect(PD, "platen-rack-1", [p.RACK_X0, p.RACK_Y0, p.RACK_BACK_Z], p.ROT_X_180, "platen-rack", **_SOLV)
 for i, gy in enumerate(p.GUIDE_Y):
-    expect(PD, f"platen-guide-{i + 1}", [p.PLATE_X0, gy, p.BAR_FRONT_Z], IDENTITY,
+    expect(PD, f"platen-guide-{i + 1}",
+           [p.PLATE_X0 + p.GUIDE_LENGTH, gy, p.BAR_FRONT_Z], p.ROT_Y_180,
            f"platen-guide y{gy:.0f}", **_SOLV)
 for i, x_c in enumerate(p.LOCK_STATION_X):
     station = p.PLATE_X0 + p.PLATE_WIDTH - x_c

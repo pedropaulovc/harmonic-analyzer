@@ -32,6 +32,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     iter_views,
     new_drawing,
+    remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
