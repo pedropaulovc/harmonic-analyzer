@@ -438,7 +438,7 @@ def _pixel_rms(a: Path, b: Path) -> float:
     if ia.size != ib.size:
         ib = ib.resize(ia.size)
     total = 0
-    for va, vb in zip(ia.getdata(), ib.getdata(), strict=True):  # type: ignore[call-overload]  # ImagingCore is iterable but PIL stubs don't declare it
+    for va, vb in zip(ia.get_flattened_data(), ib.get_flattened_data(), strict=True):
         d = va - vb
         total += d * d
     return (total / (ia.width * ia.height)) ** 0.5
