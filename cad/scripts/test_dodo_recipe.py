@@ -6,6 +6,7 @@ injected ``changed`` arg, which is corrupted after an intervening failed task.
 """
 import contextlib
 import importlib.util
+import inspect
 import os
 from pathlib import Path
 
@@ -128,6 +129,7 @@ def test_part_identity_tracker_migrates_legacy_timestamp(tmp_path, monkeypatch):
     token = tmp_path / ".part.execution"
     monkeypatch.setattr(dodo, "_part_execution_token", lambda _stem: str(token))
     tracker = dodo._PartIdentityTracker("part")
+    assert list(inspect.signature(tracker).parameters) == ["task", "values"]
 
     assert tracker(None, {}) is False
     token.write_text("1720860000000000000\n")
