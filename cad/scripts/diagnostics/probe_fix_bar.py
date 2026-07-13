@@ -32,7 +32,6 @@ from _assembly import (
     named_ref,
 )
 from build_motion_study import OUT_SLDASM, _find_one, _sub_model
-from solidworks_mcp.adapters.solidworks.assembly import _byref_i4
 
 
 async def _try_fix(adapter, model, name, tag):
@@ -86,7 +85,7 @@ async def main():
 
     # (c) activate sub doc, then fix by name
     act = adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(ch_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(ch_title, False, 2, 0), default=None)
     active = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
     active_title = str(_read_member(active, "GetTitle")) if active else None
     log(f"  ActivateDoc3({ch_title!r}) -> ret={act!r} active_title={active_title!r}")
@@ -126,7 +125,7 @@ async def main():
     bar_c = bar_top_c
 
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, _byref_i4()), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
     adapter.currentModel = top
     if bar_c is not None:
         log(f"  final amplitude-bar-1 IsFixed={bool(_read_member(bar_c, 'IsFixed'))}")
