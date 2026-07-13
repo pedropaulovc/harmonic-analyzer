@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import _telemetry  # noqa: E402
 from _common import _early_bound, _read_member  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 
@@ -52,8 +53,9 @@ async def _trial(adapter, src, rebuild_name):
     rc = adapter._attempt(lambda: model.SaveAs3(str(tmp), 0, SAVE_OPTS), default=None)
     reopened = await _fresh(adapter, tmp)
     after = _nr(reopened)
-    print(f"[{rebuild_name}] open={before} -> SaveAs3(Copy|AvoidRebuild) rc={rc!r} -> reopen={after}"
-          + ("   <-- CLEAN" if after == 0 else "   (dirty)"))
+    msg = (f"[{rebuild_name}] open={before} -> SaveAs3(Copy|AvoidRebuild) rc={rc!r} -> reopen={after}"
+           + ("   <-- CLEAN" if after == 0 else "   (dirty)"))
+    (_telemetry.success if after == 0 else _telemetry.warn)(msg)
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     if tmp.exists():
         tmp.unlink()
@@ -63,10 +65,11 @@ async def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "frame"
     src = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     adapter = PyWin32Adapter({})
-    await adapter.connect()
-    await _trial(adapter, src, "ForceRebuild3")
-    await _trial(adapter, src, "EditRebuild3")
-    await _trial(adapter, src, "ForceThenEdit")
+    with _telemetry.span("probe.editrebuild_saveas", target=str(src), stem=src.stem):
+        await adapter.connect()
+        await _trial(adapter, src, "ForceRebuild3")
+        await _trial(adapter, src, "EditRebuild3")
+        await _trial(adapter, src, "ForceThenEdit")
 
 
 if __name__ == "__main__":

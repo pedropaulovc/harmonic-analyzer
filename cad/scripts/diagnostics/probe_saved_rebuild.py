@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import _telemetry  # noqa: E402
 from _common import _early_bound, _read_member  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 
@@ -36,36 +37,38 @@ async def main() -> None:
     stem = path.stem
 
     adapter = PyWin32Adapter({})
-    await adapter.connect()
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    await adapter.open_model(str(path))
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    print(f"[{stem}] assembly NeedsRebuild2 = {_needs_rebuild(model)}")
+    with _telemetry.span("probe.saved_rebuild", target=str(path), stem=stem):
+        await adapter.connect()
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        await adapter.open_model(str(path))
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        _telemetry.info(f"[{stem}] assembly NeedsRebuild2 = {_needs_rebuild(model)}")
 
-    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
-    comps = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
-    print(f"[{stem}] {len(comps)} top-level components")
-    dirty = []
-    for c in comps:
-        c = _early_bound(c, "IComponent2")
-        name = _read_member(c, "Name2")
-        child = adapter._attempt(lambda c=c: c.GetModelDoc2(), default=None)
-        cs = adapter._attempt(lambda c=c: c.GetConstrainedStatus(), default=None)
-        nr = None
-        if child is not None:
-            child = _early_bound(child, "IModelDoc2")
-            nr = _needs_rebuild(child)
-        flag = ""
-        if nr not in (0, None, -999):
-            flag = f"  <-- child NeedsRebuild2={nr}"
-            dirty.append(name)
-        print(f"   {name!s:<34} constrained={cs} child_rebuild={nr}{flag}")
-    print(f"[{stem}] components whose CHILD doc loads dirty: {dirty or 'none'}")
+        asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
+        comps = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+        _telemetry.info(f"[{stem}] {len(comps)} top-level components")
+        dirty = []
+        for c in comps:
+            c = _early_bound(c, "IComponent2")
+            name = _read_member(c, "Name2")
+            child = adapter._attempt(lambda c=c: c.GetModelDoc2(), default=None)
+            cs = adapter._attempt(lambda c=c: c.GetConstrainedStatus(), default=None)
+            nr = None
+            if child is not None:
+                child = _early_bound(child, "IModelDoc2")
+                nr = _needs_rebuild(child)
+            flag = ""
+            if nr not in (0, None, -999):
+                flag = f"  <-- child NeedsRebuild2={nr}"
+                dirty.append(name)
+            _telemetry.info(f"   {name!s:<34} constrained={cs} child_rebuild={nr}{flag}")
+        summary = f"[{stem}] components whose CHILD doc loads dirty: {dirty or 'none'}"
+        (_telemetry.warn if dirty else _telemetry.success)(summary)
 
-    # What's Wrong on the top assembly (features with faults/rebuild marks).
-    ext = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
-    ww = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
-    print(f"[{stem}] GetWhatsWrong raw = {ww!r}")
+        # What's Wrong on the top assembly (features with faults/rebuild marks).
+        ext = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+        ww = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
+        _telemetry.info(f"[{stem}] GetWhatsWrong raw = {ww!r}")
 
 
 if __name__ == "__main__":
