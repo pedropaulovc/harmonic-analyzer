@@ -478,11 +478,10 @@ def asm_source_changed(dashed: str, src: Path, digests: dict[str, str]) -> bool:
         return True
     cur = src_digest(src)
     if cur is None:
-        # Digest-unavailable fallback: check EVERY assembly output's mtime vs the
-        # source, not just the boxes JSON -- a fresh scene JSON alongside a stale mono
-        # STL/STEP must still read stale (codex review).
-        outs = (OUT_BOXES / f"{dashed}.json", OUT_STL / f"{dashed}.STL",
-                OUT_STEP / f"{dashed}.STEP")
+        # Digest-unavailable fallback: check every assembly output that is still
+        # produced. Assembly STEP was retired; requiring it here would make every
+        # standalone export stale forever.
+        outs = (OUT_BOXES / f"{dashed}.json", OUT_STL / f"{dashed}.STL")
         return any(not o.exists() or o.stat().st_mtime < src.stat().st_mtime
                    for o in outs)
     return digests.get(dashed) != cur
