@@ -90,10 +90,60 @@ Gotcha fixed: a function-local `from .. import sw_type_info` shadowed the new
 module-level import → UnboundLocalError; removed the redundant local. Mock convention:
 objects flowing through `early_bound` need `_oleobj_ = None` to pass through.
 
-**#271 regression flagged**: commented on PR #271 (issuecomment-4958691999) with the
-16-part slot/bar under_defined evidence.
+**#271 "regression" was WRONG — retracted.** I claimed #271's rectangle commits
+broke 16 slot/bar parts with `under_defined`, from a failing build + "byte-identical
+sketch code" reasoning — WITHOUT ever running plain #271 as the positive control. The
+user ran #271 @050d0b6 + submodule 88819f9 → green (exit=0, 0 `under_defined`). A
+clean re-run on my side ALSO showed 0 `under_defined`: the original failure was a
+DIRTY-WORKTREE artifact (the prior session's half-applied `_register_fallback_classes`
+edit). Retracted on PR #271. LESSON (see [[negative-result-needs-positive-control]],
+[[no-untested-failure-assumptions]]): run the positive control before declaring a
+shared component broken. **#271 is now MERGED to main** — the "blocked" premise is
+fully gone.
 
-**STILL TODO (all need #271 green / a full build):** [DIAG] tier (~62 hand-run
+**REAL bug the clean build found — my SUBMOD regression (FIXED).** The clean 16-part
+build failed on `add_sketch_dimension: Failed to select primary entity 'Line_1.start'`
+— my `select_entity` blanket `early_bound(entity,"ISketchSegment")` rebind broke
+POINT selection. Sketch POINTS are `ISketchPoint`, which declares Select/Select2/
+Select4 at DISPIDs **7/19/25** — nothing like ISketchSegment (65545/65556/65562) or
+IEntity (65543/65552/65556); forcing ISketchSegment on a point calls a DISPID its
+dispinterface lacks → select fails. Fix: `select_entity` rebinds ONLY derived segments
+(`_DERIVED_SKETCH_SEGMENT_INTERFACES`) to ISketchSegment; points pass through as
+ISketchPoint. `_resolve_entity_ref`/`_resolve_origin_point` now bind resolved points
+to ISketchPoint at the source. **CRITICAL LESSON: the 725 mock tests did NOT catch
+this** (mock adapter never exercises real COM interface binding) — the SUBMOD tier is
+only truly validated by a REAL doit build, not pytest.
+
+## Status 2026-07-13 (cont.) — the under_defined was a SESSION PREFERENCE, not my code
+
+After the point-fix the 16-part build STILL failed `under_defined` (foot/slot/bar
+sketches). I isolated it decisively: built `arbor_pedestal` with submodule **88819f9**
+(the user's exact green submodule) + my main → STILL `under_defined`. So NOT my
+submodule. Then confirmed my main commit 338651e0 does not touch the sketch path
+(its only `_common.py` change is `apply_color`'s GetBodies2, which runs long after the
+foot sketch) and `define_centered_rectangle` is byte-identical to `origin/main`. Same
+code, same submodule, different result ⇒ **environmental**. See
+[[solidworks-center-rectangle-determinism]] for the full root cause: the SolidWorks
+system option **`swSketchAddConstToRectEntity`** (swconst id **584**) was **OFF** on my
+seat, so native `CreateCenterRectangle` at the origin never auto-added the centre→origin
+coincidence → the rectangle floats. The pref is READable but **won't set** via
+`SetUserPreferenceToggle` on 3DEXPERIENCE R2026x. Fix lives in code:
+`define_centered_rectangle` Path A now captures a construction diagonal and, when the
+profile isn't already fully defined, pins its midpoint to the origin (idempotent).
+Shipped as **standalone main PR #283** (`pedro/deterministic-center-rectangle`,
+separate from this task). Verified green on the 584=False seat for arbor_pedestal +
+support_bar + wheel_bar + foot_screw + swing_stop_screw + top_frame + cone_pivot_screw.
+
+This also VINDICATES the earlier retraction: the under_defined was never #271's fault
+nor my rebinds' — it was seat option-state all along (LESSON reinforced:
+[[negative-result-needs-positive-control]] — the positive control that broke the tie
+was building the SAME part on the user's exact submodule).
+
+Point-fix committed to submodule branch as **987b1e8** (reworded from WIP), pushed to
+PR #87; 726 adapter tests pass (was 725, +1 for the new segment-vs-point test), ruff
+clean.
+
+**STILL TODO (full validation build now UNBLOCKED, running):** [DIAG] tier (~62 hand-run
 `cad/scripts/diagnostics/` sites, non-gate); flip `_fallback_subclass.__getattr__`
 → **RAISE AttributeError** (must raise AttributeError specifically — `getattr(obj,
 name, default)` guards depend on it, e.g. pywin32_adapter GetComponentByName);
