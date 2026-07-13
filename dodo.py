@@ -65,6 +65,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -417,12 +418,14 @@ def _sldasm(stem: str) -> str:
 
 
 def _part_execution_token(stem: str) -> str:
-    """Local signal changed whenever a part artefact is rebuilt or restored.
+    """Stable identity of the exact part artefact built or restored.
 
     Recipe digests intentionally ignore SolidWorks persistent-reference IDs for
-    cross-seat cache stability.  Drawings need the orthogonal execution signal:
-    a same-recipe rebuild/cache restore may replace the model identity even when
-    the recipe digest is unchanged.
+    cross-seat cache stability. Drawings need the orthogonal identity signal: a
+    same-recipe rebuild may replace the model identity even when the recipe digest
+    is unchanged. Hashing the freshly built/restored bytes makes repeated restores
+    of the SAME cached part converge on the same token, while another build under
+    that recipe gets a different token and correctly invalidates its drawings.
     """
     name = stem.replace("_", "-")
     return str((CAD_OUT / "sldprt" / f".{name}.execution").resolve())
@@ -430,8 +433,34 @@ def _part_execution_token(stem: str) -> str:
 
 def _stamp_part_execution(stem: str) -> None:
     token = Path(_part_execution_token(stem))
+    part = Path(_sldprt(stem))
     token.parent.mkdir(parents=True, exist_ok=True)
-    token.write_text(f"{time.time_ns()}\n", encoding="utf-8")
+    identity = hashlib.sha256(part.read_bytes()).hexdigest()
+    token.write_text(identity + "\n", encoding="utf-8")
+
+
+class _PartIdentityTracker:
+    """Migrate legacy timestamp tokens through the normal part cache action.
+
+    Returning false makes doit execute the part task once. Its unchanged recipe key
+    should restore the existing part cache entry, then `_stamp_part_execution` writes
+    the exact artifact hash. No cache epoch/key bump or needless CAD rebuild is needed.
+    """
+
+    def __init__(self, stem: str):
+        self.stem = stem
+
+    def __call__(self, task, values) -> bool:
+        # doit injects these arguments by their RESERVED NAMES. Keep `task` and
+        # `values` even though this validator does not otherwise need them.
+        del task, values
+        try:
+            identity = Path(_part_execution_token(self.stem)).read_text(
+                encoding="utf-8"
+            ).strip()
+        except OSError:
+            return False
+        return re.fullmatch(r"[0-9a-f]{64}", identity) is not None
 
 
 def _stage_name(label: str) -> str:
@@ -972,6 +1001,59 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     return outs
 
 
+def _drawing_file_deps(stem: str) -> list[str]:
+    """Inputs for both doit freshness and the shared drawing-cache key.
+
+    The part execution token carries the exact restored/built model identity. It
+    prevents a drawing made against one set of SolidWorks persistent-reference IDs
+    from hitting against a same-recipe part with different IDs.
+    """
+    spec = DRAWINGS_BY_NAME[stem]
+    script = spec.script.resolve()
+    runtime = [*_helper_deps(script), _submodule_dep()]
+    return sorted(
+        {
+            str(script),
+            _sldprt(spec.part),
+            _part_execution_token(spec.part),
+            *runtime,
+            *(str(path.resolve()) for path in spec.assets),
+        }
+    )
+
+
+def _drawing_cache_outputs(stem: str) -> list[Path]:
+    """Native drawing plus every derived manufacturing output it emits."""
+    return [path.resolve() for path in DRAWINGS_BY_NAME[stem].outputs.values()]
+
+
+def _cached_drawing_action(stem: str) -> None:
+    """Restore a matched part+drawing pair or build and publish the drawing.
+
+    Mirrors the part/assembly cache contract exactly: HIT always skips COM work;
+    MISS takes the seat, re-probes after any wait, builds once, then stores outside
+    the seat. The task span and console therefore state one unambiguous disposition.
+    """
+    spec = DRAWINGS_BY_NAME[stem]
+    label = f"drawing:{stem}"
+    cmd = [sys.executable, str(spec.script.resolve()), spec.artifact_stem]
+    with _telemetry.span(f"task {label}", label=label) as sp:
+        key = _cache_key(_drawing_file_deps(stem), label)
+        outputs = _drawing_cache_outputs(stem)
+        if _cache.restore(key, outputs, label):
+            sp.set_attribute("cache", "hit")
+            return
+
+        with _com_seat(label):
+            if _cache.restore(key, outputs, label):
+                sp.set_attribute("cache", "hit-after-wait")
+                return
+            sp.set_attribute("cache", "miss")
+            _exec(cmd, label, log_stem=f"drawing-{stem}")
+
+        _cache.store(key, _drawing_cache_outputs(stem), label)
+
+
 def _part_file_deps(script: Path, stem: str) -> list[str]:
     return [str(script.resolve()), *_helper_deps(script),
             *_config_deps(script, stem, "part"), *data_deps_of(script),
@@ -1154,6 +1236,7 @@ def task_part():
             "name": stem,
             "file_dep": _part_file_deps(script, stem),
             "targets": [_sldprt(stem), _part_execution_token(stem)],
+            "uptodate": [_PartIdentityTracker(stem)],
             # Remote-cache shortcut + COM seat lock wrap the build (_cached_part_action).
             "actions": [(_cached_part_action, [stem, script])],
             "clean": True,
@@ -1387,7 +1470,7 @@ def _clean_drawing(stem: str) -> None:
 
 
 def task_drawing():
-    """Curated manufacturing drawings, serialized by the runtime COM-seat lock.
+    """Curated manufacturing drawings with identity-safe shared caching.
 
     A drawing depends on its authoritative SLDPRT plus explicitly declared
     drawing inputs. It is independently selectable as
@@ -1395,30 +1478,11 @@ def task_drawing():
     """
     for stem in _drawing_order():
         spec = DRAWINGS_BY_NAME[stem]
-        script = spec.script.resolve()
-        source = _sldprt(spec.part)
-        source_execution = _part_execution_token(spec.part)
-        runtime = [*_helper_deps(script), _submodule_dep()]
         yield {
             "name": stem,
-            "file_dep": sorted(
-                {
-                    str(script), source, source_execution, *runtime,
-                    *(str(path.resolve()) for path in spec.assets),
-                }
-            ),
+            "file_dep": _drawing_file_deps(stem),
             "targets": [str(path.resolve()) for path in spec.outputs.values()],
-            "actions": [
-                (
-                    _run,
-                    [
-                        [sys.executable, str(script), spec.artifact_stem],
-                        f"drawing {stem}",
-                        None,
-                        True,
-                    ],
-                )
-            ],
+            "actions": [(_cached_drawing_action, [stem])],
             "clean": [(_clean_drawing, [stem])],
             "verbosity": 2,
         }
@@ -1863,7 +1927,8 @@ def task_build_bare():
 #
 # SolidWorks-FREE and never takes the COM seat lock -- it computes the same
 # key/file_dep set the build does and PROBES the backend (a presence check, no
-# download), so it never touches the seat. For every part + assembly it prints HIT/MISS + key + (for a miss,
+# download), so it never touches the seat. For every part + assembly + drawing it
+# prints HIT/MISS + key + (for a miss,
 # or with `all`) the per-dep digests that produced the key, plus a drift flag when
 # this seat's last-published key differs from the current one. That is the ad-hoc
 # script we hand-wrote cutting v0.9.0, kept.
@@ -1875,6 +1940,8 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
         rows.append((f"part:{stem}", _part_file_deps(script, stem)))
     for stem in ASSEMBLY_ORDER:
         rows.append((f"assembly:{stem}", _assembly_file_deps(stem)))
+    for stem in _drawing_order():
+        rows.append((f"drawing:{stem}", _drawing_file_deps(stem)))
     return rows
 
 
@@ -1922,7 +1989,7 @@ def _cache_status(statusargs):
 
 
 def task_cache_status():
-    """Diagnostic: per part/assembly, the cache key + dep digests + backend HIT/MISS,
+    """Diagnostic: per part/assembly/drawing, key + dep digests + backend HIT/MISS,
     so any miss is explainable in one command (issue #73). SolidWorks-FREE, never
     takes the COM seat lock, never in default_tasks.
 
