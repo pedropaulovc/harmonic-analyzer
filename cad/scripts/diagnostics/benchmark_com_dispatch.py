@@ -26,6 +26,13 @@ def _args() -> argparse.Namespace:
         "--workload", choices=("layout", "features", "mates"), default="layout"
     )
     parser.add_argument(
+        "--mode",
+        choices=("early", "flag"),
+        default="early",
+        help="'early' = early binding (current); 'flag' = force the pre-migration "
+        "whole-interface flag_methods path, for an A/B on the same seat + model",
+    )
+    parser.add_argument(
         "--repo",
         type=Path,
         default=Path(__file__).resolve().parents[3],
@@ -34,7 +41,9 @@ def _args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-async def _run(model_path: Path, repo: Path, workload: str) -> dict[str, Any]:
+async def _run(
+    model_path: Path, repo: Path, workload: str, mode: str = "early"
+) -> dict[str, Any]:
     if not os.environ.get("HARMONIC_COM_SEAT"):
         raise RuntimeError("benchmark must run inside dodo._com_seat")
 
@@ -90,11 +99,25 @@ async def _run(model_path: Path, repo: Path, workload: str) -> dict[str, Any]:
             binding_calls[interface] += 1
             binding_seconds[interface] += time.perf_counter() - started
 
+    # 'flag' mode reproduces the pre-migration cost: route every call site's
+    # early_bound_or_flag through whole-interface flag_methods (timed above) and
+    # return the object unwrapped, exactly as the old code did.
+    original_early_bound_or_flag = sw_type_info.early_bound_or_flag
+
+    def _flag_mode_early_bound_or_flag(
+        obj: Any, interface: str, *_names: str
+    ) -> Any:
+        if obj is not None:
+            sw_type_info.flag_methods(obj, interface)
+        return obj
+
     sw_type_info.flag_methods = _timed_flag_methods
     if original_flag_method_names is not None:
         sw_type_info.flag_method_names = _timed_flag_method_names
     if original_early_bound is not None:
         sw_type_info.early_bound = _timed_early_bound
+    if mode == "flag":
+        sw_type_info.early_bound_or_flag = _flag_mode_early_bound_or_flag
     try:
         with _telemetry.span(
             "benchmark.com_dispatch", model=str(model_path), workload=workload
@@ -166,6 +189,7 @@ async def _run(model_path: Path, repo: Path, workload: str) -> dict[str, Any]:
                 "repo": str(repo),
                 "model": str(model_path.resolve()),
                 "workload": workload,
+                "mode": mode,
                 "elapsed_seconds": round(elapsed, 6),
                 "item_count": item_count,
                 **workload_data,
@@ -191,13 +215,14 @@ async def _run(model_path: Path, repo: Path, workload: str) -> dict[str, Any]:
             sw_type_info.flag_method_names = original_flag_method_names
         if original_early_bound is not None:
             sw_type_info.early_bound = original_early_bound
+        sw_type_info.early_bound_or_flag = original_early_bound_or_flag
         with _telemetry.span("benchmark.disconnect"):
             await adapter.disconnect()
 
 
 def main() -> int:
     args = _args()
-    result = asyncio.run(_run(args.model, args.repo, args.workload))
+    result = asyncio.run(_run(args.model, args.repo, args.workload, args.mode))
     print(json.dumps(result, sort_keys=True))
     return 0
 
