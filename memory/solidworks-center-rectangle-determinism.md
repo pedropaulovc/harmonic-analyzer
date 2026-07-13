@@ -45,6 +45,15 @@ then walk `TKIND_ENUM` typeinfos reading `GetVarDesc(v)[1]` (already an int on t
 pywin32). Ids found: swSketchAutomaticRelations=9, swInputDimValOnCreate=10,
 swSketchInferFromModel=95, swSketchInference=249, swSketchAddConstToRectEntity=584.
 
+It is a **document property** (part template), NOT a system option: absent from the
+system registry `...\SOLIDWORKS 2026\General` and the chezmoi `swSettings.sldreg`
+(only the unrelated `Add Dimensions To Rectangle Entity` exists), and the system
+`swApp.SetUserPreferenceToggle` is a no-op — it is settable only via
+`IModelDocExtension.SetUserPreferenceToggle` and stored in the `.prtdot` template.
+So the sldreg cannot carry it. Durable follow-up: **issue #284** — ship a
+repo-tracked `.prtdot` with this baked True (+ IPS units) and build parts from it
+via `create_part()` (`io.py:268` currently uses seat-default `NewPart`).
+
 Related: this was the true root cause behind the "16-part under_defined" scare in
 [[zero-late-binding-task]] — a per-seat option drift, not a code regression.
 Beware `swInputDimValOnCreate` (id 10): if ON it pops a modal dimension-entry box
