@@ -33,6 +33,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import _telemetry  # noqa: E402
 from _common import _early_bound, _read_member  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 
@@ -170,7 +171,7 @@ async def _trial(adapter, src: Path, idx: int, verb: str, mode: str, opts: int):
                 f"verb_rc={verb_rcs!r} inmem={inmem} save_rc={rc!r} "
                 f"REOPEN={reopen} {'CLEAN' if reopen == 0 else 'dirty'} "
                 f"({time.time()-t0:.0f}s)  cfg[{cfg}]")
-        print(line, flush=True)
+        (_telemetry.warn if not valid else _telemetry.info)(line)
         RESULTS.append((idx, mode, verb, opts, opened, inmem, reopen, valid))
     finally:
         for f in tmp_files:
@@ -187,58 +188,59 @@ async def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "frame"
     src = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     src_md5 = _md5(src)
-    print(f"source={src}\nsource md5={src_md5} size={src.stat().st_size}", flush=True)
+    _telemetry.info(f"source={src}\nsource md5={src_md5} size={src.stat().st_size}")
 
     adapter = PyWin32Adapter({})
-    await adapter.connect()
+    with _telemetry.span("probe.rebuild_matrix", target=str(src), stem=src.stem):
+        await adapter.connect()
 
-    # Baseline: open the source, dump state, close WITHOUT saving.
-    model = await _open_fresh(adapter, src)
-    print(f"[baseline] source opens NeedsRebuild2={_nr(model)}  cfg[{_cfg_state(adapter, model)}]",
-          flush=True)
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        # Baseline: open the source, dump state, close WITHOUT saving.
+        model = await _open_fresh(adapter, src)
+        _telemetry.info(f"[baseline] source opens NeedsRebuild2={_nr(model)}  "
+                        f"cfg[{_cfg_state(adapter, model)}]")
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
-    B = SILENT | COPY | AVOID  # the build's options
-    trials = [
-        # -- stickiness ordering: edit BEFORE any force in this session --
-        ("none", "saveas", B),
-        ("edit", "saveas", B),
-        ("force", "saveas", B),
-        ("edit", "saveas", B),          # edit AGAIN after force ran in-session
-        ("force_then_edit", "saveas", B),
-        ("edit_then_force", "saveas", B),
-        # -- all-config verbs --
-        ("ext_edit_all", "saveas", B),
-        ("ext_force_all", "saveas", B),
-        ("ext_rebuild_1", "saveas", B),
-        ("ext_rebuild_2", "saveas", B),
-        ("force_markall", "saveas", B),
-        # -- save-options sweep --
-        ("force", "saveas", SILENT),
-        ("force", "saveas", SILENT | COPY),
-        ("force", "saveas", SILENT | AVOID),
-        ("edit", "saveas", SILENT),
-        ("edit", "saveas", SILENT | AVOID),
-        ("none", "saveas", SILENT),
-        # -- in-place Save3 on byte-copies --
-        ("none", "save3", 0),
-        ("force", "save3", 0),
-        ("edit", "save3", 0),
-    ]
-    if len(sys.argv) > 2:  # optional subset: comma-separated verbs, saveas @ build opts
-        wanted = sys.argv[2].split(",")
-        trials = [(v, "saveas", B) for v in wanted]
-    for i, (verb, mode, opts) in enumerate(trials, 1):
-        await _trial(adapter, src, i, verb, mode, opts)
+        B = SILENT | COPY | AVOID  # the build's options
+        trials = [
+            # -- stickiness ordering: edit BEFORE any force in this session --
+            ("none", "saveas", B),
+            ("edit", "saveas", B),
+            ("force", "saveas", B),
+            ("edit", "saveas", B),          # edit AGAIN after force ran in-session
+            ("force_then_edit", "saveas", B),
+            ("edit_then_force", "saveas", B),
+            # -- all-config verbs --
+            ("ext_edit_all", "saveas", B),
+            ("ext_force_all", "saveas", B),
+            ("ext_rebuild_1", "saveas", B),
+            ("ext_rebuild_2", "saveas", B),
+            ("force_markall", "saveas", B),
+            # -- save-options sweep --
+            ("force", "saveas", SILENT),
+            ("force", "saveas", SILENT | COPY),
+            ("force", "saveas", SILENT | AVOID),
+            ("edit", "saveas", SILENT),
+            ("edit", "saveas", SILENT | AVOID),
+            ("none", "saveas", SILENT),
+            # -- in-place Save3 on byte-copies --
+            ("none", "save3", 0),
+            ("force", "save3", 0),
+            ("edit", "save3", 0),
+        ]
+        if len(sys.argv) > 2:  # optional subset: comma-separated verbs, saveas @ build opts
+            wanted = sys.argv[2].split(",")
+            trials = [(v, "saveas", B) for v in wanted]
+        for i, (verb, mode, opts) in enumerate(trials, 1):
+            await _trial(adapter, src, i, verb, mode, opts)
 
     end_md5 = _md5(src)
-    print(f"\nsource md5 end={end_md5} {'UNCHANGED' if end_md5 == src_md5 else '** MUTATED **'}",
-          flush=True)
-    print("\n=== SUMMARY (mode, verb, opts, open, inmem, REOPEN, valid) ===", flush=True)
+    mutated = end_md5 != src_md5
+    msg = f"\nsource md5 end={end_md5} {'** MUTATED **' if mutated else 'UNCHANGED'}"
+    (_telemetry.warn if mutated else _telemetry.success)(msg)
+    _telemetry.info("\n=== SUMMARY (mode, verb, opts, open, inmem, REOPEN, valid) ===")
     for r in RESULTS:
-        print(f"  #{r[0]:02d} {r[1]:<6} {r[2]:<15} opts={r[3]:<2} open={r[4]} inmem={r[5]} "
-              f"reopen={r[6]} {'CLEAN' if r[6] == 0 else 'dirty'}{'' if r[7] else '  INVALID'}",
-              flush=True)
+        _telemetry.info(f"  #{r[0]:02d} {r[1]:<6} {r[2]:<15} opts={r[3]:<2} open={r[4]} inmem={r[5]} "
+                        f"reopen={r[6]} {'CLEAN' if r[6] == 0 else 'dirty'}{'' if r[7] else '  INVALID'}")
 
 
 if __name__ == "__main__":

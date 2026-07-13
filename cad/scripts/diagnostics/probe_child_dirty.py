@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import _telemetry  # noqa: E402
 from _common import _early_bound, _read_member  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 
@@ -48,8 +49,8 @@ def _dump(adapter, model, label):
              for t, d in docs.items()}
     dirty = [t for t, f in flags.items() if f is True]
     top_flag = adapter._attempt(lambda: model.GetSaveFlag(), default="?")
-    print(f"[{label}] top NeedsRebuild2={_nr(model)} top save_flag={top_flag} "
-          f"child dirty {len(dirty)}/{len(flags)}: {dirty}", flush=True)
+    _telemetry.info(f"[{label}] top NeedsRebuild2={_nr(model)} top save_flag={top_flag} "
+                    f"child dirty {len(dirty)}/{len(flags)}: {dirty}")
 
 
 async def _fresh(adapter, path):
@@ -62,22 +63,23 @@ async def main() -> None:
     arg = sys.argv[1] if len(sys.argv) > 1 else "frame"
     path = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     adapter = PyWin32Adapter({})
-    await adapter.connect()
+    with _telemetry.span("probe.child_dirty", target=str(path), stem=path.stem):
+        await adapter.connect()
 
-    model = await _fresh(adapter, path)
-    _dump(adapter, model, "open")
-    adapter._attempt(lambda: model.EditRebuild3(), default=None)
-    _dump(adapter, model, "after EditRebuild3")
-    adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
-    _dump(adapter, model, "after ForceRebuild3(False)")
-    adapter._attempt(lambda: model.EditRebuild3(), default=None)
-    _dump(adapter, model, "after Edit (post-force)")
+        model = await _fresh(adapter, path)
+        _dump(adapter, model, "open")
+        adapter._attempt(lambda: model.EditRebuild3(), default=None)
+        _dump(adapter, model, "after EditRebuild3")
+        adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+        _dump(adapter, model, "after ForceRebuild3(False)")
+        adapter._attempt(lambda: model.EditRebuild3(), default=None)
+        _dump(adapter, model, "after Edit (post-force)")
 
-    model = await _fresh(adapter, path)
-    _dump(adapter, model, "reopen")
-    adapter._attempt(lambda: model.ForceRebuild3(True), default=None)
-    _dump(adapter, model, "after ForceRebuild3(True)")
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        model = await _fresh(adapter, path)
+        _dump(adapter, model, "reopen")
+        adapter._attempt(lambda: model.ForceRebuild3(True), default=None)
+        _dump(adapter, model, "after ForceRebuild3(True)")
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
 
 if __name__ == "__main__":
