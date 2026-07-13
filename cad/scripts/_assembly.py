@@ -158,7 +158,7 @@ async def apply_component_color(
     """
     from solidworks_mcp.adapters.com_variant import double_array
 
-    comp = adapter.currentModel.GetComponentByName(name)
+    comp = _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(name)
     if comp is None:
         raise RuntimeError(f"component not found for colour: {name!r}")
     # No flag: Set/GetMaterialPropertyValues2 are both called WITH args, so late
@@ -178,7 +178,7 @@ async def apply_component_color(
 def component_transform(adapter: Any, name: str) -> list[float]:
     """Return a component's ``Transform2`` ArrayData (rotation rows in
     [0:9], translation in metres in [9:12])."""
-    component = adapter.currentModel.GetComponentByName(name)
+    component = _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(name)
     if component is None:
         raise RuntimeError(f"component not found for transform readback: {name!r}")
     return [
@@ -413,7 +413,7 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
     (e.g. legitimate over-define co-flags) stay tolerated."""
     if not name:
         return 0
-    model = adapter.currentModel
+    model = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc for FeatureByName (same dispatch)
     feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
     if feat is None:
         return 0
@@ -1018,9 +1018,12 @@ def gear_mates_batch(
                         raise RuntimeError(
                             f"{mate_label}: failed to select gear entity {located!r}"
                         )
-                _sw_asm._flag_feature_methods(model, "IAssemblyDoc")
+                # CreateMate/CreateMateData are IAssemblyDoc members; the flagged
+                # handle MUST be reassigned and passed on (a discarded result is a
+                # silent no-op → the mate calls fall back on the IModelDoc2 model).
+                asm_h = _sw_asm._flag_feature_methods(model, "IAssemblyDoc")
                 mate = _sw_asm._create_standard_mate(
-                    adapter, model, params, _sw_asm._MATE_TYPES["gear"]
+                    adapter, asm_h, params, _sw_asm._MATE_TYPES["gear"]
                 )
                 model.ClearSelection2(True)
                 name = _sw_asm._mate_feature_name(adapter, mate)
@@ -1186,8 +1189,9 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     from solidworks_mcp.adapters.com_variant import null_callout
 
     model = adapter.currentModel
+    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for FeatureByName; keep `model` for ClearSelection2/Extension/SelectionManager
     name = f"PatternAxis{key.upper()}"
-    existing = adapter._attempt(lambda: model.FeatureByName(name), default=None)
+    existing = adapter._attempt(lambda: asm_h.FeatureByName(name), default=None)
     if existing is not None:
         return name
 
@@ -1242,6 +1246,7 @@ def _select_pattern_inputs(
     from solidworks_mcp.adapters.com_variant import null_callout
 
     model = adapter.currentModel
+    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponentByName; keep `model` for ClearSelection2/Extension
     model.ClearSelection2(True)
     selected = model.Extension.SelectByID2(
         direction_name,
@@ -1277,7 +1282,7 @@ def _select_pattern_inputs(
             )
     for seed_component in seed_components:
         component = adapter._attempt(
-            lambda name=seed_component: model.GetComponentByName(name), default=None
+            lambda name=seed_component: asm_h.GetComponentByName(name), default=None
         )
         if component is None or not component.Select2(True, 1):
             raise RuntimeError(
@@ -1286,7 +1291,7 @@ def _select_pattern_inputs(
 
 
 def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
-    components = model.GetComponents(False) or []
+    components = _early_bound(model, "IAssemblyDoc").GetComponents(False) or []
     return [
         component for component in components
         if str(_read_member(component, "Name2")) not in before
@@ -1344,10 +1349,11 @@ async def linear_component_pattern(
         raise ValueError("linear component pattern seeds must be unique")
 
     model = adapter.currentModel
+    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     direction_name = ensure_global_pattern_axis(adapter, axis)
     before = {
         str(_read_member(component, "Name2"))
-        for component in (model.GetComponents(False) or [])
+        for component in (asm_h.GetComponents(False) or [])
     }
     async with _telemetry.aspan(
         f"pattern {label}", kind="linear", seeds=",".join(seeds),
@@ -1421,11 +1427,12 @@ async def grid_component_pattern(
         raise ValueError("grid component pattern seeds must be unique")
 
     model = adapter.currentModel
+    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     direction1_name = ensure_global_pattern_axis(adapter, axis1)
     direction2_name = ensure_global_pattern_axis(adapter, axis2)
     before = {
         str(_read_member(component, "Name2"))
-        for component in (model.GetComponents(False) or [])
+        for component in (asm_h.GetComponents(False) or [])
     }
     async with _telemetry.aspan(
         f"pattern {label}", kind="grid", seeds=",".join(seeds),
@@ -1493,9 +1500,10 @@ async def circular_component_pattern(
         raise ValueError("circular component pattern seeds must be unique")
 
     model = adapter.currentModel
+    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     before = {
         str(_read_member(component, "Name2"))
-        for component in (model.GetComponents(False) or [])
+        for component in (asm_h.GetComponents(False) or [])
     }
     async with _telemetry.aspan(
         f"pattern {label}", kind="circular", seeds=",".join(seeds),
@@ -1784,7 +1792,8 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
         with _telemetry.span("dof.resolve"):
             if resolve:
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-            components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+            asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
+            components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
         gsp.set_attribute("components", len(components))
         log(f"checking {len(components)} components for free DOF ...")
         # NO span per component. A span per component floods the trace with one
@@ -2027,7 +2036,8 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     asm = adapter.currentModel
     if resolve:
         adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-    components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+    asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
+    components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
     under = []
     for component in components:
         component = _early_bound(
@@ -2162,7 +2172,8 @@ def delete_assembly_feature(adapter: Any, name: str) -> None:
     the feature; the seeds survive) before re-creating it with ``FlipDir1``.
     Fails loud when the feature is still present after."""
     model = adapter.currentModel
-    feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
+    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for FeatureByName; keep `model` for ClearSelection2/Extension/EditDelete
+    feat = adapter._attempt(lambda: asm_h.FeatureByName(name), default=None)
     if feat is None:
         raise RuntimeError(f"feature to delete not found: {name!r}")
     adapter._attempt(lambda: model.ClearSelection2(True), default=None)
@@ -2170,7 +2181,7 @@ def delete_assembly_feature(adapter: Any, name: str) -> None:
         raise RuntimeError(f"failed to select feature for delete: {name!r}")
     if not adapter._attempt(lambda: model.Extension.DeleteSelection2(0), default=False):
         adapter._attempt(lambda: model.EditDelete(), default=None)
-    if adapter._attempt(lambda: model.FeatureByName(name), default=None) is not None:
+    if adapter._attempt(lambda: asm_h.FeatureByName(name), default=None) is not None:
         raise RuntimeError(f"feature {name!r} still present after delete")
 
 def check_no_interference(adapter: Any) -> None:
@@ -2388,6 +2399,7 @@ def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
     on-axis-revolve / 0.00 mm^3 sliver failure class. Catches part-level
     corruption that What's Wrong (feature/mate state) does not. Empty = clean.
     """
+    model = _early_bound(model, "IPartDoc")  # IPartDoc for GetBodies2 (same dispatch)
     bodies = adapter._attempt(lambda: model.GetBodies2(0, False), default=None)
     if bodies is None:
         return []
@@ -2782,7 +2794,7 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
         # GetComponentByName scan per component (measured ~140 s for the 122
         # top-level components; this walk is ~seconds). Row shape and sort
         # match the per-name form exactly, so the digest VALUE is unchanged.
-        asm = adapter.currentModel
+        asm = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc for GetComponents (same dispatch)
         comps = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
         pose_rows = []
         for comp in comps:

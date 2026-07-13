@@ -14,7 +14,7 @@ from typing import Any, Iterable, Sequence
 from xml.etree import ElementTree
 
 import _telemetry
-from _common import check
+from _common import _early_bound, check
 from _drawing_layout_check import (
     CollisionScope,
     LayoutElement,
@@ -161,8 +161,9 @@ def _select_view_entity(
     label: str,
 ) -> Any:
     draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
-    if not draw.ActivateView(name):
+    if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
     draw.ClearSelection2(True)
     if not draw.Extension.SelectByID2(
@@ -395,8 +396,9 @@ def add_property_linked_callout(
 ) -> Any:
     """Attach one arrowed callout whose text resolves from the source SLDPRT."""
     draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
-    if not draw.ActivateView(name):
+    if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate linked-callout view {name!r}")
     draw.ClearSelection2(True)
     edge = _select_edge(adapter, *edge_xy, append=False)
@@ -448,7 +450,8 @@ def add_native_hole_callout(
     """Insert an associative Hole Wizard callout on a selected drawing edge."""
     _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
     draw = adapter.currentModel
-    display = draw.AddHoleCallout2(callout_xy[0], callout_xy[1], 0.0)
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    display = ddoc.AddHoleCallout2(callout_xy[0], callout_xy[1], 0.0)
     if display is None:
         raise RuntimeError(f"failed to insert native hole callout ({label})")
     # AddHoleCallout2 leaves its PropertyManager page open.  Accept it through
@@ -494,8 +497,9 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
         view, "IView", "GetCThreadCount", "GetFirstCThread"
     )
     draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
-    draw.ActivateView(name)
+    ddoc.ActivateView(name)
     draw.ClearSelection2(True)
     selected = draw.Extension.SelectByID2(
         name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
@@ -503,7 +507,7 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     if not selected:
         raise RuntimeError(f"failed to select drawing view {name!r}")
     adapter._attempt(
-        lambda: draw.InsertModelAnnotations3(
+        lambda: ddoc.InsertModelAnnotations3(
             0,      # swImportModelItemsFromEntireModel
             0x1,    # swInsertCThreads
             False,
@@ -553,13 +557,14 @@ def new_project_drawing(
         width=ASME_B_WIDTH_M,
         height=ASME_B_HEIGHT_M,
     )
-    sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
     sheet_name = adapter._get_attr_or_call(sheet, "GetName")
     if not sheet_name:
         raise RuntimeError("project drawing template has no sheet name")
-    configured = draw.SetupSheet6(
+    configured = ddoc.SetupSheet6(
         sheet_name,
         2,  # swDwgPaperBsize
         12,  # swDwgTemplateCustom
@@ -584,7 +589,7 @@ def new_project_drawing(
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
-    sheet = adapter._get_attr_or_call(draw, "GetCurrentSheet")
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None or not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     template_name = str(adapter._get_attr_or_call(sheet, "GetTemplateName") or "")
@@ -642,7 +647,8 @@ async def reopen_drawing(adapter: Any, path: Path) -> tuple[Any, Any]:
     adapter.swApp.CloseDoc(title)
     check(f"reopen saved drawing {path.name}", await adapter.open_model(str(path)))
     reopened = adapter.currentModel
-    sheet = adapter._get_attr_or_call(reopened, "GetCurrentSheet")
+    ddoc = _early_bound(reopened, "IDrawingDoc")  # IDrawingDoc view for GetCurrentSheet (same dispatch)
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("reopened drawing has no current sheet")
     return reopened, sheet
@@ -732,8 +738,9 @@ def add_hole_group_tags(
     if len(edge_points) != len(note_positions):
         raise ValueError("hole edge and tag-position counts differ")
     draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
-    if not draw.ActivateView(name):
+    if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
     notes: list[Any] = []
     for edge_point, note_position in zip(edge_points, note_positions, strict=True):
@@ -784,8 +791,9 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     ``swInsertDimensionsMarkedForDrawing`` only.
     """
     draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
-    draw.ActivateView(name)
+    ddoc.ActivateView(name)
     draw.ClearSelection2(True)
     selected = draw.Extension.SelectByID2(
         name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
@@ -793,7 +801,7 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     if not selected:
         raise RuntimeError(f"failed to select drawing view {name!r}")
     result = adapter._attempt(
-        lambda: draw.InsertModelAnnotations3(
+        lambda: ddoc.InsertModelAnnotations3(
             0,       # swImportModelItemsFromEntireModel
             0x8000,  # swInsertDimensionsMarkedForDrawing
             False,
@@ -981,8 +989,9 @@ def add_edge_dimension(
     on dimension creation.
     """
     draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
-    if not draw.ActivateView(name):
+    if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
     draw.ClearSelection2(True)
     for index, (x, y) in enumerate((p0, p1)):
@@ -1052,8 +1061,9 @@ def insert_hole_table(
     ``anchor_xy`` and is validated (row/column count + header) before returning.
     """
     draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
-    if not draw.ActivateView(name):
+    if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate hole-table view {name!r}")
     draw.ClearSelection2(True)
     datum = draw.Extension.SelectByID2(
@@ -1389,7 +1399,8 @@ def collect_layout_elements(
     the sheet edges by design) and are excluded.
     """
     drawing_model = adapter.currentModel
-    sheet = adapter._get_attr_or_call(drawing_model, "GetCurrentSheet")
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("drawing has no current sheet to audit layout on")
     properties = list(adapter._get_attr_or_call(sheet, "GetProperties") or [])
@@ -1442,7 +1453,7 @@ def collect_layout_elements(
 
     # Hole tables anchor to the SHEET view, not a drawing view -- scan it for
     # tables only (its notes are the sheet-format frame + title block).
-    sheet_view = adapter._attempt(lambda: drawing_model.GetFirstView())
+    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
     if sheet_view is not None:
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
@@ -1506,13 +1517,14 @@ async def finalize_drawing(
     PNG.  Returns the artifact dict every drawing recipe returns from build().
     """
     drawing_model = adapter.currentModel
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
     drawing_model.EditRebuild3()
-    sheet = adapter._get_attr_or_call(drawing_model, "GetCurrentSheet")
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("finished drawing has no current sheet")
     sheet_name = adapter._get_attr_or_call(sheet, "GetName")
-    if not sheet_name or not drawing_model.ActivateSheet(sheet_name):
+    if not sheet_name or not ddoc.ActivateSheet(sheet_name):
         raise RuntimeError("failed to activate drawing sheet for export")
     if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
         raise RuntimeError("failed to set final drawing sheet scale")
