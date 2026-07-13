@@ -109,8 +109,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, FOOT_WIDTH / 2.0, FOOT_DEPTH / 2.0, "foot", dims=foot,
         name_width="Width", drive_width='"FootWidth"',
         name_depth="Depth", drive_depth='"FootDepth"',
-        name_corner=("CornerX", "CornerZ"),
-        drive_corner=('"FootWidth" / 2', '"FootDepth" / 2'),
     )
     await ensure_fully_defined(adapter, "foot sketch")
     check("exit_sketch foot", await adapter.exit_sketch())

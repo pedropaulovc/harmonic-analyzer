@@ -156,7 +156,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, OUTER_X, OUTER_Z, "outer rectangle", dims=outer,
         name_width="Width", drive_width='2 * "OuterX"',
         name_depth="Depth", drive_depth='2 * "OuterZ"',
-        name_corner=("CornerX", "CornerZ"), drive_corner=('"OuterX"', '"OuterZ"'),
     )
     await ensure_fully_defined(adapter, "outer rectangle")
     check("exit_sketch outer", await adapter.exit_sketch())
@@ -179,7 +178,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, INNER_X, INNER_Z, "window rectangle", dims=window,
         name_width="Width", drive_width='2 * "InnerX"',
         name_depth="Depth", drive_depth='2 * "InnerZ"',
-        name_corner=("CornerX", "CornerZ"), drive_corner=('"InnerX"', '"InnerZ"'),
     )
     await ensure_fully_defined(adapter, "window rectangle")
     check("exit_sketch window", await adapter.exit_sketch())
@@ -302,6 +300,19 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "RingTop")
+    # The plane remains selectable for the frame assembly mate while hidden in
+    # part/assembly renders; shown reference geometry was visibly crossing the
+    # otherwise clean isometric output.
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "RingTop", "PLANE", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot select RingTop to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

@@ -76,7 +76,6 @@ from _assembly import (
     linear_component_pattern,
     lock_mate,
     named_ref,
-    parallel_mate,
     PatternDirection,
     place_component,
     reset_dof_manifest,
@@ -294,8 +293,7 @@ async def build(adapter) -> dict[str, str]:
     # One physically mated seed plus a native component pattern.  Seed at the
     # lower-X hole so PatternAxisX FORWARD lands the generated instance on the
     # second Hole Wizard station; both stations derive from the same bar
-    # constants.  Coaxial + under-head seat are the real contacts.  The plane
-    # parallel mate removes only the immaterial spin of this revolved screw.
+    # constants. The exact rigid pose is held by one lock mate.
     seed_x, patterned_x = sorted(CLAMP_SCREW_X)
     seed_target = [seed_x, WHEEL_BAR_Y, BAR_FRONT_Z]
     clamp_seed = await place_component(
@@ -307,26 +305,11 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label=f"clamp-screw seed (wheel x{seed_x:+.1f})",
     )
-    await coincident_mate(
-        adapter,
-        named_ref(f"ScrewAxis@{clamp_seed}", "AXIS"),
-        named_ref(f"ClampAxis0@{wheel_bar}", "AXIS"),
-        label="wheel clamp-screw seed coaxial with clamp hole 0",
-        verify=(clamp_seed, seed_target),
-    )
-    await coincident_mate(
-        adapter,
-        named_ref(f"Front Plane@{clamp_seed}", "PLANE"),
-        named_ref(f"ClampSeat@{wheel_bar}", "PLANE"),
-        label="wheel clamp-screw seed under-head seats on wheel bar",
-        verify=(clamp_seed, seed_target),
-    )
-    await parallel_mate(
+    await lock_mate(
         adapter,
         named_ref(f"Right Plane@{clamp_seed}", "PLANE"),
         named_ref(f"Right Plane@{wheel_bar}", "PLANE"),
-        label="wheel clamp-screw seed anti-spin",
-        verify=(clamp_seed, seed_target),
+        label="wheel clamp-screw seed fixed to bar",
     )
     assert_component_placed(adapter, clamp_seed, seed_target, IDENTITY)
     clamp_instances = await linear_component_pattern(
