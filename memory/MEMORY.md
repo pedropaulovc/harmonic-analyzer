@@ -1,5 +1,6 @@
 # Memory index
 
+- [Zero late-binding task](zero-late-binding-task.md) — in-progress task #7 after the early-bound merge: rebind all 25 empirical late-binding fallback sites to their correct interface (drawing→IDrawingDoc, GetComponents→IAssemblyDoc, GetBodies2→IPartDoc, Select2→IEntity/ISketchSegment, ViewZoomToFit2 case fix, …), then flip `_fallback_subclass.__getattr__` to RAISE; on `pedro/` branch off personal, validate full cold build with ZERO fallback warnings
 - [Bench Opus run setup](bench-opus-run-setup.md) — run comparisons/bench for Opus: source geometry from a release into cad/out (touch stl/boxes newer), regenerate 270 renders, `--effort high`, run-until-quota driver + periodic push to feat/bench-opus-high (PR #253)
 
 - [Fastener policy: US-customary UNC](fastener-policy-us-customary.md) — ALL threads/holes use ANSI inch UNC (1/4-20, #10-24, #5-40, 9/16-12), Hole Wizard features carry the designations; period BSW research file deliberately IGNORED; best-fit sizing when undefined
