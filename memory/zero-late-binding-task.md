@@ -143,13 +143,41 @@ Point-fix committed to submodule branch as **987b1e8** (reworded from WIP), push
 PR #87; 726 adapter tests pass (was 725, +1 for the new segment-vs-point test), ruff
 clean.
 
-**STILL TODO (full validation build now UNBLOCKED, running):** [DIAG] tier (~62 hand-run
-`cad/scripts/diagnostics/` sites, non-gate); flip `_fallback_subclass.__getattr__`
-→ **RAISE AttributeError** (must raise AttributeError specifically — `getattr(obj,
-name, default)` guards depend on it, e.g. pywin32_adapter GetComponentByName);
-NOTE the flip also affects every `_flag_feature_methods(obj, iface, *methods)` site
-whose flagged method isn't on `iface` (landmines — a full green build's zero-fallback
-grep is the only complete checklist); motion.py's TLB-absent methods use
-`flag_method_names` on a RAW dispatch (NOT `_fallback_subclass`), so the flip does
-not touch them; bump submodule pointer + final full build with ZERO `early-bound
-fallback:` warnings.
+## Status 2026-07-13 (cont.) — rebinds MERGED, flip done, DIAG skipped
+
+All three rebind PRs **MERGED** 2026-07-13: **#283** (determinism → main),
+**#87** (SUBMOD rebinds → personal, merge `3752e6c`; point-fix `987b1e8` durable
+in history), **#281** (BUILD/verify-tier rebinds + submodule pointer bump to
+`987b1e8` → main, merge `17b6b215`). Each cleared build-green + Codex-👍; a clean
+full `doit -n 4` on the rebased #281 head had **ZERO** `early-bound fallback:`
+warnings. That completed the whole rebind surface (642 occ / 25 members → 0).
+
+**The flip is DONE** — submodule branch `pedro/fail-loud-fallback` off `personal`,
+**draft PR pedropaulovc/SolidworksMCP-python#88**. `_fallback_subclass` →
+`_strict_subclass`: `__getattr__` AND `__setattr__` now RAISE `AttributeError`
+(naming the interface + member) on any undeclared member instead of forwarding to
+late binding. Removed the dead forwarding machinery (`_late_bound`/
+`_late_bound_dispatch`, `_warn_fallback_once`/`_fallback_warned`,
+`_all_method_names`); renamed `_register_fallback_classes` → `_register_strict_classes`.
+The `_`/dunder guard is UNCHANGED so `getattr(obj, "_FlagAsMethod", None)` still
+misses. AttributeError specifically (getattr-with-default guards depend on it).
+745 adapter tests pass. Validating via a cold `HARMONIC_REMOTE_CACHE_MODE=off
+doit -n 4` (submodule-digest change forces a from-scratch rebuild of every
+part/assembly/verify/drawing, exercising all COM paths with the flip live).
+
+**[DIAG] tier — SKIPPED by user decision 2026-07-13.** The ~62 off-interface
+sites across ~100 hand-run `cad/scripts/diagnostics/` probes are NOT rebound: they
+are non-gated one-off debugging scripts, many stale. Under the flip a probe that
+hits an off-interface member now raises a clear "rebind to the owning interface"
+`AttributeError` — the fail-loud contract working as intended. Rebind a probe
+lazily only when it is actually needed. (Rebinds there can't be mock-validated
+anyway — only a real SW run catches interface binding.)
+
+**Remaining:** (1) confirm the cold flip-validation build is green (zero crashes);
+(2) merge #88 → personal; (3) main-repo PR bumping the submodule pointer to #88's
+personal merge commit — validated by the same cold build (pointer content ==
+flip content) — → main. NOTE the flip also affects any `_flag_feature_methods(obj,
+iface, *methods)` site whose flagged method isn't on `iface`; the cold build's
+zero-crash result is the complete checklist. motion.py's TLB-absent methods use
+`flag_method_names` on a RAW dispatch (NOT the strict subclass), so the flip does
+not touch them.
