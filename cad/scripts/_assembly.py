@@ -332,8 +332,7 @@ def suspend_automatic_assembly_rebuilds(adapter: Any):
     state even when a COM write fails; the caller remains responsible for one
     explicit closing solve after the complete batch.
     """
-    assembly = adapter.currentModel
-    _flag_only(assembly, "EnableAssemblyRebuild")
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
     previous = bool(_read_member(assembly, "EnableAssemblyRebuild"))
     assembly.EnableAssemblyRebuild = True
     try:
@@ -1213,14 +1212,15 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     # directly: reference geometry is inserted near the front of an assembly's
     # feature tree, so searching backward from the tail took 39-78 seconds on
     # large mechanisms and any fixed scan bound eventually failed.
-    selection = model.SelectionManager
-    _flag(selection, "ISelectionMgr")
+    selection = _early_bound(
+        model.SelectionManager, "ISelectionMgr", "GetSelectedObject6"
+    )
     created = adapter._attempt(
         lambda: selection.GetSelectedObject6(1, -1), default=None
     )
     if created is None:
         raise RuntimeError(f"cannot read newly-created global {key}-axis")
-    _flag(created, "IFeature")
+    created = _early_bound(created, "IFeature", "GetTypeName2")
     if str(created.GetTypeName2()) != "RefAxis":
         raise RuntimeError(
             f"new global {key}-axis selected {created.GetTypeName2()!r}, expected RefAxis"
@@ -1435,12 +1435,13 @@ async def grid_component_pattern(
         _select_pattern_inputs(
             adapter, seeds, direction1_name, "AXIS", direction2_name, "AXIS"
         )
-        manager = model.FeatureManager
-        _flag(manager, "IFeatureManager")
+        manager = _early_bound(
+            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+        )
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
         if definition is None:
             raise RuntimeError("cannot create local grid pattern definition")
-        _flag(definition, "ILocalLinearPatternFeatureData")
+        definition = _early_bound(definition, "ILocalLinearPatternFeatureData")
         definition.D1ReverseDirection = direction1 is PatternDirection.REVERSE
         definition.D1Spacing = spacing1_mm / 1000.0
         definition.D1TotalInstances = instances1
@@ -1453,7 +1454,7 @@ async def grid_component_pattern(
         model.ClearSelection2(True)
         if feature is None:
             raise RuntimeError(f"SOLIDWORKS rejected {label}")
-        _flag(feature, "IFeature")
+        feature = _early_bound(feature, "IFeature")
         feature.Name = label
 
         created = _new_pattern_components(model, before)
@@ -1464,7 +1465,7 @@ async def grid_component_pattern(
             )
         names = []
         for component in created:
-            _flag_only(component, "IsPatternInstance")
+            component = _early_bound(component, "IComponent2", "IsPatternInstance")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
