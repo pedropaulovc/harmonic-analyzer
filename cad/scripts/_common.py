@@ -187,24 +187,7 @@ async def dimension_between(
     """Driving dimension between two point refs (``horizontal_distance``,
     ``vertical_distance``, or aligned ``distance``); value in mm."""
     result = await adapter.add_sketch_dimension(ref1, ref2, kind, value)
-    dimension_id = check(f"{kind} {label} = {value:g}", result)
-    display = adapter._sketch_entities.get(dimension_id)
-    dimension = adapter._attempt(
-        lambda: display.GetDimension2(0), default=None
-    ) if display is not None else None
-    if dimension is not None:
-        driven_state = int(
-            adapter._attempt(lambda: dimension.DrivenState, default=0) or 0
-        )
-        if driven_state != 2:  # swDimensionDriving
-            dimension.DrivenState = 2
-            adapter._set_display_dimension_value(display, value)
-            driven_state = int(
-                adapter._attempt(lambda: dimension.DrivenState, default=0) or 0
-            )
-            if driven_state != 2:
-                raise RuntimeError(f"{label}: SolidWorks kept dimension reference-driven")
-    return dimension_id
+    return check(f"{kind} {label} = {value:g}", result)
 
 
 async def anchor_point_to_origin(
