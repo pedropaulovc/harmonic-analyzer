@@ -618,7 +618,11 @@ async def define_centered_rectangle(
         for start, end in ((points[0], points[2]), (points[1], points[3])):
             result = await adapter.add_line(*start, *end)
             diagonal_id = check(f"add construction diagonal {label}", result)
-            diagonal = adapter._sketch_entities[diagonal_id]
+            # ConstructionGeometry is declared on the base ISketchSegment, not the
+            # derived ISketchLine the entity is bound as — rebind before the set.
+            diagonal = _early_bound(
+                adapter._sketch_entities[diagonal_id], "ISketchSegment"
+            )
             diagonal.ConstructionGeometry = True
             diagonals.append(diagonal_id)
     finally:
