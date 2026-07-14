@@ -72,11 +72,14 @@ discovered during harmonic-analyzer M6.4:
   Front) also defaults its blind cut back TOWARD the base plane — every k>0
   helix slice cut its southern neighbour's band at its own twist and the last
   band survived as an uncut solid ring (the 1.1 mm³ crank-mesh interference;
-  +148 mm³ excess hidden inside the 1% disc gate). A mid-body slice cut
-  running AWAY from the base plane needs `reverse_direction=True`
-  (`cut_tooth_gap(reverse=...)`), and `_gear.build_fixed_gear` now pins the
-  seed cuts to exactly one gap column (±1 mm³) BEFORE patterning, where one
-  wrong slice is a ~3.3 mm³ deficit. Diagnosis idiom: section the exported
+  +148 mm³ excess hidden inside the 1% disc gate). A mid-body cut running
+  AWAY from the base plane needs `reverse_direction=True` on the
+  ExtrusionParameters. (The slice stack itself was superseded the same day
+  by the true-helix swept tooth, but `_gear.build_fixed_gear` keeps the
+  lesson institutionalized: a seeded-tooth/gap volume gate (±1 mm³) BEFORE
+  patterning, where one wrong cut/sweep is a ≥3 mm³ error and the swept
+  tooth's embedded root sliver makes a wrong-side sweep overshoot loud.)
+  Diagnosis idiom: section the exported
   STL per band and read gap azimuth/width vs the intended per-slice twist
   (trimesh section + matplotlib even-odd containment — the band audit).
 - **A sketch on a REFERENCE plane enumerates the plane's own offset dim

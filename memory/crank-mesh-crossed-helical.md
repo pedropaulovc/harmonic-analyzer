@@ -1,6 +1,6 @@
 ---
 name: crank-mesh-crossed-helical
-description: 16T:64T crank mesh is a crossed-axis pair — engaged via linearized-helix 64T + backlash + root relief at the south-edge photo placement; crossed_mesh_study.py is the repro/gate
+description: 16T:64T crank mesh is a crossed-axis pair — engaged via a TRUE-helix 64T (swept teeth) + 0.15 backlash + root relief, proud-of-casting placement; crossed_mesh_study.py is the repro/gate
 metadata:
   type: project
 ---
@@ -14,22 +14,29 @@ depth — the crossing manifests as lateral flank misregistration (±1.08 mm
 across the face vs ≤0.70 mm clearance), so the pre-2026-07-14 "fix" (PEN16
 radial backoff) just parked the tip circles 0.29 mm apart: a literal air gap.
 
-**Shipped solution (2026-07-14, PR #292):** the 64T is cut as a linearized
+**Shipped solution (2026-07-14, PR #292):** the 64T's teeth are a TRUE
 12.5182° helix (gear helix = shaft angle → crossed-helical pair with a
-straight 16T), K=12 stacked rotated slice cuts, 0.40 mm circumferential
-backlash, root-relieved gap floors (stock base-chord floor starves a 16T
-pinion by 0.71 mm). Engaged C2C = R64+R16+0.60 slack = 38.839 (tips 1.31 mm
-in, 69% working depth), Y_CRANK 143.34 (GT 0.85σ). Axially the pinion
-(face 11) stands PROUD of the green post's casting face — ch12
-page002_img06: NO relief pocket (the img02 "pocket" ring is the bearing
-boss; a pocket-nested edge placement adopted from a concurrent branch was
-reverted 2026-07-14 on the user's read) — centred in the static
-casting-to-T120 span (PINION_TOOTH_Z −68.57, ~0.55 clearance each side,
-~96% of the 64T row; span-fit + engagement-floor asserts in the assembly).
-The pocket was an artifact of the straight-tooth era: a narrow engaged band
-was the only way straight teeth stayed collision-free, while the helix
-engages the full row. Helix HAND matters: +INCLINE zeroes the collision,
-the mirrored hand collides ~9 mm³.
+straight 16T): ONE involute tooth boss-swept along the axis with constant
+twist (`_gear.boss_tooth_swept`, root-cylinder blank, tooth root embedded
+0.3 into it) and circular-patterned — smooth helicoid flanks. 0.15 mm
+circumferential backlash, root-relieved floors (stock base-chord floor
+starves a 16T pinion by 0.71 mm). Engaged C2C = R64+R16+0.25 slack = 38.489
+(tips 1.66 mm in, 87% working depth), Y_CRANK 142.985 (GT 1.06σ). This
+supersedes the same-day interim K=12 slice-cut stack at 0.40 backlash/0.60
+slack: the user flagged visible slop + faceted teeth; the smooth flanks
+freed the ~0.2 mm the facets consumed, and the study re-arbitrated the
+tighter fit (zero window [−1.90, −1.10]° seed, ±0.4° margins clean — 4× the
+0.10° authoring-correction bound). Axially the pinion (face 11) stands
+PROUD of the green post's casting face — ch12 page002_img06: NO relief
+pocket (the img02 "pocket" ring is the bearing boss; a pocket-nested edge
+placement adopted from a concurrent branch was reverted 2026-07-14 on the
+user's read) — centred in the static casting-to-T120 span (PINION_TOOTH_Z
+−68.57, ~0.55 clearance each side, ~96% of the 64T row; span-fit +
+engagement-floor asserts in the assembly). The pocket was an artifact of
+the straight-tooth era: a narrow engaged band was the only way straight
+teeth stayed collision-free, while the helix engages the full row. Helix
+HAND matters: +INCLINE zeroes the collision, the mirrored hand collides
+~19 mm³ at the tight fit.
 
 **Why:** the mesh geometry is the harder constraint than raw GT residuals —
 the old Y_CRANK 144.96 matched GT at 0.13σ only by not meshing.
@@ -47,10 +54,11 @@ tolerances.crank_mesh.c2c_slack_mm. See [[ch30-gt-re-anchor]],
 [[load-bearing-claims-need-a-repro]].
 
 Two live-caught build traps on this pair (both fixed in PR #292, both
-gate-guarded now): (1) the k>0 helix slice cuts sit on offset planes whose
-blind cut defaults BACK toward Front — needs `reverse=bool(k)`; the
-pre-pattern single-gap-column volume gate (±1 mm³) makes a mis-directed
-slice fail loud (see [[solidworks-modeling-pitfalls]]). (2) CopyWithMates2
+gate-guarded now): (1) [retired-path lesson, kept for any future offset-plane
+cut] the K-slice era's k>0 slice cuts sat on offset planes whose blind cut
+defaults BACK toward Front; the pre-pattern seeded-tooth/gap volume gate
+(±1 mm³) makes a mis-built seed fail loud (see
+[[solidworks-modeling-pitfalls]]). (2) CopyWithMates2
 cone-keying can wander the free train's spin before the 16T:64T gear mate
 freezes the phase — the assembly measures the equivalent seed error, rotates
 the cone family back (Rodrigues about the cone axis), and re-anchors the
