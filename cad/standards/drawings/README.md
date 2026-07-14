@@ -35,8 +35,12 @@ custom properties via `$PRPSHEET` — `Number` / `Revision` / `Title` and the
 `Revision Description` by `_drawing_marks.apply_drawing_properties`.
 (Consolidating those two stamping paths is tracked in issue #249.)
 
-The title block declares **UNIT: IN**; the generated drawing views still
-dimension in mm until the inch migration (issue #290) lands.
+The title block's UNIT cell currently reads **mm**, matching the generated
+drawing views (which dimension in mm until the inch migration, issue #290,
+lands). The pipeline also stamps a `UNIT_DISPLAY` custom property on every
+drawing document (`finalize_drawing`, currently `MM`) — linking the UNIT cell
+to `$PRP:"UNIT_DISPLAY"` makes the declared unit track the configured units
+automatically when #290 flips them to inches.
 
 ## The "For Personal Use Only" watermark
 
