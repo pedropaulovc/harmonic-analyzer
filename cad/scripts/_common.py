@@ -1133,6 +1133,7 @@ def part_properties(part_name: str) -> dict[str, str]:
     props["TOL_LIN_XX"] = str(_config.title_block("linear_2pl")["display"])
     props["TOL_LIN_XXX"] = str(_config.title_block("linear_3pl")["display"])
     props["TOL_ANG"] = str(_config.title_block("angular")["display"])
+    props["TOL_SURFACE"] = str(_config.title_block("surface")["display"])
     # Per-channel stretched springs (build_channel_assembly) are length variants of
     # the registered base part -- they inherit its material / tolerance / fit so
     # the tolerance audit stays clean without 10 redundant registry rows.
