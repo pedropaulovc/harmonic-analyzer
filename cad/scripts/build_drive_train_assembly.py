@@ -83,16 +83,19 @@ near-VERTICAL line of centres (the crank sits above the 64T, ch30 GT)
 the radial interleave is ~constant across the face -- the crossing
 manifests as LATERAL flank misregistration instead, which no radial
 backoff can clear (the retired PEN16 backoff left the tip circles 0.29
-apart, a visible air gap vs the deeply-engaged pair in the ch12
-p.18/p.19 photos). The 64T is now cut as a linearized helix at the
+apart, a visible air gap vs the engaged pair in ch12
+page002_img02/img06). The 64T is now cut as a linearized helix at the
 incline angle with a backlash allowance (build_crank_drive_gear.py --
-a crossed-helical pair, gear helix = shaft angle, pinion straight), so
-the pair engages at 69% of working depth: MESH16_C2C = R64 + R16 +
-slack 0.60, the deepest zero-collision pose over a full crank-pitch
-phase sweep (crossed_mesh_study). The perpendicular 64T presents its
-contact tooth r*cos(alpha)*sin(i) north of its centre (alpha = the
-contact azimuth from the in-plane horizontal), and the pinion is
-centred on that plane.
+a crossed-helical pair, gear helix = shaft angle, pinion straight), and
+the pinion sits AXIALLY at the 64T's exposed SOUTH EDGE (overlap 2.5 --
+img02: the green casting's open pocket wraps the pinion, whose face
+covers only the near edge of the 64T row, the row's teeth running on
+north past it). The pair engages at 69% of working depth: MESH16_C2C =
+R64 + R16 + slack 0.60, the deepest zero-collision pose over a full
+crank-pitch phase sweep (diagnostics/crossed_mesh_study.py). The
+perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i) north
+of its centre (alpha = the contact azimuth from the in-plane
+horizontal).
 
 Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
 supports". Tooth phasing: every gear script seeds a TOOTH centred on
@@ -311,20 +314,24 @@ R16 = (16.0 / DP_CRANK) * 25.4 / 2.0  # 7.65: 16T crank-pinion pitch radius
 # gear are not meshing"): the crossed pair (crank machine-z, 64T plane on the
 # 12.52-deg inclined shaft) now engages at depth because the 64T is cut as a
 # linearized helix at the incline angle with a 0.40 backlash allowance
-# (build_crank_drive_gear.py) -- matching the deep engagement the book photos
-# show (ch12 p.18/p.19). C2C = R64 + R16 + slack; slack 0.60 is the deepest
-# ZERO-collision pose over a full crank-pitch phase sweep of the exact tooth
-# solids (crossed_mesh_study 2026-07-14; tips reach 1.31 into the gaps, 69%
-# of working depth -- at slack 0.45 a 0.002 mm^3 flank sliver survives).
-# This RETIRES the PEN16 radial-backoff block (C2C 40.446 left the tip
-# circles 0.29 APART -- a literal air gap; its (FACE/2)*SIN_I "dive" term
+# (build_crank_drive_gear.py) -- matching the engaged pair in the ch12
+# closeups (page002_img02/img06). C2C = R64 + R16 + slack; slack 0.60 is the
+# deepest ZERO-collision pose over a full crank-pitch phase sweep of the
+# exact tooth solids (diagnostics/crossed_mesh_study.py; tips reach 1.31 into
+# the gaps, 69% of working depth -- at slack 0.45 a 0.003 mm^3 flank sliver
+# survives). This RETIRES the PEN16 radial-backoff block (C2C 40.446 left the
+# tip circles 0.29 APART -- a literal air gap; its (FACE/2)*SIN_I "dive" term
 # modeled the horizontal-mesh depth gradient, but on the near-vertical line
 # of centres the radial interleave is ~constant across the face and the real
 # constraint is LATERAL flank misregistration, which no radial backoff fixes
 # and the helix + backlash do).
-ADD16 = 25.4 / DP_CRANK  # crank-pinion addendum (alignment-pinion crowding check)
+ADD16 = 25.4 / DP_CRANK  # crank-pinion addendum
 MESH16_C2C_SLACK = _config.fit("crank_mesh", "c2c_slack_mm")  # 0.60, tolerances.yaml
 MESH16_C2C = R64 + R16 + MESH16_C2C_SLACK  # 38.839: engaged, not backed off
+TIP16_C2C = R64 + R16 + 2.0 * ADD16  # 40.151: sum of outside radii
+CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C  # 1.312: radial tooth entry (69%)
+if not ADD16 < CRANK_MESH_DEPTH < 1.6 * ADD16:
+    raise AssertionError("crank pair mesh depth left its derived band")
 X_CRANK = -122.8  # crank/pedestal axis (GT -122.84 +- 0.9; ratifies the
 # pedestal photo -- and pins the crank AXIS along machine z: a cone-parallel
 # crankshaft would put the z -189 axle at x -144.6, 20+ sigma off the GT)
@@ -347,18 +354,33 @@ ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))  # 82.69
 # (both horizontal legs run TOWARD the other axis and read positive -- the
 # chirality-free plane-local convention; the CW spin sense is applied at the
 # rot_z(-PINION_SEED_DEG) callsite)
-# The 64T's contact tooth sits R64*cos(alpha)*sin(i) north of its centre (the
-# in-plane horizontal carries the plane's only z-component; alpha = 0 reduces
-# to the old horizontal-mesh R64*sin(i)). The 16T is centred on that plane.
-PINION_TOOTH_Z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I  # -67.80
+# The 64T contact tooth's mid-plane station follows its tilted face. Seat the
+# pinion from the exposed south face, then advance its north face 2.5 mm into
+# that row as read from the ch12 page002_img02 closeup (the green casting's
+# open pocket wraps the pinion; the 64T row's teeth run on north past it).
+# This is an EDGE overlap, not the retired full 12 mm centred overlap that
+# also clipped cone-gear-1; the pinion's south half nests in the pivot post's
+# pinion pocket (build_cone_pivot_post.py PINION_POCKET_*).
+_GEAR64_CONTACT_Z = (
+    GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
+)
+PINION_EDGE_OVERLAP = 2.5
+PINION_TOOTH_Z = (
+    _GEAR64_CONTACT_Z
+    - GEAR64_FACE / 2.0 * COS_I
+    - PINION_FACE / 2.0
+    + PINION_EDGE_OVERLAP
+)  # -76.179: pinion face centre at the exposed row edge
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
 # keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
 # cut that is the MID-FACE azimuth, the twist's symmetry plane), so its
 # nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
 # sit that same contact arc (scaled by R64/R16) past the contact on ITS side.
-# At ALPHA = 0 this is exactly 11.25. The seed formula is unchanged by the
-# helix (crossed_mesh_study swept a full crank pitch through it: zero
-# collision at every phase).
+# At ALPHA = 0 this is exactly 11.25. At the shipped slack the formula seed is
+# zero-collision over the full crank-pitch phase sweep (crossed_mesh_study;
+# at tighter slacks the window centre shifts ~-1.5 deg -- the helical twist at
+# the engaged band -- so re-arbitrate the seed with the study if the slack
+# ever changes).
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.50: 64T tooth lead
 PINION_SEED_DEG = (

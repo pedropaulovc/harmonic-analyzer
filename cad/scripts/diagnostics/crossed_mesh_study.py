@@ -9,20 +9,22 @@ gap profile of ``build_cone_gear.gear_facts`` with the ``_gear.py`` widen /
 root-relief extensions, the 64T's gaps twisted as the linearized helix
 ``build_crank_drive_gear`` cuts (optionally quantized to the K slice cuts) --
 places them on the live drive-train geometry (constants imported from
-``build_drive_train_assembly``, never mirrored), and voxel-computes the
-pair's intersection volume.
+``build_drive_train_assembly``, never mirrored) at the shipped SOUTH-EDGE
+axial placement (``PINION_EDGE_OVERLAP`` -- ch12 page002_img02), and
+voxel-computes the pair's intersection volume.
 
 Findings it reproduces (run it after changing any crank-mesh input):
 
 * the retired PEN16 radial backoff left the tip circles 0.29 mm APART -- the
   user-flagged air gap -- and no straight-tooth pose can engage (the crossing
   manifests as lateral flank misregistration, +-1.08 mm across the face);
-* helix hand: +INCLINE on the 64T zeroes the collision; the mirrored hand
-  collides ~28 mm^3, straight teeth ~16 mm^3 at the same depth;
+* helix hand: +INCLINE on the 64T zeroes the collision; at the shipped
+  edge placement the mirrored hand collides ~4.6 mm^3, straight teeth
+  ~1.3 mm^3 at the same depth (~28 / ~16 mm^3 at the wider centred band);
 * the shipped pose (backlash 0.40, K=12 slices, c2c slack 0.60 -> tips 1.31
   into the gaps, 69% of working depth) is ZERO-collision over a full
   crank-pitch phase sweep, with >=0.05 backlash margin (a -0.05 perturbation
-  leaves only a 0.0006 mm^3 sliver);
+  leaves only a 0.0004 mm^3 sliver);
 * deeper poses keep real residual contact (slack 0.45 -> ~0.002 mm^3).
 
 Run (no SolidWorks)::
@@ -54,6 +56,7 @@ SIN_I, COS_I = dta.SIN_I, dta.COS_I
 INCLINE_DEG = dta.INCLINE_DEG
 R64, R16, ADD16 = dta.R64, dta.R16, dta.ADD16
 SLACK = dta.MESH16_C2C_SLACK
+EDGE_OVERLAP = dta.PINION_EDGE_OVERLAP
 
 
 def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
@@ -164,7 +167,12 @@ def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
     tp64 = 360.0 / 64.0
     delta64 = round(alpha64 / tp64) * tp64 - alpha64
     seed = ((alpha16 + 180.0) - delta64 * (R64 / R16) - 22.5 / 2.0) % 22.5
-    pinion_tooth_z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(alpha64)) * SIN_I
+    # South-edge axial placement, exactly as the assembly derives it: the
+    # contact tooth's tilted-face station, backed to the exposed south edge,
+    # then advanced EDGE_OVERLAP into the row (ch12 page002_img02).
+    contact_z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(alpha64)) * SIN_I
+    pinion_tooth_z = (contact_z - GEAR64_FACE / 2.0 * COS_I
+                      - PINION_FACE / 2.0 + EDGE_OVERLAP)
 
     k16 = (16, widen16, root16)
     k64 = (64, widen64, root64)
@@ -205,7 +213,7 @@ def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
 
     vol = float((in16 & in64).sum()) * vox ** 3
     return {"c2c": c2c, "seed": seed, "vol_mm3": vol,
-            "interleave": (g16.ra + g64.ra) - c2c}
+            "interleave": (g16.ra + g64.ra) - c2c, "ptz": pinion_tooth_z}
 
 
 def y_for_extra(extra: float) -> float:
@@ -244,6 +252,19 @@ def main() -> int:
         print(f"{label:20s}: vol {r['vol_mm3']:8.3f} mm^3")
 
     print("\n== the shipped pose over a crank-pitch phase sweep ==", flush=True)
+    # Pin the study's derived pose to the assembly's shipped constants -- a
+    # drift here means the study is validating a pose the build doesn't ship.
+    live = study(dta.Y_CRANK, skew_deg=INCLINE_DEG, widen64=BACKLASH_MM,
+                 root16=ROOT16, root64=ROOT64, lut=lut)
+    assert abs(live["ptz"] - dta.PINION_TOOTH_Z) < 1e-9, (
+        f"study placement {live['ptz']} != assembly PINION_TOOTH_Z "
+        f"{dta.PINION_TOOTH_Z}")
+    assert abs(live["seed"] - dta.PINION_SEED_DEG) < 1e-9, (
+        f"study seed {live['seed']} != assembly PINION_SEED_DEG "
+        f"{dta.PINION_SEED_DEG}")
+    assert abs(y_for_extra(SLACK) - dta.Y_CRANK) < 0.05, (
+        f"y_for_extra({SLACK}) = {y_for_extra(SLACK)} drifted from Y_CRANK "
+        f"{dta.Y_CRANK}")
     w = worst_over_phase(BACKLASH_MM, SLACK, HELIX_SLICES, lut)
     print(f"backlash {BACKLASH_MM} c2c +{SLACK} K={HELIX_SLICES}: worst {w:.4f} mm^3")
     wm = worst_over_phase(BACKLASH_MM - 0.05, SLACK, HELIX_SLICES, lut)

@@ -139,10 +139,11 @@ TUBE_OBS = [
 ]
 
 # current model positions (machine world frame) for the comparison table
-# (2026-07-02 re-anchor: drive plane y 104.8, crank (-122.8, 144.96), chain
-# plane z -155, alignment pinion restored -- build_drive_train_assembly)
+# (2026-07-14 mesh rederive: drive plane y 104.8, crank (-122.8, 143.34) -- the
+# engaged-c2c Y_CRANK, GT 0.85 sigma -- chain plane z -155,
+# alignment pinion restored -- build_drive_train_assembly)
 MODEL_NOW = {
-    "crank_sprocket": (-122.8, 144.96, -155.0),  # T12 chain-wheel mid-plane
+    "crank_sprocket": (-122.8, 143.34, -155.0),  # T12 chain-wheel mid-plane
     "cone_front": (-116.05, 104.8, -60.47),  # T120 big-end centre
     "cone_back": (-80.99, 104.8, 97.44),  # shaft tip (station 190; GT wants
     # z ~101.8 -- deferred to the portal/back-frame re-layout)
