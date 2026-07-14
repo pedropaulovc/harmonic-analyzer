@@ -1,31 +1,42 @@
 # Harmonic-analyzer drawing standards
 
-`asme-b-book.drwdot` and `asme-b-book.slddrt` are the project-owned SolidWorks
-drawing template and sheet format used by every manufacturing drawing.
+`harmonic-analyzer.DRWDOT` is the project-owned SolidWorks drawing template
+used by every manufacturing drawing. It was **created manually in SolidWorks**
+(not generated — the old `create_drawing_standards.py` generator and the
+`asme-b-book.*` assets it produced are gone): an ASME B landscape sheet with
+the border/zone geometry, title block, tolerance block and third-angle
+projection symbol drawn directly in the template. The sheet format is embedded
+in the template, so there is no separate `.slddrt`; per-drawing setup only
+sets the sheet scale (`_drawing_common.new_project_drawing`) and links the
+sheet's custom-property view to the first drawing view
+(`_drawing_common.finalize_drawing`).
 
-They are generated from the installed native SolidWorks ASME B landscape
-template by `cad/scripts/create_drawing_standards.py`. The generator retains the
-native B-size border and zone geometry, removes proprietary/confidential text,
-company approval blocks, and unused table sections, then adds a compact
-property-linked title block for a hobby-machinist book drawing.
+`third-angle-projection.SLDBLK` is the projection-symbol block the title block
+embeds, kept alongside as the editable source for future template work.
 
-SolidWorks names sheet-format files `.slddrt`; there is no native `.sldfmt`
-format. Build-seat provisioning copies both files and registers their directory.
-
-Regenerate only on a SolidWorks seat, then reopen and visually inspect a drawing
-before committing changed binary assets.
+Edit the template only in SolidWorks, then reopen and visually inspect a
+rendered drawing before committing the changed binary. The layout audit's
+title-block keep-out box (`_drawing_common._TITLE_BLOCK_LEFT_M` /
+`_TITLE_BLOCK_TOP_M`) MUST track the block's extents — re-measure via a
+sheet-view annotation dump if the block moves or grows.
 
 ## Title block
 
-The compact title block carries, top to bottom: Title; a **DRAWN / CHECKED /
-DATE** production-control row (DRAWN is `$PRPSHEET:"Drawn By"`; CHECKED and DATE
-are blank fill-ins a machinist signs on the printed copy); DWG number, revision,
-and revision description; material specification; finish and quantity; scale and
-projection; and the sheet count. The linked fields resolve from the source
-part's custom properties — `Drawn By` / `Revision Description` are stamped by
-`_drawing_marks.apply_drawing_properties`, `Number` / `Revision` / `Title` by
-`_common.part_properties`. (Consolidating those two stamping paths is tracked in
-issue #249.)
+Left side, top to bottom: the general-tolerance block (**UNLESS OTHERWISE
+SPECIFIED** — `.XX` / `.XXX` / angular / surface finish, linked to the source
+part's `TOL_LIN_XX` / `TOL_LIN_XXX` / `TOL_ANG` / `TOL_SURFACE` custom
+properties from `cad/config/title_block.yaml`); the edge-break note; FINISH;
+MATERIAL; the ASME Y14.5-2018 interpretation note; DO NOT SCALE DRAWING; and
+the third-angle projection symbol. Right side: project title; PART name; DWG.
+NO. (`Number`, the MHA-### registry id); REV (the release tag); scale; UNIT;
+copyright + CC BY-SA mark. The linked fields resolve from the source part's
+custom properties via `$PRPSHEET` — `Number` / `Revision` / `Title` and the
+`TOL_*` set are stamped by `_common.part_properties`, `Drawn By` /
+`Revision Description` by `_drawing_marks.apply_drawing_properties`.
+(Consolidating those two stamping paths is tracked in issue #249.)
+
+The title block declares **UNIT: IN**; the generated drawing views still
+dimension in mm until the inch migration (issue #290) lands.
 
 ## The "For Personal Use Only" watermark
 
@@ -34,4 +45,3 @@ Sheets rendered on a **SolidWorks Maker / Student** seat carry a non-removable
 the licence, not by this template, and there is no API to suppress it. It is
 expected on every drawing produced on a Maker seat and is not a defect in the
 standard. A commercial seat would render without it.
-

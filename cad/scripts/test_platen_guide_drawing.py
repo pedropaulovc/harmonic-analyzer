@@ -8,10 +8,9 @@ import zipfile
 from pathlib import Path
 
 import cut_release
-import create_drawing_standards
 import draw_platen_guide as drawing
 import build_platen_guide as guide
-from _drawing_registry import DRAWINGS, ASME_B_DRWDOT, ASME_B_SLDDRT
+from _drawing_registry import DRAWINGS, PROJECT_DRWDOT
 from _drawing_common import _gtol_frame_xml, property_link, sanitize_pdf_metadata
 from _holes import CLEARANCE_MM, TAP_DRILL_MM
 
@@ -71,17 +70,15 @@ def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
 
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
-    standards_source = Path(create_drawing_standards.__file__).read_text(
-        encoding="utf-8"
-    )
     assert "insert_hole_table" in drawing_source
     assert "InsertHoleTable3" in common_source
     assert "draw_note_table" not in drawing_source
     assert "add_hole_group_tags" not in drawing_source
     assert "scale=(3, 1)" not in drawing_source
     assert "scale=(1, 4)" not in drawing_source
-    assert '$PRP:"SW-Sheet Scale"' in standards_source
-    assert "SCALE 1:1 UNLESS NOTED" not in standards_source
+    # (The sheet-scale property link now lives inside the hand-made
+    # harmonic-analyzer.DRWDOT binary -- not greppable; verified by eye on the
+    # rendered sheets.)
 
 
 def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
@@ -133,8 +130,8 @@ def test_drawing_registry_is_unique_and_extensible() -> None:
     assert len({spec.part for spec in DRAWINGS}) == len(DRAWINGS)
     outputs = [path for spec in DRAWINGS for path in spec.outputs.values()]
     assert len(set(outputs)) == len(outputs)
-    assert ASME_B_DRWDOT.suffix.lower() == ".drwdot"
-    assert ASME_B_SLDDRT.suffix.lower() == ".slddrt"
+    assert PROJECT_DRWDOT.suffix.lower() == ".drwdot"
+    assert PROJECT_DRWDOT.is_file() and PROJECT_DRWDOT.stat().st_size > 0
 
 
 def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:
