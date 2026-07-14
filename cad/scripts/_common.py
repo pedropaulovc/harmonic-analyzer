@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import math
 import os
 import sys
 import time
@@ -66,6 +67,14 @@ OUT_STL = CAD_ROOT / "out" / "stl"
 # engraving DXF). A build script that reads one of these must resolve it under
 # this dir so dodo's data_deps_of picks it up as a file_dep + cache-key input.
 REFERENCES_DIR = CAD_ROOT / "references"
+# The repo-owned part template every part is created from (hand-made in
+# SolidWorks; carries the doc properties the COM API cannot write -- the
+# DimXpert block-tolerance decimals + angular value). run_build pins the
+# seat's default part template to it before building, so NewPart inherits it
+# on ANY seat; dodo folds it into every part's recipe/cache key (path
+# duplicated there deliberately -- importing _buildgraph here would drag graph
+# tooling into every part's dep closure).
+PART_TEMPLATE = CAD_ROOT / "templates" / "harmonic-analyzer.PRTDOT"
 
 IN = 25.4  # inch -> mm
 
@@ -1042,7 +1051,9 @@ async def save_part_and_images(
     png_dir.mkdir(parents=True, exist_ok=True)
     views = list(views)
     _prune_stale_part_views(png_dir, part_name, views)
+    apply_block_tolerances(adapter)
     apply_custom_properties(adapter, part_properties(part_name))
+    apply_summary_info(adapter, title=part_name)
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
     stl_path = (OUT_STL / f"{part_name}.STL").resolve()
@@ -1125,6 +1136,13 @@ def part_properties(part_name: str) -> dict[str, str]:
     import _config
 
     props: dict[str, str] = {"Title": part_name, "Generator": f"harmonic-analyzer @ {_git_sha()}"}
+    # Title-block general tolerances (title_block.yaml) — read by the drawing
+    # template's title block via $PRPSHEET, so EVERY part carries them,
+    # registered in the parts registry or not.
+    props["TOL_LIN_XX"] = str(_config.title_block("linear_2pl")["display"])
+    props["TOL_LIN_XXX"] = str(_config.title_block("linear_3pl")["display"])
+    props["TOL_ANG"] = str(_config.title_block("angular")["display"])
+    props["TOL_SURFACE"] = str(_config.title_block("surface")["display"])
     # Per-channel stretched springs (build_channel_assembly) are length variants of
     # the registered base part -- they inherit its material / tolerance / fit so
     # the tolerance audit stays clean without 10 redundant registry rows.
@@ -1144,6 +1162,75 @@ def part_properties(part_name: str) -> dict[str, str]:
         if key in reg and reg[key] is not None:
             props[prop] = str(reg[key])
     return props
+
+
+# DimXpert block-tolerance document properties (Tools > Options > Document
+# Properties > DimXpert), ids extracted from swconst.tlb R2026x. Values from
+# title_block.yaml — the same numbers the TOL_* custom properties display in
+# the drawing title block.
+_PREF_DIMXPERT_METHOD = 637      # swPartDimXpertToleranceMethod -> 0 = BlockTolerance
+_PREF_TOL1_DECIMALS = 405        # swPartDimXpertLengthUnitTol1Decimals (get-only, see below)
+_PREF_TOL2_DECIMALS = 406        # swPartDimXpertLengthUnitTol2Decimals (get-only, see below)
+_PREF_TOL1_VALUE = 123           # swPartDimXpertLengthUnitTol1Value (meters)
+_PREF_TOL2_VALUE = 124           # swPartDimXpertLengthUnitTol2Value (meters)
+_PREF_ANGULAR_VALUE = 126        # swPartDimXpertAngularUnitTolValue (radians; get-only, see below)
+_PREF_OPT_NONE = 0               # swDetailingNoOptionSpecified
+_METERS_PER_INCH = 0.0254
+
+
+@_telemetry.traced("part.block_tolerances")
+def apply_block_tolerances(adapter: Any) -> None:
+    """Stamp the title-block general tolerances as DimXpert block-tolerance doc
+    properties on the active part, so the SLDPRT's MBD metadata matches what the
+    drawing title block states.
+
+    Probe-verified on this seat (3DEXPERIENCE R2026x, 2026-07-13): the method and
+    the linear Tolerance 1/2 VALUES set fine, but the decimals prefs (405/406) and
+    the angular value (126) reject every write (``SetUserPreference*`` returns
+    False under both int encodings, options 0-3, before/after rebuild, on a saved
+    doc) despite the API help documenting them settable — get-only in practice.
+    The get-only prefs therefore ride the seat's default part TEMPLATE, which
+    makes the template a build prerequisite: it must carry the wanted decimals
+    split (Tol1=2dp, Tol2=3dp — the stock default) and the title-block angular
+    value (set by hand in the .prtdot). This stamps what it can and RAISES on any
+    failure — a rejected settable write OR get-only drift. Drift must fail, not
+    warn: the template is not a cache-key input, so a drifted seat would publish
+    parts whose DimXpert metadata disagrees with title_block.yaml into the shared
+    remote cache under the same key as a correct seat.
+    """
+    import _config
+
+    model = adapter.currentModel
+    ext = _read_member(model, "Extension")
+    lin2 = float(_config.title_block("linear_2pl")["value_in"]) * _METERS_PER_INCH
+    lin3 = float(_config.title_block("linear_3pl")["value_in"]) * _METERS_PER_INCH
+    ang = math.radians(float(_config.title_block("angular")["value_deg"]))
+    sets = [
+        ("DimXpert method=block", ext.SetUserPreferenceInteger,
+         _PREF_DIMXPERT_METHOD, 0),
+        ("DimXpert tol1 (.xx) value", ext.SetUserPreferenceDouble,
+         _PREF_TOL1_VALUE, lin2),
+        ("DimXpert tol2 (.xxx) value", ext.SetUserPreferenceDouble,
+         _PREF_TOL2_VALUE, lin3),
+    ]
+    for label, setter, pref, value in sets:
+        if not adapter._attempt(lambda: setter(pref, _PREF_OPT_NONE, value), default=False):
+            raise RuntimeError(f"{label} write rejected (pref {pref})")
+    _telemetry.success("DimXpert block tolerances stamped")
+    drift = []
+    if ext.GetUserPreferenceInteger(_PREF_TOL1_DECIMALS, _PREF_OPT_NONE) != 2:
+        drift.append("tol1 decimals != 2")
+    if ext.GetUserPreferenceInteger(_PREF_TOL2_DECIMALS, _PREF_OPT_NONE) != 3:
+        drift.append("tol2 decimals != 3")
+    got_ang = ext.GetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE)
+    if abs(got_ang - ang) > 1e-9:
+        drift.append(f"angular {math.degrees(got_ang):g}° != {math.degrees(ang):g}°")
+    if drift:
+        raise RuntimeError(
+            "DimXpert block-tolerance drift on get-only prefs -- the seat's default "
+            "part template must carry these (open the default .prtdot, set Document "
+            "Properties > DimXpert accordingly, save), else this seat would publish "
+            f"metadata-drifted parts into the shared cache: {'; '.join(drift)}")
 
 
 def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
@@ -1174,6 +1261,62 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
             raise RuntimeError(f"custom property {name!r} readback {back!r} != {text!r}")
         written.append(name)
     log(f"custom properties [{len(written)}]: {', '.join(written)}")
+
+
+_PREF_DEFAULT_PART_TEMPLATE = 8  # swUserPreferenceStringValue_e.swDefaultTemplatePart
+
+
+@_telemetry.traced("seat.pin_part_template")
+def _pin_default_part_template(adapter: Any) -> None:
+    """Point the seat's default part template at the repo-owned PRTDOT.
+
+    ``NewPart()`` (behind the adapter's ``create_part``) instantiates the
+    seat's DEFAULT part template, whose document properties carry the DimXpert
+    prefs the COM API cannot write (decimals + angular block tolerance).
+    Pinning the default to the checked-in template removes that per-seat
+    state: every seat builds from the same template, and dodo folds the file
+    into every part's recipe/cache key, so a template edit rebuilds parts and
+    busts the remote cache. The setting is seat-global and persists -- that is
+    the point. apply_block_tolerances still fail-louds if the template's
+    get-only prefs drift from title_block.yaml.
+    """
+    if not PART_TEMPLATE.is_file() or PART_TEMPLATE.stat().st_size == 0:
+        raise FileNotFoundError(f"repo part template missing: {PART_TEMPLATE}")
+    sw = adapter.swApp
+    ok = adapter._attempt(
+        lambda: sw.SetUserPreferenceStringValue(
+            _PREF_DEFAULT_PART_TEMPLATE, str(PART_TEMPLATE)),
+        default=False)
+    got = str(adapter._attempt(
+        lambda: sw.GetUserPreferenceStringValue(_PREF_DEFAULT_PART_TEMPLATE),
+        default="") or "")
+    if not ok or not got or Path(got).resolve() != PART_TEMPLATE.resolve():
+        raise RuntimeError(
+            f"failed to pin default part template: set={ok} readback={got!r}")
+    _telemetry.success(f"default part template pinned -> {PART_TEMPLATE.name}")
+
+
+# Document summary metadata (File > Properties > Summary — also what Windows
+# Explorer shows). swSummInfoTitle=0, swSummInfoAuthor=2 (swSummInfoField_e).
+_SUMMARY_TITLE = 0
+_SUMMARY_AUTHOR = 2
+PROJECT_AUTHOR = "Pedro Paulo Vezza Campos"
+
+
+@_telemetry.traced("part.summary_info")
+def apply_summary_info(adapter: Any, *, title: str) -> None:
+    """Write and read-verify the document summary Title + Author.
+
+    Same early-bound split as the drawing summary stamper: SummaryInfo is a
+    property, so early binding exposes the getter as ``SummaryInfo(field)`` and
+    the setter as ``SetSummaryInfo(field, value)``.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    for field, value in ((_SUMMARY_TITLE, title), (_SUMMARY_AUTHOR, PROJECT_AUTHOR)):
+        model.SetSummaryInfo(field, value)
+        if model.SummaryInfo(field) != value:
+            raise RuntimeError(f"summary field {field} did not persist ({value!r})")
+    _telemetry.success(f"summary info stamped (Title={title!r}, Author={PROJECT_AUTHOR!r})")
 
 
 @_telemetry.traced("appearance.material", label_param="material")
@@ -1886,6 +2029,7 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             # open, and saving over an open path fails.
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
             _telemetry.success("CloseAllDocuments (clean session)")
+            _pin_default_part_template(adapter)
         try:
             # Group the build's own operations (inserts, the mate chokepoint, the
             # per-config gates) under ONE ``<kind>.build`` phase span, a sibling of
