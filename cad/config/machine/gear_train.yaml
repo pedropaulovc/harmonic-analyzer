@@ -5,6 +5,8 @@ gear_train:
   cylinder_teeth: 120              # equal-size cylinder gears
   crank_drive_ratio: [16, 64]      # 16T pinion on crankshaft : 64T on cone shaft
   crank_drive_diametral_pitch: 26.57 # = DP_TRAIN*64/120, so the 64T pitch radius equals the cone T120's (30.59) — restores the book's "64T OD ≈ cone 120T OD" read and keeps the 64T ~1.9× coarser than the train (low; rescaled with the 62.2 anchor)
+  crank_drive_backlash_mm: 0.40    # 64T gap widening (circumferential, at pitch r): the crossed 16T:64T mesh (crankshaft machine-z vs cone shaft inclined 12.52° in plan) needs side clearance to engage at depth — analytic study 2026-07-14 (crossed_mesh_study), arbitrated with the live interference gate; absorbs the cos(12.52°) normal-pitch shrink of the helical cut (~0.07)
+  crank_drive_helix_slices: 12     # linearized-helix slice cuts across the 10 mm face (helix angle = the cone plan incline, derived in build_crank_drive_gear.py — NOT a free knob)
   source: "DIMENSIONS.md ch13 (cylinder gear OD scaling), ch29/ch8 (gear law)"
   confidence: low
   notes: >-

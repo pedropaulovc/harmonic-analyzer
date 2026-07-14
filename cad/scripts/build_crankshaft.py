@@ -69,7 +69,8 @@ PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
 # arm seats at SEAT_ARM. build_drive_train asserts these match its
 # REMOVABLE_Z0 / PINION_TOOTH_Z / arm-placement derivations.
 SEAT_T12 = 17.5
-SEAT_PINION = 101.16972071095871  # |PINION_TOOTH_Z - FACE/2 - CRANKSHAFT_Z0|
+SEAT_PINION = 101.20245898601534  # |PINION_TOOTH_Z - FACE/2 - CRANKSHAFT_Z0|
+# (2026-07-14 crank-mesh rederive: Y_CRANK 143.34 moved the contact azimuth)
 SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's placed pose composes a
 # Ry(180), which keeps its 8-thick plate at station 0..8 but puts the
 # AS-BUILT origin at the plate's NORTH face (station 8, machine -167): the

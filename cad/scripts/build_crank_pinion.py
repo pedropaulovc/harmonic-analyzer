@@ -3,13 +3,15 @@ r"""Reproduction script: crank pinion (book ch. 11/12, pp. 16, 20).
 The pinion on the crankshaft that meshes the dark steel crank-drive gear
 at the cone set's large end (`build_crank_drive_gear.py`), implementing
 the book-stated 4:1 crank-to-cone reduction (p. 16). Tooth count/DP per
-the Appendix C #9 working estimate: DP 16, 16T -> PD 1.000", mating the
-64T drive gear at PD 4.000". The 4:1 ratio is fixed; ratify the DP split
-when the drive train is mated in M6.
+the Appendix C #9 split at the 62.2-OD re-anchor: 16T at DP 26.57
+(PD 15.30, OD 17.2 -- photo-ratified 2026-07-14: the pinion reads
+~0.72x the O24 green column in ch12 p.18/p.19). A plain straight spur
+with a root-relieved floor; the crossed-mesh accommodation lives on the
+64T (see its docstring for the full rederivation).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 12" crank-drive gear row +
-Appendix C #9 (low confidence except the ratio). Face slightly wider
-than the drive gear's (meshing-pair practice, axial alignment slack).
+Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
+Appendix C #9. Face slightly wider than the drive gear's (meshing-pair
+practice, axial alignment slack).
 
 Layout: gear axis = Z through the origin, disc z = 0..12 mm.
 
@@ -67,7 +69,17 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    volume = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    # Root-relieved floor (real dedendum): the mating 64T's tips reach
+    # 0.71 mm BELOW this 16T's base circle at working depth -- the stock
+    # base-chord gap floor (fine for the big-count train pairs) starves a
+    # 16-tooth pinion, and was half of why the old mesh could not close
+    # (2026-07-14 rederive; see build_crank_drive_gear.py's docstring).
+    # The pinion stays a plain straight spur otherwise -- the book's
+    # removable "gear on the crankshaft can be changed" stock member; the
+    # crossing accommodation (helix + backlash) lives on the 64T.
+    volume = await build_fixed_gear(
+        adapter, TEETH, FACE_WIDTH, dp=DP, root_relief=True,
+    )
 
     # On-axis bore (centre 0,0): define_circle emits only the diameter dim, so
     # only the "Dia" slot is recorded -- the X/Z names are ignored.

@@ -3,17 +3,40 @@ r"""Reproduction script: crank-drive gear (book ch. 12, p. 20).
 The dark steel gear at the cone set's large end, annotated "This gear
 engages the crank" (p. 20): together with a pinion on the crankshaft
 (`build_crank_pinion.py`) it implements the book-stated 4:1 crank-to-cone
-reduction (p. 16). Its teeth are visibly ~1.5-2x coarser than the DP 30
-train and not countable in the available photos, so the tooth-count/DP
-split is the Appendix C #9 working estimate: DP 16, 64T -> PD 4.000"
-(OD 104.8 mm, matching the p.20 appearance next to the 120T cone gear),
-mating a 16T pinion at PD 1.000". The 4:1 ratio itself is fixed; ratify
-the DP split when the drive train is mated in M6.
+reduction (p. 16). Tooth-count/DP split per the Appendix C #9 estimate,
+re-anchored on the 62.2 cylinder OD: DP 26.57, 64T (pitch r 30.59 = the
+cone T120's, restoring the p.20 "same OD as the 120T" read), mating a
+16T pinion. The 4:1 ratio itself is book-stated and fixed; the split is
+ratified by the p.18/p.19/p.20 photos (2026-07-14 rederive: pitch ~1.9x
+coarser than the train beside the 120T, pinion OD ~0.72x the O24 green
+column).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 12" crank-drive gear row +
-Appendix C #9 (low confidence except the ratio).
+CROSSED-MESH CUT (2026-07-14 rederive, "crank-pinion and crank-drive gear
+are not meshing"): the 64T rides the cone shaft, inclined 12.52 deg IN
+PLAN, while its 16T pinion spins about machine z (ch30 GT pins the crank
+axle at the pedestal's x at BOTH ends -- a cone-parallel crankshaft would
+land 22 mm east at the arm, 20+ sigma off; the planar crank->paper chain
+corroborates). The pair is therefore a CROSSED-axis mesh, and straight
+uniform teeth geometrically cannot engage at depth across it (flank
+misregistration +-1.08 mm across the face vs <=0.70 available clearance
+-- the old build backed the crank off until the tips cleared entirely,
+the user-flagged air gap). The book photos (ch12 p.18/p.19) show the
+real pair deeply engaged, so the real 64T must carry the accommodation
+the crossing demands; this script cuts it as a LINEARIZED HELIX -- the
+tooth gaps advance (z - face/2)*tan(incline)/R_pitch across the face
+(equivalently: gear helix angle = shaft angle, pinion straight = a
+textbook crossed-helical pair), approximated by stacked rotated slice
+cuts -- plus a backlash allowance (config) that also absorbs the
+cos(incline) normal-pitch shrink, and a deepened root floor (the mating
+16T's tips need real dedendum). Study: crossed_mesh_study (analytic,
+2026-07-14); arbitrated against the live interference gate.
 
-Layout: gear axis = Z through the origin, disc z = 0..10 mm.
+Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
+Appendix C #9.
+
+Layout: gear axis = Z through the origin, disc z = 0..10 mm; the helix
+twist is symmetric about the mid-face plane z = 5 (the assembly's phase
+math references the mid-face azimuth).
 
 Run (SolidWorks already open)::
 
@@ -47,14 +70,27 @@ from _gear import build_fixed_gear, volume_check
 PART_NAME = "crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
-TEETH = 64  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
-DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
+TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
+DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
 FACE_WIDTH = 10.0  # mm, p.20 -- wider than the 7 mm cone faces (low)
 # M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal
-# like the cone gears (true cone, p.20); the oblique crank-pinion mesh
-# is handled in the assembly (contact tooth 50.8*sin(21.1) north of the
-# gear centre, crank backed off for the oblique dive).
+# like the cone gears (true cone, p.20).
 BORE_DIAMETER = 0.375 * IN  # snug on the 3/8" journal
+
+# Crossed-mesh accommodation (module docstring): helix angle == the cone
+# plan incline, DERIVED from the same config the assembly derives it from
+# (radius step per 6 teeth vs the drum seat pitch) -- never a free literal,
+# so the gear and the drive-train geometry cannot drift apart. Positive
+# sign: the gap azimuth advances CCW (about local +z) toward the gear's
+# +z face, which the assembly places toward machine +z (the analytic
+# study's zero-collision hand; the mirrored hand collides 28 mm^3).
+_DP_TRAIN = _config.machine("gear_train", "diametral_pitch")
+_RADIUS_STEP = 3.0 * 25.4 / _DP_TRAIN
+_SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")
+_Z_PITCH = _SEAT_NOMINAL * math.cos(math.asin(_RADIUS_STEP / _SEAT_NOMINAL))
+HELIX_DEG = math.degrees(math.asin(_RADIUS_STEP / _Z_PITCH))  # 12.5182
+BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
+HELIX_SLICES = int(_config.machine("gear_train", "crank_drive_helix_slices"))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -75,7 +111,11 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    volume = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    volume = await build_fixed_gear(
+        adapter, TEETH, FACE_WIDTH, dp=DP,
+        helix_deg=HELIX_DEG, helix_slices=HELIX_SLICES,
+        backlash_mm=BACKLASH_MM, root_relief=True,
+    )
 
     # Shaft bore (on-axis circle at the origin: only the diameter is a dim, so
     # define_circle records just that -- the centre X/Z slots are ignored).

@@ -29,6 +29,10 @@ fits:
     edge_slack_mm: 0.55              # PEN_EDGE_SLACK — deepest-tooth penetration guard
     note: "oblique partial engagement; checker-arbitrated edge slacks 0.00..1.14"
 
+  crank_mesh:              # 16T:64T crossed mesh (crank machine-z over the inclined 64T)
+    c2c_slack_mm: 0.60               # MESH16_C2C = R64 + R16 + this; tips 1.31 into the gaps (69% of working depth)
+    note: "crossed-helical pair (64T linearized 12.52° helix + 0.40 backlash, gear_train.yaml); 0.60 is the deepest ZERO-collision pose over a full crank-pitch phase sweep at K=12 slices (crossed_mesh_study 2026-07-14) — arbitrated with the live interference gate"
+
   cam_follower_contact:
     min_clearance_to_adjacent_channel_mm: 0.50
     contact_gap_mm: 0.02             # BAR_CONTACT_GAP — design margin, not a tangent
