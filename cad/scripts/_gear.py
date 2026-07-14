@@ -69,6 +69,7 @@ async def cut_tooth_gap(
     widen_rad: float = 0.0,
     root_r_in: float | None = None,
     sketch_plane: str = "Front",
+    reverse: bool = False,
 ) -> Any:
     """Cut one involute tooth gap through a blank (+Z from ``sketch_plane``).
 
@@ -79,8 +80,12 @@ async def cut_tooth_gap(
     floor with radial flank extensions down to a root arc at that radius --
     the deepened-dedendum relief a small-pinion mate needs (the stock floor
     sits AT the base circle, so a 16T's mate bottoms out 0.7 mm early).
-    All offsets fold into the curve literals; the expression SHAPE is the
-    cone gear's live-validated recipe, unchanged.
+    ``reverse`` flips the cut side of the sketch plane: REQUIRED on an
+    offset-plane sketch, whose default blind-cut direction points back
+    toward the base plane (proven by the v1 crank-drive-gear STL band
+    audit: every k>0 slice cut its NEIGHBOUR's band and the last band
+    stayed a solid ring). All offsets fold into the curve literals; the
+    expression SHAPE is the cone gear's live-validated recipe, unchanged.
     """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -168,7 +173,9 @@ async def cut_tooth_gap(
         adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
     )
     check("exit_sketch gap", await adapter.exit_sketch())
-    gap_cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=depth))
+    gap_cut = await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=depth, reverse_direction=reverse)
+    )
     check("cut tooth gap", gap_cut)
     return gap_cut
 
@@ -361,12 +368,25 @@ async def build_fixed_gear(
                 slice_t + (1.0 if k == helix_slices - 1 else 0.0),
                 rotate_rad=rot, widen_rad=widen_rad, root_r_in=root_r_in,
                 sketch_plane=plane,
+                # An offset-plane blind cut points back toward the base plane
+                # by default (v1 live-caught: each k>0 slice cut band k-1 at
+                # slice k's twist and the LAST band survived as a solid ring
+                # -- the 1.1 mm^3 crank-mesh interference). reverse flips the
+                # k>0 cuts to +Z; the k=0 Front-plane cut already points +Z.
+                reverse=bool(k),
             )
             seeds.append(gap_cut.data.name)
-    await pattern_about_z(adapter, seeds, teeth, ra_mm, face_width / 2.0)
 
     gap_area = gap_area_in_disc_ext(
         teeth, dp=dp, pa_deg=pa_deg, widen_rad=widen_rad, root_r_in=root_r_in
     )
+    # Direction/coverage tripwire BEFORE patterning: the seed cut(s) must have
+    # removed exactly one full gap column. The final 1% disc gate is too loose
+    # to see a mis-directed slice (the v1 flip left +148 mm^3 on the 64T --
+    # 0.5%, inside tolerance); one wrong or missing slice is ~3.3 mm^3 here.
+    v_column = gap_area * IN**2 * face_width
+    await volume_check(adapter, "single gap column", v_blank - v_column, 1.0)
+
+    await pattern_about_z(adapter, seeds, teeth, ra_mm, face_width / 2.0)
     v_gear = v_blank - teeth * gap_area * IN**2 * face_width
     return await volume_check(adapter, "toothed disc", v_gear, 0.01 * v_gear)
