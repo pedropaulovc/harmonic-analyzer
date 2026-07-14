@@ -1,9 +1,16 @@
 ---
 name: helical-gear-lib-followup
-description: Follow-up idea (user, 2026-07-14) — replace the K-slice linearized helix cut with library-generated true helical gear geometry (e.g. thingiverse 2854963)
+description: RESOLVED same-day (2026-07-14) — the true-helix 64T shipped natively (one tooth boss-swept with twist, no library code, so no attribution needed); the sources below remain useful theory references
 metadata:
   type: project
 ---
+
+**RESOLVED 2026-07-14 (same day, PR #292):** the K-slice stack was replaced
+by a NATIVE true helix — `_gear.boss_tooth_swept` sweeps one involute tooth
+along the axis with SolidWorks' constant-twist sweep and patterns it; no
+external library code (or ported math) was used, so no attribution became
+due. The study's `slices=0` mode arbitrated the tightened fit exactly as
+planned below. Kept for the references and the license note.
 
 User suggestion (2026-07-14, during the crank-mesh rederive): later consider
 using library code to generate helical gear geometry instead of the K=12

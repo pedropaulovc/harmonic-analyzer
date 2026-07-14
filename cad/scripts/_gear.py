@@ -21,7 +21,15 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from _common import IN, check, define_circle, ensure_fully_defined, volume_check
+from _common import (
+    IN,
+    check,
+    define_circle,
+    dimension_between,
+    ensure_fully_defined,
+    name_last_feature,
+    volume_check,
+)
 from build_cone_gear import gear_facts
 
 import _telemetry
@@ -68,24 +76,20 @@ async def cut_tooth_gap(
     rotate_rad: float = 0.0,
     widen_rad: float = 0.0,
     root_r_in: float | None = None,
-    sketch_plane: str = "Front",
-    reverse: bool = False,
 ) -> Any:
-    """Cut one involute tooth gap through a blank (+Z from ``sketch_plane``).
+    """Cut one involute tooth gap through a blank (+Z from the Front plane).
 
-    ``rotate_rad`` spins the whole gap profile CCW about the gear axis (the
-    sliced-helix twist); ``widen_rad`` is a symmetric backlash: each flank
-    backs off the gap centre by that angle (circumferential widening =
-    2*widen_rad*R_pitch). ``root_r_in`` (inches) replaces the base-chord
-    floor with radial flank extensions down to a root arc at that radius --
-    the deepened-dedendum relief a small-pinion mate needs (the stock floor
-    sits AT the base circle, so a 16T's mate bottoms out 0.7 mm early).
-    ``reverse`` flips the cut side of the sketch plane: REQUIRED on an
-    offset-plane sketch, whose default blind-cut direction points back
-    toward the base plane (proven by the v1 crank-drive-gear STL band
-    audit: every k>0 slice cut its NEIGHBOUR's band and the last band
-    stayed a solid ring). All offsets fold into the curve literals; the
-    expression SHAPE is the cone gear's live-validated recipe, unchanged.
+    ``rotate_rad`` spins the whole gap profile CCW about the gear axis;
+    ``widen_rad`` is a symmetric backlash: each flank backs off the gap
+    centre by that angle (circumferential widening = 2*widen_rad*R_pitch).
+    ``root_r_in`` (inches) replaces the base-chord floor with radial flank
+    extensions down to a root arc at that radius -- the deepened-dedendum
+    relief a small-pinion mate needs (the stock floor sits AT the base
+    circle, so a 16T's mate bottoms out 0.7 mm early). All offsets fold
+    into the curve literals; the expression SHAPE is the cone gear's
+    live-validated recipe, unchanged. (NB a blind cut from a sketch on an
+    OFFSET plane defaults back toward the base plane -- the retired K-slice
+    helix stack tripped it; see memory/solidworks-modeling-pitfalls.md.)
     """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -104,7 +108,7 @@ async def cut_tooth_gap(
     ph_up = f"({u} + {fmt(facts['Gamma'] - facts['Delta'] + eps + rho)})"
     a1 = facts["Delta"] - eps + rho
     a2 = facts["Gamma"] - facts["Delta"] + eps + rho
-    check("create_sketch gap", await adapter.create_sketch(sketch_plane))
+    check("create_sketch gap", await adapter.create_sketch("Front"))
     gap_curves = [
         await equation_curve(
             adapter,
@@ -173,9 +177,7 @@ async def cut_tooth_gap(
         adapter, "gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
     )
     check("exit_sketch gap", await adapter.exit_sketch())
-    gap_cut = await adapter.create_cut_extrude(
-        ExtrusionParameters(depth=depth, reverse_direction=reverse)
-    )
+    gap_cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=depth))
     check("cut tooth gap", gap_cut)
     return gap_cut
 
@@ -292,6 +294,130 @@ for _t, _dp in ((16, 26.57), (64, 26.57), (12, 12.7)):
         raise AssertionError(f"gap_area_in_disc_ext drifted at T{_t}: {_a} vs {_b}")
 
 
+# Helical-tooth sweep constants, both live-arbitrated on the crank-drive
+# gear (the volume gates + the STL band audit re-prove them on any drift):
+# the tooth root EMBEDS into the blank so the boss union is robust -- and so
+# a flipped sweep path fails LOUD (a disjoint tooth keeps its embedded
+# sliver: ~+0.1 mm^2 x face x teeth over the analytic expectation).
+_TOOTH_EMBED_MM = 0.3
+# Top-plane sketch +y maps to world +Z on this template (the path line), and
+# a positive InsertProtrusionSwept4 twist turns CCW about the +Z path -- the
+# +INCLINE hand (gap azimuth advancing CCW toward +z).
+_SWEEP_PATH_Y = 1.0
+_TWIST_CCW = 1.0
+
+
+async def boss_tooth_swept(
+    adapter: Any,
+    facts: dict[str, float],
+    face_width: float,
+    *,
+    twist_deg: float,
+    rotate_rad: float,
+    widen_rad: float,
+    root_r_in: float,
+) -> str:
+    """Boss-sweep ONE involute tooth along +Z with constant twist; return the
+    sweep feature's name (the circular-pattern seed).
+
+    The profile is the exact complement of ``cut_tooth_gap``'s gap between
+    two adjacent gaps -- same involute flank expressions, tip arc at Ra, root
+    closure at ``root_r_in`` (extended ``_TOOTH_EMBED_MM`` into the blank) --
+    so mesh conjugacy and the seed convention (tooth centred on azimuth 0)
+    are IDENTICAL to the cut recipe. ``rotate_rad`` pre-rotates the profile
+    to the z=0 helix phase (-half twist), so mid-face stays the design
+    azimuth; ``widen_rad`` thins each flank by the backlash angle (the same
+    +-eps the gap curves widen by).
+    """
+    from solidworks_mcp.adapters.base import SweepParameters
+
+    rho, eps = rotate_rad, widen_rad
+    rb, ra = fmt(facts["Rb"]), fmt(facts["Ra"])
+    rr_embed = fmt(root_r_in - _TOOTH_EMBED_MM / IN)
+    gamma = facts["Gamma"]
+    theta_lo = facts["ThetaU"] + eps + rho          # tip arc start (flank A @ Ra)
+    theta_hi = gamma + facts["ThetaL"] - eps + rho  # tip arc end (flank B @ Ra)
+    a_lo = facts["Gamma"] - facts["Delta"] + eps + rho  # flank A base azimuth
+    a_hi = gamma + facts["Delta"] - eps + rho           # flank B base azimuth
+    u = f"({fmt(facts['Tmax'])} * t)"
+    ph_a = f"({u} + {fmt(a_lo)})"
+    ph_b = f"({u} - {fmt(a_hi)})"
+    check("create_sketch tooth", await adapter.create_sketch("Front"))
+    tooth_curves = [
+        await equation_curve(
+            adapter,
+            "tooth lower flank (gap 0 upper involute)",
+            f"{rb} * (cos{ph_a} + {u} * sin{ph_a})",
+            f"{rb} * (sin{ph_a} - {u} * cos{ph_a})",
+        ),
+        await equation_curve(
+            adapter,
+            "tip arc at Ra",
+            f"{ra} * cos({fmt(theta_lo)} + t * ({fmt(theta_hi)} - {fmt(theta_lo)}))",
+            f"{ra} * sin({fmt(theta_lo)} + t * ({fmt(theta_hi)} - {fmt(theta_lo)}))",
+        ),
+        await equation_curve(
+            adapter,
+            "tooth upper flank (gap 1 lower, mirrored involute)",
+            f"{rb} * (cos{ph_b} + {u} * sin{ph_b})",
+            f"{rb} * ({u} * cos{ph_b} - sin{ph_b})",
+        ),
+        await equation_curve(
+            adapter,
+            "upper root extension B->embed",
+            f"({rb} + t * ({rr_embed} - {rb})) * {fmt(math.cos(a_hi))}",
+            f"({rb} + t * ({rr_embed} - {rb})) * {fmt(math.sin(a_hi))}",
+        ),
+        await equation_curve(
+            adapter,
+            "embedded root arc B->A",
+            f"{rr_embed} * cos({fmt(a_hi)} + t * ({fmt(a_lo)} - {fmt(a_hi)}))",
+            f"{rr_embed} * sin({fmt(a_hi)} + t * ({fmt(a_lo)} - {fmt(a_hi)}))",
+        ),
+        await equation_curve(
+            adapter,
+            "lower root extension embed->A",
+            f"({rr_embed} + t * ({rb} - {rr_embed})) * {fmt(math.cos(a_lo))}",
+            f"({rr_embed} + t * ({rb} - {rr_embed})) * {fmt(math.sin(a_lo))}",
+        ),
+    ]
+    await ensure_fully_defined(
+        adapter, "tooth sketch", fix_entities=tooth_curves, allow_fix_escalation=True
+    )
+    check("exit_sketch tooth", await adapter.exit_sketch())
+
+    # Path: a fully-defined line up the gear axis (origin coincidence +
+    # vertical + one length dim -- the build_boss_hook recipe).
+    check("create_sketch tooth path", await adapter.create_sketch("Top"))
+    line = check(
+        "tooth path line",
+        await adapter.add_line(0.0, 0.0, 0.0, _SWEEP_PATH_Y * face_width),
+    )
+    check("path vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
+    check(
+        "path start -> origin",
+        await adapter.add_sketch_constraint(f"{line}.start", "origin", "coincident"),
+    )
+    await dimension_between(
+        adapter, f"{line}.start", f"{line}.end", "vertical_distance",
+        face_width, "tooth path length",
+    )
+    await ensure_fully_defined(adapter, "tooth path sketch")
+    check("exit_sketch tooth path", await adapter.exit_sketch())
+    name_last_feature(adapter, "ToothPath")
+
+    sweep = check(
+        "sweep tooth (twisted)",
+        await adapter.create_sweep(SweepParameters(
+            path="ToothPath",
+            twist_along_path=True,
+            twist_angle=_TWIST_CCW * twist_deg,
+            merge_result=True,
+        )),
+    )
+    return sweep.name
+
+
 def _blank_ref_plane(adapter: Any, name: str) -> None:
     """Hide a reference plane (shown ref geometry renders in the part PNG and
     every assembly instance -- the fix_shown_sketches BlankRefGeom idiom,
@@ -316,95 +442,88 @@ async def build_fixed_gear(
     pa_deg: float = 14.5,
     *,
     helix_deg: float = 0.0,
-    helix_slices: int = 12,
     backlash_mm: float = 0.0,
     root_relief: bool = False,
 ) -> float:
-    """Build a toothed disc (blank + gap + pattern) on the active new part.
+    """Build a toothed disc on the active new part.
 
     Gear axis = Z through the origin, disc z = 0..face_width (mm). Returns
     the volume-checked toothed-disc volume in mm^3.
 
-    ``helix_deg`` cuts the tooth gaps as a linearized helix (gap azimuth
-    advancing ``(z - face/2)*tan(helix)/R_pitch`` CCW with +z), approximated
-    by ``helix_slices`` stacked straight cuts on offset planes -- the
-    crank-drive gear's crossed-axis accommodation (the machine's 12.52-deg
-    plan incline; the adapter has no cut-sweep, and a submodule change would
-    shift every part's cache key). ``backlash_mm`` widens each gap by that
+    Straight gears (``helix_deg`` 0): tip-radius blank + one gap cut +
+    pattern (the cone gear's live-validated recipe). ``helix_deg`` builds a
+    TRUE helix instead (tooth azimuth advancing ``(z - face/2)*tan(helix)/
+    R_pitch`` CCW with +z -- the crank-drive gear's crossed-axis
+    accommodation): a root-cylinder blank + ONE involute tooth boss-swept
+    along the axis with constant twist + pattern. Smooth helicoid flanks --
+    this superseded the K-slice cut stack, whose facets consumed ~0.2 mm of
+    the mesh clearance and read as machining marks in every render.
+    ``backlash_mm`` widens each gap / thins each tooth by that
     circumferential allowance at the pitch radius (split +-eps onto the two
     flank phases). ``root_relief`` deepens the gap floor from the base
     chord to a root arc at pitch_r - 1.157*addendum (standard dedendum) --
-    REQUIRED on any gear meshing a small pinion: the stock base-circle floor
-    leaves a 16T's mate 0.7 mm shy of working depth.
+    REQUIRED on any gear meshing a small pinion (and by the helix path,
+    whose additive area algebra needs the arc floor): the stock base-circle
+    floor leaves a 16T's mate 0.7 mm shy of working depth.
     """
     facts = gear_facts(teeth, dp, pa_deg)
     ra_mm = facts["Ra"] * IN
     pitch_r_in = teeth / dp / 2.0
     widen_rad = (backlash_mm / 2.0) / (pitch_r_in * IN)
     root_r_in = (pitch_r_in - 1.157 / dp) if root_relief else None
+    if helix_deg and root_r_in is None:
+        raise ValueError("helix_deg requires root_relief=True (additive tooth "
+                         "area algebra assumes the root-arc floor)")
 
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
+    blank_r_mm = (root_r_in * IN) if helix_deg else ra_mm
     check("create_sketch blank", await adapter.create_sketch("Front"))
-    await define_circle(adapter, 0.0, 0.0, ra_mm, "gear blank")
+    await define_circle(adapter, 0.0, 0.0, blank_r_mm, "gear blank")
     await ensure_fully_defined(adapter, "blank sketch")
     check("exit_sketch blank", await adapter.exit_sketch())
     check(
         "extrude blank",
         await adapter.create_extrusion(ExtrusionParameters(depth=face_width)),
     )
-    v_blank = math.pi * ra_mm**2 * face_width
+    v_blank = math.pi * blank_r_mm**2 * face_width
     await volume_check(adapter, "blank", v_blank, 0.005 * v_blank)
 
+    gap_area = gap_area_in_disc_ext(
+        teeth, dp=dp, pa_deg=pa_deg, widen_rad=widen_rad, root_r_in=root_r_in
+    )
     if not helix_deg:
         gap_cut = await cut_tooth_gap(
             adapter, facts, face_width + 1.0,
             widen_rad=widen_rad, root_r_in=root_r_in,
         )
         seeds: list[str] = [gap_cut.data.name]
+        # Coverage tripwire BEFORE patterning: the seed cut must have removed
+        # exactly one full gap column. The final 1% disc gate is too loose to
+        # see a partial cut (the retired K-slice stack's direction flip left
+        # +148 mm^3 on the 64T -- 0.5%, inside tolerance).
+        v_seeded = v_blank - gap_area * IN**2 * face_width
+        v_gear = v_blank - teeth * gap_area * IN**2 * face_width
     else:
-        seeds = []
-        slice_t = face_width / helix_slices
-        for k in range(helix_slices):
-            z0 = k * slice_t
-            plane = "Front"
-            if k:
-                res = check(
-                    f"create_plane gap slice {k}",
-                    await adapter.create_plane(CreatePlaneParameters(
-                        mode="offset", base_plane="Front Plane", offset=z0,
-                    )),
-                )
-                plane = res.name
-            rot = ((z0 + slice_t / 2.0) - face_width / 2.0) * math.tan(
-                math.radians(helix_deg)
-            ) / (pitch_r_in * IN)
-            gap_cut = await cut_tooth_gap(
-                adapter, facts,
-                slice_t + (1.0 if k == helix_slices - 1 else 0.0),
-                rotate_rad=rot, widen_rad=widen_rad, root_r_in=root_r_in,
-                sketch_plane=plane,
-                # An offset-plane blind cut points back toward the base plane
-                # by default (v1 live-caught: each k>0 slice cut band k-1 at
-                # slice k's twist and the LAST band survived as a solid ring
-                # -- the 1.1 mm^3 crank-mesh interference). reverse flips the
-                # k>0 cuts to +Z; the k=0 Front-plane cut already points +Z.
-                reverse=bool(k),
-            )
-            seeds.append(gap_cut.data.name)
-            if k:
-                _blank_ref_plane(adapter, plane)
-
-    gap_area = gap_area_in_disc_ext(
-        teeth, dp=dp, pa_deg=pa_deg, widen_rad=widen_rad, root_r_in=root_r_in
-    )
-    # Direction/coverage tripwire BEFORE patterning: the seed cut(s) must have
-    # removed exactly one full gap column. The final 1% disc gate is too loose
-    # to see a mis-directed slice (the v1 flip left +148 mm^3 on the 64T --
-    # 0.5%, inside tolerance); one wrong or missing slice is ~3.3 mm^3 here.
-    v_column = gap_area * IN**2 * face_width
-    await volume_check(adapter, "single gap column", v_blank - v_column, 1.0)
+        twist_deg = math.degrees(
+            face_width * math.tan(math.radians(helix_deg)) / (pitch_r_in * IN))
+        seeds = [await boss_tooth_swept(
+            adapter, facts, face_width,
+            twist_deg=twist_deg,
+            rotate_rad=-math.radians(twist_deg) / 2.0,  # z=0 phase: mid-face = design azimuth
+            widen_rad=widen_rad, root_r_in=root_r_in,
+        )]
+        # One tooth must add exactly the annulus-sector complement of the gap
+        # (a twisted sweep keeps the profile area per Cavalieri; the embedded
+        # root sliver lies inside the blank so the union gains none of it --
+        # and a flipped sweep path keeps the sliver as a disjoint body,
+        # overshooting this gate loud).
+        tooth_area = (
+            math.pi * (facts["Ra"] ** 2 - root_r_in**2) / teeth - gap_area
+        )
+        v_seeded = v_blank + tooth_area * IN**2 * face_width
+        v_gear = v_blank + teeth * tooth_area * IN**2 * face_width
+    await volume_check(adapter, "seeded tooth/gap", v_seeded, 1.0)
 
     await pattern_about_z(adapter, seeds, teeth, ra_mm, face_width / 2.0)
-    v_gear = v_blank - teeth * gap_area * IN**2 * face_width
     return await volume_check(adapter, "toothed disc", v_gear, 0.01 * v_gear)
