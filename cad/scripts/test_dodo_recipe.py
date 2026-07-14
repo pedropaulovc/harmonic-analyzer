@@ -544,9 +544,7 @@ def test_drawing_runtime_lock_and_source_dependency(monkeypatch):
         "platen-guide.pdf",
         "platen-guide_drawing.png",
     }
-    assert {"asme-b-book.drwdot", "asme-b-book.slddrt"} <= {
-        name.lower() for name in dep_names
-    }
+    assert "harmonic-analyzer.drwdot" in {name.lower() for name in dep_names}
 
     build_deps = set(dodo.task_build()["task_dep"])
     bare_deps = set(dodo.task_build_bare()["task_dep"])
