@@ -45,3 +45,15 @@ be re-checked with the study whenever the slack changes. Helix/backlash knobs:
 gear_train.crank_drive_backlash_mm / crank_drive_helix_slices; fit class
 tolerances.crank_mesh.c2c_slack_mm. See [[ch30-gt-re-anchor]],
 [[load-bearing-claims-need-a-repro]].
+
+Two live-caught build traps on this pair (both fixed in PR #292, both
+gate-guarded now): (1) the k>0 helix slice cuts sit on offset planes whose
+blind cut defaults BACK toward Front — needs `reverse=bool(k)`; the
+pre-pattern single-gap-column volume gate (±1 mm³) makes a mis-directed
+slice fail loud (see [[solidworks-modeling-pitfalls]]). (2) CopyWithMates2
+cone-keying can wander the free train's spin before the 16T:64T gear mate
+freezes the phase — the assembly measures the equivalent seed error, rotates
+the cone family back (Rodrigues about the cone axis), and re-anchors the
+pose ledger (reledger_to_solved) after the correction. Fast live repro for
+any future mesh doubt: `diagnostics/probe_live_crank_mesh.py` (~17 s of
+seat, prints patch locations + saves the SW interference picture).
