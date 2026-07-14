@@ -100,7 +100,7 @@ CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
 # not buried in a solid O24 column. The pinion enters from the north/outboard
 # side of the oblique crank bore. Keep the first 4 mm of the positive-z chord
 # as a full O10 journal, then open an O18.2 counterbore through the outer wall.
-# O18.2 = the built 16T OD 17.189 + 0.5 mm running clearance per side.
+# O18.2 = the built 16T OD 17.207 + ~0.5 mm running clearance per side.
 PINION_POCKET_DIA = 18.2
 PINION_POCKET_RADIUS = PINION_POCKET_DIA / 2.0
 PINION_POCKET_INBOARD = 4.0

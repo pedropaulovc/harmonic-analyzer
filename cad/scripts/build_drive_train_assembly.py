@@ -615,6 +615,8 @@ from build_cone_pivot_post import (  # noqa: E402
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CRANK_BORE_DX as POST_CRANK_DX,
     CRANK_BORE_Y as POST_CRANK_Y,
+    PINION_POCKET_INBOARD as POST_POCKET_INBOARD,
+    PINION_POCKET_OUTBOARD as POST_POCKET_OUTBOARD,
 )
 from build_cone_tip_block import (  # noqa: E402
     ADJUSTER_BORE_DEPTH as TIP_ADJ_BORE_DEPTH,
@@ -743,6 +745,17 @@ if abs(POST_CRANK_DX - (_PPOST[0] - X_CRANK)) > 0.05:
         f"{_PPOST[0] - X_CRANK:.3f}")
 if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
+# The column's pinion relief pocket must cover the pinion's axial band: the
+# pocket t-axis runs along the crank bore (machine +z) from the perpendicular
+# foot of the column axis, so its world band is post.z + [inboard, outboard].
+# An inboard shortfall gouges the O10 journal with the pinion's south face.
+_POCKET_Z = (_PPOST[2] + POST_POCKET_INBOARD, _PPOST[2] + POST_POCKET_OUTBOARD)
+if not (_POCKET_Z[0] <= PINION_TOOTH_Z - PINION_FACE / 2.0
+        and PINION_TOOTH_Z + PINION_FACE / 2.0 <= _POCKET_Z[1]):
+    raise AssertionError(
+        f"column pinion pocket z {_POCKET_Z[0]:.3f}..{_POCKET_Z[1]:.3f} does "
+        f"not cover the 16T band {PINION_TOOTH_Z - PINION_FACE / 2.0:.3f}.."
+        f"{PINION_TOOTH_Z + PINION_FACE / 2.0:.3f}")
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED
