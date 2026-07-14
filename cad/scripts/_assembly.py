@@ -1291,7 +1291,11 @@ def _select_pattern_inputs(
 
 
 def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
-    components = _early_bound(model, "IAssemblyDoc").GetComponents(False) or []
+    # Native component patterns create top-level occurrences. A patterned
+    # flexible subassembly also exposes every nested child through
+    # GetComponents(False), multiplying the apparent result count by the child
+    # tree size (19 one-channel occurrences appeared as 133 components).
+    components = _early_bound(model, "IAssemblyDoc").GetComponents(True) or []
     return [
         component for component in components
         if str(_read_member(component, "Name2")) not in before
@@ -1353,7 +1357,7 @@ async def linear_component_pattern(
     direction_name = ensure_global_pattern_axis(adapter, axis)
     before = {
         str(_read_member(component, "Name2"))
-        for component in (asm_h.GetComponents(False) or [])
+        for component in (asm_h.GetComponents(True) or [])
     }
     async with _telemetry.aspan(
         f"pattern {label}", kind="linear", seeds=",".join(seeds),
@@ -1432,7 +1436,7 @@ async def grid_component_pattern(
     direction2_name = ensure_global_pattern_axis(adapter, axis2)
     before = {
         str(_read_member(component, "Name2"))
-        for component in (asm_h.GetComponents(False) or [])
+        for component in (asm_h.GetComponents(True) or [])
     }
     async with _telemetry.aspan(
         f"pattern {label}", kind="grid", seeds=",".join(seeds),
@@ -1503,7 +1507,7 @@ async def circular_component_pattern(
     asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     before = {
         str(_read_member(component, "Name2"))
-        for component in (asm_h.GetComponents(False) or [])
+        for component in (asm_h.GetComponents(True) or [])
     }
     async with _telemetry.aspan(
         f"pattern {label}", kind="circular", seeds=",".join(seeds),

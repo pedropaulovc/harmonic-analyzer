@@ -426,28 +426,22 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
 
 
 def assert_channel_independence(adapter: Any) -> None:
-    """Assert the channel assembly holds 20 INDEPENDENT instances of each moving stem.
+    """Assert ``channel.SLDASM`` is exactly one independently mated mechanism.
 
-    The decoherence test the docs ask for (each channel runs at its own harmonic)
-    is a motion-solver run -- tracked, not wired here. But its structural
-    precondition IS statically checkable: the four moving parts must be 20
-    individually-mated instances, not pattern slaves (a pattern instance is a
-    rigid, DOF-less copy and could never articulate independently). Counting 20 of
-    each stem is the tripwire that a rebuild did not collapse the channels into a
-    component pattern -- the single most important "no pattern for moving parts"
-    invariant (spec §5 / handoff §8), checked at the level that owns them.
+    Multiplicity now belongs to the top-level flexible-subassembly pattern. The
+    child must therefore contain one occurrence of each moving family; finding
+    20 here means the former flat bank was accidentally retained and the machine
+    would duplicate it 20x again.
     """
     stems = [_INSTANCE_SUFFIX.sub("", n) for n in component_names(adapter)]
     counts = {stem: stems.count(stem) for stem in _MOVING_CHANNEL_STEMS}
-    wrong = {s: c for s, c in counts.items() if c != CHANNELS}
+    wrong = {s: c for s, c in counts.items() if c != 1}
     if wrong:
         raise RuntimeError(
-            f"channel moving parts are not {CHANNELS} independent instances: {wrong} "
-            f"(a count != {CHANNELS} means a channel was dropped/duplicated, or the "
-            f"moving parts were collapsed into a component pattern)")
+            f"single-channel child does not contain one of each moving family: {wrong}"
+        )
     _telemetry.success(
-        f"{CHANNELS} independent instances of each moving stem "
-        f"{_MOVING_CHANNEL_STEMS} (not pattern slaves)"
+        f"one independently mated channel with moving stems {_MOVING_CHANNEL_STEMS}"
     )
 
 
@@ -585,7 +579,7 @@ def _expected_free_dof(name: str) -> int:
     if name == "drive-train":
         return 4
     if name == "channel":
-        return 3 * _config.active_count()
+        return 3
     if name == "magnifier":
         # The freed lever knife-rock + the articulated lever-wire's swing/spin;
         # the wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).

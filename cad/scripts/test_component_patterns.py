@@ -50,9 +50,11 @@ class _PatternManager:
 class _PatternModel:
     def __init__(self) -> None:
         self.created = False
+        self.component_queries: list[bool] = []
         self.FeatureManager = _PatternManager(self)
 
     def GetComponents(self, top_level_only: bool) -> list[_PatternComponent]:
+        self.component_queries.append(top_level_only)
         return [_PatternComponent()] if self.created else []
 
     @staticmethod
@@ -114,6 +116,7 @@ def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPa
 
     assert adapter.currentModel.FeatureManager.definition.D1ReverseDirection is True
     assert names == ["seed-2"]
+    assert adapter.currentModel.component_queries == [True, True]
 
 
 def test_circular_pattern_rejects_single_instance_before_com() -> None:
