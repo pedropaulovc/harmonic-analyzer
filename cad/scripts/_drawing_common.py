@@ -467,6 +467,15 @@ def add_native_hole_callout(
     return display
 
 
+# The general-tolerance custom properties every part carries
+# (_common.part_properties, from cad/config/title_block.yaml) and the drawing
+# template's title block reads via $PRPSHEET. finalize_drawing requires them on
+# the linked model so a stale part can't ship blank tolerance cells.
+TITLE_BLOCK_TOLERANCE_PROPERTIES = (
+    "TOL_LIN_XX", "TOL_LIN_XXX", "TOL_ANG", "TOL_SURFACE",
+)
+
+
 def read_required_properties(
     model: Any, names: Sequence[str], *, required: Iterable[str]
 ) -> dict[str, str]:
@@ -1535,6 +1544,25 @@ async def finalize_drawing(
     if linked != first_name:
         raise RuntimeError(
             f"CustomPropertyView did not take: {linked!r} != {first_name!r}")
+
+    # The template's title block reads the general-tolerance cells from the
+    # linked model via $PRPSHEET -- a stale source part (built before
+    # part_properties stamped the TOL_* set) would save a drawing with BLANK
+    # tolerance cells and no error. Validate here, the chokepoint every recipe
+    # passes through, against the model the sheet is now actually linked to,
+    # rather than trusting each recipe's read_required_properties list
+    # (Codex P2 #289).
+    linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
+    if linked_model is None:
+        raise RuntimeError(
+            f"view {first_name!r} has no referenced document to validate")
+    linked_model = _sw_type_info.early_bound_or_flag(
+        linked_model, "IModelDoc2", "GetCustomInfoValue")
+    read_required_properties(
+        linked_model,
+        TITLE_BLOCK_TOLERANCE_PROPERTIES,
+        required=TITLE_BLOCK_TOLERANCE_PROPERTIES,
+    )
 
     # The title block's UNIT cell links $PRP:"UNIT_DISPLAY" (a DRAWING-doc
     # property, unlike the $PRPSHEET part-property links), so the declared unit
