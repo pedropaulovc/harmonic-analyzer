@@ -1143,8 +1143,22 @@ def _recipe_files(stem: str) -> list[str]:
     no longer forces a spurious ~500 s FULL re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
+    # An assembly that GENERATES parts in-script (build_channel_assembly's
+    # stretched springs; detected by the same stamps_part_properties call-graph
+    # predicate the config tokens use) instantiates the part TEMPLATE via
+    # NewPart, so the template is a direct build input: fold it in so a
+    # template edit FULL-rebuilds the generated variants and shifts the
+    # assembly's cache key (codex #289 -- a cached channel would otherwise
+    # keep/restore springs built from the previous template). NON-generating
+    # assemblies must NOT fold it: they get the template transitively through
+    # their referenced parts' recipe digests (a template edit re-stamps the
+    # parts -> shifted artefact digests -> REFRESH), and a direct fold would
+    # escalate that refresh to a spurious ~500 s FULL rebuild.
+    template = ([str(PART_TEMPLATE.resolve())]
+                if stamps_part_properties(asm_script) else [])
     return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
-            *_config_deps(asm_script, stem, "assembly"), _submodule_assembly_dep()]
+            *_config_deps(asm_script, stem, "assembly"), *template,
+            _submodule_assembly_dep()]
 
 
 def _recipe_sidecar(stem: str) -> Path:
