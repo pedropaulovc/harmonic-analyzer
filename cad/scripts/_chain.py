@@ -45,7 +45,8 @@ KNOB_CENTRE = (54.575, 284.1332)  # build_paper_drive_assembly KNOB_SHAFT_XY:
 # drive-train (X_CRANK, Y_CRANK) and fails loud on drift, so a stale literal can
 # never silently mis-anchor the chain over the relocated 64T/cone. The cleaner
 # split (leaf-safe geometry vs assembly-time layout, no literal) is issue #86.
-CRANK_CENTRE = (122.8, 144.96)  # drive-train X_CRANK, Y_CRANK
+CRANK_CENTRE = (122.8, 143.34)  # drive-train X_CRANK, Y_CRANK (2026-07-14
+# crank-mesh rederive: the crank dropped 1.62 onto the ENGAGED 16T:64T c2c)
 
 TIP_R_T24 = 26.0  # mounted removables, module 2: tip r = (T + 2) * 2 / 2
 TIP_R_T12 = 14.0
