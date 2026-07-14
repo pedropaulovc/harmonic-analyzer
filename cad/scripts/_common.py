@@ -67,6 +67,14 @@ OUT_STL = CAD_ROOT / "out" / "stl"
 # engraving DXF). A build script that reads one of these must resolve it under
 # this dir so dodo's data_deps_of picks it up as a file_dep + cache-key input.
 REFERENCES_DIR = CAD_ROOT / "references"
+# The repo-owned part template every part is created from (hand-made in
+# SolidWorks; carries the doc properties the COM API cannot write -- the
+# DimXpert block-tolerance decimals + angular value). run_build pins the
+# seat's default part template to it before building, so NewPart inherits it
+# on ANY seat; dodo folds it into every part's recipe/cache key (path
+# duplicated there deliberately -- importing _buildgraph here would drag graph
+# tooling into every part's dep closure).
+PART_TEMPLATE = CAD_ROOT / "templates" / "harmonic-analyzer.PRTDOT"
 
 IN = 25.4  # inch -> mm
 
@@ -1255,6 +1263,38 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
     log(f"custom properties [{len(written)}]: {', '.join(written)}")
 
 
+_PREF_DEFAULT_PART_TEMPLATE = 8  # swUserPreferenceStringValue_e.swDefaultTemplatePart
+
+
+def _pin_default_part_template(adapter: Any) -> None:
+    """Point the seat's default part template at the repo-owned PRTDOT.
+
+    ``NewPart()`` (behind the adapter's ``create_part``) instantiates the
+    seat's DEFAULT part template, whose document properties carry the DimXpert
+    prefs the COM API cannot write (decimals + angular block tolerance).
+    Pinning the default to the checked-in template removes that per-seat
+    state: every seat builds from the same template, and dodo folds the file
+    into every part's recipe/cache key, so a template edit rebuilds parts and
+    busts the remote cache. The setting is seat-global and persists -- that is
+    the point. apply_block_tolerances still fail-louds if the template's
+    get-only prefs drift from title_block.yaml.
+    """
+    if not PART_TEMPLATE.is_file() or PART_TEMPLATE.stat().st_size == 0:
+        raise FileNotFoundError(f"repo part template missing: {PART_TEMPLATE}")
+    sw = adapter.swApp
+    ok = adapter._attempt(
+        lambda: sw.SetUserPreferenceStringValue(
+            _PREF_DEFAULT_PART_TEMPLATE, str(PART_TEMPLATE)),
+        default=False)
+    got = str(adapter._attempt(
+        lambda: sw.GetUserPreferenceStringValue(_PREF_DEFAULT_PART_TEMPLATE),
+        default="") or "")
+    if not ok or not got or Path(got).resolve() != PART_TEMPLATE.resolve():
+        raise RuntimeError(
+            f"failed to pin default part template: set={ok} readback={got!r}")
+    _telemetry.success(f"default part template pinned -> {PART_TEMPLATE.name}")
+
+
 # Document summary metadata (File > Properties > Summary — also what Windows
 # Explorer shows). swSummInfoTitle=0, swSummInfoAuthor=2 (swSummInfoField_e).
 _SUMMARY_TITLE = 0
@@ -1988,6 +2028,7 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             # open, and saving over an open path fails.
             adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
             _telemetry.success("CloseAllDocuments (clean session)")
+            _pin_default_part_template(adapter)
         try:
             # Group the build's own operations (inserts, the mate chokepoint, the
             # per-config gates) under ONE ``<kind>.build`` phase span, a sibling of
