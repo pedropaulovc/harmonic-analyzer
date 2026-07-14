@@ -2421,6 +2421,12 @@ async def build(adapter) -> dict[str, str]:
                 f"crank-mesh phase correction did not hold: seed error"
                 f" {_err2:+.4f} deg after the cone-train put (was"
                 f" {_err:+.4f}) -- the free train reverted the pose")
+        # The puts spun the family AFTER its ledger entries were recorded
+        # (insert / the reledger_to_solved above); a correction big enough
+        # to matter (>~0.06 deg of cone spin) would fail the save-time
+        # assert_pose_ledger rotation check as pose drift. Re-anchor them.
+        for _nm in [cone_shaft, gear64] + [n for _, n in cone_gears]:
+            reledger_to_solved(adapter, _nm)
     await gear_mate(
         adapter,
         named_ref(f"Axis2@{pinion}", "AXIS"),
