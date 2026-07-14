@@ -1,0 +1,21 @@
+# Drawing title-block general tolerances (ASME-style, inch — matches the
+# US-customary fastener policy). The dashed-decimal rows mean "a dimension
+# displayed with N decimal places carries this ± unless otherwise specified".
+# ``display`` is pasted verbatim into part custom properties (TOL_LIN_XX /
+# TOL_LIN_XXX / TOL_ANG / TOL_SURFACE) that the drawing template's title block
+# reads via $PRPSHEET; ``value_in``/``value_deg`` feed the same numbers into
+# each part's DimXpert block-tolerance document properties — keep the pairs in
+# agreement.
+#
+# Split from tolerances.yaml on purpose: the fit/general classes there are read
+# by assembly GEOMETRY (drive_train / paper_drive via _config.fit), so sharing
+# a file would send those assemblies down the ~500 s FULL rebuild path for a
+# display-string edit. In its own file, a title-block edit re-stamps parts and
+# REFRESHES dependents only.
+#
+# Coherence with the mm classes in tolerances.yaml: ±.02 in = 0.508 mm ≈
+# visual_noncritical; ±.005 in = 0.127 mm ≈ machined_block.
+linear_2pl: { value_in: 0.02,  display: "±.02" }    # .XX
+linear_3pl: { value_in: 0.005, display: "±.005" }   # .XXX
+angular:    { value_deg: 1.0,  display: "±1°" }
+surface:    { value_uin: 125,  display: "Ra 125" }  # µin, machined finish; text sits above the finish symbol's arm (ASME Y14.36)

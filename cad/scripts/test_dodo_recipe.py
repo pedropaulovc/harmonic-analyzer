@@ -641,20 +641,20 @@ def test_config_deps_are_fine_grained():
 
     # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
     # (NOT machine/channels.yaml, where active_count lives) + its own registry row
-    # + tolerances.yaml (every part stamps the title-block tolerance properties
+    # + title_block.yaml (every part stamps the title-block tolerance properties
     # from _common.part_properties -> _config.title_block).
     cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml", "parts/cone-gear.yaml", "parts/_defaults.yaml",
-        "tolerances.yaml",
+        "title_block.yaml",
     }, _rel(cone, cfg)
     assert set(cone) <= whole
 
     # Editing ONE part's registry row rebuilds only that part: a leaf screw depends
-    # on its own row + shared defaults (+ the universal tolerances.yaml), nothing else.
+    # on its own row + shared defaults (+ the universal title_block.yaml), nothing else.
     screw = dodo._config_deps(scripts / "build_fillister_screw.py", "fillister_screw", "part")
     assert _rel(screw, cfg) == {
-        "parts/fillister-screw.yaml", "parts/_defaults.yaml", "tolerances.yaml",
+        "parts/fillister-screw.yaml", "parts/_defaults.yaml", "title_block.yaml",
     }
 
     # No part depends on dimensions.yaml.
@@ -670,13 +670,17 @@ def test_config_deps_are_fine_grained():
     assert not any(t.startswith("parts/") for t in frame_recipe), frame_recipe
     assert "dimensions.yaml" not in frame_recipe
     # The title_block token narrows the same way: a non-stamping assembly must
-    # NOT fold tolerances.yaml into its recipe (a title-block edit re-stamps the
+    # NOT fold title_block.yaml into its recipe (a title-block edit re-stamps the
     # parts and REFRESHES dependents — never a FULL rebuild), while a stamping
-    # assembly (channel, stretched springs) keeps it.
+    # assembly (channel, stretched springs) keeps it. tolerances.yaml (the fit
+    # classes) must stay out of frame too — title_block living in its OWN file is
+    # what keeps a title-block edit from FULL-rebuilding the fit readers
+    # (drive_train/paper_drive).
     assert "tolerances.yaml" not in frame_recipe, frame_recipe
+    assert "title_block.yaml" not in frame_recipe, frame_recipe
     channel_recipe = _rel(dodo._recipe_files("channel"), cfg)
     assert "parts/channel-spring-installed.yaml" in channel_recipe, channel_recipe
-    assert "tolerances.yaml" in channel_recipe, channel_recipe
+    assert "title_block.yaml" in channel_recipe, channel_recipe
 
 
 def test_config_deps_recipe_digest_skips_unread_yaml():
