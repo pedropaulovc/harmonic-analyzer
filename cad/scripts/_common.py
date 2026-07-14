@@ -1045,6 +1045,7 @@ async def save_part_and_images(
     _prune_stale_part_views(png_dir, part_name, views)
     apply_block_tolerances(adapter)
     apply_custom_properties(adapter, part_properties(part_name))
+    apply_summary_info(adapter, title=part_name)
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
     stl_path = (OUT_STL / f"{part_name}.STL").resolve()
@@ -1252,6 +1253,29 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
             raise RuntimeError(f"custom property {name!r} readback {back!r} != {text!r}")
         written.append(name)
     log(f"custom properties [{len(written)}]: {', '.join(written)}")
+
+
+# Document summary metadata (File > Properties > Summary — also what Windows
+# Explorer shows). swSummInfoTitle=0, swSummInfoAuthor=2 (swSummInfoField_e).
+_SUMMARY_TITLE = 0
+_SUMMARY_AUTHOR = 2
+PROJECT_AUTHOR = "Pedro Paulo Vezza Campos"
+
+
+@_telemetry.traced("part.summary_info")
+def apply_summary_info(adapter: Any, *, title: str) -> None:
+    """Write and read-verify the document summary Title + Author.
+
+    Same early-bound split as the drawing summary stamper: SummaryInfo is a
+    property, so early binding exposes the getter as ``SummaryInfo(field)`` and
+    the setter as ``SetSummaryInfo(field, value)``.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    for field, value in ((_SUMMARY_TITLE, title), (_SUMMARY_AUTHOR, PROJECT_AUTHOR)):
+        model.SetSummaryInfo(field, value)
+        if model.SummaryInfo(field) != value:
+            raise RuntimeError(f"summary field {field} did not persist ({value!r})")
+    _telemetry.success(f"summary info stamped (Title={title!r}, Author={PROJECT_AUTHOR!r})")
 
 
 @_telemetry.traced("appearance.material", label_param="material")
