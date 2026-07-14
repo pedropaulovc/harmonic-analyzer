@@ -171,7 +171,7 @@ sections:
       - - Crank arm length (center-to-center)
         - ~66 mm
         - ~2.6
-        - 'REDERIVED from the ch30 eight-views (angle 90 side view): crankshaft axis to handle-pivot axis, scaled to the 280 mm base depth (ch6, annotated). The crank hangs straight DOWN (the handle reads "down" in all eight roll views, so the arm is on the views'' vertical rotation axis), putting the handle ~28 mm above the base top at the ch30 GT crank height (Y_CRANK 144.96; was ~10 at the old 126.8). SUPERSEDES the former ~150 (cone-axial scaled, low), which was >2x too long — a down-pointing 150 arm would drop the handle below the table'
+        - 'REDERIVED from the ch30 eight-views (angle 90 side view): crankshaft axis to handle-pivot axis, scaled to the 280 mm base depth (ch6, annotated). The crank hangs straight DOWN (the handle reads "down" in all eight roll views, so the arm is on the views'' vertical rotation axis), putting the handle ~26 mm above the base top at the crank height (Y_CRANK 142.985 since the 2026-07-14 engaged-mesh rederive at the tightened slack 0.25; ~28 at the GT-only 144.96, ~10 at the old 126.8). SUPERSEDES the former ~150 (cone-axial scaled, low), which was >2x too long — a down-pointing 150 arm would drop the handle below the table'
         - scaled
         - med
       - - Handle length
@@ -323,9 +323,9 @@ sections:
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
-        - 'coarser pitch than the train, est. DP 26.57 (= DP_TRAIN·64/120): ~64T, PD 61.18 mm (OD ≈ 63.1 mm ≈ the cone 120T''s 62.2 — visual match RESTORED); mates a ~16T crank pinion (4:1, PD 15.3, OD 17.2)'
+        - 'coarser pitch than the train, est. DP 26.57 (= DP_TRAIN·64/120): ~64T, PD 61.18 mm (OD ≈ 63.1 mm ≈ the cone 120T''s 62.2 — visual match RESTORED); mates a ~16T crank pinion (4:1, PD 15.3, OD 17.2). Cut as a linearized 12.52° helix with a 0.40 backlash allowance + root-relieved floors (2026-07-14 crank-mesh rederive)'
         - —
-        - 'p.20 annotation + visibly coarser teeth than the 120T beside it. Re-anchored with the 62.2 OD: the crank-drive DP was rescaled to 26.57 so the 64T pitch radius again equals the cone big-end''s (the book''s "OD ≈ cone 120T" cross-check holds, and the 64T stays ~1.9× coarser than the train DP 49.82). Tooth counts NOT countable in photos — split est. from the stated 4:1 + the OD-match argument (Appendix C #9)'
+        - 'p.20 annotation + visibly coarser teeth than the 120T beside it. Re-anchored with the 62.2 OD: the crank-drive DP was rescaled to 26.57 so the 64T pitch radius again equals the cone big-end''s (the book''s "OD ≈ cone 120T" cross-check holds, and the 64T stays ~1.9× coarser than the train DP 49.82). Tooth counts NOT countable in photos — split est. from the stated 4:1 + the OD-match argument (Appendix C #9), RATIFIED 2026-07-14 against ch12 p.18/p.19 (pinion OD ~0.72× the Ø24 green column; pitch ~1.9× the train''s). HELIX rederive: the pair is a crossed-axis mesh (crank machine-z vs the 12.52°-inclined cone shaft) that the photos show deeply ENGAGED — straight uniform teeth cannot do that (±1.08 lateral flank misregistration across the face), so the 64T carries the accommodation, cut as gear-helix-angle = shaft-angle (a crossed-helical pair; the real gear''s wear-darkened flanks are the physical trace of the same accommodation) — `crossed_mesh_study` diagnostic'
         - scaled
         - low
   - prose: |2
@@ -535,12 +535,12 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - along Z at (x, y) = (+122.8, 144.96), 16T pinion meshing the 64T from ABOVE (near-vertical mesh azimuth, c2c 40.446 = R64 + R16 + oblique backoff), pinion centred on the 64T contact-tooth plane z −67.83
-        - 'RESOLVED (ch30 GT 2026-07-02): crank_sprocket triangulates at machine (−122.84, 144.78) ± 1.7 — the front-view pedestal at +122 ± 3 was RIGHT all along. The old derivation wrongly assumed the crank sits ON the drive line (horizontal mesh); freeing the 16T:64T mesh azimuth reconciles the 62.2 OD anchor AND the +122 pedestal photo simultaneously: X_CRANK 122.8 (GT 0.03σ), Y_CRANK 144.96 = 104.8 + sqrt(c2c² − 4.824²) (GT 0.13σ). The appendix C #9 "either the photo or 62.2 is wrong" dichotomy was false — the mesh-direction assumption was wrong. `build_drive_train_assembly.py` X_CRANK/Y_CRANK'
-        - high (GT)
+        - along Z at (x, y) = (+122.8, 142.985), 16T pinion meshing the 64T from ABOVE at a REAL engaged centre distance (near-vertical mesh azimuth, c2c 38.489 = R64 + R16 + 0.25 slack; tips 1.66 into the gaps, 87% working depth — the 64T's teeth are a TRUE 12.52° helix, boss-swept smooth; the tight fit re-arbitrated 2026-07-14 from the K=12-slice era's 0.40 backlash/0.60 slack after visible slop), the pinion standing PROUD of the green column's casting face (ch12 page002_img06: no relief pocket — its 10.8-wide face fills the TRUE casting-to-T120 span, pinion centre z −68.90, 0.32 wall / 0.30 T120-rim clearance, spanning ~94% of the 64T row (the inclined T120 rim's arc minimum caps it at ~94.5%); span-fit + engagement-floor asserts in build_drive_train_assembly)
+        - 'RESOLVED (ch30 GT 2026-07-02): crank_sprocket triangulates at machine (−122.84, 144.78) ± 1.7 — the front-view pedestal at +122 ± 3 was RIGHT all along; the GT axle-x at BOTH z-stations also pins the crank AXIS along machine z (a cone-parallel crankshaft would land x −144.6 at the arm, 20+σ off). 2026-07-14 crank-mesh rederive: the old Y_CRANK 144.96 sat on a radial BACKOFF (c2c 40.446 — the tip circles 0.29 APART, gears visibly not meshing, refuted by the engaged pair in ch12 p.18/p.19); with the 64T''s helical teeth the pair closes to the engaged c2c, Y_CRANK 142.985 = 104.8 + sqrt(c2c² − 4.824²) (GT 1.06σ — the mesh geometry is the harder constraint). `build_drive_train_assembly.py` X_CRANK/Y_CRANK'
+        - high (GT + mesh)
       - - Chain run
-        - crank T12 sprocket (+122.8, 144.96, z −155 chain plane) up to the transgear knob-shaft T24 at post-mirror (−65, 241.78)
-        - ch30 GT crank re-anchor; the chain plane moved south to z −155 (T12 band −157.5..−152.5, well in front of the pedestal cylinder front face −121.4)
+        - crank T12 sprocket (+122.8, 142.985, z −155 chain plane) up to the transgear knob-shaft T24 at post-mirror (−65, 241.78)
+        - ch30 GT crank re-anchor (y −1.98 with the 2026-07-14 engaged-mesh Y_CRANK at slack 0.25); the chain plane moved south to z −155 (T12 band −157.5..−152.5, well in front of the pedestal cylinder front face −121.4)
         - med
       - - Cone pivot
         - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post, tip in the black clamp block, both standing ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
@@ -563,12 +563,12 @@ sections:
         - ch30 GT (cyl_front); shape from still t00393 / v4_pinion_008 (base:top taper ~1.2, scaled off the 120T OD 62.2)
         - med (GT height; shape photo-scaled)
       - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
-        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 (north, pivot) → east 20 / west 37 (south, big end) over 214 along the cone axis; the west flare makes the pivot → lock-knob line SOLID plate (the old bolt-on lock lobe is gone); plan corners rounded to the neighbouring hardware (NE/NW/SW R10 ≈ the lock washer, SE R12 = the crank column''s radius); Ø6.5 pivot hole riding the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch (chord of the R191.7 swing arc from the engaged seat out through the west taper edge, 10.46 stud travel to the mouth); carries the "crank axis" reference + CrankAxisSeat datum (vertical, 43.11 from the pivot along the plate frame, crank height 94.16 above the plate bottom) the whole crank rig mates to; plate top y 57.15 — the post/block bores sit 47.65 above it = drive line 104.8 (chiral plate: authored MIRRORED under MIRROR_PLANE "x0")'
+        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 (north, pivot) → east 20 / west 37 (south, big end) over 214 along the cone axis; the west flare makes the pivot → lock-knob line SOLID plate (the old bolt-on lock lobe is gone); plan corners rounded to the neighbouring hardware (NE/NW/SW R10 ≈ the lock washer, SE R12 = the crank column''s radius); Ø6.5 pivot hole riding the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch (chord of the R191.7 swing arc from the engaged seat out through the west taper edge, 10.46 stud travel to the mouth); carries the "crank axis" reference + CrankAxisSeat datum (vertical, 43.11 from the pivot along the plate frame, crank height 92.185 above the plate bottom — 2026-07-14 engaged-mesh Y_CRANK at slack 0.25) the whole crank rig mates to; plate top y 57.15 — the post/block bores sit 47.65 above it = drive line 104.8 (chiral plate: authored MIRRORED under MIRROR_PLANE "x0")'
         - 'FLOATED, pivot at cone station 196 = (+79.69, 103.29) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft (via both journals), tip block AND the crank rig all ride it — the p1 disengage DOF is the plate''s swing about its tip-end vertical axis, FREE by default (deferred PARK_cone_swing driver): 6.41° to clear the knob washer, the west edge then meeting the swing-stop screw'
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; dims photo-scaled vs the 64T
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
-        - 'green cast cylinder Ø24 × 100.5 tall standing ON the plate — Ø9.5 cone journal bore at 47.65 above the plate top (abs y 104.8 = drive line) + Ø10 OBLIQUE crank bore at 87.81 above the plate top (abs y 144.96 = Y_CRANK; Ø9.525 crankshaft + 0.25/side running clearance — the crank spins in this journal, and the shaft is mated to the PLATE''s crank axis so a line-to-line bore slivers the interference gate), bored along MACHINE z through the inclined column (cut-revolve about the plan-rotated axis, 0.95 east of the column centre)'
+        - 'green cast cylinder Ø24 × 100.5 tall standing ON the plate — Ø9.5 cone journal bore at 47.65 above the plate top (abs y 104.8 = drive line) + Ø10 OBLIQUE crank bore at 85.835 above the plate top (abs y 142.985 = Y_CRANK, 2026-07-14 engaged-mesh rederive; Ø9.525 crankshaft + 0.25/side running clearance — the crank spins in this journal, and the shaft is mated to the PLATE''s crank axis so a line-to-line bore slivers the interference gate), bored along MACHINE z through the inclined column (cut-revolve about the plan-rotated axis, 0.95 east of the column centre); NO pinion relief pocket — ch12 page002_img06 shows the 16T standing proud of the machined casting face, so the bore is a plain journal through both walls (an interim Ø18.2 counterbore reading of img02 was reverted 2026-07-14: that ring is the bearing boss, not a pocket)'
         - 'centre (+121.85, −86.59) = cone shaft station 1.5; south flank −98.59 (64T south face 1.1 clear at the north flank); the shaft''s front stub ends 1.47 proud of the south flank at z −100.06. Absorbs the old separate crank-pedestal (user-confirmed vs v4_t00411/t00417): the crank rig rides the SWINGING plate, so the oblique 16T↔64T mesh survives the p1 disengage — the machine''s M.O. (ch12 "oblique angle"). DOCUMENTED DEVIATION: the GT cone_front boss (−123.07 ± 1.6) belonged to the retired nested-pedestal story — the platform architecture ends the shaft at the post'
         - p.18 "pivot"-plate bracket + v4 stills (one green column serving both bores), read green cast like the pedestals
         - med
@@ -1547,7 +1547,7 @@ sections:
         - counted + scaled
         - med
       - - Drive chain (roller chain; paper-drive rework 2026-07-07)
-        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` filled by the native connected-linkage chain pattern along the `_chain.py` centreline loop): the centreline rides each mounted removable''s PITCH circle (knob T24 r 24 about post-mirror (−54.575, 284.133); crank T12 r 12 about (−122.8, 144.96) = the GT crank axis), taut common external tangent on the bar side, slack arc solved to close the 68-link loop (sag ≈ 21 below the straight tangent, vs the p006 crop read 18); link pin plane z −155 (both wheels coplanar: bands −156.2..−153.8). z stack (rework E6): inner plates STRADDLE the 2.4 sprocket (inner faces ±1.45, 0.25 clear/side), bushings ±1.45, outer plates 2.55..3.35, pins ±3.35 — only the roller↔tooth seating remains as intended contact'
+        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` filled by the native connected-linkage chain pattern along the `_chain.py` centreline loop): the centreline rides each mounted removable''s PITCH circle (knob T24 r 24 about post-mirror (−54.575, 284.133); crank T12 r 12 about (−122.8, 142.985) = the crank axis), taut common external tangent on the bar side, slack arc solved to close the 68-link loop (sag ≈ 21 below the straight tangent, vs the p006 crop read 18); link pin plane z −155 (both wheels coplanar: bands −156.2..−153.8). z stack (rework E6): inner plates STRADDLE the 2.4 sprocket (inner faces ±1.45, 0.25 clear/side), bushings ±1.45, outer plates 2.55..3.35, pins ±3.35 — only the roller↔tooth seating remains as intended contact'
         - —
         - ch30 p002/p005/p006 (taut run + visibly drooping slack run) + ch. 23 p.58-59 (chain wider than the wheel); crank centre from ch30 GT; knob centre = stud + latch c2c 44.766 @ −18°
         - scaled + derived
@@ -1997,9 +1997,35 @@ sections:
          dichotomy. The old derivation assumed the 16T meshes the 64T
          HORIZONTALLY (crank on the drive line); the GT triangulates the crank
          axis at (−122.84, 144.78) — ABOVE the 64T, near-vertical mesh azimuth
-         — which satisfies the 62.2 OD anchor, the 40.446 mesh c2c, AND the
+         — which satisfies the 62.2 OD anchor, the mesh c2c, AND the
          +122 pedestal photo simultaneously. Neither the photo nor the 62.2
          reading was wrong; the mesh-direction assumption was.
+         **Engaged-mesh rederive (2026-07-14):** the near-vertical pose above
+         initially shipped with a radial BACKOFF c2c 40.446 that left the tip
+         circles 0.29 apart — the gears visibly did not mesh, refuted by the
+         deeply-engaged pair in the ch12 p.18/p.19 photos. The pair is a
+         crossed-axis mesh (crank machine-z — the GT axle-x matches the
+         pedestal-x at both z stations, killing a cone-parallel crankshaft —
+         vs the 12.52°-inclined 64T plane), and straight uniform teeth
+         CANNOT engage across it (±1.08 mm lateral flank misregistration vs
+         ≤0.70 available clearance — why the backoff existed). The 64T's
+         teeth are now a TRUE 12.52° helix (gear helix = shaft angle: a
+         crossed-helical pair with the straight 16T; one involute tooth
+         boss-swept with twist, patterned — smooth helicoid flanks) + 0.15
+         backlash + root relief on both, closing the mesh to c2c 38.489
+         (tips 1.66 into the gaps, 87% of working depth; zero collision over
+         a full crank-pitch phase sweep with ±0.4° seed margin —
+         `diagnostics/crossed_mesh_study.py`; the fit re-arbitrated
+         2026-07-14 from the interim K=12-slice cut stack's 0.40/0.60 after
+         visible slop), Y_CRANK 144.96 → 142.985 (GT 1.06σ). Axially the
+         pinion (face 10.8) stands PROUD of
+         the green column's casting face — ch12 page002_img06 shows no
+         relief pocket — centred in the TRUE casting-to-T120 span
+         (z −68.90, 0.32/0.30 clearances, ~94% of the 64T row — the
+         inclined T120 rim's arc MINIMUM bounds the band: at the tight fit
+         the overlap arc crosses 90° azimuth, where the rim dips south of
+         the old line-of-centres estimate; an interim pocket-nested edge
+         placement from the straight-tooth era was reverted the same day).
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility (Ø22.4 drum vs
          the 12.56 mm frustum/64T channel) dissolved with the ch30 GT: the
