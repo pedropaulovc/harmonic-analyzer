@@ -563,6 +563,12 @@ def new_project_drawing(
         height=ASME_B_HEIGHT_M,
     )
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    # A hand-saved template can be saved while in Edit Sheet Format mode (it
+    # was, the day the title block was drawn) -- a drawing created from it then
+    # opens with the FORMAT layer active, where every pick lands on the sheet
+    # format and view geometry is inert (all typed SelectByID2 picks fail).
+    # EditSheet() drops back to the sheet layer; idempotent when already there.
+    ddoc.EditSheet()
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
@@ -573,6 +579,13 @@ def new_project_drawing(
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
+    # Normalize the viewport: sheet-coordinate picks (the hole-table datum
+    # vertex / hole rims) hit-test with a PIXEL tolerance mapped through the
+    # current zoom, and a hand-saved template opens at whatever zoom it was
+    # saved with (the old generated one happened to be saved fit). Fit once so
+    # coordinate picks are deterministic regardless of how the template binary
+    # was last saved.
+    draw.ViewZoomtofit2()
     draw.ForceRebuild3(False)
     draw.EditRebuild3()
     return draw, sheet
@@ -1502,22 +1515,34 @@ async def finalize_drawing(
     if not sheet_name or not ddoc.ActivateSheet(sheet_name):
         raise RuntimeError("failed to activate drawing sheet for export")
 
+    if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+        raise RuntimeError("failed to set final drawing sheet scale")
+    assert_asme_b_sheet(adapter, sheet, phase="before save", scale=scale)
+
     # Point the sheet's $PRPSHEET property links at the FIRST drawing view's
     # model, by the view's REAL name -- setting it earlier (before views exist)
     # is silently ignored by SolidWorks. Every project drawing is single-model,
-    # so the first view is always the right source.
+    # so the first view is always the right source. Done AFTER the final
+    # SetScale: the property put rebuilds the sheet under the hood, and a
+    # SetScale on the pre-put handle returns False. Re-fetch the handle after.
     first_view = next(iter_views(adapter), None)
     if first_view is None:
         raise RuntimeError("finished drawing has no views to link sheet properties to")
     first_name = view_name(adapter, first_view)
     sheet.CustomPropertyView = first_name
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
     if linked != first_name:
         raise RuntimeError(
             f"CustomPropertyView did not take: {linked!r} != {first_name!r}")
-    if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
-        raise RuntimeError("failed to set final drawing sheet scale")
-    assert_asme_b_sheet(adapter, sheet, phase="before save", scale=scale)
+
+    # The title block's UNIT cell links $PRP:"UNIT_DISPLAY" (a DRAWING-doc
+    # property, unlike the $PRPSHEET part-property links), so the declared unit
+    # always tracks what set_units_mm actually configured. Flip to "IN" with
+    # the inch migration (#290) -- a hardcoded IN cell over mm dimensions would
+    # read as inch values and get machined at the wrong scale (Codex P1).
+    from _common import apply_custom_properties
+    apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
     # The layout is now complete -- audit element collisions / sheet overflow on
     # the finished sheet before the first save, so a broken layout never reaches
