@@ -7,7 +7,8 @@ loads (the normal case), a fallback name that is NOT declared on the named
 interface routes through the early-bound wrapper's lazily-built — and
 UNFLAGGED — dynamic fallback dispatch, silently reintroducing the zero-arg
 method-vs-property drift the name was listed to prevent. That is exactly how
-``create_drawing_standards`` bound segments to base ``ISketchSegment`` while
+``create_drawing_standards`` (since removed — the drawing template is now
+hand-made) bound segments to base ``ISketchSegment`` while
 listing the derived-only ``GetStartPoint2``/``GetEndPoint2``/
 ``GetCenterPoint2``: every point read failed silently and border segments
 were misclassified (fixed via ``concrete_sketch_segment``; this gate keeps

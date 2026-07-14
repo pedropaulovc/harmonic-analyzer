@@ -108,6 +108,15 @@ def fit(group: str, *keys: str) -> Any:
     return node
 
 
+def title_block(kind: str) -> dict[str, Any]:
+    """A title-block general tolerance row from title_block.yaml.
+
+    ``title_block('linear_2pl')`` -> ``{value_in, display}``;
+    ``title_block('angular')``    -> ``{value_deg, display}``.
+    """
+    return _doc("title_block")[kind]
+
+
 def provenance(doc: str, *keys: str) -> dict[str, Any]:
     """The ``source``/``confidence``/``notes`` triple for a config node.
 

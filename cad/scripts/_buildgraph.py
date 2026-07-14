@@ -279,11 +279,13 @@ def data_deps_of(script: Path) -> list[str]:
 #
 # ``config_files_of`` returns config-relative TOKENS: a concrete path
 # (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/cone-gear.yaml"``)
-# or one of three globs -- ``"machine/*"`` (whole machine family, for a dynamic
-# subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part name in
-# ``_common.part_properties``), ``"**"`` (whole config, the fallback). dodo.py
-# expands these, narrowing ``"parts/*"`` per task: a part to its OWN row, an
-# assembly to the rows it actually stamps (see _config_deps in dodo.py).
+# or one of four dynamic tokens -- ``"machine/*"`` (whole machine family, for a
+# dynamic subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part
+# name in ``_common.part_properties``), ``"title_block"`` (title_block.yaml,
+# but only for tasks that stamp part properties), ``"**"`` (whole config, the
+# fallback). dodo.py expands these, narrowing ``"parts/*"``/``"title_block"``
+# per task: a part to its OWN row, an assembly to the rows it actually stamps
+# (see _config_deps in dodo.py).
 
 # Accessors that read a FIXED file (no argument resolution needed). Derived from
 # _config.py; kept in sync by test_config_accessor_coverage. Note active_count
@@ -296,6 +298,13 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
     "active_count": frozenset({"machine/channels.yaml"}),
     "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
     "fit": frozenset({"tolerances.yaml"}),
+    # title_block is read only by _common.part_properties (the TOL_* stamping),
+    # so it emits a DYNAMIC token dodo narrows per task exactly like "parts/*":
+    # parts (and stamping assemblies) -> title_block.yaml; a non-stamping
+    # assembly drops it (a title-block edit re-stamps the parts, whose new
+    # digests REFRESH the assembly — folding it into the assembly recipe would
+    # escalate to a spurious ~500 s FULL rebuild).
+    "title_block": frozenset({"title_block"}),
     "materials": frozenset({"materials.yaml"}),
     "palette": frozenset({"materials.yaml"}),
 }
