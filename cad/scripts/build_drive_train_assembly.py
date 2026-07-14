@@ -87,10 +87,11 @@ apart, a visible air gap vs the engaged pair in ch12
 page002_img02/img06). The 64T is now cut as a linearized helix at the
 incline angle with a backlash allowance (build_crank_drive_gear.py --
 a crossed-helical pair, gear helix = shaft angle, pinion straight), and
-the pinion sits AXIALLY at the 64T's exposed SOUTH EDGE (overlap 2.5 --
-img02: the green casting's open pocket wraps the pinion, whose face
-covers only the near edge of the 64T row, the row's teeth running on
-north past it). The pair engages at 69% of working depth: MESH16_C2C =
+the pinion stands PROUD of the pivot post's casting face (img06: no
+relief pocket in the casting -- the pinion's face fills the static
+casting-to-T120 span, ~0.55 clearance each side, spanning ~96% of the
+64T row; the span-fit assert below keeps it off both neighbours). The
+pair engages at 69% of working depth: MESH16_C2C =
 R64 + R16 + slack 0.60, the deepest zero-collision pose over a full
 crank-pitch phase sweep (diagnostics/crossed_mesh_study.py). The
 perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i) north
@@ -240,7 +241,11 @@ SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 CONE_FACE = 6.5  # M6.7 mesh packing (annotated 7 -- build_cone_gear.py)
 GEAR64_FACE = 10.0
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
-PINION_FACE = 12.0
+PINION_FACE = 11.0  # re-derived 2026-07-14: fills the casting-face -> T120
+# span centered (~0.55 clearance each side, span-fit assert below); ch12
+# page002_img06 shows the pinion proud of the casting spanning the full 64T
+# row (the old 12.0 "slightly wider than the drive gear's 10" was a low-
+# confidence read and does not fit the span). = build_crank_pinion FACE_WIDTH.
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
 # contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
@@ -354,23 +359,22 @@ ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))  # 82.69
 # (both horizontal legs run TOWARD the other axis and read positive -- the
 # chirality-free plane-local convention; the CW spin sense is applied at the
 # rot_z(-PINION_SEED_DEG) callsite)
-# The 64T contact tooth's mid-plane station follows its tilted face. Seat the
-# pinion from the exposed south face, then advance its north face 2.5 mm into
-# that row as read from the ch12 page002_img02 closeup (the green casting's
-# open pocket wraps the pinion; the 64T row's teeth run on north past it).
-# This is an EDGE overlap, not the retired full 12 mm centred overlap that
-# also clipped cone-gear-1; the pinion's south half nests in the pivot post's
-# pinion pocket (build_cone_pivot_post.py PINION_POCKET_*).
+# The pinion stands PROUD of the pivot post's casting face: ch12
+# page002_img06 shows NO relief pocket -- the pinion's whole face is outside
+# the O24 column, hub cap outboard, spanning the full 64T row. Its axial
+# band is bounded by two STATIC neighbours: the column's wall on the south
+# (the crank bore's chord exit) and the T120 cone gear's overhanging rim on
+# the north (at this c2c the T120 rim crosses the crank axis zone). The
+# station is the CENTRE of that span, a literal so the crankshaft seat
+# stays a plain decimal (~0.55 clearance each side + ~96% row engagement,
+# both asserted below at the span-fit check). This retires the pocket-
+# nested SOUTH-EDGE placement (overlap 2.5, an artifact of the straight-
+# tooth compromise that needed a narrow engaged band -- the helix engages
+# the full row) 8.06 mm south of here.
 _GEAR64_CONTACT_Z = (
     GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
 )
-PINION_EDGE_OVERLAP = 2.5
-PINION_TOOTH_Z = (
-    _GEAR64_CONTACT_Z
-    - GEAR64_FACE / 2.0 * COS_I
-    - PINION_FACE / 2.0
-    + PINION_EDGE_OVERLAP
-)  # -76.179: pinion face centre at the exposed row edge
+PINION_TOOTH_Z = -68.57
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
 # keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
 # cut that is the MID-FACE azimuth, the twist's symmetry plane), so its
@@ -615,8 +619,6 @@ from build_cone_pivot_post import (  # noqa: E402
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CRANK_BORE_DX as POST_CRANK_DX,
     CRANK_BORE_Y as POST_CRANK_Y,
-    PINION_POCKET_INBOARD as POST_POCKET_INBOARD,
-    PINION_POCKET_OUTBOARD as POST_POCKET_OUTBOARD,
 )
 from build_cone_tip_block import (  # noqa: E402
     ADJUSTER_BORE_DEPTH as TIP_ADJ_BORE_DEPTH,
@@ -745,17 +747,39 @@ if abs(POST_CRANK_DX - (_PPOST[0] - X_CRANK)) > 0.05:
         f"{_PPOST[0] - X_CRANK:.3f}")
 if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
-# The column's pinion relief pocket must cover the pinion's axial band: the
-# pocket t-axis runs along the crank bore (machine +z) from the perpendicular
-# foot of the column axis, so its world band is post.z + [inboard, outboard].
-# An inboard shortfall gouges the O10 journal with the pinion's south face.
-_POCKET_Z = (_PPOST[2] + POST_POCKET_INBOARD, _PPOST[2] + POST_POCKET_OUTBOARD)
-if not (_POCKET_Z[0] <= PINION_TOOTH_Z - PINION_FACE / 2.0
-        and PINION_TOOTH_Z + PINION_FACE / 2.0 <= _POCKET_Z[1]):
+# Span-fit: the pinion's axial band must clear BOTH static neighbours (no
+# relief pocket exists -- ch12 page002_img06). South bound: the column wall
+# where the crank bore's chord exits the O24 (the pinion face must not rub
+# the casting). North bound: the T120 cone gear's rim, which at this c2c
+# overhangs the crank axis zone -- its south face there sits r*cos(a)*sin(i)
+# north of the at-axis face (the innermost conflict radius is where the
+# pinion's tip circle starts). 0.25 = the M6.8 sliver-class design floor.
+_WALL_Z = _PPOST[2] + math.sqrt(
+    (POST_BLOCK_DIA / 2.0) ** 2 - POST_CRANK_DX**2
+)
+_T120_SEAT = cone_station(SHAFT_T120_STATION)
+_DX120 = (_T120_SEAT[0] - X_CRANK) * COS_I
+_R120_CONFLICT = math.hypot(_DX120, _DY16) - (R16 + ADD16)
+_T120_SOUTH = (
+    _T120_SEAT[2] - CONE_FACE / 2.0 * COS_I
+    + _R120_CONFLICT * (_DX120 / math.hypot(_DX120, _DY16)) * SIN_I
+)
+if not (_WALL_Z + 0.25 <= PINION_TOOTH_Z - PINION_FACE / 2.0
+        and PINION_TOOTH_Z + PINION_FACE / 2.0 <= _T120_SOUTH - 0.25):
     raise AssertionError(
-        f"column pinion pocket z {_POCKET_Z[0]:.3f}..{_POCKET_Z[1]:.3f} does "
-        f"not cover the 16T band {PINION_TOOTH_Z - PINION_FACE / 2.0:.3f}.."
-        f"{PINION_TOOTH_Z + PINION_FACE / 2.0:.3f}")
+        f"16T band {PINION_TOOTH_Z - PINION_FACE / 2.0:.3f}.."
+        f"{PINION_TOOTH_Z + PINION_FACE / 2.0:.3f} does not fit the "
+        f"casting-to-T120 span {_WALL_Z:.3f}..{_T120_SOUTH:.3f} (+-0.25)")
+# ... and must still cover the 64T row (>= 85% of its face) -- an engagement
+# floor so a future station edit cannot quietly starve the mesh.
+_G64_BAND = (_GEAR64_CONTACT_Z - GEAR64_FACE / 2.0 * COS_I,
+             _GEAR64_CONTACT_Z + GEAR64_FACE / 2.0 * COS_I)
+_ENGAGED = (min(PINION_TOOTH_Z + PINION_FACE / 2.0, _G64_BAND[1])
+            - max(PINION_TOOTH_Z - PINION_FACE / 2.0, _G64_BAND[0]))
+if _ENGAGED < 0.85 * GEAR64_FACE * COS_I:
+    raise AssertionError(
+        f"16T engages only {_ENGAGED:.3f} of the 64T row "
+        f"{GEAR64_FACE * COS_I:.3f} (floor 85%)")
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED

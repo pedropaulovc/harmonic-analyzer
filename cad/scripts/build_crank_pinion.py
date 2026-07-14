@@ -49,7 +49,12 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
-FACE_WIDTH = 12.0  # mm, slightly wider than the drive gear's 10 (low)
+FACE_WIDTH = 11.0  # mm, re-derived 2026-07-14: fills the pivot-post
+# casting-face -> T120 span centered (~0.55 clearance each side; span-fit
+# assert in build_drive_train_assembly). ch12 page002_img06: the pinion
+# stands proud of the casting face, spanning the full 64T row. (The old
+# 12.0 "slightly wider than the drive gear's 10" was a low-confidence read
+# and does not fit the span.) = build_drive_train_assembly PINION_FACE.
 BORE_DIAMETER = 0.375 * IN  # 9.525 -- crankshaft dia (med)
 
 
