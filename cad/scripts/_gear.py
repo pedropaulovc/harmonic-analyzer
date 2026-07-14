@@ -300,10 +300,12 @@ for _t, _dp in ((16, 26.57), (64, 26.57), (12, 12.7)):
 # a flipped sweep path fails LOUD (a disjoint tooth keeps its embedded
 # sliver: ~+0.1 mm^2 x face x teeth over the analytic expectation).
 _TOOTH_EMBED_MM = 0.3
-# Top-plane sketch +y maps to world +Z on this template (the path line), and
-# a positive InsertProtrusionSwept4 twist turns CCW about the +Z path -- the
-# +INCLINE hand (gap azimuth advancing CCW toward +z).
-_SWEEP_PATH_Y = 1.0
+# Top-plane sketch -y maps to world +Z on this template (live-arbitrated:
+# the +y first try left the tooth disjoint below the disc -- the seeded-tooth
+# gate read exactly +1 embedded sliver), and a positive
+# InsertProtrusionSwept4 twist turns CCW about the +Z path -- the +INCLINE
+# hand (gap azimuth advancing CCW toward +z).
+_SWEEP_PATH_Y = -1.0
 _TWIST_CCW = 1.0
 
 
