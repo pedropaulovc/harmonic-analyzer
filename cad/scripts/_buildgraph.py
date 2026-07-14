@@ -296,6 +296,7 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
     "active_count": frozenset({"machine/channels.yaml"}),
     "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
     "fit": frozenset({"tolerances.yaml"}),
+    "title_block": frozenset({"tolerances.yaml"}),
     "materials": frozenset({"materials.yaml"}),
     "palette": frozenset({"materials.yaml"}),
 }

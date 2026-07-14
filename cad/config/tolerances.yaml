@@ -6,6 +6,20 @@
 # these values and raise on violation.
 units: mm
 
+# Drawing title-block general tolerances (ASME-style, inch — matches the
+# US-customary fastener policy). The dashed-decimal rows mean "a dimension
+# displayed with N decimal places carries this ± unless otherwise specified".
+# ``display`` is pasted verbatim into part custom properties (TOL_LIN_XX /
+# TOL_LIN_XXX / TOL_ANG) that the drawing template's title block reads via
+# $PRPSHEET; ``value_in``/``value_deg`` feed the same numbers into each part's
+# DimXpert block-tolerance document properties — keep the pairs in agreement.
+# Coherence with the mm classes below: ±.02 in = 0.508 mm ≈ visual_noncritical;
+# ±.005 in = 0.127 mm ≈ machined_block.
+title_block:
+  linear_2pl: { value_in: 0.02,  display: "±.02" }    # .XX
+  linear_3pl: { value_in: 0.005, display: "±.005" }   # .XXX
+  angular:    { value_deg: 1.0,  display: "±1°" }
+
 general:
   machined_block:    { tolerance: "+/-0.10", applies_to: "milled blocks, brackets, plates" }
   plate_profile:     { tolerance: "+/-0.20", applies_to: "noncritical exterior profiles" }
