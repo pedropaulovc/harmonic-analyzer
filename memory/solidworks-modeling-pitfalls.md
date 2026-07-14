@@ -67,6 +67,21 @@ discovered during harmonic-analyzer M6.4:
   the volume gate, removal = (disc − strip)·depth exactly). Only a cut running
   ALONG the normal (material above the sketch plane, e.g. a slot cut from an
   origin head-face with the body extruded +Y) takes `reverse_direction=True`.
+  Second bite (2026-07-14, the 64T sliced-helix crank gear): an offset plane
+  MID-BODY (InsertRefPlane offset from Front, inside a disc extruded +Z from
+  Front) also defaults its blind cut back TOWARD the base plane — every k>0
+  helix slice cut its southern neighbour's band at its own twist and the last
+  band survived as an uncut solid ring (the 1.1 mm³ crank-mesh interference;
+  +148 mm³ excess hidden inside the 1% disc gate). A mid-body cut running
+  AWAY from the base plane needs `reverse_direction=True` on the
+  ExtrusionParameters. (The slice stack itself was superseded the same day
+  by the true-helix swept tooth, but `_gear.build_fixed_gear` keeps the
+  lesson institutionalized: a seeded-tooth/gap volume gate (±1 mm³) BEFORE
+  patterning, where one wrong cut/sweep is a ≥3 mm³ error and the swept
+  tooth's embedded root sliver makes a wrong-side sweep overshoot loud.)
+  Diagnosis idiom: section the exported
+  STL per band and read gap azimuth/width vs the intended per-slice twist
+  (trimesh section + matplotlib even-odd containment — the band audit).
 - **A sketch on a REFERENCE plane enumerates the plane's own offset dim
   first** in the `GetFirstDisplayDimension` walk (`D1@<plane>` before the
   sketch's own `D1@<sketch>`), shifting positional renaming and tripping the
