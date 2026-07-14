@@ -90,7 +90,6 @@ _SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")
 _Z_PITCH = _SEAT_NOMINAL * math.cos(math.asin(_RADIUS_STEP / _SEAT_NOMINAL))
 HELIX_DEG = math.degrees(math.asin(_RADIUS_STEP / _Z_PITCH))  # 12.5182
 BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
-HELIX_SLICES = int(_config.machine("gear_train", "crank_drive_helix_slices"))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -113,7 +112,7 @@ async def build(adapter) -> dict[str, str]:
 
     volume = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP,
-        helix_deg=HELIX_DEG, helix_slices=HELIX_SLICES,
+        helix_deg=HELIX_DEG,
         backlash_mm=BACKLASH_MM, root_relief=True,
     )
 

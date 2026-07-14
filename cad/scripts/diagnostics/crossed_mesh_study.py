@@ -2,31 +2,31 @@
 
 SolidWorks-free repro for the 2026-07-14 crank-mesh rederivation ("crank-pinion
 and crank-drive gear are not meshing in model") -- the study behind
-``gear_train.crank_drive_backlash_mm`` / ``crank_drive_helix_slices``,
-``fits.crank_mesh.c2c_slack_mm`` and the drive-train's ``MESH16_C2C`` /
-``Y_CRANK`` constants. It builds the exact modeled tooth solids -- the involute
-gap profile of ``build_cone_gear.gear_facts`` with the ``_gear.py`` widen /
-root-relief extensions, the 64T's gaps twisted as the linearized helix
-``build_crank_drive_gear`` cuts (optionally quantized to the K slice cuts) --
-places them on the live drive-train geometry (constants imported from
-``build_drive_train_assembly``, never mirrored) at the shipped axial
-placement (``PINION_TOOTH_Z`` -- the pinion proud of the pivot-post casting
-face, spanning the 64T row; ch12 page002_img06), and voxel-computes the
-pair's intersection volume.
+``gear_train.crank_drive_backlash_mm``, ``fits.crank_mesh.c2c_slack_mm`` and
+the drive-train's ``MESH16_C2C`` / ``Y_CRANK`` / ``MESH_WINDOW_CENTRE_DEG``
+constants. It builds the exact modeled tooth solids -- the involute gap
+profile of ``build_cone_gear.gear_facts`` with the ``_gear.py`` widen /
+root-relief extensions, the 64T's teeth twisted as the TRUE helix
+``build_crank_drive_gear`` sweeps (``slices`` optionally quantizes to the
+retired K-slice cut stack) -- places them on the live drive-train geometry
+(constants imported from ``build_drive_train_assembly``, never mirrored) at
+the shipped axial placement (``PINION_TOOTH_Z`` -- the pinion proud of the
+pivot-post casting face, spanning the 64T row; ch12 page002_img06), and
+voxel-computes the pair's intersection volume.
 
 Findings it reproduces (run it after changing any crank-mesh input):
 
 * the retired PEN16 radial backoff left the tip circles 0.29 mm APART -- the
   user-flagged air gap -- and no straight-tooth pose can engage (the crossing
   manifests as lateral flank misregistration, +-1.08 mm across the face);
-* helix hand: +INCLINE on the 64T zeroes the collision; at the shipped
-  full-row placement the mirrored hand collides ~9.4 mm^3, straight teeth
-  ~3.5 mm^3 at the same depth;
-* the shipped pose (backlash 0.40, K=12 slices, c2c slack 0.60 -> tips 1.31
-  into the gaps, 69% of working depth) is ZERO-collision over a full
-  crank-pitch phase sweep, with >=0.05 backlash margin (a -0.05 perturbation
-  leaves only a 0.0004 mm^3 sliver);
-* deeper poses keep real residual contact (slack 0.45 -> ~0.002 mm^3).
+* helix hand: +INCLINE on the 64T zeroes the collision; the mirrored hand and
+  straight teeth both collide hard at the engaged depth;
+* the shipped pose (backlash 0.15, smooth helix, c2c slack 0.25 -> tips 1.66
+  into the gaps, 87% of working depth; re-arbitrated 2026-07-14 from the
+  K=12-slice era's 0.40/0.60 after the user flagged visible slop) is
+  ZERO-collision over a full crank-pitch phase sweep, with a >=0.05 backlash
+  margin and a [-1.90, -1.10] deg zero seed window (+-0.40 around the
+  shipped centre -- 4x the 0.10-deg authoring-time correction bound).
 
 Run (no SolidWorks)::
 
@@ -46,7 +46,7 @@ import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
 import build_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
 from build_cone_gear import gear_facts
-from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG, HELIX_SLICES
+from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG
 
 IN = 25.4
 DP_CRANK = dta.DP_CRANK
@@ -241,7 +241,7 @@ def worst_over_phase(widen: float, extra: float, k: int, lut: dict,
 def main() -> int:
     lut: dict = {}
     print(f"i={INCLINE_DEG:.4f}  R64={R64:.3f} R16={R16:.3f}  std c2c={R64 + R16:.3f}  "
-          f"live: slack {SLACK} backlash {BACKLASH_MM} K={HELIX_SLICES} helix {HELIX_DEG:.4f}")
+          f"live: slack {SLACK} backlash {BACKLASH_MM} smooth helix {HELIX_DEG:.4f}")
 
     print("\n== the retired straight-tooth backoff (air gap) ==", flush=True)
     r = study(144.96)  # the pre-rederive Y_CRANK
@@ -273,16 +273,16 @@ def main() -> int:
     assert abs(y_for_extra(SLACK) - dta.Y_CRANK) < 0.05, (
         f"y_for_extra({SLACK}) = {y_for_extra(SLACK)} drifted from Y_CRANK "
         f"{dta.Y_CRANK}")
-    w = worst_over_phase(BACKLASH_MM, SLACK, HELIX_SLICES, lut, seed_off=off)
-    print(f"backlash {BACKLASH_MM} c2c +{SLACK} K={HELIX_SLICES}: worst {w:.4f} mm^3")
-    wm = worst_over_phase(BACKLASH_MM - 0.05, SLACK, HELIX_SLICES, lut,
-                          seed_off=off)
+    w = worst_over_phase(BACKLASH_MM, SLACK, 0, lut, seed_off=off)
+    print(f"backlash {BACKLASH_MM} c2c +{SLACK} smooth: worst {w:.4f} mm^3")
+    wm = worst_over_phase(BACKLASH_MM - 0.05, SLACK, 0, lut, seed_off=off)
     print(f"margin (backlash -0.05):                worst {wm:.4f} mm^3")
-    # Seed-window margin: the shipped centre must clear +-1 deg of authoring
-    # wander in BOTH directions (the interference gate + the assembly's
-    # authoring-time correction guard the real pose; this guards the margin).
-    for so in (off - 1.0, off + 1.0):
-        wm2 = worst_over_phase(BACKLASH_MM, SLACK, HELIX_SLICES, lut,
+    # Seed-window margin: the shipped centre must clear +-0.4 deg of authoring
+    # wander in BOTH directions -- 4x the 0.10-deg bound the assembly's
+    # authoring-time measure-and-correct block enforces (the interference gate
+    # guards the real pose; this guards the margin).
+    for so in (off - 0.4, off + 0.4):
+        wm2 = worst_over_phase(BACKLASH_MM, SLACK, 0, lut,
                                phases=5, seed_off=so)
         print(f"margin (seed {so - off:+.1f} deg):                 "
               f"worst {wm2:.4f} mm^3")
