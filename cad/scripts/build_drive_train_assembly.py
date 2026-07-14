@@ -78,13 +78,25 @@ checker-arbitrated, see PEN_EDGE_SLACK) -> tip interleave 0.00..1.14
 across each drum face, identical at ALL 20 stations (zero drift, T006
 included). Stub-gap caps hold without any per-gear relief: the drum
 tips dive at most 0.24 into a cone gap vs the shallowest (T006) stub
-cap 0.88. The 16T crank pinion mesh gets the same treatment, now on a
-near-VERTICAL line of centres (the crank sits above the 64T, ch30 GT):
-the perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i)
-north of its centre (alpha = the contact azimuth from the in-plane
-horizontal; the old horizontal mesh is the alpha = 0 special case), the
-pinion is centred on that plane, and Y_CRANK backs off so the oblique
-dive across the 64T face caps clear of working depth (PEN16_EDGE_SLACK).
+cap 0.88. The 16T crank pinion mesh is DIFFERENT (2026-07-14 rederive): on its
+near-VERTICAL line of centres (the crank sits above the 64T, ch30 GT)
+the radial interleave is ~constant across the face -- the crossing
+manifests as LATERAL flank misregistration instead, which no radial
+backoff can clear (the retired PEN16 backoff left the tip circles 0.29
+apart, a visible air gap vs the engaged pair in ch12
+page002_img02/img06). The 64T is now cut as a linearized helix at the
+incline angle with a backlash allowance (build_crank_drive_gear.py --
+a crossed-helical pair, gear helix = shaft angle, pinion straight), and
+the pinion stands PROUD of the pivot post's casting face (img06: no
+relief pocket in the casting -- the pinion's face fills the static
+casting-to-T120 span, ~0.55 clearance each side, spanning ~96% of the
+64T row; the span-fit assert below keeps it off both neighbours). The
+pair engages at 69% of working depth: MESH16_C2C =
+R64 + R16 + slack 0.60, the deepest zero-collision pose over a full
+crank-pitch phase sweep (diagnostics/crossed_mesh_study.py). The
+perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i) north
+of its centre (alpha = the contact azimuth from the in-plane
+horizontal).
 
 Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
 supports". Tooth phasing: every gear script seeds a TOOTH centred on
@@ -141,6 +153,8 @@ import _telemetry
 from _common import (
     _early_bound,
     check,
+    force_rebuild,
+    log,
     run_build,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
@@ -229,7 +243,14 @@ SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 CONE_FACE = 6.5  # M6.7 mesh packing (annotated 7 -- build_cone_gear.py)
 GEAR64_FACE = 10.0
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
-PINION_FACE = 12.0
+PINION_FACE = 10.8  # re-derived 2026-07-14: fills the casting-face -> T120
+# span (0.32 wall / 0.30 T120 clearance, span-fit assert below); ch12
+# page002_img06 shows the pinion proud of the casting spanning the 64T row
+# (the old 12.0 "slightly wider than the drive gear's 10" was a low-
+# confidence read and does not fit the span; 11.0 fit the LINE-OF-CENTRES
+# overhang model but grazed the true T120 arc minimum once the tight fit
+# dropped Y_CRANK -- the 2026-07-14 0.00 mm^3 interference-gate catch).
+# = build_crank_pinion FACE_WIDTH.
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
 # contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
@@ -297,54 +318,95 @@ R16 = (16.0 / DP_CRANK) * 25.4 / 2.0  # 7.65: 16T crank-pinion pitch radius
 
 # Crank: ABOVE the 64T (ch30 GT photogrammetry -- the crank axle triangulates
 # to world (-122.84, 144.78, -189.1) +- 1.4: the pedestal axis of the +122
-# photo layout, ~40 ABOVE the drive plane, a near-VERTICAL 16T:64T mesh).
-# X_CRANK is the photo-pinned pedestal axis; Y_CRANK closes the mesh at the
-# same backed-off centre distance the old horizontal layout used. Slack 1.10
-# is checker-arbitrated like the drum mesh's (the long oblique dive across
-# the 64T face squeezes flanks: 0.15 left 1.48 mm^3, 0.60 left 0.23, 0.90 a
-# 0.00 skin).
+# photo layout, ~39 ABOVE the drive plane, a near-VERTICAL 16T:64T mesh).
+# X_CRANK is the photo-pinned pedestal axis; Y_CRANK closes the mesh at a REAL
+# engaged centre distance (2026-07-14 rederive, "crank-pinion and crank-drive
+# gear are not meshing"): the crossed pair (crank machine-z, 64T plane on the
+# 12.52-deg inclined shaft) engages at depth because the 64T's teeth are a
+# TRUE helix at the incline angle (boss-swept with twist, _gear.py) with a
+# 0.15 backlash allowance (build_crank_drive_gear.py) -- matching the engaged
+# pair in the ch12 closeups (page002_img02/img06). C2C = R64 + R16 + slack;
+# slack 0.25 keeps a 1.0-deg zero-collision seed window over a full
+# crank-pitch phase sweep of the exact tooth solids
+# (diagnostics/crossed_mesh_study.py; tips reach 1.66 into the gaps, 87% of
+# working depth). Re-arbitrated 2026-07-14 from the K=12-slice era's
+# 0.40/0.60 -- the smooth swept flanks return the clearance the slice facets
+# consumed, after the user flagged the visible slop. This RETIRES the PEN16
+# radial-backoff block (C2C 40.446 left the tip circles 0.29 APART -- a
+# literal air gap; its (FACE/2)*SIN_I "dive" term modeled the
+# horizontal-mesh depth gradient, but on the near-vertical line of centres
+# the radial interleave is ~constant across the face and the real constraint
+# is LATERAL flank misregistration, which no radial backoff fixes and the
+# helix + backlash do).
 ADD16 = 25.4 / DP_CRANK  # crank-pinion addendum
-WORK16 = 2.0 * ADD16  # 1.912 at DP 26.57
-PEN16_EDGE_SLACK = 1.10
-PEN16_MID = WORK16 - PEN16_EDGE_SLACK - (GEAR64_FACE / 2.0) * SIN_I  # -0.272
-MESH16_C2C = R64 + R16 + (ADD16 * (1.0 + SEC_I) - PEN16_MID)  # 40.446 backed off
+MESH16_C2C_SLACK = _config.fit("crank_mesh", "c2c_slack_mm")  # 0.25, tolerances.yaml
+MESH16_C2C = R64 + R16 + MESH16_C2C_SLACK  # 38.489: engaged, not backed off
+TIP16_C2C = R64 + R16 + 2.0 * ADD16  # 40.151: sum of outside radii
+CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C  # 1.662: radial tooth entry (87%)
+# Depth band: above ~1.2*ADD (really engaged), below 2*ADD minus the root
+# clearance floor (slack + 0.157*ADD16 of tip-to-root air stays positive).
+if not 1.2 * ADD16 < CRANK_MESH_DEPTH < 2.0 * ADD16 - 0.1:
+    raise AssertionError("crank pair mesh depth left its derived band")
 X_CRANK = -122.8  # crank/pedestal axis (GT -122.84 +- 0.9; ratifies the
-# pedestal photo the DP-26.57 rescale had displaced -- both hold: the crank is
-# above the gear, not outboard of it)
-Y_CRANK = 144.96  # = Y_DRIVE + sqrt(MESH16_C2C^2 - dx^2) with dx the in-plane
-# horizontal offset (GT 144.78 +- 1.4, 0.13 sigma); a literal so the pedestal
-# part's BORE_HEIGHT (94.16 above the base top) stays a round number -- both
-# self-checked below.
+# pedestal photo -- and pins the crank AXIS along machine z: a cone-parallel
+# crankshaft would put the z -189 axle at x -144.6, 20+ sigma off the GT)
+Y_CRANK = 142.985  # = Y_DRIVE + sqrt(MESH16_C2C^2 - _DX16^2) rounded to the
+# 0.001 grid (GT 144.78 +- 1.7, 1.06 sigma -- the mesh geometry is the harder
+# constraint; the old 144.96 matched GT at 0.13 sigma only by not meshing);
+# a literal so the pedestal/platform part heights (85.835 / 92.185) stay
+# plain decimals -- all three self-checked below and at the part asserts.
 _DX16 = (GEAR64_SEAT[0] - X_CRANK) * COS_I  # 4.82: horizontal leg toward the
 # crank (a plane-local magnitude: the azimuth convention below measures from
 # the in-plane horizontal TOWARD the other axis, so it is chirality-free)
-_DY16 = Y_CRANK - Y_DRIVE  # 40.16: vertical leg (in BOTH gear planes)
+_DY16 = Y_CRANK - Y_DRIVE  # 38.185: vertical leg (in BOTH gear planes)
 if abs(math.hypot(_DX16, _DY16) - MESH16_C2C) > 0.05:
-    raise AssertionError("crank mesh centre distance drifted off the backoff")
-if abs(Y_CRANK - (Y_BASE_TOP + 94.16)) > 0.001:
-    raise AssertionError("Y_CRANK must equal the pedestal bore height 94.16")
+    raise AssertionError("crank mesh centre distance drifted off the engaged c2c")
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
 # the inclined cone shaft; the 16T plane is a plain machine-Z section.
-ALPHA64 = math.degrees(math.atan2(_DY16, _DX16))  # 83.15
-ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))  # 82.98
+ALPHA64 = math.degrees(math.atan2(_DY16, _DX16))  # 82.87
+ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))  # 82.69
 # (both horizontal legs run TOWARD the other axis and read positive -- the
 # chirality-free plane-local convention; the CW spin sense is applied at the
 # rot_z(-PINION_SEED_DEG) callsite)
-# The 64T's contact tooth sits R64*cos(alpha)*sin(i) north of its centre (the
-# in-plane horizontal carries the plane's only z-component; alpha = 0 reduces
-# to the old horizontal-mesh R64*sin(i)). The 16T is centred on that plane.
-PINION_TOOTH_Z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I  # -67.83
+# The pinion stands PROUD of the pivot post's casting face: ch12
+# page002_img06 shows NO relief pocket -- the pinion's whole face is outside
+# the O24 column, hub cap outboard, spanning the full 64T row. Its axial
+# band is bounded by two STATIC neighbours: the column's wall on the south
+# (the crank bore's chord exit) and the T120 cone gear's overhanging rim on
+# the north (at this c2c the T120 rim crosses the crank axis zone -- and at
+# the tight fit its overlap arc crosses the 90-deg azimuth, so the inclined
+# rim's ARC MINIMUM dips SOUTH of the line-of-centres estimate; the span
+# assert scans the true arc). The station centres the band in that TRUE
+# span, a literal so the crankshaft seat stays a plain decimal (0.32 wall /
+# 0.30 T120 clearance + ~94% row engagement, asserted below -- the T120
+# overhang caps the reachable engagement at ~94.5%). This retires the
+# pocket-nested SOUTH-EDGE placement (overlap 2.5, an artifact of the
+# straight-tooth compromise that needed a narrow engaged band -- the helix
+# engages the full row) 8.4 mm south of here.
+_GEAR64_CONTACT_Z = (
+    GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
+)
+PINION_TOOTH_Z = -68.90
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
-# keyed at its authored phase (a tooth centred at azimuth 0), so its nearest
-# tooth leads the contact azimuth by DELTA64; the pinion's gap must sit that
-# same contact arc (scaled by R64/R16) past the contact on ITS side. At
-# ALPHA = 0 this is exactly 11.25.
+# keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
+# teeth that is the MID-FACE azimuth, the twist's symmetry plane), so its
+# nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
+# sit that same contact arc (scaled by R64/R16) past the contact on ITS side.
+# At ALPHA = 0 this is exactly 11.25. The formula is then CENTRED in the
+# zero-collision window: at the full-row band the helical twist biases the
+# window negative of the formula (crossed_mesh_study seed sweep 2026-07-14 at
+# the tight 0.15/0.25 fit: zero over [-1.90, -1.10] deg around it), so the
+# shipped seed sits at the window centre, buying +-0.40 deg of margin against
+# authoring-time phase wander -- 4x the 0.10-deg bound the authoring-time
+# measure-and-correct block enforces below. Re-arbitrate BOTH terms with the
+# study if the slack, band or backlash ever changes.
 _TP64 = 360.0 / 64.0
-DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.22: 64T tooth lead
+DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
+MESH_WINDOW_CENTRE_DEG = -1.50  # study window [-1.90, -1.10] centre
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (R64 / R16) - 22.5 / 2.0
-) % 22.5  # 21.8: tooth-in-gap at the tilted line of centres
+) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
 
 ARBOR_SOUTH_Z = -90.0  # arbor south end (ch30 GT cyl_front z -89.66 +- 2.7: the
 # end stops INSIDE the arbor-pedestal bore, blind-bearing look; was -98, poking
@@ -702,6 +764,47 @@ if abs(POST_CRANK_DX - (_PPOST[0] - X_CRANK)) > 0.05:
         f"{_PPOST[0] - X_CRANK:.3f}")
 if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
+# Span-fit: the pinion's axial band must clear BOTH static neighbours (no
+# relief pocket exists -- ch12 page002_img06). South bound: the column wall
+# where the crank bore's chord exits the O24 (the pinion face must not rub
+# the casting). North bound: the T120 cone gear's rim, which at this c2c
+# overhangs the crank axis zone. Its south face is an INCLINED plane, so the
+# bound is the face's z MINIMUM over the whole radial-overlap region with
+# the pinion's tip disc -- scanned at the T120 tip radius, where the region
+# is widest and the z(theta) = -r*cos(theta)*sin(i) dip is deepest (the old
+# line-of-centres point estimate sat 0.67 NORTH of the true arc minimum and
+# let an 11.0 face graze the rim: 2026-07-14 interference-gate catch,
+# 0.00 mm^3 sliver class). 0.25 = the M6.8 sliver-class design floor.
+_WALL_Z = _PPOST[2] + math.sqrt(
+    (POST_BLOCK_DIA / 2.0) ** 2 - POST_CRANK_DX**2
+)
+_T120_SEAT = cone_station(SHAFT_T120_STATION)
+_TIP120 = R64 + 25.4 / DP_TRAIN  # T120 pitch r == R64 by design; train DP add.
+_T120_SOUTH = math.inf  # no radial overlap -> no T120 bound at all
+for _k in range(7200):
+    _c = _TIP120 * math.cos(math.radians(0.05 * _k))
+    _s = _TIP120 * math.sin(math.radians(0.05 * _k))
+    if math.hypot(_T120_SEAT[0] + _c * COS_I - X_CRANK,
+                  Y_DRIVE + _s - Y_CRANK) <= R16 + ADD16:
+        _T120_SOUTH = min(
+            _T120_SOUTH,
+            _T120_SEAT[2] - _c * SIN_I - CONE_FACE / 2.0 * COS_I)
+if not (_WALL_Z + 0.25 <= PINION_TOOTH_Z - PINION_FACE / 2.0
+        and PINION_TOOTH_Z + PINION_FACE / 2.0 <= _T120_SOUTH - 0.25):
+    raise AssertionError(
+        f"16T band {PINION_TOOTH_Z - PINION_FACE / 2.0:.3f}.."
+        f"{PINION_TOOTH_Z + PINION_FACE / 2.0:.3f} does not fit the "
+        f"casting-to-T120 span {_WALL_Z:.3f}..{_T120_SOUTH:.3f} (+-0.25)")
+# ... and must still cover the 64T row (>= 85% of its face) -- an engagement
+# floor so a future station edit cannot quietly starve the mesh.
+_G64_BAND = (_GEAR64_CONTACT_Z - GEAR64_FACE / 2.0 * COS_I,
+             _GEAR64_CONTACT_Z + GEAR64_FACE / 2.0 * COS_I)
+_ENGAGED = (min(PINION_TOOTH_Z + PINION_FACE / 2.0, _G64_BAND[1])
+            - max(PINION_TOOTH_Z - PINION_FACE / 2.0, _G64_BAND[0]))
+if _ENGAGED < 0.85 * GEAR64_FACE * COS_I:
+    raise AssertionError(
+        f"16T engages only {_ENGAGED:.3f} of the 64T row "
+        f"{GEAR64_FACE * COS_I:.3f} (floor 85%)")
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED
@@ -2250,6 +2353,100 @@ async def build(adapter) -> dict[str, str]:
                 " over-defining")
         reledger_to_solved(adapter, cg)
     # 16T pinion (keyed to the crank) drives the 64T -> the cone cluster turns.
+    # The cone keying above replicated 19 gears with CopyWithMates2, and a
+    # copy's solve can WANDER the free cone train's spin off its inserted
+    # phase (the cylinder ladder below documents the same parked-pose
+    # wander). The gear mate authored NEXT records the CURRENT relative
+    # phase forever -- and through the 64:16 ratio a 0.5 deg cone wander
+    # misregisters the mesh by 2 deg of pinion seed (2026-07-14
+    # interference-gate catch: 1.1 mm^3, an effective +1.9 deg seed error).
+    # Measure both spins against design and rotate the cone train back so
+    # the mate freezes the DESIGNED phase. The rigid family rotation keeps
+    # every kept mate satisfied (all are family-internal), and the train's
+    # world spin is the deliberately-free DOF, so the solve holds the put.
+    _u = (SIN_I, 0.0, COS_I)  # cone axis (world)
+    _exd = (COS_I, 0.0, -SIN_I)  # design image of the 64T's part +X
+
+    def _pinion_spin_off() -> float:
+        """Pinion spin off its design pose (deg, CCW about +z)."""
+        r = component_transform(adapter, pinion)
+        sd = math.radians(-PINION_SEED_DEG)
+        return math.degrees(math.atan2(
+            math.cos(sd) * r[1] - math.sin(sd) * r[0],
+            math.cos(sd) * r[0] + math.sin(sd) * r[1],
+        ))
+
+    def _gear64_spin_off() -> float:
+        """64T spin off its design pose (deg, CCW about +u)."""
+        c = component_transform(adapter, gear64)[0:3]
+        cross = (
+            _exd[1] * c[2] - _exd[2] * c[1],
+            _exd[2] * c[0] - _exd[0] * c[2],
+            _exd[0] * c[1] - _exd[1] * c[0],
+        )
+        return math.degrees(math.atan2(
+            sum(x * a for x, a in zip(cross, _u)),
+            sum(e * a for e, a in zip(_exd, c)),
+        ))
+
+    def _seed_error() -> float:
+        """Wander as an equivalent pinion-seed offset (deg): a 64T slip
+        counts 4x through the external 64:16 mesh."""
+        return -(_pinion_spin_off() + 4.0 * _gear64_spin_off())
+
+    _err = _seed_error()
+    log(f"crank-mesh phase at authoring: pinion {_pinion_spin_off():+.4f}, "
+        f"64T {_gear64_spin_off():+.4f} deg off design -> seed error "
+        f"{_err:+.4f} deg")
+    if abs(_err) > 0.02:
+        _dl = math.radians(_err / 4.0)  # cone-train correction, CCW about +u
+        _c, _s = math.cos(_dl), math.sin(_dl)
+        _R = [
+            [_c + (1 - _c) * _u[0] * _u[0],
+             (1 - _c) * _u[0] * _u[1] - _s * _u[2],
+             (1 - _c) * _u[0] * _u[2] + _s * _u[1]],
+            [(1 - _c) * _u[1] * _u[0] + _s * _u[2],
+             _c + (1 - _c) * _u[1] * _u[1],
+             (1 - _c) * _u[1] * _u[2] - _s * _u[0]],
+            [(1 - _c) * _u[2] * _u[0] - _s * _u[1],
+             (1 - _c) * _u[2] * _u[1] + _s * _u[0],
+             _c + (1 - _c) * _u[2] * _u[2]],
+        ]  # w' = R w: Rodrigues, CCW about +u
+        _p0 = [v / 1000.0 for v in cone_station(GEAR64_STATION)]  # axis pt (m)
+        _sh = [_p0[k] - sum(_R[k][j] * _p0[j] for j in range(3))
+               for k in range(3)]
+
+        def _spun(a: list[float]) -> list[float]:
+            out = list(a)
+            for i in range(3):  # rows = local axes' world images
+                for k in range(3):
+                    out[i * 3 + k] = sum(
+                        a[i * 3 + j] * _R[k][j] for j in range(3))
+            for k in range(3):  # translation (metres)
+                out[9 + k] = sum(
+                    _R[k][j] * a[9 + j] for j in range(3)) + _sh[k]
+            return out
+
+        with suspend_automatic_assembly_rebuilds(adapter):
+            for _nm in [cone_shaft, gear64] + [n for _, n in cone_gears]:
+                put_component_pose(
+                    adapter, _nm,
+                    _spun(list(component_transform(adapter, _nm))))
+        await force_rebuild(adapter)
+        _err2 = _seed_error()
+        log(f"crank-mesh phase corrected: seed error {_err:+.4f} -> "
+            f"{_err2:+.4f} deg")
+        if abs(_err2) > 0.10:
+            raise RuntimeError(
+                f"crank-mesh phase correction did not hold: seed error"
+                f" {_err2:+.4f} deg after the cone-train put (was"
+                f" {_err:+.4f}) -- the free train reverted the pose")
+        # The puts spun the family AFTER its ledger entries were recorded
+        # (insert / the reledger_to_solved above); a correction big enough
+        # to matter (>~0.06 deg of cone spin) would fail the save-time
+        # assert_pose_ledger rotation check as pose drift. Re-anchor them.
+        for _nm in [cone_shaft, gear64] + [n for _, n in cone_gears]:
+            reledger_to_solved(adapter, _nm)
     await gear_mate(
         adapter,
         named_ref(f"Axis2@{pinion}", "AXIS"),
