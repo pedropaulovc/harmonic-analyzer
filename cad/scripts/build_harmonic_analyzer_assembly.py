@@ -84,6 +84,30 @@ SUBASSEMBLIES = ("frame", "drive-train", "summing", "magnifier", "pen",
 CHANNELS = _config.active_count()
 
 
+async def _pattern_after_seed(
+    adapter,
+    seeds: tuple[str, ...],
+    *,
+    axis: str,
+    spacing_mm: float,
+    total_instances: int,
+    label: str,
+) -> list[str]:
+    """Pattern an existing seed only when more than one occurrence is needed."""
+    if total_instances < 1:
+        raise ValueError("a seeded pattern needs at least one total instance")
+    if total_instances == 1:
+        return []
+    return await linear_component_pattern(
+        adapter,
+        seeds,
+        axis=axis,
+        spacing_mm=spacing_mm,
+        instances=total_instances,
+        label=label,
+    )
+
+
 def _set_flexible(adapter, component_name: str) -> None:
     """Make a grounded subassembly flexible with the current SOLIDWORKS API."""
     from solidworks_mcp.adapters.solidworks.assembly import _select_component
@@ -196,39 +220,41 @@ async def build(adapter) -> dict[str, str]:
             label=f"lever-shaft ball mount z{z_mm:+.1f}",
         )
 
-    # One seed of each spacer, then one shared native pattern produces the 18
-    # remaining inter-channel gaps. Pattern instances are feature-driven and
-    # need no per-bushing mate solve.
-    first_gap_z = Z0 + ARM_MID_DZ + PITCH / 2.0
-    pivot_bushing = await place_component(
-        adapter, "pivot-bushing",
-        [PIVOT[0], PIVOT[1], first_gap_z], [0.0, 0.0, 0.0], IDENTITY,
-        label="pivot-bushing gap 00/01 seed",
-    )
-    lever_bushing = await place_component(
-        adapter, "lever-bushing",
-        [FULCRUM[0], FULCRUM[1], first_gap_z], [0.0, 0.0, 0.0], IDENTITY,
-        label="lever-bushing gap 00/01 seed",
-    )
-    bushing_instances = await linear_component_pattern(
-        adapter,
-        (pivot_bushing, lever_bushing),
-        axis="z",
-        spacing_mm=PITCH,
-        instances=CHANNELS - 1,
-        label="channel spacer bushings",
-    )
-    assert_pattern_targets(
-        adapter,
-        bushing_instances,
-        (
-            [xy[0], xy[1], first_gap_z + PITCH * step]
-            for step in range(1, CHANNELS - 1)
-            for xy in (PIVOT, FULCRUM)
-        ),
-        IDENTITY,
-        "channel spacer bushing pattern",
-    )
+    # Inter-channel gaps own one spacer of each kind. With one gap the two
+    # inserted components are the complete bank; larger banks pattern those
+    # seeds, while a one-channel build has no gap hardware at all.
+    gap_count = CHANNELS - 1
+    if gap_count > 0:
+        first_gap_z = Z0 + ARM_MID_DZ + PITCH / 2.0
+        pivot_bushing = await place_component(
+            adapter, "pivot-bushing",
+            [PIVOT[0], PIVOT[1], first_gap_z], [0.0, 0.0, 0.0], IDENTITY,
+            label="pivot-bushing gap 00/01 seed",
+        )
+        lever_bushing = await place_component(
+            adapter, "lever-bushing",
+            [FULCRUM[0], FULCRUM[1], first_gap_z], [0.0, 0.0, 0.0], IDENTITY,
+            label="lever-bushing gap 00/01 seed",
+        )
+        bushing_instances = await _pattern_after_seed(
+            adapter,
+            (pivot_bushing, lever_bushing),
+            axis="z",
+            spacing_mm=PITCH,
+            total_instances=gap_count,
+            label="channel spacer bushings",
+        )
+        assert_pattern_targets(
+            adapter,
+            bushing_instances,
+            (
+                [xy[0], xy[1], first_gap_z + PITCH * step]
+                for step in range(1, gap_count)
+                for xy in (PIVOT, FULCRUM)
+            ),
+            IDENTITY,
+            "channel spacer bushing pattern",
+        )
 
     # Insert the one-channel mechanism at the machine datum, locate its outer
     # component with three plane coincidences, and make the internal mates
@@ -262,13 +288,13 @@ async def build(adapter) -> dict[str, str]:
         lambda: adapter.currentModel.ForceRebuild3(False), default=None
     )
     _set_flexible(adapter, channel)
-    channel_instances = await linear_component_pattern(
+    channel_instances = await _pattern_after_seed(
         adapter,
         (channel,),
         axis="z",
         spacing_mm=PITCH,
-        instances=CHANNELS,
-        label="20 independent flexible channels",
+        total_instances=CHANNELS,
+        label=f"{CHANNELS} independent flexible channels",
     )
     assert_pattern_targets(
         adapter,
