@@ -121,6 +121,10 @@ from _drawing_registry import (  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
+# The repo-owned part template (see _common.PART_TEMPLATE -- path duplicated
+# deliberately; importing _buildgraph from _common would drag graph tooling
+# into every part's dep closure). A runtime input of every part build.
+PART_TEMPLATE = REPO_ROOT / "cad" / "templates" / "harmonic-analyzer.PRTDOT"
 # The vendored COM adapter (``solidworks_mcp``) lives in this submodule and is
 # imported AT RUNTIME by _common/_assembly (e.g. the mate/plane creation glue), so
 # its source is a genuine build input of every COM task -- yet it is an installed
@@ -1071,8 +1075,15 @@ def _cached_drawing_action(stem: str) -> None:
 
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
+    # The repo-owned part TEMPLATE is a runtime input of every part build
+    # (_common._pin_default_part_template points the seat's default at it, so
+    # NewPart inherits its document properties -- the DimXpert block-tolerance
+    # get-only prefs ride it). Folding it in makes a template edit rebuild
+    # every part AND shift the remote-cache key, so no seat can publish
+    # template-drifted parts under a stale key.
     return [str(script.resolve()), *_helper_deps(script),
             *_config_deps(script, stem, "part"), *data_deps_of(script),
+            str(PART_TEMPLATE.resolve()),
             _submodule_part_dep()]
 
 
