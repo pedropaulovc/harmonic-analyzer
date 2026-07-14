@@ -243,11 +243,14 @@ SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 CONE_FACE = 6.5  # M6.7 mesh packing (annotated 7 -- build_cone_gear.py)
 GEAR64_FACE = 10.0
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
-PINION_FACE = 11.0  # re-derived 2026-07-14: fills the casting-face -> T120
-# span centered (~0.55 clearance each side, span-fit assert below); ch12
-# page002_img06 shows the pinion proud of the casting spanning the full 64T
-# row (the old 12.0 "slightly wider than the drive gear's 10" was a low-
-# confidence read and does not fit the span). = build_crank_pinion FACE_WIDTH.
+PINION_FACE = 10.8  # re-derived 2026-07-14: fills the casting-face -> T120
+# span (0.32 wall / 0.30 T120 clearance, span-fit assert below); ch12
+# page002_img06 shows the pinion proud of the casting spanning the 64T row
+# (the old 12.0 "slightly wider than the drive gear's 10" was a low-
+# confidence read and does not fit the span; 11.0 fit the LINE-OF-CENTRES
+# overhang model but grazed the true T120 arc minimum once the tight fit
+# dropped Y_CRANK -- the 2026-07-14 0.00 mm^3 interference-gate catch).
+# = build_crank_pinion FACE_WIDTH.
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
 # contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
@@ -371,17 +374,20 @@ ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))  # 82.69
 # the O24 column, hub cap outboard, spanning the full 64T row. Its axial
 # band is bounded by two STATIC neighbours: the column's wall on the south
 # (the crank bore's chord exit) and the T120 cone gear's overhanging rim on
-# the north (at this c2c the T120 rim crosses the crank axis zone). The
-# station is the CENTRE of that span, a literal so the crankshaft seat
-# stays a plain decimal (~0.55 clearance each side + ~96% row engagement,
-# both asserted below at the span-fit check). This retires the pocket-
-# nested SOUTH-EDGE placement (overlap 2.5, an artifact of the straight-
-# tooth compromise that needed a narrow engaged band -- the helix engages
-# the full row) 8.06 mm south of here.
+# the north (at this c2c the T120 rim crosses the crank axis zone -- and at
+# the tight fit its overlap arc crosses the 90-deg azimuth, so the inclined
+# rim's ARC MINIMUM dips SOUTH of the line-of-centres estimate; the span
+# assert scans the true arc). The station centres the band in that TRUE
+# span, a literal so the crankshaft seat stays a plain decimal (0.32 wall /
+# 0.30 T120 clearance + ~94% row engagement, asserted below -- the T120
+# overhang caps the reachable engagement at ~94.5%). This retires the
+# pocket-nested SOUTH-EDGE placement (overlap 2.5, an artifact of the
+# straight-tooth compromise that needed a narrow engaged band -- the helix
+# engages the full row) 8.4 mm south of here.
 _GEAR64_CONTACT_Z = (
     GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
 )
-PINION_TOOTH_Z = -68.57
+PINION_TOOTH_Z = -68.90
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
 # keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
 # teeth that is the MID-FACE azimuth, the twist's symmetry plane), so its
@@ -762,19 +768,27 @@ if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
 # relief pocket exists -- ch12 page002_img06). South bound: the column wall
 # where the crank bore's chord exits the O24 (the pinion face must not rub
 # the casting). North bound: the T120 cone gear's rim, which at this c2c
-# overhangs the crank axis zone -- its south face there sits r*cos(a)*sin(i)
-# north of the at-axis face (the innermost conflict radius is where the
-# pinion's tip circle starts). 0.25 = the M6.8 sliver-class design floor.
+# overhangs the crank axis zone. Its south face is an INCLINED plane, so the
+# bound is the face's z MINIMUM over the whole radial-overlap region with
+# the pinion's tip disc -- scanned at the T120 tip radius, where the region
+# is widest and the z(theta) = -r*cos(theta)*sin(i) dip is deepest (the old
+# line-of-centres point estimate sat 0.67 NORTH of the true arc minimum and
+# let an 11.0 face graze the rim: 2026-07-14 interference-gate catch,
+# 0.00 mm^3 sliver class). 0.25 = the M6.8 sliver-class design floor.
 _WALL_Z = _PPOST[2] + math.sqrt(
     (POST_BLOCK_DIA / 2.0) ** 2 - POST_CRANK_DX**2
 )
 _T120_SEAT = cone_station(SHAFT_T120_STATION)
-_DX120 = (_T120_SEAT[0] - X_CRANK) * COS_I
-_R120_CONFLICT = math.hypot(_DX120, _DY16) - (R16 + ADD16)
-_T120_SOUTH = (
-    _T120_SEAT[2] - CONE_FACE / 2.0 * COS_I
-    + _R120_CONFLICT * (_DX120 / math.hypot(_DX120, _DY16)) * SIN_I
-)
+_TIP120 = R64 + 25.4 / DP_TRAIN  # T120 pitch r == R64 by design; train DP add.
+_T120_SOUTH = math.inf  # no radial overlap -> no T120 bound at all
+for _k in range(7200):
+    _c = _TIP120 * math.cos(math.radians(0.05 * _k))
+    _s = _TIP120 * math.sin(math.radians(0.05 * _k))
+    if math.hypot(_T120_SEAT[0] + _c * COS_I - X_CRANK,
+                  Y_DRIVE + _s - Y_CRANK) <= R16 + ADD16:
+        _T120_SOUTH = min(
+            _T120_SOUTH,
+            _T120_SEAT[2] - _c * SIN_I - CONE_FACE / 2.0 * COS_I)
 if not (_WALL_Z + 0.25 <= PINION_TOOTH_Z - PINION_FACE / 2.0
         and PINION_TOOTH_Z + PINION_FACE / 2.0 <= _T120_SOUTH - 0.25):
     raise AssertionError(
