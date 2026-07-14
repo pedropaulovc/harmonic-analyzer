@@ -1127,9 +1127,9 @@ def part_properties(part_name: str) -> dict[str, str]:
     import _config
 
     props: dict[str, str] = {"Title": part_name, "Generator": f"harmonic-analyzer @ {_git_sha()}"}
-    # Title-block general tolerances (tolerances.yaml ``title_block:``) — read by
-    # the drawing template's title block via $PRPSHEET, so EVERY part carries
-    # them, registered in the parts registry or not.
+    # Title-block general tolerances (title_block.yaml) — read by the drawing
+    # template's title block via $PRPSHEET, so EVERY part carries them,
+    # registered in the parts registry or not.
     props["TOL_LIN_XX"] = str(_config.title_block("linear_2pl")["display"])
     props["TOL_LIN_XXX"] = str(_config.title_block("linear_3pl")["display"])
     props["TOL_ANG"] = str(_config.title_block("angular")["display"])
@@ -1157,8 +1157,8 @@ def part_properties(part_name: str) -> dict[str, str]:
 
 # DimXpert block-tolerance document properties (Tools > Options > Document
 # Properties > DimXpert), ids extracted from swconst.tlb R2026x. Values from
-# tolerances.yaml ``title_block:`` — the same numbers the TOL_* custom
-# properties display in the drawing title block.
+# title_block.yaml — the same numbers the TOL_* custom properties display in
+# the drawing title block.
 _PREF_DIMXPERT_METHOD = 637      # swPartDimXpertToleranceMethod -> 0 = BlockTolerance
 _PREF_TOL1_DECIMALS = 405        # swPartDimXpertLengthUnitTol1Decimals (get-only, see below)
 _PREF_TOL2_DECIMALS = 406        # swPartDimXpertLengthUnitTol2Decimals (get-only, see below)
@@ -1180,10 +1180,14 @@ def apply_block_tolerances(adapter: Any) -> None:
     the angular value (126) reject every write (``SetUserPreference*`` returns
     False under both int encodings, options 0-3, before/after rebuild, on a saved
     doc) despite the API help documenting them settable — get-only in practice.
-    The template defaults already carry the wanted decimals split (Tol1=2dp,
-    Tol2=3dp), and the angular value can only be set by hand in the seat's default
-    part template, so this stamps what it can, RAISES if a settable write fails,
-    and WARNS (self-healing once the template is fixed) on decimals/angular drift.
+    The get-only prefs therefore ride the seat's default part TEMPLATE, which
+    makes the template a build prerequisite: it must carry the wanted decimals
+    split (Tol1=2dp, Tol2=3dp — the stock default) and the title-block angular
+    value (set by hand in the .prtdot). This stamps what it can and RAISES on any
+    failure — a rejected settable write OR get-only drift. Drift must fail, not
+    warn: the template is not a cache-key input, so a drifted seat would publish
+    parts whose DimXpert metadata disagrees with title_block.yaml into the shared
+    remote cache under the same key as a correct seat.
     """
     import _config
 
@@ -1213,9 +1217,11 @@ def apply_block_tolerances(adapter: Any) -> None:
     if abs(got_ang - ang) > 1e-9:
         drift.append(f"angular {math.degrees(got_ang):g}° != {math.degrees(ang):g}°")
     if drift:
-        _telemetry.warn(
-            "DimXpert block-tolerance drift (get-only prefs; fix the seat's default "
-            f"part template): {'; '.join(drift)}")
+        raise RuntimeError(
+            "DimXpert block-tolerance drift on get-only prefs -- the seat's default "
+            "part template must carry these (open the default .prtdot, set Document "
+            "Properties > DimXpert accordingly, save), else this seat would publish "
+            f"metadata-drifted parts into the shared cache: {'; '.join(drift)}")
 
 
 def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:

@@ -609,13 +609,13 @@ def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
     ``_common.part_properties``): every part stamps the title-block tolerance
     properties, as does an assembly that stamps in-script (build_channel_assembly,
-    for its stretched springs) -> tolerances.yaml; a NON-stamping assembly drops
+    for its stretched springs) -> title_block.yaml; a NON-stamping assembly drops
     it (a title-block edit re-stamps the parts, whose shifted digests REFRESH the
     assembly -- keeping it in the assembly recipe would escalate to a spurious
     FULL rebuild). Any other caller keeps the dep, conservatively."""
     if kind == "assembly" and not stamps_part_properties(script):
         return []
-    return [str((CONFIG_DIR / "tolerances.yaml").resolve())]
+    return [str((CONFIG_DIR / "title_block.yaml").resolve())]
 
 
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:

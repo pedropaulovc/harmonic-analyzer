@@ -51,6 +51,11 @@ def _report(label: str, settable: bool, ok: bool) -> None:
 
 async def main() -> int:
     _telemetry.set_service("diagnostics")
+    async with _telemetry.aspan("probe.block_tolerance"):
+        return await _probe()
+
+
+async def _probe() -> int:
     adapter = PyWin32Adapter({})
     try:
         await adapter.connect()
