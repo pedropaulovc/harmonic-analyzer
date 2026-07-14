@@ -81,7 +81,7 @@ BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
 # machine z (see the bore feature's comment); it passes CRANK_BORE_DX east
 # of the column axis (ppost.x - X_CRANK, asserted in the assembly).
 INCLINE_DEG = 12.5182
-CRANK_BORE_Y = 85.58308686  # Y_CRANK 142.73308686 - base-top 50.8 - plate 6.35
+CRANK_BORE_Y = 86.75354719  # Y_CRANK 143.90354719 - base-top 50.8 - plate 6.35
 CRANK_BORE_DX = 0.95  # east offset: ppost.x -121.85 - X_CRANK -122.8
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
