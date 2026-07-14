@@ -19,7 +19,7 @@ title_block:
   linear_2pl: { value_in: 0.02,  display: "±.02" }    # .XX
   linear_3pl: { value_in: 0.005, display: "±.005" }   # .XXX
   angular:    { value_deg: 1.0,  display: "±1°" }
-  surface:    { value_uin: 125,  display: "125 µin" } # Ra, machined finish
+  surface:    { value_uin: 125,  display: "Ra 125" }  # µin, machined finish; text sits above the finish symbol's arm (ASME Y14.36)
 
 general:
   machined_block:    { tolerance: "+/-0.10", applies_to: "milled blocks, brackets, plates" }
