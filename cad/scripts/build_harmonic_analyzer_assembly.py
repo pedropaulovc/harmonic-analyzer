@@ -39,9 +39,11 @@ from __future__ import annotations
 
 import sys
 
+import _config
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
+    _early_bound,
     check,
     run_build,
 )
@@ -49,19 +51,94 @@ from _assembly import (
     _discard_copy_source,
     assert_component_placed,
     assert_components_fully_defined,
+    assert_pattern_targets,
     check_no_interference,
+    coincident_mate,
+    linear_component_pattern,
+    named_ref,
     place_component,
     remap_front_to_machine_front,
     save_assembly_and_images,
 )
 from _transforms import IDENTITY
+from build_channel_assembly import (
+    AFRAME_MOUNT_Z_ABS,
+    ARM_MID_DZ,
+    FULCRUM,
+    LEVER_MOUNT_Z,
+    PITCH,
+    PIVOT,
+    PIVOT_SHAFT_Z,
+    RAIL_TOP_Y,
+    SUPPORT_APEX_Y,
+    SUPPORT_Z,
+    Z0,
+)
 
 import _telemetry
 
 ASM_NAME = "harmonic-analyzer"
 
-SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen",
+SUBASSEMBLIES = ("frame", "drive-train", "summing", "magnifier", "pen",
                  "paper-drive")
+CHANNELS = _config.active_count()
+
+
+async def _pattern_after_seed(
+    adapter,
+    seeds: tuple[str, ...],
+    *,
+    axis: str,
+    spacing_mm: float,
+    total_instances: int,
+    label: str,
+) -> list[str]:
+    """Pattern an existing seed only when more than one occurrence is needed."""
+    if total_instances < 1:
+        raise ValueError("a seeded pattern needs at least one total instance")
+    if total_instances == 1:
+        return []
+    return await linear_component_pattern(
+        adapter,
+        seeds,
+        axis=axis,
+        spacing_mm=spacing_mm,
+        instances=total_instances,
+        label=label,
+    )
+
+
+def _set_flexible(adapter, component_name: str) -> None:
+    """Make a grounded subassembly flexible with the current SOLIDWORKS API."""
+    from solidworks_mcp.adapters.solidworks.assembly import _select_component
+
+    with _telemetry.span("assembly.flexible", component=component_name):
+        model = adapter.currentModel
+        model.ClearSelection2(True)
+        if not _select_component(adapter, component_name, 0, False):
+            raise RuntimeError(f"failed to select {component_name!r} for flexible solve")
+        assembly = _early_bound(model, "IAssemblyDoc")
+        applied = bool(
+            assembly.CompConfigProperties6(
+                2,  # swComponentFullyResolved
+                1,  # swComponentFlexibleSolving
+                True,
+                False,
+                "",
+                False,
+                False,
+                0,  # swUseSystemSettings when saving assembly as part
+            )
+        )
+        model.ClearSelection2(True)
+        component = assembly.GetComponentByName(component_name)
+        solving = int(component.Solving) if component is not None else -1
+        if not applied or solving != 1:
+            raise RuntimeError(
+                f"{component_name!r} did not become flexible: "
+                f"CompConfigProperties6={applied}, Solving={solving}"
+            )
+        _telemetry.event("component.flexible", component=component_name)
 
 # Loose hardware on the base top -- a generic tool, not part of any mechanism.
 # Parked in the FAR-WEST margin lane running along Z (machine x -220..-212,
@@ -116,6 +193,116 @@ async def build(adapter) -> dict[str, str]:
                 await adapter.fix_component(ComponentRefParameters(name=comp)),
             )
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
+
+    # The two full-bank shafts and their end supports belong to the machine,
+    # not to the one-channel child that is instantiated 20 times below.
+    await place_component(
+        adapter, "pivot-shaft",
+        [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z], [0.0, 0.0, 0.0], IDENTITY,
+        label="pivot-shaft (20-channel rocker bank)",
+    )
+    await place_component(
+        adapter, "fulcrum-shaft",
+        [FULCRUM[0], FULCRUM[1], 0.0], [0.0, 0.0, 0.0], IDENTITY,
+        label="fulcrum-shaft (20-channel lever bank)",
+    )
+    for mount_z in (-AFRAME_MOUNT_Z_ABS, SUPPORT_Z):
+        await place_component(
+            adapter, "pivot-ball-mount",
+            [PIVOT[0], SUPPORT_APEX_Y, mount_z], [0.0, 0.0, 0.0], IDENTITY,
+            label=f"rocker-shaft ball mount z{mount_z:+.1f}",
+        )
+    for sign in (-1.0, 1.0):
+        z_mm = sign * LEVER_MOUNT_Z
+        await place_component(
+            adapter, "pivot-ball-mount",
+            [FULCRUM[0], RAIL_TOP_Y, z_mm], [0.0, 0.0, 0.0], IDENTITY,
+            label=f"lever-shaft ball mount z{z_mm:+.1f}",
+        )
+
+    # Inter-channel gaps own one spacer of each kind. With one gap the two
+    # inserted components are the complete bank; larger banks pattern those
+    # seeds, while a one-channel build has no gap hardware at all.
+    gap_count = CHANNELS - 1
+    if gap_count > 0:
+        first_gap_z = Z0 + ARM_MID_DZ + PITCH / 2.0
+        pivot_bushing = await place_component(
+            adapter, "pivot-bushing",
+            [PIVOT[0], PIVOT[1], first_gap_z], [0.0, 0.0, 0.0], IDENTITY,
+            label="pivot-bushing gap 00/01 seed",
+        )
+        lever_bushing = await place_component(
+            adapter, "lever-bushing",
+            [FULCRUM[0], FULCRUM[1], first_gap_z], [0.0, 0.0, 0.0], IDENTITY,
+            label="lever-bushing gap 00/01 seed",
+        )
+        bushing_instances = await _pattern_after_seed(
+            adapter,
+            (pivot_bushing, lever_bushing),
+            axis="z",
+            spacing_mm=PITCH,
+            total_instances=gap_count,
+            label="channel spacer bushings",
+        )
+        assert_pattern_targets(
+            adapter,
+            bushing_instances,
+            (
+                [xy[0], xy[1], first_gap_z + PITCH * step]
+                for step in range(1, gap_count)
+                for xy in (PIVOT, FULCRUM)
+            ),
+            IDENTITY,
+            "channel spacer bushing pattern",
+        )
+
+    # Insert the one-channel mechanism at the machine datum, locate its outer
+    # component with three plane coincidences, and make the internal mates
+    # flexible before patterning. SOLIDWORKS' local-linear-pattern feature then
+    # creates 19 more flexible occurrences with synchronization disabled, so
+    # each channel responds independently to its own cam.
+    channel_data = check(
+        "insert channel seed",
+        await adapter.insert_component(
+            InsertComponentParameters(
+                file_path=_subassembly("channel"),
+                position=[0.0, 0.0, 0.0],
+                rotation=[0.0, 0.0, 0.0],
+            )
+        ),
+    )
+    channel = channel_data["name"]
+    check(
+        "float channel seed",
+        await adapter.float_component(ComponentRefParameters(name=channel)),
+    )
+    for plane in ("Front Plane", "Top Plane", "Right Plane"):
+        await coincident_mate(
+            adapter,
+            named_ref(f"{plane}@{channel}", "PLANE"),
+            named_ref(plane, "PLANE"),
+            label=f"channel seed datum {plane}",
+            verify=(channel, [0.0, 0.0, 0.0]),
+        )
+    adapter._attempt(
+        lambda: adapter.currentModel.ForceRebuild3(False), default=None
+    )
+    _set_flexible(adapter, channel)
+    channel_instances = await _pattern_after_seed(
+        adapter,
+        (channel,),
+        axis="z",
+        spacing_mm=PITCH,
+        total_instances=CHANNELS,
+        label=f"{CHANNELS} independent flexible channels",
+    )
+    assert_pattern_targets(
+        adapter,
+        channel_instances,
+        ([0.0, 0.0, PITCH * j] for j in range(1, CHANNELS)),
+        IDENTITY,
+        "flexible channel pattern",
+    )
 
     # Loose hardware on the base top (not part of any mechanism). Exact machine
     # transform: flat, graduated face up, long axis along Z.

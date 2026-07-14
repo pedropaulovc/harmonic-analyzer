@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import _assembly
+import build_harmonic_analyzer_assembly as top_builder
 from _assembly import (
     PatternDirection,
     assert_pattern_targets,
@@ -50,9 +51,11 @@ class _PatternManager:
 class _PatternModel:
     def __init__(self) -> None:
         self.created = False
+        self.component_queries: list[bool] = []
         self.FeatureManager = _PatternManager(self)
 
     def GetComponents(self, top_level_only: bool) -> list[_PatternComponent]:
+        self.component_queries.append(top_level_only)
         return [_PatternComponent()] if self.created else []
 
     @staticmethod
@@ -114,6 +117,26 @@ def test_linear_pattern_preserves_reverse_direction(monkeypatch: pytest.MonkeyPa
 
     assert adapter.currentModel.FeatureManager.definition.D1ReverseDirection is True
     assert names == ["seed-2"]
+    assert adapter.currentModel.component_queries == [True, True]
+
+
+def test_seed_only_bank_skips_native_pattern(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def unexpected_pattern(*args: object, **kwargs: object) -> list[str]:
+        raise AssertionError("seed-only bank must not create a native pattern")
+
+    monkeypatch.setattr(top_builder, "linear_component_pattern", unexpected_pattern)
+    names = asyncio.run(
+        top_builder._pattern_after_seed(
+            None,
+            ("seed-1",),
+            axis="z",
+            spacing_mm=7.0,
+            total_instances=1,
+            label="seed only",
+        )
+    )
+
+    assert names == []
 
 
 def test_circular_pattern_rejects_single_instance_before_com() -> None:
