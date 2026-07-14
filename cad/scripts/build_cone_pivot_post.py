@@ -68,7 +68,7 @@ PART_NAME = "cone-pivot-post"
 MATERIAL = "Gray Cast Iron"  # ONE green casting: big-end journal + crank pedestal
 
 BLOCK_DIA = 24.0  # round green column, p.18 top-down
-BLOCK_HEIGHT = 100.5  # crank bore at 87.81 + 12.69 of material above (the old
+BLOCK_HEIGHT = 100.5  # crank bore at 85.583 + 14.917 of material above (the old
 # separate pedestal read ~110 above the BASE top = ~103.65 above the plate;
 # this column ends just past the crank bore, video-plausible)
 BORE_DIA = 0.375 * IN  # 9.525: cone shaft big-end diameter (ch. 12, legacy, med)
@@ -81,7 +81,7 @@ BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
 # machine z (see the bore feature's comment); it passes CRANK_BORE_DX east
 # of the column axis (ppost.x - X_CRANK, asserted in the assembly).
 INCLINE_DEG = 12.5182
-CRANK_BORE_Y = 87.81  # Y_CRANK 144.96 - Y_BASE_TOP 50.8 - PLATE_T 6.35
+CRANK_BORE_Y = 85.58308686  # Y_CRANK 142.73308686 - base-top 50.8 - plate 6.35
 CRANK_BORE_DX = 0.95  # east offset: ppost.x -121.85 - X_CRANK -122.8
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
