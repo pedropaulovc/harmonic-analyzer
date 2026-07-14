@@ -679,6 +679,21 @@ def test_config_deps_are_fine_grained():
     channel_recipe = _rel(dodo._recipe_files("channel"), cfg)
     assert "parts/channel-spring-installed.yaml" in channel_recipe, channel_recipe
     assert "title_block.yaml" in channel_recipe, channel_recipe
+    # The part TEMPLATE narrows identically: channel GENERATES its stretch
+    # springs in-script via NewPart (which instantiates the template), so the
+    # PRTDOT is a direct recipe member -- a template edit must FULL-rebuild the
+    # generated variants and shift channel's cache key. A non-generating
+    # assembly (frame) gets the template only transitively (re-stamped parts ->
+    # shifted artefact digests -> REFRESH), never as a direct member.
+    channel_names = {Path(p).name.lower() for p in dodo._recipe_files("channel")}
+    frame_names = {Path(p).name.lower() for p in dodo._recipe_files("frame")}
+    assert "harmonic-analyzer.prtdot" in channel_names, channel_names
+    assert "harmonic-analyzer.prtdot" not in frame_names, frame_names
+    # ... and every normal part task carries it directly (NewPart instantiates it).
+    a_stem = next(iter(dodo.part_stems()))
+    part_names = {Path(p).name.lower()
+                  for p in dodo._part_file_deps(scripts / f"build_{a_stem}.py", a_stem)}
+    assert "harmonic-analyzer.prtdot" in part_names, part_names
 
 
 def test_config_deps_recipe_digest_skips_unread_yaml():
