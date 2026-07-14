@@ -71,6 +71,16 @@ cannot batch (each CreateMate consumes its own selection); everything but the so
 Also corrected: drive-train's "export_image front 77.3s" log line is mislabeled — the cost is
 `assembly_geometry_digest`'s `get_mass_properties` (exact-BREP fingerprint), render itself ~1s.
 
+**2026-07-14 finding-7 validation (PR #297):** fresh builds now make the DOF gate the single
+explicit deep rebuild, require `NeedsRebuild2 == 0` after the remaining gates and again after
+view setup, and fail instead of falling back to another rebuild. One all-assembly cold pass
+recorded 8 `dof.resolve` spans, 16 clean `assembly.rebuild_not_required` spans, and zero
+`assembly.final_rebuild` spans. The removed rebuilds totalled 193.54s in the preceding baseline;
+the new after-gate checks cost 10.95s, a net measured saving of 182.59s (~3m03s). Drive-train
+alone reclaimed ~28.32s net (31.43s rebuild replaced by a 3.11s status proof); the top assembly
+reclaimed ~129.33s net (129.82s -> 0.49s). Full `doit -n 4` passed in 2293.6s, including all
+soundness/kinematics gates; all eight assembly isometric renders passed visual inspection.
+
 **2026-07-09 seat validation (PR #219) — measured results:**
 - **Channel rebuild 1016s vs 1736s = 720s saved (41%)**, all gates green + soundness 5/5 +
   renders pixel-equivalent to v0.18.0. Bushing banks seed+pattern off the `BankZ` datum axis
