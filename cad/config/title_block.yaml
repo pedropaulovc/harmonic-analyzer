@@ -15,7 +15,15 @@
 #
 # Coherence with the mm classes in tolerances.yaml: ±.02 in = 0.508 mm ≈
 # visual_noncritical; ±.005 in = 0.127 mm ≈ machined_block.
-linear_2pl: { value_in: 0.02,  display: "±.02" }    # .XX
-linear_3pl: { value_in: 0.005, display: "±.005" }   # .XXX
+#
+# INTERIM (until the inch migration, issue #290): the ``display`` strings are
+# the mm renderings of the same inch tolerances, because generated sheets
+# still dimension in mm — an inch string like "±.02" on a metric print reads
+# as ±0.02 mm, 25x tighter than intended (Codex P1). When #290 flips the
+# drawings to inch, restore the inch strings: "±.02" / "±.005" / "±1°" /
+# "Ra 125" (µin). The numeric value_in/value_deg/value_uin fields are
+# unit-explicit and stay put.
+linear_2pl: { value_in: 0.02,  display: "±0.51" }   # .XX  (= ±.02 in)
+linear_3pl: { value_in: 0.005, display: "±0.13" }   # .XXX (= ±.005 in)
 angular:    { value_deg: 1.0,  display: "±1°" }
-surface:    { value_uin: 125,  display: "Ra 125" }  # µin, machined finish; text sits above the finish symbol's arm (ASME Y14.36)
+surface:    { value_uin: 125,  display: "Ra 3.2" }  # µm (= 125 µin), machined finish; text sits above the finish symbol's arm (ASME Y14.36)
