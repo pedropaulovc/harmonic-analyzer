@@ -153,6 +153,8 @@ import _telemetry
 from _common import (
     _early_bound,
     check,
+    force_rebuild,
+    log,
     run_build,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
@@ -380,16 +382,19 @@ PINION_TOOTH_Z = -68.57
 # cut that is the MID-FACE azimuth, the twist's symmetry plane), so its
 # nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
 # sit that same contact arc (scaled by R64/R16) past the contact on ITS side.
-# At ALPHA = 0 this is exactly 11.25. At the shipped slack the formula seed is
-# zero-collision over the full crank-pitch phase sweep (crossed_mesh_study;
-# at tighter slacks the window centre shifts ~-1.5 deg -- the helical twist at
-# the engaged band -- so re-arbitrate the seed with the study if the slack
-# ever changes).
+# At ALPHA = 0 this is exactly 11.25. The formula is then CENTRED in the
+# zero-collision window: at the full-row band the helical twist biases the
+# window negative of the formula (crossed_mesh_study seed sweep 2026-07-14:
+# zero over [-3.4, +0.1] deg around it -- the formula lands at the + EDGE),
+# so the shipped seed sits at the window centre, buying ~+-1.75 deg of
+# margin against authoring-time phase wander. Re-arbitrate BOTH terms with
+# the study if the slack, band or backlash ever changes.
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.50: 64T tooth lead
+MESH_WINDOW_CENTRE_DEG = -1.65  # study window [-3.4, +0.1] centre
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (R64 / R16) - 22.5 / 2.0
-) % 22.5  # 20.4: tooth-in-gap at the tilted line of centres
+) % 22.5 + MESH_WINDOW_CENTRE_DEG  # 18.75: window-centred tooth-in-gap
 
 ARBOR_SOUTH_Z = -90.0  # arbor south end (ch30 GT cyl_front z -89.66 +- 2.7: the
 # end stops INSIDE the arbor-pedestal bore, blind-bearing look; was -98, poking
@@ -2328,6 +2333,94 @@ async def build(adapter) -> dict[str, str]:
                 " over-defining")
         reledger_to_solved(adapter, cg)
     # 16T pinion (keyed to the crank) drives the 64T -> the cone cluster turns.
+    # The cone keying above replicated 19 gears with CopyWithMates2, and a
+    # copy's solve can WANDER the free cone train's spin off its inserted
+    # phase (the cylinder ladder below documents the same parked-pose
+    # wander). The gear mate authored NEXT records the CURRENT relative
+    # phase forever -- and through the 64:16 ratio a 0.5 deg cone wander
+    # misregisters the mesh by 2 deg of pinion seed (2026-07-14
+    # interference-gate catch: 1.1 mm^3, an effective +1.9 deg seed error).
+    # Measure both spins against design and rotate the cone train back so
+    # the mate freezes the DESIGNED phase. The rigid family rotation keeps
+    # every kept mate satisfied (all are family-internal), and the train's
+    # world spin is the deliberately-free DOF, so the solve holds the put.
+    _u = (SIN_I, 0.0, COS_I)  # cone axis (world)
+    _exd = (COS_I, 0.0, -SIN_I)  # design image of the 64T's part +X
+
+    def _pinion_spin_off() -> float:
+        """Pinion spin off its design pose (deg, CCW about +z)."""
+        r = component_transform(adapter, pinion)
+        sd = math.radians(-PINION_SEED_DEG)
+        return math.degrees(math.atan2(
+            math.cos(sd) * r[1] - math.sin(sd) * r[0],
+            math.cos(sd) * r[0] + math.sin(sd) * r[1],
+        ))
+
+    def _gear64_spin_off() -> float:
+        """64T spin off its design pose (deg, CCW about +u)."""
+        c = component_transform(adapter, gear64)[0:3]
+        cross = (
+            _exd[1] * c[2] - _exd[2] * c[1],
+            _exd[2] * c[0] - _exd[0] * c[2],
+            _exd[0] * c[1] - _exd[1] * c[0],
+        )
+        return math.degrees(math.atan2(
+            sum(x * a for x, a in zip(cross, _u)),
+            sum(e * a for e, a in zip(_exd, c)),
+        ))
+
+    def _seed_error() -> float:
+        """Wander as an equivalent pinion-seed offset (deg): a 64T slip
+        counts 4x through the external 64:16 mesh."""
+        return -(_pinion_spin_off() + 4.0 * _gear64_spin_off())
+
+    _err = _seed_error()
+    log(f"crank-mesh phase at authoring: pinion {_pinion_spin_off():+.4f}, "
+        f"64T {_gear64_spin_off():+.4f} deg off design -> seed error "
+        f"{_err:+.4f} deg")
+    if abs(_err) > 0.02:
+        _dl = math.radians(_err / 4.0)  # cone-train correction, CCW about +u
+        _c, _s = math.cos(_dl), math.sin(_dl)
+        _R = [
+            [_c + (1 - _c) * _u[0] * _u[0],
+             (1 - _c) * _u[0] * _u[1] - _s * _u[2],
+             (1 - _c) * _u[0] * _u[2] + _s * _u[1]],
+            [(1 - _c) * _u[1] * _u[0] + _s * _u[2],
+             _c + (1 - _c) * _u[1] * _u[1],
+             (1 - _c) * _u[1] * _u[2] - _s * _u[0]],
+            [(1 - _c) * _u[2] * _u[0] - _s * _u[1],
+             (1 - _c) * _u[2] * _u[1] + _s * _u[0],
+             _c + (1 - _c) * _u[2] * _u[2]],
+        ]  # w' = R w: Rodrigues, CCW about +u
+        _p0 = [v / 1000.0 for v in cone_station(GEAR64_STATION)]  # axis pt (m)
+        _sh = [_p0[k] - sum(_R[k][j] * _p0[j] for j in range(3))
+               for k in range(3)]
+
+        def _spun(a: list[float]) -> list[float]:
+            out = list(a)
+            for i in range(3):  # rows = local axes' world images
+                for k in range(3):
+                    out[i * 3 + k] = sum(
+                        a[i * 3 + j] * _R[k][j] for j in range(3))
+            for k in range(3):  # translation (metres)
+                out[9 + k] = sum(
+                    _R[k][j] * a[9 + j] for j in range(3)) + _sh[k]
+            return out
+
+        with suspend_automatic_assembly_rebuilds(adapter):
+            for _nm in [cone_shaft, gear64] + [n for _, n in cone_gears]:
+                put_component_pose(
+                    adapter, _nm,
+                    _spun(list(component_transform(adapter, _nm))))
+        await force_rebuild(adapter)
+        _err2 = _seed_error()
+        log(f"crank-mesh phase corrected: seed error {_err:+.4f} -> "
+            f"{_err2:+.4f} deg")
+        if abs(_err2) > 0.10:
+            raise RuntimeError(
+                f"crank-mesh phase correction did not hold: seed error"
+                f" {_err2:+.4f} deg after the cone-train put (was"
+                f" {_err:+.4f}) -- the free train reverted the pose")
     await gear_mate(
         adapter,
         named_ref(f"Axis2@{pinion}", "AXIS"),

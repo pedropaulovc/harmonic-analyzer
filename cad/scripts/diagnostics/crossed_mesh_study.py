@@ -146,7 +146,7 @@ ROOT64 = R64 - 1.157 * ADD16
 def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
           widen64: float = 0.0, root16: float | None = None,
           root64: float | None = None, crank_deg: float = 0.0,
-          slices: int = 0, vox: float = 0.06,
+          slices: int = 0, vox: float = 0.06, seed_off: float = 0.0,
           lut: dict | None = None) -> dict[str, float]:
     """Voxel intersection of the placed pair at the drive-train geometry.
 
@@ -169,7 +169,8 @@ def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
     alpha16 = math.degrees(math.atan2(dy16, GEAR64_SEAT[0] - X_CRANK))
     tp64 = 360.0 / 64.0
     delta64 = round(alpha64 / tp64) * tp64 - alpha64
-    seed = ((alpha16 + 180.0) - delta64 * (R64 / R16) - 22.5 / 2.0) % 22.5
+    seed = ((alpha16 + 180.0) - delta64 * (R64 / R16) - 22.5 / 2.0
+            ) % 22.5 + seed_off
     # Axial placement: the shipped station. It is anchored to the STATIC
     # casting-to-T120 span (see the assembly's span-fit assert), not to the
     # contact azimuth, so it does not move with the y_crank sweeps here.
@@ -224,12 +225,14 @@ def y_for_extra(extra: float) -> float:
 
 
 def worst_over_phase(widen: float, extra: float, k: int, lut: dict,
-                     phases: int = 9, vox: float = 0.06) -> float:
+                     phases: int = 9, vox: float = 0.06,
+                     seed_off: float = 0.0) -> float:
     w = 0.0
     for ph in np.linspace(0.0, 22.5, phases):
         w = max(w, study(y_for_extra(extra), skew_deg=INCLINE_DEG, widen64=widen,
                          root16=ROOT16, root64=ROOT64, crank_deg=float(ph),
-                         slices=k, vox=vox, lut=lut)["vol_mm3"])
+                         slices=k, vox=vox, seed_off=seed_off,
+                         lut=lut)["vol_mm3"])
         if w > 0.05:
             break
     return w
@@ -245,18 +248,22 @@ def main() -> int:
     print(f"old pose: c2c {r['c2c']:.3f}, tip interleave {r['interleave']:+.3f} "
           f"(NEGATIVE = the tips never touch), vol {r['vol_mm3']:.3f}")
 
+    # The assembly ships the seed at the zero-window CENTRE, not the raw
+    # formula (dta.MESH_WINDOW_CENTRE_DEG); model the same offset everywhere.
+    off = dta.MESH_WINDOW_CENTRE_DEG
+
     print("\n== helix hand at the live depth ==", flush=True)
     for skew, label in ((INCLINE_DEG, "+incline (shipped)"),
                         (-INCLINE_DEG, "mirrored hand"), (0.0, "straight teeth")):
         r = study(y_for_extra(SLACK), skew_deg=skew, widen64=BACKLASH_MM,
-                  root16=ROOT16, root64=ROOT64, lut=lut)
+                  root16=ROOT16, root64=ROOT64, seed_off=off, lut=lut)
         print(f"{label:20s}: vol {r['vol_mm3']:8.3f} mm^3")
 
     print("\n== the shipped pose over a crank-pitch phase sweep ==", flush=True)
     # Pin the study's derived pose to the assembly's shipped constants -- a
     # drift here means the study is validating a pose the build doesn't ship.
     live = study(dta.Y_CRANK, skew_deg=INCLINE_DEG, widen64=BACKLASH_MM,
-                 root16=ROOT16, root64=ROOT64, lut=lut)
+                 root16=ROOT16, root64=ROOT64, seed_off=off, lut=lut)
     assert abs(live["ptz"] - dta.PINION_TOOTH_Z) < 1e-9, (
         f"study placement {live['ptz']} != assembly PINION_TOOTH_Z "
         f"{dta.PINION_TOOTH_Z}")
@@ -266,10 +273,21 @@ def main() -> int:
     assert abs(y_for_extra(SLACK) - dta.Y_CRANK) < 0.05, (
         f"y_for_extra({SLACK}) = {y_for_extra(SLACK)} drifted from Y_CRANK "
         f"{dta.Y_CRANK}")
-    w = worst_over_phase(BACKLASH_MM, SLACK, HELIX_SLICES, lut)
+    w = worst_over_phase(BACKLASH_MM, SLACK, HELIX_SLICES, lut, seed_off=off)
     print(f"backlash {BACKLASH_MM} c2c +{SLACK} K={HELIX_SLICES}: worst {w:.4f} mm^3")
-    wm = worst_over_phase(BACKLASH_MM - 0.05, SLACK, HELIX_SLICES, lut)
+    wm = worst_over_phase(BACKLASH_MM - 0.05, SLACK, HELIX_SLICES, lut,
+                          seed_off=off)
     print(f"margin (backlash -0.05):                worst {wm:.4f} mm^3")
+    # Seed-window margin: the shipped centre must clear +-1 deg of authoring
+    # wander in BOTH directions (the interference gate + the assembly's
+    # authoring-time correction guard the real pose; this guards the margin).
+    for so in (off - 1.0, off + 1.0):
+        wm2 = worst_over_phase(BACKLASH_MM, SLACK, HELIX_SLICES, lut,
+                               phases=5, seed_off=so)
+        print(f"margin (seed {so - off:+.1f} deg):                 "
+              f"worst {wm2:.4f} mm^3")
+        assert wm2 < 0.02, (
+            f"seed window margin lost at {so - off:+.1f} deg: {wm2:.4f} mm^3")
     ok = w < 0.0005
     print("\nPASS" if ok else "\nFAIL: shipped pose no longer zero-collision")
     return 0 if ok else 1
