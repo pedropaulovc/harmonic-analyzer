@@ -349,10 +349,10 @@ async def build_fixed_gear(
                 res = check(
                     f"create_plane gap slice {k}",
                     await adapter.create_plane(CreatePlaneParameters(
-                        mode="offset", base_plane="Front", offset=z0,
+                        mode="offset", base_plane="Front Plane", offset=z0,
                     )),
                 )
-                plane = res.data.name
+                plane = res.name
             rot = ((z0 + slice_t / 2.0) - face_width / 2.0) * math.tan(
                 math.radians(helix_deg)
             ) / (pitch_r_in * IN)
