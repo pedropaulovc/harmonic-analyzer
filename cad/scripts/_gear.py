@@ -292,6 +292,22 @@ for _t, _dp in ((16, 26.57), (64, 26.57), (12, 12.7)):
         raise AssertionError(f"gap_area_in_disc_ext drifted at T{_t}: {_a} vs {_b}")
 
 
+def _blank_ref_plane(adapter: Any, name: str) -> None:
+    """Hide a reference plane (shown ref geometry renders in the part PNG and
+    every assembly instance -- the fix_shown_sketches BlankRefGeom idiom,
+    applied at build; see build_lever_wire/_output_fixture)."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        name, "PLANE", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"blank ref plane: cannot select {name!r}")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
+
+
 async def build_fixed_gear(
     adapter: Any,
     teeth: int,
@@ -376,6 +392,8 @@ async def build_fixed_gear(
                 reverse=bool(k),
             )
             seeds.append(gap_cut.data.name)
+            if k:
+                _blank_ref_plane(adapter, plane)
 
     gap_area = gap_area_in_disc_ext(
         teeth, dp=dp, pa_deg=pa_deg, widen_rad=widen_rad, root_r_in=root_r_in
