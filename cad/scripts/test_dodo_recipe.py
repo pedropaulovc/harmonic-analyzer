@@ -669,8 +669,14 @@ def test_config_deps_are_fine_grained():
     frame_recipe = _rel(dodo._recipe_files("frame"), cfg)
     assert not any(t.startswith("parts/") for t in frame_recipe), frame_recipe
     assert "dimensions.yaml" not in frame_recipe
+    # The title_block token narrows the same way: a non-stamping assembly must
+    # NOT fold tolerances.yaml into its recipe (a title-block edit re-stamps the
+    # parts and REFRESHES dependents — never a FULL rebuild), while a stamping
+    # assembly (channel, stretched springs) keeps it.
+    assert "tolerances.yaml" not in frame_recipe, frame_recipe
     channel_recipe = _rel(dodo._recipe_files("channel"), cfg)
     assert "parts/channel-spring-installed.yaml" in channel_recipe, channel_recipe
+    assert "tolerances.yaml" in channel_recipe, channel_recipe
 
 
 def test_config_deps_recipe_digest_skips_unread_yaml():

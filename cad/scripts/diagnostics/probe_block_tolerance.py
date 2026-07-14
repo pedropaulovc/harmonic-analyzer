@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     _PREF_ANGULAR_VALUE,
     _PREF_DIMXPERT_METHOD,
@@ -40,12 +41,22 @@ from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 IN = 0.0254
 
 
+def _report(label: str, settable: bool, ok: bool) -> None:
+    """A write outcome: success when it matches the claim, warn when it deviates
+    (a deviation means the get-only claim no longer holds on this seat)."""
+    expected = ok if settable else not ok
+    emit = _telemetry.success if expected else _telemetry.warn
+    emit(f"{label}: ret={ok}" + ("" if expected else " (UNEXPECTED — claim drifted)"))
+
+
 async def main() -> int:
+    _telemetry.set_service("diagnostics")
     adapter = PyWin32Adapter({})
     try:
         await adapter.connect()
         res = await adapter.create_part()
-        print(f"create_part: {res.status}")
+        if not res.is_success:
+            raise RuntimeError(f"create_part failed: {res.error}")
         model = adapter.currentModel
         ext = _read_member(model, "Extension")
 
@@ -56,43 +67,43 @@ async def main() -> int:
             v1 = ext.GetUserPreferenceDouble(_PREF_TOL1_VALUE, _PREF_OPT_NONE)
             v2 = ext.GetUserPreferenceDouble(_PREF_TOL2_VALUE, _PREF_OPT_NONE)
             a = ext.GetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE)
-            print(f"[{tag}] method={m} tol1=({d1}, {v1!r}) tol2=({d2}, {v2!r}) ang={a!r}")
+            _telemetry.info(
+                f"[{tag}] method={m} tol1=({d1}, {v1!r}) tol2=({d2}, {v2!r}) ang={a!r}")
 
         show("defaults")
 
-        print("SETTABLE (expect True):")
-        print("  method->block:",
-              ext.SetUserPreferenceInteger(_PREF_DIMXPERT_METHOD, _PREF_OPT_NONE, 0))
-        print("  tol1 value 0.02in:",
-              ext.SetUserPreferenceDouble(_PREF_TOL1_VALUE, _PREF_OPT_NONE, 0.02 * IN))
-        print("  tol2 value 0.005in:",
-              ext.SetUserPreferenceDouble(_PREF_TOL2_VALUE, _PREF_OPT_NONE, 0.005 * IN))
+        _report("SETTABLE method->block",
+                True, ext.SetUserPreferenceInteger(_PREF_DIMXPERT_METHOD, _PREF_OPT_NONE, 0))
+        _report("SETTABLE tol1 value 0.02in",
+                True, ext.SetUserPreferenceDouble(_PREF_TOL1_VALUE, _PREF_OPT_NONE, 0.02 * IN))
+        _report("SETTABLE tol2 value 0.005in",
+                True, ext.SetUserPreferenceDouble(_PREF_TOL2_VALUE, _PREF_OPT_NONE, 0.005 * IN))
 
-        print("GET-ONLY on R2026x (False everywhere when the claim still holds):")
         for opt in (0, 1, 2, 3):
-            print(f"  opt={opt}:",
-                  "ang(rad 1deg)=",
-                  ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, opt, math.radians(1.0)),
-                  "tol1dec(raw 3)=",
-                  ext.SetUserPreferenceInteger(_PREF_TOL1_DECIMALS, opt, 3),
-                  "tol1dec(enum 1)=",
-                  ext.SetUserPreferenceInteger(_PREF_TOL1_DECIMALS, opt, 1))
+            _report(f"get-only ang rad(1deg) opt={opt}",
+                    False, ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, opt, math.radians(1.0)))
+            _report(f"get-only tol1dec raw-3 opt={opt}",
+                    False, ext.SetUserPreferenceInteger(_PREF_TOL1_DECIMALS, opt, 3))
+            _report(f"get-only tol1dec enum-1 opt={opt}",
+                    False, ext.SetUserPreferenceInteger(_PREF_TOL1_DECIMALS, opt, 1))
         model.ForceRebuild3(False)
-        print("  after ForceRebuild3: ang=",
-              ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE, math.radians(1.0)))
+        _report("get-only ang after ForceRebuild3",
+                False, ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE, math.radians(1.0)))
         save_path = str(Path(tempfile.gettempdir()) / "probe_block_tol.SLDPRT")
         saved = await adapter.save_file(save_path)
-        print(f"  saved ({saved.status}): ang=",
-              ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE, math.radians(1.0)),
-              "deg-encoded=",
-              ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE, 1.0))
+        if not saved.is_success:
+            raise RuntimeError(f"save failed: {saved.error}")
+        _report("get-only ang on saved doc",
+                False, ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE, math.radians(1.0)))
+        _report("get-only ang deg-encoded on saved doc",
+                False, ext.SetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE, 1.0))
 
         show("final")
 
         title = model.GetTitle
         title = title() if callable(title) else title
         adapter.swApp.QuitDoc(title)
-        print("scratch part closed:", title)
+        _telemetry.success(f"scratch part closed: {title}")
         return 0
     finally:
         await adapter.disconnect()

@@ -186,9 +186,9 @@ def test_config_files_track_real_reads():
 
 def test_config_files_subset_of_known_tokens():
     """Every real script resolves to known tokens (concrete files that exist, or
-    the machine/* | parts/* | ** globs). The set can only NARROW the old whole-
-    config dep, never invent a missing-file dependency."""
-    globs = {"machine/*", "parts/*", "**"}
+    the machine/* | parts/* | title_block | ** dynamic tokens). The set can only
+    NARROW the old whole-config dep, never invent a missing-file dependency."""
+    globs = {"machine/*", "parts/*", "title_block", "**"}
     for stem in part_stems():
         for tok in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"):
             assert tok in globs or (bg.CONFIG_DIR / tok).is_file(), f"{stem}: {tok}"
