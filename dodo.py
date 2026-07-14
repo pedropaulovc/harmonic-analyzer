@@ -605,12 +605,27 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
     return parts_registry_files()
 
 
+def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
+    """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
+    ``_common.part_properties``): every part stamps the title-block tolerance
+    properties, as does an assembly that stamps in-script (build_channel_assembly,
+    for its stretched springs) -> tolerances.yaml; a NON-stamping assembly drops
+    it (a title-block edit re-stamps the parts, whose shifted digests REFRESH the
+    assembly -- keeping it in the assembly recipe would escalate to a spurious
+    FULL rebuild). Any other caller keeps the dep, conservatively."""
+    if kind == "assembly" and not stamps_part_properties(script):
+        return []
+    return [str((CONFIG_DIR / "tolerances.yaml").resolve())]
+
+
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
     """The cad/config FILES this build script actually reads (fine-grained;
     conservative whole-config fallback on any unclassifiable ``_config`` use).
 
     Expands the tokens from ``config_files_of`` to concrete paths, narrowing the
-    ``"parts/*"`` registry token to the task's own rows (see _expand_parts_token).
+    ``"parts/*"`` registry token to the task's own rows (see _expand_parts_token)
+    and the ``"title_block"`` token to stamping tasks only
+    (_expand_title_block_token).
     """
     script = script if isinstance(script, Path) else Path(script)
     tokens = config_files_of(script)
@@ -622,6 +637,8 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(machine_family_files())
         elif tok == "parts/*":
             out.update(_expand_parts_token(stem, kind, script))
+        elif tok == "title_block":
+            out.update(_expand_title_block_token(kind, script))
         else:
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)

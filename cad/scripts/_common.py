@@ -1168,6 +1168,7 @@ _PREF_OPT_NONE = 0               # swDetailingNoOptionSpecified
 _METERS_PER_INCH = 0.0254
 
 
+@_telemetry.traced("part.block_tolerances")
 def apply_block_tolerances(adapter: Any) -> None:
     """Stamp the title-block general tolerances as DimXpert block-tolerance doc
     properties on the active part, so the SLDPRT's MBD metadata matches what the
