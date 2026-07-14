@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import math
 import os
 import sys
 import time
@@ -1042,6 +1043,7 @@ async def save_part_and_images(
     png_dir.mkdir(parents=True, exist_ok=True)
     views = list(views)
     _prune_stale_part_views(png_dir, part_name, views)
+    apply_block_tolerances(adapter)
     apply_custom_properties(adapter, part_properties(part_name))
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
@@ -1125,6 +1127,12 @@ def part_properties(part_name: str) -> dict[str, str]:
     import _config
 
     props: dict[str, str] = {"Title": part_name, "Generator": f"harmonic-analyzer @ {_git_sha()}"}
+    # Title-block general tolerances (tolerances.yaml ``title_block:``) — read by
+    # the drawing template's title block via $PRPSHEET, so EVERY part carries
+    # them, registered in the parts registry or not.
+    props["TOL_LIN_XX"] = str(_config.title_block("linear_2pl")["display"])
+    props["TOL_LIN_XXX"] = str(_config.title_block("linear_3pl")["display"])
+    props["TOL_ANG"] = str(_config.title_block("angular")["display"])
     # Per-channel stretched springs (build_channel_assembly) are length variants of
     # the registered base part -- they inherit its material / tolerance / fit so
     # the tolerance audit stays clean without 10 redundant registry rows.
@@ -1144,6 +1152,68 @@ def part_properties(part_name: str) -> dict[str, str]:
         if key in reg and reg[key] is not None:
             props[prop] = str(reg[key])
     return props
+
+
+# DimXpert block-tolerance document properties (Tools > Options > Document
+# Properties > DimXpert), ids extracted from swconst.tlb R2026x. Values from
+# tolerances.yaml ``title_block:`` — the same numbers the TOL_* custom
+# properties display in the drawing title block.
+_PREF_DIMXPERT_METHOD = 637      # swPartDimXpertToleranceMethod -> 0 = BlockTolerance
+_PREF_TOL1_DECIMALS = 405        # swPartDimXpertLengthUnitTol1Decimals (get-only, see below)
+_PREF_TOL2_DECIMALS = 406        # swPartDimXpertLengthUnitTol2Decimals (get-only, see below)
+_PREF_TOL1_VALUE = 123           # swPartDimXpertLengthUnitTol1Value (meters)
+_PREF_TOL2_VALUE = 124           # swPartDimXpertLengthUnitTol2Value (meters)
+_PREF_ANGULAR_VALUE = 126        # swPartDimXpertAngularUnitTolValue (radians; get-only, see below)
+_PREF_OPT_NONE = 0               # swDetailingNoOptionSpecified
+_METERS_PER_INCH = 0.0254
+
+
+def apply_block_tolerances(adapter: Any) -> None:
+    """Stamp the title-block general tolerances as DimXpert block-tolerance doc
+    properties on the active part, so the SLDPRT's MBD metadata matches what the
+    drawing title block states.
+
+    Probe-verified on this seat (3DEXPERIENCE R2026x, 2026-07-13): the method and
+    the linear Tolerance 1/2 VALUES set fine, but the decimals prefs (405/406) and
+    the angular value (126) reject every write (``SetUserPreference*`` returns
+    False under both int encodings, options 0-3, before/after rebuild, on a saved
+    doc) despite the API help documenting them settable — get-only in practice.
+    The template defaults already carry the wanted decimals split (Tol1=2dp,
+    Tol2=3dp), and the angular value can only be set by hand in the seat's default
+    part template, so this stamps what it can, RAISES if a settable write fails,
+    and WARNS (self-healing once the template is fixed) on decimals/angular drift.
+    """
+    import _config
+
+    model = adapter.currentModel
+    ext = _read_member(model, "Extension")
+    lin2 = float(_config.title_block("linear_2pl")["value_in"]) * _METERS_PER_INCH
+    lin3 = float(_config.title_block("linear_3pl")["value_in"]) * _METERS_PER_INCH
+    ang = math.radians(float(_config.title_block("angular")["value_deg"]))
+    sets = [
+        ("DimXpert method=block", ext.SetUserPreferenceInteger,
+         _PREF_DIMXPERT_METHOD, 0),
+        ("DimXpert tol1 (.xx) value", ext.SetUserPreferenceDouble,
+         _PREF_TOL1_VALUE, lin2),
+        ("DimXpert tol2 (.xxx) value", ext.SetUserPreferenceDouble,
+         _PREF_TOL2_VALUE, lin3),
+    ]
+    for label, setter, pref, value in sets:
+        if not adapter._attempt(lambda: setter(pref, _PREF_OPT_NONE, value), default=False):
+            raise RuntimeError(f"{label} write rejected (pref {pref})")
+    _telemetry.success("DimXpert block tolerances stamped")
+    drift = []
+    if ext.GetUserPreferenceInteger(_PREF_TOL1_DECIMALS, _PREF_OPT_NONE) != 2:
+        drift.append("tol1 decimals != 2")
+    if ext.GetUserPreferenceInteger(_PREF_TOL2_DECIMALS, _PREF_OPT_NONE) != 3:
+        drift.append("tol2 decimals != 3")
+    got_ang = ext.GetUserPreferenceDouble(_PREF_ANGULAR_VALUE, _PREF_OPT_NONE)
+    if abs(got_ang - ang) > 1e-9:
+        drift.append(f"angular {math.degrees(got_ang):g}° != {math.degrees(ang):g}°")
+    if drift:
+        _telemetry.warn(
+            "DimXpert block-tolerance drift (get-only prefs; fix the seat's default "
+            f"part template): {'; '.join(drift)}")
 
 
 def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
