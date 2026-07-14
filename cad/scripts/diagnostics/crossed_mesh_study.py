@@ -9,9 +9,10 @@ gap profile of ``build_cone_gear.gear_facts`` with the ``_gear.py`` widen /
 root-relief extensions, the 64T's gaps twisted as the linearized helix
 ``build_crank_drive_gear`` cuts (optionally quantized to the K slice cuts) --
 places them on the live drive-train geometry (constants imported from
-``build_drive_train_assembly``, never mirrored) at the shipped SOUTH-EDGE
-axial placement (``PINION_EDGE_OVERLAP`` -- ch12 page002_img02), and
-voxel-computes the pair's intersection volume.
+``build_drive_train_assembly``, never mirrored) at the shipped axial
+placement (``PINION_TOOTH_Z`` -- the pinion proud of the pivot-post casting
+face, spanning the 64T row; ch12 page002_img06), and voxel-computes the
+pair's intersection volume.
 
 Findings it reproduces (run it after changing any crank-mesh input):
 
@@ -19,8 +20,8 @@ Findings it reproduces (run it after changing any crank-mesh input):
   user-flagged air gap -- and no straight-tooth pose can engage (the crossing
   manifests as lateral flank misregistration, +-1.08 mm across the face);
 * helix hand: +INCLINE on the 64T zeroes the collision; at the shipped
-  edge placement the mirrored hand collides ~4.6 mm^3, straight teeth
-  ~1.3 mm^3 at the same depth (~28 / ~16 mm^3 at the wider centred band);
+  full-row placement the mirrored hand collides ~9.4 mm^3, straight teeth
+  ~3.5 mm^3 at the same depth;
 * the shipped pose (backlash 0.40, K=12 slices, c2c slack 0.60 -> tips 1.31
   into the gaps, 69% of working depth) is ZERO-collision over a full
   crank-pitch phase sweep, with >=0.05 backlash margin (a -0.05 perturbation
@@ -39,7 +40,9 @@ import sys
 import numpy as np
 from matplotlib.path import Path
 
-import _common  # noqa: F401  -- sys.path shim: puts cad/scripts first
+import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
+# shim that inserts the parent cad/scripts onto sys.path and re-exports the
+# real _common (every diag_*/probe_* script here relies on it)
 import build_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
 from build_cone_gear import gear_facts
@@ -56,7 +59,7 @@ SIN_I, COS_I = dta.SIN_I, dta.COS_I
 INCLINE_DEG = dta.INCLINE_DEG
 R64, R16, ADD16 = dta.R64, dta.R16, dta.ADD16
 SLACK = dta.MESH16_C2C_SLACK
-EDGE_OVERLAP = dta.PINION_EDGE_OVERLAP
+PINION_TOOTH_Z = dta.PINION_TOOTH_Z
 
 
 def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
@@ -167,12 +170,10 @@ def study(y_crank: float, skew_deg: float = 0.0, widen16: float = 0.0,
     tp64 = 360.0 / 64.0
     delta64 = round(alpha64 / tp64) * tp64 - alpha64
     seed = ((alpha16 + 180.0) - delta64 * (R64 / R16) - 22.5 / 2.0) % 22.5
-    # South-edge axial placement, exactly as the assembly derives it: the
-    # contact tooth's tilted-face station, backed to the exposed south edge,
-    # then advanced EDGE_OVERLAP into the row (ch12 page002_img02).
-    contact_z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(alpha64)) * SIN_I
-    pinion_tooth_z = (contact_z - GEAR64_FACE / 2.0 * COS_I
-                      - PINION_FACE / 2.0 + EDGE_OVERLAP)
+    # Axial placement: the shipped station. It is anchored to the STATIC
+    # casting-to-T120 span (see the assembly's span-fit assert), not to the
+    # contact azimuth, so it does not move with the y_crank sweeps here.
+    pinion_tooth_z = PINION_TOOTH_Z
 
     k16 = (16, widen16, root16)
     k64 = (64, widen64, root64)

@@ -19,11 +19,17 @@ radial backoff) just parked the tip circles 0.29 mm apart: a literal air gap.
 straight 16T), K=12 stacked rotated slice cuts, 0.40 mm circumferential
 backlash, root-relieved gap floors (stock base-chord floor starves a 16T
 pinion by 0.71 mm). Engaged C2C = R64+R16+0.60 slack = 38.839 (tips 1.31 mm
-in, 69% working depth), Y_CRANK 143.34 (GT 0.85σ). Pinion sits axially at the
-64T's exposed SOUTH EDGE (2.5 mm overlap — ch12 page002_img02: pinion nested
-in an open Ø18.2 pocket in the green post, 64T row's teeth running north past
-it); the pocket lives in build_cone_pivot_post. Helix HAND matters: +INCLINE
-zeroes the collision, the mirrored hand collides ~5 mm³.
+in, 69% working depth), Y_CRANK 143.34 (GT 0.85σ). Axially the pinion
+(face 11) stands PROUD of the green post's casting face — ch12
+page002_img06: NO relief pocket (the img02 "pocket" ring is the bearing
+boss; a pocket-nested edge placement adopted from a concurrent branch was
+reverted 2026-07-14 on the user's read) — centred in the static
+casting-to-T120 span (PINION_TOOTH_Z −68.57, ~0.55 clearance each side,
+~96% of the 64T row; span-fit + engagement-floor asserts in the assembly).
+The pocket was an artifact of the straight-tooth era: a narrow engaged band
+was the only way straight teeth stayed collision-free, while the helix
+engages the full row. Helix HAND matters: +INCLINE zeroes the collision,
+the mirrored hand collides ~9 mm³.
 
 **Why:** the mesh geometry is the harder constraint than raw GT residuals —
 the old Y_CRANK 144.96 matched GT at 0.13σ only by not meshing.

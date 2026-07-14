@@ -96,15 +96,6 @@ BORE_RADIUS = BORE_DIA / 2.0
 # coaxial to this part's own named axis.
 CRANK_BORE_DIA = BORE_DIA + 0.5
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
-# The ch12 closeups show the broad 16T nested in an OPEN green casting pocket,
-# not buried in a solid O24 column. The pinion enters from the north/outboard
-# side of the oblique crank bore. Keep the first 4 mm of the positive-z chord
-# as a full O10 journal, then open an O18.2 counterbore through the outer wall.
-# O18.2 = the built 16T OD 17.207 + ~0.5 mm running clearance per side.
-PINION_POCKET_DIA = 18.2
-PINION_POCKET_RADIUS = PINION_POCKET_DIA / 2.0
-PINION_POCKET_INBOARD = 4.0
-PINION_POCKET_OUTBOARD = 20.0  # beyond the O24 column wall; guarantees open end
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
 
@@ -126,43 +117,6 @@ def _bore_removed(r: float = BORE_RADIUS) -> float:
     s += 4.0 * sum(f(-r + (2 * k - 1) * h) for k in range(1, n // 2 + 1))
     s += 2.0 * sum(f(-r + 2 * k * h) for k in range(1, n // 2))
     return s * h / 3.0
-
-
-def _segmented_bore_removed(r: float, t0: float, t1: float) -> float:
-    """Volume of an offset z-bore segment inside the O24 column.
-
-    Integrate the circular bore's x-y area clipped by the column chord at each
-    machine-z station. The crank/pocket centres are far enough from the top and
-    bottom that the block-height planes never clip their circular sections.
-    """
-    R = BLOCK_RADIUS
-    lo_t, hi_t = max(t0, -R), min(t1, R)
-    if hi_t <= lo_t:
-        return 0.0
-
-    def circle_strip(a: float) -> float:
-        lo = max(-a, CRANK_BORE_DX - r)
-        hi = min(a, CRANK_BORE_DX + r)
-        if hi <= lo:
-            return 0.0
-
-        def primitive(x: float) -> float:
-            u = x - CRANK_BORE_DX
-            root = math.sqrt(max(r * r - u * u, 0.0))
-            return u * root + r * r * math.asin(max(-1.0, min(1.0, u / r)))
-
-        return primitive(hi) - primitive(lo)
-
-    n = 4000
-    h = (hi_t - lo_t) / n
-
-    def section(t: float) -> float:
-        return circle_strip(math.sqrt(max(R * R - t * t, 0.0)))
-
-    total = section(lo_t) + section(hi_t)
-    total += 4.0 * sum(section(lo_t + (2 * k - 1) * h) for k in range(1, n // 2 + 1))
-    total += 2.0 * sum(section(lo_t + 2 * k * h) for k in range(1, n // 2))
-    return total * h / 3.0
 
 
 async def build(adapter) -> dict[str, str]:
@@ -286,49 +240,6 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "CrankBore")
     v_crank = _bore_removed(CRANK_BORE_RADIUS)
     volume = await volume_check(adapter, "crank bore", volume - v_crank, 0.01 * v_crank)
-
-    # Open pinion counterbore, coaxial with the crank bore but only on its
-    # positive machine-z/outboard chord. The page002 closeups show the green
-    # casting wrapping the pinion at the inboard edge and open around its broad
-    # toothed face. A full through O18.2 bore would throw away the south journal
-    # land that carries the crankshaft; this segmented revolve preserves it.
-    check("create_sketch pinion pocket", await adapter.create_sketch("CrankBorePlane"))
-    t0, t1 = PINION_POCKET_INBOARD, PINION_POCKET_OUTBOARD
-    pocket = SketchDims()
-    set_sketch_direct_db(adapter, True)
-    _pocket_rect = [
-        (_cx + t0 * _dx, _cy + t0 * _dy),
-        (_cx + t1 * _dx, _cy + t1 * _dy),
-        (_cx + t1 * _dx + PINION_POCKET_RADIUS * _nx,
-         _cy + t1 * _dy + PINION_POCKET_RADIUS * _ny),
-        (_cx + t0 * _dx + PINION_POCKET_RADIUS * _nx,
-         _cy + t0 * _dy + PINION_POCKET_RADIUS * _ny),
-    ]
-    _pocket_lines = await add_line_chain(adapter, _pocket_rect)
-    set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(
-        adapter, _pocket_lines, _pocket_rect, label="pinion pocket rect", dims=pocket,
-        names=["PPAnchorX", "PPAnchorZ", "PPRunDx", "PPRunDy",
-               "PPEndDx", "PPEndDy", "PPBackDx", "PPBackDy"],
-        drives=[None] * 8,
-    )
-    check("centreline pinion pocket", await adapter.add_centerline(
-        _pocket_rect[0][0], _pocket_rect[0][1],
-        _pocket_rect[1][0], _pocket_rect[1][1]))
-    await ensure_fully_defined(adapter, "pinion pocket sketch")
-    check("exit_sketch pinion pocket", await adapter.exit_sketch())
-    name_last_feature(adapter, "PinionPocketProfile")
-    check(
-        "cut-revolve pinion pocket",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-    )
-    name_last_feature(adapter, "PinionPocket")
-    v_pocket = (
-        _segmented_bore_removed(PINION_POCKET_RADIUS, t0, t1)
-        - _segmented_bore_removed(CRANK_BORE_RADIUS, t0, t1)
-    )
-    volume = await volume_check(
-        adapter, "open pinion pocket", volume - v_pocket, 0.02 * v_pocket)
 
     # Apply the deferred drive equations after the model + a rebuild exist, then
     # re-check: every equation evaluates to the value just built, so geometry
