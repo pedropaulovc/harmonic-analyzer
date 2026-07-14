@@ -1767,6 +1767,46 @@ async def place_components_batch(
     return out_names
 
 
+def _resolve_dof_gate(adapter: Any, model: Any, *, resolve: bool) -> None:
+    """Explicitly resolve the model for a DOF gate, or record why it was skipped.
+
+    A build-time DOF gate owns the one deep rebuild used by the remaining gates
+    and the fresh-save path.  Soundness passes ``resolve=False`` because its
+    shared open-time rebuild already established the state being inspected.
+    Never hide a rejected or incomplete rebuild behind the subsequent status
+    walk: both the API return and ``NeedsRebuild2`` must prove it completed.
+    """
+    with _telemetry.span("dof.resolve", rebuild_called=resolve) as rsp:
+        if not resolve:
+            _telemetry.event(
+                "assembly.rebuild.skipped",
+                stage="dof_gate",
+                reason="caller_pre_resolved",
+            )
+            _telemetry.success(
+                "DOF gate reused caller-resolved assembly; no rebuild called"
+            )
+            return
+
+        _telemetry.event(
+            "assembly.rebuild.called",
+            stage="dof_gate",
+            method="ForceRebuild3",
+            top_only=False,
+        )
+        rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+        status = saved_rebuild_status(adapter, model)
+        rsp.set_attribute("result", repr(rebuilt))
+        rsp.set_attribute("needs_rebuild", status)
+        if rebuilt is False or rebuilt is None:
+            raise RuntimeError(f"DOF gate ForceRebuild3 returned {rebuilt!r}")
+        if status != 0:
+            raise RuntimeError(
+                f"DOF gate rebuild left NeedsRebuild2={status}; refusing to continue"
+            )
+        _telemetry.success("DOF gate ForceRebuild3 completed clean")
+
+
 def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> None:
     """Raise when any top-level component is neither fixed, fully defined,
     nor a pattern instance.
@@ -1793,9 +1833,8 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
         # ``resolve=False``: the soundness suite already re-solved ONCE after open
         # (verify._verify_static_one) and does not mutate the model between gates,
         # so the rebuild here would be redundant -- skip it and just read status.
-        with _telemetry.span("dof.resolve"):
-            if resolve:
-                adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+        _resolve_dof_gate(adapter, asm, resolve=resolve)
+        with _telemetry.span("dof.read_components"):
             asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
             components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
         gsp.set_attribute("components", len(components))
@@ -2038,8 +2077,7 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     ``resolve=False`` skips the rebuild when the caller already re-solved (the
     soundness suite's single shared rebuild)."""
     asm = adapter.currentModel
-    if resolve:
-        adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+    _resolve_dof_gate(adapter, asm, resolve=resolve)
     asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
     components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
     under = []
@@ -2511,8 +2549,10 @@ async def save_assembly_and_images(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
-    # Establish a clean solved state for the health and pose gates.
-    final_rebuild_before_save(adapter, asm_name)
+    # The build-time DOF gate owns the one deep rebuild. Interference inspection
+    # must leave that verified solve state clean; never mask a dirty state with a
+    # save-time fallback rebuild.
+    assert_rebuild_not_required(adapter, asm_name, stage="after_gates")
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
     # mate whose entity went suppressed = the silent drive-train corruption) that
     # the DOF and interference gates miss -- a fixed/grounded component passes
@@ -2528,10 +2568,10 @@ async def save_assembly_and_images(
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
-    # View setup dirties the document so the camera persists, but does not dirty
-    # the solve state. Avoid repeating the 7-32 s deep rebuild unless SolidWorks
-    # explicitly reports that a gate or view operation requested one.
-    rebuild_if_needed_before_save(adapter, asm_name)
+    # View setup dirties the document so the camera persists, but must not dirty
+    # the solve state. A non-zero status is a contract violation, not permission
+    # to silently spend another 7-130 seconds rebuilding at the save chokepoint.
+    assert_rebuild_not_required(adapter, asm_name, stage="after_view_setup")
     _save_new_assembly_as_copy(adapter, asm_path)
     try:
         # Record the resolved-geometry fingerprint of the just-built assembly so a
@@ -2548,10 +2588,10 @@ async def save_assembly_and_images(
     finally:
         _discard_copy_source(adapter)
     # Reopen the just-saved artifact and reconcile its persisted rebuild mark
-    # (issue #267): the ForceRebuild3(False) above dirtied every referenced child
-    # part IN MEMORY, so the copy-save recorded a rebuild stamp absent from the
-    # on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs after
-    # the copy source is discarded so the reopen loads clean children from disk.
+    # (issue #267): the DOF gate's ForceRebuild3(False) dirtied every referenced
+    # child part IN MEMORY, so the copy-save recorded a rebuild stamp absent from
+    # the on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs
+    # after the copy source is discarded so the reopen loads clean children.
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
     return artefacts
 
@@ -2709,21 +2749,46 @@ async def reconcile_saved_rebuild_state(adapter: Any, asm_name: str, asm_path: A
         _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
 
 
-def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> None:
-    """Rebuild at the save chokepoint only when the solve state became dirty.
+def assert_rebuild_not_required(
+    adapter: Any,
+    label: str,
+    model: Any = None,
+    *,
+    stage: str = "before_save",
+) -> None:
+    """Prove a prior explicit rebuild is still clean; never rebuild as fallback.
 
     ``GetSaveFlag`` is deliberately not consulted: changing the active view sets
     that flag because the camera must be saved, but it does not invalidate model
-    geometry. ``NeedsRebuild2`` is the authoritative geometry/solve signal.
+    geometry. ``NeedsRebuild2`` is the authoritative geometry/solve signal. A
+    dirty result fails loud so traces cannot blur whether a rebuild was called.
     """
     target = adapter.currentModel if model is None else model
-    status = saved_rebuild_status(adapter, target)
-    if status != 0:
-        _telemetry.event("assembly.final_rebuild_required", asm=label, status=status)
-        final_rebuild_before_save(adapter, label, target)
-        return
-    _telemetry.event("assembly.final_rebuild_skipped", asm=label)
-    _telemetry.success(f"solve state already clean before save ({label})")
+    with _telemetry.span(
+        "assembly.rebuild_not_required", asm=label, stage=stage
+    ) as sp:
+        status = saved_rebuild_status(adapter, target)
+        sp.set_attribute("needs_rebuild", status)
+        if status != 0:
+            _telemetry.event(
+                "assembly.rebuild.refused_fallback",
+                asm=label,
+                stage=stage,
+                status=status,
+            )
+            raise RuntimeError(
+                f"{label}: {stage} left NeedsRebuild2={status}; refusing hidden "
+                "fallback rebuild before save"
+            )
+        _telemetry.event(
+            "assembly.rebuild.skipped",
+            asm=label,
+            stage=stage,
+            reason="verified_clean",
+        )
+        _telemetry.success(
+            f"no rebuild called at {stage}; verified solve state clean ({label})"
+        )
 
 
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:

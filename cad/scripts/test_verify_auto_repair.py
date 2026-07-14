@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import verify
 from _assembly import (
+    _resolve_dof_gate,
     assert_manifest_dof_state,
+    assert_rebuild_not_required,
     assert_saved_rebuild_clean,
     final_rebuild_before_save,
-    rebuild_if_needed_before_save,
     save_assembly_and_images,
     save_assembly_in_place,
 )
@@ -159,11 +162,33 @@ def test_final_rebuild_accepts_fully_rebuilt_state() -> None:
     final_rebuild_before_save(_Adapter(status=0), "harmonic-analyzer")
 
 
-def test_save_chokepoint_skips_rebuild_when_solve_state_is_clean() -> None:
+def test_dof_gate_rebuild_refuses_failed_api_result() -> None:
+    adapter = _Adapter(status=0)
+    adapter.currentModel.ForceRebuild3 = lambda _top_only: False
+    with pytest.raises(RuntimeError, match="ForceRebuild3 returned False"):
+        _resolve_dof_gate(adapter, adapter.currentModel, resolve=True)
+
+
+def test_dof_gate_rebuild_refuses_dirty_result() -> None:
+    adapter = _Adapter(status=1)
+    with pytest.raises(RuntimeError, match="left NeedsRebuild2=1"):
+        _resolve_dof_gate(adapter, adapter.currentModel, resolve=True)
+
+
+def test_save_chokepoint_proves_clean_without_rebuilding() -> None:
     calls = []
     adapter = _Adapter(status=0)
     adapter.currentModel.ForceRebuild3 = lambda _top_only: calls.append(True) or True
-    rebuild_if_needed_before_save(adapter, "harmonic-analyzer")
+    assert_rebuild_not_required(adapter, "harmonic-analyzer")
+    assert calls == []
+
+
+def test_save_chokepoint_refuses_fallback_rebuild_when_dirty() -> None:
+    calls = []
+    adapter = _Adapter(status=1)
+    adapter.currentModel.ForceRebuild3 = lambda _top_only: calls.append(True) or True
+    with pytest.raises(RuntimeError, match="refusing hidden fallback rebuild"):
+        assert_rebuild_not_required(adapter, "harmonic-analyzer")
     assert calls == []
 
 
@@ -176,11 +201,40 @@ def test_in_place_save_rebuilds_at_the_save_chokepoint() -> None:
 
 def test_fresh_build_checks_solve_state_after_gates_and_view_setup() -> None:
     source = inspect.getsource(save_assembly_and_images)
-    assert source.count("final_rebuild_before_save(adapter, asm_name)") == 1
-    assert source.count("rebuild_if_needed_before_save(adapter, asm_name)") == 1
-    assert source.index("rebuild_if_needed_before_save(adapter, asm_name)") < source.index(
+    assert "final_rebuild_before_save" not in source
+    assert source.count("assert_rebuild_not_required(adapter, asm_name") == 2
+    assert source.rindex("assert_rebuild_not_required(adapter, asm_name") < source.index(
         "_save_new_assembly_as_copy(adapter, asm_path)"
     )
+
+
+def test_every_fresh_assembly_runs_a_resolving_gate_before_shared_save() -> None:
+    scripts_dir = Path(__file__).parent
+    builders: dict[str, list[tuple[int, str]]] = {}
+    for path in scripts_dir.glob("build_*_assembly.py"):
+        calls = [
+            (node.lineno, node.func.id)
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        ]
+        if any(name == "save_assembly_and_images" for _, name in calls):
+            builders[path.name] = calls
+
+    assert set(builders) == {
+        "build_channel_assembly.py",
+        "build_drive_train_assembly.py",
+        "build_frame_assembly.py",
+        "build_harmonic_analyzer_assembly.py",
+        "build_magnifier_assembly.py",
+        "build_paper_drive_assembly.py",
+        "build_pen_assembly.py",
+        "build_summing_assembly.py",
+    }
+    resolving_gates = {"assert_components_fully_defined", "assert_free_dof_necessity"}
+    for name, calls in builders.items():
+        save_line = max(line for line, call in calls if call == "save_assembly_and_images")
+        gate_lines = [line for line, call in calls if call in resolving_gates]
+        assert gate_lines and max(gate_lines) < save_line, name
 
 
 def test_refresh_dof_gate_uses_saved_manifest(tmp_path, monkeypatch) -> None:
