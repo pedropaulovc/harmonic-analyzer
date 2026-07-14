@@ -425,6 +425,27 @@ def _bisect(f, lo: float, hi: float, tol: float = 1e-10, iters: int = 80) -> flo
     return 0.5 * (lo + hi)
 
 
+def _shared_channel_states(
+    configured_amplitudes: list[float],
+) -> tuple[float, dict[str, float], dict[str, float]]:
+    """Validate the reusable preset and return build + neutral reference states."""
+    if not configured_amplitudes:
+        raise RuntimeError("channel pattern requires at least one active channel")
+    amplitude = configured_amplitudes[0]
+    if any(abs(value - amplitude) > 1e-9 for value in configured_amplitudes):
+        raise RuntimeError(
+            "one-channel linear pattern requires one shared amplitude_mm; got "
+            f"{configured_amplitudes}. A non-uniform preset needs distinct seed "
+            "subassemblies rather than silently cloning the wrong geometry."
+        )
+    if amplitude < 0.0:
+        raise RuntimeError(
+            "amplitude_mm must be >= 0 (the lifting side keeps the foot clear of "
+            f"the pivot shaft); got {configured_amplitudes}"
+        )
+    return amplitude, solve_state(amplitude), solve_state(0.0)
+
+
 async def _revolute(
     adapter,
     comp: str,
@@ -638,24 +659,13 @@ async def build(adapter) -> dict[str, str]:
     # neutral state still anchors the amplitude-independent rocker/rod and the
     # cosmetic spring/threading seed.
     configured_amplitudes = _config.amplitudes()[: _config.active_count()]
-    if not configured_amplitudes:
-        raise RuntimeError("channel pattern requires at least one active channel")
-    if any(abs(a - configured_amplitudes[0]) > 1e-9 for a in configured_amplitudes):
-        raise RuntimeError(
-            "one-channel linear pattern requires one shared amplitude_mm; got "
-            f"{configured_amplitudes}. A non-uniform preset needs distinct seed "
-            "subassemblies rather than silently cloning the wrong geometry."
-        )
-    amplitudes = [configured_amplitudes[0]]
-    if any(a < 0.0 for a in amplitudes):
-        raise RuntimeError(
-            "amplitude_mm must be >= 0 (the lifting side keeps the foot clear of"
-            f" the pivot shaft); got {amplitudes}"
-        )
-    state = solve_state(0.0)
+    amplitude, state, neutral_state = _shared_channel_states(configured_amplitudes)
+    amplitudes = [amplitude]
     log(
-        "neutral state: arm tilt %.3f deg, rod tilt %.3f deg, pin (%.2f, %.2f),"
-        % (state["arm_tilt"], state["rod_tilt"], state["pin_x"], state["pin_y"])
+        "configured state a=%.3f: arm tilt %.3f deg, rod tilt %.3f deg,"
+        " pin (%.2f, %.2f),"
+        % (amplitude, state["arm_tilt"], state["rod_tilt"],
+           state["pin_x"], state["pin_y"])
     )
     log(
         "  bar contact %.3f, bar bottom %.3f, bar pin y %.3f, lever tilt %.3f deg"
@@ -671,14 +681,14 @@ async def build(adapter) -> dict[str, str]:
     # springs translate up with their levers (placed in the loop); their fit to
     # the fixed summing plate is realised at the top level by the parametric
     # spring length (parametric-springs memory).
-    phi = math.radians(state["lever_tilt"])
+    phi = math.radians(neutral_state["lever_tilt"])
     spring_hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
     eye_y = spring_hole_y - SPRING_EYE_DROP
     _assert_spring_threading(spring_hole_y, eye_y)
     _assert_hook_fastener(eye_y)
 
     # Bushing clearance under the bar foot at d = 0 (geometry gate).
-    bar_clearance = state["bar_bottom"] - PIVOT[1]
+    bar_clearance = neutral_state["bar_bottom"] - PIVOT[1]
     if bar_clearance < 5.5:
         raise RuntimeError(f"bar passes only {bar_clearance:.2f} above the shaft")
 
@@ -689,7 +699,7 @@ async def build(adapter) -> dict[str, str]:
     # length variants of channel-spring-installed, so part_properties inherits its
     # registry row (their placement is authored machine-handed here, no per-part
     # symmetry declaration -- the #151 mirror layer is gone).
-    phi_0 = math.radians(state["lever_tilt"])  # state = solve_state(0.0)
+    phi_0 = math.radians(neutral_state["lever_tilt"])
     hole_x_0 = FULCRUM[0] - LEVER_SPRING_X * math.cos(phi_0)  # lever reaches -X
     spring_specs = [_spring_spec(a, hole_x_0) for a in amplitudes]
     # The canonical channel-spring-installed body MUST equal the neutral gap so
