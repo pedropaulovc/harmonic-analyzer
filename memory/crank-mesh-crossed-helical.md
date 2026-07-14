@@ -30,9 +30,14 @@ tighter fit (zero window [−1.90, −1.10]° seed, ±0.4° margins clean — 4�
 PROUD of the green post's casting face — ch12 page002_img06: NO relief
 pocket (the img02 "pocket" ring is the bearing boss; a pocket-nested edge
 placement adopted from a concurrent branch was reverted 2026-07-14 on the
-user's read) — centred in the static casting-to-T120 span (PINION_TOOTH_Z
-−68.57, ~0.55 clearance each side, ~96% of the 64T row; span-fit +
-engagement-floor asserts in the assembly). The pocket was an artifact of
+user's read) — centred in the TRUE casting-to-T120 span (PINION_TOOTH_Z
+−68.90, face 10.8, 0.32 wall / 0.30 T120-rim clearance, ~94% of the 64T
+row; span-fit + engagement-floor asserts in the assembly). NB the T120
+bound is the inclined rim's ARC MINIMUM over the whole radial-overlap
+region, not the line-of-centres point — at the tight fit the overlap arc
+crosses 90° azimuth and the rim dips SOUTH of that estimate (0.67 model
+error → a 0.00 mm³ pinion↔T120 graze the interference gate caught
+2026-07-14; the assert now scans the arc). The pocket was an artifact of
 the straight-tooth era: a narrow engaged band was the only way straight
 teeth stayed collision-free, while the helix engages the full row. Helix
 HAND matters: +INCLINE zeroes the collision, the mirrored hand collides

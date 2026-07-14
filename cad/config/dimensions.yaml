@@ -535,7 +535,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - along Z at (x, y) = (+122.8, 142.985), 16T pinion meshing the 64T from ABOVE at a REAL engaged centre distance (near-vertical mesh azimuth, c2c 38.489 = R64 + R16 + 0.25 slack; tips 1.66 into the gaps, 87% working depth — the 64T's teeth are a TRUE 12.52° helix, boss-swept smooth; the tight fit re-arbitrated 2026-07-14 from the K=12-slice era's 0.40 backlash/0.60 slack after visible slop), the pinion standing PROUD of the green column's casting face (ch12 page002_img06: no relief pocket — its 11-wide face fills the casting-to-T120 span centered, pinion centre z −68.57, ~0.55 clearance each side, spanning ~96% of the 64T row; span-fit + engagement-floor asserts in build_drive_train_assembly)
+        - along Z at (x, y) = (+122.8, 142.985), 16T pinion meshing the 64T from ABOVE at a REAL engaged centre distance (near-vertical mesh azimuth, c2c 38.489 = R64 + R16 + 0.25 slack; tips 1.66 into the gaps, 87% working depth — the 64T's teeth are a TRUE 12.52° helix, boss-swept smooth; the tight fit re-arbitrated 2026-07-14 from the K=12-slice era's 0.40 backlash/0.60 slack after visible slop), the pinion standing PROUD of the green column's casting face (ch12 page002_img06: no relief pocket — its 10.8-wide face fills the TRUE casting-to-T120 span, pinion centre z −68.90, 0.32 wall / 0.30 T120-rim clearance, spanning ~94% of the 64T row (the inclined T120 rim's arc minimum caps it at ~94.5%); span-fit + engagement-floor asserts in build_drive_train_assembly)
         - 'RESOLVED (ch30 GT 2026-07-02): crank_sprocket triangulates at machine (−122.84, 144.78) ± 1.7 — the front-view pedestal at +122 ± 3 was RIGHT all along; the GT axle-x at BOTH z-stations also pins the crank AXIS along machine z (a cone-parallel crankshaft would land x −144.6 at the arm, 20+σ off). 2026-07-14 crank-mesh rederive: the old Y_CRANK 144.96 sat on a radial BACKOFF (c2c 40.446 — the tip circles 0.29 APART, gears visibly not meshing, refuted by the engaged pair in ch12 p.18/p.19); with the 64T''s helical teeth the pair closes to the engaged c2c, Y_CRANK 142.985 = 104.8 + sqrt(c2c² − 4.824²) (GT 1.06σ — the mesh geometry is the harder constraint). `build_drive_train_assembly.py` X_CRANK/Y_CRANK'
         - high (GT + mesh)
       - - Chain run
@@ -2018,12 +2018,14 @@ sections:
          `diagnostics/crossed_mesh_study.py`; the fit re-arbitrated
          2026-07-14 from the interim K=12-slice cut stack's 0.40/0.60 after
          visible slop), Y_CRANK 144.96 → 142.985 (GT 1.06σ). Axially the
-         pinion (face 11) stands PROUD of
+         pinion (face 10.8) stands PROUD of
          the green column's casting face — ch12 page002_img06 shows no
-         relief pocket — centred in the static casting-to-T120 span
-         (z −68.57, ~0.55 clearance each side, ~96% of the 64T row; an
-         interim pocket-nested edge placement from the straight-tooth era
-         was reverted the same day).
+         relief pocket — centred in the TRUE casting-to-T120 span
+         (z −68.90, 0.32/0.30 clearances, ~94% of the 64T row — the
+         inclined T120 rim's arc MINIMUM bounds the band: at the tight fit
+         the overlap arc crosses 90° azimuth, where the rim dips south of
+         the old line-of-centres estimate; an interim pocket-nested edge
+         placement from the straight-tooth era was reverted the same day).
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility (Ø22.4 drum vs
          the 12.56 mm frustum/64T channel) dissolved with the ch30 GT: the
