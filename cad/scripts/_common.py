@@ -1266,6 +1266,7 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
 _PREF_DEFAULT_PART_TEMPLATE = 8  # swUserPreferenceStringValue_e.swDefaultTemplatePart
 
 
+@_telemetry.traced("seat.pin_part_template")
 def _pin_default_part_template(adapter: Any) -> None:
     """Point the seat's default part template at the repo-owned PRTDOT.
 
