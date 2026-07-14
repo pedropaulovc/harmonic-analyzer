@@ -14,9 +14,11 @@ from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_ROOT = SCRIPTS_DIR.parent
-DRAWING_STANDARDS_DIR = CAD_ROOT / "standards" / "drawings"
-ASME_B_DRWDOT = DRAWING_STANDARDS_DIR / "asme-b-book.DRWDOT"
-ASME_B_SLDDRT = DRAWING_STANDARDS_DIR / "asme-b-book.slddrt"
+TEMPLATES_DIR = CAD_ROOT / "templates"
+# Hand-made in SolidWorks (title block, tolerance block, embedded ASME B sheet
+# format) -- NOT generated; see cad/templates/README.md. The template
+# embeds its own sheet format, so there is no separate .slddrt.
+PROJECT_DRWDOT = TEMPLATES_DIR / "harmonic-analyzer.DRWDOT"
 
 
 @dataclass(frozen=True)
@@ -40,7 +42,7 @@ class DrawingSpec:
 
     @property
     def assets(self) -> tuple[Path, ...]:
-        return (ASME_B_DRWDOT, ASME_B_SLDDRT)
+        return (PROJECT_DRWDOT,)
 
 
 DRAWINGS: tuple[DrawingSpec, ...] = (

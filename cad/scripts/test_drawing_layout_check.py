@@ -106,7 +106,6 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
         ("dimension", "dim"),
         ("hole-table", "table"),
         ("title-block", "titleblock"),
-        ("projection-symbol", "titleblock"),
     ]
 
 
@@ -250,11 +249,11 @@ def test_titleblock_is_a_hard_keepout_for_exempt_elements():
 
 
 def test_two_keepout_boxes_never_collide():
-    # The title block and its projection symbol overlap slightly by design; two
-    # keep-out boxes must not report a self-collision.
-    title = _el("title-block", 0.278, 0.0, SHEET_W, 0.080, kind="titleblock")
-    proj = _el("projection-symbol", 0.242, 0.019, 0.281, 0.035, kind="titleblock")
-    assert find_overlaps([title, proj]) == []
+    # Two keep-out boxes must never report a self-collision (today's template
+    # reserves ONE box, but the invariant guards any future second keep-out).
+    title = _el("title-block", 0.264, 0.0, SHEET_W, 0.064, kind="titleblock")
+    other = _el("keepout-2", 0.242, 0.019, 0.281, 0.035, kind="titleblock")
+    assert find_overlaps([title, other]) == []
 
 
 def test_dimension_is_overflow_only():

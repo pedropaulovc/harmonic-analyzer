@@ -21,7 +21,7 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
-from _drawing_registry import ASME_B_DRWDOT, ASME_B_SLDDRT
+from _drawing_registry import PROJECT_DRWDOT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -72,26 +72,20 @@ _NOMINAL_GDT_HALF_M = 0.008
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
 
-# The checked-in ASME B sheet format (asme-b-book.slddrt) bakes its title block
-# in as lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
-# None), so its occupied region is reserved here as fixed keep-out boxes. Any
-# element overlapping one fails the audit, so content can never land on the title
-# block (Codex #269 threads 4). These MUST track create_drawing_standards.py --
-# update if that sheet format's title block / projection symbol moves.
+# The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
+# format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
+# None), so its occupied region is reserved here as a fixed keep-out box. Any
+# element overlapping it fails the audit, so content can never land on the title
+# block (Codex #269 threads 4). These MUST track the manual template -- if the
+# title block moves, re-measure with the sheet-view annotation dump (probe via
+# _iter_view_annotations on a fresh drawing; last measured 2026-07-13: notes
+# span x 0.2672..0.4229, y <= 0.0611, borders a couple of mm outside).
 #
-# (1) The title block proper: from its left rule (TITLE_X0) up to its top rule
-# (TITLE_Y1), extending to the sheet's right and bottom edges (a conservative
-# superset of the drawn frame's right/bottom rules, which sit 6 mm inside).
-_TITLE_BLOCK_LEFT_M = 0.278  # create_drawing_standards.TITLE_X0
-_TITLE_BLOCK_TOP_M = 0.080  # create_drawing_standards.TITLE_Y1
-#
-# (2) The third-angle projection symbol, drawn LEFT of the title block at
-# create_drawing_standards.add_third_angle_symbol(0.252, 0.027, size=0.007). Its
-# glyph (concentric circles + trapezoid + axis) spans cx-1.4r .. cx+3.6r+0.4r in
-# x and cy±r in y; reserved with ~1 mm margin as its own box so the empty strip
-# between it and the title block is NOT reserved (a notes block legitimately
-# reaches x~253 mm at that height on top-crossbar).
-_PROJ_SYMBOL_BOX_M = (0.242, 0.019, 0.281, 0.035)
+# The block runs from its left rule up to its top rule, extending to the
+# sheet's right and bottom edges. The third-angle projection symbol lives
+# INSIDE the block (bottom-center cell), so it needs no separate keep-out.
+_TITLE_BLOCK_LEFT_M = 0.264
+_TITLE_BLOCK_TOP_M = 0.064
 
 
 ASME_B_WIDTH_M = 0.4318
@@ -473,6 +467,15 @@ def add_native_hole_callout(
     return display
 
 
+# The general-tolerance custom properties every part carries
+# (_common.part_properties, from cad/config/title_block.yaml) and the drawing
+# template's title block reads via $PRPSHEET. finalize_drawing requires them on
+# the linked model so a stale part can't ship blank tolerance cells.
+TITLE_BLOCK_TOLERANCE_PROPERTIES = (
+    "TOL_LIN_XX", "TOL_LIN_XXX", "TOL_ANG", "TOL_SURFACE",
+)
+
+
 def read_required_properties(
     model: Any, names: Sequence[str], *, required: Iterable[str]
 ) -> dict[str, str]:
@@ -543,61 +546,55 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
 def new_project_drawing(
     adapter: Any,
     *,
-    property_view: str,
+    property_view: str | None = None,
     scale: tuple[float, float] = (1.0, 1.0),
     decimals: int = 2,
 ) -> tuple[Any, Any]:
-    for asset in (ASME_B_DRWDOT, ASME_B_SLDDRT):
-        if not asset.is_file() or asset.stat().st_size == 0:
-            raise FileNotFoundError(f"project drawing standard is missing: {asset}")
+    """Create a drawing from the hand-made project template.
+
+    The template embeds its own ASME B sheet format (title block, tolerance
+    block, projection symbol), so there is no SetupSheet6 format re-apply; the
+    only per-drawing knobs are the sheet scale (here) and WHICH view's model
+    feeds the sheet's $PRPSHEET property links -- linked in finalize_drawing,
+    once views exist (SolidWorks silently ignores a CustomPropertyView naming a
+    view that does not exist yet, falling back to 'Default' = first view).
+    ``property_view`` is accepted for compatibility and unused.
+    """
+    _ = property_view
+    if not PROJECT_DRWDOT.is_file() or PROJECT_DRWDOT.stat().st_size == 0:
+        raise FileNotFoundError(
+            f"project drawing standard is missing: {PROJECT_DRWDOT}")
 
     draw = new_drawing(
         adapter,
-        template=str(ASME_B_DRWDOT),
+        template=str(PROJECT_DRWDOT),
         width=ASME_B_WIDTH_M,
         height=ASME_B_HEIGHT_M,
     )
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    # A hand-saved template can be saved while in Edit Sheet Format mode (it
+    # was, the day the title block was drawn) -- a drawing created from it then
+    # opens with the FORMAT layer active, where every pick lands on the sheet
+    # format and view geometry is inert (all typed SelectByID2 picks fail).
+    # EditSheet() drops back to the sheet layer; idempotent when already there.
+    ddoc.EditSheet()
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
-    sheet_name = adapter._get_attr_or_call(sheet, "GetName")
-    if not sheet_name:
-        raise RuntimeError("project drawing template has no sheet name")
-    configured = ddoc.SetupSheet6(
-        sheet_name,
-        2,  # swDwgPaperBsize
-        12,  # swDwgTemplateCustom
-        float(scale[0]),
-        float(scale[1]),
-        False,
-        str(ASME_B_SLDDRT.resolve()),
-        ASME_B_WIDTH_M,
-        ASME_B_HEIGHT_M,
-        property_view,
-        True,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0,
-        0,
-    )
-    if not configured:
-        raise RuntimeError("SetupSheet6 rejected the project ASME B sheet format")
     # 2 decimals by default: 3-decimal display (76.000) reads as false precision
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
-    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-    if sheet is None or not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
+    if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
-    template_name = str(adapter._get_attr_or_call(sheet, "GetTemplateName") or "")
-    if Path(template_name).resolve() != ASME_B_SLDDRT.resolve():
-        raise RuntimeError(
-            f"sheet format provenance mismatch: {template_name!r} != {ASME_B_SLDDRT}"
-        )
     assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
+    # Normalize the viewport: sheet-coordinate picks (the hole-table datum
+    # vertex / hole rims) hit-test with a PIXEL tolerance mapped through the
+    # current zoom, and a hand-saved template opens at whatever zoom it was
+    # saved with (the old generated one happened to be saved fit). Fit once so
+    # coordinate picks are deterministic regardless of how the template binary
+    # was last saved.
+    draw.ViewZoomtofit2()
     draw.ForceRebuild3(False)
     draw.EditRebuild3()
     return draw, sheet
@@ -1459,8 +1456,9 @@ def collect_layout_elements(
             tables[table.label] = table
 
     elements.extend(tables.values())
-    # Reserve the checked-in title block + its projection symbol as keep-outs: any
-    # element overlapping either is flagged (the two never collide with each other).
+    # Reserve the checked-in title block as a keep-out: any element overlapping
+    # it is flagged (the projection symbol sits INSIDE the block in the manual
+    # template, so it needs no box of its own).
     elements.append(
         LayoutElement(
             "title-block",
@@ -1471,7 +1469,6 @@ def collect_layout_elements(
             _TITLE_BLOCK_TOP_M,
         )
     )
-    elements.append(LayoutElement("projection-symbol", "titleblock", *_PROJ_SYMBOL_BOX_M))
     return elements, width, height
 
 
@@ -1526,9 +1523,54 @@ async def finalize_drawing(
     sheet_name = adapter._get_attr_or_call(sheet, "GetName")
     if not sheet_name or not ddoc.ActivateSheet(sheet_name):
         raise RuntimeError("failed to activate drawing sheet for export")
+
     if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
         raise RuntimeError("failed to set final drawing sheet scale")
     assert_asme_b_sheet(adapter, sheet, phase="before save", scale=scale)
+
+    # Point the sheet's $PRPSHEET property links at the FIRST drawing view's
+    # model, by the view's REAL name -- setting it earlier (before views exist)
+    # is silently ignored by SolidWorks. Every project drawing is single-model,
+    # so the first view is always the right source. Done AFTER the final
+    # SetScale: the property put rebuilds the sheet under the hood, and a
+    # SetScale on the pre-put handle returns False. Re-fetch the handle after.
+    first_view = next(iter_views(adapter), None)
+    if first_view is None:
+        raise RuntimeError("finished drawing has no views to link sheet properties to")
+    first_name = view_name(adapter, first_view)
+    sheet.CustomPropertyView = first_name
+    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+    linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
+    if linked != first_name:
+        raise RuntimeError(
+            f"CustomPropertyView did not take: {linked!r} != {first_name!r}")
+
+    # The template's title block reads the general-tolerance cells from the
+    # linked model via $PRPSHEET -- a stale source part (built before
+    # part_properties stamped the TOL_* set) would save a drawing with BLANK
+    # tolerance cells and no error. Validate here, the chokepoint every recipe
+    # passes through, against the model the sheet is now actually linked to,
+    # rather than trusting each recipe's read_required_properties list
+    # (Codex P2 #289).
+    linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
+    if linked_model is None:
+        raise RuntimeError(
+            f"view {first_name!r} has no referenced document to validate")
+    linked_model = _sw_type_info.early_bound_or_flag(
+        linked_model, "IModelDoc2", "GetCustomInfoValue")
+    read_required_properties(
+        linked_model,
+        TITLE_BLOCK_TOLERANCE_PROPERTIES,
+        required=TITLE_BLOCK_TOLERANCE_PROPERTIES,
+    )
+
+    # The title block's UNIT cell links $PRP:"UNIT_DISPLAY" (a DRAWING-doc
+    # property, unlike the $PRPSHEET part-property links), so the declared unit
+    # always tracks what set_units_mm actually configured. Flip to "IN" with
+    # the inch migration (#290) -- a hardcoded IN cell over mm dimensions would
+    # read as inch values and get machined at the wrong scale (Codex P1).
+    from _common import apply_custom_properties
+    apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
     # The layout is now complete -- audit element collisions / sheet overflow on
     # the finished sheet before the first save, so a broken layout never reaches

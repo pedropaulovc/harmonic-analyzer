@@ -6,6 +6,10 @@
 # these values and raise on violation.
 units: mm
 
+# Drawing title-block general tolerances live in title_block.yaml (own file, so
+# a title-block edit never shifts this file's digest and FULL-rebuilds the
+# assemblies whose geometry reads the fit classes below).
+
 general:
   machined_block:    { tolerance: "+/-0.10", applies_to: "milled blocks, brackets, plates" }
   plate_profile:     { tolerance: "+/-0.20", applies_to: "noncritical exterior profiles" }

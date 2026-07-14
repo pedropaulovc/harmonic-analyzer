@@ -115,13 +115,16 @@ from _buildgraph import (  # noqa: E402
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 from _drawing_registry import (  # noqa: E402
-    ASME_B_DRWDOT,
-    ASME_B_SLDDRT,
     DRAWINGS_BY_NAME,
+    PROJECT_DRWDOT,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
+# The repo-owned part template (see _common.PART_TEMPLATE -- path duplicated
+# deliberately; importing _buildgraph from _common would drag graph tooling
+# into every part's dep closure). A runtime input of every part build.
+PART_TEMPLATE = REPO_ROOT / "cad" / "templates" / "harmonic-analyzer.PRTDOT"
 # The vendored COM adapter (``solidworks_mcp``) lives in this submodule and is
 # imported AT RUNTIME by _common/_assembly (e.g. the mate/plane creation glue), so
 # its source is a genuine build input of every COM task -- yet it is an installed
@@ -605,12 +608,27 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
     return parts_registry_files()
 
 
+def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
+    """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
+    ``_common.part_properties``): every part stamps the title-block tolerance
+    properties, as does an assembly that stamps in-script (build_channel_assembly,
+    for its stretched springs) -> title_block.yaml; a NON-stamping assembly drops
+    it (a title-block edit re-stamps the parts, whose shifted digests REFRESH the
+    assembly -- keeping it in the assembly recipe would escalate to a spurious
+    FULL rebuild). Any other caller keeps the dep, conservatively."""
+    if kind == "assembly" and not stamps_part_properties(script):
+        return []
+    return [str((CONFIG_DIR / "title_block.yaml").resolve())]
+
+
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
     """The cad/config FILES this build script actually reads (fine-grained;
     conservative whole-config fallback on any unclassifiable ``_config`` use).
 
     Expands the tokens from ``config_files_of`` to concrete paths, narrowing the
-    ``"parts/*"`` registry token to the task's own rows (see _expand_parts_token).
+    ``"parts/*"`` registry token to the task's own rows (see _expand_parts_token)
+    and the ``"title_block"`` token to stamping tasks only
+    (_expand_title_block_token).
     """
     script = script if isinstance(script, Path) else Path(script)
     tokens = config_files_of(script)
@@ -622,6 +640,8 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(machine_family_files())
         elif tok == "parts/*":
             out.update(_expand_parts_token(stem, kind, script))
+        elif tok == "title_block":
+            out.update(_expand_title_block_token(kind, script))
         else:
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)
@@ -1055,8 +1075,15 @@ def _cached_drawing_action(stem: str) -> None:
 
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
+    # The repo-owned part TEMPLATE is a runtime input of every part build
+    # (_common._pin_default_part_template points the seat's default at it, so
+    # NewPart inherits its document properties -- the DimXpert block-tolerance
+    # get-only prefs ride it). Folding it in makes a template edit rebuild
+    # every part AND shift the remote-cache key, so no seat can publish
+    # template-drifted parts under a stale key.
     return [str(script.resolve()), *_helper_deps(script),
             *_config_deps(script, stem, "part"), *data_deps_of(script),
+            str(PART_TEMPLATE.resolve()),
             _submodule_part_dep()]
 
 
@@ -1116,8 +1143,22 @@ def _recipe_files(stem: str) -> list[str]:
     no longer forces a spurious ~500 s FULL re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
+    # An assembly that GENERATES parts in-script (build_channel_assembly's
+    # stretched springs; detected by the same stamps_part_properties call-graph
+    # predicate the config tokens use) instantiates the part TEMPLATE via
+    # NewPart, so the template is a direct build input: fold it in so a
+    # template edit FULL-rebuilds the generated variants and shifts the
+    # assembly's cache key (codex #289 -- a cached channel would otherwise
+    # keep/restore springs built from the previous template). NON-generating
+    # assemblies must NOT fold it: they get the template transitively through
+    # their referenced parts' recipe digests (a template edit re-stamps the
+    # parts -> shifted artefact digests -> REFRESH), and a direct fold would
+    # escalate that refresh to a spurious ~500 s FULL rebuild.
+    template = ([str(PART_TEMPLATE.resolve())]
+                if stamps_part_properties(asm_script) else [])
     return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
-            *_config_deps(asm_script, stem, "assembly"), _submodule_assembly_dep()]
+            *_config_deps(asm_script, stem, "assembly"), *template,
+            _submodule_assembly_dep()]
 
 
 def _recipe_sidecar(stem: str) -> Path:
@@ -1689,8 +1730,7 @@ def task_check():
         "recipe": {
             "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
                          *recipe_test_deps,
-                         str(ASME_B_DRWDOT.resolve()),
-                         str(ASME_B_SLDDRT.resolve())],
+                         str(PROJECT_DRWDOT.resolve())],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },
         "cache": {
