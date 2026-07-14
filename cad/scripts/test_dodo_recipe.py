@@ -640,17 +640,22 @@ def test_config_deps_are_fine_grained():
     whole = set(dodo._CONFIG_YAMLS)
 
     # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
-    # (NOT machine/channels.yaml, where active_count lives) + its own registry row.
+    # (NOT machine/channels.yaml, where active_count lives) + its own registry row
+    # + tolerances.yaml (every part stamps the title-block tolerance properties
+    # from _common.part_properties -> _config.title_block).
     cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml", "parts/cone-gear.yaml", "parts/_defaults.yaml",
+        "tolerances.yaml",
     }, _rel(cone, cfg)
     assert set(cone) <= whole
 
     # Editing ONE part's registry row rebuilds only that part: a leaf screw depends
-    # on its own row + shared defaults, nothing else.
+    # on its own row + shared defaults (+ the universal tolerances.yaml), nothing else.
     screw = dodo._config_deps(scripts / "build_fillister_screw.py", "fillister_screw", "part")
-    assert _rel(screw, cfg) == {"parts/fillister-screw.yaml", "parts/_defaults.yaml"}
+    assert _rel(screw, cfg) == {
+        "parts/fillister-screw.yaml", "parts/_defaults.yaml", "tolerances.yaml",
+    }
 
     # No part depends on dimensions.yaml.
     for stem in dodo.part_stems():
