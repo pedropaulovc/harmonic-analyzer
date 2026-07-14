@@ -174,7 +174,7 @@ def _corner_fillet_area(label: str, r: float) -> float:
 # sits EAST of the pivot, pivot.x - X_CRANK = 43.11 (asserted against the
 # live cone geometry in the assembly).
 CRANK_AXIS_OFF = 43.11  # east offset: ppivot.x -79.69 - X_CRANK -122.8
-CRANK_AXIS_Y = 94.16  # Y_CRANK 144.96 - Y_BASE_TOP 50.8 (above plate BOTTOM)
+CRANK_AXIS_Y = 91.93308686  # Y_CRANK 142.73308686 - base-top 50.8
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan
 # point (the foot of the pivot's perpendicular onto the axis line), built
 # as the intersection of two principal-plane offsets -- name-selected and

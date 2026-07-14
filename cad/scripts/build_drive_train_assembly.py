@@ -78,13 +78,15 @@ checker-arbitrated, see PEN_EDGE_SLACK) -> tip interleave 0.00..1.14
 across each drum face, identical at ALL 20 stations (zero drift, T006
 included). Stub-gap caps hold without any per-gear relief: the drum
 tips dive at most 0.24 into a cone gap vs the shallowest (T006) stub
-cap 0.88. The 16T crank pinion mesh gets the same treatment, now on a
-near-VERTICAL line of centres (the crank sits above the 64T, ch30 GT):
+cap 0.88. The 16T crank pinion meshes on a near-VERTICAL line of centres
+(the crank sits above the 64T, ch30 GT):
 the perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i)
 north of its centre (alpha = the contact azimuth from the in-plane
 horizontal; the old horizontal mesh is the alpha = 0 special case), the
-pinion is centred on that plane, and Y_CRANK backs off so the oblique
-dive across the 64T face caps clear of working depth (PEN16_EDGE_SLACK).
+pinion is centred on that plane, and the axes sit at the gears' nominal
+pitch-centre distance. Book ch.12 page002_img02/page002_img06 show the
+pinion teeth engaged to working depth; the retired interference-derived
+backoff put the tip circles 0.29 mm apart and visibly broke the mesh.
 
 Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
 supports". Tooth phasing: every gear script seeds a TOOTH centred on
@@ -296,55 +298,56 @@ R64 = (64.0 / DP_CRANK) * 25.4 / 2.0  # 30.59: 64T pitch radius (== cone T120 by
 R16 = (16.0 / DP_CRANK) * 25.4 / 2.0  # 7.65: 16T crank-pinion pitch radius
 
 # Crank: ABOVE the 64T (ch30 GT photogrammetry -- the crank axle triangulates
-# to world (-122.84, 144.78, -189.1) +- 1.4: the pedestal axis of the +122
-# photo layout, ~40 ABOVE the drive plane, a near-VERTICAL 16T:64T mesh).
-# X_CRANK is the photo-pinned pedestal axis; Y_CRANK closes the mesh at the
-# same backed-off centre distance the old horizontal layout used. Slack 1.10
-# is checker-arbitrated like the drum mesh's (the long oblique dive across
-# the 64T face squeezes flanks: 0.15 left 1.48 mm^3, 0.60 left 0.23, 0.90 a
-# 0.00 skin).
+# to world (-122.84, 144.78, -189.1) +- 1.7: the pedestal axis of the +122
+# photo layout, ~38 ABOVE the drive plane, a near-VERTICAL 16T:64T mesh).
+# X_CRANK remains the photo-pinned pedestal axis. Y_CRANK is rederived from
+# the nominal pitch-centre distance: the direct ch12 closeups page002_img02
+# and page002_img06 show the pinion teeth fully entering the 64T gaps. The
+# retired 40.446 mm checker-arbitrated backoff exceeded the 40.152 mm sum of
+# the OUTSIDE radii, leaving a visible 0.29 mm air gap before tooth phasing
+# even mattered.
 ADD16 = 25.4 / DP_CRANK  # crank-pinion addendum
 WORK16 = 2.0 * ADD16  # 1.912 at DP 26.57
-PEN16_EDGE_SLACK = 1.10
-PEN16_MID = WORK16 - PEN16_EDGE_SLACK - (GEAR64_FACE / 2.0) * SIN_I  # -0.272
-MESH16_C2C = R64 + R16 + (ADD16 * (1.0 + SEC_I) - PEN16_MID)  # 40.446 backed off
+MESH16_C2C = R64 + R16  # 38.239: nominal pitch circles tangent
+TIP16_C2C = R64 + R16 + 2.0 * ADD16  # 40.151: sum of outside radii
+CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C  # 1.912: full working depth
+if abs(CRANK_MESH_DEPTH - WORK16) > 1e-9:
+    raise AssertionError("crank pair no longer engages to the full working depth")
 X_CRANK = -122.8  # crank/pedestal axis (GT -122.84 +- 0.9; ratifies the
 # pedestal photo the DP-26.57 rescale had displaced -- both hold: the crank is
 # above the gear, not outboard of it)
-Y_CRANK = 144.96  # = Y_DRIVE + sqrt(MESH16_C2C^2 - dx^2) with dx the in-plane
-# horizontal offset (GT 144.78 +- 1.4, 0.13 sigma); a literal so the pedestal
-# part's BORE_HEIGHT (94.16 above the base top) stays a round number -- both
-# self-checked below.
 _DX16 = (GEAR64_SEAT[0] - X_CRANK) * COS_I  # 4.82: horizontal leg toward the
 # crank (a plane-local magnitude: the azimuth convention below measures from
 # the in-plane horizontal TOWARD the other axis, so it is chirality-free)
-_DY16 = Y_CRANK - Y_DRIVE  # 40.16: vertical leg (in BOTH gear planes)
+Y_CRANK = Y_DRIVE + math.sqrt(MESH16_C2C**2 - _DX16**2)  # 142.733; 1.2 sigma
+# below the GT y=144.78 +-1.7, while X stays at the direct photo anchor. The
+# pitch law and the direct closeups outrank the old best-fit centre that put
+# daylight between the teeth.
+_DY16 = Y_CRANK - Y_DRIVE  # 37.93: vertical leg (in BOTH gear planes)
 if abs(math.hypot(_DX16, _DY16) - MESH16_C2C) > 0.05:
-    raise AssertionError("crank mesh centre distance drifted off the backoff")
-if abs(Y_CRANK - (Y_BASE_TOP + 94.16)) > 0.001:
-    raise AssertionError("Y_CRANK must equal the pedestal bore height 94.16")
+    raise AssertionError("crank mesh centre distance drifted off the pitch circles")
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
 # the inclined cone shaft; the 16T plane is a plain machine-Z section.
-ALPHA64 = math.degrees(math.atan2(_DY16, _DX16))  # 83.15
-ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))  # 82.98
+ALPHA64 = math.degrees(math.atan2(_DY16, _DX16))  # 82.75
+ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))  # 82.57
 # (both horizontal legs run TOWARD the other axis and read positive -- the
 # chirality-free plane-local convention; the CW spin sense is applied at the
 # rot_z(-PINION_SEED_DEG) callsite)
 # The 64T's contact tooth sits R64*cos(alpha)*sin(i) north of its centre (the
 # in-plane horizontal carries the plane's only z-component; alpha = 0 reduces
 # to the old horizontal-mesh R64*sin(i)). The 16T is centred on that plane.
-PINION_TOOTH_Z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I  # -67.83
+PINION_TOOTH_Z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I  # -67.78
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
 # keyed at its authored phase (a tooth centred at azimuth 0), so its nearest
 # tooth leads the contact azimuth by DELTA64; the pinion's gap must sit that
 # same contact arc (scaled by R64/R16) past the contact on ITS side. At
 # ALPHA = 0 this is exactly 11.25.
 _TP64 = 360.0 / 64.0
-DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.22: 64T tooth lead
+DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.62: 64T tooth lead
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (R64 / R16) - 22.5 / 2.0
-) % 22.5  # 21.8: tooth-in-gap at the tilted line of centres
+) % 22.5  # 19.8: tooth-in-gap at the tilted line of centres
 
 ARBOR_SOUTH_Z = -90.0  # arbor south end (ch30 GT cyl_front z -89.66 +- 2.7: the
 # end stops INSIDE the arbor-pedestal bore, blind-bearing look; was -98, poking
