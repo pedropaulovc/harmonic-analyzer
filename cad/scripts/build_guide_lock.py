@@ -32,6 +32,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -39,25 +40,38 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from guide_lock_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    HOLE_XY,
+    ISOMETRIC_VIEW_NOTE,
+    LOCK_HEIGHT,
+    LOCK_THICK,
+    LOCK_WIDTH,
+)
 
 PART_NAME = "guide-lock"
 MATERIAL = "Plain Carbon Steel"
 
-LOCK_WIDTH = 22.0
-# Sized by the BOTTOM station: its rail sits 7 below the bar (open channel), so
-# reaching a 7 overlap behind the bar band takes 5 (rail) + 7 (channel) + 7
-# (bar) = 19. The top rail sits ON the bar, so the same plate overlaps the bar
-# by 14 there -- and the two rows still clear each other by 1.0 in y
-# (2026-07-07 field report: a 12-tall plate topped out AT the bar's bottom
-# edge and retained nothing at the bottom stations).
-LOCK_HEIGHT = 19.0
-LOCK_THICK = 2.0
+# LOCK_WIDTH/LOCK_HEIGHT/LOCK_THICK/HOLE_XY live in guide_lock_spec.py (the
+# dimensional contract shared with draw_guide_lock.py; re-exported here for
+# build_paper_drive_assembly). LOCK_HEIGHT is sized by the BOTTOM station: its
+# rail sits 7 below the bar (open channel), so reaching a 7 overlap behind the
+# bar band takes 5 (rail) + 7 (channel) + 7 (bar) = 19. The top rail sits ON
+# the bar, so the same plate overlaps the bar by 14 there -- and the two rows
+# still clear each other by 1.0 in y (2026-07-07 field report: a 12-tall plate
+# topped out AT the bar's bottom edge and retained nothing at the bottom
+# stations).
 # The fillister screws' O2.9 shanks pass through: #4 clearance, CLOSE fit
 # (Ø3.048, the wizard-table twin of the old Ø3.0 artefact dim; nearest UNC to
 # the ~Ø2.9 screw -- memory/fastener-policy-us-customary).
 HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
-HOLE_XY = ((4.0, 2.5), (18.0, 2.5))  # on the guide band (guide holes x +-7)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -98,6 +112,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=LOCK_THICK)),
     )
     name_last_feature(adapter, "Lock")
+    depth_dim = name_dimensions(adapter, "Lock", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"LockThick"')]
     v_plate = LOCK_WIDTH * LOCK_HEIGHT * LOCK_THICK
     await volume_check(adapter, "lock plate", v_plate, 0.005 * v_plate)
 
@@ -127,9 +143,24 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven lock (equations neutral)", v_final, 0.005 * v_plate
     )
 
+    # Manufacturing drawing support: mark exactly the print's dimensions (the
+    # drawing recipe imports the marked set and must find every one of these),
+    # and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
