@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
 from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -45,9 +46,11 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
         "files": {
             "step/sample-part.STEP": {
                 "source": step.relative_to(tmp_path).as_posix(), "bytes": step.stat().st_size,
+                "sha256": export_models._file_sha256(step),
             },
             "stl/sample-assembly.STL": {
                 "source": stl.relative_to(tmp_path).as_posix(), "bytes": stl.stat().st_size,
+                "sha256": export_models._file_sha256(stl),
             },
         },
     }), encoding="utf-8")
@@ -103,3 +106,7 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
         "release.neutral_copy",
     }
     assert not [span for span in finished if span.name == "release.neutral_document"]
+
+    step.write_bytes(b"xxxx")
+    with pytest.raises(RuntimeError, match="digest changed"):
+        export_models.stage_release_neutral(tmp_path / "corrupt-stage")

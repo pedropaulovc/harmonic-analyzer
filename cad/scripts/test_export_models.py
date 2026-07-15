@@ -102,7 +102,7 @@ def test_release_inventory_reuses_build_owned_pngs(tmp_path: Path, monkeypatch) 
 def test_scene_inventory_keeps_generated_default_meshes(tmp_path: Path) -> None:
     scene = tmp_path / "scene.json"
     scene.write_text(
-        '{"components":['
+        '{"unit":"mm","components":['
         '{"part":"generated-spring","cfg":"Default","mesh":"generated-spring"},'
         '{"part":"gear","cfg":"T12","mesh":"gear--t12"}'
         ']}',
@@ -116,6 +116,34 @@ def test_scene_inventory_keeps_generated_default_meshes(tmp_path: Path) -> None:
     assert export_models.scene_config_meshes(scene) == {
         "gear": [("T12", "gear--t12")],
     }
+
+
+def test_invalid_scene_is_not_fresh(tmp_path: Path) -> None:
+    scene = tmp_path / "scene.json"
+    scene.write_text('{"unit":"mm","components":[', encoding="utf-8")
+
+    assert not export_models.scene_is_valid(scene)
+
+
+def test_zero_byte_neutral_outputs_are_stale(tmp_path: Path, monkeypatch) -> None:
+    stl = tmp_path / "stl"
+    step = tmp_path / "step"
+    native = tmp_path / "sldprt"
+    for path in (stl / "sample.STL", step / "sample.STEP"):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"")
+    _write(native / "sample.SLDPRT", time.time())
+    monkeypatch.setattr(export_models, "OUT_STL", stl)
+    monkeypatch.setattr(export_models, "OUT_STEP", step)
+    monkeypatch.setattr(export_models, "OUT_SLDPRT", native)
+    monkeypatch.setattr(export_models, "src_digest", lambda _src: "recipe-v1")
+
+    assert export_models.part_stl_stale(
+        "sample", "sample", {"sample": (1, 1, 1)}, {"sample": "recipe-v1"},
+    )
+    assert export_models.manifest_part_stale(
+        "sample", {"sample": (1, 1, 1)}, {"sample": "recipe-v1"},
+    )
 
 
 def test_default_and_configuration_exports_share_one_part_open(

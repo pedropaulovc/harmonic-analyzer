@@ -82,7 +82,7 @@ SRC_DIGESTS = OUT_STL / "export-src.json"
 # mismatch invalidates the whole cache -> full regeneration through the new logic.
 _EXPORTER_KEY = "__exporter__"
 NEUTRAL_MANIFEST = CAD_ROOT / "out" / "reports" / "release-neutral.json"
-NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@1"
+NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@2"
 TOP_ASSEMBLY = "harmonic-analyzer"
 
 # Comparison gallery, produced by THIS export stage from the STLs written above
@@ -114,6 +114,18 @@ DEFAULT_RGB = (0.55, 0.55, 0.55)
 
 INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
 TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True, TOGGLE_STL_NO_TRANSLATE: True}
+
+
+def _nonempty(path: Path) -> bool:
+    return path.is_file() and path.stat().st_size > 0
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def manifest_models() -> list[str]:
@@ -290,8 +302,11 @@ def scan_assembly(adapter: Any, part_colors: dict) -> tuple[list, list, set[tupl
 
 def load_colors() -> dict:
     if COLORS.exists():
-        return {k: tuple(v) for k, v in
-                json.loads(COLORS.read_text(encoding="utf-8")).items()}
+        try:
+            return {k: tuple(v) for k, v in
+                    json.loads(COLORS.read_text(encoding="utf-8")).items()}
+        except Exception:
+            _telemetry.warn(f"invalid colours cache will be rebuilt: {COLORS}")
     return {}
 
 
@@ -404,6 +419,8 @@ def scene_part_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[st
     """
     path = scene_path or OUT_BOXES / f"{TOP_ASSEMBLY}.json"
     data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("unit") != "mm":
+        raise RuntimeError(f"release scene has invalid/missing mm unit: {path}")
     components = data.get("components")
     if not isinstance(components, list) or not components:
         raise RuntimeError(f"release scene has no components: {path}")
@@ -418,6 +435,14 @@ def scene_part_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[st
         if entry not in bucket:
             bucket.append(entry)
     return {stem: sorted(entries) for stem, entries in sorted(by_stem.items())}
+
+
+def scene_is_valid(scene_path: Path) -> bool:
+    try:
+        scene_part_meshes(scene_path)
+    except Exception:
+        return False
+    return True
 
 
 def scene_config_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[str, str]]]:
@@ -476,11 +501,7 @@ def _source_fingerprint(source: Path) -> str | None:
         return recipe
     if not source.is_file():
         return None
-    digest = hashlib.sha256()
-    with source.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return _file_sha256(source)
 
 
 def write_release_neutral_manifest(
@@ -492,8 +513,9 @@ def write_release_neutral_manifest(
 
     The exporter writes this only after every requested SaveAs and configuration
     distinctness guard succeeds.  Source recipe digests prove freshness without
-    trusting volatile SolidWorks mtimes; exact file names and sizes prove the set is
-    complete.  PNGs are the render outputs owned by the corresponding build tasks.
+    trusting volatile SolidWorks mtimes; exact file names, sizes, and hashes prove the
+    set is complete and unchanged.  PNGs are the render outputs owned by the
+    corresponding build tasks.
     """
     sources = _release_sources(parts, assemblies, scene_meshes)
     source_records: dict[str, str] = {}
@@ -526,6 +548,7 @@ def write_release_neutral_manifest(
         file_records[destination] = {
             "source": source.resolve().relative_to(REPO.resolve()).as_posix(),
             "bytes": source.stat().st_size,
+            "sha256": _file_sha256(source),
         }
 
     manifest = {
@@ -570,11 +593,28 @@ def _copy_release_files(
             source = REPO / str(record.get("source") or "")
             if source.resolve() != expected_source.resolve():
                 raise RuntimeError(f"release neutral source path drifted for {destination}")
-            if not source.is_file() or source.stat().st_size != record.get("bytes"):
+            if not _nonempty(source) or source.stat().st_size != record.get("bytes"):
                 raise RuntimeError(f"release neutral output changed: {source}; rerun doit export")
             output = stage / destination
             output.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, output)
+            partial = output.with_name(f"{output.name}.partial")
+            partial.unlink(missing_ok=True)
+            digest = hashlib.sha256()
+            try:
+                with source.open("rb") as src, partial.open("wb") as dst:
+                    for chunk in iter(lambda: src.read(1 << 20), b""):
+                        digest.update(chunk)
+                        dst.write(chunk)
+                if digest.hexdigest() != record.get("sha256"):
+                    raise RuntimeError(
+                        f"release neutral output digest changed: {source}; "
+                        "rerun doit export"
+                    )
+                shutil.copystat(source, partial)
+                partial.replace(output)
+            except Exception:
+                partial.unlink(missing_ok=True)
+                raise
 
 
 def stage_release_neutral(stage: Path) -> dict[str, int]:
@@ -730,7 +770,7 @@ def _source_changed(stem: str, mesh: str, digests: dict[str, str]) -> bool:
     cur = src_digest(src)
     if cur is None:
         stl = OUT_STL / f"{mesh}.STL"
-        return not stl.exists() or stl.stat().st_mtime < src.stat().st_mtime
+        return not _nonempty(stl) or stl.stat().st_mtime < src.stat().st_mtime
     return digests.get(mesh) != cur
 
 
@@ -751,7 +791,7 @@ def asm_source_changed(
         outs = [OUT_STL / f"{dashed}.STL"]
         if require_scene:
             outs.append(OUT_BOXES / f"{dashed}.json")
-        return any(not o.exists() or o.stat().st_mtime < src.stat().st_mtime
+        return any(not _nonempty(o) or o.stat().st_mtime < src.stat().st_mtime
                    for o in outs)
     return digests.get(dashed) != cur
 
@@ -762,7 +802,7 @@ def part_stl_stale(stem: str, mesh: str, colors: dict, digests: dict[str, str]) 
     manifest parts + assemblies do), so a STEP is NOT required here -- requiring one made
     every referenced part re-export forever once the manifest held only the assembly."""
     stl = OUT_STL / f"{mesh}.STL"
-    return (not stl.exists() or mesh not in colors
+    return (not _nonempty(stl) or mesh not in colors
             or _source_changed(stem, mesh, digests))
 
 
@@ -776,7 +816,7 @@ def manifest_part_stale(stem: str, colors: dict, digests: dict[str, str]) -> boo
     there the STEP-vs-source mtime guard is re-added so a rebuilt part with a fresh STL
     but a stale STEP is not treated as fresh (codex review)."""
     step = OUT_STEP / f"{stem}.STEP"
-    if not step.exists() or part_stl_stale(stem, stem, colors, digests):
+    if not _nonempty(step) or part_stl_stale(stem, stem, colors, digests):
         return True
     src = OUT_SLDPRT / f"{stem}.SLDPRT"
     if src.exists() and src_digest(src) is None:
@@ -927,17 +967,19 @@ def main() -> int:
 
     missing_asm_png = {
         stem for stem in assemblies
-        if not (OUT_PNG / stem.replace("_", "-")
-                / f"{stem.replace('_', '-')}_isometric.png").is_file()
+        if not _nonempty(OUT_PNG / stem.replace("_", "-")
+                         / f"{stem.replace('_', '-')}_isometric.png")
     }
     stale_asms: list[str] = []
     for stem in assemblies:
         dashed = stem.replace("_", "-")
         src = OUT_SLDASM / f"{dashed}.SLDASM"
         require_scene = stem in scene_assemblies
-        scene_missing = require_scene and not (OUT_BOXES / f"{dashed}.json").exists()
-        if (force or stem in missing_asm_png or scene_missing
-                or not (OUT_STL / f"{dashed}.STL").exists()
+        scene_invalid = require_scene and not scene_is_valid(
+            OUT_BOXES / f"{dashed}.json"
+        )
+        if (force or stem in missing_asm_png or scene_invalid
+                or not _nonempty(OUT_STL / f"{dashed}.STL")
                 or asm_source_changed(
                     dashed, src, digests, require_scene=require_scene,
                 )):
@@ -945,8 +987,8 @@ def main() -> int:
 
     missing_part_png = {
         stem.replace("_", "-") for stem in parts
-        if not (OUT_PNG / stem.replace("_", "-")
-                / f"{stem.replace('_', '-')}_isometric.png").is_file()
+        if not _nonempty(OUT_PNG / stem.replace("_", "-")
+                         / f"{stem.replace('_', '-')}_isometric.png")
     }
     stale_parts = [
         stem for stem in parts
