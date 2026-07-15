@@ -55,19 +55,24 @@ def test_stud_nominals_track_the_fastener_catalog() -> None:
 def test_linked_notes_define_remaining_knob_operations() -> None:
     notes = cone_lock_knob_spec.DRAWING_NOTES
     assert "1/4-20" in notes
-    assert "CHROME PLATE" in notes
+    assert "THREAD RELIEF" in notes
+    assert "CHROME PLATE PER ASTM B456" in notes
     assert "DOME R5" in notes
+    # The blanket tolerance lives in the title block ONLY -- a second general
+    # tolerance in the notes would conflict with it (codex machinist review).
+    assert "+/-0.25" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_controls_seat_stud_and_finish() -> None:
+def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
+    assert source.count("add_feature_control_frame(") == 2
     assert source.count('characteristic="perpendicularity"') == 1
+    assert source.count('characteristic="circular_runout"') == 1
     assert source.count("add_surface_finish(") == 2
 
 

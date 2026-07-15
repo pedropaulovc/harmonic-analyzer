@@ -209,33 +209,57 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 
-    # Every GD&T anchor is a REAL model edge seen edge-on (a face boundary
-    # projecting to a line).  A cylinder's side outline is an HLR silhouette,
-    # not a model edge, so it is NOT selectable via SelectByID2("EDGE", ...).
+    # Every GD&T anchor is a REAL model edge seen edge-on or as a circle (a
+    # face boundary).  A cylinder's side outline is an HLR silhouette, not a
+    # model edge, so it is NOT selectable via SelectByID2("EDGE", ...).
+    #
+    # Datum A is the turned AXIS (from the body OD circle in the top view,
+    # the fulcrum-shaft/lever-bushing convention); the clamp seat is held
+    # perpendicular to it and the washer OD holds runout to it, so the
+    # thread line, body and flange are tied to one inspectable axis.
     fdx, fdy = front_delta
+    tdx, tdy = top_delta
     seat_y = _front_y(0.0) + fdy
     seat_half_x = (STUD_DIA / 2.0 + WASHER_DIA / 2.0) / 2.0 * _S
     seat_right = (FRONT_CENTER[0] + fdx + seat_half_x, seat_y)
     seat_left = (FRONT_CENTER[0] + fdx - seat_half_x, seat_y)
-    stud_end = (FRONT_CENTER[0] + fdx, _front_y(-STUD_LEN) + fdy)
     crown_flat = (FRONT_CENTER[0] + fdx, _front_y(BODY_TOP) + fdy)
+    _diag = 2.0 ** -0.5
+    body_circle = (
+        TOP_CENTER[0] + tdx + BODY_DIA * _S / 2.0 * _diag,
+        TOP_CENTER[1] + tdy + BODY_DIA * _S / 2.0 * _diag,
+    )
+    washer_circle = (
+        TOP_CENTER[0] + tdx + WASHER_DIA * _S / 2.0,
+        TOP_CENTER[1] + tdy,
+    )
     add_datum_feature(
         adapter,
-        front,
-        edge_xy=seat_right,
-        symbol_xy=(seat_right[0] + 0.012, seat_y - 0.014),
+        top,
+        edge_xy=body_circle,
+        symbol_xy=(body_circle[0] + 0.016, body_circle[1] + 0.014),
         datum="A",
-        label="washer clamp seat",
+        label="knob body axis",
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=washer_circle,
+        frame_xy=(washer_circle[0] + 0.026, washer_circle[1] + 0.024),
+        characteristic="circular_runout",
+        tolerance="0.10",
+        datums=("A",),
+        label="washer flange runout",
     )
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=stud_end,
-        frame_xy=(FRONT_CENTER[0] + fdx + 0.045, stud_end[1] - 0.010),
+        edge_xy=seat_right,
+        frame_xy=(seat_right[0] + 0.026, seat_y - 0.020),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
-        label="clamp stud perpendicularity",
+        label="clamp seat perpendicularity",
     )
     add_surface_finish(
         adapter,
