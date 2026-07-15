@@ -42,6 +42,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_pivot_block_spec import (
     BLOCK_BOTTOM_Y,
+    BLOCK_DEPTH,
     BLOCK_WIDTH,
     BORE_DIA,
     BORE_HALF_SPACING,
@@ -201,8 +202,21 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, screw_spacing, label="hold-down screw spacing")
 
+    # Hold-down pattern across the depth: both drills sit at exact mid-depth,
+    # so a single basic 6 from the broad face (datum C) locates the pair.
+    depth_location = add_edge_dimension(
+        adapter,
+        top,
+        p0=(_front_x(-17.0), TOP_CENTER[1] - BLOCK_DEPTH * SHEET_SCALE[0] / 2000.0),
+        p1=(_front_x(-SCREW_HALF_SPACING), TOP_CENTER[1] - SCREW_R_SHEET),
+        text_xy=(0.062, 0.212),
+        label="hold-down depth location",
+    )
+    set_basic_dimension(adapter, depth_location, label="hold-down depth location")
+
     # Native datum/GD&T/surface annotations.  A = the base seat (right view's
-    # bottom edge); B = the pivot bore; C = the block's west side face.
+    # bottom edge); B = the pivot bore; C = a broad face (constrains the depth
+    # direction B leaves free -- the right view's sheet-right edge is z = 0).
     add_datum_feature(
         adapter,
         right,
@@ -223,13 +237,14 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="pivot bore axis",
     )
+    right_half_depth = BLOCK_DEPTH * SHEET_SCALE[0] / 2000.0
     add_datum_feature(
         adapter,
-        front,
-        edge_xy=(_front_x(-BLOCK_WIDTH / 2.0), FRONT_CENTER[1]),
-        symbol_xy=(_front_x(-BLOCK_WIDTH / 2.0) - 0.020, FRONT_CENTER[1] - 0.020),
+        right,
+        edge_xy=(RIGHT_CENTER[0] + right_half_depth, RIGHT_CENTER[1]),
+        symbol_xy=(RIGHT_CENTER[0] + right_half_depth + 0.016, RIGHT_CENTER[1] + 0.020),
         datum="C",
-        label="block west side face",
+        label="block broad face",
     )
     lift_edge = (
         _front_x(-BORE_HALF_SPACING),
@@ -243,29 +258,33 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="parallelism",
         tolerance="0.10",
         datums=("B",),
+        diameter=True,
         label="lift-bore parallelism",
     )
-    east_screw_edge = (
-        _front_x(SCREW_HALF_SPACING),
+    west_screw_edge = (
+        _front_x(-SCREW_HALF_SPACING),
         TOP_CENTER[1] + SCREW_R_SHEET,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=east_screw_edge,
-        frame_xy=(0.212, 0.242),
-        characteristic="position",
-        tolerance="0.25",
-        datums=("A", "B", "C"),
-        diameter=True,
-        label="hold-down hole position",
     )
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=(_front_x(-SCREW_HALF_SPACING), TOP_CENTER[1] + SCREW_R_SHEET),
-        callout_xy=(0.052, 0.244),
+        edge_xy=west_screw_edge,
+        callout_xy=(0.052, 0.252),
         label="hold-down screw hole",
+    )
+    # Position frame stacked directly UNDER the 2X size callout, led to the
+    # same hole, so the control unambiguously governs the two-hole pattern.
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=west_screw_edge,
+        frame_xy=(0.052, 0.240),
+        characteristic="position",
+        tolerance="0.25",
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="2X",
+        label="hold-down hole position",
     )
     add_surface_finish(
         adapter,

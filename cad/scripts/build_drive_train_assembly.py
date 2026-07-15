@@ -571,13 +571,13 @@ from build_pinion_bracket import (  # noqa: E402
     PIVOT_BORE as STRAP_PIVOT_BORE,
 )
 from build_pinion_pivot_block import (  # noqa: E402
+    BLOCK_DEPTH,
+    BLOCK_HEIGHT,
+    BLOCK_WIDTH,
     BORE_UP as BLOCK_BORE_UP,
-    DEPTH as BLOCK_DEPTH,
-    HEIGHT as BLOCK_HEIGHT,
     LIFT_BORE_DROP,
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
     SCREW_HOLE_DIA as BLOCK_SCREW_HOLE_DIA,
-    WIDTH as BLOCK_WIDTH,
 )
 from build_pinion_cam import (  # noqa: E402
     BORE as CAM_BORE_DIA,
