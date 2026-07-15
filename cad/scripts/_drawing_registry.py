@@ -135,6 +135,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="cylinder-gear-shaft",
         script_name="draw_cylinder_gear_shaft.py",
     ),
+    DrawingSpec(
+        name="cone_lock_knob",
+        part="cone_lock_knob",
+        artifact_stem="cone-lock-knob",
+        script_name="draw_cone_lock_knob.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

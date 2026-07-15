@@ -42,6 +42,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -49,21 +50,29 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from cone_lock_knob_spec import (
+    BODY_DIA,  # knob body -- ONE straight wall (t00411: no mid step)
+    BODY_TOP,  # body top above the washer seat; height ~ diameter
+    DOME_R,  # top-edge fillet: the domed crown (leaves a O3 flat at the
+    # apex, the still's slightly-flattened dome)
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    STUD_DIA,  # 1/4" clamp stud -- rides the platform's SLOT_W notch
+    STUD_LEN,  # plate thickness exactly: stud ends FLUSH with the base
+    # top (thread engagement into the absent base unmodeled, see docstring)
+    WASHER_DIA,  # clamp washer flange, seats on the plate top
+    WASHER_T,
+)
 
 PART_NAME = "cone-lock-knob"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # bright/chromed steel (the pinion-handle
 # precedent for chrome-look hardware; v4_t00411 shows worn chrome plate)
-
-WASHER_DIA = 18.0  # clamp washer flange, seats on the plate top
-WASHER_T = 1.5
-BODY_DIA = 13.0  # knob body -- ONE straight wall (t00411: no mid step)
-BODY_TOP = 13.5  # body top above the washer seat; height ~ diameter
-DOME_R = 5.0  # top-edge fillet radius: the domed crown (leaves a O3 flat
-# at the apex, the still's slightly-flattened dome)
-STUD_DIA = SPEC.model_diameter_mm  # 1/4" clamp stud -- rides the platform's SLOT_W notch
-STUD_LEN = SPEC.length_mm  # plate thickness exactly: stud ends FLUSH with the base
-# top (thread engagement into the absent base unmodeled, see docstring)
 
 def _dome_fillet_volume(body_r: float, r: float) -> float:
     """Removed volume of a radius-r fillet on a body_r cylinder's top rim.
@@ -90,6 +99,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "WasherT", f"{WASHER_T}mm")
     await set_global(adapter, "BodyDia", f"{BODY_DIA}mm")
     await set_global(adapter, "BodyTop", f"{BODY_TOP}mm")
+    await set_global(adapter, "DomeR", f"{DOME_R}mm")
     await set_global(adapter, "StudDia", f"{STUD_DIA}mm")
     await set_global(adapter, "StudLen", f"{STUD_LEN}mm")
 
@@ -100,13 +110,13 @@ async def build(adapter) -> dict[str, str]:
     # extent (the thumb-screw blank trick): the smaller-diameter body adds
     # volume only past the washer it merges into, so each delta is analytic.
     v_expect = 0.0
-    for label, dia, extent, delta, dia_name, dia_drive in (
+    for label, dia, extent, delta, dia_name, dia_drive, depth_name in (
         ("washer", WASHER_DIA, WASHER_T,
          math.pi * (WASHER_DIA / 2.0) ** 2 * WASHER_T,
-         "WasherDia", '"WasherDia"'),
+         "WasherDia", '"WasherDia"', "WasherT"),
         ("body", BODY_DIA, BODY_TOP,
          math.pi * (BODY_DIA / 2.0) ** 2 * (BODY_TOP - WASHER_T),
-         "BodyDia", '"BodyDia"'),
+         "BodyDia", '"BodyDia"', "BodyTop"),
     ):
         sd = SketchDims()
         check(f"create_sketch {label}", await adapter.create_sketch("Top"))
@@ -124,6 +134,8 @@ async def build(adapter) -> dict[str, str]:
             await adapter.create_extrusion(ExtrusionParameters(depth=extent)),
         )
         name_last_feature(adapter, label.capitalize())
+        depth_dim = name_dimensions(adapter, label.capitalize(), [depth_name])
+        drive_jobs += [(depth_dim[0], f'"{depth_name}"')]
         v_expect += delta
         await volume_check(adapter, label, v_expect, 0.005 * v_expect)
 
@@ -133,6 +145,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_fillet(DOME_R, [[BODY_DIA / 2.0, BODY_TOP, 0.0]]),
     )
     name_last_feature(adapter, "DomeCrown")
+    dome_dim = name_dimensions(adapter, "DomeCrown", ["DomeR"])
+    drive_jobs += [(dome_dim[0], '"DomeR"')]
     v_expect -= _dome_fillet_volume(BODY_DIA / 2.0, DOME_R)
     await volume_check(adapter, "dome crown", v_expect, 0.005 * v_expect)
 
@@ -156,6 +170,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Stud")
+    stud_dim = name_dimensions(adapter, "Stud", ["StudLen"])
+    drive_jobs += [(stud_dim[0], '"StudLen"')]
     v_expect += math.pi * (STUD_DIA / 2.0) ** 2 * STUD_LEN
     await volume_check(adapter, "stud", v_expect, 0.005 * v_expect)
 
@@ -176,6 +192,14 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
