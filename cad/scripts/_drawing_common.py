@@ -213,6 +213,26 @@ def add_datum_feature(
     return tag
 
 
+@_telemetry.traced("drawing.centerline", label_param="label")
+def add_view_centerline(
+    adapter: Any,
+    view: Any,
+    *,
+    face_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Insert the axis centerline of a cylindrical face seen side-on in a view."""
+    _select_view_entity(adapter, view, "FACE", face_xy, label=label)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    centerline = ddoc.InsertCenterLine2()
+    if centerline is None:
+        raise RuntimeError(f"failed to insert centerline ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return centerline
+
+
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
 def add_feature_control_frame(
     adapter: Any,

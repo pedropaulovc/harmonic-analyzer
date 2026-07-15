@@ -38,6 +38,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -45,13 +46,21 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from pivot_bushing_spec import (
+    BORE_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    LENGTH,
+    OUTER_DIA,
+)
 
 PART_NAME = "pivot-bushing"
 MATERIAL = "Brass"
-
-OUTER_DIA = 10.0  # DIMENSIONS.md ch14 layout: bar-clearance ceiling ~11.25 (low)
-BORE_DIA = 6.5  # rides the 6.35 pivot shaft (derived)
-LENGTH = 4.5565  # channel pitch 7.0565 - arm 2.5 (derived)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -92,6 +101,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Bushing")
+    depth_dim = name_dimensions(adapter, "Bushing", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"Length"')]
     v = math.pi * ((OUTER_DIA / 2.0) ** 2 - (BORE_DIA / 2.0) ** 2) * LENGTH
     await volume_check(adapter, "bushing annulus", v, 0.001 * v)
 
@@ -105,6 +116,12 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
