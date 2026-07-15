@@ -67,6 +67,14 @@ from pinion_pivot_block_spec import (
 
 PART_NAME = "pinion-pivot-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel block (p.68)
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 # Slotted-screw shank pass-throughs (PR7: the p.69 close-up's two bright
 # hold-down heads per block): #19 drill (Ø4.216) -- the wizard twin of the old
@@ -206,7 +214,15 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    missing = [
+        name for name in _SAVED_DRAWING_PROPERTIES
+        if not str(adapter.currentModel.GetCustomInfoValue("", name) or "")
+    ]
+    if missing:
+        raise RuntimeError(f"saved part drawing properties are missing: {missing}")
+    check("saved part carries all drawing properties", True)
+    return artefacts
 
 
 if __name__ == "__main__":
