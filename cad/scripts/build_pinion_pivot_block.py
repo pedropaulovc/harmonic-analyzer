@@ -183,12 +183,13 @@ async def build(adapter) -> dict[str, str]:
 
     # Named lift-bore axis (Axis1): the lift rod's revolute mates coaxial to
     # this in the assembly (PR8 -- the rod spins to drive the cams).
-    await name_bore_axis(
+    lift_axis = await name_bore_axis(
         adapter, "Right Plane", -BORE_HALF_SPACING, "Top Plane", -LIFT_BORE_DROP,
         "lift bore",
     )
-    _blank_ref_plane(adapter, "Plane1")
-    _blank_ref_plane(adapter, "Plane2")
+    _blank_ref_geometry(adapter, "Plane1", "PLANE")
+    _blank_ref_geometry(adapter, "Plane2", "PLANE")
+    _blank_ref_geometry(adapter, lift_axis, "AXIS")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -226,14 +227,14 @@ async def build(adapter) -> dict[str, str]:
     return artefacts
 
 
-def _blank_ref_plane(adapter, name: str) -> None:
-    """Keep construction planes out of saved part and assembly renders."""
+def _blank_ref_geometry(adapter, name: str, kind: str) -> None:
+    """Keep construction planes and axes out of saved renders."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = adapter.currentModel
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
-        name, "PLANE", 0, 0, 0, False, 0, null_callout(), 0,
+        name, kind, 0, 0, 0, False, 0, null_callout(), 0,
     ):
         raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
     model.BlankRefGeom()
