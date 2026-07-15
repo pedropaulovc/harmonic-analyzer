@@ -96,6 +96,7 @@ COMPARISONS_DIR = REPO / "comparisons"
 RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
 COMPOSITE_PY = COMPARISONS_DIR / "tools" / "composite.py"
 GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
+GALLERY_STAMP = CAD_ROOT / "out" / "reports" / "comparison-gallery.json"
 
 # swconst ids (extracted from the installed swconst.tlb, R2026x). The STL ids
 # live in _common (shared with the part-build STL export); STEP is export-only.
@@ -913,22 +914,101 @@ def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
         seen[crc] = mesh
 
 
-def _run_tool(cmd: list[str], tag: str) -> None:
+def _run_tool(cmd: list[str], tag: str) -> list[str]:
     """Run a PEP-723 comparison tool via ``uv run`` from the repo root, streaming
     its output line-by-line (a Blender render takes minutes) and raising on a
     non-zero exit (kept for the caller's best-effort catch)."""
     proc = subprocess.Popen(cmd, cwd=str(REPO), stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, bufsize=1)
+    output: list[str] = []
     tail: list[str] = []
     assert proc.stdout is not None
     for raw in proc.stdout:
         line = raw.rstrip()
         log(f"    {tag}| {line}")
+        output.append(line)
         tail.append(line)
         if len(tail) > 40:
             del tail[0]
     if proc.wait() != 0:
         raise RuntimeError(f"{tag} exited non-zero: {' / '.join(tail)[-400:]}")
+    return output
+
+
+def _gallery_inputs(manifest: dict[str, Any]) -> list[Path]:
+    paths = {
+        COMPARISONS_DIR / "manifest.json",
+        RENDER_OFFLINE,
+        COMPOSITE_PY,
+        GALLERY_PY,
+    }
+    paths.update(REPO / str(pair["reference"]["path"])
+                 for pair in manifest.get("pairs", []))
+    return sorted(paths, key=lambda path: path.as_posix())
+
+
+def _gallery_input_digest(manifest: dict[str, Any]) -> str:
+    digest = hashlib.sha256()
+    for path in _gallery_inputs(manifest):
+        if not path.is_file():
+            raise FileNotFoundError(f"comparison gallery input missing: {path}")
+        try:
+            label = path.resolve().relative_to(REPO.resolve()).as_posix()
+        except ValueError:
+            label = path.resolve().as_posix()
+        digest.update(label.encode("utf-8"))
+        digest.update(b"\0")
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1 << 20), b""):
+                digest.update(chunk)
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _gallery_outputs_complete(manifest: dict[str, Any]) -> bool:
+    required = {
+        COMPARISONS_DIR / "scores.json",
+        COMPARISONS_DIR / "index.html",
+    }
+    for pair in manifest.get("pairs", []):
+        pair_id = str(pair["id"])
+        required.update({
+            COMPARISONS_DIR / "ref" / f"{pair_id}.jpg",
+            COMPARISONS_DIR / "render" / f"{pair_id}.jpg",
+            COMPARISONS_DIR / "render" / f"{pair_id}.meta.json",
+            COMPARISONS_DIR / "composite" / f"{pair_id}_cad.jpg",
+            COMPARISONS_DIR / "composite" / f"{pair_id}_blend.jpg",
+        })
+    return all(_nonempty(path) for path in required)
+
+
+def _gallery_stamp_digest() -> str | None:
+    try:
+        data = json.loads(GALLERY_STAMP.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    value = data.get("inputs")
+    return str(value) if value else None
+
+
+def _write_gallery_stamp(input_digest: str) -> None:
+    GALLERY_STAMP.parent.mkdir(parents=True, exist_ok=True)
+    temporary = GALLERY_STAMP.with_suffix(".json.partial")
+    temporary.write_text(json.dumps({"inputs": input_digest}, indent=1), encoding="utf-8")
+    temporary.replace(GALLERY_STAMP)
+
+
+def _rendered_pair_ids(lines: list[str]) -> set[str]:
+    rendered: set[str] = set()
+    for line in lines:
+        text = line.strip()
+        if not text.startswith("OK  "):
+            continue
+        pair_id = text[4:].strip()
+        if pair_id.startswith("["):
+            continue  # composite.py progress, not a newly rendered pair
+        rendered.add(pair_id)
+    return rendered
 
 
 def _prune_stale_gallery() -> None:
@@ -979,12 +1059,12 @@ def refresh_comparison_gallery() -> bool:
     bundles (cut_release.stage_comparisons). Returns True if refreshed.
 
     Runs render_offline (Blender, no SolidWorks) ``--stale-only`` so only pairs
-    whose geometry changed re-render, then a FULL composite.py pass — its
-    staleness key is camera/reference/model only, so an align-only manifest edit
-    (scale/dx/dy) skips the render yet still must recompute the _cad/_blend
-    overlays + scores (cheap: Pillow over ~20 pairs) — then gallery.py rebuilds
-    the static index. The gallery outputs are gitignored + regenerable, so
-    nothing tracked is touched.
+    whose geometry changed re-render. That command already composites every pair
+    it renders. A content-keyed stamp covers the manifest, reference images, and
+    gallery tools: unchanged inputs plus complete outputs skip the 45-second
+    composite pass entirely; changed inputs trigger one full pass only when some
+    pairs were not rendered (for example an align-only manifest edit). Gallery
+    HTML is rebuilt only when renders or gallery inputs changed.
 
     BEST-EFFORT: the offline renderer needs Blender, which lives on a separate
     GPU seat, so on an export seat without it this warns + returns False rather
@@ -993,10 +1073,32 @@ def refresh_comparison_gallery() -> bool:
     """
     with _telemetry.span("export.comparisons") as sp:
         try:
+            manifest = json.loads(
+                (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8")
+            )
+            input_digest = _gallery_input_digest(manifest)
+            inputs_changed = _gallery_stamp_digest() != input_digest
             _prune_stale_gallery()
-            _run_tool(["uv", "run", str(RENDER_OFFLINE), "--stale-only"], "cmp")
-            _run_tool(["uv", "run", str(COMPOSITE_PY)], "composite")
-            _run_tool(["uv", "run", str(GALLERY_PY)], "gallery")
+            render_lines = _run_tool(
+                ["uv", "run", str(RENDER_OFFLINE), "--stale-only"], "cmp",
+            )
+            rendered = _rendered_pair_ids(render_lines)
+            pair_count = len(manifest.get("pairs", []))
+            outputs_complete = _gallery_outputs_complete(manifest)
+            full_composite = (
+                not outputs_complete
+                or (inputs_changed and len(rendered) < pair_count)
+            )
+            if full_composite:
+                _run_tool(["uv", "run", str(COMPOSITE_PY)], "composite")
+            if rendered or inputs_changed or not outputs_complete:
+                _run_tool(["uv", "run", str(GALLERY_PY)], "gallery")
+            else:
+                _telemetry.info("comparison gallery already current")
+                _telemetry.event("comparisons.current", pairs=pair_count)
+            _write_gallery_stamp(input_digest)
+            sp.set_attribute("rendered_pairs", len(rendered))
+            sp.set_attribute("full_composite", full_composite)
         except Exception as exc:  # noqa: BLE001 -- best-effort; never fail export
             _telemetry.warn(
                 f"comparison gallery not refreshed ({exc}); export continues -- "

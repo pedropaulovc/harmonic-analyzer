@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import time
@@ -334,6 +335,72 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     assert (step / "sample-part.STEP").read_bytes() == b"T24"
     assert (stl / "sample-part.STL").read_bytes() == b"T24"
     assert (stl / "sample-part--c1.STL").exists()
+
+
+def test_current_gallery_skips_redundant_composite_and_index(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    comparisons = tmp_path / "comparisons"
+    tools = comparisons / "tools"
+    tools.mkdir(parents=True)
+    reference = tmp_path / "reference.png"
+    reference.write_bytes(b"reference")
+    manifest = {
+        "pairs": [{
+            "id": "sample",
+            "reference": {"path": "reference.png"},
+        }],
+    }
+    (comparisons / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    render_tool = tools / "render_offline.py"
+    composite_tool = tools / "composite.py"
+    gallery_tool = tools / "gallery.py"
+    for tool in (render_tool, composite_tool, gallery_tool):
+        tool.write_text(tool.name, encoding="utf-8")
+    for path in (
+        comparisons / "scores.json",
+        comparisons / "index.html",
+        comparisons / "ref/sample.jpg",
+        comparisons / "render/sample.jpg",
+        comparisons / "render/sample.meta.json",
+        comparisons / "composite/sample_cad.jpg",
+        comparisons / "composite/sample_blend.jpg",
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"current")
+
+    monkeypatch.setattr(export_models, "REPO", tmp_path)
+    monkeypatch.setattr(export_models, "COMPARISONS_DIR", comparisons)
+    monkeypatch.setattr(export_models, "RENDER_OFFLINE", render_tool)
+    monkeypatch.setattr(export_models, "COMPOSITE_PY", composite_tool)
+    monkeypatch.setattr(export_models, "GALLERY_PY", gallery_tool)
+    monkeypatch.setattr(export_models, "GALLERY_STAMP", tmp_path / "gallery.json")
+    monkeypatch.setattr(export_models, "_prune_stale_gallery", lambda: None)
+    export_models._write_gallery_stamp(export_models._gallery_input_digest(manifest))
+    calls: list[str] = []
+
+    def _run(cmd: list[str], _tag: str) -> list[str]:
+        calls.append(Path(cmd[2]).name)
+        return ["nothing to render"]
+
+    monkeypatch.setattr(export_models, "_run_tool", _run)
+
+    assert export_models.refresh_comparison_gallery()
+    assert calls == ["render_offline.py"]
+
+    export_models.GALLERY_STAMP.unlink()
+    calls.clear()
+    assert export_models.refresh_comparison_gallery()
+    assert calls == ["render_offline.py", "composite.py", "gallery.py"]
+
+
+def test_rendered_pair_parser_ignores_composite_progress() -> None:
+    assert export_models._rendered_pair_ids([
+        "  OK  pair-a",
+        "  OK  [1/2] pair-a: score 88.2 (1s)",
+        "  OK  pair-b",
+        "composites done",
+    ]) == {"pair-a", "pair-b"}
 
 
 def test_routine_view_cleanup_preserves_configuration_renders(tmp_path: Path) -> None:
