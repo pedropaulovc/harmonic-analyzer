@@ -221,7 +221,6 @@ async def build(adapter) -> dict[str, str]:
     ]
     if missing:
         raise RuntimeError(f"saved part drawing properties are missing: {missing}")
-    check("saved part carries all drawing properties", True)
     return artefacts
 
 
