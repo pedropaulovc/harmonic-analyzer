@@ -35,9 +35,13 @@ def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
     assert source.count("_add_end_diameter(") >= 3  # definition + both ends
     assert 'below="BIG END"' in source
     assert 'below="SMALL END"' in source
+    # No. 2 taper pin, 1:48 over the 45 mm length -> 0.9375 on diameter, matching
+    # the crank-arm cross-hole reamed for a No. 2 (1:48) taper pin.
     taper_on_dia = crank_pin_spec.BIG_END_DIA - crank_pin_spec.SMALL_END_DIA
-    assert round(taper_on_dia, 2) == 1.00
-    assert "TAPER 1.0 ON DIA OVER 45.0" in crank_pin_spec.DRAWING_NOTES
+    assert round(taper_on_dia, 4) == round(crank_pin_spec.PIN_LENGTH / 48.0, 4)
+    assert round(taper_on_dia, 4) == 0.9375
+    assert "1:48" in crank_pin_spec.DRAWING_NOTES
+    assert "0.9375 ON DIA OVER 45.0" in crank_pin_spec.DRAWING_NOTES
 
 
 def test_linked_notes_define_remaining_pin_operations() -> None:

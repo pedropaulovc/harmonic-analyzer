@@ -62,6 +62,7 @@ FRONT_KEEP = {
 }
 
 
+@_telemetry.traced("drawing.end_diameter", label_param="label")
 def _add_end_diameter(
     adapter: Any,
     view: Any,
