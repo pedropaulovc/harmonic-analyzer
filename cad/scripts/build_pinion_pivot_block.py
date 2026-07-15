@@ -51,6 +51,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -218,12 +219,7 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
-    missing = [
-        name for name in _SAVED_DRAWING_PROPERTIES
-        if not str(adapter.currentModel.GetCustomInfoValue("", name) or "")
-    ]
-    if missing:
-        raise RuntimeError(f"saved part drawing properties are missing: {missing}")
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
 
 

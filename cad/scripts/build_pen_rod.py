@@ -43,6 +43,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _saved_part_guard import require_saved_drawing_properties
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
 from pen_rod_spec import (
     DRAWING_DIMENSIONS,
@@ -155,7 +156,15 @@ async def build(adapter) -> dict[str, str]:
             "Top View Note": TOP_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "Top View Note",
+        ),
+    )
+    return artefacts
 
 
 if __name__ == "__main__":

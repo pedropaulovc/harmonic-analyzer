@@ -42,6 +42,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _saved_part_guard import require_saved_drawing_properties
 from crank_pin_spec import (
     BIG_END_DIA,
     DRAWING_DIMENSIONS,
@@ -158,7 +159,15 @@ async def build(adapter) -> dict[str, str]:
             "End View Note": END_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "End View Note",
+        ),
+    )
+    return artefacts
 
 
 if __name__ == "__main__":
