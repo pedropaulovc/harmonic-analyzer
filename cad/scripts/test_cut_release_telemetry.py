@@ -59,8 +59,7 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
     monkeypatch.setattr(export_models, "NEUTRAL_MANIFEST", manifest_path)
     monkeypatch.setattr(export_models, "part_stems", lambda: ["sample_part"])
     monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("sample_assembly",))
-    monkeypatch.setattr(export_models, "scene_part_meshes", lambda: {})
-    monkeypatch.setattr(export_models, "scene_config_meshes", lambda: {})
+    monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _scenes: {})
     monkeypatch.setattr(
         export_models, "_release_sources",
         lambda _parts, _assemblies, _scene: {
@@ -69,7 +68,7 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
     )
     monkeypatch.setattr(
         export_models, "_release_inventory",
-        lambda _parts, _assemblies, _cfg: {
+        lambda _parts, _assemblies, _cfg, _scenes: {
             "step/sample-part.STEP": step,
             "stl/sample-assembly.STL": stl,
         },
