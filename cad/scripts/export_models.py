@@ -1091,7 +1091,8 @@ def refresh_comparison_gallery() -> bool:
             )
             if full_composite:
                 _run_tool(["uv", "run", str(COMPOSITE_PY)], "composite")
-            if rendered or inputs_changed or not outputs_complete:
+            refreshed = bool(rendered or inputs_changed or not outputs_complete)
+            if refreshed:
                 _run_tool(["uv", "run", str(GALLERY_PY)], "gallery")
             else:
                 _telemetry.info("comparison gallery already current")
@@ -1099,16 +1100,17 @@ def refresh_comparison_gallery() -> bool:
             _write_gallery_stamp(input_digest)
             sp.set_attribute("rendered_pairs", len(rendered))
             sp.set_attribute("full_composite", full_composite)
+            sp.set_attribute("outcome", "refreshed" if refreshed else "current")
         except Exception as exc:  # noqa: BLE001 -- best-effort; never fail export
             _telemetry.warn(
                 f"comparison gallery not refreshed ({exc}); export continues -- "
                 "refresh on a Blender-equipped seat with "
                 "`uv run comparisons/tools/render_offline.py`.")
             _telemetry.event("comparisons.skipped", reason=str(exc)[:200])
-            sp.set_attribute("refreshed", False)
+            sp.set_attribute("outcome", "skipped")
             return False
-        sp.set_attribute("refreshed", True)
-        _telemetry.info("comparison gallery refreshed from exported STLs")
+        if refreshed:
+            _telemetry.info("comparison gallery refreshed from exported STLs")
         return True
 
 

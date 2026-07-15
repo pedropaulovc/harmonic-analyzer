@@ -376,6 +376,8 @@ def test_current_gallery_skips_redundant_composite_and_index(
     monkeypatch.setattr(export_models, "GALLERY_PY", gallery_tool)
     monkeypatch.setattr(export_models, "GALLERY_STAMP", tmp_path / "gallery.json")
     monkeypatch.setattr(export_models, "_prune_stale_gallery", lambda: None)
+    messages: list[str] = []
+    monkeypatch.setattr(export_models._telemetry, "info", messages.append)
     export_models._write_gallery_stamp(export_models._gallery_input_digest(manifest))
     calls: list[str] = []
 
@@ -387,6 +389,7 @@ def test_current_gallery_skips_redundant_composite_and_index(
 
     assert export_models.refresh_comparison_gallery()
     assert calls == ["render_offline.py"]
+    assert messages == ["comparison gallery already current"]
 
     export_models.GALLERY_STAMP.unlink()
     calls.clear()
