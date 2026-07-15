@@ -125,6 +125,65 @@ def test_invalid_scene_is_not_fresh(tmp_path: Path) -> None:
     assert not export_models.scene_is_valid(scene)
 
 
+def test_scene_with_retired_component_source_requires_owner_rescan(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    scene = tmp_path / "scene.json"
+    native = tmp_path / "sldprt"
+    _write(native / "current-part.SLDPRT", time.time())
+    scene.write_text(
+        '{"unit":"mm","components":['
+        '{"part":"current-part","cfg":"Default","mesh":"current-part"},'
+        '{"part":"retired-part","cfg":"Default","mesh":"retired-part"}'
+        ']}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(export_models, "OUT_SLDPRT", native)
+
+    assert export_models.scene_is_valid(scene)
+    assert not export_models.scene_sources_exist(scene)
+
+
+def test_certified_output_hash_detects_same_length_corruption(tmp_path: Path) -> None:
+    output = tmp_path / "sample.STL"
+    output.write_bytes(b"good")
+    certified = {
+        output.resolve(): {
+            "bytes": output.stat().st_size,
+            "sha256": export_models._file_sha256(output),
+        },
+    }
+
+    assert not export_models._certified_output_changed(output, certified)
+    output.write_bytes(b"evil")
+    assert export_models._certified_output_changed(output, certified)
+
+
+def test_certified_output_hash_is_memoized_per_export(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    output = tmp_path / "sample.STL"
+    output.write_bytes(b"neutral")
+    expected = export_models._file_sha256(output)
+    calls = 0
+    original = export_models._file_sha256
+
+    def _counted(path: Path) -> str:
+        nonlocal calls
+        calls += 1
+        return original(path)
+
+    monkeypatch.setattr(export_models, "_file_sha256", _counted)
+    certified = {
+        output.resolve(): {"bytes": output.stat().st_size, "sha256": expected},
+    }
+    cache: dict[Path, bool] = {}
+
+    assert not export_models._certified_output_changed(output, certified, cache)
+    assert not export_models._certified_output_changed(output, certified, cache)
+    assert calls == 1
+
+
 def test_zero_byte_neutral_outputs_are_stale(tmp_path: Path, monkeypatch) -> None:
     stl = tmp_path / "stl"
     step = tmp_path / "step"
@@ -161,7 +220,7 @@ def test_neutral_save_is_silent_and_suppresses_stl_info(tmp_path: Path) -> None:
     assert export_models.TOGGLES[export_models.TOGGLE_STL_SHOW_INFO] is False
 
 
-def test_default_and_configuration_exports_share_one_part_open(
+def test_saved_active_and_configuration_exports_share_one_part_open(
     tmp_path: Path, monkeypatch,
 ) -> None:
     sldprt = tmp_path / "sldprt"
@@ -184,7 +243,7 @@ def test_default_and_configuration_exports_share_one_part_open(
     )
 
     class _Config:
-        Name = "Default"
+        Name = "T24"
 
     class _ConfigManager:
         ActiveConfiguration = _Config()
@@ -203,7 +262,7 @@ def test_default_and_configuration_exports_share_one_part_open(
             return True
 
         def GetConfigurationNames(self) -> list[str]:
-            return ["Default", "C1"]
+            return ["T24", "C1"]
 
         def SaveAs3(self, path: str, _version: int, _options: int) -> int:
             Path(path).write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
@@ -242,6 +301,7 @@ def test_default_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("harmonic_analyzer",))
     monkeypatch.setattr(export_models, "manifest_models", lambda: ["harmonic_analyzer"])
     monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
+    monkeypatch.setattr(export_models, "_certified_outputs", lambda: {})
     monkeypatch.setattr(export_models, "load_colors", lambda: {"sample-part": (1, 1, 1)})
     monkeypatch.setattr(
         export_models, "load_src_digests",
@@ -271,7 +331,8 @@ def test_default_and_configuration_exports_share_one_part_open(
     assert export_models.main() == 0
     assert adapter.opened == ["sample-part.SLDPRT"]
     assert repaired_pngs == ["sample-part"]
-    assert (step / "sample-part.STEP").exists()
+    assert (step / "sample-part.STEP").read_bytes() == b"T24"
+    assert (stl / "sample-part.STL").read_bytes() == b"T24"
     assert (stl / "sample-part--c1.STL").exists()
 
 

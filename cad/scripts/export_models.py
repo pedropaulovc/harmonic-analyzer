@@ -131,6 +131,59 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _certified_outputs() -> dict[Path, dict[str, Any]]:
+    """Return source-path keyed records from the current neutral certificate.
+
+    A certificate from another exporter revision is not evidence about this
+    exporter's bytes: ``exporter_untrusted`` already forces those outputs to be
+    regenerated.  Malformed or partial certificates likewise contribute no
+    freshness evidence and are replaced after a successful export.
+    """
+    try:
+        manifest = json.loads(NEUTRAL_MANIFEST.read_text(encoding="utf-8"))
+        if (manifest.get("schema") != NEUTRAL_SCHEMA
+                or manifest.get("exporter") != _exporter_digest()):
+            return {}
+        records = manifest.get("files")
+        if not isinstance(records, dict):
+            return {}
+        certified: dict[Path, dict[str, Any]] = {}
+        for record in records.values():
+            if not isinstance(record, dict) or not record.get("source"):
+                return {}
+            certified[(REPO / str(record["source"])).resolve()] = record
+        return certified
+    except Exception:
+        return {}
+
+
+def _certified_output_changed(
+    path: Path, certified: dict[Path, dict[str, Any]],
+    cache: dict[Path, bool] | None = None,
+) -> bool:
+    """True when an existing certificate proves ``path`` was modified.
+
+    Source recipe digests establish *which geometry* should have been exported;
+    this check establishes that the already-exported bytes still are the bytes
+    that were certified.  Without both, a same-recipe cache corruption could be
+    hashed into a replacement certificate and silently become trusted.
+    """
+    resolved = path.resolve()
+    if cache is not None and resolved in cache:
+        return cache[resolved]
+    record = certified.get(resolved)
+    if record is None:
+        return False
+    changed = (
+        not _nonempty(path)
+        or path.stat().st_size != record.get("bytes")
+        or _file_sha256(path) != record.get("sha256")
+    )
+    if cache is not None:
+        cache[resolved] = changed
+    return changed
+
+
 def manifest_models() -> list[str]:
     manifest = json.loads(
         (CAD_ROOT.parent / "comparisons" / "manifest.json").read_text(encoding="utf-8")
@@ -446,6 +499,20 @@ def scene_is_valid(scene_path: Path) -> bool:
     except Exception:
         return False
     return True
+
+
+def scene_sources_exist(scene_path: Path) -> bool:
+    """Whether every part named by a parseable scene still has a native source.
+
+    A missing mesh can be repaired by reopening its part.  A missing part source
+    means the cached scene itself names a retired/bogus component, so its owning
+    assembly must be rescanned instead of attempting to open a nonexistent file.
+    """
+    try:
+        stems = scene_part_meshes(scene_path)
+    except Exception:
+        return False
+    return all((OUT_SLDPRT / f"{stem}.SLDPRT").is_file() for stem in stems)
 
 
 def scene_config_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[str, str]]]:
@@ -959,6 +1026,12 @@ def main() -> int:
     comparison_models = manifest_models()
     colors = load_colors()
     digests = load_src_digests()
+    certified = _certified_outputs()
+    certified_drift: dict[Path, bool] = {}
+
+    def neutral_changed(path: Path) -> bool:
+        return _certified_output_changed(path, certified, certified_drift)
+
     parts = part_stems()
     assemblies = list(ASSEMBLY_ORDER)
     assembly_set = set(assemblies)
@@ -970,19 +1043,25 @@ def main() -> int:
 
     missing_asm_png = {
         stem for stem in assemblies
-        if not _nonempty(OUT_PNG / stem.replace("_", "-")
-                         / f"{stem.replace('_', '-')}_isometric.png")
+        if (not _nonempty(OUT_PNG / stem.replace("_", "-")
+                          / f"{stem.replace('_', '-')}_isometric.png")
+            or neutral_changed(
+                OUT_PNG / stem.replace("_", "-")
+                / f"{stem.replace('_', '-')}_isometric.png",
+            ))
     }
     stale_asms: list[str] = []
     for stem in assemblies:
         dashed = stem.replace("_", "-")
         src = OUT_SLDASM / f"{dashed}.SLDASM"
         require_scene = stem in scene_assemblies
-        scene_invalid = require_scene and not scene_is_valid(
-            OUT_BOXES / f"{dashed}.json"
+        scene_path = OUT_BOXES / f"{dashed}.json"
+        scene_invalid = require_scene and (
+            not scene_is_valid(scene_path) or not scene_sources_exist(scene_path)
         )
         if (force or stem in missing_asm_png or scene_invalid
                 or not _nonempty(OUT_STL / f"{dashed}.STL")
+                or neutral_changed(OUT_STL / f"{dashed}.STL")
                 or asm_source_changed(
                     dashed, src, digests, require_scene=require_scene,
                 )):
@@ -990,19 +1069,28 @@ def main() -> int:
 
     missing_part_png = {
         stem.replace("_", "-") for stem in parts
-        if not _nonempty(OUT_PNG / stem.replace("_", "-")
-                         / f"{stem.replace('_', '-')}_isometric.png")
+        if (not _nonempty(OUT_PNG / stem.replace("_", "-")
+                          / f"{stem.replace('_', '-')}_isometric.png")
+            or neutral_changed(
+                OUT_PNG / stem.replace("_", "-")
+                / f"{stem.replace('_', '-')}_isometric.png",
+            ))
     }
     stale_parts = [
         stem for stem in parts
         if (force or stem.replace("_", "-") in missing_part_png
+            or neutral_changed(OUT_STL / f"{stem.replace('_', '-')}.STL")
+            or neutral_changed(OUT_STEP / f"{stem.replace('_', '-')}.STEP")
             or manifest_part_stale(stem.replace("_", "-"), colors, digests))
     ]
     stale_scene_mesh_stems: set[str] = set()
     if not any(stem in scene_assemblies for stem in stale_asms):
         for stem, entries in scene_part_meshes().items():
-            if force or any(part_stl_stale(stem, mesh, colors, digests)
-                            for _cfg, mesh in entries):
+            if force or any(
+                part_stl_stale(stem, mesh, colors, digests)
+                or neutral_changed(OUT_STL / f"{mesh}.STL")
+                for _cfg, mesh in entries
+            ):
                 stale_scene_mesh_stems.add(stem)
 
     if not stale_parts and not stale_asms and not stale_scene_mesh_stems:
@@ -1101,12 +1189,20 @@ def main() -> int:
                 all_by_stem.setdefault(stem, []).append((cfg, mesh))
             default_stale = {
                 stem.replace("_", "-") for stem in parts
-                if force or manifest_part_stale(stem.replace("_", "-"), colors, digests)
+                if (force
+                    or neutral_changed(OUT_STL / f"{stem.replace('_', '-')}.STL")
+                    or neutral_changed(OUT_STEP / f"{stem.replace('_', '-')}.STEP")
+                    or manifest_part_stale(
+                        stem.replace("_", "-"), colors, digests,
+                    ))
             }
             scene_stale = {
                 stem for stem, entries in all_by_stem.items()
-                if force or any(part_stl_stale(stem, mesh, colors, digests)
-                                for _cfg, mesh in entries)
+                if force or any(
+                    part_stl_stale(stem, mesh, colors, digests)
+                    or neutral_changed(OUT_STL / f"{mesh}.STL")
+                    for _cfg, mesh in entries
+                )
             }
 
             # Open each part at most once. Default STEP/STL and the whole referenced
@@ -1118,7 +1214,6 @@ def main() -> int:
                 doc = adapter.currentModel
                 render_cfg = active_cfg(doc)
                 if stem in default_stale:
-                    switch_configuration(doc, stem, "Default")
                     for out in (OUT_STL / f"{stem}.STL", OUT_STEP / f"{stem}.STEP"):
                         _save_as(doc, out)
                         log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
