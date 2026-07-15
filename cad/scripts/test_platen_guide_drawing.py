@@ -7,6 +7,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
 import cut_release
 import draw_platen_guide as drawing
 import build_platen_guide as guide
@@ -157,18 +159,22 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     for relpath in staged.values():
         assert (stage / relpath).is_file()
 
+    referenced_model = tmp_path / "source" / "sldprt" / "platen-guide.SLDPRT"
+    referenced_model.parent.mkdir(parents=True)
+    referenced_model.write_bytes(b"referenced model")
+
     def fake_pack(_sw, source, doc_type, archive):
         assert source == sources["slddrw"]
         assert doc_type == cut_release.SW_DOC_DRAWING
         with zipfile.ZipFile(archive, "w") as package:
             package.writestr(source.name, source.read_bytes())
             package.writestr("platen-guide.SLDPRT", b"referenced model")
-        return 2
+        return (source, referenced_model)
 
     monkeypatch.setattr(cut_release, "_pack_and_go_document", fake_pack)
     monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
     cut_release.RELEASE_DIR.mkdir()
-    native = cut_release.package_drawings(object(), stage)
+    native = cut_release.package_drawings(object(), stage, {})
     assert native == {
         "platen_guide:solidworks_slddrw": "solidworks/platen-guide.SLDDRW",
         "platen_guide:slddrw": "slddrw/platen-guide.SLDDRW",
@@ -177,3 +183,71 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     assert (stage / "solidworks" / "platen-guide.SLDPRT").read_bytes() == b"referenced model"
     assert (stage / "slddrw" / "platen-guide.SLDDRW").read_bytes() == b"slddrw"
     assert (stage / "slddrw" / "platen-guide.SLDPRT").read_bytes() == b"referenced model"
+
+
+def test_release_accepts_pack_rewrite_of_same_original_source(
+    tmp_path: Path, monkeypatch
+) -> None:
+    drawing = tmp_path / "source" / "slddrw" / "pen-assembly.SLDDRW"
+    assembly = tmp_path / "source" / "sldasm" / "pen.SLDASM"
+    drawing.parent.mkdir(parents=True)
+    assembly.parent.mkdir(parents=True)
+    drawing.write_bytes(b"drawing")
+    assembly.write_bytes(b"source assembly")
+    monkeypatch.setattr(
+        cut_release,
+        "DRAWING_OUTPUTS",
+        {"pen_assembly": {"slddrw": drawing}},
+    )
+
+    stage = tmp_path / "stage"
+    native_dir = stage / "solidworks"
+    native_dir.mkdir(parents=True)
+    (native_dir / assembly.name).write_bytes(b"top-level Pack-and-Go rewrite")
+
+    def fake_pack(_sw, _source, _doc_type, archive):
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(drawing.name, b"drawing")
+            package.writestr(assembly.name, b"drawing Pack-and-Go rewrite")
+        return (drawing, assembly)
+
+    monkeypatch.setattr(cut_release, "_pack_and_go_document", fake_pack)
+    monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
+    cut_release.RELEASE_DIR.mkdir()
+
+    staged = cut_release.package_drawings(
+        object(), stage, {assembly.name.casefold(): assembly}
+    )
+
+    assert staged["pen_assembly:solidworks_slddrw"] == (
+        "solidworks/pen-assembly.SLDDRW"
+    )
+    assert (native_dir / assembly.name).read_bytes() == (
+        b"top-level Pack-and-Go rewrite"
+    )
+    assert (stage / "slddrw" / assembly.name).read_bytes() == (
+        b"drawing Pack-and-Go rewrite"
+    )
+
+
+def test_release_rejects_pack_collision_from_distinct_original_sources(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "one" / "pen.SLDASM"
+    second = tmp_path / "two" / "pen.SLDASM"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_bytes(b"one")
+    second.write_bytes(b"two")
+    archive = tmp_path / "pack.zip"
+    with zipfile.ZipFile(archive, "w") as package:
+        package.writestr(first.name, b"rewrite")
+    destination = tmp_path / "destination"
+    destination.mkdir()
+
+    with pytest.raises(RuntimeError, match="different sources"):
+        cut_release._merge_pack_and_go_zip(
+            archive,
+            (second,),
+            ((destination, {first.name.casefold(): first}),),
+        )
