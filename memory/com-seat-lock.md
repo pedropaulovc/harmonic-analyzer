@@ -43,3 +43,19 @@ session state, so it is a safety belt, not a green light for independent paralle
 (see [[parallel-sw-instances-investigation]]). Tests: `test_dodo_recipe.py`
 (`check:recipe`) pins `_com_seat` acquire/env/release, reentrancy, no-inter-COM-task_dep,
 and the export/release gate edges.
+
+**Parallel doit invocations (e.g. two agents) MUST use SEPARATE worktrees.** The seat
+lock serializes SW access across invocations, but it does NOT protect doit's own state
+DB: `DOIT_CONFIG` uses `backend="json"`, `dep_file=cad/out/.doit.db`, and (per the
+`_checkpoint` comment) the json backend only persists on a CLEAN exit via
+`Dependency.close()`→`backend.dump()`. Two concurrent invocations in the SAME worktree
+share one `.doit.db` and clobber each other last-writer-wins (lost up-to-date records →
+spurious re-runs), so give each agent its own worktree (own `.doit.db`) — the machine-
+global seat lock then serializes them on the one seat. Validated 2026-07-14: two Haiku
+subagents ran `verify_soundness:summing` (drawings wt) and `verify_soundness:pen`
+(seat-test-2 wt) concurrently; an external `.holder` poller recorded strictly disjoint,
+back-to-back seat holds (summing 21:53:47.891→21:54:16.774, pen →21:54:39.523, no
+overlap, <200 ms hand-off), both RC=0 / 5 gates. pen's task span was 43.96 s vs 20.0 s
+actual verify work — the ~24 s gap was blocking on the seat. Attach to a running seat for
+ad-hoc cleanup with `win32com.client.GetActiveObject("SldWorks.Application")`, NEVER
+`Dispatch` (spawns an unlicensed Makers instance — see [[solidworks-3dx-launch]]).
