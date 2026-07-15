@@ -133,7 +133,10 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "flange", _V_FLANGE, 0.005 * _V_FLANGE)
 
     # Stud: O5 bearing run from the flange face to the tip (y 3..17), started
-    # at an offset so its length dim IS the flange-face -> tip length.
+    # at an offset so its length dim IS the flange-face -> tip length. The
+    # start offset is a NAMED dim driven from "FlangeLen" (not a baked-in
+    # literal), so editing FlangeLen in SolidWorks keeps the stud rooted on
+    # the flange face and preserves the flange-face -> tip contract.
     stud = SketchDims()
     check("create_sketch stud", await adapter.create_sketch("Top"))
     await define_circle(
@@ -147,13 +150,17 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += stud.apply(adapter, "StudProfile")
     extrude_at_offset(adapter, STUD_LEN, FLANGE_LEN)
     name_last_feature(adapter, "Stud")
-    stud_dims = name_dimensions(adapter, "Stud", ["StudLength"])
-    drive_jobs += [(stud_dims[0], '"StudLen"')]
+    # dim[0] = blind depth (StudLen); dim[1] = start offset (flange face).
+    stud_dims = name_dimensions(adapter, "Stud", ["StudLength", "StudStart"])
+    drive_jobs += [(stud_dims[0], '"StudLen"'), (stud_dims[1], '"FlangeLen"')]
     await volume_check(
         adapter, "flange+stud", _V_FLANGE + _V_STUD, 0.005 * _V_STUD
     )
 
-    # Collar: O9 retainer around the stud tip (y 13..17).
+    # Collar: O9 retainer around the stud tip (y 13..17). Its start offset is a
+    # NAMED dim driven from the length globals ("FlangeLen" + "StudLen" -
+    # "CollarLen"), so the collar top stays flush with the stud tip when any
+    # length global changes -- no baked-in literal to drift.
     collar = SketchDims()
     check("create_sketch collar", await adapter.create_sketch("Top"))
     await define_circle(
@@ -167,8 +174,12 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += collar.apply(adapter, "CollarProfile")
     extrude_at_offset(adapter, COLLAR_LEN, FLANGE_LEN + STUD_LEN - COLLAR_LEN)
     name_last_feature(adapter, "Collar")
-    collar_dims = name_dimensions(adapter, "Collar", ["CollarLength"])
-    drive_jobs += [(collar_dims[0], '"CollarLen"')]
+    # dim[0] = blind depth (CollarLen); dim[1] = start offset (stud tip - collar).
+    collar_dims = name_dimensions(adapter, "Collar", ["CollarLength", "CollarStart"])
+    drive_jobs += [
+        (collar_dims[0], '"CollarLen"'),
+        (collar_dims[1], '"FlangeLen" + "StudLen" - "CollarLen"'),
+    ]
     await volume_check(adapter, "axle", _V_TOTAL, 0.005 * _V_TOTAL)
     await _assert_axle_com(adapter, "axle")
 
