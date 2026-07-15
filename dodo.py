@@ -1742,12 +1742,17 @@ def task_check():
         },
         "telemetry": {
             # The OTel observability spine: severity split, no-gap span status,
-            # log<->trace correlation, cross-process propagation. Pure python, so
-            # it runs as an offline gate -- without this the spine could regress
-            # while the required checks stay green.
+            # log<->trace correlation, cross-process propagation, plus the release
+            # neutral-export aggregate/event shape. Pure python, so it runs as an
+            # offline gate -- without this the spine or release observability could
+            # regress while the required checks stay green.
             "file_dep": [str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                         str((SCRIPTS_DIR / "test_telemetry.py").resolve())],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_telemetry.py")],
+                         str((SCRIPTS_DIR / "cut_release.py").resolve()),
+                         str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
+                         str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve())],
+            "cmd": [*pytest_cmd,
+                    str(SCRIPTS_DIR / "test_telemetry.py"),
+                    str(SCRIPTS_DIR / "test_cut_release_telemetry.py")],
         },
         "verify_telemetry": {
             # The verify-gate span SHAPE, driven by a mock SolidWorks whose COM
