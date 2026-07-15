@@ -13,6 +13,12 @@ rotates +Y to -Z (machine front). Base y 0..9.1 (bracket + arm hub), seat
 y 9.1..22.9 (feed pinion + disc), collar 22.9..26.9.
 Dimensions: memory/paper-drive-rework.md E7/E8.
 
+Dimension scheme: the three lands carry true DIAMETRIC dims (doubled
+centerline-to-outline dims, ``swDiametricLinearDimension``) plus a
+per-land length dim -- the machinist-facing set the manufacturing drawing
+inserts as marked model items (a plain chain dim would print the radius
+and the step drops, not the diameters a lathe operator works to).
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_transgear_stub.py
@@ -22,14 +28,16 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
+import _telemetry
 from _common import (
-    IN,
     SketchDims,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
-    define_rectilinear_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -41,16 +49,48 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from transgear_stub_spec import (
+    BASE_DIA,
+    BASE_LEN,
+    COLLAR_DIA,
+    COLLAR_LEN,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    SEAT_DIA,
+    SEAT_LEN,
+)
 
 PART_NAME = "transgear-stub"
 MATERIAL = "Plain Carbon Steel"
 
-BASE_DIA = 0.375 * IN  # 9.525 machine-standard stock (low)
-BASE_LEN = 9.1  # bracket plate (4) + gap + latch big hub (z -125.9..-135)
-SEAT_DIA = 5.0  # turned-down gear seat (feed pinion + disc bores)
-SEAT_LEN = 13.8  # feed pinion 9.5 + disc 3 + 0.9 slack (z -135..-148.8)
-COLLAR_DIA = 14.0
-COLLAR_LEN = 4.0
+
+async def _diametric_dim(
+    adapter: Any, centerline: str, line: str, text_xy: tuple[float, float], label: str
+) -> None:
+    """Driving doubled (diameter) dim between the revolve centerline and one
+    outline line (``swDiametricLinearDimension``). ``text_xy`` in sketch mm."""
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [centerline, line], 0)
+    ext = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    # Early-bound out param: returns (IDisplayDimension, swAddSpecificDimension_e).
+    display, status = ext.AddSpecificDimension(
+        text_xy[0] / 1000.0, text_xy[1] / 1000.0, 0.0, 15, 0
+    )  # 15 = swDimensionType_e.swDiametricLinearDimension
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: AddSpecificDimension(diametric) failed ({status})")
+    _telemetry.success(f"diametric dim {label}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -69,14 +109,12 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
     await set_global(adapter, "CollarLen", f"{COLLAR_LEN}mm")
 
-    drive_jobs: list[tuple[str, str]] = []
-
     y_seat = BASE_LEN + SEAT_LEN
     y_tip = y_seat + COLLAR_LEN
     profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    check(
+    axis = check(
         "axis centerline",
         await adapter.add_centerline(0.0, 0.0, 0.0, y_tip),
     )
@@ -93,30 +131,44 @@ async def build(adapter) -> dict[str, str]:
     profile_lines = await add_line_chain(adapter, profile_pts)
     set_sketch_direct_db(adapter, False)
     # The centerline merged into the (0, 0)/(0, y_tip) profile corners at
-    # creation, so the closed chain's own constraints define it too. Emission
-    # order = the kept per-segment distance dims in line order (each direction's
-    # last segment is closure-supplied and skipped): seg0 base radius, seg1 base
-    # length, seg2 seat step (radius drop), seg3 seat length, seg4 collar step
-    # (radius rise), seg5 collar length; the origin anchor at (0, 0) adds no dim.
-    await define_rectilinear_chain(
-        adapter, profile_lines, profile_pts, label="stub", dims=profile,
-        names=[
-            "BaseRadius", "BaseLength", "SeatStep",
-            "SeatLength", "CollarStep", "CollarLength",
-        ],
-        drives=[
-            '"BaseDia" / 2',
-            '"BaseLen"',
-            '"BaseDia" / 2 - "SeatDia" / 2',
-            '"SeatLen"',
-            '"CollarDia" / 2 - "SeatDia" / 2',
-            '"CollarLen"',
-        ],
+    # creation, so the closed chain's own constraints define it too. Unlike
+    # define_rectilinear_chain, the horizontal spans carry NO chain dims --
+    # each land's outline line is pinned by its diametric dim instead, and
+    # the on-axis closing segment plus closure supply the rest.
+    n = len(profile_lines)
+    for i, line in enumerate(profile_lines):
+        (x1, y1), (x2, y2) = profile_pts[i], profile_pts[(i + 1) % n]
+        direction = "horizontal" if y1 == y2 else "vertical"
+        check(
+            f"stub {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    # Land lengths (the closing on-axis segment's span is closure-supplied).
+    for line, span, name, drive in (
+        (profile_lines[1], BASE_LEN, "BaseLength", '"BaseLen"'),
+        (profile_lines[3], SEAT_LEN, "SeatLength", '"SeatLen"'),
+        (profile_lines[5], COLLAR_LEN, "CollarLength", '"CollarLen"'),
+    ):
+        await dimension_between(
+            adapter, f"{line}.start", f"{line}.end", "vertical_distance", span,
+            f"stub {name}",
+        )
+        profile.record(name, drive)
+    # Land diameters: doubled centerline dims (value = the full diameter).
+    for line, name, drive, text_y in (
+        (profile_lines[1], "BaseDia", '"BaseDia"', BASE_LEN / 2.0),
+        (profile_lines[3], "SeatDia", '"SeatDia"', BASE_LEN + SEAT_LEN / 2.0),
+        (profile_lines[5], "CollarDia", '"CollarDia"', y_seat + COLLAR_LEN / 2.0),
+    ):
+        await _diametric_dim(adapter, axis, line, (-8.0, text_y), name)
+        profile.record(name, drive)
+    await anchor_point_to_origin(
+        adapter, f"{profile_lines[0]}.start", 0.0, 0.0, "stub anchor"
     )
     await ensure_fully_defined(adapter, "stub profile")
     check("exit_sketch profile", await adapter.exit_sketch())
     name_last_feature(adapter, "StubProfile")
-    drive_jobs += profile.apply(adapter, "StubProfile")
+    drive_jobs = profile.apply(adapter, "StubProfile")
     check("revolve stub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Stub")
 
@@ -137,6 +189,14 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

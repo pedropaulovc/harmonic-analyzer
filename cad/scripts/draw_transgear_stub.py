@@ -1,0 +1,220 @@
+r"""Create the curated machinist drawing for the transgear stud."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from typing import Any
+
+import _telemetry
+from _common import CAD_ROOT, check, run_build
+from _drawing_common import (
+    DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
+    add_property_linked_note,
+    add_surface_finish,
+    curate_view_dimensions,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    set_dimension_callouts,
+    set_dimension_precision,
+    set_hidden_lines_removed,
+    stamp_drawing_summary,
+)
+from _drawing_registry import DRAWINGS_BY_NAME
+from transgear_stub_spec import (
+    BASE_DIA,
+    BASE_LEN,
+    COLLAR_DIA,
+    COLLAR_LEN,
+    SEAT_DIA,
+    SEAT_LEN,
+)
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
+
+SPEC = DRAWINGS_BY_NAME["transgear_stub"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+SLDDRW = OUTPUTS.slddrw
+PDF = OUTPUTS.pdf
+PNG = OUTPUTS.png
+
+# A 26.9 mm stud reads at 4:1 everywhere, so the sheet scale IS the view
+# scale -- no per-view blow-up note needed.
+SHEET_SCALE = (4.0, 1.0)
+VIEW_MM = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm in the views
+TOTAL_LEN = BASE_LEN + SEAT_LEN + COLLAR_LEN
+
+FRONT_CENTER = (0.115, 0.185)
+END_CENTER = (0.115, 0.068)  # base-end view, third-angle: below the front
+ISO_CENTER = (0.320, 0.190)
+
+
+def _fx(x_mm: float) -> float:
+    """Front-view sheet x for a model radial offset (mm from the axis)."""
+    return FRONT_CENTER[0] + x_mm * VIEW_MM
+
+
+def _fy(y_mm: float) -> float:
+    """Front-view sheet y for a model axial station (mm from the base end)."""
+    return FRONT_CENTER[1] + (y_mm - TOTAL_LEN / 2.0) * VIEW_MM
+
+
+# Diameters stack on the left, land lengths chain on the right; the callout
+# texts sit clear of each other's extension lines (steps at different y).
+FRONT_KEEP = {
+    "BaseDia": (0.052, _fy(BASE_LEN / 2.0)),
+    "SeatDia": (0.052, _fy(BASE_LEN + 3.0)),
+    "CollarDia": (0.052, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
+    "BaseLength": (0.162, _fy(BASE_LEN / 2.0)),
+    "SeatLength": (0.162, _fy(BASE_LEN + SEAT_LEN / 2.0)),
+    "CollarLength": (0.162, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
+}
+DIMENSION_CALLOUTS = {"BaseDia": "+0.00/-0.05", "SeatDia": "+0.00/-0.02"}
+# The base is a 3/8" conversion: display 9.525, not a false-precision 9.53.
+DIMENSION_PRECISION = {"BaseDia": 3}
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+
+    check("open transgear-stub source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+    )
+    drawing_model, _sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Transgear Stud Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "transgear stud; stepped gear stud; turned steel",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
+    end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=(4, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
+    for view in (front, end, iso):
+        set_hidden_lines_removed(adapter, view)
+
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
+    # SolidWorks classifies the solid circular end silhouettes under the same
+    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
+    # makes the API a guaranteed no-op even though the end view is circular.
+    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to stud end view")
+
+    base_circle = (
+        END_CENTER[0] + BASE_DIA / 2.0 * VIEW_MM,
+        END_CENTER[1],
+    )
+    add_datum_feature(
+        adapter,
+        end,
+        edge_xy=base_circle,
+        symbol_xy=(END_CENTER[0] + 0.040, END_CENTER[1] - 0.018),
+        datum="A",
+        label="transgear stud base axis",
+    )
+    # The stud is a revolve: its side outlines are SILHOUETTE entities (no
+    # model edge runs along a cylinder side), so every front-view attachment
+    # picks entity_type="SILHOUETTE".
+    seat_left = _fx(-SEAT_DIA / 2.0)
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(seat_left, _fy(BASE_LEN + 9.0)),
+        frame_xy=(0.038, _fy(BASE_LEN + 9.0)),
+        characteristic="cylindricity",
+        tolerance="0.01",
+        label="gear seat cylindricity",
+        entity_type="SILHOUETTE",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(seat_left, _fy(BASE_LEN + 12.0)),
+        frame_xy=(0.038, _fy(BASE_LEN + 12.0)),
+        characteristic="circular_runout",
+        tolerance="0.03",
+        datums=("A",),
+        label="gear seat runout to base",
+        entity_type="SILHOUETTE",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=(_fx(SEAT_DIA / 2.0), _fy(BASE_LEN + SEAT_LEN / 2.0)),
+        symbol_xy=(_fx(SEAT_DIA / 2.0) + 0.008, _fy(BASE_LEN + SEAT_LEN / 2.0) + 0.004),
+        roughness_ra="1.6",
+        label="gear seat finish",
+        entity_type="SILHOUETTE",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=(_fx(BASE_DIA / 2.0), _fy(BASE_LEN / 2.0 - 1.5)),
+        symbol_xy=(_fx(BASE_DIA / 2.0) + 0.008, _fy(BASE_LEN / 2.0 - 1.5) + 0.004),
+        roughness_ra="3.2",
+        label="base bearing finish",
+        entity_type="SILHOUETTE",
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.112)
+
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title="Transgear Stud Manufacturing Drawing",
+        scale=SHEET_SCALE,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))
