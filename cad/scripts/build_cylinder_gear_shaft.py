@@ -25,7 +25,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     apply_material,
     check,
@@ -34,6 +33,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -41,19 +41,22 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from cylinder_gear_shaft_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    ISO_VIEW_NOTE,
+    SHAFT_DIA,
+    SHAFT_LENGTH,
+)
 
 PART_NAME = "cylinder-gear-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
-
-SHAFT_DIA = 0.375 * IN  # ch13: = cam bore (legacy parameters.kcl)
-SHAFT_LENGTH = 187.0  # ch13 stack + journals; north end at machine +97: 7.0
-# seated in the NORTH arbor-pedestal bore band (PR8, ch12 img09 -- the base-
-# standing north clamp restored; the pedestal foot sits just clear of the
-# rocker-arm-support footprint). Was 168, clear of the old solid
-# rocker-arm-support north upright (shortened from 200, 2026-06-19); south end
-# pulled back to machine z -90 (ch30 GT cyl_front, 2026-07-02: the end stops
-# INSIDE the arbor-pedestal bore, blind-bearing look). See
-# build_drive_train_assembly.ARBOR_LENGTH / ARBOR_SOUTH_Z.
 
 SHAFT_RADIUS = SHAFT_DIA / 2.0
 
@@ -66,8 +69,6 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations): the arbor diameter and length. The mm
     # suffix is load-bearing -- this is an INCH document and the equation manager
     # reads BARE numbers in document units (an unsuffixed 176 would be 176 in).
-    # ShaftLength is the extrude DEPTH (a feature parameter, not a sketch dim), so
-    # nothing drives it; it stays an editable knob matching the exemplars.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
 
@@ -91,6 +92,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LENGTH)),
     )
     name_last_feature(adapter, "Shaft")
+    depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * SHAFT_RADIUS**2 * SHAFT_LENGTH
     # expected: pi * 4.7625^2 * 176 = ~12,541 mm^3
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
@@ -109,6 +112,18 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+            "Iso View Note": ISO_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
