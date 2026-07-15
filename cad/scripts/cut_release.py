@@ -418,7 +418,7 @@ def attach_solidworks() -> tuple[Any, str]:
 
 
 def _pack_and_go_document(sw: Any, source: Path, doc_type: int,
-                          zip_path: Path) -> int:
+                          zip_path: Path) -> tuple[Path, ...]:
     """Pack-and-Go ``source`` and all references into a flat zip.
 
     Pack-and-Go bundles a document with every file it references; SetSaveToName2
@@ -446,9 +446,6 @@ def _pack_and_go_document(sw: Any, source: Path, doc_type: int,
     if pg is None:
         raise RuntimeError("GetPackAndGo returned None")
 
-    names_count = pg.GetDocumentNamesCount()
-    log(f"pack-and-go: {names_count} referenced documents")
-
     # Bundle exactly the CAD: no drawings/sim/toolbox, but DO include components
     # suppressed in the active config so no part is dropped from the archive.
     pg.IncludeDrawings = False
@@ -456,6 +453,18 @@ def _pack_and_go_document(sw: Any, source: Path, doc_type: int,
     pg.IncludeToolboxComponents = False
     pg.IncludeSuppressed = True
     pg.FlattenToSingleFolder = True
+
+    names_count = pg.GetDocumentNamesCount()
+    document_names, got_names = pg.GetDocumentNames()
+    if not got_names:
+        raise RuntimeError("Pack-and-Go did not return original document names")
+    documents = tuple(Path(str(name)).resolve() for name in document_names)
+    if len(documents) != names_count:
+        raise RuntimeError(
+            "Pack-and-Go document-name count mismatch: "
+            f"reported {names_count}, returned {len(documents)}"
+        )
+    log(f"pack-and-go: {names_count} referenced documents")
 
     if not pg.SetSaveToName2(True, str(zip_path)):
         raise RuntimeError(f"SetSaveToName2 rejected {zip_path}")
@@ -467,20 +476,21 @@ def _pack_and_go_document(sw: Any, source: Path, doc_type: int,
     if not zip_path.exists() or zip_path.stat().st_size == 0:
         raise RuntimeError(f"Pack-and-Go produced no zip at {zip_path}")
 
-    return names_count
+    return documents
 
 
 def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
     """Pack-and-Go the top assembly into ``zip_path``."""
     top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
-    names_count = _pack_and_go_document(
+    documents = _pack_and_go_document(
         sw, top, SW_DOC_ASSEMBLY, zip_path
     )
 
     return {
         "zip": zip_path,
         "size_mb": zip_path.stat().st_size / 1e6,
-        "documents": names_count,
+        "documents": len(documents),
+        "_native_sources": _source_index(documents),
         "sw_revision": revision,
     }
 
@@ -605,12 +615,39 @@ def stage_drawings(stage: Path) -> dict[str, str]:
     return staged
 
 
-def _merge_pack_and_go_zip(archive: Path, destination: Path) -> tuple[str, ...]:
-    """Merge a flat Pack-and-Go zip, rejecting conflicting duplicate files."""
+def _source_index(paths: tuple[Path, ...]) -> dict[str, Path]:
+    """Index Pack-and-Go originals by their case-insensitive flat filename."""
+    indexed: dict[str, Path] = {}
+    for path in paths:
+        key = path.name.casefold()
+        previous = indexed.get(key)
+        if previous is not None and previous != path:
+            raise RuntimeError(
+                "Pack-and-Go cannot flatten distinct source files with the same "
+                f"name: {previous} and {path}"
+            )
+        indexed[key] = path
+    return indexed
+
+
+def _merge_pack_and_go_zip(
+    archive: Path,
+    original_sources: tuple[Path, ...],
+    destinations: tuple[tuple[Path, dict[str, Path]], ...],
+) -> tuple[str, ...]:
+    """Merge one flat Pack-and-Go archive using original source identity.
+
+    Pack-and-Go rewrites internal reference paths, so two archives made from the
+    same source document can legitimately have different bytes.  A duplicate is
+    accepted only when ``GetDocumentNames`` proves both copies came from the exact
+    same original path; a same-filename collision from distinct originals remains
+    a hard failure.
+    """
     unpacked = archive.with_suffix("")
     if unpacked.exists():
         shutil.rmtree(unpacked)
     unpacked.mkdir(parents=True)
+    archive_sources = _source_index(original_sources)
     members: list[str] = []
     try:
         shutil.unpack_archive(str(archive), str(unpacked), "zip")
@@ -619,31 +656,78 @@ def _merge_pack_and_go_zip(archive: Path, destination: Path) -> tuple[str, ...]:
                 raise RuntimeError(
                     f"Pack-and-Go archive is not flat: {source.relative_to(unpacked)}"
                 )
-            target = destination / source.name
-            if not target.exists():
-                shutil.copy2(source, target)
-            elif _sha256(source) != _sha256(target):
+            key = source.name.casefold()
+            original = archive_sources.get(key)
+            if original is None:
                 raise RuntimeError(
-                    f"Pack-and-Go filename collision has different content: {source.name}"
+                    "Pack-and-Go archive member has no original source identity: "
+                    f"{source.name}"
                 )
+            for destination, known_sources in destinations:
+                known = known_sources.get(key)
+                if known is not None and known != original:
+                    raise RuntimeError(
+                        "Pack-and-Go filename collision comes from different "
+                        f"sources: {known} and {original}"
+                    )
+                target = destination / source.name
+                if not target.exists():
+                    shutil.copy2(source, target)
+                elif _sha256(source) != _sha256(target):
+                    _telemetry.event(
+                        "release.pack_collision_same_source",
+                        filename=source.name,
+                        original_source=str(original),
+                        destination=str(destination),
+                    )
+                    log(
+                        "pack-and-go: kept existing rewritten copy of "
+                        f"{source.name}; original source identity matches"
+                    )
+                known_sources[key] = original
             members.append(source.name)
+        missing = sorted(
+            path.name for key, path in archive_sources.items()
+            if key not in {name.casefold() for name in members}
+        )
+        if missing:
+            raise RuntimeError(
+                "Pack-and-Go archive omitted named source documents: "
+                + ", ".join(missing)
+            )
     finally:
         shutil.rmtree(unpacked, ignore_errors=True)
     return tuple(sorted(members))
 
 
-def package_drawings(sw: Any, stage: Path) -> dict[str, str]:
+def package_drawings(
+    sw: Any,
+    stage: Path,
+    native_sources: dict[str, Path],
+) -> dict[str, str]:
     """Pack each native drawing with its model references into ``solidworks/``."""
     native_dir = stage / "solidworks"
     native_dir.mkdir(parents=True, exist_ok=True)
+    drawing_dir = stage / "slddrw"
+    drawing_dir.mkdir(parents=True, exist_ok=True)
+    drawing_sources: dict[str, Path] = {}
     staged: dict[str, str] = {}
     for drawing_name, outputs in DRAWING_OUTPUTS.items():
         source = outputs["slddrw"]
         archive = RELEASE_DIR / f"_{drawing_name}-drawing-packandgo.zip"
         archive.unlink(missing_ok=True)
         try:
-            _pack_and_go_document(sw, source, SW_DOC_DRAWING, archive)
-            packed_names = _merge_pack_and_go_zip(archive, native_dir)
+            original_sources = _pack_and_go_document(
+                sw, source, SW_DOC_DRAWING, archive
+            )
+            _merge_pack_and_go_zip(
+                archive,
+                original_sources,
+                (
+                    (native_dir, native_sources),
+                    (drawing_dir, drawing_sources),
+                ),
+            )
         finally:
             archive.unlink(missing_ok=True)
 
@@ -655,18 +739,6 @@ def package_drawings(sw: Any, stage: Path) -> dict[str, str]:
         staged[f"{drawing_name}:solidworks_slddrw"] = str(
             native_drawing.relative_to(stage)
         ).replace("\\", "/")
-        drawing_dir = stage / "slddrw"
-        drawing_dir.mkdir(parents=True, exist_ok=True)
-        for name in packed_names:
-            packed_source = native_dir / name
-            packed_copy = drawing_dir / name
-            if not packed_copy.exists():
-                shutil.copy2(packed_source, packed_copy)
-                continue
-            if _sha256(packed_source) != _sha256(packed_copy):
-                raise RuntimeError(
-                    f"drawing bundle filename collision has different content: {name}"
-                )
         portable_drawing = drawing_dir / source.name
         staged[f"{drawing_name}:slddrw"] = str(
             portable_drawing.relative_to(stage)
@@ -694,6 +766,7 @@ def bundle(sw: Any, revision: str, version: str,
     if pg_tmp.exists():
         pg_tmp.unlink()
     facts = package(sw, revision, pg_tmp)
+    native_sources = facts.pop("_native_sources")
     sw_dir = stage / "solidworks"
     sw_dir.mkdir()
     shutil.unpack_archive(str(pg_tmp), str(sw_dir), "zip")
@@ -703,7 +776,7 @@ def bundle(sw: Any, revision: str, version: str,
     #    Pack-and-Go is the release's only native-document open.
     facts.update(stage_release_neutral(stage))
     facts["drawings"] = stage_drawings(stage)
-    facts["drawings"].update(package_drawings(sw, stage))
+    facts["drawings"].update(package_drawings(sw, stage, native_sources))
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
 
     # 3. Scene graph (mm): per-component transforms + mesh keys + colours. The
