@@ -2773,13 +2773,20 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
         check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
         with _telemetry.span(
             "geometry_digest.resolve_configuration", configuration=cfg
-        ):
+        ) as rsp:
             rebuilt = adapter._attempt(
                 lambda: adapter.currentModel.ForceRebuild3(False), default=None
             )
+            status = saved_rebuild_status(adapter)
+            rsp.set_attribute("needs_rebuild", status)
             if rebuilt is False or rebuilt is None:
                 raise RuntimeError(
                     f"{asm_name}: ForceRebuild3 failed after activating {cfg!r}"
+                )
+            if status != 0:
+                raise RuntimeError(
+                    f"{asm_name}: configuration {cfg!r} still has "
+                    f"NeedsRebuild2={status} after ForceRebuild3"
                 )
 
     rows: list[Any] = []

@@ -251,6 +251,8 @@ def test_multi_config_digest_resolves_each_lazy_activation() -> None:
     assert "await activate_resolved(cfg)" in source
     assert "await activate_resolved(rest)" in source
     assert "geometry_digest.resolve_configuration" in source
+    assert "status = saved_rebuild_status(adapter)" in source
+    assert "if status != 0" in source
 
 
 def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) -> None:
