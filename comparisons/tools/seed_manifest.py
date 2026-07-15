@@ -30,7 +30,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO / "cad" / "scripts"
 CATALOG = REPO / "references" / "curation" / "stills_catalog.json"
-PHOTOS_MD = REPO / "photogrammetry" / "raw" / "README.md"
+PHOTOS_MD = REPO / "references" / "photogrammetry" / "raw" / "README.md"
 MANIFEST = REPO / "comparisons" / "manifest.json"
 
 def part_stems() -> set[str]:
@@ -115,7 +115,7 @@ def parse_photos_md() -> tuple[dict[str, list[str]], dict[str, str]]:
 
 
 def photo_path(suffix: str) -> str:
-    return f"photogrammetry/raw/20250828_{suffix}_iOS.jpg"
+    return f"references/photogrammetry/raw/20250828_{suffix}_iOS.jpg"
 
 
 # --- pair construction -------------------------------------------------------
