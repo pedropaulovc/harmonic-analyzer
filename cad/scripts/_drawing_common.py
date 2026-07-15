@@ -1197,6 +1197,7 @@ def insert_bom_table(
     *,
     anchor_xy: tuple[float, float],
     expected_components: Sequence[str],
+    descriptions: dict[str, str] | None = None,
     label: str,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
@@ -1206,7 +1207,10 @@ def insert_bom_table(
     template, anchored top-left at ``anchor_xy`` (sheet meters). Validated hard:
     one data row per ``expected_components`` entry and every expected part
     number present, so a BOM that silently dropped a component can never ship.
-    Returns the table rebound as ``ITableAnnotation``.
+    ``descriptions`` maps a part number to its DESCRIPTION cell text (written
+    per cell and read-verified) — the components carry no Description custom
+    property, and a blank column reads as an unreleased sheet. Returns the
+    table rebound as ``ITableAnnotation``.
     """
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
@@ -1282,6 +1286,41 @@ def insert_bom_table(
         raise RuntimeError(
             f"{label} BOM table is missing components {missing}: {contents!r}"
         )
+    if descriptions:
+        header = [cell.strip().upper() for cell in contents[0]]
+        if "DESCRIPTION" not in header or "PART NUMBER" not in header:
+            raise RuntimeError(
+                f"{label} BOM header carries no DESCRIPTION/PART NUMBER: {header!r}"
+            )
+        description_column = header.index("DESCRIPTION")
+        part_column = header.index("PART NUMBER")
+        remaining = {key.strip().lower(): text for key, text in descriptions.items()}
+        for row in range(1, rows):
+            part = str(
+                adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
+                or ""
+            ).strip().lower()
+            text = remaining.pop(part, None)
+            if text is None:
+                continue
+            if not table.IsCellTextEditable(row, description_column):
+                raise RuntimeError(
+                    f"{label} BOM description cell {row} is not editable"
+                )
+            table.SetText2(row, description_column, False, text)
+            applied = str(
+                table.DisplayedText2(row, description_column, False) or ""
+            )
+            if applied != text:
+                raise RuntimeError(
+                    f"{label} BOM description did not persist: {applied!r} != {text!r}"
+                )
+        if remaining:
+            raise RuntimeError(
+                f"{label} BOM descriptions not applied (no matching row): "
+                f"{sorted(remaining)}"
+            )
+        adapter.currentModel.EditRebuild3()
     _telemetry.success(
         f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
     )

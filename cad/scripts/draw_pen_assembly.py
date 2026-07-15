@@ -49,17 +49,20 @@ SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
 
 # One BOM row per top-level component of build_pen_assembly.py (each part is
-# placed exactly once, so IgnoreMultiple collapses nothing).
-BOM_COMPONENTS = (
-    "pen-hanger",
-    "pen-v-block",
-    "pen-rod",
-    "pen-marker",
-    "pen-wire",
-    "pen-frame",
-    "pen-set-screw",
-    "hanger-screw",
-)
+# placed exactly once, so IgnoreMultiple collapses nothing). Descriptions fill
+# the standard template's DESCRIPTION column -- the parts carry no Description
+# custom property, and a blank column reads as an unreleased sheet (codex
+# machinist review).
+BOM_COMPONENTS = {
+    "pen-hanger": "WHEEL-BAR CLAMP STRAP",
+    "pen-v-block": "PEN ROD GUIDE BLOCK",
+    "pen-rod": "PEN CARRIAGE SLIDE ROD",
+    "pen-marker": "RECORDING MARKER",
+    "pen-wire": "WIRE 2, WHEEL RIM TO ROD",
+    "pen-frame": "MARKER RETAINER FRAME",
+    "pen-set-screw": "KNURLED SET SCREW",
+    "hanger-screw": "HANGER CLAMP SCREW",
+}
 
 FRONT_CENTER = (0.070, 0.150)
 RIGHT_CENTER = (0.150, 0.150)
@@ -119,7 +122,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         anchor_xy=BOM_ANCHOR,
-        expected_components=BOM_COMPONENTS,
+        expected_components=tuple(BOM_COMPONENTS),
+        descriptions=BOM_COMPONENTS,
         label="pen assembly",
     )
     # Balloon the ISOMETRIC view: the orthographic views occlude a component

@@ -305,8 +305,10 @@ async def build(adapter) -> dict[str, str]:
     )
     # The title block's PART cell resolves the document summary Title (the
     # part builds stamp it in save_part_and_images); without it the assembly
-    # print ships a blank PART row.
-    apply_summary_info(adapter, title=ASM_NAME)
+    # print ships a blank PART row. "pen assembly", not the bare stem: the
+    # sheet must identify itself as an assembly drawing (codex machinist
+    # review).
+    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

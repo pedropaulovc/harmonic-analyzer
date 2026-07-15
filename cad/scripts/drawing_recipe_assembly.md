@@ -111,6 +111,21 @@ Layout budget notes (ASME B, sheet meters, origin bottom-left):
 - `bom-standard.sldbomtbt` is 4 columns (ITEM NO. / PART NUMBER / DESCRIPTION /
   QTY.); anchor it top-left with enough width to the right border.
 
+## Independent machinist review (codex) — after the PNG looks correct, before commit
+
+Send ONLY the rendered image, with no repo context, to an independent
+machinist review. Run from a NEUTRAL directory (outside the repo, so codex
+does not pick up AGENTS.md and explore the codebase), pipe the prompt on
+stdin (codex's multi-value `-i` swallows a positional prompt), and tee the
+review to the gitignored `cad/out/reports/`:
+
+```
+( cd "C:/Users/pedro/AppData/Local/Temp" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the assembly can be built as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check -i "<worktree>/cad/out/png/<asm-stem>-assembly_drawing.png" ) 2>&1 | tee "<worktree>/cad/out/reports/codex_machinist_review.txt"
+```
+
+If codex flags clearly valid problems, fix and re-render (bounded: 1-2
+iterations), and include the full review verbatim in your report.
+
 ## Merge gate (same three-part gate as every PR, plus)
 
 - `uv run python -m doit drawing:<stem>_assembly` exits 0.
@@ -119,6 +134,8 @@ Layout budget notes (ASME B, sheet meters, origin bottom-left):
 - Eye pass on `cad/out/png/<asm-stem>-assembly_drawing.png`: views not
   overlapping, components visible, BOM rows legible and complete, balloons
   numbered, title block populated (no blank Number/Revision/tolerance cells).
+- The codex machinist review above ran, and its clearly-valid findings were
+  addressed.
 
 ## Fan-out prompt template (one agent per assembly, own worktree)
 
@@ -139,5 +156,10 @@ Layout budget notes (ASME B, sheet meters, origin bottom-left):
 >    expected — let it wait).
 > 4. Add `test_<ASM_STEM>_assembly_drawing.py` (offline contracts) and run
 >    `uv run python -m pytest cad/scripts/test_*_drawing.py -q`.
-> 5. Commit on your branch; report the PNG path, layout-audit status, and the
->    BOM row count.
+> 5. Run the codex machinist review (recipe section above — exact command;
+>    image-only, from a neutral dir) and address clearly-valid findings
+>    (1-2 re-render iterations max).
+> 6. Commit on your branch — stage files explicitly, never `git add -A`, and
+>    verify with `git show --stat HEAD` that no `cad/out` artifact or review
+>    txt landed. Report the PNG path, layout-audit status, BOM row count, and
+>    the codex review verbatim.
