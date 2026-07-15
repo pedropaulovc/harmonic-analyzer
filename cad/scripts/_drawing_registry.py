@@ -71,6 +71,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_lever_bushing.py",
     ),
     DrawingSpec(
+        name="cone_tip_bushing",
+        part="cone_tip_bushing",
+        artifact_stem="cone-tip-bushing",
+        script_name="draw_cone_tip_bushing.py",
+    ),
+    DrawingSpec(
         name="fulcrum_shaft",
         part="fulcrum_shaft",
         artifact_stem="fulcrum-shaft",

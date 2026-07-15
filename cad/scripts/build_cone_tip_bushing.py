@@ -19,7 +19,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     apply_material,
     check,
@@ -28,6 +27,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -35,13 +35,23 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from cone_tip_bushing_spec import (
+    BORE_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    LENGTH,
+    OUTER_DIA,
+)
 
 PART_NAME = "cone-tip-bushing"
 MATERIAL = "Brass"
 
-OD = 6.0
-LENGTH = 4.0
-BORE_DIA = 0.03125 * IN  # 0.794: the shaft's 1/32" tip stub
+OD = OUTER_DIA  # spec nominal; the assembly reads BORE_DIA/LENGTH from here too
 
 
 async def build(adapter) -> dict[str, str]:
@@ -66,6 +76,8 @@ async def build(adapter) -> dict[str, str]:
     check("extrude body", await adapter.create_extrusion(
         ExtrusionParameters(depth=LENGTH)))
     name_last_feature(adapter, "Body")
+    depth_dim = name_dimensions(adapter, "Body", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"Length"')]
     v = math.pi * (OD / 2.0) ** 2 * LENGTH
     volume = await volume_check(adapter, "body", v, 0.005 * v)
 
@@ -95,6 +107,12 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "bore axis")
     await apply_material(adapter, MATERIAL)  # Brass appearance = the gears' gold
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
