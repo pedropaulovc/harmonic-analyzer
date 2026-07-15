@@ -196,7 +196,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=front_side,
-        symbol_xy=(front_side[0] - 0.016, FRONT_CENTER[1] + 0.040),
+        symbol_xy=(front_side[0] - 0.026, FRONT_CENTER[1] + 0.015),
         roughness_ra="1.6",
         label="pen-rod slide face finish",
     )
