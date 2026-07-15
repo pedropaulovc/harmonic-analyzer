@@ -183,6 +183,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="pinion-pivot-block",
         script_name="draw_pinion_pivot_block.py",
     ),
+    DrawingSpec(
+        name="pen_v_block",
+        part="pen_v_block",
+        artifact_stem="pen-v-block",
+        script_name="draw_pen_v_block.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

@@ -36,6 +36,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -46,20 +47,29 @@ from _common import (
 )
 
 import _telemetry
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from pen_v_block_spec import (
+    BLOCK_DEPTH,
+    BLOCK_HEIGHT,
+    BLOCK_LENGTH,
+    BORE_DIA,
+    BORE_X,
+    CHAMFER,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+    SCREW_HOLE_DIA,
+    SCREW_HOLE_XY,
+    SLIT_LENGTH,
+    SLIT_Y,
+)
 
 PART_NAME = "pen-v-block"
 MATERIAL = "Brass"  # see _common.apply_material docstring
-
-BLOCK_LENGTH = 32.0  # X  DIMENSIONS.md ch24: p.65 vs 5 mm rod (low)
-BLOCK_HEIGHT = 18.0  # Y
-BLOCK_DEPTH = 16.0  # Z
-CHAMFER = 6.0  # 45 deg top corners
-BORE_DIA = 8.0  # two vertical bores
-BORE_X = (11.0, 21.0)
-SLIT_LENGTH = 26.0  # stopped cut from x=0; hinge remains 26..32
-SLIT_Y = (4.0, 8.0)  # slit band
-SCREW_HOLE_DIA = 2.5  # front-face clamp/set screw hole
-SCREW_HOLE_XY = (29.0, 11.0)
 
 THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
 
@@ -137,6 +147,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_DEPTH)),
     )
     name_last_feature(adapter, "Block")
+    depth_dim = name_dimensions(adapter, "Block", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"BlockDepth"')]
     vol = await _volume(adapter)
     _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
@@ -234,11 +246,26 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven pen v-block (equations neutral)", v_final, 0.001 * v_final
     )
 
+    # Manufacturing drawing support: mark exactly the print's dimensions (the
+    # drawing recipe imports the marked set and must find every one of these),
+    # and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     # The ch24 macro shows the cradle painted the machine green (manifest note
     # "pen v-block authored brass vs green"); keep the brass mass model.
     await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
