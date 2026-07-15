@@ -17,21 +17,49 @@ from __future__ import annotations
 import sys
 
 from _clamp_arc import build_arc
-from _common import run_build
+from _common import run_build, save_part_and_images
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import HoleSpec
+from column_clamp_front_spec import (
+    ARC_DEPTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "column-clamp-front"
 
-DEPTH = 17.9  # bar back face to the column-axis plane
+DEPTH = ARC_DEPTH  # bar back face to the column-axis plane
 # The O3.9 clamp-screw shanks PASS THROUGH here (front arc = bar side):
 # #8 clearance (normal fit Ø4.978; nearest UNC to the ~Ø4 screw).
 HOLE_SPEC = HoleSpec("clearance", "#8")
 
 
 async def build(adapter) -> dict[str, str]:
-    return await build_arc(
+    await build_arc(
         adapter, part_name=PART_NAME, depth=DEPTH, front=True, hole_spec=HOLE_SPEC
     )
+    # Manufacturing drawing support, applied AFTER the shared builder's gated
+    # save (the marks live only in this front arc, so the shared _clamp_arc
+    # stays untouched and the back arc's recipe digest never moves): mark
+    # exactly the print's dimensions, stamp the make-critical title-block
+    # properties, then re-save so the shipped SLDPRT carries both.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    return await save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

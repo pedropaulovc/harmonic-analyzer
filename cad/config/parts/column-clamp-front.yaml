@@ -1,5 +1,8 @@
 column-clamp-front:
   number: MHA-105
   material: Gray Cast Iron
+  material_specification: ASTM A48 Class 30 gray cast iron
+  finish: black enamel; bore, bar face + ear holes masked
+  quantity: 3
   tolerance_class: machined_block
   process: "cast + machined"
