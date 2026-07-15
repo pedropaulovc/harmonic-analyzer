@@ -80,7 +80,8 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source
-    assert "add_surface_finish(" in source
+    # Ra 1.6 on BOTH pen bores (the 2X functional pair), one symbol each.
+    assert source.count("add_surface_finish(") == 2
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

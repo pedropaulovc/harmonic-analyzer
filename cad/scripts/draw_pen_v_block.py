@@ -29,9 +29,11 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -188,6 +190,20 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *top_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
     )
+    # The two bore stations from datum B are the nominal locations the A-B-C
+    # position FCF controls, so they must be BASIC -- leaving them under the
+    # general/title-block tolerance would double-tolerance the bore positions.
+    # curate_view_dimensions yields IAnnotation; set_basic_dimension wants the
+    # IDisplayDimension, so resolve it via GetSpecificAnnotation.
+    top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
+    for station in ("Bore0X", "Bore1X"):
+        annotation = top_by_name[station]
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"{station} station has no display dimension to box")
+        set_basic_dimension(
+            adapter, display, label=f"{station} basic bore station"
+        )
     # Block height (18): dimension the right view's flat top/bottom silhouette
     # edges.  At 4:1 the 16 x 18 section spans +/-0.032 (Z) x +/-0.036 (Y)
     # around the view center.
@@ -254,6 +270,17 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="block top-face parallelism",
     )
+    # Ra 1.6 on BOTH pen bores (the 2X functional pair) -- add_surface_finish
+    # attaches to one edge, so each bore carries its own symbol; a single symbol
+    # would leave the other Ø8 bore without the finish requirement.
+    add_surface_finish(
+        adapter,
+        top,
+        edge_xy=bore0_edge,
+        symbol_xy=(0.120, 0.255),
+        roughness_ra="1.6",
+        label="pen bore finish (bore 0)",
+    )
     bore1_edge = (_sheet_x(BORE_X[1]) + 0.016, TOP_CENTER[1])
     add_surface_finish(
         adapter,
@@ -261,7 +288,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bore1_edge,
         symbol_xy=(0.195, 0.255),
         roughness_ra="1.6",
-        label="pen bore finish",
+        label="pen bore finish (bore 1)",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.070)
