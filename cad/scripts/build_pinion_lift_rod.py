@@ -35,6 +35,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -43,16 +44,30 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from pinion_lift_rod_spec import (
+    CAP_SAG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    ROD_DIA,
+    ROD_LEN,
+)
 
 PART_NAME = "pinion-lift-rod"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
 
-ROD_DIA = 6.35  # rides the block bores, same stock as the torque shaft (derived)
-ROD_LEN = 202.0  # machine z -114..+88 (PR7): back end FLUSH with the back
+# ROD_DIA rides the block bores, same stock as the torque shaft (derived).
+# ROD_LEN spans machine z -114..+88 (PR7): back end FLUSH with the back
 # block's outer face (+88, crowned below); the front end reaches just far
-# enough south of the front block (-104) for the lever's clamp hub
-CAP_SAG = 1.2  # back-end crown sagitta (the p.69 dome; the front end hides
-# under the lever hub's own domed cap)
+# enough south of the front block (-104) for the lever's clamp hub.
+# CAP_SAG is the back-end crown sagitta (the p.69 dome; the front end hides
+# under the lever hub's own domed cap). All three live in
+# pinion_lift_rod_spec.py, the dimensional contract the drawing shares.
 
 ROD_R = ROD_DIA / 2.0
 CAP_R = (ROD_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.80 crown sphere radius
@@ -66,11 +81,11 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the rod diameter; RodLen feeds the
-    # feature-parameter extrude length (built with the literal below) --
-    # declared so a GUI edit sees the knob. The mm suffix is load-bearing --
-    # this is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 6.35 = 6.35 in).
+    # Editable knobs (Tools > Equations): the rod diameter, length and crown
+    # sagitta -- RodDia/RodLen drive the marked drawing dims, CapSag the crown
+    # profile. The mm suffix is load-bearing -- this is an INCH document and
+    # the equation manager reads BARE numbers in document units (an unsuffixed
+    # 6.35 = 6.35 in).
     await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
     await set_global(adapter, "RodLen", f"{ROD_LEN}mm")
     await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
@@ -94,6 +109,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=ROD_LEN)),
     )
     name_last_feature(adapter, "Rod")
+    depth_dim = name_dimensions(adapter, "Rod", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"RodLen"')]
     volume = await volume_check(adapter, "rod", V_ROD, 0.005 * V_ROD)
 
     expected = volume
@@ -195,6 +212,17 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

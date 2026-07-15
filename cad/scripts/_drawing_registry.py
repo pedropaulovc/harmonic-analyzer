@@ -123,6 +123,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_pen_assembly.py",
         source_kind="assembly",
     ),
+    DrawingSpec(
+        name="pinion_lift_rod",
+        part="pinion_lift_rod",
+        artifact_stem="pinion-lift-rod",
+        script_name="draw_pinion_lift_rod.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
