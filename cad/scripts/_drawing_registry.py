@@ -27,10 +27,26 @@ class DrawingSpec:
     part: str
     artifact_stem: str
     script_name: str
+    # "part" (default) draws a cad/out/sldprt SLDPRT; "assembly" draws the
+    # cad/out/sldasm SLDASM of the assembly build named by ``part``.
+    source_kind: str = "part"
 
     @property
     def script(self) -> Path:
         return SCRIPTS_DIR / self.script_name
+
+    @property
+    def source(self) -> Path:
+        """The authoritative CAD model this drawing documents.
+
+        Build scripts emit dashed artefact names (``fulcrum_shaft`` ->
+        ``fulcrum-shaft.SLDPRT``, ``pen`` -> ``pen.SLDASM``), so the source stem
+        is the dashed ``part``.
+        """
+        stem = self.part.replace("_", "-")
+        if self.source_kind == "assembly":
+            return CAD_ROOT / "out" / "sldasm" / f"{stem}.SLDASM"
+        return CAD_ROOT / "out" / "sldprt" / f"{stem}.SLDPRT"
 
     @property
     def outputs(self) -> dict[str, Path]:
@@ -82,10 +98,24 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="top-crossbar",
         script_name="draw_top_crossbar.py",
     ),
+    DrawingSpec(
+        name="pen_assembly",
+        part="pen",
+        artifact_stem="pen-assembly",
+        script_name="draw_pen_assembly.py",
+        source_kind="assembly",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
 
 if len(DRAWINGS_BY_NAME) != len(DRAWINGS):
     raise RuntimeError("drawing registry contains duplicate task names")
+
+for _drawing in DRAWINGS:
+    if _drawing.source_kind not in ("part", "assembly"):
+        raise RuntimeError(
+            f"drawing {_drawing.name!r} has unknown source_kind "
+            f"{_drawing.source_kind!r}"
+        )
 

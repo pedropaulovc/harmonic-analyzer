@@ -1150,6 +1150,161 @@ def insert_hole_table(
     return table
 
 
+def bom_table_template(adapter: Any) -> Path:
+    """Path to the install's standard BOM table template (``bom-standard.sldbomtbt``)."""
+    executable = adapter._attempt(
+        lambda: adapter.swApp.GetExecutablePath(), default=None
+    )
+    if not executable:
+        raise RuntimeError("SolidWorks executable path is unavailable")
+    install_root = Path(str(executable)).parent
+    relative = Path("lang") / "english" / "bom-standard.sldbomtbt"
+    candidates = (install_root / relative, install_root / "SOLIDWORKS" / relative)
+    for template in candidates:
+        if template.is_file():
+            return template
+    raise FileNotFoundError(
+        "native BOM-table template is missing; checked "
+        + ", ".join(str(path) for path in candidates)
+    )
+
+
+def _activate_and_select_view(adapter: Any, view: Any, *, label: str) -> str:
+    """Activate ``view`` and select it as a DRAWINGVIEW; return its name."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"failed to select {label} drawing view {name!r}")
+    return name
+
+
+@_telemetry.traced("drawing.bom_table", label_param="label")
+def insert_bom_table(
+    adapter: Any,
+    view: Any,
+    *,
+    anchor_xy: tuple[float, float],
+    expected_components: Sequence[str],
+    label: str,
+) -> Any:
+    """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
+
+    ``IView.InsertBomTable6`` (the current variant; ``InsertBomTable4`` is
+    obsolete) with the install's standard ITEM NO./PART NUMBER/DESCRIPTION/QTY
+    template, anchored top-left at ``anchor_xy`` (sheet meters). Validated hard:
+    one data row per ``expected_components`` entry and every expected part
+    number present, so a BOM that silently dropped a component can never ship.
+    Returns the table rebound as ``ITableAnnotation``.
+    """
+    _activate_and_select_view(adapter, view, label=label)
+    draw = adapter.currentModel
+    bom = view.InsertBomTable6(
+        False,  # UseAnchorPoint=False -> place at the explicit X/Y below
+        anchor_xy[0],
+        anchor_xy[1],
+        1,  # swBomConfigurationAnchorType_e.swBOMConfigurationAnchor_TopLeft
+        2,  # swBomType_e.swBomType_TopLevelOnly
+        "",  # Configuration: blank = the view's configuration (top-level BOM)
+        str(bom_table_template(adapter)),
+        False,  # Hidden
+        0,  # swNumberingType_e.swNumberingType_None (non-indented BOM)
+        False,  # DetailedCutList
+        False,  # DissolvePartLevelRows
+        False,  # DisplayAsOneItem
+    )
+    draw.ClearSelection2(True)
+    if bom is None:
+        raise RuntimeError(f"SolidWorks failed to create the {label} BOM table")
+    adapter.currentModel.EditRebuild3()
+    table = _sw_type_info.early_bound(bom, "ITableAnnotation")
+    if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
+        raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    contents = tuple(
+        tuple(
+            str(
+                adapter._attempt(
+                    lambda row=row, column=column: table.DisplayedText(row, column)
+                )
+                or ""
+            )
+            for column in range(columns)
+        )
+        for row in range(rows)
+    )
+    expected_rows = 1 + len(expected_components)
+    if rows != expected_rows or columns < 3:
+        raise RuntimeError(
+            f"{label} BOM table is {rows}x{columns}, expected {expected_rows} rows: "
+            f"{contents!r}"
+        )
+    flattened = {cell.strip().lower() for row in contents[1:] for cell in row}
+    missing = sorted(
+        component
+        for component in expected_components
+        if component.strip().lower() not in flattened
+    )
+    if missing:
+        raise RuntimeError(
+            f"{label} BOM table is missing components {missing}: {contents!r}"
+        )
+    _telemetry.success(
+        f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
+    )
+    return table
+
+
+@_telemetry.traced("drawing.auto_balloons", label_param="label")
+def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> list[Any]:
+    """Auto-insert circular item-number balloons around one assembly view.
+
+    ``IDrawingDoc.CreateAutoBalloonOptions`` + ``AutoBalloon5`` on the selected
+    ``view``: square layout, circular 2-character style, upper text = the BOM
+    item number (so balloons and the BOM table cross-reference), one balloon
+    per component (``IgnoreMultiple``). Fails loud unless at least ``expected``
+    balloons landed. Returns the balloon notes.
+    """
+    _activate_and_select_view(adapter, view, label=label)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    options = ddoc.CreateAutoBalloonOptions()
+    if options is None:
+        raise RuntimeError(f"failed to create auto-balloon options ({label})")
+    options = _sw_type_info.early_bound_or_flag(options, "IAutoBalloonOptions")
+    options.Layout = 1  # swBalloonLayoutType_e.swDetailingBalloonLayout_Square
+    options.ReverseDirection = False
+    options.IgnoreMultiple = True  # one balloon per component, not per instance
+    options.InsertMagneticLine = False
+    options.LeaderAttachmentToFaces = True
+    options.Style = 1  # swBalloonStyle_e.swBS_Circular
+    options.Size = 2  # swBalloonFit_e.swBF_2Chars
+    options.UpperTextContent = 1  # swBalloonTextContent_e.swBalloonTextItemNumber
+    options.ItemNumberStart = 1
+    options.ItemNumberIncrement = 1
+    # swBalloonItemNumbersOrder_e.swBalloonItemNumbers_DoNotChangeItemNumbers:
+    # the BOM table owns the item numbering; balloons must not resequence it.
+    options.ItemOrder = 1
+    notes = ddoc.AutoBalloon5(options)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if not notes or isinstance(notes, str):
+        raise RuntimeError(f"AutoBalloon5 produced no balloons ({label})")
+    balloons = list(notes)
+    if len(balloons) < expected:
+        raise RuntimeError(
+            f"{label}: {len(balloons)} balloons landed, expected >= {expected}"
+        )
+    _telemetry.success(f"{label}: {len(balloons)} BOM balloons inserted")
+    return balloons
+
+
 def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:
     """Write and read-verify the drawing document summary metadata."""
     model_doc = _sw_type_info.early_bound_or_flag(drawing_model, "IModelDoc2")

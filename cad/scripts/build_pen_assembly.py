@@ -50,9 +50,12 @@ import math
 import sys
 
 from _common import (
+    apply_custom_properties,
     check,
+    part_properties,
     run_build,
 )
+from _drawing_marks import DRAWN_BY
 from _assembly import (
     angle_driver,
     assert_component_placed,
@@ -279,6 +282,23 @@ async def build(adapter) -> dict[str, str]:
         adapter, 1, required_stems=("pen-rod", "pen-marker", "pen-wire"))
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
+    # Title-block identity for the assembly drawing (draw_pen_assembly.py):
+    # part_properties supplies Title/Generator plus the TOL_* general-tolerance
+    # cells finalize_drawing hard-requires on the linked model; material and
+    # finish defer to the parts list, standard assembly-drawing practice.
+    apply_custom_properties(
+        adapter,
+        {
+            **part_properties(ASM_NAME),
+            "Number": "HA-ASM-PEN",
+            "Revision": "A",
+            "Revision Description": "Initial release",
+            "Material Specification": "SEE PARTS LIST",
+            "Finish": "SEE PARTS LIST",
+            "Quantity": "1",
+            "Drawn By": DRAWN_BY,
+        },
+    )
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
