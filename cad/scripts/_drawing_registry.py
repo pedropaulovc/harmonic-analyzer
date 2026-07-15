@@ -159,6 +159,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="transgear-stub",
         script_name="draw_transgear_stub.py",
     ),
+    DrawingSpec(
+        name="guide_lock",
+        part="guide_lock",
+        artifact_stem="guide-lock",
+        script_name="draw_guide_lock.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
