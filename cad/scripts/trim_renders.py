@@ -4,7 +4,7 @@ Run this explicitly after a model change to refresh the committed
 ``docs/images`` README renders from the latest ``cad/out/png`` build output,
 then commit the result::
 
-    python cad/scripts/trim_renders.py
+    uv run python cad/scripts/trim_renders.py
 
 Decoupled from the build on purpose: ``save_assembly_and_images`` no longer
 writes ``docs/images``, so a normal build/release never dirties a tracked file
