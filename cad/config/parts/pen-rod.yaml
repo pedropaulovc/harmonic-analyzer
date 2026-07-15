@@ -1,5 +1,8 @@
 pen-rod:
   number: MHA-051
   material: Brass
+  material_specification: C36000 free-machining brass square bar
+  finish: machined, deburred, oiled
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (brass)"
