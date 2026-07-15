@@ -187,6 +187,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Right Plane", -BORE_HALF_SPACING, "Top Plane", -LIFT_BORE_DROP,
         "lift bore",
     )
+    _blank_ref_plane(adapter, "Plane1")
+    _blank_ref_plane(adapter, "Plane2")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -222,6 +224,20 @@ async def build(adapter) -> dict[str, str]:
     if missing:
         raise RuntimeError(f"saved part drawing properties are missing: {missing}")
     return artefacts
+
+
+def _blank_ref_plane(adapter, name: str) -> None:
+    """Keep construction planes out of saved part and assembly renders."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        name, "PLANE", 0, 0, 0, False, 0, null_callout(), 0,
+    ):
+        raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
 
 
 if __name__ == "__main__":
