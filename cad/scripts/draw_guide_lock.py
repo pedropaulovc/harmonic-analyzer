@@ -242,7 +242,13 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(DATUM_FACE_X, RIGHT_CENTER[1] - 0.022),
+        # Pick on datum face A CLEAR of the screw-hole band.  Seen edge-on in
+        # the right view the Ø3.048 holes read as hidden edges at y = 0.122 +-
+        # 0.0061 (0.1159..0.1281 sheet); a pick at the old -0.022 (=0.128)
+        # landed on the hole-edge/datum-face intersection, so the FCF could
+        # attach to the hole edge instead.  -0.006 sits above the band (like
+        # the +0.006/+0.030 datum and finish picks), on a clean face point.
+        edge_xy=(DATUM_FACE_X, RIGHT_CENTER[1] - 0.006),
         frame_xy=(0.248, 0.124),
         characteristic="flatness",
         tolerance="0.10",
