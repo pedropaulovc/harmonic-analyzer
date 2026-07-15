@@ -207,10 +207,10 @@ class LocalSource:
         return self._path(key)
 
     def scene(self):
-        cands = sorted((self.root / "boxes").glob("*.json"))
-        if not cands:
-            raise SystemExit(f"!! no boxes/*.json under {self.root}")
-        return json.loads(cands[0].read_text(encoding="utf-8"))
+        scene = self.root / "boxes" / "harmonic-analyzer.json"
+        if not scene.is_file():
+            raise SystemExit(f"!! no {scene.relative_to(self.root)} under {self.root}")
+        return json.loads(scene.read_text(encoding="utf-8"))
 
 
 def make_source(release, local):

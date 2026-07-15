@@ -51,6 +51,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -67,6 +68,14 @@ from pinion_pivot_block_spec import (
 
 PART_NAME = "pinion-pivot-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel block (p.68)
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 # Slotted-screw shank pass-throughs (PR7: the p.69 close-up's two bright
 # hold-down heads per block): #19 drill (Ø4.216) -- the wizard twin of the old
@@ -175,10 +184,13 @@ async def build(adapter) -> dict[str, str]:
 
     # Named lift-bore axis (Axis1): the lift rod's revolute mates coaxial to
     # this in the assembly (PR8 -- the rod spins to drive the cams).
-    await name_bore_axis(
+    lift_axis = await name_bore_axis(
         adapter, "Right Plane", -BORE_HALF_SPACING, "Top Plane", -LIFT_BORE_DROP,
         "lift bore",
     )
+    _blank_ref_geometry(adapter, "Plane1", "PLANE")
+    _blank_ref_geometry(adapter, "Plane2", "PLANE")
+    _blank_ref_geometry(adapter, lift_axis, "AXIS")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -206,7 +218,23 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
+
+
+def _blank_ref_geometry(adapter, name: str, kind: str) -> None:
+    """Keep construction planes and axes out of saved renders."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        name, kind, 0, 0, 0, False, 0, null_callout(), 0,
+    ):
+        raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
 
 
 if __name__ == "__main__":

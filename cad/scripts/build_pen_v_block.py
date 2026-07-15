@@ -52,6 +52,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _saved_part_guard import require_saved_drawing_properties
 from pen_v_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -266,7 +267,15 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "Isometric View Note",
+        ),
+    )
+    return artefacts
 
 
 if __name__ == "__main__":
