@@ -93,6 +93,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_fulcrum_shaft.py",
     ),
     DrawingSpec(
+        name="pivot_shaft",
+        part="pivot_shaft",
+        artifact_stem="pivot-shaft",
+        script_name="draw_pivot_shaft.py",
+    ),
+    DrawingSpec(
         name="top_crossbar",
         part="top_crossbar",
         artifact_stem="top-crossbar",
