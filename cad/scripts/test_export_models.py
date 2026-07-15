@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import os
 import sys
@@ -406,9 +407,10 @@ def test_current_gallery_skips_redundant_composite_and_index(
     }
     (comparisons / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     render_tool = tools / "render_offline.py"
+    worker_tool = tools / "blender_worker.py"
     composite_tool = tools / "composite.py"
     gallery_tool = tools / "gallery.py"
-    for tool in (render_tool, composite_tool, gallery_tool):
+    for tool in (render_tool, worker_tool, composite_tool, gallery_tool):
         tool.write_text(tool.name, encoding="utf-8")
     (comparisons / "scores.json").write_text(
         json.dumps({"sample": {"score": 1.0}}), encoding="utf-8",
@@ -427,6 +429,7 @@ def test_current_gallery_skips_redundant_composite_and_index(
     monkeypatch.setattr(export_models, "REPO", tmp_path)
     monkeypatch.setattr(export_models, "COMPARISONS_DIR", comparisons)
     monkeypatch.setattr(export_models, "RENDER_OFFLINE", render_tool)
+    monkeypatch.setattr(export_models, "BLENDER_WORKER", worker_tool)
     monkeypatch.setattr(export_models, "COMPOSITE_PY", composite_tool)
     monkeypatch.setattr(export_models, "GALLERY_PY", gallery_tool)
     monkeypatch.setattr(export_models, "GALLERY_STAMP", tmp_path / "gallery.json")
@@ -442,10 +445,15 @@ def test_current_gallery_skips_redundant_composite_and_index(
 
     monkeypatch.setattr(export_models, "_run_tool", _run)
 
+    old_mtime = time.time() - 100
+    os.utime(comparisons / "scores.json", (old_mtime, old_mtime))
+    os.utime(comparisons / "index.html", (old_mtime, old_mtime))
     assert export_models.refresh_comparison_gallery()
     assert [Path(cmd[2]).name for cmd in calls] == ["render_offline.py"]
     assert calls[0][-1] == "--stale-only"
     assert messages == ["comparison gallery already current"]
+    assert (comparisons / "scores.json").stat().st_mtime > old_mtime
+    assert (comparisons / "index.html").stat().st_mtime > old_mtime
 
     export_models.GALLERY_STAMP.unlink()
     calls.clear()
@@ -454,6 +462,51 @@ def test_current_gallery_skips_redundant_composite_and_index(
         "render_offline.py", "composite.py", "gallery.py",
     ]
     assert calls[0] == ["uv", "run", str(render_tool)]
+
+
+def test_gallery_digest_includes_blender_worker(tmp_path: Path, monkeypatch) -> None:
+    comparisons = tmp_path / "comparisons"
+    tools = comparisons / "tools"
+    tools.mkdir(parents=True)
+    manifest = {"pairs": []}
+    inputs = {
+        "manifest.json": json.dumps(manifest),
+        "tools/render_offline.py": "render",
+        "tools/blender_worker.py": "worker-v1",
+        "tools/composite.py": "composite",
+        "tools/gallery.py": "gallery",
+    }
+    for relative, content in inputs.items():
+        path = comparisons / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(export_models, "REPO", tmp_path)
+    monkeypatch.setattr(export_models, "COMPARISONS_DIR", comparisons)
+    monkeypatch.setattr(export_models, "RENDER_OFFLINE", tools / "render_offline.py")
+    monkeypatch.setattr(export_models, "BLENDER_WORKER", tools / "blender_worker.py")
+    monkeypatch.setattr(export_models, "COMPOSITE_PY", tools / "composite.py")
+    monkeypatch.setattr(export_models, "GALLERY_PY", tools / "gallery.py")
+
+    before = export_models._gallery_input_digest(manifest)
+    (tools / "blender_worker.py").write_text("worker-v2", encoding="utf-8")
+
+    assert export_models._gallery_input_digest(manifest) != before
+
+
+def test_render_diff_local_source_uses_top_scene(tmp_path: Path) -> None:
+    module_path = Path(__file__).parents[2] / "comparisons" / "tools" / "render_diff.py"
+    spec = importlib.util.spec_from_file_location("render_diff_under_test", module_path)
+    assert spec is not None and spec.loader is not None
+    render_diff = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(render_diff)
+    boxes = tmp_path / "boxes"
+    boxes.mkdir()
+    (boxes / "channel.json").write_text('{"scene": "channel"}', encoding="utf-8")
+    (boxes / "harmonic-analyzer.json").write_text(
+        '{"scene": "top"}', encoding="utf-8",
+    )
+
+    assert render_diff.LocalSource(tmp_path).scene() == {"scene": "top"}
 
 
 def test_gallery_with_missing_score_is_incomplete(tmp_path: Path, monkeypatch) -> None:

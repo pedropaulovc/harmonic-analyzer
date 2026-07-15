@@ -94,6 +94,7 @@ TOP_ASSEMBLY = "harmonic-analyzer"
 REPO = CAD_ROOT.parent
 COMPARISONS_DIR = REPO / "comparisons"
 RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
+BLENDER_WORKER = COMPARISONS_DIR / "tools" / "blender_worker.py"
 COMPOSITE_PY = COMPARISONS_DIR / "tools" / "composite.py"
 GALLERY_PY = COMPARISONS_DIR / "tools" / "gallery.py"
 GALLERY_STAMP = CAD_ROOT / "out" / "reports" / "comparison-gallery.json"
@@ -979,6 +980,7 @@ def _gallery_inputs(manifest: dict[str, Any]) -> list[Path]:
     paths = {
         COMPARISONS_DIR / "manifest.json",
         RENDER_OFFLINE,
+        BLENDER_WORKER,
         COMPOSITE_PY,
         GALLERY_PY,
     }
@@ -1005,18 +1007,9 @@ def _gallery_input_digest(manifest: dict[str, Any]) -> str:
     return digest.hexdigest()
 
 
-def _gallery_outputs_complete(manifest: dict[str, Any]) -> bool:
-    pair_ids = {str(pair["id"]) for pair in manifest.get("pairs", [])}
-    scores_path = COMPARISONS_DIR / "scores.json"
-    try:
-        scores = json.loads(scores_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    if not isinstance(scores, dict) or not pair_ids.issubset(scores):
-        return False
-
+def _gallery_output_paths(manifest: dict[str, Any]) -> set[Path]:
     required = {
-        scores_path,
+        COMPARISONS_DIR / "scores.json",
         COMPARISONS_DIR / "index.html",
     }
     for pair in manifest.get("pairs", []):
@@ -1028,7 +1021,39 @@ def _gallery_outputs_complete(manifest: dict[str, Any]) -> bool:
             COMPARISONS_DIR / "composite" / f"{pair_id}_cad.jpg",
             COMPARISONS_DIR / "composite" / f"{pair_id}_blend.jpg",
         })
-    return all(_nonempty(path) for path in required)
+    return required
+
+
+def _gallery_outputs_complete(manifest: dict[str, Any]) -> bool:
+    pair_ids = {str(pair["id"]) for pair in manifest.get("pairs", [])}
+    scores_path = COMPARISONS_DIR / "scores.json"
+    try:
+        scores = json.loads(scores_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(scores, dict) or not pair_ids.issubset(scores):
+        return False
+
+    return all(_nonempty(path) for path in _gallery_output_paths(manifest))
+
+
+def _stamp_gallery_outputs_current(manifest: dict[str, Any]) -> None:
+    """Restamp the complete, digest-matched gallery after a stale-only no-op.
+
+    Export restamps its certified scene/mesh cache, so release staging's mtime
+    honesty guard needs the gallery certificate to move with that post-condition.
+    This is safe only on the branch where the input digest matches and every
+    required output was validated as complete.
+    """
+    now = time.time()
+    stamped = 0
+    for path in _gallery_output_paths(manifest):
+        try:
+            os.utime(path, (now, now))
+            stamped += 1
+        except OSError:
+            pass
+    _telemetry.event("comparisons.restamped", outputs=stamped)
 
 
 def _gallery_stamp_digest() -> str | None:
@@ -1145,6 +1170,7 @@ def refresh_comparison_gallery() -> bool:
             if refreshed:
                 _run_tool(["uv", "run", str(GALLERY_PY)], "gallery")
             else:
+                _stamp_gallery_outputs_current(manifest)
                 _telemetry.info("comparison gallery already current")
                 _telemetry.event("comparisons.current", pairs=pair_count)
             _write_gallery_stamp(input_digest)
