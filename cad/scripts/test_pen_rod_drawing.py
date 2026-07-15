@@ -36,7 +36,9 @@ def test_wire_hole_matches_the_number_drill_standard() -> None:
     assert pen_rod_spec.WIRE_HOLE_Y < pen_rod_spec.ROD_LENGTH
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_native_hole_callout(") == 1
-    assert source.count("add_edge_dimension(") == 1
+    # Two located dims for the wire hole: along the rod (length) AND across the
+    # section (centerline), so the cross-hole cannot drift off-centre.
+    assert source.count("add_edge_dimension(") == 2
 
 
 def test_linked_notes_define_remaining_square_rod_operations() -> None:

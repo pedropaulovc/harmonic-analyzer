@@ -59,7 +59,11 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] - 0.034, TOP_CENTER[1]),
 }
+# No-oversize on BOTH functional slide faces: Section (front, X width) and Depth
+# (top, Z width) are the two 5 mm faces the rod rides on in the v-block, so each
+# is controlled +0.00/-0.05 rather than leaning on the general SECTION +/-0.05.
 DIMENSION_CALLOUTS = {"Section": "+0.00/-0.05"}
+TOP_DIMENSION_CALLOUTS = {"Depth": "+0.00/-0.05"}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -114,8 +118,11 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
+    )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, top_annotations, TOP_DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the wire hole")
 
@@ -136,6 +143,18 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=hole_bottom,
         text_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] + 0.030),
         label="wire-hole length location",
+    )
+    # Locate the wire hole ACROSS the square section too: the native callout gives
+    # only the drill size, so without this the cross-hole could sit off-centre and
+    # still satisfy every shown dimension. Left slide face -> hole (line-to-circle,
+    # so the value is to the hole centre) reads 2.50 of the 5.00 section = centred.
+    add_edge_dimension(
+        adapter,
+        front,
+        p0=front_side,
+        p1=hole_side,
+        text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
+        label="wire-hole centerline location",
     )
     add_native_hole_callout(
         adapter,
