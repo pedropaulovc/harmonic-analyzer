@@ -153,6 +153,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="pen-marker",
         script_name="draw_pen_marker.py",
     ),
+    DrawingSpec(
+        name="transgear_stub",
+        part="transgear_stub",
+        artifact_stem="transgear-stub",
+        script_name="draw_transgear_stub.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
