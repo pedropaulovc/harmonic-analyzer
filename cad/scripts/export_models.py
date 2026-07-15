@@ -56,6 +56,7 @@ from _common import (  # noqa: E402
     check,
     log,
     run_build,
+    set_isometric_view,
 )
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 
@@ -393,12 +394,13 @@ def src_digest(src: Path) -> str | None:
         return None
 
 
-def scene_config_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[str, str]]]:
-    """Return the non-default per-configuration meshes referenced by a scene.
+def scene_part_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[str, str]]]:
+    """Return every ``(configuration, mesh)`` referenced by a scene.
 
     The release inventory is derived from the scene graph instead of duplicating a
     cone/transgear configuration registry.  A missing or malformed scene is never
-    interpreted as an empty set: that would silently omit 23 release meshes.
+    interpreted as an empty set: that would silently omit configured or assembly-
+    generated meshes.
     """
     path = scene_path or OUT_BOXES / f"{TOP_ASSEMBLY}.json"
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -411,8 +413,6 @@ def scene_config_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[
         mesh = str(comp.get("mesh") or "")
         if not stem or not mesh:
             raise RuntimeError(f"release scene component lacks part/mesh: {comp!r}")
-        if mesh == stem:
-            continue
         entry = (str(comp.get("cfg") or ""), mesh)
         bucket = by_stem.setdefault(stem, [])
         if entry not in bucket:
@@ -420,8 +420,17 @@ def scene_config_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[
     return {stem: sorted(entries) for stem, entries in sorted(by_stem.items())}
 
 
+def scene_config_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[str, str]]]:
+    """The scene's non-default mesh aliases (23 cone/transgear configurations)."""
+    return {
+        stem: [(cfg, mesh) for cfg, mesh in entries if mesh != stem]
+        for stem, entries in scene_part_meshes(scene_path).items()
+        if any(mesh != stem for _cfg, mesh in entries)
+    }
+
+
 def _release_inventory(
-    parts: list[str], assemblies: list[str], cfg_meshes: dict[str, list[tuple[str, str]]],
+    parts: list[str], assemblies: list[str], scene_meshes: dict[str, list[tuple[str, str]]],
 ) -> dict[str, Path]:
     """Exact bundle-relative neutral inventory and its cache-owned source files."""
     files: dict[str, Path] = {}
@@ -438,13 +447,16 @@ def _release_inventory(
         files[f"png/{dashed}/{dashed}_isometric.png"] = (
             OUT_PNG / dashed / f"{dashed}_isometric.png"
         )
-    for entries in cfg_meshes.values():
+    for entries in scene_meshes.values():
         for _cfg, mesh in entries:
             files[f"stl/{mesh}.STL"] = OUT_STL / f"{mesh}.STL"
     return dict(sorted(files.items()))
 
 
-def _release_sources(parts: list[str], assemblies: list[str]) -> dict[str, Path]:
+def _release_sources(
+    parts: list[str], assemblies: list[str],
+    scene_meshes: dict[str, list[tuple[str, str]]] | None = None,
+) -> dict[str, Path]:
     sources = {
         stem.replace("_", "-"): OUT_SLDPRT / f"{stem.replace('_', '-')}.SLDPRT"
         for stem in parts
@@ -453,12 +465,28 @@ def _release_sources(parts: list[str], assemblies: list[str]) -> dict[str, Path]
         stem.replace("_", "-"): OUT_SLDASM / f"{stem.replace('_', '-')}.SLDASM"
         for stem in assemblies
     })
+    for stem in (scene_meshes or {}):
+        sources.setdefault(stem, OUT_SLDPRT / f"{stem}.SLDPRT")
     return dict(sorted(sources.items()))
 
 
+def _source_fingerprint(source: Path) -> str | None:
+    recipe = src_digest(source)
+    if recipe is not None:
+        return recipe
+    if not source.is_file():
+        return None
+    digest = hashlib.sha256()
+    with source.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def write_release_neutral_manifest(
-    parts: list[str], assemblies: list[str], cfg_meshes: dict[str, list[tuple[str, str]]],
-    digests: dict[str, str],
+    parts: list[str], assemblies: list[str],
+    scene_meshes: dict[str, list[tuple[str, str]]],
+    colors: dict[str, Any], digests: dict[str, str],
 ) -> None:
     """Atomically certify a complete, current neutral set for ``cut_release``.
 
@@ -467,27 +495,30 @@ def write_release_neutral_manifest(
     trusting volatile SolidWorks mtimes; exact file names and sizes prove the set is
     complete.  PNGs are the render outputs owned by the corresponding build tasks.
     """
-    sources = _release_sources(parts, assemblies)
+    sources = _release_sources(parts, assemblies, scene_meshes)
     source_records: dict[str, str] = {}
     for dashed, source in sources.items():
         if not source.is_file():
             raise RuntimeError(f"release neutral source missing: {source}")
-        current = src_digest(source)
-        if current is None or digests.get(dashed) != current:
+        current = _source_fingerprint(source)
+        recipe = src_digest(source)
+        if current is None or (recipe is not None and digests.get(dashed) != recipe):
             raise RuntimeError(
                 f"release neutral source is not export-current: {source.name}"
             )
         source_records[dashed] = current
-    for stem, entries in cfg_meshes.items():
+    for stem, entries in scene_meshes.items():
         source = OUT_SLDPRT / f"{stem}.SLDPRT"
-        current = source_records.get(stem)
-        if current is None:
+        recipe = src_digest(source)
+        if source_records.get(stem) is None:
             raise RuntimeError(f"release scene references non-manifest part: {stem}")
         for _cfg, mesh in entries:
-            if digests.get(mesh) != current:
-                raise RuntimeError(f"release configuration mesh is stale: {mesh}")
+            fresh = (digests.get(mesh) == recipe if recipe is not None
+                     else not part_stl_stale(stem, mesh, colors, digests))
+            if not fresh:
+                raise RuntimeError(f"release scene mesh is stale: {mesh}")
 
-    inventory = _release_inventory(parts, assemblies, cfg_meshes)
+    inventory = _release_inventory(parts, assemblies, scene_meshes)
     file_records: dict[str, dict[str, Any]] = {}
     for destination, source in inventory.items():
         if not source.is_file() or source.stat().st_size == 0:
@@ -511,8 +542,39 @@ def write_release_neutral_manifest(
         "export.neutral_manifest",
         documents=len(sources),
         files=len(file_records),
-        config_meshes=sum(len(entries) for entries in cfg_meshes.values()),
+        config_meshes=sum(
+            mesh != stem for stem, entries in scene_meshes.items()
+            for _cfg, mesh in entries
+        ),
     )
+
+
+def _validate_release_sources(
+    expected: dict[str, Path], recorded: dict[str, str],
+) -> None:
+    with _telemetry.span("release.neutral_validate_sources", documents=len(expected)):
+        for dashed, source in expected.items():
+            current = _source_fingerprint(source)
+            if current is None or recorded.get(dashed) != current:
+                raise RuntimeError(
+                    f"release neutral source changed: {source.name}; rerun doit export"
+                )
+
+
+def _copy_release_files(
+    stage: Path, expected: dict[str, Path], recorded: dict[str, dict[str, Any]],
+) -> None:
+    with _telemetry.span("release.neutral_copy", files=len(expected)):
+        for destination, expected_source in expected.items():
+            record = recorded[destination]
+            source = REPO / str(record.get("source") or "")
+            if source.resolve() != expected_source.resolve():
+                raise RuntimeError(f"release neutral source path drifted for {destination}")
+            if not source.is_file() or source.stat().st_size != record.get("bytes"):
+                raise RuntimeError(f"release neutral output changed: {source}; rerun doit export")
+            output = stage / destination
+            output.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, output)
 
 
 def stage_release_neutral(stage: Path) -> dict[str, int]:
@@ -531,17 +593,14 @@ def stage_release_neutral(stage: Path) -> dict[str, int]:
 
     parts = part_stems()
     assemblies = list(ASSEMBLY_ORDER)
+    scene_meshes = scene_part_meshes()
     cfg_meshes = scene_config_meshes()
-    expected_sources = _release_sources(parts, assemblies)
+    expected_sources = _release_sources(parts, assemblies, scene_meshes)
     recorded_sources = manifest.get("sources")
     if not isinstance(recorded_sources, dict) or set(recorded_sources) != set(expected_sources):
         raise RuntimeError("release neutral source inventory drifted; rerun doit export")
-    for dashed, source in expected_sources.items():
-        current = src_digest(source)
-        if current is None or recorded_sources.get(dashed) != current:
-            raise RuntimeError(f"release neutral source changed: {source.name}; rerun doit export")
 
-    expected_files = _release_inventory(parts, assemblies, cfg_meshes)
+    expected_files = _release_inventory(parts, assemblies, scene_meshes)
     recorded_files = manifest.get("files")
     if not isinstance(recorded_files, dict) or set(recorded_files) != set(expected_files):
         raise RuntimeError("release neutral file inventory drifted; rerun doit export")
@@ -551,16 +610,8 @@ def stage_release_neutral(stage: Path) -> dict[str, int]:
         documents=len(expected_sources),
         files=len(expected_files),
     ) as sp:
-        for destination, expected_source in expected_files.items():
-            record = recorded_files[destination]
-            source = REPO / str(record.get("source") or "")
-            if source.resolve() != expected_source.resolve():
-                raise RuntimeError(f"release neutral source path drifted for {destination}")
-            if not source.is_file() or source.stat().st_size != record.get("bytes"):
-                raise RuntimeError(f"release neutral output changed: {source}; rerun doit export")
-            output = stage / destination
-            output.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, output)
+        _validate_release_sources(expected_sources, recorded_sources)
+        _copy_release_files(stage, expected_files, recorded_files)
         sp.set_attribute("config_meshes", sum(len(v) for v in cfg_meshes.values()))
 
     return {
@@ -594,6 +645,27 @@ def _save_as(doc: Any, out: Path) -> int:
             out.unlink(missing_ok=True)  # never leave a zero-byte placeholder behind
             raise RuntimeError(f"SaveAs3 produced no/empty file: {out} (rc={ok})")
         return ok
+
+
+@_telemetry.traced("export.build_png", label_param="stem")
+async def export_build_png(adapter: Any, stem: str) -> None:
+    """Repair the build-owned isometric render from an already-open native doc."""
+    output = OUT_PNG / stem / f"{stem}_isometric.png"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.unlink(missing_ok=True)
+    set_isometric_view(adapter)
+    check(
+        f"export_image isometric -> {output.name}",
+        await adapter.export_image({
+            "file_path": str(output.resolve()),
+            "format_type": "png",
+            "width": 1600,
+            "height": 1000,
+            "view_orientation": "isometric",
+        }),
+    )
+    if not output.is_file() or output.stat().st_size == 0:
+        raise RuntimeError(f"isometric render repair produced no/empty file: {output}")
 
 
 def validated_outputs(
@@ -853,35 +925,47 @@ def main() -> int:
     }
     scene_assemblies.add("harmonic_analyzer")
 
+    missing_asm_png = {
+        stem for stem in assemblies
+        if not (OUT_PNG / stem.replace("_", "-")
+                / f"{stem.replace('_', '-')}_isometric.png").is_file()
+    }
     stale_asms: list[str] = []
     for stem in assemblies:
         dashed = stem.replace("_", "-")
         src = OUT_SLDASM / f"{dashed}.SLDASM"
         require_scene = stem in scene_assemblies
         scene_missing = require_scene and not (OUT_BOXES / f"{dashed}.json").exists()
-        if (force or scene_missing or not (OUT_STL / f"{dashed}.STL").exists()
+        if (force or stem in missing_asm_png or scene_missing
+                or not (OUT_STL / f"{dashed}.STL").exists()
                 or asm_source_changed(
                     dashed, src, digests, require_scene=require_scene,
                 )):
             stale_asms.append(stem)
 
+    missing_part_png = {
+        stem.replace("_", "-") for stem in parts
+        if not (OUT_PNG / stem.replace("_", "-")
+                / f"{stem.replace('_', '-')}_isometric.png").is_file()
+    }
     stale_parts = [
         stem for stem in parts
-        if force or manifest_part_stale(stem.replace("_", "-"), colors, digests)
+        if (force or stem.replace("_", "-") in missing_part_png
+            or manifest_part_stale(stem.replace("_", "-"), colors, digests))
     ]
-    stale_config_stems: set[str] = set()
+    stale_scene_mesh_stems: set[str] = set()
     if not any(stem in scene_assemblies for stem in stale_asms):
-        for stem, entries in scene_config_meshes().items():
+        for stem, entries in scene_part_meshes().items():
             if force or any(part_stl_stale(stem, mesh, colors, digests)
                             for _cfg, mesh in entries):
-                stale_config_stems.add(stem)
+                stale_scene_mesh_stems.add(stem)
 
-    if not stale_parts and not stale_asms and not stale_config_stems:
+    if not stale_parts and not stale_asms and not stale_scene_mesh_stems:
         _telemetry.info("all exports fresh")
         stamp_render_cache_current(validated_outputs(parts, assemblies, scene_assemblies))
         if record:
             write_release_neutral_manifest(
-                parts, assemblies, scene_config_meshes(), digests,
+                parts, assemblies, scene_part_meshes(), colors, digests,
             )
         # Geometry unchanged, but still reconcile the gallery (cheap: --stale-only
         # is a no-op when nothing drifted) so `doit export` always leaves an
@@ -889,7 +973,7 @@ def main() -> int:
         refresh_comparison_gallery()
         return 0
     _telemetry.info(
-        f"exporting parts={stale_parts or sorted(stale_config_stems) or '[]'} "
+        f"exporting parts={stale_parts or sorted(stale_scene_mesh_stems) or '[]'} "
         f"assemblies={stale_asms or '[]'}"
     )
     for d in (OUT_STL, OUT_STEP, OUT_BOXES):
@@ -954,6 +1038,8 @@ def main() -> int:
                     colors.update(scan_colors)
                     pending_scenes[stem] = (boxes, scene, stems)
                     all_scene_stems.update(stems)
+                if stem in missing_asm_png:
+                    await export_build_png(adapter, dashed)
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 if stem not in scene_assemblies:
                     d = src_digest(src) if record else None
@@ -972,7 +1058,7 @@ def main() -> int:
                 stem.replace("_", "-") for stem in parts
                 if force or manifest_part_stale(stem.replace("_", "-"), colors, digests)
             }
-            config_stale = {
+            scene_stale = {
                 stem for stem, entries in all_by_stem.items()
                 if force or any(part_stl_stale(stem, mesh, colors, digests)
                                 for _cfg, mesh in entries)
@@ -981,10 +1067,11 @@ def main() -> int:
             # Open each part at most once. Default STEP/STL and the whole referenced
             # configuration family are emitted in that one session; exporting all
             # siblings preserves the distinct-CRC stale-tessellation guard.
-            for stem in sorted(default_stale | config_stale):
+            for stem in sorted(default_stale | scene_stale | missing_part_png):
                 src = OUT_SLDPRT / f"{stem}.SLDPRT"
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
+                render_cfg = active_cfg(doc)
                 if stem in default_stale:
                     switch_configuration(doc, stem, "Default")
                     for out in (OUT_STL / f"{stem}.STL", OUT_STEP / f"{stem}.STEP"):
@@ -992,7 +1079,7 @@ def main() -> int:
                         log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
                     colors[stem] = doc_rgb(doc)
 
-                entries = all_by_stem.get(stem, []) if stem in config_stale else []
+                entries = all_by_stem.get(stem, []) if stem in scene_stale else []
                 crc_by_mesh: dict[str, int] = {}
                 for cfg, mesh in entries:
                     switch_configuration(doc, stem, cfg)
@@ -1004,6 +1091,9 @@ def main() -> int:
                     log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) "
                         f"rgb={colors[mesh]}")
                 assert_configs_distinct(stem, crc_by_mesh)
+                if stem in missing_part_png:
+                    switch_configuration(doc, stem, render_cfg)
+                    await export_build_png(adapter, stem)
 
                 d = src_digest(src) if record else None
                 if d is not None:
@@ -1051,7 +1141,7 @@ def main() -> int:
         stamp_render_cache_current(validated_outputs(parts, assemblies, scene_assemblies))
         if record:
             write_release_neutral_manifest(
-                parts, assemblies, scene_config_meshes(), digests,
+                parts, assemblies, scene_part_meshes(), colors, digests,
             )
         refresh_comparison_gallery()
     return rc

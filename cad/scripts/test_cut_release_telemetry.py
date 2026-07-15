@@ -56,10 +56,11 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
     monkeypatch.setattr(export_models, "NEUTRAL_MANIFEST", manifest_path)
     monkeypatch.setattr(export_models, "part_stems", lambda: ["sample_part"])
     monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("sample_assembly",))
+    monkeypatch.setattr(export_models, "scene_part_meshes", lambda: {})
     monkeypatch.setattr(export_models, "scene_config_meshes", lambda: {})
     monkeypatch.setattr(
         export_models, "_release_sources",
-        lambda _parts, _assemblies: {
+        lambda _parts, _assemblies, _scene: {
             "sample-part": part, "sample-assembly": assembly,
         },
     )
@@ -97,4 +98,8 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
     assert neutral[0].attributes["documents"] == 2
     assert neutral[0].attributes["files"] == 2
     assert not neutral[0].events
+    assert {span.name for span in finished} >= {
+        "release.neutral_validate_sources",
+        "release.neutral_copy",
+    }
     assert not [span for span in finished if span.name == "release.neutral_document"]

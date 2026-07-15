@@ -78,7 +78,10 @@ def test_release_inventory_reuses_build_owned_pngs(tmp_path: Path, monkeypatch) 
 
     files = export_models._release_inventory(
         ["sample_part"], ["sample_assembly"],
-        {"sample-part": [("C1", "sample-part--c1")]},
+        {
+            "generated-spring": [("Default", "generated-spring")],
+            "sample-part": [("C1", "sample-part--c1")],
+        },
     )
 
     assert files == {
@@ -90,8 +93,28 @@ def test_release_inventory_reuses_build_owned_pngs(tmp_path: Path, monkeypatch) 
         ),
         "step/sample-part.STEP": tmp_path / "step-cache/sample-part.STEP",
         "stl/sample-assembly.STL": tmp_path / "stl-cache/sample-assembly.STL",
+        "stl/generated-spring.STL": tmp_path / "stl-cache/generated-spring.STL",
         "stl/sample-part--c1.STL": tmp_path / "stl-cache/sample-part--c1.STL",
         "stl/sample-part.STL": tmp_path / "stl-cache/sample-part.STL",
+    }
+
+
+def test_scene_inventory_keeps_generated_default_meshes(tmp_path: Path) -> None:
+    scene = tmp_path / "scene.json"
+    scene.write_text(
+        '{"components":['
+        '{"part":"generated-spring","cfg":"Default","mesh":"generated-spring"},'
+        '{"part":"gear","cfg":"T12","mesh":"gear--t12"}'
+        ']}',
+        encoding="utf-8",
+    )
+
+    assert export_models.scene_part_meshes(scene) == {
+        "gear": [("T12", "gear--t12")],
+        "generated-spring": [("Default", "generated-spring")],
+    }
+    assert export_models.scene_config_meshes(scene) == {
+        "gear": [("T12", "gear--t12")],
     }
 
 
@@ -103,12 +126,14 @@ def test_default_and_configuration_exports_share_one_part_open(
     stl = tmp_path / "stl"
     step = tmp_path / "step"
     boxes = tmp_path / "boxes"
+    png = tmp_path / "png"
     for path in (sldprt / "sample-part.SLDPRT",
                  sldasm / "harmonic-analyzer.SLDASM",
                  stl / "sample-part.STL",
                  stl / "harmonic-analyzer.STL"):
         _write(path, time.time())
     boxes.mkdir(parents=True)
+    _write(png / "harmonic-analyzer/harmonic-analyzer_isometric.png", time.time())
     (boxes / "harmonic-analyzer.json").write_text(
         '{"unit":"mm","components":[{"part":"sample-part",'
         '"cfg":"C1","mesh":"sample-part--c1"}]}',
@@ -167,6 +192,7 @@ def test_default_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "OUT_STL", stl)
     monkeypatch.setattr(export_models, "OUT_STEP", step)
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
+    monkeypatch.setattr(export_models, "OUT_PNG", png)
     monkeypatch.setattr(export_models, "COLORS", stl / "colors.json")
     monkeypatch.setattr(export_models, "SRC_DIGESTS", stl / "export-src.json")
     monkeypatch.setattr(export_models, "part_stems", lambda: ["sample_part"])
@@ -187,6 +213,12 @@ def test_default_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
     monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
     monkeypatch.setattr(export_models, "refresh_comparison_gallery", lambda: True)
+    repaired_pngs: list[str] = []
+
+    async def _repair_png(_adapter, stem: str) -> None:
+        repaired_pngs.append(stem)
+
+    monkeypatch.setattr(export_models, "export_build_png", _repair_png)
     monkeypatch.setattr(
         export_models, "run_build",
         lambda build: (asyncio.run(build(adapter)), 0)[1],
@@ -195,6 +227,7 @@ def test_default_and_configuration_exports_share_one_part_open(
 
     assert export_models.main() == 0
     assert adapter.opened == ["sample-part.SLDPRT"]
+    assert repaired_pngs == ["sample-part"]
     assert (step / "sample-part.STEP").exists()
     assert (stl / "sample-part--c1.STL").exists()
 
