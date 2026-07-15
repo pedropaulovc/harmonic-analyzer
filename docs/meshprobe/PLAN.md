@@ -3,7 +3,8 @@
 > Greenfield, mesh-side, Python. Gives an agent read-only inspection powers over a 3D
 > model — **6-DOF camera**, **name/highlight components**, **hide/show to expose
 > occluded geometry**, **high-density contact-sheet renders** (+ a **section/clip
-> plane** for single-mesh interiors) — and ships with a **necessity-proven eval set**
+> plane** for single-mesh interiors and **diagnostic illumination** —
+> raking/backlit/flat) — and ships with a **necessity-proven eval set**
 > that can only be solved by exercising them.
 >
 > `meshprobe` is a working name (rename is a find/replace; affects nothing in the
@@ -32,7 +33,10 @@
 
 - No geometry creation/editing/repair, no CSG, no CAD-kernel work.
 - No SolidWorks/COM path (exists in-repo already; this decouples from it).
-- No photorealism. Flat/AO shading; Blender-quality lighting is a documented fallback.
+- No photorealism / global illumination / ray-traced shadows. We *do* drive
+  diagnostic direct-light setups (raking, backlit, flat, high-key — §3 API); cast
+  shadows are optional/best-effort, since the diagnostic value comes from the shading
+  gradient and the backlit silhouette, not from shadow maps.
 - No cross-process session persistence in v1.
 
 ## 3. Architecture — five layers, one Python core
@@ -42,7 +46,7 @@
  │  CLI (JSON/JSONL) · MCP adapter · Python InspectSession API │  ← every response echoes full session state
  ├ inspection engine ─────────────────────────────────────────┤
  │  camera pose/move · display mode · highlight · section      │  ← stateful, read-only
- │  render_sheet (one cell = ordinary render)                  │
+ │  illumination · render_sheet (one cell = ordinary render)   │
  ├ render backend ────────────────────────────────────────────┤
  │  PyVista Plotter(off_screen, shape=(r,c)) on VTK OSMesa     │  ← one PNG per montage, pixel-budgeted
  ├ scene model ───────────────────────────────────────────────┤
@@ -105,6 +109,20 @@ class DisplayMode(StrEnum):
     ISOLATED = "isolated"
     XRAY = "xray"
 
+class IlluminationPreset(StrEnum):
+    NEUTRAL = "neutral"      # even, three-point-ish; general shape/material reading (default)
+    RAKING = "raking"        # grazing light; reveals shallow relief, engraving, steps
+    BACKLIT = "backlit"      # bright background + rim; silhouettes, gaps, thin parts
+    FLAT = "flat"            # unlit constant shade; identity/segmentation, no shading cues
+    HIGH_KEY = "high_key"    # lifts cavities/dark assemblies without crushing shadows
+
+@dataclass(frozen=True)
+class Illumination:
+    preset: IlluminationPreset = IlluminationPreset.NEUTRAL
+    azimuth_deg: float | None = None    # RAKING: grazing direction in the view plane
+    elevation_deg: float | None = None  # RAKING: low angle exaggerates relief
+    intensity: float | None = None
+
 @dataclass(frozen=True)
 class CameraPose:
     position: Vec3
@@ -133,14 +151,21 @@ class InspectSession:
     def set_display(self, names, mode: DisplayMode, opacity=None) -> CommandResult: ...
     def set_highlight(self, names, style=None) -> CommandResult[list[str]]: ...
     def set_section(self, plane: Plane | None) -> CommandResult: ...
+    def set_illumination(self, spec: Illumination) -> CommandResult: ...
     def render_sheet(self, cells, layout=None, labels=True) -> CommandResult[Render]: ...
 ```
 
 - `CameraPose` is the exact absolute 6-DOF representation. `CameraDelta` makes
   relative navigation easy for an agent without introducing a second camera model.
 - `render_sheet` is the only render command. One cell is an ordinary render; many
-  cells are a contact sheet. A cell may override camera, display, highlight and
-  section state without mutating the session after the render completes.
+  cells are a contact sheet. A cell may override camera, display, highlight, section
+  and illumination state without mutating the session after the render completes — so
+  a surface-inspection sheet can pair `RAKING` from two opposing azimuths with a
+  `NEUTRAL` context cell in one PNG.
+- **Illumination is session state**, echoed in `SessionState` and recorded in every
+  render manifest. Lights are VTK directional/positional lights (`Plotter.add_light`)
+  in the software OSMesa path; `FLAT` disables shading (`lighting=False`) for clean
+  component-identity reads.
 - Turntables and progressive peel views are client-side `render_sheet` recipes, not
   additional tools. Fewer orthogonal tools makes selection easier and traces clearer.
 - `render_sheet` uses one `Plotter(shape=(r,c))` and emits **one PNG**, with per-cell
@@ -183,7 +208,9 @@ the grader. Cardinality is raised so guessing loses.
 | Generator | Secret | Question | Required channel(s) |
 |---|---|---|---|
 | `enclosed_token` | inner block carrying a random **code** (unambiguous alphabet, no O/0/I/1/S/5/B/8/Z/2) | "What is the code on the inner block?" | visibility + camera |
-| `engraved_face` | random code embossed on one face; **legibility-gated** (see below) | "Read the code engraved on the housing." | camera |
+| `engraved_face` | random code embossed on one face; **legibility-gated** (see below) | "Read the code engraved on the housing." | camera + illumination (raking) |
+| `relief_mark` | shallow stamped mark (arrow/glyph) unreadable under `NEUTRAL`; direction is the answer | "Which way does the stamped arrow point?" | illumination (raking) + camera |
+| `gap_silhouette` | a narrow through-gap readable only against a bright backdrop, near its axis | "Is the slot a through-gap or blind?" | illumination (backlit) + camera |
 | `buried_count` | N∈**wide, non-canonical range** of enclosed features; non-overlapping silhouettes at the oracle view; N capped for VLM countability | "How many pins are inside the case?" | visibility + camera |
 | `occluded_link` | hidden bracket joining 2 of **≥10** parts (C(10,2)=45-way) | "Which two parts does the internal bracket connect?" | visibility + camera |
 | `coded_inner` | innermost part tagged with a **colour-band sequence code** (not a nameable colour) | "Read the band code on the innermost part." | visibility + camera |
@@ -192,10 +219,11 @@ the grader. Cardinality is raised so guessing loses.
 
 - **Composite answers** (code AND count AND relation) multiply the answer space where a
   single field is low-cardinality.
-- **Legibility gate** (`engraved_face`, `coded_inner`, count generators): at generation
-  time, render the oracle's canonical view and require the extractor VLM to read the
-  planted answer **k/k** times, with a minimum **glyph/feature pixel-height asserted
-  geometrically**. Fail → reject the seed. (Text-to-mesh via `trimesh`/VTK is a real
+- **Legibility gate** (`engraved_face`, `relief_mark`, `coded_inner`, count generators):
+  at generation time, render the oracle's canonical view **under the task's required
+  illumination preset** and require the extractor VLM to read the planted answer
+  **k/k** times, with a minimum **glyph/feature pixel-height asserted geometrically**.
+  Fail → reject the seed. (Text-to-mesh via `trimesh`/VTK is a real
   implementation detail; colour-band or discrete-symbol codes are a more raster-robust
   carrier than extruded glyphs and are preferred where possible.)
 
@@ -224,6 +252,7 @@ For each task, generation-time gates (all deterministic, CI-safe):
 - **camera-pose freedom** — `set_camera` / `move_camera` / `frame`, and per-cell poses in `render_sheet`;
 - **visibility control** — `set_display` (`HIDDEN`/`ISOLATED`/`XRAY`) + `set_section`;
 - **name↔geometry binding** — `set_highlight` / `frame(names=…)` / hide-diff via `set_display` / `list_components`;
+- **illumination control** — `set_illumination` presets/angles (raking, backlit, flat, high-key);
 - **multi-view throughput** — a multi-cell `render_sheet`.
 
 **Honesty about `set_highlight`.** Highlight is informationally equivalent to
@@ -232,6 +261,14 @@ impossible. It is **exercised, not necessary**: `bind_the_part` *requires the bi
 channel* (some name↔geometry op) and is graded on the **returned name-set** of a
 required `set_highlight`/`frame` call (precision/recall), with scrambled/neutral names
 so textual naming alone can't shortcut it.
+
+**Illumination necessity is measured, not geometric.** "Unreadable without raking
+light" is a shading/legibility fact, not an occlusion one, so its gate is a *measured
+legibility differential*: across N seeds the VLM reads the answer **k/k under the
+required preset and 0/k under `NEUTRAL`/`FLAT`**. Size the relief depth and grazing
+angle so the differential is large and stable (parallels the text-prior gate — a
+population measurement, not ray geometry). This is the one channel whose necessity
+does not rest on the exterior-sweep proof.
 
 ### 4.3 Closing the non-visual shortcuts
 - **Scrub agent-visible metadata** (§3 `ComponentInfo`): no bbox/centroid/volume/colour
@@ -270,8 +307,8 @@ so textual naming alone can't shortcut it.
   **pass threshold set by binomial test against the *measured* text-only-prior/chance
   baseline (P(pass|baseline) < 1%)** — not theoretical uniform chance. `success@1`
   reported as a secondary number.
-- **Per-capability** success (camera / visibility / binding / contact-under-budget) and
-  **channel-ablation deltas**.
+- **Per-capability** success (camera / visibility / binding / illumination /
+  contact-under-budget) and **channel-ablation deltas**.
 - **Efficiency**: steps-to-solve, wrong-tool rate, sheet-vs-single-cell call counts.
 - **Necessity-coverage CI gate = 100%** — survives as a gate *only because* the §4.2
   validity gates are deterministic (no VLM-in-CI flapping).
@@ -298,9 +335,9 @@ so textual naming alone can't shortcut it.
 meshprobe/
   pyproject.toml            # uv: pyvista, trimesh, numpy, pillow, fastmcp, pytest, (cadquery/gmsh opt)
   src/meshprobe/
-    load.py  scene.py  session.py  render.py  cli.py  mcp_server.py  models.py
+    load.py  scene.py  session.py  render.py  illumination.py  cli.py  mcp_server.py  models.py
   eval/
-    generators/   # enclosed_token, engraved_face, buried_count, occluded_link, coded_inner, count_by_view, bind_the_part
+    generators/   # enclosed_token, engraved_face, buried_count, occluded_link, coded_inner, count_by_view, bind_the_part, relief_mark, gap_silhouette
     gates.py      # §4.2 deterministic validity gates (sweep-invisibility, watertight, metadata-only, text-prior, legibility)
     oracle.py     # scripted solvers (smoke test) driving InspectSession
     grade.py      # objective graders + binomial thresholds + optional VLM judge
@@ -318,8 +355,8 @@ meshprobe/
   recovered time prototyping the **exterior-sweep falsifier** (§4.2.1) — the one truly
   unproven component.
 - **M1 — engine.** Loader (incl. dogfood colour-resolution) + Scene + `InspectSession`
-  (camera / display / highlight / section + `render_sheet`) + full state-echo, with
-  unit tests.
+  (camera / display / highlight / section / illumination + `render_sheet`) + full
+  state-echo, with unit tests.
 - **M2 — CLI + MCP surface.** `inspect`/`serve` adapters over the same typed command
   models; drive from Claude Code; confirm image blocks + pixel budget.
 - **M3 — eval v1 *with the shortcut gates built in from day one*.** 2–3 generators +
@@ -343,7 +380,8 @@ meshprobe/
 | Anti-prior selection bias from VLM rejection | Reject only on deterministic gates; VLM null is population-level, not per-task acceptance |
 | Low cardinality / lucky guessing | ≥45-way `occluded_link`, coded (not named) colours, wide count ranges, N≥20 + binomial thresholds |
 | Contact sheet un-evaluated (it's affordance, not unique info) | Necessity-under-budget lane (§4.4) gives it a real pass/fail |
-| `engraved_face` illegible under flat OSMesa shading | Legibility gate (k/k read, min glyph px), unambiguous alphabet, prefer colour-band/symbol codes |
+| `engraved_face`/`relief_mark` illegible under flat shading | `RAKING` illumination is the intended reveal (grazing light exaggerates shallow relief); legibility gate renders under that preset; unambiguous alphabet, prefer colour-band/symbol codes |
+| Illumination necessity is softer than the geometric gates | Rests on a measured legibility differential (k/k under preset, 0/k under `NEUTRAL`/`FLAT`), not ray geometry — size relief depth + grazing angle for a large, stable margin |
 | Single-mesh public models exercise only camera | Scope them to camera/section; `set_section` is the only interior-reveal for monoliths |
 | Test split = answer key in the repo | Runtime-entropy test seeds logged in report, never pre-registered |
 | OSMesa GL libs flaky on a box | pyrender(OSMesa) fallback behind `render.py`; legibility gates carry AA margin |
@@ -362,5 +400,12 @@ meshprobe/
 - **`set_section` is a first-class command** (visibility channel), not a deferred
   extra — it is the only interior-reveal for solid/single-mesh models, which the
   public-models slice needs.
+- **`set_illumination` is a first-class command and its own capability channel** —
+  diagnostic presets (raking for relief/engraving, backlit for gaps/silhouettes, flat
+  for identity/segmentation, high-key for cavities). Session state, per-cell
+  overridable, recorded in every render manifest. This is what closes the flat-shading
+  legibility gap the eval otherwise fights — and it brings the PyVista plan to parity
+  with the illumination model in the Blender plan (`docs/greenfield-meshprobe-plan.md`)
+  without leaving the headless OSMesa raster path.
 - **One Python core, thin adapters** — the CLI and MCP server are generated over the
   same typed command models; no second behavior path, no arbitrary-code tool.
