@@ -241,6 +241,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.20",
         datums=("A", "B", "C"),
         diameter=True,
+        quantity="2X",
         label="pen bore position",
     )
     add_feature_control_frame(
