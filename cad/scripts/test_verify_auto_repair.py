@@ -243,6 +243,16 @@ def test_refresh_reuses_one_resolved_state_across_gates_and_save() -> None:
     )
 
 
+def test_multi_config_digest_resolves_each_lazy_activation() -> None:
+    import _assembly
+
+    source = inspect.getsource(_assembly.assembly_geometry_digest)
+    assert "async def activate_resolved(cfg: str)" in source
+    assert "await activate_resolved(cfg)" in source
+    assert "await activate_resolved(rest)" in source
+    assert "geometry_digest.resolve_configuration" in source
+
+
 def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) -> None:
     import _assembly
 

@@ -2765,10 +2765,27 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     # the single-config case (the rest pose is already active after the gates) we
     # read mass properties in place and never activate/re-activate.
     multi = len(configs) > 1
+
+    async def activate_resolved(cfg: str) -> None:
+        """Activate and explicitly solve one config after a lazy switch."""
+        if active_configuration_name(adapter) == cfg:
+            return
+        check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+        with _telemetry.span(
+            "geometry_digest.resolve_configuration", configuration=cfg
+        ):
+            rebuilt = adapter._attempt(
+                lambda: adapter.currentModel.ForceRebuild3(False), default=None
+            )
+            if rebuilt is False or rebuilt is None:
+                raise RuntimeError(
+                    f"{asm_name}: ForceRebuild3 failed after activating {cfg!r}"
+                )
+
     rows: list[Any] = []
     for cfg in configs:
-        if multi and active_configuration_name(adapter) != cfg:
-            check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+        if multi:
+            await activate_resolved(cfg)
         async with _telemetry.aspan(
             "geometry_digest.mass_properties", configuration=cfg
         ):
@@ -2823,8 +2840,8 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
                     tuple(round(v, 4) for v in a16[9:12]),
                 ))
         rows.extend((cfg, *pr) for pr in sorted(pose_rows))
-    if multi and rest is not None and active_configuration_name(adapter) != rest:
-        check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
+    if multi and rest is not None:
+        await activate_resolved(rest)
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
 
 
