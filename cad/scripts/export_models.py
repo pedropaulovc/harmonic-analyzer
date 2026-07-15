@@ -33,6 +33,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -55,6 +56,7 @@ from _common import (  # noqa: E402
     run_build,
 )
 from render_compare import model_path  # noqa: E402
+from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 
 import _telemetry  # noqa: E402
 
@@ -62,6 +64,8 @@ OUT_STL = CAD_ROOT / "out" / "stl"
 OUT_STEP = CAD_ROOT / "out" / "step"
 OUT_BOXES = CAD_ROOT / "out" / "boxes"
 OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
+OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
+OUT_PNG = CAD_ROOT / "out" / "png"
 COLORS = OUT_STL / "colors.json"
 # Per-output source-recipe digests: ``mesh|dashed-assembly -> digest`` recorded at
 # export time so a re-export fires iff the SOURCE's recipe changed. Keyed on doit's
@@ -75,6 +79,9 @@ SRC_DIGESTS = OUT_STL / "export-src.json"
 # looking fresh and ship stale STEP/STL/scene JSON (codex review). A sentinel
 # mismatch invalidates the whole cache -> full regeneration through the new logic.
 _EXPORTER_KEY = "__exporter__"
+NEUTRAL_MANIFEST = CAD_ROOT / "out" / "reports" / "release-neutral.json"
+NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@1"
+TOP_ASSEMBLY = "harmonic-analyzer"
 
 # Comparison gallery, produced by THIS export stage from the STLs written above
 # (so `doit export` yields an up-to-date gallery for the release to bundle). Both
