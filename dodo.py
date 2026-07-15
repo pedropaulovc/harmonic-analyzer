@@ -243,9 +243,15 @@ def _com_seat(label: str):
 # the runtime COM-seat lock provides serialization without adding false DAG edges.
 def _drawing_order() -> list[str]:
     producer_order = {stem: i for i, stem in enumerate(_seat_part_order())}
+    # Assembly-sourced drawings have no part producer; schedule them after the
+    # part drawings (their .SLDASM source is the last COM artefact to settle).
+    fallback = len(producer_order)
     return sorted(
         DRAWINGS_BY_NAME,
-        key=lambda name: (producer_order[DRAWINGS_BY_NAME[name].part], name),
+        key=lambda name: (
+            producer_order.get(DRAWINGS_BY_NAME[name].part, fallback),
+            name,
+        ),
     )
 
 
@@ -1031,11 +1037,22 @@ def _drawing_file_deps(stem: str) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
     script = spec.script.resolve()
     runtime = [*_helper_deps(script), _submodule_dep()]
+    if spec.source_kind == "assembly":
+        # Assembly-sourced drawing: the CAD dep is the built .SLDASM, whose
+        # ContentChecker digest is its producing recipe. Assemblies have no
+        # execution token, so the drawing inherits the documented recipe-vs-PID
+        # identity limitation (AGENTS.md "recipe != PID identity") already
+        # accepted for assemblies over parts: a same-recipe from-scratch
+        # assembly rebuild can strand the drawing's view references; the
+        # drawing task rebuilds on any real recipe change, and a dangling view
+        # is visible on the mandatory render inspection.
+        source_deps: tuple[str, ...] = (_sldasm(spec.part),)
+    else:
+        source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
     return sorted(
         {
             str(script),
-            _sldprt(spec.part),
-            _part_execution_token(spec.part),
+            *source_deps,
             *runtime,
             *(str(path.resolve()) for path in spec.assets),
         }
@@ -1513,8 +1530,9 @@ def _clean_drawing(stem: str) -> None:
 def task_drawing():
     """Curated manufacturing drawings with identity-safe shared caching.
 
-    A drawing depends on its authoritative SLDPRT plus explicitly declared
-    drawing inputs. It is independently selectable as
+    A drawing depends on its authoritative source model (a part's SLDPRT or an
+    assembly's SLDASM, per the registry row's ``source_kind``) plus explicitly
+    declared drawing inputs. It is independently selectable as
     ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
     """
     for stem in _drawing_order():

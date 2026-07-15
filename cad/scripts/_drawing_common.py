@@ -8,6 +8,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -23,7 +24,7 @@ from _drawing_layout_check import (
 )
 from _drawing_registry import PROJECT_DRWDOT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     TOL_BASIC,
@@ -71,6 +72,11 @@ _NOMINAL_GDT_HALF_M = 0.008
 # dims (Codex #269 thread 1).
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
+
+# A circular 2-character BOM balloon renders ~10-12 mm across at the template
+# font; its GetExtent is leader-polluted (see _note_element), so it gets this
+# nominal half-span box around its IAnnotation.GetPosition anchor instead.
+_NOMINAL_BALLOON_HALF_M = 0.006
 
 # The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
 # format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
@@ -1150,6 +1156,271 @@ def insert_hole_table(
     return table
 
 
+def bom_table_template(adapter: Any) -> Path:
+    """Path to the install's standard BOM table template (``bom-standard.sldbomtbt``)."""
+    executable = adapter._attempt(
+        lambda: adapter.swApp.GetExecutablePath(), default=None
+    )
+    if not executable:
+        raise RuntimeError("SolidWorks executable path is unavailable")
+    install_root = Path(str(executable)).parent
+    relative = Path("lang") / "english" / "bom-standard.sldbomtbt"
+    candidates = (install_root / relative, install_root / "SOLIDWORKS" / relative)
+    for template in candidates:
+        if template.is_file():
+            return template
+    raise FileNotFoundError(
+        "native BOM-table template is missing; checked "
+        + ", ".join(str(path) for path in candidates)
+    )
+
+
+def _activate_and_select_view(adapter: Any, view: Any, *, label: str) -> str:
+    """Activate ``view`` and select it as a DRAWINGVIEW; return its name."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"failed to select {label} drawing view {name!r}")
+    return name
+
+
+@_telemetry.traced("drawing.bom_table", label_param="label")
+def insert_bom_table(
+    adapter: Any,
+    view: Any,
+    *,
+    anchor_xy: tuple[float, float],
+    expected_components: Sequence[str],
+    descriptions: dict[str, str] | None = None,
+    label: str,
+) -> Any:
+    """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
+
+    ``IView.InsertBomTable6`` (the current variant; ``InsertBomTable4`` is
+    obsolete) with the install's standard ITEM NO./PART NUMBER/DESCRIPTION/QTY
+    template, anchored top-left at ``anchor_xy`` (sheet meters). Validated hard:
+    one data row per ``expected_components`` entry and every expected part
+    number present, so a BOM that silently dropped a component can never ship.
+    ``descriptions`` maps a part number to its DESCRIPTION cell text (written
+    per cell and read-verified) — the components carry no Description custom
+    property, and a blank column reads as an unreleased sheet. Returns the
+    table rebound as ``ITableAnnotation``.
+    """
+    _activate_and_select_view(adapter, view, label=label)
+    draw = adapter.currentModel
+    configuration = str(
+        adapter._get_attr_or_call(view, "ReferencedConfiguration") or "Default"
+    )
+    bom = view.InsertBomTable6(
+        False,  # UseAnchorPoint=False -> place at the explicit X/Y below
+        anchor_xy[0],
+        anchor_xy[1],
+        1,  # swBomConfigurationAnchorType_e.swBOMConfigurationAnchor_TopLeft
+        2,  # swBomType_e.swBomType_TopLevelOnly
+        "",  # Configuration: top-level BOMs bind configs via SetConfigurations
+        str(bom_table_template(adapter)),
+        False,  # Hidden
+        0,  # swNumberingType_e.swNumberingType_None (non-indented BOM)
+        False,  # DetailedCutList
+        False,  # DissolvePartLevelRows
+        False,  # DisplayAsOneItem
+    )
+    draw.ClearSelection2(True)
+    if bom is None:
+        raise RuntimeError(f"SolidWorks failed to create the {label} BOM table")
+    # A COM-inserted top-level BOM starts with NO configuration bound (a
+    # header-only table without even its per-configuration QTY column) --
+    # IBomFeature::SetConfigurations is the documented binding path for
+    # top-level tables, so bind the view's own configuration.
+    bom = _sw_type_info.early_bound_or_flag(bom, "IBomTableAnnotation", "BomFeature")
+    feature = adapter._get_attr_or_call(bom, "BomFeature")
+    if feature is None:
+        raise RuntimeError(f"{label} BOM table has no BOM feature")
+    feature = _sw_type_info.early_bound_or_flag(
+        feature, "IBomFeature", "SetConfigurations"
+    )
+    if not feature.SetConfigurations(
+        True, bool_array([True]), bstr_array([configuration])
+    ):
+        raise RuntimeError(
+            f"failed to bind {label} BOM table to configuration {configuration!r}"
+        )
+    draw.ForceRebuild3(False)
+    adapter.currentModel.EditRebuild3()
+    table = _sw_type_info.early_bound(bom, "ITableAnnotation")
+    if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
+        raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    contents = tuple(
+        tuple(
+            str(
+                adapter._attempt(
+                    lambda row=row, column=column: table.DisplayedText(row, column)
+                )
+                or ""
+            )
+            for column in range(columns)
+        )
+        for row in range(rows)
+    )
+    expected_rows = 1 + len(expected_components)
+    if rows != expected_rows or columns < 3:
+        raise RuntimeError(
+            f"{label} BOM table is {rows}x{columns}, expected {expected_rows} rows: "
+            f"{contents!r}"
+        )
+    flattened = {cell.strip().lower() for row in contents[1:] for cell in row}
+    missing = sorted(
+        component
+        for component in expected_components
+        if component.strip().lower() not in flattened
+    )
+    if missing:
+        raise RuntimeError(
+            f"{label} BOM table is missing components {missing}: {contents!r}"
+        )
+    if descriptions:
+        header = [cell.strip().upper() for cell in contents[0]]
+        if "DESCRIPTION" not in header or "PART NUMBER" not in header:
+            raise RuntimeError(
+                f"{label} BOM header carries no DESCRIPTION/PART NUMBER: {header!r}"
+            )
+        description_column = header.index("DESCRIPTION")
+        part_column = header.index("PART NUMBER")
+        remaining = {key.strip().lower(): text for key, text in descriptions.items()}
+        for row in range(1, rows):
+            part = str(
+                adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
+                or ""
+            ).strip().lower()
+            text = remaining.pop(part, None)
+            if text is None:
+                continue
+            if not table.IsCellTextEditable(row, description_column):
+                raise RuntimeError(
+                    f"{label} BOM description cell {row} is not editable"
+                )
+            table.SetText2(row, description_column, False, text)
+            applied = str(
+                table.DisplayedText2(row, description_column, False) or ""
+            )
+            if applied != text:
+                raise RuntimeError(
+                    f"{label} BOM description did not persist: {applied!r} != {text!r}"
+                )
+        if remaining:
+            raise RuntimeError(
+                f"{label} BOM descriptions not applied (no matching row): "
+                f"{sorted(remaining)}"
+            )
+        adapter.currentModel.EditRebuild3()
+    _telemetry.success(
+        f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
+    )
+    return table
+
+
+def _spread_balloons(
+    adapter: Any, view: Any, balloons: list[Any], *, margin: float = 0.014
+) -> None:
+    """Re-ring auto-balloons evenly around ``view`` (the layout audit fails loud).
+
+    ``AutoBalloon5`` stacks balloons whose attachment points cluster, and on a
+    pictorial view its square layout can even drop balloons INSIDE the outline
+    box. Deterministic fix: place every balloon's box center on an ellipse
+    ``margin`` outside the view outline, evenly spaced, each assigned the ring
+    slot nearest its landed angle so leaders do not cross. Leaders stay
+    attached; only the balloon anchor moves (``IAnnotation.SetPosition``).
+    """
+    outline = adapter._attempt(lambda: view.GetOutline())
+    if not outline:
+        raise RuntimeError("balloon spread: view has no outline")
+    vxmin, vymin, vxmax, vymax = (float(v) for v in list(outline)[:4])
+    center_x, center_y = (vxmin + vxmax) / 2.0, (vymin + vymax) / 2.0
+    radius_x = (vxmax - vxmin) / 2.0 + margin
+    radius_y = (vymax - vymin) / 2.0 + margin
+    items = []
+    for note in balloons:
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+        annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
+        if annotation is None:
+            raise RuntimeError("balloon spread: balloon without an annotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetPosition", "SetPosition"
+        )
+        # Work from the ANCHOR, never GetExtent: a balloon note's extent box
+        # includes its LEADER, so it spans to the pointed-at component and is
+        # useless for placing the balloon circle itself.
+        position = adapter._attempt(lambda a=annotation: a.GetPosition())
+        if not position:
+            raise RuntimeError("balloon spread: balloon without a position")
+        px, py = float(position[0]), float(position[1])
+        theta = math.atan2(py - center_y, px - center_x)
+        items.append((theta, annotation))
+    items.sort(key=lambda item: item[0])
+    count = len(items)
+    start = items[0][0]  # anchor the ring on the first balloon's own angle
+    for slot, (_theta, annotation) in enumerate(items):
+        angle = start + 2.0 * math.pi * slot / count
+        target_x = center_x + radius_x * math.cos(angle)
+        target_y = center_y + radius_y * math.sin(angle)
+        if not annotation.SetPosition(target_x, target_y, 0.0):
+            raise RuntimeError("failed to re-ring a BOM balloon")
+
+
+@_telemetry.traced("drawing.auto_balloons", label_param="label")
+def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> list[Any]:
+    """Auto-insert circular item-number balloons around one assembly view.
+
+    ``IDrawingDoc.CreateAutoBalloonOptions`` + ``AutoBalloon5`` on the selected
+    ``view``: square layout, circular 2-character style, upper text = the BOM
+    item number (so balloons and the BOM table cross-reference), one balloon
+    per component (``IgnoreMultiple``). Fails loud unless at least ``expected``
+    balloons landed. Returns the balloon notes.
+    """
+    _activate_and_select_view(adapter, view, label=label)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    options = ddoc.CreateAutoBalloonOptions()
+    if options is None:
+        raise RuntimeError(f"failed to create auto-balloon options ({label})")
+    options = _sw_type_info.early_bound_or_flag(options, "IAutoBalloonOptions")
+    options.Layout = 1  # swBalloonLayoutType_e.swDetailingBalloonLayout_Square
+    options.ReverseDirection = False
+    options.IgnoreMultiple = True  # one balloon per component, not per instance
+    options.InsertMagneticLine = False
+    options.LeaderAttachmentToFaces = True
+    options.Style = 1  # swBalloonStyle_e.swBS_Circular
+    options.Size = 2  # swBalloonFit_e.swBF_2Chars
+    options.UpperTextContent = 1  # swBalloonTextContent_e.swBalloonTextItemNumber
+    options.ItemNumberStart = 1
+    options.ItemNumberIncrement = 1
+    # swBalloonItemNumbersOrder_e.swBalloonItemNumbers_DoNotChangeItemNumbers:
+    # the BOM table owns the item numbering; balloons must not resequence it.
+    options.ItemOrder = 1
+    notes = ddoc.AutoBalloon5(options)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if not notes or isinstance(notes, str):
+        raise RuntimeError(f"AutoBalloon5 produced no balloons ({label})")
+    balloons = list(notes)
+    if len(balloons) < expected:
+        raise RuntimeError(
+            f"{label}: {len(balloons)} balloons landed, expected >= {expected}"
+        )
+    _spread_balloons(adapter, view, balloons)
+    draw.EditRebuild3()
+    _telemetry.success(f"{label}: {len(balloons)} BOM balloons inserted")
+    return balloons
+
+
 def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:
     """Write and read-verify the drawing document summary metadata."""
     model_doc = _sw_type_info.early_bound_or_flag(drawing_model, "IModelDoc2")
@@ -1215,7 +1486,24 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     )
     if note is None:
         return None
-    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetExtent")
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetExtent", "IsBomBalloon")
+    # A BOM balloon's GetExtent includes its LEADER -- the box spans from the
+    # balloon circle to the pointed-at component (same leader-polluted-box dead
+    # end as GD&T symbols), so neighboring balloons' boxes always intersect near
+    # the view. Box a balloon nominally around its anchor instead; NON_VIEW scope
+    # still catches two stacked balloons or a balloon dropped on a table.
+    if bool(adapter._attempt(lambda: note.IsBomBalloon(), default=False)):
+        position = adapter._attempt(
+            lambda: adapter._get_attr_or_call(annotation, "GetPosition")
+        )
+        if not position:
+            return None
+        x, y = float(position[0]), float(position[1])
+        half = _NOMINAL_BALLOON_HALF_M
+        return LayoutElement(
+            name, "note", x - half, y - half, x + half, y + half,
+            scope=CollisionScope.NON_VIEW,
+        )
     extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
     if not extent:
         return None

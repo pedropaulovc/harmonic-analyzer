@@ -50,9 +50,13 @@ import math
 import sys
 
 from _common import (
+    apply_custom_properties,
+    apply_summary_info,
     check,
+    part_properties,
     run_build,
 )
+from _drawing_marks import DRAWN_BY
 from _assembly import (
     angle_driver,
     assert_component_placed,
@@ -279,6 +283,32 @@ async def build(adapter) -> dict[str, str]:
         adapter, 1, required_stems=("pen-rod", "pen-marker", "pen-wire"))
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
+    # Title-block identity for the assembly drawing (draw_pen_assembly.py):
+    # part_properties supplies Title/Generator plus the TOL_* general-tolerance
+    # cells finalize_drawing hard-requires on the linked model; material and
+    # finish defer to the parts list, standard assembly-drawing practice.
+    apply_custom_properties(
+        adapter,
+        {
+            **part_properties(ASM_NAME),
+            # MHA-A## = assembly drawing ids, beside the parts' MHA-### range
+            # (a longer number overflows the DWG. NO. title-block cell).
+            "Number": "MHA-A01",
+            "Revision": "A",
+            "Revision Description": "Initial release",
+            "Material": "SEE PARTS LIST",
+            "Material Specification": "SEE PARTS LIST",
+            "Finish": "SEE PARTS LIST",
+            "Quantity": "1",
+            "Drawn By": DRAWN_BY,
+        },
+    )
+    # The title block's PART cell resolves the document summary Title (the
+    # part builds stamp it in save_part_and_images); without it the assembly
+    # print ships a blank PART row. "pen assembly", not the bare stem: the
+    # sheet must identify itself as an assembly drawing (codex machinist
+    # review).
+    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
