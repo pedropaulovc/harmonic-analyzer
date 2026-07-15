@@ -1,6 +1,9 @@
 cylinder-gear-shaft:
   number: MHA-028
   material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finished steel shafting
+  finish: precision turned or ground, oiled
+  quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "machined (steel)"
