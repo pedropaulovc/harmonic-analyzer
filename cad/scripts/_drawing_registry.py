@@ -147,6 +147,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="pinion-arbor",
         script_name="draw_pinion_arbor.py",
     ),
+    DrawingSpec(
+        name="pen_marker",
+        part="pen_marker",
+        artifact_stem="pen-marker",
+        script_name="draw_pen_marker.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

@@ -37,14 +37,22 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from pen_marker_spec import (
+    BARREL_DIA,
+    BARREL_TOP_Y,
+    CONE_H,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "pen-marker"
 MATERIAL = "Brass"
-
-BARREL_DIA = 8.0  # (low)
-BARREL_TOP_Y = 60.0
-CONE_H = 5.0  # tip nose (low) — the ch24 macro shows a blunt bullet nose
-# (~0.6x dia), not the needle cone the old 12 gave; keep the same tip origin
 
 
 async def build(adapter) -> dict[str, str]:
@@ -112,6 +120,17 @@ async def build(adapter) -> dict[str, str]:
     # keep the brass mass model, override the display colour.
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
