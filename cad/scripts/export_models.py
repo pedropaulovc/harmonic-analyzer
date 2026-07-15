@@ -51,6 +51,7 @@ from _common import (  # noqa: E402
     TOGGLE_STL_BINARY,
     TOGGLE_STL_NO_TRANSLATE,
     TOGGLE_STL_ONE_FILE,
+    TOGGLE_STL_SHOW_INFO,
     _early_bound,
     _read_member,
     check,
@@ -114,6 +115,8 @@ DEFAULT_RGB = (0.55, 0.55, 0.55)
 
 INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
 TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True, TOGGLE_STL_NO_TRANSLATE: True}
+TOGGLES[TOGGLE_STL_SHOW_INFO] = False
+SW_SAVE_OPTS = 1 | 8  # swSaveAsOptions_Silent | AvoidRebuildOnSave
 
 
 def _nonempty(path: Path) -> bool:
@@ -679,7 +682,7 @@ def _save_as(doc: Any, out: Path) -> int:
     ) as sp:
         out.unlink(missing_ok=True)
         _telemetry.info(f"SaveAs3 starting -> {out.name}")
-        ok = doc.SaveAs3(str(out), 0, 0)
+        ok = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
         sp.set_attribute("save.rc", int(ok))
         if not out.exists() or out.stat().st_size == 0:
             out.unlink(missing_ok=True)  # never leave a zero-byte placeholder behind

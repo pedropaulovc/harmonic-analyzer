@@ -146,6 +146,21 @@ def test_zero_byte_neutral_outputs_are_stale(tmp_path: Path, monkeypatch) -> Non
     )
 
 
+def test_neutral_save_is_silent_and_suppresses_stl_info(tmp_path: Path) -> None:
+    calls: list[tuple[str, int, int]] = []
+
+    class _Doc:
+        def SaveAs3(self, path: str, version: int, options: int) -> int:
+            calls.append((path, version, options))
+            Path(path).write_bytes(b"neutral")
+            return 1
+
+    output = tmp_path / "sample.STL"
+    assert export_models._save_as(_Doc(), output) == 1
+    assert calls == [(str(output), 0, 1 | 8)]
+    assert export_models.TOGGLES[export_models.TOGGLE_STL_SHOW_INFO] is False
+
+
 def test_default_and_configuration_exports_share_one_part_open(
     tmp_path: Path, monkeypatch,
 ) -> None:
