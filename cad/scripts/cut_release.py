@@ -17,10 +17,11 @@ What it does, in order:
   2. Pre-flight: tag must not already exist; the committed tree must be clean
      (``--allow-dirty`` to override); harmonic-analyzer.SLDASM must be built.
   3. SolidWorks (COM): open harmonic-analyzer.SLDASM, run Pack-and-Go flattened,
-     and -- in the same session -- export every built part and assembly to AP214
-     STEP + fine binary STL + multi-angle PNG previews. The STL set is
-     one-per-part plus a per-configuration STL for the parts whose configs are
-     distinct geometry (cone gears / transgears). Also copies the millimetre
+     and -- in the same session -- export every built part to AP214 STEP, every
+     built part and assembly to fine binary STL, and one isometric PNG preview
+     per document. The STL set is one-per-document plus a per-configuration STL
+     for the parts whose configs are distinct geometry (cone gears / transgears).
+     Also copies the millimetre
      scene graph (``cad/out/boxes/harmonic-analyzer.json`` from export_models.py)
      so the comparison gallery renders from the bundle with no SolidWorks.
      Everything is staged and zipped into ONE bundle
@@ -132,24 +133,23 @@ _EXPORT_INTS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
 _EXPORT_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
                    TOGGLE_STL_NO_TRANSLATE: True, TOGGLE_STL_SHOW_INFO: False}
 
-# Preview renders per document: (name, swStandardViews_e id). SaveBMP captures
+# Preview render per document: (name, swStandardViews_e id). SaveBMP captures
 # the active viewport at an exact pixel size (the only screenshot API that does);
 # Pillow then transcodes the BMP to compressed PNG.
 PNG_VIEWS = (("isometric", 7),)
 PNG_WIDTH, PNG_HEIGHT = 1600, 1000
 
 # Incremental PNG render cache (gitignored, under the release dir). Rendering the
-# multi-angle previews is the single most expensive release step (~550 s for 486
-# PNGs in v0.9.1) AND the only step that genuinely needs the SolidWorks seat (SaveBMP
-# of the live viewport -- STEP/STL are copied from cad/out). Each document's PNG set
-# is cached under a key derived from its RESOLVED geometry, so a release whose
-# geometry is unchanged (the common case: most releases touch a handful of parts, and
-# v0.9.1 touched none) reuses the prior renders and opens nothing. A cache MISS only
-# ever costs a re-render -- it can never ship a wrong image.
+# previews used to dominate release time (~550 s for 486 PNGs in v0.9.1). STEP/STL
+# still export here because cad/out does not contain the complete per-document neutral
+# set; every document therefore still opens. The PNG cache skips SaveBMP when the
+# resolved geometry is unchanged. A cache miss only ever costs a re-render -- it can
+# never ship a wrong image.
 PNG_CACHE_DIR = RELEASE_DIR / "png-cache"
 # Bump when _export_pngs' rendering (views, pixel size, framing) changes so a code
 # change invalidates every cached render rather than shipping a stale-format image.
 PNG_RENDER_REV = "3"  # rev 3: isometric-only previews
+SLOW_NEUTRAL_DOCUMENT_SECONDS = 10.0
 
 
 # --------------------------------------------------------------------------- #
@@ -773,62 +773,105 @@ def export_neutral(sw: Any, stage: Path) -> dict[str, Any]:
     colors_digest = _sha256(colors_json) if colors_json.exists() else ""
 
     old_prefs = _set_export_prefs(sw)
-    pngs = cfg_done = hits = 0
+    pngs = cfg_done = hits = slow_documents = 0
+    slowest_name = ""
+    slowest_seconds = 0.0
     used_keys: set[str] = set()
-    try:
-        for i, (src, doc_type) in enumerate(docs, 1):
-            doc = _open_and_verify(sw, src, doc_type)
-            stl_out = stl_dir / f"{src.stem}.STL"
-            outputs = [stl_out]
-            if doc_type == SW_DOC_PART:
-                outputs.insert(0, step_dir / f"{src.stem}.STEP")
-            for out in outputs:
-                rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
-                if not out.exists() or out.stat().st_size == 0:
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
-            # one extra STL per referenced configuration (cone gears / transgears)
-            stl_paths = [stl_out]
-            cfg_crc: dict[str, str] = {}
-            for cfg, mesh in cfg_meshes.get(src.stem, ()):
-                # ShowConfiguration2 returns False when cfg is ALREADY active (the part
-                # opened in it) -- a real failure only if it's still not active after.
-                switched = _active_config(doc) != cfg
-                if switched and not doc.ShowConfiguration2(cfg) and _active_config(doc) != cfg:
-                    raise RuntimeError(f"{src.name}: ShowConfiguration2({cfg!r}) failed")
-                # Config switches regenerate LAZILY: force a full rebuild so SaveAs3
-                # captures THIS config, not the prior one's stale tessellation (the
-                # race that shipped --t18 as 12-tooth geometry in v0.5.1).
-                if switched:
-                    doc.ForceRebuild3(False)
-                    doc.EditRebuild3()
-                out = stl_dir / f"{mesh}.STL"
-                rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
-                if not out.exists() or out.stat().st_size == 0:
-                    raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
-                cfg_crc[mesh] = _sha256(out)
-                stl_paths.append(out)
-                cfg_done += 1
-            _assert_configs_distinct(src.stem, cfg_crc)
+    with _telemetry.span(
+        "release.neutral_export",
+        documents=len(docs),
+        parts=len(parts),
+        assemblies=len(assemblies),
+    ) as nsp:
+        try:
+            for i, (src, doc_type) in enumerate(docs, 1):
+                document_started = time.perf_counter()
+                document_kind = "part" if doc_type == SW_DOC_PART else "assembly"
+                nsp.set_attribute("document.current", src.name)
 
-            # PNGs: reuse the cached render when this doc's resolved geometry is unchanged.
-            key = _png_key(src, stl_paths, colors_digest)
-            used_keys.add(key)
-            if _staged_pngs(doc, src.stem, png_root, key):
-                hits += 1
-            pngs += len(PNG_VIEWS)
+                doc = _open_and_verify(sw, src, doc_type)
+                stl_out = stl_dir / f"{src.stem}.STL"
+                outputs = [stl_out]
+                if doc_type == SW_DOC_PART:
+                    outputs.insert(0, step_dir / f"{src.stem}.STEP")
+                for out in outputs:
+                    rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
+                    if not out.exists() or out.stat().st_size == 0:
+                        raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
 
-            _close_active_documents(sw)  # CloseDoc -> discards, never prompts
-            if i % 10 == 0 or i == len(docs):
-                log(f"neutral export: {i}/{len(docs)} documents "
-                    f"({pngs} PNGs, {hits} render-cache hits)")
-    finally:
-        _restore_export_prefs(sw, old_prefs)
+                # one extra STL per referenced configuration (cone gears / transgears)
+                stl_paths = [stl_out]
+                cfg_crc: dict[str, str] = {}
+                for cfg, mesh in cfg_meshes.get(src.stem, ()):
+                    # ShowConfiguration2 returns False when cfg is ALREADY active (the part
+                    # opened in it) -- a real failure only if it's still not active after.
+                    switched = _active_config(doc) != cfg
+                    if (switched and not doc.ShowConfiguration2(cfg)
+                            and _active_config(doc) != cfg):
+                        raise RuntimeError(f"{src.name}: ShowConfiguration2({cfg!r}) failed")
+                    # Config switches regenerate LAZILY: force a full rebuild so SaveAs3
+                    # captures THIS config, not the prior one's stale tessellation (the
+                    # race that shipped --t18 as 12-tooth geometry in v0.5.1).
+                    if switched:
+                        doc.ForceRebuild3(False)
+                        doc.EditRebuild3()
+                    out = stl_dir / f"{mesh}.STL"
+                    rc = doc.SaveAs3(str(out), 0, SW_SAVE_OPTS)
+                    if not out.exists() or out.stat().st_size == 0:
+                        raise RuntimeError(f"SaveAs3 produced no file: {out} (rc={rc})")
+                    cfg_crc[mesh] = _sha256(out)
+                    stl_paths.append(out)
+                    cfg_done += 1
+                _assert_configs_distinct(src.stem, cfg_crc)
 
-    # Prune cache keys not used this run (best-effort): an unused key is geometry no
-    # longer in the model; partial dirs are crash leftovers. Never fatal.
-    for d in PNG_CACHE_DIR.iterdir():
-        if d.is_dir() and d.name not in used_keys:
-            shutil.rmtree(d, ignore_errors=True)
+                # PNGs: reuse the cache when this doc's resolved geometry is unchanged.
+                key = _png_key(src, stl_paths, colors_digest)
+                used_keys.add(key)
+                cache_hit = _staged_pngs(doc, src.stem, png_root, key)
+                if cache_hit:
+                    hits += 1
+                pngs += len(PNG_VIEWS)
+
+                _close_active_documents(sw)  # CloseDoc -> discards, never prompts
+                elapsed = time.perf_counter() - document_started
+                if elapsed > slowest_seconds:
+                    slowest_name = src.name
+                    slowest_seconds = elapsed
+                if elapsed >= SLOW_NEUTRAL_DOCUMENT_SECONDS:
+                    slow_documents += 1
+                    _telemetry.warn(
+                        f"slow neutral export document: {src.name} took {elapsed:.1f}s "
+                        f"(kind={document_kind}, PNG cache "
+                        f"{'hit' if cache_hit else 'miss'})"
+                    )
+                _telemetry.event(
+                    "release.neutral_document",
+                    document=src.name,
+                    document_kind=document_kind,
+                    elapsed_seconds=round(elapsed, 3),
+                    png_cache="hit" if cache_hit else "miss",
+                    config_meshes=len(cfg_crc),
+                    neutral_outputs=len(outputs) + len(cfg_crc),
+                )
+                nsp.set_attribute("document.last_completed", src.name)
+
+                if i % 10 == 0 or i == len(docs):
+                    log(f"neutral export: {i}/{len(docs)} documents "
+                        f"({pngs} PNGs, {hits} render-cache hits)")
+        finally:
+            _restore_export_prefs(sw, old_prefs)
+
+        # Prune cache keys not used this run (best-effort): an unused key is geometry no
+        # longer in the model; partial dirs are crash leftovers. Never fatal.
+        for d in PNG_CACHE_DIR.iterdir():
+            if d.is_dir() and d.name not in used_keys:
+                shutil.rmtree(d, ignore_errors=True)
+        nsp.set_attribute("png_cache.hits", hits)
+        nsp.set_attribute("png_cache.misses", len(docs) - hits)
+        nsp.set_attribute("config_meshes", cfg_done)
+        nsp.set_attribute("slow_documents", slow_documents)
+        nsp.set_attribute("slowest_document", slowest_name)
+        nsp.set_attribute("slowest_seconds", round(slowest_seconds, 3))
     log(f"neutral export: {len(docs) - hits} document(s) rendered on the seat, "
         f"{hits} reused from the PNG cache")
 

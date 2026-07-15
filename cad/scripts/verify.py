@@ -297,10 +297,11 @@ def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
     # and the per-component status scan are the two costs -- give each its own
     # child span so the wall-clock is attributable, mirroring gate.dof/gate.health.
     with _telemetry.span("gate.over_constrained") as gsp:
-        # ``resolve=False``: soundness already re-solved once after open and does
-        # not mutate the model between gates, so this rebuild would be redundant.
-        with _telemetry.span("over.rebuild"):
-            if resolve:
+        # ``resolve=False`` means soundness already performed its one shared
+        # ``verify.rebuild``. Only emit this child when ForceRebuild3 really runs;
+        # a zero-length ``over.rebuild`` otherwise implies work that did not occur.
+        if resolve:
+            with _telemetry.span("over.rebuild"):
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
         with _telemetry.span("over.scan") as ssp:
             asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
