@@ -189,9 +189,14 @@ def add_datum_feature(
     symbol_xy: tuple[float, float],
     datum: str,
     label: str,
+    entity_type: str = "EDGE",
 ) -> Any:
-    """Attach a native datum-feature symbol to a drawing-view edge."""
-    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    """Attach a native datum-feature symbol to a drawing-view edge.
+
+    ``entity_type`` widens the pick for entities that are not model edges —
+    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+    """
+    _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
     draw = adapter.currentModel
     tag = draw.InsertDatumTag2()
     if tag is None:
@@ -246,9 +251,14 @@ def add_feature_control_frame(
     diameter: bool = False,
     quantity: str = "",
     label: str,
+    entity_type: str = "EDGE",
 ) -> Any:
-    """Attach a native feature-control frame to a drawing-view edge."""
-    edge = _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    """Attach a native feature-control frame to a drawing-view edge.
+
+    ``entity_type`` widens the pick for entities that are not model edges —
+    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+    """
+    edge = _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
     draw = adapter.currentModel
     gtol = draw.InsertGtol()
     if gtol is None:
@@ -353,9 +363,14 @@ def add_surface_finish(
     symbol_xy: tuple[float, float],
     roughness_ra: str,
     label: str,
+    entity_type: str = "EDGE",
 ) -> Any:
-    """Attach a native machining-required surface-finish symbol to an edge."""
-    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    """Attach a native machining-required surface-finish symbol to an edge.
+
+    ``entity_type`` widens the pick for entities that are not model edges —
+    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+    """
+    _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
