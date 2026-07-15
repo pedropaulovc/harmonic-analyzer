@@ -51,6 +51,7 @@ import sys
 
 from _common import (
     apply_custom_properties,
+    apply_summary_info,
     check,
     part_properties,
     run_build,
@@ -290,15 +291,22 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         {
             **part_properties(ASM_NAME),
-            "Number": "HA-ASM-PEN",
+            # MHA-A## = assembly drawing ids, beside the parts' MHA-### range
+            # (a longer number overflows the DWG. NO. title-block cell).
+            "Number": "MHA-A01",
             "Revision": "A",
             "Revision Description": "Initial release",
+            "Material": "SEE PARTS LIST",
             "Material Specification": "SEE PARTS LIST",
             "Finish": "SEE PARTS LIST",
             "Quantity": "1",
             "Drawn By": DRAWN_BY,
         },
     )
+    # The title block's PART cell resolves the document summary Title (the
+    # part builds stamp it in save_part_and_images); without it the assembly
+    # print ships a blank PART row.
+    apply_summary_info(adapter, title=ASM_NAME)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

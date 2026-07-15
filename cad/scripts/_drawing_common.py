@@ -8,6 +8,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -23,7 +24,7 @@ from _drawing_layout_check import (
 )
 from _drawing_registry import PROJECT_DRWDOT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     TOL_BASIC,
@@ -71,6 +72,11 @@ _NOMINAL_GDT_HALF_M = 0.008
 # dims (Codex #269 thread 1).
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
+
+# A circular 2-character BOM balloon renders ~10-12 mm across at the template
+# font; its GetExtent is leader-polluted (see _note_element), so it gets this
+# nominal half-span box around its IAnnotation.GetPosition anchor instead.
+_NOMINAL_BALLOON_HALF_M = 0.006
 
 # The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
 # format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
@@ -1204,13 +1210,16 @@ def insert_bom_table(
     """
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
+    configuration = str(
+        adapter._get_attr_or_call(view, "ReferencedConfiguration") or "Default"
+    )
     bom = view.InsertBomTable6(
         False,  # UseAnchorPoint=False -> place at the explicit X/Y below
         anchor_xy[0],
         anchor_xy[1],
         1,  # swBomConfigurationAnchorType_e.swBOMConfigurationAnchor_TopLeft
         2,  # swBomType_e.swBomType_TopLevelOnly
-        "",  # Configuration: blank = the view's configuration (top-level BOM)
+        "",  # Configuration: top-level BOMs bind configs via SetConfigurations
         str(bom_table_template(adapter)),
         False,  # Hidden
         0,  # swNumberingType_e.swNumberingType_None (non-indented BOM)
@@ -1221,6 +1230,24 @@ def insert_bom_table(
     draw.ClearSelection2(True)
     if bom is None:
         raise RuntimeError(f"SolidWorks failed to create the {label} BOM table")
+    # A COM-inserted top-level BOM starts with NO configuration bound (a
+    # header-only table without even its per-configuration QTY column) --
+    # IBomFeature::SetConfigurations is the documented binding path for
+    # top-level tables, so bind the view's own configuration.
+    bom = _sw_type_info.early_bound_or_flag(bom, "IBomTableAnnotation", "BomFeature")
+    feature = adapter._get_attr_or_call(bom, "BomFeature")
+    if feature is None:
+        raise RuntimeError(f"{label} BOM table has no BOM feature")
+    feature = _sw_type_info.early_bound_or_flag(
+        feature, "IBomFeature", "SetConfigurations"
+    )
+    if not feature.SetConfigurations(
+        True, bool_array([True]), bstr_array([configuration])
+    ):
+        raise RuntimeError(
+            f"failed to bind {label} BOM table to configuration {configuration!r}"
+        )
+    draw.ForceRebuild3(False)
     adapter.currentModel.EditRebuild3()
     table = _sw_type_info.early_bound(bom, "ITableAnnotation")
     if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
@@ -1259,6 +1286,54 @@ def insert_bom_table(
         f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
     )
     return table
+
+
+def _spread_balloons(
+    adapter: Any, view: Any, balloons: list[Any], *, margin: float = 0.014
+) -> None:
+    """Re-ring auto-balloons evenly around ``view`` (the layout audit fails loud).
+
+    ``AutoBalloon5`` stacks balloons whose attachment points cluster, and on a
+    pictorial view its square layout can even drop balloons INSIDE the outline
+    box. Deterministic fix: place every balloon's box center on an ellipse
+    ``margin`` outside the view outline, evenly spaced, each assigned the ring
+    slot nearest its landed angle so leaders do not cross. Leaders stay
+    attached; only the balloon anchor moves (``IAnnotation.SetPosition``).
+    """
+    outline = adapter._attempt(lambda: view.GetOutline())
+    if not outline:
+        raise RuntimeError("balloon spread: view has no outline")
+    vxmin, vymin, vxmax, vymax = (float(v) for v in list(outline)[:4])
+    center_x, center_y = (vxmin + vxmax) / 2.0, (vymin + vymax) / 2.0
+    radius_x = (vxmax - vxmin) / 2.0 + margin
+    radius_y = (vymax - vymin) / 2.0 + margin
+    items = []
+    for note in balloons:
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+        annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
+        if annotation is None:
+            raise RuntimeError("balloon spread: balloon without an annotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetPosition", "SetPosition"
+        )
+        # Work from the ANCHOR, never GetExtent: a balloon note's extent box
+        # includes its LEADER, so it spans to the pointed-at component and is
+        # useless for placing the balloon circle itself.
+        position = adapter._attempt(lambda a=annotation: a.GetPosition())
+        if not position:
+            raise RuntimeError("balloon spread: balloon without a position")
+        px, py = float(position[0]), float(position[1])
+        theta = math.atan2(py - center_y, px - center_x)
+        items.append((theta, annotation))
+    items.sort(key=lambda item: item[0])
+    count = len(items)
+    start = items[0][0]  # anchor the ring on the first balloon's own angle
+    for slot, (_theta, annotation) in enumerate(items):
+        angle = start + 2.0 * math.pi * slot / count
+        target_x = center_x + radius_x * math.cos(angle)
+        target_y = center_y + radius_y * math.sin(angle)
+        if not annotation.SetPosition(target_x, target_y, 0.0):
+            raise RuntimeError("failed to re-ring a BOM balloon")
 
 
 @_telemetry.traced("drawing.auto_balloons", label_param="label")
@@ -1301,6 +1376,8 @@ def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> 
         raise RuntimeError(
             f"{label}: {len(balloons)} balloons landed, expected >= {expected}"
         )
+    _spread_balloons(adapter, view, balloons)
+    draw.EditRebuild3()
     _telemetry.success(f"{label}: {len(balloons)} BOM balloons inserted")
     return balloons
 
@@ -1370,7 +1447,24 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     )
     if note is None:
         return None
-    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetExtent")
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetExtent", "IsBomBalloon")
+    # A BOM balloon's GetExtent includes its LEADER -- the box spans from the
+    # balloon circle to the pointed-at component (same leader-polluted-box dead
+    # end as GD&T symbols), so neighboring balloons' boxes always intersect near
+    # the view. Box a balloon nominally around its anchor instead; NON_VIEW scope
+    # still catches two stacked balloons or a balloon dropped on a table.
+    if bool(adapter._attempt(lambda: note.IsBomBalloon(), default=False)):
+        position = adapter._attempt(
+            lambda: adapter._get_attr_or_call(annotation, "GetPosition")
+        )
+        if not position:
+            return None
+        x, y = float(position[0]), float(position[1])
+        half = _NOMINAL_BALLOON_HALF_M
+        return LayoutElement(
+            name, "note", x - half, y - half, x + half, y + half,
+            scope=CollisionScope.NON_VIEW,
+        )
     extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
     if not extent:
         return None

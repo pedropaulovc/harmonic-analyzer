@@ -28,4 +28,38 @@ Learned building the drawing **layout audit** (`_drawing_layout_check.py` + `_dr
 13. **GD&T symbols AND display dimensions have NO real bounding box.** `IAnnotation.GetDisplayData`→`IDisplayData` is a DEAD END for a sheet-space box: its line primitives include the **leader line** (so the extent balloons to the pointed-at geometry) and the coordinates are in a **non-sheet space** — an SFSymbol at `GetPosition (191,245)` reported a display box `[0,61,91,228]` (doesn't contain its own anchor); a datum tag reported `xmax=1000 mm` on a 431 mm sheet. Don't re-probe it. Only `IAnnotation.GetPosition()` (sheet-space anchor) is reliable → box these as a small nominal square (GD&T ±8 mm, dims ±4 mm). Fine for OVERFLOW (catches an off-sheet symbol/callout) but too coarse for OVERLAP — a datum tag beside its own control frame self-collides — so both are scoped `NONE` (overflow + title-block-keep-out only). Types (`swAnnotationType_e`): note=6, datum=2, gtol=5, sfsym=7, **displayDimension=4**. A native **hole callout** (`annotate_holes_thru`/`add_native_hole_callout`) is a swDisplayDimension (a diameter dim with "/ THRU" text), NOT a note — so it is caught by the type-4 branch, not type-6. Follow-up if a real box is found: issue #275.
 14. **The checked-in ASME B sheet format (`asme-b-book.slddrt`) bakes its title block in as lines/notes, NOT a queryable `ITitleBlock`** — `sheet.TitleBlock` is None and `ITitleBlock.GetExtents` is unavailable. Reserve its occupied region as fixed keep-out boxes that MUST track `create_drawing_standards.py`: (a) the title block proper `TITLE_X0=0.278 .. TITLE_Y1=0.080` extended to the sheet right/bottom (`_TITLE_BLOCK_LEFT_M`/`_TITLE_BLOCK_TOP_M`), and (b) a SEPARATE box for the third-angle projection symbol at `(0.252,0.027) size 0.007` (`_PROJ_SYMBOL_BOX_M`) — it sits LEFT of the title block, and a combined leftward-extended box would clip top-crossbar's notes block (reaches x~253 mm at y72-90). Don't eyeball these constants (an earlier 0.2785/0.078 left a 0.5 mm/2 mm strip and the whole projection symbol unreserved — Codex). Follow-up to add a real ITitleBlock: issue #273.
 
+Learned building the first ASSEMBLY drawing (pen, `draw_pen_assembly.py`, 2026-07-14 —
+BOM + auto-balloons):
+
+15. **A COM-inserted top-level BOM starts with NO configuration bound.**
+    `IView.InsertBomTable6` (`InsertBomTable4` is obsolete) with
+    `swBomType_TopLevelOnly` returns a header-only table — no data rows and no
+    QTY column (QTY columns are per-configuration on top-level BOMs). Bind the
+    view's configuration explicitly afterwards:
+    `IBomFeature.SetConfigurations(True, bool_array([True]), bstr_array([cfg]))`
+    (the documented path for top-level tables), then rebuild — 8 rows + QTY
+    appear. `_drawing_common.insert_bom_table` owns this.
+16. **`AutoBalloon5` drops balloons for components with no visible geometry in
+    the view.** On the HLR front view only 7 of the pen's 8 components
+    ballooned (the hanger screw is fully occluded behind the strap). Balloon
+    the ISOMETRIC view, where every component keeps visible edges.
+17. **A BOM balloon note's `GetExtent` box includes its LEADER** — it spans
+    from the balloon circle to the pointed-at component (same
+    leader-polluted-box dead end as #13's `IDisplayData`), so neighboring
+    balloons' extent boxes always intersect near the view. Never place or box
+    balloons by extent: place them by their `IAnnotation.GetPosition` anchor
+    (`_drawing_common._spread_balloons` re-rings them evenly on an ellipse just
+    outside the view outline, slots assigned by landed angle so leaders don't
+    cross), and the layout audit boxes a `IsBomBalloon` note as a ±6 mm nominal
+    square around that anchor (`_NOMINAL_BALLOON_HALF_M`), scope `NON_VIEW`.
+18. **Assembly title block needs properties parts get for free.** The template's
+    PART cell resolves the document summary **Title** (`apply_summary_info`,
+    which only `save_part_and_images` stamps) and the MATERIAL cell links the
+    custom property **`Material`** — not `Material Specification`. An assembly
+    build must stamp both (plus Number/Revision/TOL_* — see
+    `build_pen_assembly.py`), or the print ships blank cells that
+    `finalize_drawing`'s TOL-only validation does not catch. The DWG. NO. cell
+    fits ~7 characters (`MHA-###` / `MHA-A##`); a longer id overlaps the REV
+    cell.
+
 Related: [[codex-drawing-image-review]].

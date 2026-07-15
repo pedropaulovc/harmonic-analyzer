@@ -122,8 +122,12 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_components=BOM_COMPONENTS,
         label="pen assembly",
     )
+    # Balloon the ISOMETRIC view: the orthographic views occlude a component
+    # under hidden-lines-removed (the hanger screw sits fully behind the strap
+    # in front projection -- only 7 of 8 balloons land there), while the
+    # pictorial view keeps every component visible.
     add_auto_balloons(
-        adapter, front, expected=len(BOM_COMPONENTS), label="pen assembly balloons"
+        adapter, iso, expected=len(BOM_COMPONENTS), label="pen assembly balloons"
     )
 
     return await finalize_drawing(
