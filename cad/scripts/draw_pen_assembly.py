@@ -66,7 +66,7 @@ BOM_COMPONENTS = {
 
 FRONT_CENTER = (0.070, 0.150)
 RIGHT_CENTER = (0.150, 0.150)
-ISO_CENTER = (0.225, 0.150)
+ISO_CENTER = (0.225, 0.130)
 BOM_ANCHOR = (0.240, 0.272)  # top-left corner, clear of the views and border
 
 
