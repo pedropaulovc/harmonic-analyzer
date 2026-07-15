@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
+import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import _common
 import export_models
@@ -50,6 +53,150 @@ def test_assembly_fallback_still_requires_current_scene_and_stl(
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
     assert export_models.asm_source_changed("frame", src, {})
+
+
+def test_subassembly_fallback_does_not_require_a_scene(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    src = tmp_path / "sldasm" / "frame.SLDASM"
+    stl = tmp_path / "stl"
+    now = time.time()
+    _write(src, now - 10)
+    _write(stl / "frame.STL", now)
+    monkeypatch.setattr(export_models, "OUT_STL", stl)
+    monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
+
+    assert not export_models.asm_source_changed(
+        "frame", src, {}, require_scene=False,
+    )
+
+
+def test_release_inventory_reuses_build_owned_pngs(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(export_models, "OUT_STEP", tmp_path / "step-cache")
+    monkeypatch.setattr(export_models, "OUT_STL", tmp_path / "stl-cache")
+    monkeypatch.setattr(export_models, "OUT_PNG", tmp_path / "build-renders")
+
+    files = export_models._release_inventory(
+        ["sample_part"], ["sample_assembly"],
+        {"sample-part": [("C1", "sample-part--c1")]},
+    )
+
+    assert files == {
+        "png/sample-assembly/sample-assembly_isometric.png": (
+            tmp_path / "build-renders/sample-assembly/sample-assembly_isometric.png"
+        ),
+        "png/sample-part/sample-part_isometric.png": (
+            tmp_path / "build-renders/sample-part/sample-part_isometric.png"
+        ),
+        "step/sample-part.STEP": tmp_path / "step-cache/sample-part.STEP",
+        "stl/sample-assembly.STL": tmp_path / "stl-cache/sample-assembly.STL",
+        "stl/sample-part--c1.STL": tmp_path / "stl-cache/sample-part--c1.STL",
+        "stl/sample-part.STL": tmp_path / "stl-cache/sample-part.STL",
+    }
+
+
+def test_default_and_configuration_exports_share_one_part_open(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    sldprt = tmp_path / "sldprt"
+    sldasm = tmp_path / "sldasm"
+    stl = tmp_path / "stl"
+    step = tmp_path / "step"
+    boxes = tmp_path / "boxes"
+    for path in (sldprt / "sample-part.SLDPRT",
+                 sldasm / "harmonic-analyzer.SLDASM",
+                 stl / "sample-part.STL",
+                 stl / "harmonic-analyzer.STL"):
+        _write(path, time.time())
+    boxes.mkdir(parents=True)
+    (boxes / "harmonic-analyzer.json").write_text(
+        '{"unit":"mm","components":[{"part":"sample-part",'
+        '"cfg":"C1","mesh":"sample-part--c1"}]}',
+        encoding="utf-8",
+    )
+
+    class _Config:
+        Name = "Default"
+
+    class _ConfigManager:
+        ActiveConfiguration = _Config()
+
+    class _Doc:
+        ConfigurationManager = _ConfigManager()
+
+        def ShowConfiguration2(self, cfg: str) -> bool:
+            self.ConfigurationManager.ActiveConfiguration.Name = cfg
+            return True
+
+        def ForceRebuild3(self, _top_only: bool) -> bool:
+            return True
+
+        def EditRebuild3(self) -> bool:
+            return True
+
+        def GetConfigurationNames(self) -> list[str]:
+            return ["Default", "C1"]
+
+        def SaveAs3(self, path: str, _version: int, _options: int) -> int:
+            Path(path).write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
+            return 1
+
+    class _Sw:
+        def CloseAllDocuments(self, _include_unsaved: bool) -> None:
+            return None
+
+    class _Adapter:
+        swApp = _Sw()
+        currentModel = _Doc()
+        opened: list[str] = []
+
+        async def open_model(self, path: str):
+            self.opened.append(Path(path).name)
+            self.currentModel = _Doc()
+            return SimpleNamespace(is_success=True, data=None)
+
+        def _attempt(self, call, default=None):
+            try:
+                return call()
+            except Exception:
+                return default
+
+    adapter = _Adapter()
+    monkeypatch.setattr(export_models, "OUT_SLDPRT", sldprt)
+    monkeypatch.setattr(export_models, "OUT_SLDASM", sldasm)
+    monkeypatch.setattr(export_models, "OUT_STL", stl)
+    monkeypatch.setattr(export_models, "OUT_STEP", step)
+    monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
+    monkeypatch.setattr(export_models, "COLORS", stl / "colors.json")
+    monkeypatch.setattr(export_models, "SRC_DIGESTS", stl / "export-src.json")
+    monkeypatch.setattr(export_models, "part_stems", lambda: ["sample_part"])
+    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("harmonic_analyzer",))
+    monkeypatch.setattr(export_models, "manifest_models", lambda: ["harmonic_analyzer"])
+    monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
+    monkeypatch.setattr(export_models, "load_colors", lambda: {"sample-part": (1, 1, 1)})
+    monkeypatch.setattr(
+        export_models, "load_src_digests",
+        lambda: {"sample-part": "part-v1", "harmonic-analyzer": "asm-v1"},
+    )
+    monkeypatch.setattr(
+        export_models, "src_digest",
+        lambda path: "asm-v1" if path.suffix == ".SLDASM" else "part-v1",
+    )
+    monkeypatch.setattr(export_models, "set_export_prefs", lambda _adapter: {})
+    monkeypatch.setattr(export_models, "restore_export_prefs", lambda *_args: None)
+    monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
+    monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
+    monkeypatch.setattr(export_models, "refresh_comparison_gallery", lambda: True)
+    monkeypatch.setattr(
+        export_models, "run_build",
+        lambda build: (asyncio.run(build(adapter)), 0)[1],
+    )
+    monkeypatch.setattr(sys, "argv", ["export_models.py"])
+
+    assert export_models.main() == 0
+    assert adapter.opened == ["sample-part.SLDPRT"]
+    assert (step / "sample-part.STEP").exists()
+    assert (stl / "sample-part--c1.STL").exists()
 
 
 def test_routine_view_cleanup_preserves_configuration_renders(tmp_path: Path) -> None:

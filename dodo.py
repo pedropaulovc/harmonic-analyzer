@@ -1684,6 +1684,7 @@ def task_check():
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_cut_release_version.py",
+        SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
@@ -1766,6 +1767,7 @@ def task_check():
             # regress while the required checks stay green.
             "file_dep": [str((SCRIPTS_DIR / "_telemetry.py").resolve()),
                          str((SCRIPTS_DIR / "cut_release.py").resolve()),
+                         str((SCRIPTS_DIR / "export_models.py").resolve()),
                          str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
                          str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve())],
             "cmd": [*pytest_cmd,
@@ -1852,7 +1854,7 @@ def task_check():
 
 
 def task_export():
-    """Neutral-format export (STEP / STL / scene boxes). Needs SW; COM seat lock.
+    """Complete release-neutral export (STEP / STL / PNG manifest + scene). COM seat.
 
     Always runs ``export_models.py`` (``uptodate: False``) -- it self-checks every
     output's per-file staleness cheaply and prints "all exports fresh" when there
@@ -1864,12 +1866,15 @@ def task_export():
     boxes JSON + CAD inputs unchanged) must still be regenerated, which doit would
     otherwise skip (codex review).
     """
-    target = str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve())
+    targets = [
+        str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve()),
+        str((REPORTS / "release-neutral.json").resolve()),
+    ]
     deps = ([_sldprt(s) for s in part_stems()]
             + [_sldasm(s) for s in ASSEMBLY_ORDER])
     return {
         "file_dep": [str(EXPORT_PY), *deps],
-        "targets": [target],
+        "targets": targets,
         # REAL gate edge (was implicit via the spine): export writes neutral formats +
         # refreshes the comparison gallery into cad/out, side effects that must NOT be
         # generated from a model that then fails soundness/kinematics. So export waits

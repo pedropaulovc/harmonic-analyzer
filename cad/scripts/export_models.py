@@ -1,12 +1,14 @@
-"""Export render-cache geometry from SolidWorks: STL + STEP + scene JSON.
+"""Export one complete recipe-keyed neutral cache: STL + STEP + scene JSON.
 
 doit task: ``export`` (on the COM spine). Normally invoked via ``doit export``
 or as a prerequisite of ``doit release``; runnable standalone too.
 
 
-For every model referenced by comparisons/manifest.json: AP214 STEP (exact
-archival geometry) and the offline-render feed consumed by
-comparisons/tools/render_offline.py —
+For every built part/assembly: part AP214 STEP, per-document STL, and the
+build-owned isometric PNG certified in ``reports/release-neutral.json``. The
+release task validates and stages that complete set without reopening native
+documents. For every model referenced by comparisons/manifest.json it also
+produces the offline-render feed consumed by render_offline.py —
 
 * parts: fine binary STL in MILLIMETRES, untranslated (cad/out/stl/<dashed>.STL)
   plus an appearance colour in cad/out/stl/colors.json;
@@ -55,7 +57,6 @@ from _common import (  # noqa: E402
     log,
     run_build,
 )
-from render_compare import model_path  # noqa: E402
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 
 import _telemetry  # noqa: E402
@@ -392,6 +393,186 @@ def src_digest(src: Path) -> str | None:
         return None
 
 
+def scene_config_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[str, str]]]:
+    """Return the non-default per-configuration meshes referenced by a scene.
+
+    The release inventory is derived from the scene graph instead of duplicating a
+    cone/transgear configuration registry.  A missing or malformed scene is never
+    interpreted as an empty set: that would silently omit 23 release meshes.
+    """
+    path = scene_path or OUT_BOXES / f"{TOP_ASSEMBLY}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    components = data.get("components")
+    if not isinstance(components, list) or not components:
+        raise RuntimeError(f"release scene has no components: {path}")
+    by_stem: dict[str, list[tuple[str, str]]] = {}
+    for comp in components:
+        stem = str(comp.get("part") or "")
+        mesh = str(comp.get("mesh") or "")
+        if not stem or not mesh:
+            raise RuntimeError(f"release scene component lacks part/mesh: {comp!r}")
+        if mesh == stem:
+            continue
+        entry = (str(comp.get("cfg") or ""), mesh)
+        bucket = by_stem.setdefault(stem, [])
+        if entry not in bucket:
+            bucket.append(entry)
+    return {stem: sorted(entries) for stem, entries in sorted(by_stem.items())}
+
+
+def _release_inventory(
+    parts: list[str], assemblies: list[str], cfg_meshes: dict[str, list[tuple[str, str]]],
+) -> dict[str, Path]:
+    """Exact bundle-relative neutral inventory and its cache-owned source files."""
+    files: dict[str, Path] = {}
+    for stem in parts:
+        dashed = stem.replace("_", "-")
+        files[f"step/{dashed}.STEP"] = OUT_STEP / f"{dashed}.STEP"
+        files[f"stl/{dashed}.STL"] = OUT_STL / f"{dashed}.STL"
+        files[f"png/{dashed}/{dashed}_isometric.png"] = (
+            OUT_PNG / dashed / f"{dashed}_isometric.png"
+        )
+    for stem in assemblies:
+        dashed = stem.replace("_", "-")
+        files[f"stl/{dashed}.STL"] = OUT_STL / f"{dashed}.STL"
+        files[f"png/{dashed}/{dashed}_isometric.png"] = (
+            OUT_PNG / dashed / f"{dashed}_isometric.png"
+        )
+    for entries in cfg_meshes.values():
+        for _cfg, mesh in entries:
+            files[f"stl/{mesh}.STL"] = OUT_STL / f"{mesh}.STL"
+    return dict(sorted(files.items()))
+
+
+def _release_sources(parts: list[str], assemblies: list[str]) -> dict[str, Path]:
+    sources = {
+        stem.replace("_", "-"): OUT_SLDPRT / f"{stem.replace('_', '-')}.SLDPRT"
+        for stem in parts
+    }
+    sources.update({
+        stem.replace("_", "-"): OUT_SLDASM / f"{stem.replace('_', '-')}.SLDASM"
+        for stem in assemblies
+    })
+    return dict(sorted(sources.items()))
+
+
+def write_release_neutral_manifest(
+    parts: list[str], assemblies: list[str], cfg_meshes: dict[str, list[tuple[str, str]]],
+    digests: dict[str, str],
+) -> None:
+    """Atomically certify a complete, current neutral set for ``cut_release``.
+
+    The exporter writes this only after every requested SaveAs and configuration
+    distinctness guard succeeds.  Source recipe digests prove freshness without
+    trusting volatile SolidWorks mtimes; exact file names and sizes prove the set is
+    complete.  PNGs are the render outputs owned by the corresponding build tasks.
+    """
+    sources = _release_sources(parts, assemblies)
+    source_records: dict[str, str] = {}
+    for dashed, source in sources.items():
+        if not source.is_file():
+            raise RuntimeError(f"release neutral source missing: {source}")
+        current = src_digest(source)
+        if current is None or digests.get(dashed) != current:
+            raise RuntimeError(
+                f"release neutral source is not export-current: {source.name}"
+            )
+        source_records[dashed] = current
+    for stem, entries in cfg_meshes.items():
+        source = OUT_SLDPRT / f"{stem}.SLDPRT"
+        current = source_records.get(stem)
+        if current is None:
+            raise RuntimeError(f"release scene references non-manifest part: {stem}")
+        for _cfg, mesh in entries:
+            if digests.get(mesh) != current:
+                raise RuntimeError(f"release configuration mesh is stale: {mesh}")
+
+    inventory = _release_inventory(parts, assemblies, cfg_meshes)
+    file_records: dict[str, dict[str, Any]] = {}
+    for destination, source in inventory.items():
+        if not source.is_file() or source.stat().st_size == 0:
+            raise RuntimeError(f"release neutral output missing/empty: {source}")
+        file_records[destination] = {
+            "source": source.resolve().relative_to(REPO.resolve()).as_posix(),
+            "bytes": source.stat().st_size,
+        }
+
+    manifest = {
+        "schema": NEUTRAL_SCHEMA,
+        "exporter": _exporter_digest(),
+        "sources": source_records,
+        "files": file_records,
+    }
+    NEUTRAL_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    temporary = NEUTRAL_MANIFEST.with_suffix(".json.partial")
+    temporary.write_text(json.dumps(manifest, indent=1, sort_keys=True), encoding="utf-8")
+    temporary.replace(NEUTRAL_MANIFEST)
+    _telemetry.event(
+        "export.neutral_manifest",
+        documents=len(sources),
+        files=len(file_records),
+        config_meshes=sum(len(entries) for entries in cfg_meshes.values()),
+    )
+
+
+def stage_release_neutral(stage: Path) -> dict[str, int]:
+    """Validate and copy the certified neutral set without touching SolidWorks."""
+    try:
+        manifest = json.loads(NEUTRAL_MANIFEST.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(
+            f"release neutral manifest missing/unreadable: {NEUTRAL_MANIFEST}; "
+            "run `uv run python -m doit export`"
+        ) from exc
+    if manifest.get("schema") != NEUTRAL_SCHEMA:
+        raise RuntimeError("release neutral manifest schema is stale; rerun doit export")
+    if manifest.get("exporter") != _exporter_digest():
+        raise RuntimeError("release neutral exporter changed; rerun doit export")
+
+    parts = part_stems()
+    assemblies = list(ASSEMBLY_ORDER)
+    cfg_meshes = scene_config_meshes()
+    expected_sources = _release_sources(parts, assemblies)
+    recorded_sources = manifest.get("sources")
+    if not isinstance(recorded_sources, dict) or set(recorded_sources) != set(expected_sources):
+        raise RuntimeError("release neutral source inventory drifted; rerun doit export")
+    for dashed, source in expected_sources.items():
+        current = src_digest(source)
+        if current is None or recorded_sources.get(dashed) != current:
+            raise RuntimeError(f"release neutral source changed: {source.name}; rerun doit export")
+
+    expected_files = _release_inventory(parts, assemblies, cfg_meshes)
+    recorded_files = manifest.get("files")
+    if not isinstance(recorded_files, dict) or set(recorded_files) != set(expected_files):
+        raise RuntimeError("release neutral file inventory drifted; rerun doit export")
+
+    with _telemetry.span(
+        "release.neutral_stage",
+        documents=len(expected_sources),
+        files=len(expected_files),
+    ) as sp:
+        for destination, expected_source in expected_files.items():
+            record = recorded_files[destination]
+            source = REPO / str(record.get("source") or "")
+            if source.resolve() != expected_source.resolve():
+                raise RuntimeError(f"release neutral source path drifted for {destination}")
+            if not source.is_file() or source.stat().st_size != record.get("bytes"):
+                raise RuntimeError(f"release neutral output changed: {source}; rerun doit export")
+            output = stage / destination
+            output.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, output)
+        sp.set_attribute("config_meshes", sum(len(v) for v in cfg_meshes.values()))
+
+    return {
+        "documents": len(expected_sources),
+        "parts": len(parts),
+        "assemblies": len(assemblies),
+        "pngs": len(parts) + len(assemblies),
+        "views": 1,
+        "config_meshes": sum(len(entries) for entries in cfg_meshes.values()),
+    }
+
+
 def _save_as(doc: Any, out: Path) -> int:
     """SaveAs3 to ``out``, guaranteeing THIS call produced a REAL file: remove any prior
     output first, so a SaveAs3 that fails (a locked / read-only path) leaves NO file and
@@ -415,7 +596,9 @@ def _save_as(doc: Any, out: Path) -> int:
         return ok
 
 
-def validated_outputs(parts: list[str], assemblies: list[str]) -> set[Path]:
+def validated_outputs(
+    parts: list[str], assemblies: list[str], scene_assemblies: set[str] | None = None,
+) -> set[Path]:
     """Every render-cache output whose freshness THIS run establishes for the current
     manifest: each manifest part's STL + STEP; each manifest assembly's boxes JSON +
     mono STL and every part-mesh STL its scene references; plus the colours /
@@ -425,11 +608,14 @@ def validated_outputs(parts: list[str], assemblies: list[str]) -> set[Path]:
     for m in parts:
         d = m.replace("_", "-")
         out |= {OUT_STL / f"{d}.STL", OUT_STEP / f"{d}.STEP"}
+    scene_assemblies = set(assemblies) if scene_assemblies is None else scene_assemblies
     for m in assemblies:
         d = m.replace("_", "-")
         bj = OUT_BOXES / f"{d}.json"
-        out |= {bj, OUT_STL / f"{d}.STL"}
-        if bj.exists():
+        out.add(OUT_STL / f"{d}.STL")
+        if m in scene_assemblies:
+            out.add(bj)
+        if m in scene_assemblies and bj.exists():
             try:
                 comps = json.loads(bj.read_text(encoding="utf-8")).get("components") or []
                 out |= {OUT_STL / f"{c['mesh']}.STL" for c in comps if c.get("mesh")}
@@ -476,7 +662,9 @@ def _source_changed(stem: str, mesh: str, digests: dict[str, str]) -> bool:
     return digests.get(mesh) != cur
 
 
-def asm_source_changed(dashed: str, src: Path, digests: dict[str, str]) -> bool:
+def asm_source_changed(
+    dashed: str, src: Path, digests: dict[str, str], *, require_scene: bool = True,
+) -> bool:
     """True when the assembly's recipe digest differs from the one its boxes/scene were
     exported at. Falls back to boxes-JSON-vs-SLDASM mtime only when the digest is
     unavailable (dodo import failed) -- so a broken import degrades to the old behaviour,
@@ -488,7 +676,9 @@ def asm_source_changed(dashed: str, src: Path, digests: dict[str, str]) -> bool:
         # Digest-unavailable fallback: check every assembly output that is still
         # produced. Assembly STEP was retired; requiring it here would make every
         # standalone export stale forever.
-        outs = (OUT_BOXES / f"{dashed}.json", OUT_STL / f"{dashed}.STL")
+        outs = [OUT_STL / f"{dashed}.STL"]
+        if require_scene:
+            outs.append(OUT_BOXES / f"{dashed}.json")
         return any(not o.exists() or o.stat().st_mtime < src.stat().st_mtime
                    for o in outs)
     return digests.get(dashed) != cur
@@ -651,42 +841,57 @@ def main() -> int:
     # (codex review). Standalone still READS the cache (fast "all fresh"); it just
     # never writes, so it can never poison it.
     record = "--record-digests" in sys.argv[1:]
-    models = manifest_models()
+    comparison_models = manifest_models()
     colors = load_colors()
     digests = load_src_digests()
+    parts = part_stems()
+    assemblies = list(ASSEMBLY_ORDER)
+    assembly_set = set(assemblies)
+    scene_assemblies = {
+        model.replace("-", "_") for model in comparison_models
+        if model.replace("-", "_") in assembly_set
+    }
+    scene_assemblies.add("harmonic_analyzer")
 
-    parts = [m for m in models if model_path(m).suffix.lower() == ".sldprt"]
-    assemblies = [m for m in models if m not in parts]
+    stale_asms: list[str] = []
+    for stem in assemblies:
+        dashed = stem.replace("_", "-")
+        src = OUT_SLDASM / f"{dashed}.SLDASM"
+        require_scene = stem in scene_assemblies
+        scene_missing = require_scene and not (OUT_BOXES / f"{dashed}.json").exists()
+        if (force or scene_missing or not (OUT_STL / f"{dashed}.STL").exists()
+                or asm_source_changed(
+                    dashed, src, digests, require_scene=require_scene,
+                )):
+            stale_asms.append(stem)
 
-    stale_parts = [m for m in parts if force
-                   or manifest_part_stale(m.replace("_", "-"), colors, digests)]
-    stale_asms = []
-    for m in assemblies:
-        src, dashed = model_path(m), m.replace("_", "-")
-        bj = OUT_BOXES / f"{dashed}.json"
-        mono = OUT_STL / f"{dashed}.STL"
-        # Assembly source (its .SLDASM digest folds every referenced part, recursively),
-        # so any leaf-part recipe change flips it -> re-export. Missing outputs re-export
-        # regardless (why the export task runs `uptodate: False`).
-        if (force or not bj.exists() or not mono.exists()
-                or asm_source_changed(dashed, src, digests)):
-            stale_asms.append(m)
-            continue
-        data = json.loads(bj.read_text(encoding="utf-8"))
-        comps = data.get("components") or []
-        if (not comps or any("mesh" not in c for c in comps) or any(
-                part_stl_stale(c["part"], c["mesh"], colors, digests) for c in comps)):
-            stale_asms.append(m)
+    stale_parts = [
+        stem for stem in parts
+        if force or manifest_part_stale(stem.replace("_", "-"), colors, digests)
+    ]
+    stale_config_stems: set[str] = set()
+    if not any(stem in scene_assemblies for stem in stale_asms):
+        for stem, entries in scene_config_meshes().items():
+            if force or any(part_stl_stale(stem, mesh, colors, digests)
+                            for _cfg, mesh in entries):
+                stale_config_stems.add(stem)
 
-    if not stale_parts and not stale_asms:
+    if not stale_parts and not stale_asms and not stale_config_stems:
         _telemetry.info("all exports fresh")
-        stamp_render_cache_current(validated_outputs(parts, assemblies))
+        stamp_render_cache_current(validated_outputs(parts, assemblies, scene_assemblies))
+        if record:
+            write_release_neutral_manifest(
+                parts, assemblies, scene_config_meshes(), digests,
+            )
         # Geometry unchanged, but still reconcile the gallery (cheap: --stale-only
         # is a no-op when nothing drifted) so `doit export` always leaves an
         # up-to-date gallery for the release to bundle.
         refresh_comparison_gallery()
         return 0
-    _telemetry.info(f"exporting parts={stale_parts or '[]'} assemblies={stale_asms or '[]'}")
+    _telemetry.info(
+        f"exporting parts={stale_parts or sorted(stale_config_stems) or '[]'} "
+        f"assemblies={stale_asms or '[]'}"
+    )
     for d in (OUT_STL, OUT_STEP, OUT_BOXES):
         d.mkdir(parents=True, exist_ok=True)
 
@@ -702,68 +907,35 @@ def main() -> int:
             except Exception:
                 return ""
 
-        async def export_part_stls(stem: str, cfg_meshes: list[tuple[str, str]]) -> None:
-            """One open per part; one STL per referenced configuration."""
-            src = OUT_SLDPRT / f"{stem}.SLDPRT"
-            check(f"open {src.name}", await adapter.open_model(str(src)))
-            doc = adapter.currentModel
-            crc_by_mesh: dict[str, int] = {}
-            for cfg, mesh in cfg_meshes:
-                switched = bool(cfg and cfg.lower() != "default" and active_cfg(doc) != cfg)
-                if switched:
-                    ok_cfg = doc.ShowConfiguration2(cfg)
-                    # ShowConfiguration2 returns False when cfg was already
-                    # active — only fail if it's genuinely not active now
-                    if not ok_cfg and active_cfg(doc) != cfg:
-                        try:
-                            names = list(doc.GetConfigurationNames() or [])
-                        except Exception:
-                            names = None
-                        raise RuntimeError(
-                            f"{stem}: ShowConfiguration2({cfg!r}) failed (has {names})")
-                # Config switches regenerate LAZILY (see build_cone_gear): without a
-                # forced rebuild SaveAs3 captures the PRIOR config's still-tessellated
-                # solid, so a config's STL non-deterministically holds an adjacent
-                # configuration (observed: --t18.STL carrying 12-tooth geometry). Force
-                # a full rebuild so THIS config is applied before the mesh is written.
-                if switched:
-                    adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
-                    adapter._attempt(lambda: doc.EditRebuild3(), default=None)
-                out = OUT_STL / f"{mesh}.STL"
-                _save_as(doc, out)
-                crc_by_mesh[mesh] = zlib.crc32(out.read_bytes()) & 0xFFFFFFFF
-                colors[mesh] = doc_rgb(doc)
-                log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) rgb={colors[mesh]}")
-            assert_configs_distinct(stem, crc_by_mesh)
-            # Stamp the source recipe digest AFTER the distinctness proof passes, so a
-            # bad (stale-config) export is never recorded fresh. All configs share one
-            # source part, hence one digest.
-            d = src_digest(src) if record else None
-            if d is not None:
-                for _cfg, mesh in cfg_meshes:
-                    digests[mesh] = d
-            adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        def switch_configuration(doc: Any, stem: str, cfg: str) -> bool:
+            if not cfg or active_cfg(doc).casefold() == cfg.casefold():
+                return False
+            ok_cfg = doc.ShowConfiguration2(cfg)
+            if not ok_cfg and active_cfg(doc).casefold() != cfg.casefold():
+                try:
+                    names = list(doc.GetConfigurationNames() or [])
+                except Exception:
+                    names = None
+                raise RuntimeError(
+                    f"{stem}: ShowConfiguration2({cfg!r}) failed (has {names})"
+                )
+            adapter._attempt(lambda: doc.ForceRebuild3(False), default=None)
+            adapter._attempt(lambda: doc.EditRebuild3(), default=None)
+            return True
+
+        def scene_stems(data: dict[str, Any]) -> set[tuple[str, str, str]]:
+            return {
+                (str(comp["part"]), str(comp.get("cfg") or ""), str(comp["mesh"]))
+                for comp in data.get("components") or []
+                if comp.get("part") and comp.get("mesh")
+            }
 
         try:
-            for m in stale_parts:
-                dashed = m.replace("_", "-")
-                src = model_path(m)
-                check(f"open {src.name}", await adapter.open_model(str(src)))
-                doc = adapter.currentModel
-                for out in (OUT_STL / f"{dashed}.STL", OUT_STEP / f"{dashed}.STEP"):
-                    _save_as(doc, out)
-                    log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
-                colors[dashed] = doc_rgb(doc)
-                log(f"colour {dashed}: {colors[dashed]}")
-                d = src_digest(src) if record else None
-                if d is not None:
-                    digests[dashed] = d
-                adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-                done[m] = "exported"
-
-            for m in stale_asms:
-                dashed = m.replace("_", "-")
-                src = model_path(m)
+            pending_scenes: dict[str, tuple[list, list, set[tuple[str, str, str]]]] = {}
+            all_scene_stems: set[tuple[str, str, str]] = set()
+            for stem in stale_asms:
+                dashed = stem.replace("_", "-")
+                src = OUT_SLDASM / f"{dashed}.SLDASM"
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 # Assembly STEP is deliberately omitted: native Pack-and-Go plus
@@ -774,36 +946,82 @@ def main() -> int:
                 mono = OUT_STL / f"{dashed}.STL"  # mm, like every other STL
                 _save_as(doc, mono)
                 log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")
-                # fresh cache: only resolved-component doc reads land in
-                # scan_colors (a lightweight scan seeds nothing), so stale
-                # colors.json entries are refreshed, never masked
-                scan_colors: dict = {}
-                boxes, scene, stems = scan_assembly(adapter, scan_colors)
-                colors.update(scan_colors)
+                if stem in scene_assemblies:
+                    # Fresh cache: only resolved-component doc reads land in
+                    # scan_colors, so a lightweight scan never masks a stale colour.
+                    scan_colors: dict = {}
+                    boxes, scene, stems = scan_assembly(adapter, scan_colors)
+                    colors.update(scan_colors)
+                    pending_scenes[stem] = (boxes, scene, stems)
+                    all_scene_stems.update(stems)
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+                if stem not in scene_assemblies:
+                    d = src_digest(src) if record else None
+                    if d is not None:
+                        digests[dashed] = d
+                done[stem] = "exported"
 
-                # Group ALL configs per stem, and re-export the WHOLE group whenever
-                # ANY of its configs is stale: export_part_stls' assert_configs_distinct
-                # (the stale-tessellation guard) needs >=2 sibling CRCs to catch a
-                # config that failed to rebuild, so a single-config partial refresh
-                # (one deleted --tNN.STL / missing colour) must still bring its siblings
-                # along (codex review). Single-config parts are unaffected (one entry).
-                all_by_stem: dict[str, list[tuple[str, str]]] = {}
-                stale_stems: set[str] = set()
-                for stem, cfg, mesh in sorted(stems):
-                    all_by_stem.setdefault(stem, []).append((cfg, mesh))
-                    if force or part_stl_stale(stem, mesh, colors, digests):
-                        stale_stems.add(stem)
-                for stem in sorted(stale_stems):
-                    await export_part_stls(stem, all_by_stem[stem])
+            for stem in sorted(scene_assemblies - set(pending_scenes)):
+                path = OUT_BOXES / f"{stem.replace('_', '-')}.json"
+                all_scene_stems.update(scene_stems(json.loads(path.read_text(encoding="utf-8"))))
 
-                # Scene colours are written AFTER the part exports so a
-                # component without an appearance override gets the part-doc
-                # colour those exports just (re-)read — the cascade SolidWorks
-                # actually displays. A lightweight scan (GetModelDoc2 = None,
-                # appearance reads unset) therefore no longer greys the scene.
-                for c in scene:
-                    c["rgb"] = c["rgb"] or list(colors.get(c["mesh"], DEFAULT_RGB))
+            all_by_stem: dict[str, list[tuple[str, str]]] = {}
+            for stem, cfg, mesh in sorted(all_scene_stems):
+                all_by_stem.setdefault(stem, []).append((cfg, mesh))
+            default_stale = {
+                stem.replace("_", "-") for stem in parts
+                if force or manifest_part_stale(stem.replace("_", "-"), colors, digests)
+            }
+            config_stale = {
+                stem for stem, entries in all_by_stem.items()
+                if force or any(part_stl_stale(stem, mesh, colors, digests)
+                                for _cfg, mesh in entries)
+            }
+
+            # Open each part at most once. Default STEP/STL and the whole referenced
+            # configuration family are emitted in that one session; exporting all
+            # siblings preserves the distinct-CRC stale-tessellation guard.
+            for stem in sorted(default_stale | config_stale):
+                src = OUT_SLDPRT / f"{stem}.SLDPRT"
+                check(f"open {src.name}", await adapter.open_model(str(src)))
+                doc = adapter.currentModel
+                if stem in default_stale:
+                    switch_configuration(doc, stem, "Default")
+                    for out in (OUT_STL / f"{stem}.STL", OUT_STEP / f"{stem}.STEP"):
+                        _save_as(doc, out)
+                        log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB)")
+                    colors[stem] = doc_rgb(doc)
+
+                entries = all_by_stem.get(stem, []) if stem in config_stale else []
+                crc_by_mesh: dict[str, int] = {}
+                for cfg, mesh in entries:
+                    switch_configuration(doc, stem, cfg)
+                    out = OUT_STL / f"{mesh}.STL"
+                    if not (mesh == stem and stem in default_stale):
+                        _save_as(doc, out)
+                    crc_by_mesh[mesh] = zlib.crc32(out.read_bytes()) & 0xFFFFFFFF
+                    colors[mesh] = doc_rgb(doc)
+                    log(f"saved {out.name} ({out.stat().st_size / 1e6:.1f} MB) "
+                        f"rgb={colors[mesh]}")
+                assert_configs_distinct(stem, crc_by_mesh)
+
+                d = src_digest(src) if record else None
+                if d is not None:
+                    if stem in default_stale:
+                        digests[stem] = d
+                    for _cfg, mesh in entries:
+                        digests[mesh] = d
+                adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+                done[stem] = "exported"
+
+            # Fill component colours only after part exports, then publish each scene
+            # and its assembly digest. A partial failure never certifies the manifest.
+            for stem, (boxes, scene, stems) in pending_scenes.items():
+                dashed = stem.replace("_", "-")
+                for component in scene:
+                    component["rgb"] = component["rgb"] or list(
+                        colors.get(component["mesh"], DEFAULT_RGB)
+                    )
                 (OUT_BOXES / f"{dashed}.json").write_text(json.dumps({
                     "unit": "mm",
                     "boxes": [{"name": n, "box": list(b)} for n, b in boxes],
@@ -811,12 +1029,9 @@ def main() -> int:
                 }), encoding="utf-8")
                 log(f"saved boxes+scene {dashed}.json "
                     f"({len(boxes)} boxes, {len(scene)} instances, {len(stems)} meshes)")
-                # Stamp the assembly digest only after its scene JSON is actually
-                # on disk with final colours.
-                d = src_digest(src) if record else None
+                d = src_digest(OUT_SLDASM / f"{dashed}.SLDASM") if record else None
                 if d is not None:
                     digests[dashed] = d
-                done[m] = "exported"
             # Persist the digest cache + exporter sentinel ONLY on a fully successful
             # export -- inside the `finally` a partial failure would stamp the current
             # sentinel, so the next run's exporter_untrusted() goes false and skips the
@@ -833,7 +1048,11 @@ def main() -> int:
     # a failed COM export leaves the render cache half-written (fail loud there);
     # the stamp keeps mtime-based downstream guards satisfied.
     if rc == 0:
-        stamp_render_cache_current(validated_outputs(parts, assemblies))
+        stamp_render_cache_current(validated_outputs(parts, assemblies, scene_assemblies))
+        if record:
+            write_release_neutral_manifest(
+                parts, assemblies, scene_config_meshes(), digests,
+            )
         refresh_comparison_gallery()
     return rc
 
