@@ -41,7 +41,7 @@ import sys
 import time
 import zlib
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import (  # noqa: E402
@@ -174,7 +174,9 @@ def _certified_output_changed(
         return cache[resolved]
     record = certified.get(resolved)
     if record is None:
-        return False
+        if cache is not None:
+            cache[resolved] = True
+        return True
     changed = (
         not _nonempty(path)
         or path.stat().st_size != record.get("bytes")
@@ -183,6 +185,12 @@ def _certified_output_changed(
     if cache is not None:
         cache[resolved] = changed
     return changed
+
+
+def _png_needs_export(
+    path: Path, force: bool, neutral_changed: Callable[[Path], bool],
+) -> bool:
+    return force or not _nonempty(path) or bool(neutral_changed(path))
 
 
 def manifest_models() -> list[str]:
@@ -567,11 +575,11 @@ def _release_sources(
 
 
 def _source_fingerprint(source: Path) -> str | None:
+    if not source.is_file():
+        return None
     recipe = src_digest(source)
     if recipe is not None:
         return recipe
-    if not source.is_file():
-        return None
     return _file_sha256(source)
 
 
@@ -1147,12 +1155,12 @@ def main() -> int:
 
     missing_asm_png = {
         stem for stem in assemblies
-        if (not _nonempty(OUT_PNG / stem.replace("_", "-")
-                          / f"{stem.replace('_', '-')}_isometric.png")
-            or neutral_changed(
-                OUT_PNG / stem.replace("_", "-")
-                / f"{stem.replace('_', '-')}_isometric.png",
-            ))
+        if _png_needs_export(
+            OUT_PNG / stem.replace("_", "-")
+            / f"{stem.replace('_', '-')}_isometric.png",
+            force,
+            neutral_changed,
+        )
     }
     stale_asms: list[str] = []
     for stem in assemblies:
@@ -1173,12 +1181,12 @@ def main() -> int:
 
     missing_part_png = {
         stem.replace("_", "-") for stem in parts
-        if (not _nonempty(OUT_PNG / stem.replace("_", "-")
-                          / f"{stem.replace('_', '-')}_isometric.png")
-            or neutral_changed(
-                OUT_PNG / stem.replace("_", "-")
-                / f"{stem.replace('_', '-')}_isometric.png",
-            ))
+        if _png_needs_export(
+            OUT_PNG / stem.replace("_", "-")
+            / f"{stem.replace('_', '-')}_isometric.png",
+            force,
+            neutral_changed,
+        )
     }
     stale_parts = [
         stem for stem in parts

@@ -160,6 +160,27 @@ def test_certified_output_hash_detects_same_length_corruption(tmp_path: Path) ->
     assert export_models._certified_output_changed(output, certified)
 
 
+def test_uncertified_output_is_untrusted(tmp_path: Path) -> None:
+    output = tmp_path / "sample.STL"
+    output.write_bytes(b"neutral")
+
+    assert export_models._certified_output_changed(output, {})
+
+
+def test_missing_native_has_no_source_fingerprint(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "missing.SLDPRT"
+    monkeypatch.setattr(export_models, "src_digest", lambda _source: "recipe-v1")
+
+    assert export_models._source_fingerprint(source) is None
+
+
+def test_forced_export_regenerates_existing_certified_png(tmp_path: Path) -> None:
+    output = tmp_path / "sample_isometric.png"
+    output.write_bytes(b"current")
+
+    assert export_models._png_needs_export(output, True, lambda _path: False)
+
+
 def test_certified_output_hash_is_memoized_per_export(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -303,6 +324,9 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "manifest_models", lambda: ["harmonic_analyzer"])
     monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
     monkeypatch.setattr(export_models, "_certified_outputs", lambda: {})
+    monkeypatch.setattr(
+        export_models, "_certified_output_changed", lambda *_args: False,
+    )
     monkeypatch.setattr(export_models, "load_colors", lambda: {"sample-part": (1, 1, 1)})
     monkeypatch.setattr(
         export_models, "load_src_digests",
