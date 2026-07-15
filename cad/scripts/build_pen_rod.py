@@ -141,7 +141,10 @@ async def build(adapter) -> dict[str, str]:
     # Named slide axis (local Y through the origin = Front Plane ∩ Right Plane,
     # the square rod's long axis) so the pen rod runs as a prismatic joint along
     # the v-block guide in the M6 mated-DOF assembly (vertical pen travel).
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "slide axis")
+    slide_axis = await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "slide axis",
+    )
+    _blank_ref_axis(adapter, slide_axis)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
@@ -165,6 +168,20 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     return artefacts
+
+
+def _blank_ref_axis(adapter, name: str) -> None:
+    """Keep the assembly-mating axis out of saved part renders."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        name, "AXIS", 0, 0, 0, False, 0, null_callout(), 0,
+    ):
+        raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
 
 
 if __name__ == "__main__":
