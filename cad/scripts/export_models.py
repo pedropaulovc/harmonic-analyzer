@@ -1107,13 +1107,13 @@ def refresh_comparison_gallery() -> bool:
     wrote, so ``doit export`` yields an up-to-date gallery that the release then
     bundles (cut_release.stage_comparisons). Returns True if refreshed.
 
-    Runs render_offline (Blender, no SolidWorks) ``--stale-only`` so only pairs
-    whose geometry changed re-render. That command already composites every pair
-    it renders. A content-keyed stamp covers the manifest, reference images, and
-    gallery tools: unchanged inputs plus complete outputs skip the 45-second
-    composite pass entirely; changed inputs trigger one full pass only when some
-    pairs were not rendered (for example an align-only manifest edit). Gallery
-    HTML is rebuilt only when renders or gallery inputs changed.
+    Runs render_offline (Blender, no SolidWorks) ``--stale-only`` when the
+    content-keyed gallery inputs are unchanged, so only pairs whose geometry
+    changed re-render. A manifest/reference/tool change forces a full render
+    because render_offline's own stale predicate does not include renderer code.
+    The renderer already composites every pair it renders; a separate full
+    composite pass is needed only when outputs remain incomplete. Gallery HTML
+    is rebuilt only when renders or gallery inputs changed.
 
     BEST-EFFORT: the offline renderer needs Blender, which lives on a separate
     GPU seat, so on an export seat without it this warns + returns False rather
@@ -1128,9 +1128,10 @@ def refresh_comparison_gallery() -> bool:
             input_digest = _gallery_input_digest(manifest)
             inputs_changed = _gallery_stamp_digest() != input_digest
             _prune_stale_gallery()
-            render_lines = _run_tool(
-                ["uv", "run", str(RENDER_OFFLINE), "--stale-only"], "cmp",
-            )
+            render_cmd = ["uv", "run", str(RENDER_OFFLINE)]
+            if not inputs_changed:
+                render_cmd.append("--stale-only")
+            render_lines = _run_tool(render_cmd, "cmp")
             rendered = _rendered_pair_ids(render_lines)
             pair_count = len(manifest.get("pairs", []))
             outputs_complete = _gallery_outputs_complete(manifest)

@@ -434,22 +434,26 @@ def test_current_gallery_skips_redundant_composite_and_index(
     messages: list[str] = []
     monkeypatch.setattr(export_models._telemetry, "info", messages.append)
     export_models._write_gallery_stamp(export_models._gallery_input_digest(manifest))
-    calls: list[str] = []
+    calls: list[list[str]] = []
 
     def _run(cmd: list[str], _tag: str) -> list[str]:
-        calls.append(Path(cmd[2]).name)
+        calls.append(cmd)
         return ["nothing to render"]
 
     monkeypatch.setattr(export_models, "_run_tool", _run)
 
     assert export_models.refresh_comparison_gallery()
-    assert calls == ["render_offline.py"]
+    assert [Path(cmd[2]).name for cmd in calls] == ["render_offline.py"]
+    assert calls[0][-1] == "--stale-only"
     assert messages == ["comparison gallery already current"]
 
     export_models.GALLERY_STAMP.unlink()
     calls.clear()
     assert export_models.refresh_comparison_gallery()
-    assert calls == ["render_offline.py", "composite.py", "gallery.py"]
+    assert [Path(cmd[2]).name for cmd in calls] == [
+        "render_offline.py", "composite.py", "gallery.py",
+    ]
+    assert calls[0] == ["uv", "run", str(render_tool)]
 
 
 def test_gallery_with_missing_score_is_incomplete(tmp_path: Path, monkeypatch) -> None:
