@@ -126,7 +126,7 @@ from build_support_bar import (  # noqa: E402
     BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (machine -X holes)
     CLAMP_HOLE_X,
 )
-from column_clamp_front_spec import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
+from column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
 from build_transgear_bracket import (  # noqa: E402
     PLATE_THICK as BRACKET_THICK,
     SCREW_HOLE_DX as BRACKET_SCREW_DX,

@@ -13,20 +13,20 @@ fails before any SolidWorks build.
 
 from __future__ import annotations
 
-# --- Nominal geometry (book ch. 21/22, ch30 p005; layout memory/paper-drive-
-# rework.md E2).  Mirrors: ARC_DEPTH = build_column_clamp_front.DEPTH; the rest
-# = _clamp_arc constants; EAR_HOLE_DIA = the #8-clearance normal-fit table
-# diameter (_holes.CLEARANCE_MM). ---
-ARC_DEPTH = 17.9  # bar back face to the column-axis plane
-ARC_WIDTH = 48.0  # lateral span, ear tip to ear tip
-ARC_HEIGHT = 16.0  # along the column (2 * _clamp_arc.ARC_HALF_H)
-COLUMN_BORE = 25.6  # half-cylinder relief: slides on the O25.4 column
-EAR_HOLE_Z = 17.5  # ear screw line flanks the column
-EAR_HOLE_DIA = 4.978  # #8 clearance, normal fit (ANSI-inch wizard table)
-
-# Derived spans (equations of the primitives above).
-EAR_SPACING = 2.0 * EAR_HOLE_Z  # 35.0: ear-hole centre to centre
-BORE_RADIUS = COLUMN_BORE / 2.0  # 12.8
+# Nominal geometry lives in the drawing-FREE ``column_clamp_front_geom`` module so
+# the assemblies can import ``ARC_DEPTH`` without pulling this file's drawing
+# contract (notes / marked-dimension map) into their build-recipe closure.
+# Re-exported here unchanged for the drawing-side consumers and the lockstep test.
+from column_clamp_front_geom import (  # noqa: F401
+    ARC_DEPTH,
+    ARC_HEIGHT,
+    ARC_WIDTH,
+    BORE_RADIUS,
+    COLUMN_BORE,
+    EAR_HOLE_DIA,
+    EAR_HOLE_Z,
+    EAR_SPACING,
+)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  ``build_column_clamp_front`` marks exactly these;
