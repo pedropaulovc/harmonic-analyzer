@@ -69,6 +69,7 @@ PART_NAME = "transgear-stub"
 MATERIAL = "Plain Carbon Steel"
 
 
+@_telemetry.traced("dim.diametric", label_param="label")
 async def _diametric_dim(
     adapter: Any, centerline: str, line: str, text_xy: tuple[float, float], label: str
 ) -> None:
