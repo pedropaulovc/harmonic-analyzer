@@ -37,13 +37,22 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from crank_pin_spec import (
+    BIG_END_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    PIN_LENGTH,
+    SMALL_END_DIA,
+)
 
 PART_NAME = "crank-pin"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
-
-PIN_LENGTH = 45.0  # DIMENSIONS.md ch11: p.14 photo (low)
-BIG_END_DIA = 6.0  # DIMENSIONS.md ch11: p.14 photo (low)
-SMALL_END_DIA = 5.0  # DIMENSIONS.md ch11: cross-hole dia, small end (low)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -138,6 +147,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
