@@ -502,6 +502,21 @@ def scene_part_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[st
     return {stem: sorted(entries) for stem, entries in sorted(by_stem.items())}
 
 
+def all_scene_part_meshes(
+    scene_assemblies: set[str],
+) -> dict[str, list[tuple[str, str]]]:
+    """Union the mesh inventories of every comparison scene assembly."""
+    by_stem: dict[str, list[tuple[str, str]]] = {}
+    for assembly in sorted(scene_assemblies):
+        dashed = assembly.replace("_", "-")
+        for stem, entries in scene_part_meshes(OUT_BOXES / f"{dashed}.json").items():
+            bucket = by_stem.setdefault(stem, [])
+            for entry in entries:
+                if entry not in bucket:
+                    bucket.append(entry)
+    return {stem: sorted(entries) for stem, entries in sorted(by_stem.items())}
+
+
 def scene_is_valid(scene_path: Path) -> bool:
     try:
         scene_part_meshes(scene_path)
@@ -535,6 +550,7 @@ def scene_config_meshes(scene_path: Path | None = None) -> dict[str, list[tuple[
 
 def _release_inventory(
     parts: list[str], assemblies: list[str], scene_meshes: dict[str, list[tuple[str, str]]],
+    scene_assemblies: set[str],
 ) -> dict[str, Path]:
     """Exact bundle-relative neutral inventory and its cache-owned source files."""
     files: dict[str, Path] = {}
@@ -554,6 +570,9 @@ def _release_inventory(
     for entries in scene_meshes.values():
         for _cfg, mesh in entries:
             files[f"stl/{mesh}.STL"] = OUT_STL / f"{mesh}.STL"
+    for stem in sorted(scene_assemblies):
+        dashed = stem.replace("_", "-")
+        files[f"boxes/{dashed}.json"] = OUT_BOXES / f"{dashed}.json"
     return dict(sorted(files.items()))
 
 
@@ -586,6 +605,7 @@ def _source_fingerprint(source: Path) -> str | None:
 def write_release_neutral_manifest(
     parts: list[str], assemblies: list[str],
     scene_meshes: dict[str, list[tuple[str, str]]],
+    scene_assemblies: set[str],
     colors: dict[str, Any], digests: dict[str, str],
 ) -> None:
     """Atomically certify a complete, current neutral set for ``cut_release``.
@@ -619,7 +639,7 @@ def write_release_neutral_manifest(
             if not fresh:
                 raise RuntimeError(f"release scene mesh is stale: {mesh}")
 
-    inventory = _release_inventory(parts, assemblies, scene_meshes)
+    inventory = _release_inventory(parts, assemblies, scene_meshes, scene_assemblies)
     file_records: dict[str, dict[str, Any]] = {}
     for destination, source in inventory.items():
         if not source.is_file() or source.stat().st_size == 0:
@@ -712,14 +732,26 @@ def stage_release_neutral(stage: Path) -> dict[str, int]:
 
     parts = part_stems()
     assemblies = list(ASSEMBLY_ORDER)
-    scene_meshes = scene_part_meshes()
-    cfg_meshes = scene_config_meshes()
+    assembly_set = set(assemblies)
+    scene_assemblies = {
+        model.replace("-", "_") for model in manifest_models()
+        if model.replace("-", "_") in assembly_set
+    }
+    scene_assemblies.add("harmonic_analyzer")
+    scene_meshes = all_scene_part_meshes(scene_assemblies)
+    cfg_meshes = {
+        stem: [(cfg, mesh) for cfg, mesh in entries if mesh != stem]
+        for stem, entries in scene_meshes.items()
+        if any(mesh != stem for _cfg, mesh in entries)
+    }
     expected_sources = _release_sources(parts, assemblies, scene_meshes)
     recorded_sources = manifest.get("sources")
     if not isinstance(recorded_sources, dict) or set(recorded_sources) != set(expected_sources):
         raise RuntimeError("release neutral source inventory drifted; rerun doit export")
 
-    expected_files = _release_inventory(parts, assemblies, scene_meshes)
+    expected_files = _release_inventory(
+        parts, assemblies, scene_meshes, scene_assemblies,
+    )
     recorded_files = manifest.get("files")
     if not isinstance(recorded_files, dict) or set(recorded_files) != set(expected_files):
         raise RuntimeError("release neutral file inventory drifted; rerun doit export")
@@ -974,8 +1006,17 @@ def _gallery_input_digest(manifest: dict[str, Any]) -> str:
 
 
 def _gallery_outputs_complete(manifest: dict[str, Any]) -> bool:
+    pair_ids = {str(pair["id"]) for pair in manifest.get("pairs", [])}
+    scores_path = COMPARISONS_DIR / "scores.json"
+    try:
+        scores = json.loads(scores_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(scores, dict) or not pair_ids.issubset(scores):
+        return False
+
     required = {
-        COMPARISONS_DIR / "scores.json",
+        scores_path,
         COMPARISONS_DIR / "index.html",
     }
     for pair in manifest.get("pairs", []):
@@ -1169,7 +1210,9 @@ def main() -> int:
         require_scene = stem in scene_assemblies
         scene_path = OUT_BOXES / f"{dashed}.json"
         scene_invalid = require_scene and (
-            not scene_is_valid(scene_path) or not scene_sources_exist(scene_path)
+            not scene_is_valid(scene_path)
+            or not scene_sources_exist(scene_path)
+            or neutral_changed(scene_path)
         )
         if (force or stem in missing_asm_png or scene_invalid
                 or not _nonempty(OUT_STL / f"{dashed}.STL")
@@ -1196,8 +1239,10 @@ def main() -> int:
             or manifest_part_stale(stem.replace("_", "-"), colors, digests))
     ]
     stale_scene_mesh_stems: set[str] = set()
+    scene_meshes: dict[str, list[tuple[str, str]]] = {}
     if not any(stem in scene_assemblies for stem in stale_asms):
-        for stem, entries in scene_part_meshes().items():
+        scene_meshes = all_scene_part_meshes(scene_assemblies)
+        for stem, entries in scene_meshes.items():
             if force or any(
                 part_stl_stale(stem, mesh, colors, digests)
                 or neutral_changed(OUT_STL / f"{mesh}.STL")
@@ -1210,7 +1255,7 @@ def main() -> int:
         stamp_render_cache_current(validated_outputs(parts, assemblies, scene_assemblies))
         if record:
             write_release_neutral_manifest(
-                parts, assemblies, scene_part_meshes(), colors, digests,
+                parts, assemblies, scene_meshes, scene_assemblies, colors, digests,
             )
         # Geometry unchanged, but still reconcile the gallery (cheap: --stale-only
         # is a no-op when nothing drifted) so `doit export` always leaves an
@@ -1393,7 +1438,8 @@ def main() -> int:
         stamp_render_cache_current(validated_outputs(parts, assemblies, scene_assemblies))
         if record:
             write_release_neutral_manifest(
-                parts, assemblies, scene_part_meshes(), colors, digests,
+                parts, assemblies, all_scene_part_meshes(scene_assemblies),
+                scene_assemblies, colors, digests,
             )
         refresh_comparison_gallery()
     return rc

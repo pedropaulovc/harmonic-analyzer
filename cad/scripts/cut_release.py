@@ -706,11 +706,12 @@ def bundle(sw: Any, revision: str, version: str,
     facts["drawings"].update(package_drawings(sw, stage))
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
 
-    # 3. Scene graph (mm): per-component transforms + mesh keys + colours, so a
-    #    consumer can render the bundle with render_offline.py (no SolidWorks).
-    boxes_dst = stage / "boxes"
-    boxes_dst.mkdir(exist_ok=True)
-    shutil.copy2(SCENE_JSON, boxes_dst / SCENE_JSON.name)
+    # 3. Scene graph (mm): per-component transforms + mesh keys + colours. The
+    #    certified neutral inventory staged it above; never overwrite it from a
+    #    live cache path after validation.
+    staged_scene = stage / "boxes" / SCENE_JSON.name
+    if not staged_scene.is_file() or staged_scene.stat().st_size == 0:
+        raise RuntimeError(f"certified release scene missing: {staged_scene}")
     facts["scene_json"] = SCENE_JSON.name
 
     # 4. Changed-parts diff render vs the previous release (into stage/diff, so
