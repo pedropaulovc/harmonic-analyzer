@@ -30,6 +30,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -37,14 +38,23 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from pen_rod_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ROD_LENGTH,
+    ROD_SECTION,
+    TOP_VIEW_NOTE,
+    WIRE_HOLE_Y,
+)
 
 PART_NAME = "pen-rod"
 MATERIAL = "Brass"  # see _common.apply_material docstring
-
-ROD_SECTION = 5.0  # DIMENSIONS.md ch24: square section (low)
-ROD_LENGTH = 120.0  # DIMENSIONS.md ch24: p.64 inset (low)
-WIRE_HOLE_Y = 115.0  # wire tie-off near the top (build_pen_assembly imports this)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -93,6 +103,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=ROD_SECTION)),
     )
     name_last_feature(adapter, "Rod")
+    depth_dim = name_dimensions(adapter, "Rod", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"RodSection"')]
     v_rod = ROD_SECTION * ROD_SECTION * ROD_LENGTH
     await volume_check(adapter, "rod", v_rod, 0.005 * v_rod)
 
@@ -132,6 +144,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Top View Note": TOP_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
