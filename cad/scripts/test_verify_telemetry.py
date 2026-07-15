@@ -413,6 +413,22 @@ def test_whats_wrong_collapses_to_one_span_per_health_gate(monkeypatch, tmp_path
     assert dt.attributes["errors"] == 0
 
 
+def test_soundness_rebuild_spans_name_only_real_rebuilds(monkeypatch, tmp_path):
+    """Soundness passes a shared rebuild result into every gate, so its trace must
+    not claim that DOF, over-constrained, or health rebuilt the model again."""
+    spans, report = _run_soundness(["frame"], monkeypatch, tmp_path)
+    assert report.failed == [], report.failed
+    assert len(_by_name(spans, "verify.rebuild")) == 1
+    assert _by_name(spans, "dof.rebuild") == []
+    assert _by_name(spans, "dof.resolve") == []  # retired ambiguous name
+    assert _by_name(spans, "over.rebuild") == []
+    assert _by_name(spans, "health.rebuild") == []
+
+    collect = _by_name(spans, "health.collect_targets")
+    assert len(collect) == 1
+    assert collect[0].attributes["targets"] == COMPONENT_COUNTS["frame"] + 1
+
+
 # NOTE: test_slow_gates_have_child_spans_no_unspanned_gap was removed. It asserted
 # each slow gate's child spans cover >=85% of the gate's wall-clock -- a wall-clock
 # ratio that is inherently jitter-sensitive (a one-off scheduler/GC pause in the

@@ -1784,14 +1784,13 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
     problems = []
     with _telemetry.span("gate.dof") as gsp:
         # Re-solve the mate solver before reading the gate (stale-status reason
-        # above) -- the ForceRebuild3 is the bulk of the gate's wall-clock, so it
-        # gets its own child span rather than sitting in an unspanned gap.
-        # ``resolve=False``: the soundness suite already re-solved ONCE after open
-        # (verify._verify_static_one) and does not mutate the model between gates,
-        # so the rebuild here would be redundant -- skip it and just read status.
-        with _telemetry.span("dof.resolve"):
-            if resolve:
+        # above). ``resolve=False`` means soundness already performed its single
+        # shared ``verify.rebuild``; do not emit a misleading rebuild span when
+        # this gate only collects components and reads their status.
+        if resolve:
+            with _telemetry.span("dof.rebuild"):
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
+        with _telemetry.span("dof.collect_components"):
             asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
             components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
         gsp.set_attribute("components", len(components))
@@ -2330,19 +2329,19 @@ def assert_model_healthy(
     model_doc = _early_bound(raw_model, "IModelDoc2", "ForceRebuild3")
     asm_doc = _early_bound(raw_model, "IAssemblyDoc", "GetComponents")
     with _telemetry.span("gate.health", label=label or "top", deep=deep) as hsp:
-        # The deep ForceRebuild3 + sub-document collection is the bulk of the
-        # gate's wall-clock; span it so it is not an unspanned leading gap before
-        # the per-target whats_wrong checks.
-        with _telemetry.span("health.rebuild"):
-            # ``rebuilt`` may be supplied by a caller that already re-solved this
-            # model (the soundness suite's single shared rebuild); only
-            # ForceRebuild3 here when it was NOT (standalone/build/motion callers).
-            # A False result -- from either path -- is still a hard health fault.
-            if rebuilt is _REBUILD_UNSET:
+        # ``rebuilt`` may be supplied by a caller that already re-solved this
+        # model (the soundness suite's single shared rebuild). Emit a rebuild span
+        # only when this function actually calls ForceRebuild3; otherwise the old
+        # span name falsely made target discovery look like another rebuild.
+        if rebuilt is _REBUILD_UNSET:
+            with _telemetry.span("health.rebuild"):
                 rebuilt = adapter._attempt(
                     lambda: model_doc.ForceRebuild3(False), default=None
                 )
 
+        # Deep sub-document collection can be material on a large assembly, so
+        # keep it visible under its own truthful phase name.
+        with _telemetry.span("health.collect_targets") as csp:
             targets = [(label or "top", model_doc)]
             if deep:
                 comps = adapter._attempt(
@@ -2358,6 +2357,7 @@ def assert_model_healthy(
                     sub = adapter._attempt(lambda c=comp: c.GetModelDoc2(), default=None)
                     if sub is not None and sub is not raw_model:
                         targets.append((name, sub))
+            csp.set_attribute("targets", len(targets))
 
         errors: list[str] = []
         warnings: list[str] = []

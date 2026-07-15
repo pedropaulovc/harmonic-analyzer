@@ -37,6 +37,14 @@ The analyzer is composed of 20 mechanical channels operating in parallel, each c
 |:---:|:---:|:---:|
 | <img src="docs/images/magnifier.png" alt="Magnifier sub-assembly: magnifying lever and wheel"> | <img src="docs/images/pen.png" alt="Pen sub-assembly: pen carriage and kinematic driver"> | <img src="docs/images/paper-drive.png" alt="Paper-drive sub-assembly: platen, transgear, roller chain"> |
 
+### Engineering drawings
+
+The release bundle also includes production-ready drawings for selected parts.
+
+| Rocker-arm support | Platen guide |
+|:---:|:---:|
+| <img src="docs/images/rocker-arm-support-drawing.png" alt="Engineering drawing for the rocker-arm support"> | <img src="docs/images/platen-guide-drawing.png" alt="Engineering drawing for the platen guide"> |
+
 Every part and assembly is generated from **Python reproduction scripts** in
 [`cad/scripts/`](./cad/scripts) that drive SolidWorks over its COM API (via the
 [`SolidworksMCP-python`](https://github.com/pedropaulovc/SolidworksMCP-python) adapter). The
@@ -70,38 +78,38 @@ Tasks are grouped by whether they need SolidWorks — the prefix tells you at a 
 | **`build`** | yes | **every** part + assembly + **every** gate — the one fully-safe entry |
 | `build_bare` | yes | parts + assemblies only — a quick rebuild |
 
-One-off: install the build deps —
-`…\.venv\Scripts\python.exe -m pip install doit pillow pytest`.
+One-off: initialize the submodule and install the locked environment with `uv`.
 
 ```powershell
-$py = "C:\src\SolidworksMCP-python\.venv\Scripts\python.exe"
+git submodule update --init --recursive
+uv sync
 
 # The one fully-safe build: every part + assembly + every gate (= default task)
-& $py -m doit
+uv run python -m doit
 
 # Same, but fan the SolidWorks-free check:* gates out across 4 workers while the
 # COM build/verify stream stays serial (safe -- see "Parallelism" below)
-& $py -m doit -n 4
+uv run python -m doit -n 4
 
 # Quick rebuild -- parts + assemblies only, no gates or export
-& $py -m doit build_bare
+uv run python -m doit build_bare
 
 # Just one part (doit selection does NOT run reverse dependents -- the dependent
 # .SLDASM/renders stay stale until you run plain `doit` or select them explicitly)
-& $py -m doit part:cone_gear
+uv run python -m doit part:cone_gear
 
 # Just one assembly (+ its stale prerequisites), or a single gate
-& $py -m doit assembly:paper_drive
-& $py -m doit verify:soundness        # one SW gate
-& $py -m doit check:math              # one offline gate
+uv run python -m doit assembly:paper_drive
+uv run python -m doit verify:soundness        # one SW gate
+uv run python -m doit check:math              # one offline gate
 
 # Neutral export, then cut the next vNN release (explicit tag after `--` is optional)
-& $py -m doit export
-& $py -m doit release
+uv run python -m doit export
+uv run python -m doit release
 
 # Inspect the graph / clean
-& $py -m doit list --all
-& $py -m doit clean
+uv run python -m doit list --all
+uv run python -m doit clean
 ```
 
 **Parallelism.** There is one SolidWorks STA seat, so COM work must stay serial — but
@@ -119,7 +127,7 @@ its target — a missing target makes doit take the FULL branch (hooks included)
 
 ```powershell
 del cad\out\sldasm\paper-drive.SLDASM
-& $py -m doit assembly:paper_drive
+uv run python -m doit assembly:paper_drive
 ```
 
 ### Repository layout
