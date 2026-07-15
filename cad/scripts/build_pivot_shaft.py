@@ -25,7 +25,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     apply_material,
     check,
@@ -33,6 +32,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -40,13 +40,21 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from pivot_shaft_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    SHAFT_DIA,
+    SHAFT_LENGTH,
+)
 
 PART_NAME = "pivot-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
-
-SHAFT_DIA = 0.25 * IN  # 6.35  DIMENSIONS.md channel layout (low)
-SHAFT_LENGTH = 8.0 * IN  # 203.2  north end trimmed to the support edge (was 9"
-# / 228.6); the PART stays symmetric, the assembly places it off-centre (med)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -56,7 +64,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations): the shaft diameter and length. The mm
     # suffix is load-bearing -- this is an INCH document and the equation manager
-    # reads BARE numbers in document units (an unsuffixed 228.6 = 228.6 in).
+    # reads BARE numbers in document units (an unsuffixed 203.2 = 203.2 in).
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
 
@@ -82,6 +90,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Shaft")
+    depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v, 0.001 * v)
 
@@ -95,6 +105,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
