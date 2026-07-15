@@ -277,7 +277,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=bore0_edge,
-        symbol_xy=(0.120, 0.240),
+        symbol_xy=(0.075, 0.240),
         roughness_ra="1.6",
         label="pen bore finish (bore 0)",
     )
