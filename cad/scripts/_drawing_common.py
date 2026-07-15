@@ -374,6 +374,33 @@ def add_surface_finish(
     return symbol
 
 
+@_telemetry.traced("drawing.centerline", label_param="label")
+def add_view_centerline(
+    adapter: Any,
+    view: Any,
+    *,
+    face_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Insert the axis centerline of a cylindrical face shown in ``view``.
+
+    A rectangular side view of a turned part is ambiguous without its axis
+    (which pair of edges is the end faces vs the OD silhouette); the ASME
+    centerline disambiguates. The cylinder's straight outline is a SILHOUETTE,
+    not a selectable EDGE, so — per the API's own centerline example — select
+    the cylindrical FACE and let ``InsertCenterLine2`` derive its axis.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    _select_view_entity(adapter, view, "FACE", face_xy, label=label)
+    centerline = adapter._attempt(lambda: ddoc.InsertCenterLine2())
+    if centerline is None:
+        raise RuntimeError(f"failed to insert view centerline ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return centerline
+
+
 @_telemetry.traced("drawing.linked_note", label_param="property_name")
 def add_property_linked_note(
     adapter: Any, property_name: str, x: float, y: float
