@@ -10,6 +10,11 @@ assembly rotates it so +Y points -Z (machine front). Flange y 0..3,
 stud 3..17, wheel hub rides 3..13, collar 13..17. Dimensions:
 cad/DIMENSIONS.md ch. 21 (M6.4, low).
 
+Built as three coaxial extrusions off the Top plane (flange disc, stud,
+tip collar) rather than one revolved profile, so every manufacturing
+diameter and length is a first-class named dimension the curated drawing
+inserts as a model item (see wheel_axle_spec.DRAWING_DIMENSIONS).
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_wheel_axle.py
@@ -22,44 +27,80 @@ import sys
 
 from _common import (
     SketchDims,
-    add_line_chain,
     apply_material,
     check,
-    define_rectilinear_chain,
+    define_circle,
     drive_dimension,
     ensure_fully_defined,
+    extrude_at_offset,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
+)
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from wheel_axle_spec import (
+    COLLAR_DIA,
+    COLLAR_LEN,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FLANGE_DIA,
+    FLANGE_LEN,
+    STUD_DIA,
+    STUD_LEN,
 )
 
 PART_NAME = "wheel-axle"
 MATERIAL = "Plain Carbon Steel"
 
-FLANGE_DIA = 35.0  # seats on the support bar face (low)
-FLANGE_LEN = 3.0
-STUD_DIA = 5.0  # wheel bore O5 rides this (med: wheel part)
-STUD_LEN = 14.0  # flange face -> tip
-COLLAR_DIA = 9.0  # washer + nut, collapsed (low)
-COLLAR_LEN = 4.0  # at the stud tip
+_V_FLANGE = math.pi * (FLANGE_DIA / 2.0) ** 2 * FLANGE_LEN
+_V_STUD = math.pi * (STUD_DIA / 2.0) ** 2 * STUD_LEN
+_V_COLLAR = math.pi * ((COLLAR_DIA / 2.0) ** 2 - (STUD_DIA / 2.0) ** 2) * COLLAR_LEN
+_V_TOTAL = _V_FLANGE + _V_STUD + _V_COLLAR
+
+
+async def _assert_axle_com(adapter, label: str) -> None:
+    """Pin the stack's direction: every extrusion must run +Y off the flange.
+
+    Volume alone cannot tell a flipped extrusion (same material either side of
+    the sketch plane), so assert the centre of mass sits on the axis at the
+    analytic height of the flange->stud->collar stack.
+    """
+    res = await adapter.get_mass_properties()
+    if not res.is_success:
+        raise RuntimeError(f"{label}: get_mass_properties failed: {res.error}")
+    com = [float(v) for v in res.data.center_of_mass]
+    com_y = (
+        _V_FLANGE * FLANGE_LEN / 2.0
+        + _V_STUD * (FLANGE_LEN + STUD_LEN / 2.0)
+        + _V_COLLAR * (FLANGE_LEN + STUD_LEN - COLLAR_LEN / 2.0)
+    ) / _V_TOTAL
+    if abs(com[0]) > 0.05 or abs(com[2]) > 0.05 or abs(com[1] - com_y) > 0.2:
+        raise RuntimeError(
+            f"{label}: centre of mass {com} is off the +Y stack "
+            f"(expected [0, {com_y:.3f}, 0])"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the four stepped diameters + the two
-    # axial lengths. The mm suffix is load-bearing -- this is an INCH document and
-    # the equation manager reads BARE numbers in document units (an unsuffixed 14
-    # = 14 in). Each profile dim below is driven from these via the equation
-    # strings declared at the define call.
+    # Editable knobs (Tools > Equations): the three stepped diameters + the
+    # three axial lengths. The mm suffix is load-bearing -- this is an INCH
+    # document and the equation manager reads BARE numbers in document units
+    # (an unsuffixed 14 = 14 in). Each profile/feature dim below is driven from
+    # these via the deferred drive batch.
     await set_global(adapter, "FlangeDia", f"{FLANGE_DIA}mm")
     await set_global(adapter, "FlangeLen", f"{FLANGE_LEN}mm")
     await set_global(adapter, "StudDia", f"{STUD_DIA}mm")
@@ -69,55 +110,67 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Stepped revolve profile about the Y axis (Front sketch).
-    y_tip = FLANGE_LEN + STUD_LEN
-    y_collar = y_tip - COLLAR_LEN
-    profile_dims = SketchDims()
-    check("create_sketch profile", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
+    # Flange: O35 disc on the Top plane (normal +Y), y 0..3. On-axis circle,
+    # so define_circle emits only the diameter dim.
+    flange = SketchDims()
+    check("create_sketch flange", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, FLANGE_DIA / 2.0, "flange section", dims=flange,
+        names=(None, None, "FlangeDia"),
+        drives=(None, None, '"FlangeDia"'),
+    )
+    await ensure_fully_defined(adapter, "flange sketch")
+    check("exit_sketch flange", await adapter.exit_sketch())
+    name_last_feature(adapter, "FlangeProfile")
+    drive_jobs += flange.apply(adapter, "FlangeProfile")
     check(
-        "axis centerline",
-        await adapter.add_centerline(0.0, 0.0, 0.0, y_tip),
+        "extrude flange",
+        await adapter.create_extrusion(ExtrusionParameters(depth=FLANGE_LEN)),
     )
-    profile_pts = [
-        (0.0, 0.0),
-        (FLANGE_DIA / 2.0, 0.0),
-        (FLANGE_DIA / 2.0, FLANGE_LEN),
-        (STUD_DIA / 2.0, FLANGE_LEN),
-        (STUD_DIA / 2.0, y_collar),
-        (COLLAR_DIA / 2.0, y_collar),
-        (COLLAR_DIA / 2.0, y_tip),
-        (0.0, y_tip),
-    ]
-    profile = await add_line_chain(adapter, profile_pts)
-    set_sketch_direct_db(adapter, False)
-    # The centerline merged into the (0, 0)/(0, y_tip) profile corners at
-    # creation, so the closed chain's own constraints define it too.
-    # Emission order = the per-segment distance dims in line order, skipping the
-    # last segment of each direction (closure supplies it): flange-radius (H),
-    # flange-length (V), flange->stud step (H), stud run (V), stud->collar step
-    # (H), collar-length (V). Anchor vertex 0 is the origin -> no anchor dims.
-    await define_rectilinear_chain(
-        adapter, profile, profile_pts, label="axle", dims=profile_dims,
-        names=["FlangeRadius", "FlangeLength", "FlangeStudStep",
-               "StudRunLength", "StudCollarStep", "CollarLength"],
-        drives=['"FlangeDia" / 2', '"FlangeLen"', '("FlangeDia" - "StudDia") / 2',
-                '"StudLen" - "CollarLen"', '("CollarDia" - "StudDia") / 2',
-                '"CollarLen"'],
-    )
-    await ensure_fully_defined(adapter, "axle profile")
-    check("exit_sketch profile", await adapter.exit_sketch())
-    name_last_feature(adapter, "AxleProfile")
-    drive_jobs += profile_dims.apply(adapter, "AxleProfile")
-    check("revolve axle", await adapter.create_revolve(RevolveParameters(angle=360.0)))
-    name_last_feature(adapter, "Axle")
+    name_last_feature(adapter, "Flange")
+    flange_dims = name_dimensions(adapter, "Flange", ["FlangeLength"])
+    drive_jobs += [(flange_dims[0], '"FlangeLen"')]
+    await volume_check(adapter, "flange", _V_FLANGE, 0.005 * _V_FLANGE)
 
-    expected = math.pi * (
-        (FLANGE_DIA / 2.0) ** 2 * FLANGE_LEN
-        + (STUD_DIA / 2.0) ** 2 * (STUD_LEN - COLLAR_LEN)
-        + (COLLAR_DIA / 2.0) ** 2 * COLLAR_LEN
+    # Stud: O5 bearing run from the flange face to the tip (y 3..17), started
+    # at an offset so its length dim IS the flange-face -> tip length.
+    stud = SketchDims()
+    check("create_sketch stud", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, STUD_DIA / 2.0, "stud section", dims=stud,
+        names=(None, None, "StudDia"),
+        drives=(None, None, '"StudDia"'),
     )
-    await volume_check(adapter, "axle", expected, 0.005 * expected)
+    await ensure_fully_defined(adapter, "stud sketch")
+    check("exit_sketch stud", await adapter.exit_sketch())
+    name_last_feature(adapter, "StudProfile")
+    drive_jobs += stud.apply(adapter, "StudProfile")
+    extrude_at_offset(adapter, STUD_LEN, FLANGE_LEN)
+    name_last_feature(adapter, "Stud")
+    stud_dims = name_dimensions(adapter, "Stud", ["StudLength"])
+    drive_jobs += [(stud_dims[0], '"StudLen"')]
+    await volume_check(
+        adapter, "flange+stud", _V_FLANGE + _V_STUD, 0.005 * _V_STUD
+    )
+
+    # Collar: O9 retainer around the stud tip (y 13..17).
+    collar = SketchDims()
+    check("create_sketch collar", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, COLLAR_DIA / 2.0, "collar section", dims=collar,
+        names=(None, None, "CollarDia"),
+        drives=(None, None, '"CollarDia"'),
+    )
+    await ensure_fully_defined(adapter, "collar sketch")
+    check("exit_sketch collar", await adapter.exit_sketch())
+    name_last_feature(adapter, "CollarProfile")
+    drive_jobs += collar.apply(adapter, "CollarProfile")
+    extrude_at_offset(adapter, COLLAR_LEN, FLANGE_LEN + STUD_LEN - COLLAR_LEN)
+    name_last_feature(adapter, "Collar")
+    collar_dims = name_dimensions(adapter, "Collar", ["CollarLength"])
+    drive_jobs += [(collar_dims[0], '"CollarLen"')]
+    await volume_check(adapter, "axle", _V_TOTAL, 0.005 * _V_TOTAL)
+    await _assert_axle_com(adapter, "axle")
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -125,14 +178,25 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven axle (equations neutral)", expected, 0.005 * expected)
+    await volume_check(
+        adapter, "driven axle (equations neutral)", _V_TOTAL, 0.005 * _V_TOTAL
+    )
+    await _assert_axle_com(adapter, "driven axle (equations neutral)")
 
-    # Named stud axis (local Y through the origin = the revolve axis) so the
+    # Named stud axis (local Y through the origin = the stack axis) so the
     # magnifying wheel revolves on it in the M6 mated-DOF assembly.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "stud axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
