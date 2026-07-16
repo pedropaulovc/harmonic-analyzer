@@ -106,7 +106,16 @@ def test_drawing_depends_on_actual_part_execution():
     assert token in drawing["file_dep"]
 
 
-def test_part_execution_identity_is_stable_for_same_artifact(tmp_path, monkeypatch):
+def test_assembly_drawing_depends_on_actual_assembly_execution():
+    dodo = _load_dodo()
+    token = dodo._assembly_execution_token("pen")
+    assembly = next(task for task in dodo.task_assembly() if task["name"] == "pen")
+    drawing = next(task for task in dodo.task_drawing() if task["name"] == "pen_assembly")
+    assert token in assembly["targets"]
+    assert token in drawing["file_dep"]
+
+
+def test_execution_identity_is_stable_for_same_artifact(tmp_path, monkeypatch):
     dodo = _load_dodo()
     part = tmp_path / "part.SLDPRT"
     token = tmp_path / ".part.execution"
@@ -124,11 +133,10 @@ def test_part_execution_identity_is_stable_for_same_artifact(tmp_path, monkeypat
     assert token.read_text() != first
 
 
-def test_part_identity_tracker_migrates_legacy_timestamp(tmp_path, monkeypatch):
+def test_execution_identity_tracker_migrates_missing_and_legacy_tokens(tmp_path):
     dodo = _load_dodo()
     token = tmp_path / ".part.execution"
-    monkeypatch.setattr(dodo, "_part_execution_token", lambda _stem: str(token))
-    tracker = dodo._PartIdentityTracker("part")
+    tracker = dodo._ExecutionIdentityTracker(str(token))
     assert list(inspect.signature(tracker).parameters) == ["task", "values"]
 
     assert tracker(None, {}) is False
@@ -136,6 +144,53 @@ def test_part_identity_tracker_migrates_legacy_timestamp(tmp_path, monkeypatch):
     assert tracker(None, {}) is False
     token.write_text("a" * 64 + "\n")
     assert tracker(None, {}) is True
+
+
+def test_assembly_depends_on_exact_child_execution_identities():
+    """Issue #301: recipe-equal CAD files can carry different PIDs/rebuild stamps."""
+    dodo = _load_dodo()
+    for stem in dodo.ASSEMBLY_ORDER:
+        deps = set(dodo._assembly_file_deps(stem))
+        for ref in dodo.references_of(stem):
+            token = (
+                dodo._assembly_execution_token(ref)
+                if ref in dodo.ASSEMBLY_ORDER
+                else dodo._part_execution_token(ref)
+            )
+            assert token in deps, f"assembly:{stem} lacks exact identity for {ref}"
+
+
+def test_verify_gates_depend_on_exact_assembly_identities():
+    """An identity-only refresh must invalidate persisted verify stamps."""
+    dodo = _load_dodo()
+    soundness = {task["name"]: task for task in dodo.task_verify_soundness()}
+    for stem in dodo.ASSEMBLY_ORDER:
+        assert dodo._assembly_execution_token(stem) in soundness[stem]["file_dep"]
+
+    kinematics = next(task for task in dodo.task_verify() if task["name"] == "kinematics")
+    for stem in ("pen", "magnifier", "paper_drive"):
+        assert dodo._assembly_execution_token(stem) in kinematics["file_dep"]
+
+
+def test_assembly_cache_key_changes_with_child_identity(tmp_path, monkeypatch):
+    """A foreign same-recipe child must miss instead of restoring an incompatible assembly."""
+    dodo = _load_dodo()
+    recipe = tmp_path / "build_parent_assembly.py"
+    child = tmp_path / "child.SLDPRT"
+    token = tmp_path / ".child.execution"
+    recipe.write_text("unchanged recipe\n")
+    child.write_bytes(b"recipe-stable CAD placeholder")
+    token.write_text("a" * 64 + "\n")
+
+    monkeypatch.setattr(dodo, "references_of", lambda _stem: ("child",))
+    monkeypatch.setattr(dodo, "_recipe_files", lambda _stem: [str(recipe)])
+    monkeypatch.setattr(dodo, "_sldprt", lambda _stem: str(child))
+    monkeypatch.setattr(dodo, "_part_execution_token", lambda _stem: str(token))
+
+    first = dodo._cache_key(dodo._assembly_file_deps("parent"))
+    token.write_text("b" * 64 + "\n")
+    second = dodo._cache_key(dodo._assembly_file_deps("parent"))
+    assert first != second
 
 
 def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):

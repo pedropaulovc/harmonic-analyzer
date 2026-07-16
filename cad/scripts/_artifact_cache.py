@@ -4,9 +4,10 @@ The expensive tasks in this pipeline -- ``part:<stem>`` / ``assembly:<stem>`` /
 ``drawing:<stem>`` -- drive a live SolidWorks seat. Their
 outputs are a pure function of *hashed inputs*: a part's ``.SLDPRT`` is determined
 by its build script + helper closure + the cad/config files it reads; an
-assembly's ``.SLDASM`` by its recipe files + the content of the referenced part
-artefacts; and a drawing by its script/assets plus the exact restored part-identity
-token. ``dodo.py`` computes those input sets as each task's ``file_dep``.
+assembly's ``.SLDASM`` by its recipe files + the recipe-stable referenced CAD
+digests + the exact identities of those referenced artefacts; and a drawing by
+its script/assets plus the exact restored part-identity token. ``dodo.py``
+computes those input sets as each task's ``file_dep``.
 
 This module turns that into a *shared* cache: key a task by the content hash of
 its ``file_dep`` (repo-relative, parsed-YAML-normalised -- identical across
@@ -17,11 +18,11 @@ COM; a CI builder with a seat populates the cache for everyone else.
 
 Design notes / invariants:
 
-* **Content-addressed, input-keyed.** We key by INPUTS, never by output bytes.
-  SolidWorks files embed timestamps, so two builds of the same inputs are not
-  byte-identical -- that's fine: any valid build for those inputs is acceptable,
-  and the first one to land wins the key. So the cache never needs reproducible
-  output, only a deterministic input hash.
+* **Content-addressed, input-keyed.** We key by INPUTS, never by the task's own
+  output bytes. Referenced CAD inputs carry execution tokens that identify the
+  exact artefacts whose PIDs/rebuild stamps the output was authored against; pure
+  parent-save byte churn does not restamp them. Thus two valid outputs may differ
+  in timestamp metadata, while incompatible child identities cannot share a key.
 
 * **Repo-relative keys.** ``_digest_files`` in dodo tags by absolute path (correct
   for the local .doit.db, wrong for a shared cache). ``cache_key`` here tags by

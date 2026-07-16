@@ -200,21 +200,14 @@ key and each artefact dep's stored digest once; the build self-heals over one ru
 in place without a rebuild.
 
 > [!NOTE]
-> **Known limitation — recipe ≠ PID identity (gate-guarded).** Keying on inputs is
-> what buys cross-machine cache stability *and* idempotency, but it is blind to a
-> part rebuilt **from scratch with an unchanged recipe** (you `rm` its `.SLDPRT` to
-> force it, or a partial cache mix): SolidWorks reassigns persistent-reference IDs on
-> every from-empty rebuild, so its PIDs churn while the digest holds, the dependent
-> assembly is not refreshed, and `AutoMateRepair` never re-binds → a later open can
-> dangle. This is unfixable *inside* the digest (cross-machine, identical inputs give
-> different PIDs, so PID-sensitivity and a stable cache key are contradictory). It is
-> narrow — the normal `doit build` flow never hits it (a part rebuilds only on a
-> recipe change → digest moves → dependents refresh+heal; or on a missing target in a
-> clean build, where the assembly is FULL-built fresh anyway) — and **not silent**: a
-> dangle fails the `model-healthy-deep`/DOF gates in `verify:soundness` loud. Proper
-> fix (follow-up): force-refresh a part's dependents when its task *actually executed*
-> a local SolidWorks build (new PIDs), as opposed to a cache-restore/up-to-date skip —
-> an orchestration signal that leaves the recipe-based cache key untouched.
+> **Recipe digest and CAD identity are separate signals.** The recipe-derived
+> `.SLDPRT`/`.SLDASM` digest stays byte-churn-immune for idempotent doit freshness,
+> while each built/restored artefact also gets an exact SHA-256 execution token.
+> Assemblies depend on their immediate children’s tokens: a same-recipe from-scratch
+> rebuild (new PIDs) therefore refreshes dependents, and an assembly cache entry only
+> hits against the exact child identities/rebuild stamps it was saved with. Assembly
+> tokens propagate this through subassemblies to the top. Pure parent-save metadata
+> churn does not restamp tokens, so it still cannot create phantom rebuild cascades.
 
 ## Remote build cache (cross-machine)
 
