@@ -33,6 +33,9 @@ Fix in `dodo.py`:
   REFRESH (not FULL when the recipe is unchanged) and changes the cache key.
 - Assembly tokens propagate this identity through subassembly levels to the top
   and to assembly-sourced drawings.
+- Per-assembly soundness stamps and the pen/magnifier/paper-drive kinematics gate
+  also depend on the opened assembly tokens, so an identity-only restore/refresh
+  is always re-gated even though the recipe-derived `.SLDASM` digest is stable.
 - The recipe-derived `_stable_artefact_digest` remains unchanged and immune to
   SolidWorks parent-save metadata churn. Such churn deliberately does not
   restamp execution tokens; the token identifies the CAD/PID lineage, not volatile
@@ -42,4 +45,3 @@ Regression coverage: `test_dodo_recipe.py` pins child-token deps, cache-key
 movement on identity change, token propagation, and assembly-drawing identity;
 `test_pen_assembly_drawing.py` now requires the exact assembly token and rejects a
 part token in its place.
-

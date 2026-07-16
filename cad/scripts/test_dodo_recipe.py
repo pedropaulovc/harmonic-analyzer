@@ -160,6 +160,18 @@ def test_assembly_depends_on_exact_child_execution_identities():
             assert token in deps, f"assembly:{stem} lacks exact identity for {ref}"
 
 
+def test_verify_gates_depend_on_exact_assembly_identities():
+    """An identity-only refresh must invalidate persisted verify stamps."""
+    dodo = _load_dodo()
+    soundness = {task["name"]: task for task in dodo.task_verify_soundness()}
+    for stem in dodo.ASSEMBLY_ORDER:
+        assert dodo._assembly_execution_token(stem) in soundness[stem]["file_dep"]
+
+    kinematics = next(task for task in dodo.task_verify() if task["name"] == "kinematics")
+    for stem in ("pen", "magnifier", "paper_drive"):
+        assert dodo._assembly_execution_token(stem) in kinematics["file_dep"]
+
+
 def test_assembly_cache_key_changes_with_child_identity(tmp_path, monkeypatch):
     """A foreign same-recipe child must miss instead of restoring an incompatible assembly."""
     dodo = _load_dodo()

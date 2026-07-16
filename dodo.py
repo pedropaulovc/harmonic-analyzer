@@ -1574,7 +1574,12 @@ def task_verify_soundness():
     for stem in ASSEMBLY_ORDER:
         name = stem.replace("_", "-")
         sldasm = Path(_sldasm(stem))
-        deps = [str(VERIFY_PY), str(POSTBUILD_PY), str(sldasm)]
+        deps = [
+            str(VERIFY_PY),
+            str(POSTBUILD_PY),
+            str(sldasm),
+            _assembly_execution_token(stem),
+        ]
         if stem == "paper_drive":
             deps.append(str(sldasm.parent / f".{sldasm.stem}.dof.json"))
         stamp = str(REPORTS / f"verify-soundness-{name}.ok")
@@ -1606,17 +1611,20 @@ def task_verify():
         # into soundness, which already opens `channel` (see verify._verify_static_one).
         "kinematics": [
             _sldasm("pen"),
+            _assembly_execution_token("pen"),
             # The magnifier live-chain sweep (verify._verify_live_chain_one)
             # opens magnifier.SLDASM and authors its recorded lever drive spec
             # transiently; without this dep a magnifier rebuild would leave a
             # fresh verify-kinematics.ok stamp valid and SKIP the WIRE-1 gates
             # (codex review, PR #177).
             _sldasm("magnifier"),
+            _assembly_execution_token("magnifier"),
             # The paper-feed kinematic proof (verify._verify_paper_feed_one) opens
             # paper-drive.SLDASM and drives the crank; without these deps a paper-drive
             # or probe change would leave a fresh verify-kinematics.ok stamp valid and
             # SKIP the crank->feed gate (codex #189).
             _sldasm("paper-drive"),
+            _assembly_execution_token("paper_drive"),
             # The pen sweep + magnifier chain sweep read these manifests
             # directly (the transient drive specs). Same rationale as
             # soundness's paper-drive manifest dep above (codex #221).
