@@ -167,11 +167,12 @@ def test_save_chokepoint_skips_rebuild_when_solve_state_is_clean() -> None:
     assert calls == []
 
 
-def test_in_place_save_rebuilds_at_the_save_chokepoint() -> None:
+def test_in_place_save_checks_solve_state_at_the_save_chokepoint() -> None:
     source = inspect.getsource(save_assembly_in_place)
-    rebuild = source.index("final_rebuild_before_save(adapter, asm_name, asm)")
+    rebuild = source.index("rebuild_if_needed_before_save(adapter, asm_name, asm)")
     save = source.index("asm.Save3(options, 0, 0)")
     assert rebuild < source.index("asm.GetSaveFlag()") < save
+    assert "final_rebuild_before_save(adapter, asm_name, asm)" not in source
 
 
 def test_fresh_build_checks_solve_state_after_gates_and_view_setup() -> None:
@@ -200,6 +201,58 @@ def test_refresh_dof_gate_uses_saved_manifest(tmp_path, monkeypatch) -> None:
         encoding="utf-8",
     )
     assert_manifest_dof_state(adapter, "free")
+
+
+def test_refresh_dof_gate_can_reuse_an_already_resolved_model(
+    tmp_path, monkeypatch
+) -> None:
+    import _assembly
+
+    rebuilds = []
+    component = SimpleNamespace(
+        Name2="crank-1",
+        IsFixed=False,
+        IsPatternInstance=lambda: False,
+        GetConstrainedStatus=lambda: 2,
+    )
+    adapter = _Adapter()
+    adapter.currentModel.GetComponents = lambda _top_only: [component]
+    adapter.currentModel.ForceRebuild3 = (
+        lambda _top_only: rebuilds.append(True) or True
+    )
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    (tmp_path / ".free.dof.json").write_text(
+        json.dumps({"stem": "free", "specs": [{"verify": ["crank-1", []]}]}),
+        encoding="utf-8",
+    )
+
+    assert_manifest_dof_state(adapter, "free", resolve=False)
+
+    assert rebuilds == []
+
+
+def test_refresh_reuses_one_resolved_state_across_gates_and_save() -> None:
+    import _assembly
+
+    source = inspect.getsource(_assembly.refresh_assembly)
+    assert source.count("final_rebuild_before_save(adapter, asm_name)") == 1
+    assert "assert_manifest_dof_state(adapter, asm_name, resolve=False)" in source
+    assert (
+        "assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)"
+        in source
+    )
+
+
+def test_multi_config_digest_resolves_each_lazy_activation() -> None:
+    import _assembly
+
+    source = inspect.getsource(_assembly.assembly_geometry_digest)
+    assert "async def activate_resolved(cfg: str)" in source
+    assert "await activate_resolved(cfg)" in source
+    assert "await activate_resolved(rest)" in source
+    assert "geometry_digest.resolve_configuration" in source
+    assert "status = saved_rebuild_status(adapter)" in source
+    assert "if status != 0" in source
 
 
 def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) -> None:

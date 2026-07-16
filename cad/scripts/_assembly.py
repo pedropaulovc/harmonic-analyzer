@@ -1987,19 +1987,25 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
 }
 
 
-def assert_manifest_dof_state(adapter: Any, asm_name: str) -> None:
+def assert_manifest_dof_state(
+    adapter: Any,
+    asm_name: str,
+    *,
+    resolve: bool = True,
+) -> None:
     """Apply the refresh DOF gate that matches the assembly's saved contract.
 
     A non-empty DOF manifest means the assembly intentionally ships with those
     operational freedoms. Prove their exact recorded witness instances remain
     under-constrained; assemblies without a manifest retain the strict 0-DOF gate.
     The exhaustive coupled-family check remains in ``verify:soundness``.
+    ``resolve=False`` reuses a model the caller has already deep-rebuilt.
     """
     path = dof_manifest_path(asm_name)
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        assert_components_fully_defined(adapter)
+        assert_components_fully_defined(adapter, resolve=resolve)
         return
     except (OSError, ValueError, TypeError) as exc:
         raise RuntimeError(f"invalid free-DOF manifest {path}: {exc}") from exc
@@ -2016,6 +2022,7 @@ def assert_manifest_dof_state(adapter: Any, asm_name: str) -> None:
     assert_free_dof_necessity(
         adapter,
         len(specs),
+        resolve=resolve,
         required_instances=tuple(dict.fromkeys(instances)),
         allowed_stems=_ALLOWED_FREE_STEMS.get(asm_name, ()),
     )
@@ -2722,6 +2729,7 @@ def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -
     _telemetry.success(f"solve state already clean before save ({label})")
 
 
+@_telemetry.traced("assembly.geometry_digest", label_param="asm_name")
 async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     """A deterministic fingerprint of an assembly's RESOLVED geometry across every
     configuration: exact-BREP mass properties (mass / volume / surface area / centre
@@ -2757,11 +2765,38 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     # the single-config case (the rest pose is already active after the gates) we
     # read mass properties in place and never activate/re-activate.
     multi = len(configs) > 1
+
+    async def activate_resolved(cfg: str) -> None:
+        """Activate and explicitly solve one config after a lazy switch."""
+        if active_configuration_name(adapter) == cfg:
+            return
+        check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+        with _telemetry.span(
+            "geometry_digest.resolve_configuration", configuration=cfg
+        ) as rsp:
+            rebuilt = adapter._attempt(
+                lambda: adapter.currentModel.ForceRebuild3(False), default=None
+            )
+            status = saved_rebuild_status(adapter)
+            rsp.set_attribute("needs_rebuild", status)
+            if rebuilt is False or rebuilt is None:
+                raise RuntimeError(
+                    f"{asm_name}: ForceRebuild3 failed after activating {cfg!r}"
+                )
+            if status != 0:
+                raise RuntimeError(
+                    f"{asm_name}: configuration {cfg!r} still has "
+                    f"NeedsRebuild2={status} after ForceRebuild3"
+                )
+
     rows: list[Any] = []
     for cfg in configs:
-        if multi and active_configuration_name(adapter) != cfg:
-            check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
-        res = await adapter.get_mass_properties()
+        if multi:
+            await activate_resolved(cfg)
+        async with _telemetry.aspan(
+            "geometry_digest.mass_properties", configuration=cfg
+        ):
+            res = await adapter.get_mass_properties()
         if not res.is_success:
             raise RuntimeError(
                 f"{asm_name}: get_mass_properties failed for config {cfg!r}: "
@@ -2795,19 +2830,25 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
         # top-level components; this walk is ~seconds). Row shape and sort
         # match the per-name form exactly, so the digest VALUE is unchanged.
         asm = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc for GetComponents (same dispatch)
-        comps = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
-        pose_rows = []
-        for comp in comps:
-            a16 = [float(v) for v in _read_member(
-                _read_member(comp, "Transform2"), "ArrayData")]
-            pose_rows.append((
-                str(_read_member(comp, "Name2")),
-                tuple(round(v, 6) for v in a16[0:9]),
-                tuple(round(v, 4) for v in a16[9:12]),
-            ))
+        with _telemetry.span(
+            "geometry_digest.component_poses", configuration=cfg
+        ) as psp:
+            comps = adapter._attempt(
+                lambda: asm.GetComponents(True), default=None
+            ) or []
+            psp.set_attribute("components", len(comps))
+            pose_rows = []
+            for comp in comps:
+                a16 = [float(v) for v in _read_member(
+                    _read_member(comp, "Transform2"), "ArrayData")]
+                pose_rows.append((
+                    str(_read_member(comp, "Name2")),
+                    tuple(round(v, 6) for v in a16[0:9]),
+                    tuple(round(v, 4) for v in a16[9:12]),
+                ))
         rows.extend((cfg, *pr) for pr in sorted(pose_rows))
-    if multi and rest is not None and active_configuration_name(adapter) != rest:
-        check(f"re-activate {rest}", await adapter.set_active_configuration(rest))
+    if multi and rest is not None:
+        await activate_resolved(rest)
     return hashlib.sha256(repr(rows).encode("utf-8")).hexdigest()
 
 
@@ -2942,8 +2983,10 @@ def save_assembly_in_place(
         return
 
     # This is the shared last-mile chokepoint for refreshes, config hooks, and
-    # verify --auto-repair. Nothing geometry-touching may run between it and Save3.
-    final_rebuild_before_save(adapter, asm_name, asm)
+    # verify --auto-repair. The caller may already have deep-rebuilt and then run
+    # read-only gates; trust that resolved state while NeedsRebuild2 stays clean,
+    # but rebuild loud if any intervening operation actually dirtied the solver.
+    rebuild_if_needed_before_save(adapter, asm_name, asm)
 
     if not bool(adapter._attempt(lambda: asm.GetSaveFlag(), default=True)):
         log(f"{sldasm.name} reported clean -- forcing rewrite for md5 propagation")
@@ -3084,9 +3127,12 @@ async def refresh_assembly(
         # Gates -- each already raises a RuntimeError naming the culprit. No
         # fallback: a failure leaves the .SLDASM untouched (the save below
         # never runs).
-        assert_manifest_dof_state(adapter, asm_name)
+        # The explicit final rebuild immediately above established the solved
+        # state. Reuse it across the read-only gates instead of paying two more
+        # whole-model ForceRebuild3 calls (issue #326).
+        assert_manifest_dof_state(adapter, asm_name, resolve=False)
         check_no_interference(adapter)
-        assert_model_healthy(adapter, label=asm_name, deep=True)
+        assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)
     else:
         # No-op reload: the per-config rebuild-fault check above already ran
         # clean, the geometry the gates would inspect is fingerprint-identical
