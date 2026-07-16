@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Parametric CAD model + build pipeline for a Michelson-style harmonic analyzer (SolidWorks-driven, doit-orchestrated)."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 
 # Core: everything the doit pipeline and the SolidWorks-free gates / comparison
 # diff tooling import directly.
@@ -51,6 +51,7 @@ dependencies = [
     "solidworks-mcp-python",
     "pypdfium2>=5.11.0",
     "pypdf>=6.14.2",
+    "meshprobe>=0.2.0",
 ]
 
 [dependency-groups]
