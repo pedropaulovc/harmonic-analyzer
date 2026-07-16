@@ -440,33 +440,51 @@ def _part_execution_token(stem: str) -> str:
     return str((CAD_OUT / "sldprt" / f".{name}.execution").resolve())
 
 
-def _stamp_part_execution(stem: str) -> None:
-    token = Path(_part_execution_token(stem))
-    part = Path(_sldprt(stem))
+def _assembly_execution_token(stem: str) -> str:
+    """Stable identity of the exact assembly artefact built or restored.
+
+    Assembly rebuild state and mate references are persisted against the exact
+    child CAD identities, not merely their recipes. Propagating this token to a
+    parent prevents a same-recipe subassembly from being mixed with a parent that
+    was saved against another SolidWorks identity (issue #301).
+    """
+    name = stem.replace("_", "-")
+    return str((CAD_OUT / "sldasm" / f".{name}.execution").resolve())
+
+
+def _stamp_execution(artefact: str, token_path: str) -> None:
+    token = Path(token_path)
+    source = Path(artefact)
     token.parent.mkdir(parents=True, exist_ok=True)
-    identity = hashlib.sha256(part.read_bytes()).hexdigest()
+    identity = hashlib.sha256(source.read_bytes()).hexdigest()
     token.write_text(identity + "\n", encoding="utf-8")
 
 
-class _PartIdentityTracker:
-    """Migrate legacy timestamp tokens through the normal part cache action.
+def _stamp_part_execution(stem: str) -> None:
+    _stamp_execution(_sldprt(stem), _part_execution_token(stem))
 
-    Returning false makes doit execute the part task once. Its unchanged recipe key
-    should restore the existing part cache entry, then `_stamp_part_execution` writes
-    the exact artifact hash. No cache epoch/key bump or needless CAD rebuild is needed.
+
+def _stamp_assembly_execution(stem: str) -> None:
+    _stamp_execution(_sldasm(stem), _assembly_execution_token(stem))
+
+
+class _ExecutionIdentityTracker:
+    """Require a valid exact-artefact identity token before treating a task as current.
+
+    Returning false makes doit execute the normal cache action once. A hit restores
+    the existing artefact, then the action stamps its exact identity. This migrates
+    legacy part tasks and introduces assembly tokens without a cache epoch bump.
     """
 
-    def __init__(self, stem: str):
-        self.stem = stem
+    def __init__(self, token_path: str):
+        self.token_path = token_path
 
     def __call__(self, task, values) -> bool:
         # doit injects these arguments by their RESERVED NAMES. Keep `task` and
         # `values` even though this validator does not otherwise need them.
         del task, values
         try:
-            identity = Path(_part_execution_token(self.stem)).read_text(
-                encoding="utf-8"
-            ).strip()
+            identity = Path(self.token_path).read_text(encoding="utf-8").strip()
         except OSError:
             return False
         return re.fullmatch(r"[0-9a-f]{64}", identity) is not None
@@ -1038,15 +1056,13 @@ def _drawing_file_deps(stem: str) -> list[str]:
     script = spec.script.resolve()
     runtime = [*_helper_deps(script), _submodule_dep()]
     if spec.source_kind == "assembly":
-        # Assembly-sourced drawing: the CAD dep is the built .SLDASM, whose
-        # ContentChecker digest is its producing recipe. Assemblies have no
-        # execution token, so the drawing inherits the documented recipe-vs-PID
-        # identity limitation (AGENTS.md "recipe != PID identity") already
-        # accepted for assemblies over parts: a same-recipe from-scratch
-        # assembly rebuild can strand the drawing's view references; the
-        # drawing task rebuilds on any real recipe change, and a dangling view
-        # is visible on the mandatory render inspection.
-        source_deps: tuple[str, ...] = (_sldasm(spec.part),)
+        # Assembly-sourced drawings need the same exact-identity signal as
+        # part-sourced drawings. The recipe-stable .SLDASM digest preserves
+        # idempotency; its execution token catches a same-recipe rebuild with
+        # new PIDs so the drawing cannot restore against a foreign identity.
+        source_deps: tuple[str, ...] = (
+            _sldasm(spec.part), _assembly_execution_token(spec.part)
+        )
     else:
         source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
     return sorted(
@@ -1105,9 +1121,22 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
 
 
 def _assembly_file_deps(stem: str) -> list[str]:
+    """Assembly recipe/CAD deps plus each referenced artefact's exact identity.
+
+    The raw CAD targets retain the recipe-derived digest used for stable
+    incrementality. The execution-token deps are orthogonal: they change only when
+    a part/subassembly is built or restored as a different SolidWorks artefact, so
+    doit refreshes the dependent assembly and the remote cache cannot serve an
+    assembly saved against incompatible child PIDs/rebuild stamps (issue #301).
+    """
     refs = references_of(stem)
     ref_targets = [_sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs]
-    return [*_recipe_files(stem), *ref_targets]
+    ref_identities = [
+        _assembly_execution_token(r) if r in ASSEMBLY_ORDER
+        else _part_execution_token(r)
+        for r in refs
+    ]
+    return [*_recipe_files(stem), *ref_targets, *ref_identities]
 
 
 def _cache_key(file_deps: list[str], label: str | None = None) -> str:
@@ -1237,26 +1266,11 @@ def _stable_artefact_digest(path: str) -> str | None:
     calls stay O(1) after the first compute. The recipe members are .py/.yaml, so
     this never recurses back into the artefact branch of ``ContentChecker._digest``.
 
-    KNOWN LIMITATION (recipe != PID identity). Keying on inputs is what makes the
-    digest cross-machine-stable (the cache key) and idempotent (no save-churn
-    refresh), but it is deliberately blind to a part being REBUILT FROM SCRATCH with
-    an UNCHANGED recipe -- e.g. you ``rm`` its ``.SLDPRT`` to force it, or a partial
-    cache mix. SolidWorks assigns fresh persistent-reference IDs on every from-empty
-    rebuild, so such a part's PIDs churn while this digest stays put -> a dependent
-    assembly is NOT marked stale, so ``refresh_assembly``/``AutoMateRepair`` does not
-    re-bind, and the next open can dangle the mates that selected the old PIDs.
-    This cannot be closed inside the digest: cross-machine the SAME inputs yield
-    DIFFERENT PIDs, so any PID-sensitive value breaks the cache key, and any
-    cache-stable value is PID-blind -- the two requirements are contradictory. It is
-    narrow and NOT silent: the normal ``doit build`` flow never hits it (a part
-    rebuilds only on a recipe change -> digest moves -> dependents refresh+heal, or
-    on a missing target during a clean build where the assembly is FULL-built fresh
-    anyway), and any resulting dangle fails the ``model-healthy-deep``/DOF gates in
-    ``verify:soundness`` loud. The proper fix is orthogonal to this digest: have
-    doit force-refresh a part's dependents when its build task ACTUALLY EXECUTED a
-    local SolidWorks build (new PIDs) -- as opposed to a cache-restore / up-to-date
-    skip -- which is an orchestration signal that leaves the recipe cache key intact.
-    Tracked as a follow-up; see AGENTS.md "Idempotent" note and PR #103 review."""
+    Recipe identity deliberately remains blind to a same-recipe from-scratch rebuild:
+    that is what makes this digest cross-machine-stable and immune to parent-save byte
+    churn. Exact ``.execution`` tokens carry the orthogonal CAD-identity signal through
+    assembly ``file_dep`` and cache keys, so new PIDs refresh dependents without
+    contaminating this stable digest (issue #301)."""
     key = _artefact_key(path)
     cached = _ARTEFACT_DIGEST_MEMO.get(key)
     if cached is not None:
@@ -1294,7 +1308,7 @@ def task_part():
             "name": stem,
             "file_dep": _part_file_deps(script, stem),
             "targets": [_sldprt(stem), _part_execution_token(stem)],
-            "uptodate": [_PartIdentityTracker(stem)],
+            "uptodate": [_ExecutionIdentityTracker(_part_execution_token(stem))],
             # Remote-cache shortcut + COM seat lock wrap the build (_cached_part_action).
             "actions": [(_cached_part_action, [stem, script])],
             "clean": True,
@@ -1389,6 +1403,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
 
         if _cache.restore(cache_key, cache_outputs, label):
             sp.set_attribute("cache", "hit")
+            _stamp_assembly_execution(stem)
             _record_recipe_digest()
             return
 
@@ -1399,6 +1414,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
             # operate on the just-built model without another COM task interleaving.
             if _cache.restore(cache_key, cache_outputs, label):
                 sp.set_attribute("cache", "hit-after-wait")
+                _stamp_assembly_execution(stem)
                 _record_recipe_digest()
                 return
             sp.set_attribute("cache", "miss")
@@ -1426,6 +1442,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
                       f"REFRESH {stem}", log_stem=f"assembly-{stem}")
             # _exec raised if the build failed, so we only get here on success: record
             # this build's recipe digest for the next run's FULL/REFRESH decision.
+            _stamp_assembly_execution(stem)
             _record_recipe_digest()
         # Publish the fresh artefacts for other machines OUTSIDE the seat (an Azure
         # upload is network, not COM). RECOMPUTE the output set here, not reuse the one
@@ -1480,6 +1497,7 @@ def _clean_assembly(stem):
     task's declared target, so a stale stretchNN body would otherwise be reused on
     the next build; codex review #4)."""
     _force_remove(Path(_sldasm(stem)))
+    _force_remove(Path(_assembly_execution_token(stem)))
     _force_remove(_recipe_sidecar(stem))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
     if stem == "channel":
@@ -1496,10 +1514,6 @@ def task_assembly():
     parts changed -> refresh).
     """
     for stem in ASSEMBLY_ORDER:
-        refs = references_of(stem)
-        ref_targets = [
-            _sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs
-        ]
         # Recipe = the files whose change forces a FULL rebuild (re-insert/re-mate)
         # vs a part-only refresh: the assembly script, its hooks, its helper
         # closure, AND the config docs THIS assembly reads (a placement like
@@ -1510,9 +1524,12 @@ def task_assembly():
         recipe_files = _recipe_files(stem)
         yield {
             "name": stem,
-            "file_dep": [*recipe_files, *ref_targets],
-            "targets": [_sldasm(stem)],
-            "uptodate": [_RecipeTracker(stem, recipe_files)],
+            "file_dep": _assembly_file_deps(stem),
+            "targets": [_sldasm(stem), _assembly_execution_token(stem)],
+            "uptodate": [
+                _RecipeTracker(stem, recipe_files),
+                _ExecutionIdentityTracker(_assembly_execution_token(stem)),
+            ],
             # No spine: ordering (parts + sub-assemblies before this one) comes from
             # the real file_dep on their targets above; SolidWorks serialization is
             # the COM seat lock inside build_or_refresh.

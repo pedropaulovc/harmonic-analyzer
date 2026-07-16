@@ -77,15 +77,13 @@ landed with the shared infrastructure on branch `draw-assembly-infra`.
 
 4. **The doit task comes for free.** `dodo._drawing_file_deps` keys an
    assembly-sourced drawing on the `.SLDASM` recipe (script + helper closure +
-   full submodule digest + template). There is no assembly execution token:
-   the drawing inherits the documented recipe-vs-PID identity limitation
-   (AGENTS.md "recipe ≠ PID identity") — a same-recipe from-scratch assembly
-   rebuild can strand view references; it rebuilds on any real recipe change
-   and a dangle is visible on the mandatory render inspection.
+   full submodule digest + template) plus the assembly execution token. The
+   recipe digest remains byte-churn-immune, while the token invalidates the
+   drawing after a same-recipe from-scratch assembly rebuild with new PIDs.
 
 5. **An offline contract test** `test_pen_assembly_drawing.py`-style:
-   registry row, output paths, `_drawing_file_deps` shape (SLDASM in, no
-   `.execution` token), task targets, BOM list vs the build script.
+   registry row, output paths, `_drawing_file_deps` shape (SLDASM + exact
+   `.execution` token in), task targets, BOM list vs the build script.
 
 ## Build / iterate loop
 

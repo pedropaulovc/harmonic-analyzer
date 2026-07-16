@@ -43,11 +43,12 @@ def test_part_rows_keep_their_part_source() -> None:
         assert spec.source.as_posix().endswith(f"/out/sldprt/{spec.artifact_stem}.SLDPRT")
 
 
-def test_dodo_deps_use_the_sldasm_recipe_not_a_part_token() -> None:
+def test_dodo_deps_use_the_sldasm_recipe_and_exact_assembly_token() -> None:
     dodo = _load_dodo()
     deps = dodo._drawing_file_deps("pen_assembly")
     assert any(dep.replace("\\", "/").endswith("/out/sldasm/pen.SLDASM") for dep in deps)
-    assert not any(dep.endswith(".execution") for dep in deps)
+    assert dodo._assembly_execution_token("pen") in deps
+    assert dodo._part_execution_token("pen") not in deps
     assert any(dep.endswith("harmonic-analyzer.DRWDOT") for dep in deps)
     # Regression: part drawings keep their execution-token identity dep.
     part_deps = dodo._drawing_file_deps("fulcrum_shaft")
