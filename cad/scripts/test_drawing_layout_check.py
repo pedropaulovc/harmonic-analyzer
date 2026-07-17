@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 import _drawing_common as drawing_common
 from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
@@ -527,8 +529,87 @@ def test_surface_finish_box_matches_the_measured_symbol_anatomy():
     assert element.xmax - element.xmin > 2 * (element.ymax - element.ymin)
 
 
-def test_datum_and_control_frame_stay_centred_on_their_anchor():
-    """Only the surface-finish symbol is asymmetric; the others are centred."""
+def _gdt_with_geometry(x, y, kind, label, lines=(), triangles=()):
+    """A GD&T annotation whose GetSpecificAnnotation exposes real primitives.
+
+    Mirrors the COM shapes exactly: GetLineAtIndex -> [lineType, startPt[3],
+    endPt[3]], GetTriangleAtIndex -> [vtx1[3], vtx2[3], vtx3[3], isFilled,
+    lineType].
+    """
+    spec = SimpleNamespace(
+        GetLineCount=lambda: len(lines),
+        GetLineAtIndex=lambda i: [1.0, *lines[i][0], 0.0, *lines[i][1], 0.0],
+        GetArcCount=lambda: 0,
+        GetArcAtIndex=lambda i: None,
+        GetTriangleCount=lambda: len(triangles),
+        GetTriangleAtIndex=lambda i: [
+            c for v in triangles[i] for c in (*v, 0.0)
+        ] + [1.0, 1.0],
+    )
+    annotation = SimpleNamespace(
+        GetPosition=[x, y, 0.0],
+        GetType=lambda k=kind: k,
+        GetName=lambda n=label: n,
+        GetSpecificAnnotation=lambda: spec,
+    )
+    return drawing_common._gdt_element(_FakeAdapter(None), annotation, label, kind)
+
+
+def test_control_frame_is_measured_from_its_rendered_lines():
+    """An FCF's box is its real geometry, NOT a square around its anchor.
+
+    The numbers are top-crossbar's position frame as the COM probe read it
+    (2026-07-16): five 7.0mm-tall compartment rectangles spanning x
+    0.1200..0.1616 off anchor (0.1200, 0.0900), plus a leader shoulder and a
+    diagonal leader. Independently confirmed against the render, which measured
+    the same frame at +41.6mm right / -7.1mm down of the anchor.
+    """
+    ax, ay = 0.1200, 0.0900
+    frame = [((ax, ay - 0.0070), (ax, ay)),          # first compartment
+             ((ax, ay), (0.1616, ay)),               # frame top run
+             ((0.1616, ay), (0.1616, ay - 0.0070)),
+             ((0.1616, ay - 0.0070), (ax, ay - 0.0070))]
+    leader = [((0.1137, 0.0865), (ax, 0.0865)),      # shoulder
+              ((0.1137, 0.0865), (0.1049, 0.1268))]  # diagonal
+    el = _gdt_with_geometry(ax, ay, drawing_common._ANNOT_GTOL, "pos",
+                            lines=frame + leader)
+
+    # The FRAME hangs down-right of the anchor (its top-left corner), so the
+    # box's bottom is the frame's bottom...
+    assert el.ymin == pytest.approx(ay - 0.0070)
+    # ...and it reaches the frame's full 41.6mm width. The old +-8mm square
+    # stopped at 0.128 and left ~34mm of frame body unchecked.
+    assert el.xmax == pytest.approx(0.1616)
+    assert el.xmax - ax > 0.030
+    # The box also spans the LEADER (left to 0.1049, up to 0.1268): that is ink
+    # too, and it can cross a border on its own. So the element's ymax is the
+    # leader's apex, NOT the frame's top edge at the anchor.
+    assert el.xmin == pytest.approx(0.1049)
+    assert el.ymax == pytest.approx(0.1268)
+    assert el.ymax > ay
+
+
+def test_datum_tag_box_spans_its_leader_and_triangle():
+    """rocker-arm-support datum A as probed: 7x7mm box + a 12.6mm leader up."""
+    ax, ay = 0.2100, 0.1436
+    box = [((0.2065, 0.1366), (0.2065, ay)), ((0.2065, ay), (0.2135, ay)),
+           ((0.2135, ay), (0.2135, 0.1366)), ((0.2135, 0.1366), (0.2065, 0.1366))]
+    leader = [((ax, 0.1562), (ax, ay))]
+    tri = [((0.2086, 0.1537), (0.2114, 0.1537), (0.2100, 0.1562))]
+    el = _gdt_with_geometry(ax, ay, drawing_common._ANNOT_DATUM, "A",
+                            lines=box + leader, triangles=tri)
+
+    assert el.ymin == pytest.approx(0.1366)   # box bottom
+    assert el.ymax == pytest.approx(0.1562)   # triangle tip at the attachment
+    assert (el.xmin, el.xmax) == pytest.approx((0.2065, 0.2135))
+
+
+def test_unmeasurable_gdt_falls_back_to_the_nominal_square():
+    """No GetSpecificAnnotation (PMI-only) -> keep a coarse box, don't drop it.
+
+    A dropped symbol is worse than a coarse one: it leaves the audit silent on a
+    symbol placed clear off the sheet.
+    """
     half = drawing_common._NOMINAL_GDT_HALF_M
     for kind in (drawing_common._ANNOT_DATUM, drawing_common._ANNOT_GTOL):
         element = _gdt(0.100, 0.200, kind, "tag")

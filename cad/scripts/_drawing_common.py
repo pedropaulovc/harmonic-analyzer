@@ -61,6 +61,16 @@ _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
+# The interface each GD&T kind's geometry actually lives on -- reached via
+# IAnnotation::GetSpecificAnnotation, never off IAnnotation itself.
+_GDT_IFACE = {
+    _ANNOT_DATUM: "IDatumTag",
+    _ANNOT_GTOL: "IGtol",
+    _ANNOT_SFSYM: "ISFSymbol",
+}
+# Fallback only, for an annotation whose geometry cannot be read. Every GD&T
+# symbol that CAN be measured is (see _measured_gdt_box) -- a fixed square is
+# wrong for an FCF by construction, since its width tracks its compartments.
 _NOMINAL_GDT_HALF_M = 0.008
 
 # A SURFACE-FINISH symbol is NOT centred on its anchor, so the symmetric box
@@ -1762,24 +1772,76 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     return LayoutElement(name, "table", x, y - height, x + width, y)
 
 
+def _measured_gdt_box(
+    adapter: Any, annotation: Any, kind: int
+) -> tuple[float, float, float, float] | None:
+    """Box a GD&T symbol from the geometry SolidWorks actually renders.
+
+    ``IDatumTag`` / ``IGtol`` / ``ISFSymbol`` all expose the symbol's real
+    primitives -- ``GetLineAtIndex(i)`` -> ``[lineType, startPt[3], endPt[3]]``,
+    ``GetTriangleAtIndex(i)`` -> ``[vtx1[3], vtx2[3], vtx3[3], isFilled,
+    lineType]``, ``GetArcAtIndex(i)`` -> ``[lineType, startPt[3], endPt[3],
+    centerPt[3], rotationDir]``. Their union is the symbol's ink, leader
+    included, which is exactly the question an OVERFLOW check asks.
+
+    They are NOT on ``IAnnotation``: go through ``GetSpecificAnnotation()``
+    first, or every call raises. (``GetExtent`` is not the route -- the type
+    library declares it on ``IBomTable`` and ``INote`` only, verified against a
+    working ``INote.GetExtent()`` in the same probe run.)
+    """
+    spec = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
+    )
+    if spec is None:
+        return None
+    spec = _sw_type_info.early_bound_or_flag(spec, _GDT_IFACE[kind])
+
+    points: list[tuple[float, float]] = []
+    for count_name, at_name, offsets in (
+        ("GetLineCount", "GetLineAtIndex", ((1, 2), (4, 5))),
+        ("GetArcCount", "GetArcAtIndex", ((1, 2), (4, 5))),
+        ("GetTriangleCount", "GetTriangleAtIndex", ((0, 1), (3, 4), (6, 7))),
+    ):
+        n = adapter._attempt(
+            lambda c=count_name: int(adapter._get_attr_or_call(spec, c) or 0)
+        ) or 0
+        for i in range(n):
+            raw = adapter._attempt(lambda a=at_name, j=i: getattr(spec, a)(j))
+            if not raw:
+                continue
+            v = [float(t) for t in raw]
+            points.extend((v[ix], v[iy]) for ix, iy in offsets if iy < len(v))
+    if not points:
+        return None
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
 def _gdt_element(
     adapter: Any, annotation: Any, name: str, kind: int
 ) -> LayoutElement | None:
-    """Box a native GD&T symbol around its GetPosition anchor.
+    """Box a native GD&T symbol from its rendered geometry where possible.
 
-    Datum tags / feature-control frames / surface-finish symbols expose no real
-    bounding box, so a nominal span is used -- good enough to catch a symbol
-    placed clear off the sheet. Given ``NONE`` collision scope: the nominal box is
-    too coarse to assert an overlap (a datum tag placed beside its own control
-    frame would self-collide), so the symbol is overflow-checked only.
+    Given ``NONE`` collision scope -- a datum tag legitimately sits beside its
+    own control frame, so these are overflow-checked only, never overlap-checked.
 
-    The box is per-KIND because the anchor's meaning is per-kind. A datum tag and
-    a feature-control frame sit roughly CENTRED on their anchor, so a symmetric
-    square fits. A surface-finish symbol does NOT -- its anchor is the leader's
-    attachment point at the body's bottom-left, so it gets the measured
-    asymmetric box (``_SF_BOX_*``). Boxing it symmetrically put the entire symbol
-    outside its own bounds and let an Ra print over the sheet border with the
-    audit reporting clean.
+    Datum tags and feature-control frames are MEASURED (``_measured_gdt_box``).
+    They have to be: an FCF's anchor is its frame's TOP-LEFT corner and its width
+    grows with compartment count (measured: 41.6 mm for "Ø0.20|A|B|C" vs 32.2 mm
+    for "0.10|A|B", both 7.0 mm tall), so the old symmetric ±8 mm square wasted
+    8 mm above on empty sheet while missing ~34 mm of frame body to the right --
+    a border crossing in an FCF's right half read clean. No fixed box can be
+    right when the width depends on the text.
+
+    A surface-finish symbol keeps its measured ``_SF_BOX_*`` constants, because
+    measuring it would be WORSE: its "Ra 1.6" text overhangs the bar drawn above
+    it by ~1.3 mm, and text is not among the primitives, so a geometry-derived
+    box quietly clips it. The constants were measured off renders (which do show
+    the text) and cover it. Same reason the box is asymmetric at all: the anchor
+    is the leader's attachment at the body's bottom-left, so a symmetric box is
+    the wrong SHAPE, not merely the wrong size, and once let an Ra print over the
+    sheet border with the audit reporting clean.
     """
     position = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetPosition")
@@ -1788,9 +1850,6 @@ def _gdt_element(
         return None
     x, y = float(position[0]), float(position[1])
     if kind == _ANNOT_SFSYM:
-        # Anchor is the symbol's bottom vertex, body up-right -- see the
-        # _SF_BOX_* constants. A symmetric box here is the wrong SHAPE, not
-        # merely the wrong size, and hides the whole body.
         return LayoutElement(
             name,
             "gdt",
@@ -1800,6 +1859,14 @@ def _gdt_element(
             y + _SF_BOX_UP_M,
             scope=CollisionScope.NONE,
         )
+    measured = _measured_gdt_box(adapter, annotation, kind)
+    if measured is not None:
+        x0, y0, x1, y1 = measured
+        return LayoutElement(name, "gdt", x0, y0, x1, y1, scope=CollisionScope.NONE)
+    # No geometry came back (an unexpected kind, or a PMI-only annotation whose
+    # GetSpecificAnnotation is None). Fall back to the nominal square rather than
+    # dropping the symbol from the audit entirely -- a coarse box still catches
+    # one placed clear off the sheet.
     half = _NOMINAL_GDT_HALF_M
     return LayoutElement(
         name, "gdt", x - half, y - half, x + half, y + half, scope=CollisionScope.NONE
