@@ -278,13 +278,19 @@ async def build(adapter: Any) -> dict[str, str]:
     #     (BossRadius / ShaftBoreDia / DimpleDia), and ShaftBoreDia's callout is
     #     ~48 mm wide now that dimension text renders horizontally instead of
     #     stacked vertically; and
-    #   * low enough that the symbol's TEXT, which sits ABOVE the arm (ASME
-    #     Y14.36), clears BossRadius's R8.00 at y=0.162; and far enough left
-    #     that the text ends before the boss circle's left edge (x=0.061)
-    #     instead of printing over its arc.
-    # The text runs RIGHT of the anchor and the symbol arm LEFT of it, so the
-    # usable window here is narrow: the arm still clears the 12.7 mm zone
-    # margin the layout audit enforces.
+    #   * low enough that the symbol's body clears BossRadius's R8.00 at
+    #     y=0.162; and far enough left that its text ends before the boss
+    #     circle's left edge (x=0.061) instead of printing over the arc.
+    #
+    # symbol_xy is the LEADER'S ATTACHMENT POINT -- the bottom vertex of the
+    # triangle -- not the symbol's centre. The whole body draws UP and RIGHT of
+    # it, ~46 x 19 mm: triangle x [ax-0.006, ax+0.006] y [ay, ay+0.011], the
+    # "Ra 1.6" text x [ax+0.013, ax+0.039] y [ay+0.010, ay+0.017], arm at
+    # y ~= ay+0.018. So an anchor at y=0.145 pushed text into R8.00 15 mm above
+    # it, and the arm sets the left edge against the 12.7 mm zone margin.
+    # (Measured across three sheets; an earlier note here claimed the text sits
+    # ABOVE the arm -- it sits just under it. The prediction was right for the
+    # wrong reason.)
     add_surface_finish(
         adapter,
         front,

@@ -58,3 +58,30 @@ every sheet — and it cannot be gated, because dimensions/GD&T expose no
 `GetExtent` (only `INote`/`IBomTable` do), which is why they carry
 `CollisionScope.NONE`. Re-layout is an eye pass. See
 [[drawing-sheet-zone-border]] and [[solidworks-modeling-pitfalls]].
+
+**Ra symbol anatomy — `symbol_xy` is the leader's attachment point, NOT the
+centre.** Measured across three sheets. Relative to `symbol_xy` = (ax, ay), the
+whole body draws UP and RIGHT of the triangle's bottom vertex, which sits exactly
+at (ax, ay): triangle x [ax-0.006, ax+0.006] y [ay, ay+0.011]; "Ra 1.6" text
+x [ax+0.013, ax+0.039] y [ay+0.010, ay+0.017]; arm y ≈ ay+0.018. Footprint
+≈ 46 x 19 mm over [ax-0.007, ax+0.039] x [ay, ay+0.018]. Two consequences the
+gates cannot see: a target ABOVE the anchor draws the leader THROUGH the
+triangle unless it escapes sideways faster than the ~1.8 flank slope, and a
+target UP-RIGHT strikes the leader through the symbol's own text (needs slope
+> ~1.3). So aim for slope in (1.3, 1.8), or simply put the target BELOW the
+anchor — always clean. The pick height, not the symbol position, is the cheap
+knob.
+
+**A datum feature symbol is not freely placeable — the ATTACHED ENTITY decides.**
+`IAnnotation::SetPosition2` sets "the point where the leader hits the symbol",
+and its Remarks restrict a symbol on an edge to "along that edge or extensions of
+that edge", otherwise landing "as near as possible". So: on a STRAIGHT edge, y is
+honoured and x is projected back onto the line; on a CIRCLE the permitted set is
+the circumference, so the tag re-attaches at the circle point NEAREST the symbol
+and prints on the geometry — regardless of the circle's SIZE. Fix a stuck tag by
+picking the circle at the clock position you want (`edge_xy=bore_top` with the
+symbol above — the `draw_pivot_bushing.py` spelling), or by attaching to a
+straight flank in a side view instead. There is no `add_datum_feature` lever:
+datum FEATURE symbols are absent from `SetLeader3`'s support list (only datum
+TARGET symbols are), `IDatumTag::LeaderOrientation` is round-tags-only, and
+`SetDisplayStyle` sets shape, not attachment.
