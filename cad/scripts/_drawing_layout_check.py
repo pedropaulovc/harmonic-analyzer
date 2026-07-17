@@ -45,6 +45,21 @@ real defect (Codex #269):
 
 Every element -- whatever its scope -- is still checked for OVERFLOW, so a
 pictorial view or leadered note mis-placed off the sheet is always caught.
+
+Two further audits keep a print readable rather than merely well-boxed:
+
+* OVERFLOW is measured against the sheet's ZONE FRAME (:class:`DrawableRegion`),
+  not the raw sheet rectangle.  The border/zone band carrying the A/B and 1..4
+  zone labels is reserved by the sheet format, so an element that stops inside
+  the paper but crosses into that band is still a defect.  The region is QUERIED
+  from the live sheet (``ISheet::GetZoneMargin``) -- it is sheet metadata, never
+  a measured constant, so it tracks a template edit automatically.
+* LEADER CROSSINGS (:func:`find_leader_crossings`).  A bounding box cannot see a
+  leader line: the shipped crank-arm sheet ran its ``Ra 1.6`` leader as one long
+  diagonal straight THROUGH the top view to reach the front view's bore, and
+  every box-based check passed.  A leader may land on the view it annotates (its
+  ``owner``), but crossing any OTHER view's interior is a defect -- fix it by
+  moving the anchor or the text placement.
 """
 
 from __future__ import annotations
@@ -104,6 +119,52 @@ class LayoutElement:
 
 
 @dataclass(frozen=True)
+class DrawableRegion:
+    """The usable sheet region: inside the border/zone band, in sheet meters.
+
+    The sheet format reserves a band around the paper edge for the zone grid
+    (the ``A``/``B`` row labels and ``1``..``4`` column labels) and the border
+    frame.  Content may not cross into it.
+
+    Built by :meth:`from_margins` out of values QUERIED from the live sheet
+    (``ISheet::GetZoneMargin``), so it follows the template rather than
+    duplicating it -- edit the zone margins in the DRWDOT and the gate moves
+    with them, no constant to re-measure.
+    """
+
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
+
+    @classmethod
+    def from_margins(
+        cls,
+        sheet_width: float,
+        sheet_height: float,
+        *,
+        left: float,
+        right: float,
+        bottom: float,
+        top: float,
+    ) -> "DrawableRegion":
+        """The region inside ``ISheet::GetZoneMargin``'s four margins."""
+        region = cls(left, bottom, sheet_width - right, sheet_height - top)
+        if region.xmin >= region.xmax or region.ymin >= region.ymax:
+            raise ValueError(
+                "sheet zone margins leave no drawable region: "
+                f"left={left} right={right} bottom={bottom} top={top} on a "
+                f"{sheet_width} x {sheet_height} m sheet"
+            )
+        return region
+
+    @classmethod
+    def whole_sheet(cls, sheet_width: float, sheet_height: float) -> "DrawableRegion":
+        """The full sheet -- the region when a sheet declares no zone margins."""
+        return cls(0.0, 0.0, sheet_width, sheet_height)
+
+
+@dataclass(frozen=True)
 class Overlap:
     a: LayoutElement
     b: LayoutElement
@@ -129,9 +190,115 @@ class Overflow:
             f"{side} by {amount * 1000:.1f} mm" for side, amount in self.sides
         )
         return (
-            f"{self.element.kind} {self.element.label!r} overflows the sheet: "
-            f"{breaches}"
+            f"{self.element.kind} {self.element.label!r} crosses the sheet zone "
+            f"border: {breaches}"
         )
+
+
+@dataclass(frozen=True)
+class LeaderSegment:
+    """One straight run of an annotation's leader, in sheet meters.
+
+    A bent leader is two segments (elbow + tail); a straight leader is one.
+    ``owner`` is the view the annotation points at -- the leader is EXPECTED to
+    land there, so that view is exempt.
+    """
+
+    label: str
+    kind: str  # the owning annotation's kind: "gdt" | "note" | "dim"
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    owner: str = ""
+
+
+@dataclass(frozen=True)
+class Crossing:
+    segment: LeaderSegment
+    view: LayoutElement
+
+    def describe(self) -> str:
+        return (
+            f"{self.segment.kind} {self.segment.label!r} runs its leader across "
+            f"view {self.view.label!r} -- move the anchor or the text placement"
+        )
+
+
+def _segment_crosses_box(
+    segment: LeaderSegment, box: tuple[float, float, float, float], *, inset: float
+) -> bool:
+    """True if ``segment`` passes through ``box``, shrunk by ``inset``.
+
+    Liang-Barsky clipping.  The box is INSET so a leader that merely grazes a
+    neighbouring view's padded ``GetOutline`` whitespace is not reported -- only
+    a genuine run through the view's interior is.
+    """
+    xmin, ymin, xmax, ymax = box
+    xmin, ymin = xmin + inset, ymin + inset
+    xmax, ymax = xmax - inset, ymax - inset
+    if xmin >= xmax or ymin >= ymax:  # inset collapsed a tiny box
+        return False
+    dx = segment.x1 - segment.x0
+    dy = segment.y1 - segment.y0
+    t0, t1 = 0.0, 1.0
+    for p, q in (
+        (-dx, segment.x0 - xmin),
+        (dx, xmax - segment.x0),
+        (-dy, segment.y0 - ymin),
+        (dy, ymax - segment.y0),
+    ):
+        if p == 0:
+            if q < 0:  # parallel to this edge and outside it
+                return False
+            continue
+        t = q / p
+        if p < 0:
+            if t > t1:
+                return False
+            t0 = max(t0, t)
+        else:
+            if t < t0:
+                return False
+            t1 = min(t1, t)
+    return t0 < t1
+
+
+# How far inside a view's padded outline a leader must run before it counts as
+# crossing it.  ``GetOutline`` pads a few mm of whitespace, so a leader routed
+# cleanly past a neighbouring view can clip the padding without touching any
+# geometry; ~2 mm clears that while a leader driven across a view penetrates by
+# centimetres.
+DEFAULT_CROSSING_INSET_M = 0.002
+
+
+def find_leader_crossings(
+    segments: list[LeaderSegment],
+    elements: list[LayoutElement],
+    *,
+    inset: float = DEFAULT_CROSSING_INSET_M,
+) -> list[Crossing]:
+    """Every leader segment that runs through a view it does not annotate.
+
+    An annotation's leader must reach its own view (``owner``), so that view is
+    skipped.  Any OTHER view's interior is off limits: a leader crossing it is
+    the defect a bounding-box audit structurally cannot see.
+
+    Scope, stated honestly: this compares leaders against view OUTLINES, not
+    against the actual drawn edges inside a view.  It therefore catches a leader
+    driven across a NEIGHBOURING view (the real, repeated defect) and does not
+    attempt to judge a leader's path within its own view -- that needs real
+    geometry, and a wrong call there would be worse than no call.
+    """
+    views = [element for element in elements if element.kind == "view"]
+    crossings: list[Crossing] = []
+    for segment in segments:
+        for view in views:
+            if view.label == segment.owner:
+                continue
+            if _segment_crosses_box(segment, view.box, inset=inset):
+                crossings.append(Crossing(segment, view))
+    return crossings
 
 
 def _penetration(a: LayoutElement, b: LayoutElement) -> tuple[float, float]:
@@ -213,33 +380,41 @@ def find_overlaps(
 
 def find_overflows(
     elements: list[LayoutElement],
-    sheet_width: float,
-    sheet_height: float,
+    region: DrawableRegion,
     *,
     allowance: float = DEFAULT_BOUNDARY_ALLOWANCE_M,
 ) -> list[Overflow]:
-    """Every element whose box runs past the sheet edge by more than its slack.
+    """Every element whose box crosses the sheet's ZONE BORDER past its slack.
 
-    The sheet origin is its lower-left corner (SolidWorks sheet space), so the
-    usable region is ``[-slack, width + slack] x [-slack, height + slack]``.
+    The bound is the sheet's :class:`DrawableRegion` -- the area inside the
+    border/zone band -- NOT the paper rectangle.  The band carries the zone grid
+    labels and the border frame, so an element that stays on the paper but runs
+    into the band is still a defect (it prints over the zone letters and reads as
+    a clipped sheet).
+
     EVERY element is checked -- a pictorial view or leadered callout can still be
     mis-placed off the sheet.  The outward ``allowance`` applies ONLY to ``view``
-    boxes, which ``IView.GetOutline`` pads a millimetre or two past an on-sheet
-    edge; notes / tables / GD&T carry EXACT extents, so they get zero slack and
-    any real off-sheet clip is flagged (Codex #269 thread 7).
+    boxes, which ``IView.GetOutline`` pads a millimetre or two; notes / tables /
+    GD&T carry EXACT extents, so they get zero slack and any real breach is
+    flagged (Codex #269 thread 7).
     """
     overflows: list[Overflow] = []
     for element in elements:
+        # The title-block keep-out is a RESERVED REGION, not content: it is
+        # defined to run to the sheet's bottom-right corner, so measuring it
+        # against the zone frame just re-reports its own definition.
+        if element.kind == "titleblock":
+            continue
         slack = allowance if element.kind == "view" else 0.0
         sides: list[tuple[str, float]] = []
-        if element.xmin < -slack:
-            sides.append(("left", -slack - element.xmin))
-        if element.ymin < -slack:
-            sides.append(("bottom", -slack - element.ymin))
-        if element.xmax > sheet_width + slack:
-            sides.append(("right", element.xmax - (sheet_width + slack)))
-        if element.ymax > sheet_height + slack:
-            sides.append(("top", element.ymax - (sheet_height + slack)))
+        if element.xmin < region.xmin - slack:
+            sides.append(("left", region.xmin - slack - element.xmin))
+        if element.ymin < region.ymin - slack:
+            sides.append(("bottom", region.ymin - slack - element.ymin))
+        if element.xmax > region.xmax + slack:
+            sides.append(("right", element.xmax - (region.xmax + slack)))
+        if element.ymax > region.ymax + slack:
+            sides.append(("top", element.ymax - (region.ymax + slack)))
         if sides:
             overflows.append(Overflow(element, tuple(sides)))
     return overflows
@@ -247,21 +422,28 @@ def find_overflows(
 
 def audit_layout(
     elements: list[LayoutElement],
-    sheet_width: float,
-    sheet_height: float,
+    region: DrawableRegion,
     *,
+    leaders: list[LeaderSegment] | None = None,
     overlap_tol: float = DEFAULT_OVERLAP_TOL_M,
     allowance: float = DEFAULT_BOUNDARY_ALLOWANCE_M,
-) -> tuple[list[Overlap], list[Overflow]]:
-    """Return (overlaps, overflows) for a laid-out sheet."""
+    crossing_inset: float = DEFAULT_CROSSING_INSET_M,
+) -> tuple[list[Overlap], list[Overflow], list[Crossing]]:
+    """Return (overlaps, overflows, leader crossings) for a laid-out sheet."""
     return (
         find_overlaps(elements, overlap_tol=overlap_tol),
-        find_overflows(elements, sheet_width, sheet_height, allowance=allowance),
+        find_overflows(elements, region, allowance=allowance),
+        find_leader_crossings(leaders or [], elements, inset=crossing_inset),
     )
 
 
-def format_findings(overlaps: list[Overlap], overflows: list[Overflow]) -> str:
+def format_findings(
+    overlaps: list[Overlap],
+    overflows: list[Overflow],
+    crossings: list[Crossing] = (),
+) -> str:
     """One human-readable block listing every layout finding."""
     lines = [finding.describe() for finding in overlaps]
     lines += [finding.describe() for finding in overflows]
+    lines += [finding.describe() for finding in crossings]
     return "\n".join(f"  - {line}" for line in lines)

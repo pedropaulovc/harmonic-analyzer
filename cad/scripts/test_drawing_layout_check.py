@@ -19,8 +19,12 @@ from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
     DEFAULT_OVERLAP_TOL_M,
     CollisionScope,
+    DrawableRegion,
     LayoutElement,
+    LeaderSegment,
     audit_layout,
+    format_findings,
+    find_leader_crossings,
     find_overflows,
     find_overlaps,
 )
@@ -28,6 +32,16 @@ from _drawing_layout_check import (
 # ASME B sheet used by every project drawing (meters).
 SHEET_W = 0.4318
 SHEET_H = 0.2794
+
+# The bound used by the pre-zone-border cases: the raw sheet rectangle, so each
+# keeps asserting exactly what it did before the audit gained a zone frame.
+WHOLE_SHEET = DrawableRegion.whole_sheet(SHEET_W, SHEET_H)
+
+# The real ASME B zone frame, cross-checked against the shipped renders: the
+# border/zone band inset measured off every sheet PNG agrees with these margins
+# to within a pixel.
+ZONE_MARGINS = {"left": 0.0159, "right": 0.0095, "bottom": 0.0133, "top": 0.0120}
+ZONE_REGION = DrawableRegion.from_margins(SHEET_W, SHEET_H, **ZONE_MARGINS)
 
 
 class _FakeAdapter:
@@ -90,16 +104,22 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
         GetNextView=None,
     )
     sheet_view = SimpleNamespace(GetNextView=lambda: view, GetTableAnnotations=[])
+    zone = {0: ZONE_MARGINS["top"], 1: ZONE_MARGINS["bottom"],
+            2: ZONE_MARGINS["right"], 3: ZONE_MARGINS["left"]}
     sheet = SimpleNamespace(
-        GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H]
+        GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H],
+        GetZoneMargin=lambda code: zone[code],
     )
     model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
 
-    elements, width, height = drawing_common.collect_layout_elements(
+    elements, leaders, region = drawing_common.collect_layout_elements(
         _FakeAdapter(model)
     )
 
-    assert (width, height) == (SHEET_W, SHEET_H)
+    # The drawable region is QUERIED from the sheet's zone margins, never a
+    # constant: a template whose zone band moves moves the keep-out with it.
+    assert region == ZONE_REGION
+    assert leaders == []
     assert [(element.label, element.kind) for element in elements] == [
         ("Front", "view"),
         ("general-note", "note"),
@@ -115,7 +135,7 @@ def test_disjoint_layout_is_clean():
         _el("V2", 0.18, 0.18, 0.20, 0.23),
         _el("N1", 0.014, 0.089, 0.153, 0.112, kind="note"),
     ]
-    overlaps, overflows = audit_layout(elements, SHEET_W, SHEET_H)
+    overlaps, overflows, crossings = audit_layout(elements, WHOLE_SHEET)
     assert overlaps == []
     assert overflows == []
 
@@ -172,7 +192,7 @@ def test_scope_exempt_element_still_checked_for_overflow():
     note_off = _el(
         "N", -0.03, 0.10, 0.05, 0.12, kind="note", scope=CollisionScope.NON_VIEW
     )
-    overflows = find_overflows([iso_off, note_off], SHEET_W, SHEET_H)
+    overflows = find_overflows([iso_off, note_off], WHOLE_SHEET)
     flagged = {o.element.label: {side for side, _ in o.sides} for o in overflows}
     assert flagged == {"ISO": {"top"}, "N": {"left"}}
 
@@ -184,7 +204,7 @@ def test_overflow_off_each_sheet_edge():
     top = _el("T", 0.10, 0.20, 0.15, SHEET_H + allow + 0.002)
     bottom = _el("Bt", 0.10, -allow - 0.002, 0.15, 0.10)
     inside = _el("I", 0.10, 0.10, 0.15, 0.15)
-    overflows = find_overflows([left, right, top, bottom, inside], SHEET_W, SHEET_H)
+    overflows = find_overflows([left, right, top, bottom, inside], WHOLE_SHEET)
     flagged = {o.element.label: {side for side, _ in o.sides} for o in overflows}
     assert flagged == {
         "L": {"left"},
@@ -199,7 +219,7 @@ def test_view_padding_within_allowance_is_not_overflow():
     # the platen-guide iso view) must NOT be flagged -- the outward allowance
     # absorbs GetOutline padding on a (kind == "view") pictorial box.
     view = _el("V", 0.05, 0.10, 0.15, SHEET_H + 0.0015, scope=CollisionScope.NONE)
-    assert find_overflows([view], SHEET_W, SHEET_H) == []
+    assert find_overflows([view], WHOLE_SHEET) == []
 
 
 def test_exact_note_barely_off_sheet_is_flagged():
@@ -207,11 +227,11 @@ def test_exact_note_barely_off_sheet_is_flagged():
     # boxes; an exact note/table poking even 1 mm past the edge is a real clip in
     # the exported PDF/PNG and must be flagged.
     note = _el("N", 0.05, SHEET_H - 0.02, 0.15, SHEET_H + 0.001, kind="note")
-    (overflow,) = find_overflows([note], SHEET_W, SHEET_H)
+    (overflow,) = find_overflows([note], WHOLE_SHEET)
     assert {side for side, _ in overflow.sides} == {"top"}
     # ... the same 1 mm overhang on a padded VIEW box is absorbed by the allowance.
     view = _el("V", 0.05, SHEET_H - 0.02, 0.15, SHEET_H + 0.001, kind="view")
-    assert find_overflows([view], SHEET_W, SHEET_H) == []
+    assert find_overflows([view], WHOLE_SHEET) == []
 
 
 def test_leadered_callout_collides_with_notes_not_owner_view():
@@ -264,7 +284,7 @@ def test_dimension_is_overflow_only():
     dim_on_view = _el("D", 0.10, 0.18, 0.108, 0.188, kind="dim", scope=CollisionScope.NONE)
     assert find_overlaps([view, dim_on_view]) == []
     dim_off = _el("D2", SHEET_W - 0.002, 0.15, SHEET_W + 0.006, 0.16, kind="dim", scope=CollisionScope.NONE)
-    overflows = find_overflows([dim_off], SHEET_W, SHEET_H)
+    overflows = find_overflows([dim_off], WHOLE_SHEET)
     assert len(overflows) == 1 and "right" in {s for s, _ in overflows[0].sides}
 
 
@@ -307,7 +327,7 @@ def test_gdt_symbol_is_overflow_only():
     note = _el("N", 0.10, 0.185, 0.14, 0.205, kind="note")  # gdt also overlaps a note
     assert find_overlaps([gdt, note]) == []  # nominal box is not overlap-checked
     gdt_off = _el("G2", 0.42, 0.15, 0.44, 0.17, kind="gdt", scope=CollisionScope.NONE)
-    overflows = find_overflows([gdt_off], SHEET_W, SHEET_H)
+    overflows = find_overflows([gdt_off], WHOLE_SHEET)
     assert len(overflows) == 1 and "right" in {s for s, _ in overflows[0].sides}
 
 
@@ -330,7 +350,7 @@ def test_lever_bushing_real_boxes_are_clean():
         _el("N18", 0.01390, 0.08939, 0.15347, 0.11211, kind="note"),
         _el("N19", 0.16970, 0.06440, 0.32193, 0.10529, kind="note"),
     ]
-    overlaps, overflows = audit_layout(elements, SHEET_W, SHEET_H)
+    overlaps, overflows, crossings = audit_layout(elements, WHOLE_SHEET)
     assert overlaps == []
     assert overflows == []
 
@@ -350,6 +370,125 @@ def test_platen_guide_real_boxes_are_clean():
         _el("N47", 0.14373, 0.14067, 0.22163, 0.14522, kind="note"),
         _el("T45", 0.01400, 0.16874, 0.15876, 0.25800, kind="table"),
     ]
-    overlaps, overflows = audit_layout(elements, SHEET_W, SHEET_H)
+    overlaps, overflows, crossings = audit_layout(elements, WHOLE_SHEET)
     assert overlaps == []
     assert overflows == []
+
+
+# --- sheet zone border -------------------------------------------------------
+#
+# The border/zone band carries the frame and the A/B + 1..4 zone labels. Content
+# may sit anywhere on the paper INSIDE that band and nowhere on it.
+
+
+def test_zone_region_is_derived_from_the_sheet_margins():
+    region = DrawableRegion.from_margins(
+        SHEET_W, SHEET_H, left=0.02, right=0.01, bottom=0.015, top=0.005
+    )
+    assert region.xmin == 0.02
+    assert region.ymin == 0.015
+    assert region.xmax == SHEET_W - 0.01
+    assert region.ymax == SHEET_H - 0.005
+
+
+def test_zone_margins_that_swallow_the_sheet_raise():
+    # A nonsense template must fail loud rather than silently audit nothing.
+    try:
+        DrawableRegion.from_margins(
+            SHEET_W, SHEET_H, left=0.3, right=0.3, bottom=0.0, top=0.0
+        )
+    except ValueError as exc:
+        assert "no drawable region" in str(exc)
+    else:
+        raise AssertionError("expected a ValueError for inverted zone margins")
+
+
+def test_note_inside_the_paper_but_on_the_zone_band_is_flagged():
+    # The shipped crank-arm notes block started LEFT of the frame line: on the
+    # paper, on the zone band. The whole-sheet bound cannot see it; the zone
+    # region must.
+    note = _el("notes", 0.008, 0.05, 0.20, 0.09, kind="note")
+    assert find_overflows([note], WHOLE_SHEET) == []
+    (overflow,) = find_overflows([note], ZONE_REGION)
+    assert overflow.sides[0][0] == "left"
+    assert overflow.describe().startswith("note 'notes' crosses the sheet zone border")
+
+
+def test_content_inside_the_zone_frame_is_clean():
+    note = _el("notes", 0.02, 0.05, 0.20, 0.09, kind="note")
+    assert find_overflows([note], ZONE_REGION) == []
+
+
+def test_view_outline_padding_still_gets_slack_at_the_zone_border():
+    # GetOutline pads whitespace, so a legitimately-placed view may poke a
+    # millimetre past the frame; an exact-extent note at the same place may not.
+    over = ZONE_REGION.xmin - 0.001
+    view = _el("V", over, 0.05, 0.20, 0.09, kind="view")
+    assert find_overflows([view], ZONE_REGION) == []
+    note = _el("N", over, 0.05, 0.20, 0.09, kind="note")
+    assert len(find_overflows([note], ZONE_REGION)) == 1
+
+
+# --- leader crossings --------------------------------------------------------
+
+
+def _views():
+    return [
+        _el("Front", 0.10, 0.10, 0.25, 0.18, kind="view"),
+        _el("Top", 0.10, 0.20, 0.25, 0.26, kind="view"),
+    ]
+
+
+def test_leader_across_a_foreign_view_is_flagged():
+    # The real crank-arm defect: the Ra symbol sat above the top view and its
+    # straight leader ran down to the front view's bore, straight through Top.
+    leader = LeaderSegment("Ra 1.6", "gdt", 0.14, 0.28, 0.16, 0.14, owner="Front")
+    (crossing,) = find_leader_crossings([leader], _views())
+    assert crossing.view.label == "Top"
+    assert "runs its leader across view 'Top'" in crossing.describe()
+
+
+def test_leader_landing_on_its_own_view_is_clean():
+    leader = LeaderSegment("dia", "dim", 0.30, 0.14, 0.20, 0.14, owner="Front")
+    assert find_leader_crossings([leader], _views()) == []
+
+
+def test_leader_routed_clear_of_other_views_is_clean():
+    # Same annotation, anchored so the leader approaches Front from the side it
+    # sits on instead of driving through Top: the fix the gate should accept.
+    leader = LeaderSegment("Ra 1.6", "gdt", 0.30, 0.08, 0.24, 0.13, owner="Front")
+    assert find_leader_crossings([leader], _views()) == []
+
+
+def test_leader_grazing_outline_padding_is_not_a_crossing():
+    # Runs along Top's bottom edge, inside the GetOutline whitespace only.
+    leader = LeaderSegment("n", "note", 0.05, 0.2005, 0.30, 0.2005, owner="Front")
+    assert find_leader_crossings([leader], _views()) == []
+
+
+def test_bent_leader_reports_each_segment_that_crosses():
+    # A bent leader is two segments; only the one through Top is a crossing.
+    elbow = LeaderSegment("Ra", "gdt", 0.05, 0.28, 0.14, 0.28, owner="Front")
+    tail = LeaderSegment("Ra", "gdt", 0.14, 0.28, 0.16, 0.14, owner="Front")
+    crossings = find_leader_crossings([elbow, tail], _views())
+    assert [c.view.label for c in crossings] == ["Top"]
+
+
+def test_audit_layout_reports_crossings_alongside_boxes():
+    leader = LeaderSegment("Ra 1.6", "gdt", 0.14, 0.28, 0.16, 0.14, owner="Front")
+    overlaps, overflows, crossings = audit_layout(
+        _views(), ZONE_REGION, leaders=[leader]
+    )
+    assert overlaps == []
+    assert overflows == []
+    assert len(crossings) == 1
+    assert "move the anchor or the text placement" in format_findings(
+        overlaps, overflows, crossings
+    )
+
+
+def test_titleblock_keepout_is_not_border_checked():
+    # The keep-out is a reserved region defined to reach the sheet corner, not
+    # content -- border-checking it would report its own definition forever.
+    title = _el("title-block", 0.264, 0.0, SHEET_W, 0.064, kind="titleblock")
+    assert find_overflows([title], ZONE_REGION) == []

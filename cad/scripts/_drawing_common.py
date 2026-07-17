@@ -18,7 +18,9 @@ import _telemetry
 from _common import _early_bound, check
 from _drawing_layout_check import (
     CollisionScope,
+    DrawableRegion,
     LayoutElement,
+    LeaderSegment,
     audit_layout,
     format_findings,
 )
@@ -72,6 +74,59 @@ _NOMINAL_GDT_HALF_M = 0.008
 # dims (Codex #269 thread 1).
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
+
+# swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
+# is bent: a straight leader runs at whatever angle its anchor-to-text vector
+# happens to take, which is what drove the old Ra symbol's leader diagonally
+# across two views. A bent leader lands its elbow horizontally at the text.
+_LEADER_BENT = 2
+_LEADER_SIDE_SMART = 0
+
+# swUserPreferenceIntegerValue_e.swDetailingDimensionTextAndLeaderStyle and
+# swDisplayDimensionLeaderText_e.swBrokenLeaderHorizontalText.
+#
+# Dimensions do NOT take IAnnotation::SetLeader3 (its documented support list is
+# notes / GTols / surface-finish / weld / datum-target / block instances only);
+# a dimension's leader+text style comes from this DOCUMENT property instead,
+# with IDisplayDimension::SetBrokenLeader2 as the per-dimension override.
+# swBrokenLeaderHorizontalText delivers BOTH requirements at once: the leader is
+# broken (bent) and the text is always horizontal rather than rotated to follow
+# the leader.
+#
+# These ints are READ OFF the installed swconst.tlb, not the published docs: the
+# API reference prints "See System Options and Document Properties" instead of a
+# value for every swUserPreferenceIntegerValue_e / swUserPreferenceOption_e
+# member, and that page documents none of them. Re-read them from the type
+# library (swconst.tlb, SOLIDWORKS Constant type library) rather than guessing
+# if they ever need revisiting.
+_PREF_DIM_TEXT_AND_LEADER_STYLE = 372
+_BROKEN_LEADER_HORIZONTAL_TEXT = 2
+
+# swUserPreferenceOption_e's dimension scopes. Two live-probed facts pin this
+# list, neither of them documented:
+#
+#  * the style REQUIRES a dimension scope -- writing it under
+#    swDetailingNoOptionSpecified(0) returns False and leaves the document on
+#    swSolidLeaderAlignedText(1), the aligned-text default this fix exists to
+#    replace; and
+#  * the umbrella swDetailingDimension(200) does NOT propagate -- after setting
+#    it, every per-type scope still read 1, so a drawing whose dimensions are
+#    linear/radius/diameter would have kept rotated text.
+#
+# So every scope is set explicitly and read back. Values are from swconst.tlb
+# (the docs print no integer for any swUserPreferenceOption_e member).
+_DIM_DETAILING_SCOPES = {
+    "swDetailingDimension": 200,
+    "swDetailingAngleDimension": 201,
+    "swDetailingArcLengthDimension": 202,
+    "swDetailingChamferDimension": 203,
+    "swDetailingDiameterDimension": 204,
+    "swDetailingHoleDimension": 205,
+    "swDetailingLinearDimension": 206,
+    "swDetailingOrdinateDimension": 207,
+    "swDetailingRadiusDimension": 208,
+    "swDetailingAngularRunningDimension": 209,
+}
 
 # A circular 2-character BOM balloon renders ~10-12 mm across at the template
 # font; its GetExtent is leader-polluted (see _note_element), so it gets this
@@ -336,11 +391,28 @@ def add_feature_control_frame(
         "GetAttachedEntityCount3",
         "SetAttachedEntities",
         "SetPosition2",
+        "SetLeader3",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
-    gtol.SetLeader(True, 0, False, False)  # swLeaderSide_e.swLS_SMART
+    # Bent leader: a straight leader runs at whatever angle the anchor-to-frame
+    # vector takes and can cut clean across a neighbouring view.
+    leader_status = int(
+        annotation.SetLeader3(
+            _LEADER_BENT,
+            _LEADER_SIDE_SMART,
+            True,  # smart arrowhead
+            False,  # perpendicular (GTol-only; not wanted here)
+            False,  # all-around
+            False,  # dashed
+        )
+    )
+    if leader_status != 0:
+        raise RuntimeError(
+            f"failed to set a bent leader on the feature-control frame ({label}): "
+            f"SetLeader3 status {leader_status}"
+        )
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     draw.EditRebuild3()
@@ -374,7 +446,7 @@ def add_surface_finish(
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
-        1,  # swLeaderStyle_e.swSTRAIGHT
+        _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
         symbol_xy[0],
         symbol_xy[1],
         0.0,
@@ -400,8 +472,23 @@ def add_surface_finish(
     if str(symbol.GetText(8) or "").strip() != f"Ra {roughness_ra}":
         raise RuntimeError(f"surface-finish roughness did not persist ({label})")
     annotation = _sw_type_info.early_bound_or_flag(
-        symbol.GetAnnotation(), "IAnnotation", "SetPosition2"
+        symbol.GetAnnotation(), "IAnnotation", "SetPosition2", "SetLeader3"
     )
+    leader_status = int(
+        annotation.SetLeader3(
+            _LEADER_BENT,
+            _LEADER_SIDE_SMART,
+            True,  # smart arrowhead
+            False,  # perpendicular (GTol-only)
+            False,  # all-around
+            False,  # dashed
+        )
+    )
+    if leader_status != 0:
+        raise RuntimeError(
+            f"failed to set a bent leader on the Ra {roughness_ra} symbol "
+            f"({label}): SetLeader3 status {leader_status}"
+        )
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position surface-finish symbol ({label})")
     draw.ClearSelection2(True)
@@ -611,6 +698,40 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     return seed_count, instance_count
 
 
+def _pin_dimension_text_and_leader_style(draw: Any) -> None:
+    """Force every dimension on ``draw`` to a bent leader with HORIZONTAL text.
+
+    Set on the DOCUMENT (``IModelDocExtension::SetUserPreferenceInteger``), not
+    the application, so a build can never drift the seat's global preferences.
+
+    This is the only mechanism that reaches dimensions: ``SetLeader3`` covers
+    notes / GD&T / surface-finish symbols but explicitly not dimensions. Read
+    back and raise on mismatch -- the preference's value enum is undocumented
+    (read from swconst.tlb), so a silent no-op is exactly the failure mode to
+    guard against.
+    """
+    for name, option in _DIM_DETAILING_SCOPES.items():
+        ok = draw.Extension.SetUserPreferenceInteger(
+            _PREF_DIM_TEXT_AND_LEADER_STYLE, option, _BROKEN_LEADER_HORIZONTAL_TEXT
+        )
+        applied = int(
+            draw.Extension.GetUserPreferenceInteger(
+                _PREF_DIM_TEXT_AND_LEADER_STYLE, option
+            )
+        )
+        if not ok or applied != _BROKEN_LEADER_HORIZONTAL_TEXT:
+            raise RuntimeError(
+                "failed to pin dimension text/leader style to broken-leader + "
+                f"horizontal-text for {name} (set returned {ok!r}, document "
+                f"reads {applied})"
+            )
+    _telemetry.event(
+        "drawing.dim_text_leader_style",
+        style=_BROKEN_LEADER_HORIZONTAL_TEXT,
+        scopes=len(_DIM_DETAILING_SCOPES),
+    )
+
+
 def new_project_drawing(
     adapter: Any,
     *,
@@ -653,6 +774,7 @@ def new_project_drawing(
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
+    _pin_dimension_text_and_leader_style(draw)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
@@ -1660,13 +1782,16 @@ def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
 
 
 def _iter_view_annotations(adapter: Any, view: Any):
-    """Yield each free ``LayoutElement`` (note, GD&T symbol or dimension) a view owns.
+    """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
     ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
     callouts, notes and GD&T symbols; NOTES (swNote), native GD&T symbols (datum
     tag / feature-control frame / surface-finish) and DISPLAY DIMENSIONS / hole
     callouts (swDisplayDimension) become elements. Tables come from
     ``GetTableAnnotations`` instead.
+
+    The live annotation rides along so the caller can pull its leader geometry
+    (see :func:`_leader_segments_of`) without a second COM walk.
     """
     annotations = adapter._attempt(
         lambda: adapter._get_attr_or_call(view, "GetAnnotations")
@@ -1692,7 +1817,7 @@ def _iter_view_annotations(adapter: Any, view: Any):
         else:
             continue
         if element is not None:
-            yield element
+            yield element, annotation
 
 
 def _iter_tables(adapter: Any, view: Any):
@@ -1721,10 +1846,81 @@ def _iter_tables(adapter: Any, view: Any):
             yield element
 
 
+# swZoneMargin_e -- the four margins reserved by the sheet format's zone band.
+_ZONE_MARGINS = {"top": 0, "bottom": 1, "right": 2, "left": 3}
+
+
+def sheet_drawable_region(
+    adapter: Any, sheet: Any, *, width: float, height: float
+) -> DrawableRegion:
+    """The region inside the sheet's border/zone band, QUERIED from the sheet.
+
+    The zone band is sheet metadata (``ISheet::GetZoneMargin``), so the audit
+    reads it rather than carrying a measured copy: edit the zone margins in the
+    DRWDOT and the keep-out follows automatically.
+
+    A sheet format that declares no zone margins returns 0 for every side; that
+    is reported as the whole sheet rather than treated as an error, so a plain
+    unzoned sheet still audits.
+    """
+    margins: dict[str, float] = {}
+    for side, code in _ZONE_MARGINS.items():
+        value = adapter._attempt(lambda c=code: sheet.GetZoneMargin(c))
+        if value is None:
+            raise RuntimeError(
+                f"cannot read the sheet's {side} zone margin -- the border "
+                "keep-out cannot be audited"
+            )
+        margins[side] = float(value)
+    if not any(margins.values()):
+        _telemetry.warn(
+            "sheet declares no zone margins; auditing against the full sheet"
+        )
+        return DrawableRegion.whole_sheet(width, height)
+    region = DrawableRegion.from_margins(width, height, **margins)
+    _telemetry.event(
+        "drawing.zone_region",
+        left=margins["left"],
+        right=margins["right"],
+        bottom=margins["bottom"],
+        top=margins["top"],
+    )
+    return region
+
+
+def _leader_segments_of(
+    adapter: Any, annotation: Any, *, label: str, kind: str, owner: str
+) -> list[LeaderSegment]:
+    """Every straight run of ``annotation``'s leader(s), in sheet meters.
+
+    ``GetLeaderPointsAtIndex`` returns a flat x,y,z triple stream; consecutive
+    points are joined, so a bent leader yields its elbow AND its tail. The
+    documentation does not state the points' coordinate space -- the sibling
+    ``IAnnotation::GetPosition`` is documented as sheet space and the live
+    probe agrees, which is why the audit compares them against sheet-space
+    ``IView::GetOutline`` boxes.
+    """
+    count = int(adapter._attempt(lambda: annotation.GetLeaderCount(), default=0) or 0)
+    segments: list[LeaderSegment] = []
+    for index in range(count):
+        raw = adapter._attempt(lambda i=index: annotation.GetLeaderPointsAtIndex(i))
+        if not raw:
+            continue
+        values = [float(v) for v in raw]
+        points = [
+            (values[i], values[i + 1]) for i in range(0, len(values) - 2, 3)
+        ]
+        for start, end in zip(points, points[1:]):
+            segments.append(
+                LeaderSegment(label, kind, start[0], start[1], end[0], end[1], owner)
+            )
+    return segments
+
+
 def collect_layout_elements(
     adapter: Any,
-) -> tuple[list[LayoutElement], float, float]:
-    """Gather every free-standing drawing element and the sheet size (meters).
+) -> tuple[list[LayoutElement], list[LeaderSegment], DrawableRegion]:
+    """Gather every drawing element, its leader geometry, and the drawable region.
 
     Elements are:
 
@@ -1742,6 +1938,9 @@ def collect_layout_elements(
     * two reserved KEEP-OUT boxes -- the checked-in title block and its
       projection symbol -- so no content may land on either.
 
+    Also returned: every annotation's LEADER geometry (for the crossing audit)
+    and the sheet's :class:`DrawableRegion`, queried from its zone margins.
+
     Notes owned by the SHEET view are the sheet-format frame + zone labels (at
     the sheet edges by design) and are excluded.
     """
@@ -1756,6 +1955,7 @@ def collect_layout_elements(
     width, height = float(properties[5]), float(properties[6])
 
     elements: list[LayoutElement] = []
+    leaders: list[LeaderSegment] = []
     # Tables are deduped by name: SolidWorks can surface the same table under both
     # its owning view and the sheet, and a duplicated box would self-collide.
     tables: dict[str, LayoutElement] = {}
@@ -1775,11 +1975,20 @@ def collect_layout_elements(
                     scope=_view_scope(adapter, view),
                 )
             )
-        for element in _iter_view_annotations(adapter, view):
+        for element, annotation in _iter_view_annotations(adapter, view):
             # Record the owning view: a NON_VIEW annotation is exempt from
             # colliding with THIS view only, not other drawing views (Codex #269
             # thread 3).
             element = replace(element, owner=name)
+            leaders.extend(
+                _leader_segments_of(
+                    adapter,
+                    annotation,
+                    label=element.label,
+                    kind=element.kind,
+                    owner=name,
+                )
+            )
             # A SMALL note centered inside its owning view is a hole tag / balloon
             # sitting on the geometry -- give it NON_VIEW scope so it does not
             # collide with the view it sits on (but still collides with a free
@@ -1819,34 +2028,42 @@ def collect_layout_elements(
             _TITLE_BLOCK_TOP_M,
         )
     )
-    return elements, width, height
+    region = sheet_drawable_region(adapter, sheet, width=width, height=height)
+    return elements, leaders, region
 
 
 def check_drawing_layout(adapter: Any) -> None:
-    """Fail loud if any two drawing elements collide or one runs off the sheet.
+    """Fail loud on a colliding, border-crossing, or leader-crossed layout.
 
     Runs at the end of every recipe's layout, right before the drawing is saved
     (see :func:`finalize_drawing`), so a print can never ship with a note landed
-    on a view or a table hanging over the border -- defects the dimensional and
-    format gates cannot see.
+    on a view, an element run into the zone border, or a leader driven across a
+    view it does not annotate -- defects the dimensional and format gates cannot
+    see.
     """
     with _telemetry.span("drawing.layout_audit") as span:
-        elements, width, height = collect_layout_elements(adapter)
-        overlaps, overflows = audit_layout(elements, width, height)
+        elements, leaders, region = collect_layout_elements(adapter)
+        overlaps, overflows, crossings = audit_layout(
+            elements, region, leaders=leaders
+        )
         if span is not None:
             span.set_attribute("elements", len(elements))
+            span.set_attribute("leaders", len(leaders))
             span.set_attribute("overlaps", len(overlaps))
             span.set_attribute("overflows", len(overflows))
-        if not overlaps and not overflows:
+            span.set_attribute("crossings", len(crossings))
+        if not overlaps and not overflows and not crossings:
             _telemetry.success(
                 f"drawing layout clean: {len(elements)} elements, "
-                "no overlaps or overflows"
+                f"{len(leaders)} leader segment(s); no overlaps, border "
+                "crossings or leader crossings"
             )
             return
         raise RuntimeError(
             "drawing layout audit failed "
-            f"({len(overlaps)} overlap(s), {len(overflows)} overflow(s)):\n"
-            + format_findings(overlaps, overflows)
+            f"({len(overlaps)} overlap(s), {len(overflows)} border "
+            f"crossing(s), {len(crossings)} leader crossing(s)):\n"
+            + format_findings(overlaps, overflows, crossings)
         )
 
 
