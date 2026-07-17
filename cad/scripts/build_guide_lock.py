@@ -45,7 +45,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-import _config
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 from guide_lock_spec import (
     DRAWING_DIMENSIONS,
@@ -73,10 +72,10 @@ MATERIAL = "Plain Carbon Steel"
 # (Ø3.048, the wizard-table twin of the old Ø3.0 artefact dim; nearest UNC to
 # the ~Ø2.9 screw -- memory/fastener-policy-us-customary).
 HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
-# (minus, plus) mm on the clearance hole's diameter -- cad/config/tolerances.yaml.
-# A SPEC, so it is read from config and never written here; _buildgraph maps
-# _config.fit() to tolerances.yaml so this part rebuilds when the spec moves.
-CLEARANCE_HOLE_TOL = tuple(_config.fit("fastener_clearance", "drill_tolerance_mm"))
+# These #4 CLOSE clearance holes ride the DRILLED HOLES title-block row UOS
+# (+TOL_HOLE_PLUS/-0), like every drilled hole -- no per-feature callout. The
+# hard-zero minus keeps them from being cut under the screw; the +0.10 slop is
+# fine for a hand-cranked brass replica (title_block.yaml drilled_hole).
 
 
 async def build(adapter) -> dict[str, str]:
@@ -133,12 +132,6 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 0.0, -1.0),
         "guide-lock screw holes (#4 clearance)",
         name="ScrewHoles",
-        # The fit rides the PART's hole feature, so the drawing's native callout
-        # displays it. fastener<->clearance-hole is one of the few CRITICAL
-        # interfaces in docs/tolerance-policy.md: the title block's general
-        # +/-0.51 is five times this hole's entire 0.203 clearance and would let
-        # it be cut at 2.54, under the 2.845 screw it must pass.
-        dia_tolerance_mm=CLEARANCE_HOLE_TOL,
     )
     v_holes = len(HOLE_XY) * math.pi * (hole_dia / 2.0) ** 2 * LOCK_THICK
     v_final = v_plate - v_holes

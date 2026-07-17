@@ -27,3 +27,16 @@ linear_2pl: { value_in: 0.02,  display: "±0.51" }   # .XX  (= ±.02 in)
 linear_3pl: { value_in: 0.005, display: "±0.13" }   # .XXX (= ±.005 in)
 angular:    { value_deg: 1.0,  display: "±1°" }
 surface:    { value_uin: 125,  display: "Ra 3.2" }  # µm (= 125 µin), machined finish; text sits above the finish symbol's arm (ASME Y14.36)
+
+# DRILLED HOLES general tolerance — UNILATERAL, not the symmetric ± linear
+# block. A twist drill cuts on-size to oversize and never under, and a clearance
+# hole must never come out under its fastener, so the minus side is a HARD ZERO
+# and the plus side is drill allowance. This is the ASME Y14.5 §1.4(a)
+# supplementary-block general tolerance for a feature class: it governs every
+# drilled hole UOS, so individual clearance holes need no per-feature callout
+# (docs/tolerance-policy.md — only the few critical features carry explicit
+# callouts, via _holes.wizard_holes dia_tolerance_mm when TIGHTER is needed).
+# Stamped as TOL_HOLE_MINUS / TOL_HOLE_PLUS; the title block's DRILLED HOLES row
+# reads them via $PRPSHEET. display_* are magnitudes — the template row supplies
+# the +/- around them.
+drilled_hole: { minus_mm: 0.0, plus_mm: 0.10, display_minus: "0", display_plus: "0.10" }

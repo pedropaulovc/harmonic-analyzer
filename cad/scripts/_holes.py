@@ -211,7 +211,6 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
     return best
 
 
-@_telemetry.traced("feature.hole_wizard", label_param="label")
 def _tolerance_hole_diameter(
     feat: Any, tolerance_mm: tuple[float, float], *, label: str
 ) -> None:
@@ -231,6 +230,11 @@ def _tolerance_hole_diameter(
     permits a 2.54 hole the screw cannot pass. That is why
     docs/tolerance-policy.md lists fastener<->clearance-hole as a CRITICAL
     interface: the general block cannot govern it.
+
+    This is the EXCEPTION hook, not the default path. Every drilled hole already
+    carries the DRILLED HOLES title-block row (unilateral +TOL_HOLE_PLUS/-0) UOS,
+    so a clearance hole needs this only when it wants TIGHTER than that general
+    row (title_block.yaml drilled_hole).
     """
     minus_mm, plus_mm = tolerance_mm
     matches = []
@@ -262,6 +266,7 @@ def _tolerance_hole_diameter(
     )
 
 
+@_telemetry.traced("feature.hole_wizard", label_param="label")
 def wizard_holes(
     adapter,
     spec: HoleSpec,
@@ -375,6 +380,10 @@ def wizard_holes(
     feat = _early_bound(feat, "IFeature")
     _telemetry.debug(f"hole wizard {label}: feature created, placing points")
 
+    # A clearance hole's fit rides the DRILLED HOLES title-block row UOS
+    # (unilateral, hard-zero minus -- a drill cannot cut undersize), so it needs
+    # no per-feature callout. dia_tolerance_mm is the exception hook: pass it only
+    # for a hole that needs TIGHTER than the general row.
     if dia_tolerance_mm is not None:
         _tolerance_hole_diameter(feat, dia_tolerance_mm, label=label)
 

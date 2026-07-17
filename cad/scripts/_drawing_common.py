@@ -675,6 +675,11 @@ def add_native_hole_callout(
 # the linked model so a stale part can't ship blank tolerance cells.
 TITLE_BLOCK_TOLERANCE_PROPERTIES = (
     "TOL_LIN_XX", "TOL_LIN_XXX", "TOL_ANG", "TOL_SURFACE",
+    # The DRILLED HOLES row's two cells. Required like the rest: with holes now
+    # relying on this general tolerance UOS (no per-feature callout), a blank row
+    # would silently drop every clearance hole's fit -- so a stale source part
+    # that predates the TOL_HOLE_* stamp must fail loud here, not ship blank.
+    "TOL_HOLE_MINUS", "TOL_HOLE_PLUS",
 )
 
 
