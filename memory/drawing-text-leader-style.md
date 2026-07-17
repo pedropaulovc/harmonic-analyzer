@@ -74,13 +74,30 @@ but a coincidence:
 
 This table independently CONFIRMS the Ra anatomy measured below ("lower-left
 point" ⇒ up-right body), and it confirms draw-A's measurement that a datum tag's
-requested y lands on the box's BOTTOM edge ("point where leader hits"). It also
-means the `_NOMINAL_GDT_HALF_M` symmetric box in `_drawing_common` is wrong for
-FCFs the same way it was wrong for Ra — an FCF's anchor is its upper-left CORNER,
-so the box wastes 8 mm above and left on empty sheet while the whole ~40 mm body
-("⊕ Ø0.25 A B C") sits outside it to the right and below. Doc-confirmed, NOT yet
-measured — measure before changing the box (see [[drawing-sheet-zone-border]] for
-why measuring beats inferring here).
+requested y lands on the box's BOTTOM edge ("point where leader hits").
+
+**FCF anatomy — MEASURED 2026-07-16, and no fixed box can be right.** Both of
+top-crossbar's frames, read off the render against their requested `frame_xy`:
+
+| frame | left | right | up | down |
+|---|---|---|---|---|
+| `⊕ Ø0.20 A B C` @ (0.112, 0.235) | −2.6 | **+41.6** | +0.1 | −7.1 |
+| `⊥ 0.10 A B` @ (0.115, 0.175) | −2.6 | **+32.2** | +0.1 | −7.1 |
+
+(mm, relative to the anchor.) So the doc is exactly right — **anchor = the box's
+TOP-LEFT corner** (up = +0.1, i.e. the anchor's y IS the top edge), the height is
+a CONSTANT 7.1 mm (the same as a datum tag's box), the −2.6 mm on the left is the
+leader's horizontal entry stub, and **the width VARIES with compartment count**
+(+9.4 mm for the third datum + the Ø prefix).
+
+That kills the `_NOMINAL_GDT_HALF_M` symmetric ±8 mm box for GTOLs the same way
+the Ra box died: it wastes 8 mm above and 5.4 mm left on empty sheet while
+**missing ~34 mm of frame body to the right** — a border crossing or overflow in
+an FCF's right half is invisible to the audit. And because the width is
+content-dependent, the Ra fix's trick (a per-kind constant box) does NOT
+transfer. It needs either a measured extent or a width derived from the frame's
+compartments; `_probe_datum_leader.py` tests `GetExtent` on GTOLs (with a swNote
+as the positive control) to decide which.
 
 **Ra symbol anatomy — `symbol_xy` is the leader's attachment point, NOT the
 centre.** Measured across three sheets, and matching the doc's "lower-left point of
