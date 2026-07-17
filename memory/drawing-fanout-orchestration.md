@@ -80,6 +80,14 @@ are the gate working; the failure mode to watch for is the ABSENCE of a verdict,
 presence. A LEAD VISUAL PASS is still the real gate regardless — see
 [[codex-drawing-image-review]].
 
+**But do not lean on the broken sandbox as the ONLY belt — it is an accident of this
+machine.** Pin `--ignore-user-config --ignore-rules` as well (codex #325): they skip
+`$CODEX_HOME/config.toml` and user/project rules, which is what stops the SessionStart hook
+from firing in the first place, rather than letting it fire and die at the sandbox. That
+makes the isolation intentional and portable to a seat where the sandbox works.
+`comparisons/bench/run.py` pins the same two flags so a benchmark subject cannot vary per
+seat.
+
 **2026-07-15 run outcome:** fanned out ~18 Fable drawing agents in 4 waves; **17 PRs
 landed** (#305-308, #312-324) before Fable hit **96% weekly (critical)** — the wall. The
 finalize-myself pattern (Opus commit+rebase+PR, codex via CLI — neither touches Fable)
@@ -110,7 +118,17 @@ dirties the registry of all remaining PRs, forcing a rebase per merge. Mechanics
   the shared helper the branch's draw script needs is already present from the first merge.
 - One reusable `merge_pr()` bash fn (rebase → resolve registry → `--ours` drawing_common →
   `rebase --continue` loop → verify registry import + pytest → `push --force-with-lease` →
-  WAIT for Codex on the pushed head → `gh pr merge --merge`). Do NOT carry a standing 👍
+  **`uv run python -m doit -n 4` green on the rebased head** → **eye-pass the rebased
+  head's rendered PNGs** → WAIT for Codex on the pushed head → `gh pr merge --merge`).
+  **All THREE AGENTS.md gates apply to every merge in the cascade, not just Codex.** A
+  registry import + the slice's own pytest is NOT the build gate: it proves the module
+  parses and the slice's offline contract holds, and says nothing about whether the other
+  22 drawings still build after this registry rewrite. And the render eye pass is the only
+  gate that sees the two defect families the layout audit is blind to — a datum triangle
+  collapsed inside its own box, and a dimension printed across a note (both are
+  `CollisionScope.NONE`). Skipping either because "the rebase only touched the registry"
+  is the same reasoning the 👍 trap below refutes.
+  Do NOT carry a standing 👍
   across the rebase: it belongs to the pre-rebase commit, and the force-push lands a head
   Codex has never reviewed. "The reviewed draw-script bytes are untouched" is not the gate —
   the gate (AGENTS.md) is a clean Codex review of the LATEST push, and the rebase itself

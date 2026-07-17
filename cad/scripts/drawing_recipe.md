@@ -81,14 +81,24 @@ the repo**, where `--skip-git-repo-check` only skips the safety check — it doe
 stop codex reading `AGENTS.md`, so the review is no longer blind. `mktemp -d` has
 neither failure mode, and `set -e` turns a missing temp dir into a loud stop.
 
+**Isolate the reviewer by CONFIG, not just by cwd.** `--ignore-user-config`
+skips `$CODEX_HOME/config.toml` and `--ignore-rules` skips user/project rules, so
+a seat's persistent hooks, MCP servers and standing instructions cannot bias the
+machinist verdict. Without them the review is only as blind as the seat's config
+happens to be — the SessionStart hook *does* force a memory lookup, and on a seat
+where the sandbox works it would land. `comparisons/bench/run.py` pins the same
+two flags for exactly this reason (a subject must not vary per seat).
+
 **Do NOT add `--sandbox danger-full-access`, and do not "fix" the sandbox errors
-in the transcript.** They are what makes this gate work. On this Windows seat the
+in the transcript.** They are a second, independent belt. On this Windows seat the
 default sandbox fails every shell command
-(`orchestrator_helper_launch_failed: failed to launch setup helper`), so the
-SessionStart hook's memory lookup cannot run and codex never reaches the
-filesystem — the review is genuinely blind. `danger-full-access` (correct for a
-codex task that must read/write, per `memory/codex-windows-sandbox.md`) would
-un-break exactly the exploration this gate exists to prevent. Verified 2026-07-16
+(`orchestrator_helper_launch_failed: failed to launch setup helper`), so codex
+never reaches the filesystem even if something did survive the config flags.
+`danger-full-access` (correct for a codex task that must read/write, per
+`memory/codex-windows-sandbox.md`) would un-break exactly the exploration this
+gate exists to prevent. Do not rely on the broken sandbox ALONE, though: it is an
+accident of this machine, and the config flags are what make the isolation
+intentional and portable. Verified 2026-07-16
 by running the real command on `pivot-shaft_drawing.png` under the default
 sandbox: a complete machinist verdict came back, image-only, and volunteered
 "without the other views, it resembles a rectangular bar" — a reviewer that had
@@ -101,7 +111,8 @@ That is the healthy state. The failure to watch for is the *absence* of a verdic
 mkdir -p "{WORKTREE}/cad/out/reports"
 NEUTRAL=$(mktemp -d) || exit 1
 ( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." \
-  | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check \
+  | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" \
+      --skip-git-repo-check --ignore-user-config --ignore-rules \
       -i "{WORKTREE}/cad/out/png/<artifact-stem>_drawing.png" ) \
   2>&1 | tee "{WORKTREE}/cad/out/reports/codex_machinist_review.txt"
 rmdir "$NEUTRAL"
@@ -192,8 +203,9 @@ Create the manufacturing drawing slice for part **{PART}** by cloning the
 Work ONLY in worktree: {WORKTREE}. Invoke /developing-solidworks FIRST.
 
 Geometry facts (from build_{PART}.py): {GEOMETRY_FACTS}
-DRAWING_DIMENSIONS = {DIM_MAP}          # feature -> {marked dim names}
-artifact_stem = {ARTIFACT_STEM}          # dashed; outputs land at cad/out/{slddrw,pdf,png}/{ARTIFACT_STEM}*
+DRAWING_DIMENSIONS = {DIM_MAP}          # feature -> marked dim names
+artifact_stem = {ARTIFACT_STEM}          # dashed; outputs land at
+                                         # cad/out/slddrw|pdf|png/{ARTIFACT_STEM}*
 
 Do all 6 pieces, then BUILD + ITERATE (always via uv — bare doit/pytest may be missing
 or a stale global install on a machine where only `uv sync` ran):
@@ -213,7 +225,7 @@ Use mktemp -d, NOT $TMPDIR — it is unset here, and `cd ""` either aborts the w
 reads AGENTS.md and the review stops being blind. mkdir the report dir first or tee fails:
   mkdir -p "{WORKTREE}/cad/out/reports"
   NEUTRAL=$(mktemp -d) || exit 1
-  ( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check -i "{WORKTREE}/cad/out/png/{ARTIFACT_STEM}_drawing.png" ) 2>&1 | tee "{WORKTREE}/cad/out/reports/codex_machinist_review.txt"
+  ( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check --ignore-user-config --ignore-rules -i "{WORKTREE}/cad/out/png/{ARTIFACT_STEM}_drawing.png" ) 2>&1 | tee "{WORKTREE}/cad/out/reports/codex_machinist_review.txt"
   rmdir "$NEUTRAL"
   READ the review file back before trusting it. The failure is a transcript with NO verdict
   (only a shell error, because the cd aborted the command). Naming the part is NOT a tell --
