@@ -206,11 +206,18 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="lock rail-mating face",
     )
+    # Symbol sits RIGHT of the plate at bottom-edge height, not under it: the
+    # whole band below the view (y 0.088..0.104) is the nested locator chain
+    # (22.00 / 18.00 / 4.00), and the old (0.148, 0.098) spot put this box
+    # exactly on the 18.00 dimension line's right terminus at x=0.148 -- the
+    # arrow landed inside the box. Nothing else lives right of the plate at this
+    # height (the position FCF is up at y=0.134), so the leader stays short and
+    # horizontal.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + 0.020, BOTTOM_EDGE_Y),
-        symbol_xy=(FRONT_CENTER[0] + 0.028, BOTTOM_EDGE_Y - 0.014),
+        edge_xy=(FRONT_CENTER[0] + 0.038, BOTTOM_EDGE_Y),
+        symbol_xy=(0.184, BOTTOM_EDGE_Y),
         datum="B",
         label="lock guide-side edge",
     )
@@ -253,14 +260,26 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.10",
         label="rail-mating face flatness",
     )
+    # The bent leader elbows at the text's LEFT end, so the text must start just
+    # RIGHT of the hole it points at or the tail rakes back across the view: the
+    # old (0.094, 0.198) centred the ~45 mm wide "2X Ø3.05 THRU ALL" so its
+    # elbow fell at x=0.071, left of hole 1 at x=0.093, and the tail ran as one
+    # long diagonal down across the whole plate face. Centred at 0.117 the text
+    # starts at ~0.094 and the tail drops nearly vertically into the bore.
     add_native_hole_callout(
         adapter,
         front,
         edge_xy=(HOLE_1_X_SHEET, HOLE_Y_SHEET + HOLE_R_SHEET),
-        callout_xy=(0.094, 0.198),
+        callout_xy=(0.117, 0.196),
         label="guide-lock screw holes",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
+    # x=0.020, not the 0.014 that reads as "the zone margin plus a hair": the
+    # sheet's DRAWN border rule sits at 0.0159, not at the 0.0127 margin
+    # ISheet::GetZoneMargin declares, and the note anchor IS the text's left
+    # edge -- measured ink began at 0.0141, i.e. printed straight through the
+    # border line. The audit cannot catch it (it bounds notes by the declared
+    # margin, which is 3.2 mm left of the rule), so this is eye-verified.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.160)
 
     return await finalize_drawing(

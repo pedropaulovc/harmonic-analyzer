@@ -273,11 +273,28 @@ async def build(adapter: Any) -> dict[str, str]:
     # Ra 1.6 on BOTH pen bores (the 2X functional pair) -- add_surface_finish
     # attaches to one edge, so each bore carries its own symbol; a single symbol
     # would leave the other Ø8 bore without the finish requirement.
+    #
+    # Both symbols stack in the empty space RIGHT of the top view. The ▽ tip sits
+    # AT the anchor and the body draws up-right from there (~46 x 19 mm), so the
+    # old shared y=0.240 dropped both glyphs onto the view, whose top edge is
+    # y=0.248; there is no room to lift them (the border cuts in) and the band
+    # under the view is full of bore stations and chamfer/screw callouts.
+    #
+    # The LEFT column cannot take bore 0 either, though it looks empty: the body
+    # would have to clear the DRAWN border rule at 0.0159 (ink >= 0.020, so
+    # ax >= 0.026) AND stop before the view at 0.0658 (ax <= 0.0248) -- an empty
+    # window. Dropping it lower-left instead puts its bore up-RIGHT of the anchor,
+    # the one direction that makes the leader strike through its own text.
+    #
+    # So bore 0 is picked at its TOP rather than a side: from the right, a leader
+    # to its top edge passes ~5 mm ABOVE bore 1 (y=0.2365 vs bore 1's 0.231),
+    # whereas a leader to either of its side edges would run straight through
+    # bore 1. y=0.244 keeps this leader off bore 1's Ra body below (top 0.239).
     add_surface_finish(
         adapter,
         top,
-        edge_xy=bore0_edge,
-        symbol_xy=(0.075, 0.240),
+        edge_xy=(_sheet_x(BORE_X[0]), TOP_CENTER[1] + 0.016),  # bore 0, top edge
+        symbol_xy=(0.205, 0.244),
         roughness_ra="1.6",
         label="pen bore finish (bore 0)",
     )
@@ -286,12 +303,16 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=bore1_edge,
-        symbol_xy=(0.195, 0.240),
+        symbol_xy=(0.205, 0.220),
         roughness_ra="1.6",
         label="pen bore finish (bore 1)",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.070)
+    # x=0.020: the DRAWN border rule is at 0.0159, not the 0.0127 zone margin the
+    # sheet declares, and the anchor is the text's left edge -- 0.014 put the ink
+    # at 0.0141, printing through the rule. The audit bounds notes by the declared
+    # margin, so it cannot see this; eye-verified.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.180)
 
     return await finalize_drawing(

@@ -67,7 +67,21 @@ BOM_COMPONENTS = {
 FRONT_CENTER = (0.070, 0.150)
 RIGHT_CENTER = (0.150, 0.150)
 ISO_CENTER = (0.225, 0.130)
-BOM_ANCHOR = (0.240, 0.272)  # top-left corner, clear of the views and border
+# Top-left corner of a 0.1689 x 0.0669 table (measured off its own rules), and
+# both coordinates are pinned within a few mm.
+#
+# y: bounded by the sheet's ZONE band, not the paper. ISheet::GetZoneMargin
+# reserves 12.7 mm all round, so the drawable region tops out at 0.2667 and a
+# table -- an EXACT extent, given no view-outline slack -- may not cross it. The
+# old 0.272 overhung it by 5.3 mm and failed the border gate outright.
+#
+# x: dropping the table to clear the border pushed its bottom-left corner into
+# the top auto-balloon, which sits at ~(0.239, 0.193) and carries a 6 mm box, so
+# at x=0.240 the balloon ate 4.8 mm of the corner. That leaves a ~5 mm window:
+# right of the balloon's 0.2454 edge, yet left of 0.2502, past which the table's
+# own width runs it off the zone border. Balloons are auto-placed off the iso
+# view, so this tracks that view's position.
+BOM_ANCHOR = (0.248, 0.265)
 
 
 async def build(adapter: Any) -> dict[str, str]:

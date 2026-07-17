@@ -135,13 +135,25 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
         FRONT_CENTER[1],
     )
+    bore_top = (
+        FRONT_CENTER[0],
+        FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
+    )
     half_depth = LENGTH * SHEET_SCALE[0] / 2000.0
     left_end = (RIGHT_CENTER[0] - half_depth, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + half_depth, RIGHT_CENTER[1])
+    # Attach at the bore's TOP, not its 3 o'clock: the symbol is asked for
+    # straight above the bore, and a datum tag on a CIRCULAR edge slides its
+    # attachment to the circle point nearest the symbol. Picking the 3 o'clock
+    # while asking for a 12 o'clock symbol made SolidWorks re-attach at the top
+    # and clamp the box down beside it -- it landed at y~0.222, inside the view,
+    # straddling the annulus and the vertical centerline. Pick and symbol now
+    # agree (the draw_pivot_bushing spelling), so the +0.037 is honored and the
+    # box clears the view's 0.229 top.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=bore_edge,
+        edge_xy=bore_top,
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
         datum="A",
         label="bushing bore axis",
@@ -174,16 +186,29 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("B",),
         label="bushing end-face parallelism",
     )
+    # Sits just right of the front view, level with the bore. From (0.160, 0.225)
+    # the leader ran ~70 mm diagonally back across the whole ring to reach the
+    # bore, tangling with the Ø12.00 and Ø6.50 dimension lines that already meet
+    # at the centre. The symbol draws UP and RIGHT of its anchor (roughly
+    # x+0.039, y+0.019) and the leader leaves the anchor itself, so anchoring
+    # just above/right of the bore keeps the leader short and the body in the
+    # empty band between the views: clear of the Ø6.50 callout below (it ends at
+    # y=0.205), the runout frame above (y=0.251) and the OD-runout leader that
+    # drops down x~0.104..0.115.
     add_surface_finish(
         adapter,
         front,
         edge_xy=bore_edge,
-        symbol_xy=(0.160, 0.225),
+        symbol_xy=(0.120, 0.212),
         roughness_ra="1.6",
         label="bushing bore finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.095)
+    # x=0.020: the DRAWN border rule is at 0.0159, not the 0.0127 zone margin the
+    # sheet declares, and the anchor is the text's left edge -- 0.014 put the ink
+    # at 0.0141, printing through the rule. The audit bounds notes by the declared
+    # margin, so it cannot see this; eye-verified.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.095)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

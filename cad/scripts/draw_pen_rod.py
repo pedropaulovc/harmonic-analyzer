@@ -190,15 +190,47 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="pen-rod bottom end squareness",
     )
+    # Sits RIGHT of the rod and BELOW the right view, reaching back up-left to the
+    # slide face. At (0.0415, 0.165) the body printed "Ra 1.6" straight across the
+    # rod, which is only 5 mm wide at 1:1 and sits at x 0.0675..0.0725.
+    #
+    # The symbol may not go LEFT of the rod, even though that corner is empty: the
+    # leader leaves the ▽ tip AT the anchor and the ~46 mm body draws up-RIGHT of
+    # it (text at x+0.013..x+0.039, y+0.010..y+0.017), so a target up-right forces
+    # the leader to thread between the ▽ and its own text -- steeper than the ▽'s
+    # ~1.8 flank slope is drawn through the glyph, shallower than ~1.9 clips the
+    # text. That window is empty in practice: a 1.5 slope still grazed the "R".
+    # Anchoring right of the rod puts the target up-LEFT instead, so the leader
+    # runs away from the body and the constraint disappears.
+    #
+    # y=0.068 keeps the run under the right view (its box starts at y=0.090, and a
+    # leader through a view it does not annotate fails the crossing gate) and above
+    # the notes at y<=0.062; it also passes below the 115.00 line and the squareness
+    # frame, both of which start at y>=0.095.
     add_surface_finish(
         adapter,
         front,
-        edge_xy=front_side,
-        symbol_xy=(front_side[0] - 0.026, FRONT_CENTER[1] + 0.015),
+        edge_xy=(front_side[0], FRONT_CENTER[1] - 0.050),
+        symbol_xy=(0.170, 0.068),
         roughness_ra="1.6",
         label="pen-rod slide face finish",
     )
 
+    # Stays at 0.014 even though that prints through the DRAWN border rule at
+    # 0.0159 -- unlike every other sheet, this note cannot be moved off it.
+    #
+    # Its first line is one 250.1 mm run, and the gap between that rule and the
+    # title-block keep-out at 0.2672 is 251.1 mm: 1.0 mm of total slack. x=0.020
+    # (the safe anchor elsewhere) drives the tail 2.9 mm into the title block and
+    # fails the audit outright; x=0.017 splits the difference at +1.0 mm from the
+    # rule and +0.1 mm from the title block, which is worse than what it fixes.
+    # It cannot move UP either: the band above is the Ra body, the Section callout
+    # and then the view itself.
+    #
+    # This is the template's fault, not the coordinate's -- the frame is drawn
+    # 3.2 mm left of the 12.7 mm margin it declares. Once the DRWDOT is re-centred
+    # onto its declared margins, 0.014 clears the rule by 1.4 mm and the title
+    # block by 3.1 mm, and this comment can go.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.058)
     add_property_linked_note(adapter, "Top View Note", 0.036, 0.266)
 

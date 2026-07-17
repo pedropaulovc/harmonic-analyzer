@@ -259,19 +259,32 @@ async def build(adapter: Any) -> dict[str, str]:
         label="marker tip runout",
         entity_type="SILHOUETTE",
     )
-    # Below the barrel, clear of the overall-length dimension above the view
-    # (a leader crossing the 60.00 text struck it through on the first pass).
+    # In the band ABOVE the barrel, between the barrel top (0.188) and the 60.00
+    # dimension line (~0.221) -- NOT above that dimension, where an early pass
+    # ran the leader through the 60.00 text and struck it out.
+    #
+    # The leader leaves the anchor at the symbol's ▽ tip and the ▽ opens UPWARD,
+    # so a leader that has to CLIMB to its target is drawn through the glyph (or
+    # along its flank) unless it escapes sideways faster than the ▽'s ~1.8 flank
+    # slope. Anchoring to the TOP silhouette instead makes the leader run DOWN
+    # and away from the body entirely, so it stays short and unambiguous. The
+    # body draws up and RIGHT of the anchor (~x+0.039, y+0.019), which fixes the
+    # 0.196 ceiling here and keeps it clear of the tip-runout frame at x<=0.111.
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] - 0.010, FRONT_CENTER[1] - _HALF_DIA),
-        symbol_xy=(FRONT_CENTER[0] - 0.018, FRONT_CENTER[1] - 0.032),
+        edge_xy=(FRONT_CENTER[0] - 0.024, FRONT_CENTER[1] + _HALF_DIA),
+        symbol_xy=(FRONT_CENTER[0] - 0.016, 0.196),
         roughness_ra="1.6",
         label="barrel bearing finish",
         entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.100)
+    # x=0.020: the DRAWN border rule is at 0.0159, not the 0.0127 zone margin the
+    # sheet declares, and the anchor is the text's left edge -- 0.014 put the ink
+    # at 0.0141, printing through the rule. The audit bounds notes by the declared
+    # margin, so it cannot see this; eye-verified.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
     add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.135)
 
     return await finalize_drawing(
