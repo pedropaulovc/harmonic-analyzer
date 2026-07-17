@@ -37,10 +37,17 @@ SHEET_H = 0.2794
 # keeps asserting exactly what it did before the audit gained a zone frame.
 WHOLE_SHEET = DrawableRegion.whole_sheet(SHEET_W, SHEET_H)
 
-# The real ASME B zone frame, cross-checked against the shipped renders: the
-# border/zone band inset measured off every sheet PNG agrees with these margins
-# to within a pixel.
-ZONE_MARGINS = {"left": 0.0159, "right": 0.0095, "bottom": 0.0133, "top": 0.0120}
+# The zone margins the project DRWDOT actually reports through
+# ISheet::GetZoneMargin: a uniform 12.7 mm (0.5 in) on all four sides, read off
+# a live sheet.
+#
+# These are NOT the template's drawn border frame, which sits at left 15.9 /
+# right 9.5 / bottom 13.3 / top 12.0 mm (measured identically on all 23 rendered
+# sheets). Artwork and metadata disagree in the shipped template; the gate keys
+# on the METADATA, and the template's frame is being corrected to match. Do not
+# "fix" these numbers to the drawn-frame ones -- they would then assert
+# something no sheet reports.
+ZONE_MARGINS = {"left": 0.0127, "right": 0.0127, "bottom": 0.0127, "top": 0.0127}
 ZONE_REGION = DrawableRegion.from_margins(SHEET_W, SHEET_H, **ZONE_MARGINS)
 
 
