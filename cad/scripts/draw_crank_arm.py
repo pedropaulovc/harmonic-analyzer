@@ -271,14 +271,25 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="crank broad-face parallelism",
     )
-    # Placed LEFT of the front view, below the top view's lower edge (0.189):
-    # the symbol used to sit at (0.140, 0.235), above the top view, so its
-    # leader ran diagonally down through the whole top view to reach this bore.
+    # Sits LEFT of the boss and BELOW bore height. Three constraints pin it:
+    #   * not above the top view (its old (0.140, 0.235) spot) -- the leader
+    #     then ran as one long diagonal down across the whole top view;
+    #   * not in the 0.151..0.189 band between the two views -- that is full
+    #     (BossRadius / ShaftBoreDia / DimpleDia), and ShaftBoreDia's callout is
+    #     ~48 mm wide now that dimension text renders horizontally instead of
+    #     stacked vertically; and
+    #   * low enough that the symbol's TEXT, which sits ABOVE the arm (ASME
+    #     Y14.36), clears BossRadius's R8.00 at y=0.162; and far enough left
+    #     that the text ends before the boss circle's left edge (x=0.061)
+    #     instead of printing over its arc.
+    # The text runs RIGHT of the anchor and the symbol arm LEFT of it, so the
+    # usable window here is narrow: the arm still clears the 12.7 mm zone
+    # margin the layout audit enforces.
     add_surface_finish(
         adapter,
         front,
         edge_xy=shaft_edge,
-        symbol_xy=(0.040, 0.170),
+        symbol_xy=(0.022, 0.125),
         roughness_ra="1.6",
         label="shaft bore finish",
     )
