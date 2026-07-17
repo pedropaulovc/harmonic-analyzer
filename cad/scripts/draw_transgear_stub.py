@@ -73,13 +73,20 @@ def _fy(y_mm: float) -> float:
 
 # Diameters stack on the left, land lengths chain on the right; the callout
 # texts sit clear of each other's extension lines (steps at different y).
+#
+# The chain runs at x=0.176 rather than 0.162: the Ra symbol beside the gear
+# seat throws its text out to x~0.171 (the text starts ~13 mm right of the
+# anchor and runs ~26 mm), and at 0.162 the chain's dimension line printed
+# straight through "Ra 1.6". The seat silhouette at x=0.125 leaves too little
+# room to walk the symbol left instead, so the chain moves right; ~7 mm of gap.
+_LENGTH_CHAIN_X = 0.176
 FRONT_KEEP = {
     "BaseDia": (0.052, _fy(BASE_LEN / 2.0)),
     "SeatDia": (0.052, _fy(BASE_LEN + 3.0)),
     "CollarDia": (0.052, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
-    "BaseLength": (0.162, _fy(BASE_LEN / 2.0)),
-    "SeatLength": (0.162, _fy(BASE_LEN + SEAT_LEN / 2.0)),
-    "CollarLength": (0.162, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
+    "BaseLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN / 2.0)),
+    "SeatLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN + SEAT_LEN / 2.0)),
+    "CollarLength": (_LENGTH_CHAIN_X, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
 }
 DIMENSION_CALLOUTS = {"BaseDia": "+0.00/-0.05", "SeatDia": "+0.00/-0.02"}
 # The base is a 3/8" conversion: display 9.525, not a false-precision 9.53.
@@ -189,7 +196,10 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.112)
+    # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
+    # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
+    # is the 12.7 mm zone margin, so it cannot see this).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.112)
 
     return await finalize_drawing(
         adapter,

@@ -50,7 +50,10 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-TOP_CENTER = (0.090, 0.215)
+# The 202 mm bar at the view's 1:2 override is ~101 mm tall, so y=0.215 put its
+# outline 1.4 mm into the top zone band. 0.211 clears it by ~2.6 mm while its
+# lower edge (~0.158) still stays above the TOP VIEW SCALE note at y=0.155.
+TOP_CENTER = (0.090, 0.211)
 FRONT_CENTER = (0.165, 0.135)
 ISO_CENTER = (0.355, 0.200)
 
@@ -59,7 +62,11 @@ TOP_KEEP = {
 }
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.034),
-    "Height": (FRONT_CENTER[0] - 0.035, FRONT_CENTER[1]),
+    # -0.047, not -0.035: datum B's tag sits at x=0.138 (16 mm off the bar's
+    # left face), and the now-horizontal "41.00" text centred on x=0.130 ran
+    # straight through it ("41.0B"). This lane clears the tag by ~5 mm and still
+    # starts right of the top view (which ends at x~0.100).
+    "Height": (FRONT_CENTER[0] - 0.047, FRONT_CENTER[1]),
 }
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -146,7 +153,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=front_bottom,
-        symbol_xy=(FRONT_CENTER[0], front_bottom[1] - 0.016),
+        # Offset in X from the bottom face's midpoint: directly below it the
+        # tag's leader ran down through the 22.00 width text, which is centred
+        # on the same x. From here the leader passes x~0.186 at the dimension
+        # line's height -- outside the bar's right face (0.176) -- so it reaches
+        # the face without touching the dimension.
+        symbol_xy=(FRONT_CENTER[0] + 0.025, front_bottom[1] - 0.016),
         datum="A",
         label="crossbar bottom face",
     )
@@ -197,7 +209,10 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("C",),
         label="crossbar end-seat parallelism",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.090)
+    # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
+    # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
+    # is the 12.7 mm zone margin, so it cannot see this).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.090)
     add_property_linked_note(adapter, "Top View Note", 0.045, 0.155)
     add_native_hole_callout(
         adapter,

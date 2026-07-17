@@ -60,7 +60,11 @@ FRONT_LEFT_X_M = 0.040
 FRONT_VIEW_Y_M = 0.110
 FRONT_HOLE_Y_M = 0.1111
 FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
-HOLE_TABLE_X_M = 0.014
+# 0.020, not 0.014: the sheet's DRAWN frame rule is at x=0.0159, inboard of the
+# 12.7 mm zone margin the audit checks, so a table left edge at 0.0143 passed the
+# gate while printing 1.6 mm over the frame (measured). 0.020 clears the rule
+# whether or not the DRWDOT is later re-centred onto its declared margins.
+HOLE_TABLE_X_M = 0.020
 HOLE_TABLE_Y_M = 0.258
 THREAD_DESIGNATION = "#4-40 UNC-2B"
 THREAD_MAJOR_DIA_MM = 2.845
@@ -109,7 +113,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Front", 0.190, FRONT_VIEW_Y_M, scale=(1, 1)
     )
     right = place_view(adapter, str(SOURCE), "*Right", 0.370, 0.110, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.210, scale=(1, 1))
+    # A 300 mm bar drawn isometrically at the 1:1 sheet scale spans ~237 x 133 mm,
+    # so this view's outline nearly fills the sheet's upper half: at y=0.210 its
+    # top ran 11.2 mm into the 12.7 mm zone band. Dropped to 0.196 (~2.8 mm of
+    # top clearance). It cannot shrink instead -- a view at a scale other than
+    # the sheet's must be labelled, and the only note helpers are property-linked
+    # (this part declares no "Isometric View Note"); nor move left (the hole
+    # table ends at x=0.159) or right (its box already reaches x~0.410 against
+    # the 0.4191 margin).
+    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.196, scale=(1, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -162,7 +174,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=datum_a_edge,
-        symbol_xy=(0.350, 0.132),
+        # Level with the face it names, in the 25 mm gap between the front view's
+        # end (x=0.340) and the right view (x=0.365), so the leader is short and
+        # horizontal and its arrow lands ON the face. Below the view instead, the
+        # arrow ran onto the 10.00 dimension's extension line ~22 mm down, where
+        # a datum tag reads as the center plane rather than the surface. The box
+        # top (y=0.118) still clears the isometric's outline at y=0.131.
+        symbol_xy=(0.352, 0.110),
         datum="A",
         label="platen-mating face",
     )
@@ -186,7 +204,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=datum_a_edge,
-        frame_xy=(0.325, 0.145),
+        # Was (0.325, 0.145) -- under the isometric, so its leader ran across
+        # that view. Below the view instead; the leader reaches the face at
+        # y=0.110 while staying under the front view's lower edge (y=0.104).
+        frame_xy=(0.312, 0.092),
         characteristic="flatness",
         tolerance="0.10",
         label="platen-mating face flatness",
@@ -195,7 +216,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=(0.375, 0.110),
-        frame_xy=(0.382, 0.145),
+        # Below-right of the view (was (0.382, 0.145), under the isometric).
+        # x=0.400 keeps the frame's 8 mm half-box inside the 0.4191 right margin
+        # and clear of the 5.00 height dimension at (0.385, 0.110).
+        frame_xy=(0.400, 0.086),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
@@ -213,7 +237,10 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="9X",
         label="guide hole-pattern position",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.075)
+    # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
+    # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
+    # is the 12.7 mm zone margin, so it cannot see this).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
     return await finalize_drawing(
         adapter, OUTPUTS, pdf_title="Platen Guide Manufacturing Drawing"

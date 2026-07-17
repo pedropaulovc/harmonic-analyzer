@@ -60,7 +60,11 @@ _TOTAL_LEN = FLANGE_LEN + STUD_LEN
 # Front view: the profile (axle axis vertical, flange at the bottom).
 # End view: the tip-side circles, third-angle above the front view.
 FRONT_CENTER = (0.105, 0.100)
-END_CENTER = (0.105, 0.215)
+# The O35 flange at 3:1 makes this view a 105 mm circle, so y=0.215 ran its
+# outline 3.4 mm into the top zone band. 0.208 clears it by ~3.6 mm and keeps
+# the third-angle stack (end view above front, both on x=0.105) intact; the gap
+# to the front view's upper dimensions is ~27 mm, so nothing crowds below.
+END_CENTER = (0.105, 0.208)
 ISO_CENTER = (0.310, 0.185)
 
 
@@ -286,7 +290,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         end,
         edge_xy=stud_circle_top,
-        frame_xy=ept(END_CENTER[0] + 0.052, END_CENTER[1] + 0.052),
+        # +0.052 in y put the frame's 8 mm half-box 8.3 mm over the top margin.
+        # Held to +0.045 (box top ~0.261) and pushed out to +0.058 in x, which
+        # keeps it clear of the flange circle (52.5 mm radius) without reaching
+        # the 0.4191 right margin.
+        frame_xy=ept(END_CENTER[0] + 0.058, END_CENTER[1] + 0.045),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
@@ -303,20 +311,33 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("B",),
         label="collar runout on the stud",
     )
+    # The stud OD is dimensioned in the end view, but its Ra belongs on the
+    # FRONT view. The symbol's TEXT renders ABOVE its arm (ASME Y14.36) and runs
+    # ~13..39 mm to the RIGHT of the anchor, so in the end view it cannot clear
+    # the O35 flange circle at ANY height the 12.7 mm left margin allows -- the
+    # arc reaches x=0.0534 at bore height while the text would need to stop by
+    # x=0.0144 -- and it printed over the arc. (The audit cannot catch that: it
+    # boxes the symbol as a nominal square about its anchor.) On the profile the
+    # stud's left flank has ~45 mm of empty sheet beside it, which takes the
+    # short, roughly horizontal leader this symbol wants.
+    stud_flank_y = _front_y(FLANGE_LEN + STUD_LEN / 2.0)
     add_surface_finish(
         adapter,
-        end,
-        edge_xy=_find_edge(
-            adapter, end,
-            ept(END_CENTER[0] - STUD_DIA / 2.0 * _K, END_CENTER[1]),
-            axis="x", label="stud circle left pick",
-        ),
-        symbol_xy=ept(END_CENTER[0] - 0.075, END_CENTER[1] + 0.040),
+        front,
+        # A cylinder's side outline is a SILHOUETTE, not a model edge.
+        edge_xy=fpt(FRONT_CENTER[0] - STUD_DIA / 2.0 * _K, stud_flank_y),
+        # Text lands at x~0.058..0.084: clear of the stud flank (x=0.0975) and
+        # of the O9 collar (x>=0.0915), which starts a further 9 mm up.
+        symbol_xy=fpt(0.045, stud_flank_y),
         roughness_ra="1.6",
         label="stud bearing finish",
+        entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.048)
+    # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
+    # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
+    # is the 12.7 mm zone margin, so it cannot see this).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.048)
 
     return await finalize_drawing(
         adapter,
