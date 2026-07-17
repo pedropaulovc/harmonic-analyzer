@@ -239,7 +239,31 @@ returns **1**. So GTOLs expose leaders and datum tags do not — consistent with
 `IDatumTag` having no `GetLeaderCount` member in the type library at all. There
 is no leader to measure, so the proposed "fail a tag whose leader is shorter
 than X" gate cannot be built, and draw-D's ink-measured (1.05, 4.1) mm window
-can never be read back through COM. **I asserted this gate was "strictly better"
+can never be read back through COM.
+
+**The mechanism, and it is NOT "COM hides it" — a leader is only REGISTERED if
+`SetLeader3` created it** (draw-D, verified in source). `add_datum_feature`
+never calls `SetLeader3`; the only callers are `add_feature_control_frame`,
+`add_surface_finish` and `add_property_linked_callout`. `_leader_segments_of`
+gates on `GetLeaderCount()`, so **exactly the `SetLeader3`'d annotations report
+leaders — precisely FCF + Ra**. And `add_datum_feature` cannot start calling it:
+datum FEATURE symbols are absent from `SetLeader3`'s support list (only datum
+TARGET symbols are, see above). So this is closed, not a missing call.
+
+The subtlety worth keeping: **a datum tag's leader IS DRAWN and IS readable —
+just not as a "leader".** It comes back as ordinary geometry in
+`GetLineAtIndex` (rocker datum A: `line[0]`, a 12.6 mm vertical). So "the tag
+has no leader" is false; "the tag has no *registered annotation leader*" is
+true. Two independent confirmations: draw-D's arithmetic `segments = 2 × (FCF +
+Ra)` fits all five of their sheets exactly (datum counts vary 1..3 across them
+and never register), and rocker's datums B and C have visibly drawn leaders yet
+still contribute nothing — which rules out "the leader exists but measures
+zero". The ×2 is because one bent leader = 3 points = 2 `zip(pts, pts[1:])`
+segments, reconciling their segment count with the `swGtol -> 1` COM reading.
+
+Ink and COM agree to ~0.1 mm on this class (tag box 7.11 ink / 7.0 COM; datum B
+leader 4.1 ink / 4.2 COM), so an ink measurement is a legitimate way to pin a
+COM constant while the seat is busy. **I asserted this gate was "strictly better"
 and let a threshold get bounded for it before ever checking the premise** — the
 [[load-bearing-claims-need-a-repro]] failure, committed by the person who wrote
 that note down.
