@@ -151,7 +151,20 @@ is immutable — it stays on the commit Codex actually reviewed. Seen 2026-07-16
 pushing five P2 fixes, `commit_id == head` counted 1 "finding" that was really the old
 mkdir-p comment re-anchored (`created_at` still the previous review's timestamp, a second tell).
 Fresh = `[.[]|select(.original_commit_id==$head)]`; a review landed = `reviews[].commit_id==$head`.
-Zero fresh findings ON a review that exists = clean; no review yet ≠ clean.
+
+**But "zero fresh findings" is a NOTIFICATION signal, NOT the merge gate** (codex #325
+caught this in the rule above — the fix for one bug introduced its own). The two failure
+modes are opposite, and `original_commit_id` only fixes the first:
+- keying on `commit_id` → an old, already-addressed finding re-anchors to the new head and
+  is reported as a NEW round-N finding (false positive);
+- keying on `original_commit_id` alone → an old finding that is **still unresolved** also
+  has `original_commit_id != $head`, so it is ignored and the PR reads "clean" the moment
+  any review lands on the new head (**false negative — the dangerous direction**).
+
+So: use the fresh-count to decide *when to look*, and gate the merge on the latest review's
+green signal PLUS every previously-raised finding being addressed. Unresolved threads are
+the durable check — `gh api graphql` on `reviewThreads { isResolved }`, or track the
+findings you have actually answered. A finding does not stop applying because you pushed.
 
 **Fix-agents share the SAME 5-hour session quota and die mid-task** ("session limit · resets
 <time>"). When they do, the LEAD (Opus, extra-usage on) takes over the remaining fixes inline —

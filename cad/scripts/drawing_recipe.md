@@ -7,10 +7,27 @@ fanning out N drawings later is fill-in-the-blanks.
 
 ## The slice — 6 pieces (part drawing)
 
+**`<part>` is the UNDERSCORED python/doit stem** (`fulcrum_shaft` — `build_<part>.py`,
+`draw_<part>.py`, `drawing:<part>`). **`<artifact-stem>` is the DASHED one**
+(`fulcrum-shaft` — the config file and every `cad/out/` artefact). Do not swap
+them, and note the failure is SILENT AND DELAYED rather than loud:
+
+- `_config` aggregates `parts/` by globbing every `*.yaml` and merging its
+  CONTENTS, so a misnamed `parts/fulcrum_shaft.yaml` **is** still read — the
+  metadata reaches the title block and the first build looks perfect.
+- But `dodo._expand_parts_token` derives the part's config `file_dep` via
+  `part_row_files(stem.replace("_", "-"))`, which looks for
+  `parts/fulcrum-shaft.yaml` and returns **`[]`** when only the underscored file
+  exists (verified). So the part depends on NO config file, and **editing that
+  row never rebuilds the part** — you get a stale artefact with no error.
+
+Verify with `part_row_files("<dashed-stem>")` returning its row + `_defaults`,
+not an empty list.
+
 | # | file | what it holds | reference (shaft / bushing) |
 |---|------|---------------|------------------------------|
 | 1 | `cad/scripts/<part>_spec.py` | pure data: nominal dims, `DRAWING_DIMENSIONS` (feature → marked-dim names), `DRAWING_NOTES`, optional `END_VIEW_NOTE` | `fulcrum_shaft_spec.py` / `lever_bushing_spec.py` |
-| 2 | `cad/config/parts/<part>.yaml` | manufacturing metadata: `number` (keep the existing one), `material_specification`, `finish`, `quantity`, `tolerance_class`, `process` | `fulcrum-shaft.yaml` / `lever-bushing.yaml` |
+| 2 | `cad/config/parts/<artifact-stem>.yaml` | manufacturing metadata: `number` (keep the existing one), `material_specification`, `finish`, `quantity`, `tolerance_class`, `process` | `fulcrum-shaft.yaml` / `lever-bushing.yaml` |
 | 3 | `cad/scripts/build_<part>.py` | import dims from the spec; at the end of `build()` (after `report_mass_properties`, before `save_part_and_images`): `clear_dimensions_for_drawing` → loop `mark_dimensions_for_drawing` over `DRAWING_DIMENSIONS` → `apply_drawing_properties(...)` | `build_fulcrum_shaft.py` |
 | 4 | `cad/scripts/draw_<part>.py` | the recipe: `place_view` per view, `curate_view_dimensions` (its `keep` keys must equal the marked dims), callouts, GD&T, `add_property_linked_note`, `finalize_drawing` | `draw_fulcrum_shaft.py` |
 | 5 | `cad/scripts/test_<part>_drawing.py` | offline pytest contract: output paths, spec-is-single-source-of-dims, `kept == marked`, annotation counts, config fields | `test_fulcrum_shaft_drawing.py` |
@@ -47,7 +64,8 @@ dead weight.
 - turned shaft / pin / dowel → **`fulcrum_shaft`**
 - turned bushing / sleeve / spacer (has a bore) → **`lever_bushing`**
 - prismatic machined block / bracket / arm → **`crank_arm`** or **`top_crossbar`**
-- (assembly drawing → see `drawing_recipe_assembly.md` once the assembly infra lands)
+- assembly drawing → see `drawing_recipe_assembly.md` (the infra has landed —
+  `pen_assembly` is registered and building)
 
 ## Build + iterate (SolidWorks open; COM serialized on the machine-global seat)
 

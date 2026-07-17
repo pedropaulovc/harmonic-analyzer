@@ -117,11 +117,29 @@ Send ONLY the rendered image, with no repo context, to an independent
 machinist review. Run from a NEUTRAL directory (outside the repo, so codex
 does not pick up AGENTS.md and explore the codebase), pipe the prompt on
 stdin (codex's multi-value `-i` swallows a positional prompt), and tee the
-review to the gitignored `cad/out/reports/`:
+review to the gitignored `cad/out/reports/`.
+
+**Every safeguard in `drawing_recipe.md`'s review section applies here verbatim
+— read it, this block is only the assembly-flavoured command.** In particular:
+`mktemp -d` (never a fixed temp path: a shell that rejects `cd ""` makes `&&`
+short-circuit, and `tee` then writes a plausible-looking review file containing
+only a shell error); `mkdir -p` the report dir; `--ignore-user-config
+--ignore-rules` so the seat's hooks/rules cannot bias the verdict; and NEVER
+`--sandbox danger-full-access`, which un-blinds the reviewer.
 
 ```
-( cd "C:/Users/pedro/AppData/Local/Temp" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the assembly can be built as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check -i "<worktree>/cad/out/png/<asm-stem>-assembly_drawing.png" ) 2>&1 | tee "<worktree>/cad/out/reports/codex_machinist_review.txt"
+mkdir -p "<worktree>/cad/out/reports"
+NEUTRAL=$(mktemp -d) || exit 1
+( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the assembly can be built as drawn." \
+  | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" \
+      --skip-git-repo-check --ignore-user-config --ignore-rules \
+      -i "<worktree>/cad/out/png/<asm-stem>-assembly_drawing.png" ) \
+  2>&1 | tee "<worktree>/cad/out/reports/codex_machinist_review.txt"
+rmdir "$NEUTRAL"
 ```
+
+Then **read the review file before believing the gate ran** — a transcript with
+no verdict is the failure to catch.
 
 If codex flags clearly valid problems, fix and re-render (bounded: 1-2
 iterations), and include the full review verbatim in your report.
