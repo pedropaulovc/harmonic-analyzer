@@ -101,6 +101,16 @@ spec so assemblies don't rebuild on note edits; #314 crank_pin: 1:45→1:48 tape
 Watch all open PRs with ONE persistent Monitor polling codex body-reaction (👍=green,
 👀=reviewing) + last review state; merge on the 👍 transition.
 
+**Counting FRESH findings: key on `original_commit_id`, NEVER `commit_id`.** GitHub
+REWRITES a review comment's `commit_id` to the latest head whenever its line still maps
+after a push, so an old, already-addressed finding re-anchors itself onto the new head and
+a monitor keyed on `commit_id` reports it as a brand-new ROUND-N finding. `original_commit_id`
+is immutable — it stays on the commit Codex actually reviewed. Seen 2026-07-16 on #325: after
+pushing five P2 fixes, `commit_id == head` counted 1 "finding" that was really the old
+mkdir-p comment re-anchored (`created_at` still the previous review's timestamp, a second tell).
+Fresh = `[.[]|select(.original_commit_id==$head)]`; a review landed = `reviews[].commit_id==$head`.
+Zero fresh findings ON a review that exists = clean; no review yet ≠ clean.
+
 **Fix-agents share the SAME 5-hour session quota and die mid-task** ("session limit · resets
 <time>"). When they do, the LEAD (Opus, extra-usage on) takes over the remaining fixes inline —
 verify each dead agent's worktree ON DISK first (idle≠done here too): several had correct-but-
