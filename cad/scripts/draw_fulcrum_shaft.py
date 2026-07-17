@@ -164,7 +164,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # as one long diagonal across the whole sheet, skimming just over the side
     # view.  The side view starts at x=0.100 and tops out at y=0.208, so this
     # band is empty; the 8 mm half-box tops out at 0.258, inside the 0.2667 zone
-    # margin.
+    # margin.  (STALE ARITHMETIC, conclusion unchanged: the "8 mm half-box" was
+    # the audit's old model. An FCF's anchor is its frame's TOP-LEFT corner, so
+    # it reaches ~0.1 mm above the anchor, not 8 -- even further inside the
+    # margin. The side that under-reads is the RIGHT, where the frame grows by
+    # its full 20-30 mm width; this frame is nowhere near the right margin.)
     #
     # x=0.065 sits the frame almost directly ABOVE the end_circle pick, which
     # makes its leader near-vertical (it hugs x=0.062..0.065 the whole way down).

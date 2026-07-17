@@ -294,6 +294,15 @@ async def build(adapter: Any) -> dict[str, str]:
         # Held to +0.045 (box top ~0.261) and pushed out to +0.058 in x, which
         # keeps it clear of the flange circle (52.5 mm radius) without reaching
         # the 0.4191 right margin.
+        #
+        # STALE ARITHMETIC, placement still good: the "8 mm half-box" was the
+        # audit's old model. An FCF's anchor is its frame's TOP-LEFT corner, so
+        # it reaches only ~0.1 mm ABOVE the anchor (and ~7.0 mm below) -- the top
+        # overrun that forced this move was never real. Kept as-is because the
+        # placement is fine and re-tuning costs a COM rebuild for nothing. The
+        # direction that DOES bite is the RIGHT: the frame grows right by its
+        # full width (20-30 mm, not 8), which is what put platen_guide's frame
+        # over the right margin. That is why the x note above still matters.
         frame_xy=ept(END_CENTER[0] + 0.058, END_CENTER[1] + 0.045),
         characteristic="perpendicularity",
         tolerance="0.05",

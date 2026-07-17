@@ -238,6 +238,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # offsets stacked on the 45-deg body-circle anchor put them at y=0.2628 and
     # 0.259, whose 8 mm half-boxes overran the top border by 4.1 and 0.3 mm.)
     #
+    # STALE ARITHMETIC, placement still good: the "8 mm half-box" was the audit's
+    # old model, so those two top-border overruns were false alarms -- an FCF's
+    # anchor is its frame's TOP-LEFT corner and a datum tag's is its box top, so
+    # neither reaches more than ~0.1 mm above its anchor. Kept as-is: the Y bands
+    # below are what keep these three annotations off each other, which is a real
+    # constraint independent of the box model. The side that under-read was the
+    # RIGHT (a frame grows right by its full 20-30 mm width).
+    #
     # The right side carries THREE annotations, so each gets its own Y band:
     # datum A at 0.255, this frame at 0.238, and the StudDia callout, whose
     # drawn text occupies x=0.111..0.145 / y=0.218..0.228.  None of that is

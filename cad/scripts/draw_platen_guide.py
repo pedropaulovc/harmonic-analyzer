@@ -217,9 +217,16 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=(0.375, 0.110),
         # Below-right of the view (was (0.382, 0.145), under the isometric).
-        # x=0.400 keeps the frame's 8 mm half-box inside the 0.4191 right margin
-        # and clear of the 5.00 height dimension at (0.385, 0.110).
-        frame_xy=(0.400, 0.086),
+        # x=0.390, NOT 0.400: an FCF's anchor is its frame's TOP-LEFT corner and
+        # the frame grows RIGHT from it by its full width -- it is not centred.
+        # This one ("|//| 0.10 |A|") measures 25.2 mm wide, so x=0.400 put its
+        # right edge at 0.4252, over the 0.4191 margin by 6.1 mm. The old comment
+        # here reasoned from an "8 mm half-box" -- the audit's since-corrected
+        # model, which had it stopping at 0.408 and passed it clean. 0.390 lands
+        # the right edge at 0.4152, 3.9 mm inside the margin, and the frame sits
+        # at y 0.079..0.086 so it stays clear of the 5.00 height dimension up at
+        # (0.385, 0.110).
+        frame_xy=(0.390, 0.086),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
