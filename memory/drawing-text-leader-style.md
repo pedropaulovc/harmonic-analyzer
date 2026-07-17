@@ -59,8 +59,32 @@ every sheet — and it cannot be gated, because dimensions/GD&T expose no
 `CollisionScope.NONE`. Re-layout is an eye pass. See
 [[drawing-sheet-zone-border]] and [[solidworks-modeling-pitfalls]].
 
+**EVERY annotation's anchor means something DIFFERENT, and none of them is "the
+centre".** `SetPosition2`'s Remarks carry the authoritative table; any gate that
+boxes an annotation symmetrically around `GetPosition` is the wrong SHAPE for all
+but a coincidence:
+
+| annotation | XYZ origin IS | so the body draws |
+|---|---|---|
+| Surface finish | "Lower-left point of symbol" | UP + RIGHT |
+| Geometric tolerance (FCF) | "Upper-left corner of the symbol" | DOWN + RIGHT |
+| Datum feature | "Point where leader hits symbol" | away from the leader |
+| Note | "Upper-left corner of the text box" | DOWN + RIGHT |
+| Display dimension | "Point of leader attachment centered on a text box border / center point of bottom border of text box" | — |
+
+This table independently CONFIRMS the Ra anatomy measured below ("lower-left
+point" ⇒ up-right body), and it confirms draw-A's measurement that a datum tag's
+requested y lands on the box's BOTTOM edge ("point where leader hits"). It also
+means the `_NOMINAL_GDT_HALF_M` symmetric box in `_drawing_common` is wrong for
+FCFs the same way it was wrong for Ra — an FCF's anchor is its upper-left CORNER,
+so the box wastes 8 mm above and left on empty sheet while the whole ~40 mm body
+("⊕ Ø0.25 A B C") sits outside it to the right and below. Doc-confirmed, NOT yet
+measured — measure before changing the box (see [[drawing-sheet-zone-border]] for
+why measuring beats inferring here).
+
 **Ra symbol anatomy — `symbol_xy` is the leader's attachment point, NOT the
-centre.** Measured across three sheets. Relative to `symbol_xy` = (ax, ay), the
+centre.** Measured across three sheets, and matching the doc's "lower-left point of
+symbol" exactly. Relative to `symbol_xy` = (ax, ay), the
 whole body draws UP and RIGHT of the triangle's bottom vertex, which sits exactly
 at (ax, ay): triangle x [ax-0.006, ax+0.006] y [ay, ay+0.011]; "Ra 1.6" text
 x [ax+0.013, ax+0.039] y [ay+0.010, ay+0.017]; arm y ≈ ay+0.018. Footprint
@@ -82,10 +106,44 @@ points are already taken (e.g. 49 deg and 229 deg), so the free quadrants are
 what is left. Budget them before adding a datum tag or Ra symbol.
 
 **A datum feature symbol is not freely placeable — the ATTACHED ENTITY decides.**
-`IAnnotation::SetPosition2` sets "the point where the leader hits the symbol",
-and its Remarks restrict a symbol on an edge to "along that edge or extensions of
-that edge", otherwise landing "as near as possible". On a STRAIGHT edge, y is
-honoured and x is projected back onto the line.
+**READ THE RESTRICTION'S SCOPE — it is the whole ballgame.** `SetPosition2`'s
+Remarks say: "One example of a restriction is a surface-finish symbol that is
+inserted directly on a face **(that is, no leaders)**. It can only be moved within
+the borders of that face. If it is inserted directly on an edge, it can only be
+moved along that edge or extensions of that edge. Datum feature symbols have
+similar restrictions."
+
+The **"(that is, no leaders)"** qualifier scopes the entire thing. A LEADERED datum
+tag — which is what `add_datum_feature` produces — is NOT subject to the
+along-the-edge restriction at all. An earlier version of this note quoted the
+restriction with that qualifier dropped, and then two successive false theories got
+built on the mis-paraphrase ("trapped on the circumference regardless of size", then
+"on a straight edge, y is honoured and x is projected back onto the line"). Both are
+FALSE. `draw_pivot_bushing`'s datum B is the disproof of the second: perpendicular
+x −18 mm off a VERTICAL edge, honoured in full, with a long clean leader. If x were
+projected onto the line its box would sit on the edge with no leader.
+
+**What actually governs (draw-A's controlled experiment, 2026-07-16).** Decompose
+the displacement from the PICK to the SYMBOL along the entity's outward normal at
+the pick:
+
+| case | normal component | tangent | result |
+|---|---|---|---|
+| cylinder_gear pick @ 3 o'clock | **−0.0095** | +0.0239 | STUCK |
+| cylinder_gear pick @ 12 o'clock | **+0.0145** | 0.0000 | FREE |
+| cone_lock_knob pick @ 45° | **+0.0321** | −0.0233 | FREE |
+
+Rows 1–2 are a controlled experiment: same circle, same `symbol_xy`, ONLY the pick
+moved. **The rule: `dot(symbol_xy − edge_xy, outward_normal_at(edge_xy))` must be
+POSITIVE.** Otherwise the tag has no room to stand off and slides along the entity.
+A straight edge's normal is fixed → "offset perpendicular, not along". A circle's
+normal rotates with clock position → the pick's clock position is the knob. Same
+rule, two faces. And the along-edge component is not wasted: it SLIDES the
+attachment point along the edge (draw-C's `pinion_pivot_block` datum C — perp
+x +16 AND along y +20, both honoured).
+
+cone-lock-knob's 57 mm was never what saved it: its normal component is simply the
+largest of the three. **Distance was a red herring in every version of this note.**
 
 **On a CIRCLE the rule that fits all six measured samples is: the tag always
 re-attaches at the circle point NEAREST the symbol, but the requested STANDOFF
