@@ -1552,9 +1552,29 @@ def _spread_balloons(
     ``AutoBalloon5`` stacks balloons whose attachment points cluster, and on a
     pictorial view its square layout can even drop balloons INSIDE the outline
     box. Deterministic fix: place every balloon's box center on an ellipse
-    ``margin`` outside the view outline, evenly spaced, each assigned the ring
-    slot nearest its landed angle so leaders do not cross. Leaders stay
+    ``margin`` outside the view outline, evenly spaced, and assign the ring slots
+    in the angular order of the balloons' ATTACHMENT POINTS. Leaders stay
     attached; only the balloon anchor moves (``IAnnotation.SetPosition``).
+
+    **Sort on the ATTACHMENT, not on where the balloon landed.** For straight
+    leaders from points on a convex ring to points inside it, the non-crossing
+    condition is that the ring order matches the ATTACHMENTS' angular order --
+    ring slot k must serve the k-th attachment going round. Sorting on the
+    balloon's own landed angle (the ``GetPosition`` this used to read) merely
+    preserves AutoBalloon5's ordering, which was never non-crossing to begin
+    with, so the ring was re-spacing the balloons while faithfully reproducing
+    the crossings.
+
+    This docstring used to CLAIM "each assigned the ring slot nearest its landed
+    angle so leaders do not cross". That claim was never true and never tested;
+    the shipped pen-assembly sheet crossed B4xB6 at (0.2285, 0.1161) under it.
+    ``find_leader_leader_crossings`` is now the repro, so the claim is a gate
+    rather than a comment.
+
+    Attachment = the LAST point of ``GetLeaderPointsAtIndex(0)``; the first is
+    the balloon end. Measured on pen-assembly's 8 balloons: the first points
+    spread over 61 mm of x (the ring) while the last cluster within 13 mm (the
+    tall, skinny pen sub they point at).
     """
     outline = adapter._attempt(lambda: view.GetOutline())
     if not outline:
@@ -1570,20 +1590,32 @@ def _spread_balloons(
         if annotation is None:
             raise RuntimeError("balloon spread: balloon without an annotation")
         annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetPosition", "SetPosition"
+            annotation,
+            "IAnnotation",
+            "GetPosition",
+            "SetPosition",
+            "GetLeaderPointsAtIndex",
         )
-        # Work from the ANCHOR, never GetExtent: a balloon note's extent box
-        # includes its LEADER, so it spans to the pointed-at component and is
-        # useless for placing the balloon circle itself.
-        position = adapter._attempt(lambda a=annotation: a.GetPosition())
-        if not position:
-            raise RuntimeError("balloon spread: balloon without a position")
-        px, py = float(position[0]), float(position[1])
-        theta = math.atan2(py - center_y, px - center_x)
+        # Never GetExtent: a balloon note's extent box includes its LEADER, so it
+        # spans to the pointed-at component and is useless for placing the
+        # balloon circle itself.
+        raw = adapter._attempt(lambda a=annotation: a.GetLeaderPointsAtIndex(0))
+        if not raw or len(raw) < 6:
+            raise RuntimeError(
+                "balloon spread: balloon without a readable leader -- the ring "
+                "order is derived from the ATTACHMENT point, so a balloon whose "
+                "leader cannot be read cannot be placed without crossing"
+            )
+        # Flat x,y,z stream; the LAST triple is the attachment on the component.
+        attach_x, attach_y = float(raw[-3]), float(raw[-2])
+        theta = math.atan2(attach_y - center_y, attach_x - center_x)
         items.append((theta, annotation))
     items.sort(key=lambda item: item[0])
     count = len(items)
-    start = items[0][0]  # anchor the ring on the first balloon's own angle
+    # Anchor the ring on the first ATTACHMENT's angle, so slot k sits in the same
+    # direction as the component it serves and the k-th ring slot serves the k-th
+    # attachment going round -- the non-crossing condition itself.
+    start = items[0][0]
     for slot, (_theta, annotation) in enumerate(items):
         angle = start + 2.0 * math.pi * slot / count
         target_x = center_x + radius_x * math.cos(angle)

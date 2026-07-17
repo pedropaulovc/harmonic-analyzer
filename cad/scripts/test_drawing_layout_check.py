@@ -27,6 +27,7 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
     find_leader_crossings,
+    find_leader_leader_crossings,
     find_overflows,
     find_overlaps,
 )
@@ -43,12 +44,18 @@ WHOLE_SHEET = DrawableRegion.whole_sheet(SHEET_W, SHEET_H)
 # ISheet::GetZoneMargin: a uniform 12.7 mm (0.5 in) on all four sides, read off
 # a live sheet.
 #
-# These are NOT the template's drawn border frame, which sits at left 15.9 /
-# right 9.5 / bottom 13.3 / top 12.0 mm (measured identically on all 23 rendered
-# sheets). Artwork and metadata disagree in the shipped template; the gate keys
-# on the METADATA, and the template's frame is being corrected to match. Do not
-# "fix" these numbers to the drawn-frame ones -- they would then assert
-# something no sheet reports.
+# The drawn frame USED to disagree with this metadata (left 15.9 / right 9.5 /
+# bottom 13.3 / top 12.0 mm), which made the gate blind on the left by 3.2 mm --
+# ink could clear the declared margin and still print on the drawn rule. The
+# template was re-centred 2026-07-16 and the artwork now AGREES: measured on the
+# rebuilt renders, the rules span left 0.0124..0.0128, right 0.4188..0.4192,
+# bottom 0.0124..0.0128, top 0.2665..0.2669 -- centrelines within a 0.4 mm line
+# width of 12.7 on all four sides.
+#
+# The gate still keys on the METADATA, and that is the point: it is queried from
+# the live sheet, so it tracked the template edit without a code change. Do not
+# replace these with measured drawn-frame constants -- that would freeze today's
+# artwork into the test and go stale the next time the frame moves.
 ZONE_MARGINS = {"left": 0.0127, "right": 0.0127, "bottom": 0.0127, "top": 0.0127}
 ZONE_REGION = DrawableRegion.from_margins(SHEET_W, SHEET_H, **ZONE_MARGINS)
 
@@ -734,3 +741,102 @@ def test_surface_finish_clear_of_the_border_still_passes():
     for ax, ay in ((0.045, 0.1045), (0.133, 0.1992)):
         ra = _gdt(ax, ay, drawing_common._ANNOT_SFSYM, "Ra")
         assert not find_overflows([ra], ZONE_REGION)
+
+
+# --- leader-vs-leader crossings ----------------------------------------------
+
+
+def test_two_leaders_crossing_each_other_are_flagged():
+    # The pen-rod defect at its MEASURED sheet coordinates (2026-07-16 render).
+    # The Ra rises from its symbol right of the rod to the slide face; the
+    # squareness frame's leader descends from its box to the rod's bottom. X.
+    #
+    # The frame's leader is BENT, and the bend matters here: its box sits at
+    # x=0.102 but the shoulder runs left to an elbow at (0.0956, 0.1044) before
+    # the diagonal drops to the rod. Modelling it as one straight run from the
+    # box moves the reported crossing 1.5 mm (0.0805 -> 0.0820), so the DIAGONAL
+    # is what gets asserted -- the segment the sheet actually draws.
+    ra = LeaderSegment("Ra 1.6", "gdt", 0.170, 0.068, 0.0675, 0.100, owner="Front")
+    fcf = LeaderSegment("perp", "gdt", 0.0956, 0.1044, 0.070, 0.090, owner="Front")
+    (crossing,) = find_leader_leader_crossings([ra, fcf])
+    assert {crossing.a.label, crossing.b.label} == {"Ra 1.6", "perp"}
+    # The real intersection, independently read off the render at (0.080, 0.096)
+    # -- not merely "something was reported".
+    assert crossing.x == pytest.approx(0.0805, abs=5e-4)
+    assert crossing.y == pytest.approx(0.0959, abs=5e-4)
+    assert "cross their leaders" in crossing.describe()
+
+
+def test_the_fix_direction_clears_the_crossing():
+    # Positive control for the test above: same two annotations, the frame moved
+    # below the rod so its leader approaches from underneath. Without this, the
+    # test above would pass just as happily against a function that flags every
+    # pair it is handed.
+    ra = LeaderSegment("Ra 1.6", "gdt", 0.170, 0.068, 0.0675, 0.100, owner="Front")
+    fcf = LeaderSegment("perp", "gdt", 0.102, 0.0765, 0.070, 0.090, owner="Front")
+    assert find_leader_leader_crossings([ra, fcf]) == []
+
+
+def test_a_bent_leaders_own_elbow_and_tail_never_cross():
+    # A bent leader is two segments sharing an elbow BY CONSTRUCTION. If the
+    # touch tolerance were wrong, every bent leader on every sheet would report.
+    elbow = LeaderSegment("Ra", "gdt", 0.10, 0.10, 0.14, 0.10, owner="Front")
+    tail = LeaderSegment("Ra", "gdt", 0.14, 0.10, 0.18, 0.16, owner="Front")
+    assert find_leader_leader_crossings([elbow, tail]) == []
+
+
+def test_two_leaders_landing_on_one_point_touch_but_do_not_cross():
+    # Two arrows converging on a shared edge point is a STACKING question the
+    # overlap audit owns. Reporting it here would be a false positive.
+    a = LeaderSegment("datum A", "gdt", 0.20, 0.05, 0.10, 0.10, owner="Front")
+    b = LeaderSegment("Ra", "gdt", 0.20, 0.15, 0.10, 0.10, owner="Front")
+    assert find_leader_leader_crossings([a, b]) == []
+
+
+def test_parallel_leaders_never_cross():
+    a = LeaderSegment("one", "gdt", 0.10, 0.10, 0.20, 0.14, owner="Front")
+    b = LeaderSegment("two", "gdt", 0.10, 0.12, 0.20, 0.16, owner="Front")
+    assert find_leader_leader_crossings([a, b]) == []
+
+
+def test_leaders_whose_extensions_would_meet_off_segment_do_not_cross():
+    # Crossing must be judged on the SEGMENTS, not their infinite lines: these
+    # two only meet far outside both runs.
+    a = LeaderSegment("one", "gdt", 0.10, 0.10, 0.12, 0.11, owner="Front")
+    b = LeaderSegment("two", "gdt", 0.10, 0.20, 0.12, 0.19, owner="Front")
+    assert find_leader_leader_crossings([a, b]) == []
+
+
+def test_leader_leader_crossings_reach_the_audit():
+    # The gate is only real if audit_layout actually runs it.
+    ra = LeaderSegment("Ra 1.6", "gdt", 0.170, 0.068, 0.0675, 0.100, owner="Front")
+    fcf = LeaderSegment("perp", "gdt", 0.102, 0.1045, 0.070, 0.090, owner="Front")
+    _, _, crossings = audit_layout(
+        [_el("Front", 0.06, 0.09, 0.08, 0.21, kind="view")],
+        DrawableRegion.whole_sheet(0.4318, 0.2794),
+        leaders=[ra, fcf],
+    )
+    assert any("cross their leaders" in c.describe() for c in crossings)
+
+
+def test_leaders_converging_on_one_point_are_stacked_not_crossed():
+    # platen-guide's REAL segments (2026-07-16). Datum A arrives horizontally and
+    # a second frame's leader arrives diagonally; both terminate at x=0.3650,
+    # 0.2 mm apart in y. Their last 0.2 mm technically crosses -- underneath
+    # ~2.4 mm arrowheads, so no reader can see it. The gate's first sweep DID
+    # report this; it was the only false positive in 23 sheets.
+    datum = LeaderSegment("datum A", "gdt", 0.3650, 0.1100, 0.3520, 0.1100, owner="Iso")
+    other = LeaderSegment("frame", "gdt", 0.3389, 0.0885, 0.3650, 0.1102, owner="Iso")
+    assert find_leader_leader_crossings([datum, other]) == []
+
+
+def test_a_shared_terminus_does_not_mask_a_real_crossing_elsewhere():
+    # Positive control for the exemption: pen-assembly's B4xB6 balloons end
+    # 4.7 mm apart -- the tightest TRUE positive on the fleet, and it must still
+    # report. Without this, widening _SHARED_TERMINUS_M would silently swallow
+    # real findings and every test above would still pass.
+    b4 = LeaderSegment("B4", "note", 0.2380, 0.1882, 0.2280, 0.1121, owner="Iso")
+    b6 = LeaderSegment("B6", "note", 0.2546, 0.1508, 0.2238, 0.1099, owner="Iso")
+    (crossing,) = find_leader_leader_crossings([b4, b6])
+    assert crossing.x == pytest.approx(0.2285, abs=5e-4)
+    assert crossing.y == pytest.approx(0.1161, abs=5e-4)
