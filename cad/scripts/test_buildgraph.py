@@ -284,17 +284,41 @@ def test_module_deps_follow_non_helper_siblings():
 
 
 def test_stamps_part_properties_only_genuine_stampers():
-    """Only assemblies that GENERATE+stamp an in-script part (no separate part task)
-    are flagged, via the function-level call graph. channel calls
-    _spring.build_spring (-> save_part_and_images) so it stamps its
-    stretched springs; summing/magnifier import part-builder CONSTANTS and
-    paper_drive reaches only build_cone_gear MATH helpers, so none of them stamp and
-    a registry-row edit only REFRESHES them, no FULL (codex P2)."""
+    """Only assemblies that REACH a stamping primitive are flagged, via the
+    function-level call graph. Two genuine kinds reach one:
+
+      * channel GENERATES+stamps an in-script part with no separate part task --
+        it calls _spring.build_spring (-> save_part_and_images) for its stretched
+        springs;
+      * pen stamps its OWN assembly document's title-block identity -- since
+        06bada6 (assembly drawing infrastructure) build_pen_assembly calls
+        part_properties/apply_custom_properties directly, so draw_pen_assembly's
+        title block resolves. That call reads title_block.yaml (the TOL_* cells
+        finalize_drawing hard-requires), so pen MUST stay flagged: the flag is
+        what keeps title_block.yaml in its recipe (_expand_title_block_token).
+        Were pen unflagged, assembly:pen would carry NO config dep at all and a
+        title_block.yaml edit would silently ship stale TOL_* -- an
+        under-rebuild, which this analyzer must never do.
+
+    summing/magnifier import part-builder CONSTANTS and paper_drive reaches only
+    build_cone_gear MATH helpers, so none of them stamp and a registry-row edit
+    only REFRESHES them, no FULL (codex P2).
+    """
     assert stamps_part_properties(script_for("channel")), "channel stamps stretched springs"
-    for non in ("frame", "summing", "magnifier", "paper_drive", "pen", "drive_train"):
+    assert stamps_part_properties(script_for("pen")), "pen stamps its own title block"
+    for non in ("frame", "summing", "magnifier", "paper_drive", "drive_train"):
         assert not stamps_part_properties(script_for(non)), f"{non} must not be a stamper"
     # a part build script genuinely stamps its own properties (sanity on the graph).
     assert stamps_part_properties(SCRIPTS_DIR / "build_fillister_screw.py")
+
+
+def test_stamping_assemblies_keep_the_title_block_dep():
+    """The REASON a stamper stays flagged: stamping reads title_block.yaml, so the
+    flag must put it in the assembly's recipe. This pins the consequence the flag
+    exists for, so a future 'simplification' of stamps_part_properties that drops
+    pen fails HERE (an under-rebuild) rather than silently shipping stale TOL_*."""
+    for stem in ("channel", "pen"):
+        assert "title_block" in config_files_of(script_for(stem)), stem
 
 
 def _run() -> int:

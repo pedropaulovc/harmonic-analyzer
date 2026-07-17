@@ -610,11 +610,13 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
 
       * a PART stamps only its OWN row -> parts/<dashed-stem>.yaml + _defaults
         (editing one row rebuilds one part);
-      * an ASSEMBLY that stamps in-script (only build_channel_assembly, for its
-        stretched springs) depends on the rows of the parts it references (a
-        superset of the rows it stamps -- conservative); a non-stamping assembly
-        needs NO parts row (a referenced part's row edit rebuilds that PART, whose
-        new .SLDPRT triggers the assembly REFRESH);
+      * an ASSEMBLY that stamps (build_channel_assembly, for its stretched springs;
+        build_pen_assembly, for its own title-block identity) depends on the rows of
+        the parts it references (a superset of the rows it stamps -- conservative;
+        pen in fact reads no row at all, there being no parts/pen.yaml, so this
+        purely over-rebuilds); a non-stamping assembly needs NO parts row (a
+        referenced part's row edit rebuilds that PART, whose new .SLDPRT triggers
+        the assembly REFRESH);
       * any other caller (e.g. an offline check) -> the whole registry.
     """
     if kind == "part" and stem is not None:
@@ -635,11 +637,16 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
 def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     """Per-task expansion of the ``"title_block"`` token (the TOL_* stamping in
     ``_common.part_properties``): every part stamps the title-block tolerance
-    properties, as does an assembly that stamps in-script (build_channel_assembly,
-    for its stretched springs) -> title_block.yaml; a NON-stamping assembly drops
-    it (a title-block edit re-stamps the parts, whose shifted digests REFRESH the
-    assembly -- keeping it in the assembly recipe would escalate to a spurious
-    FULL rebuild). Any other caller keeps the dep, conservatively."""
+    properties, as does an assembly that stamps (build_channel_assembly, for its
+    stretched springs; build_pen_assembly, for its own title-block identity)
+    -> title_block.yaml; a NON-stamping assembly drops it (a title-block edit
+    re-stamps the parts, whose shifted digests REFRESH the assembly -- keeping it
+    in the assembly recipe would escalate to a spurious FULL rebuild). Any other
+    caller keeps the dep, conservatively.
+
+    A stamper must KEEP the dep: part_properties reads title_block.yaml
+    unconditionally, so dropping it would ship stale TOL_* on that assembly's own
+    document (pinned by test_buildgraph)."""
     if kind == "assembly" and not stamps_part_properties(script):
         return []
     return [str((CONFIG_DIR / "title_block.yaml").resolve())]

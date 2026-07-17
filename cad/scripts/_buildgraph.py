@@ -596,11 +596,25 @@ def _stamping_modules() -> frozenset[str]:
 
 
 def stamps_part_properties(script: Path) -> bool:
-    """True if this build script stamps a registry row for a part with NO separate
-    part task -- i.e. one it GENERATES in-script (e.g. build_channel_assembly's
-    stretched springs). Drives whether an ASSEMBLY depends on parts rows directly;
-    a non-stamping assembly's parts metadata propagates via the rebuilt ``.SLDPRT``
-    -> REFRESH. Resolved by the function-level call graph in ``_stamping_modules``."""
+    """True if this build script REACHES a property-stamping primitive. Two kinds
+    of assembly do:
+
+      * it GENERATES+stamps an in-script part with no separate part task
+        (``build_channel_assembly``'s stretched springs);
+      * it stamps its OWN assembly document's title-block identity
+        (``build_pen_assembly`` -> ``part_properties``/``apply_custom_properties``,
+        so ``draw_pen_assembly``'s title block resolves).
+
+    Drives two recipe tokens: whether an ASSEMBLY depends on parts rows directly
+    (a non-stamping assembly's parts metadata propagates via the rebuilt
+    ``.SLDPRT`` -> REFRESH) and whether it keeps ``title_block.yaml`` -- which
+    stamping ALWAYS reads, so a stamper must keep it or ship stale TOL_*.
+
+    CONSERVATIVE, per the fine-grained-deps contract: an assembly that stamps only
+    its own identity (pen reads NO parts row -- there is no ``parts/pen.yaml``, so
+    ``part_properties("pen")`` KeyErrors to the minimal set) still takes the parts
+    token for every part it references. That over-rebuilds on a row edit; it never
+    skips one. Resolved by the function-level call graph in ``_stamping_modules``."""
     return script.stem in _stamping_modules()
 
 
