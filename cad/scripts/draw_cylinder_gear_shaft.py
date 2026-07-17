@@ -67,7 +67,7 @@ ISO_SCALE = (1, 2)
 # horizontally through the centre rather than diagonally.  x=0.032, not the old
 # bbox-derived 0.022: the callout is centred on its anchor and ~22 mm wide now
 # that it renders horizontally, so it needs to start clear of the border rule
-# at ~0.0158.
+# at ~0.0126.
 END_KEEP = {
     "ShaftDia": (0.032, END_CENTER[1]),
 }
@@ -175,9 +175,27 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to arbor end view")
 
+    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
     end_circle = (
-        END_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+        END_CENTER[0] + end_radius,
         END_CENTER[1],
+    )
+    # The cylindricity frame's terminus: 55 deg up the arc, NOT `end_circle`.
+    # The frame and the Ra BOTH used to pick `end_circle` (3 o'clock), so their
+    # two leaders ended on the same point and printed as ONE blob: measured
+    # arrowheads x 0.0638..0.0645 and x 0.0651..0.0660 -- a 0.6 mm gap
+    # edge-to-edge, centroids 1.2 mm apart.
+    #
+    # 55 deg is not a guess: it is the angle maximising the MINIMUM clearance to
+    # everything already landing on this arc, swept at 5 deg steps against three
+    # measured obstacles -- the Ra's arrowhead at 0 deg, the ShaftDia diametral
+    # line's terminus at 33 deg / (0.0624, 0.2098), and datum A's triangle whose
+    # BASE rests on the circle at 90 deg spanning x 0.0527..0.0571.  At 55 deg
+    # those read 8.8 / 3.6 / 3.7 mm (the binding pair is dia-vs-tri; 45 deg
+    # gives 2.0 and 60 deg gives 2.9).
+    end_upper = (
+        END_CENTER[0] + end_radius * math.cos(math.radians(55.0)),
+        END_CENTER[1] + end_radius * math.sin(math.radians(55.0)),
     )
     left_end = (PROFILE_CENTER[0] - SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
     right_end = (PROFILE_CENTER[0] + SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
@@ -219,10 +237,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # leader raked down at an angle and printed straight through the Ra symbol's
     # bar and triangle.  Near-vertical, it passes x=0.067 at the Ra's top edge --
     # clear left of the Ra's arm at 0.075.
+    #
+    # That arm-clearance reasoning still HOLDS, and re-terminating at `end_upper`
+    # only strengthens it: the leader now runs x=0.0605..0.066, i.e. it moves
+    # FURTHER LEFT, away from the Ra's arm at 0.075, and stays near-vertical
+    # (5.5 mm of horizontal run over 37 mm of drop).  It also stays outside the
+    # circle (its low end IS the circle) and clears datum A's box (x<=0.0585) by
+    # 4.4 mm at y=0.229.  The Ra keeps `end_circle`; only this terminus moved.
     add_feature_control_frame(
         adapter,
         end,
-        edge_xy=end_circle,
+        edge_xy=end_upper,
         frame_xy=(0.068, 0.252),
         characteristic="cylindricity",
         tolerance="0.01",
@@ -268,8 +293,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="arbor bearing finish",
     )
 
-    # 0.020, not 0.014 -- the border rule sits at ~0.016, so a note anchored
-    # at 0.014 starts its first character on the frame line.
+    # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
     add_property_linked_note(adapter, "Iso View Note", 0.325, 0.092)

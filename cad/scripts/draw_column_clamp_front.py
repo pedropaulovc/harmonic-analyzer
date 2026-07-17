@@ -258,10 +258,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="ear holes",
     )
 
-    # 0.020, not 0.014 -- the note is left-aligned ON its anchor and the border
-    # rule is drawn at ~0.0158, so every line's first character printed on the
-    # frame.  The layout audit cannot catch it: it measures the 12.7 mm ZONE
-    # margin, which 0.014 clears.
+    # 0.020: the note is left-aligned ON its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.168)
 

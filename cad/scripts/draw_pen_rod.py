@@ -54,7 +54,19 @@ ISO_CENTER = (0.340, 0.195)
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
-    "Section": (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0 - 0.012),
+    # x offset -0.034 (the Depth spelling below), NOT the view centre: Section
+    # measures the 5 mm square across, so at 1:1 its two extension lines land
+    # 4.7 mm apart (measured x=0.0679 and x=0.0726) while the toleranced text
+    # renders 24.5 mm wide. Centred on FRONT_CENTER[0] the text spanned
+    # 0.0580..0.0820, so BOTH extension lines ran through it and struck out
+    # "+0.00/-0.05". text_xy is the text CENTRE, so -0.034 puts the run at
+    # 0.0238..0.0483: clear of the left extension line by 19.6 mm and of the
+    # drawn border rule (gray, x=~0.0126) by ~11.2 mm. No gate sees this -- a
+    # dimension exposes no GetExtent, so only the render shows it.
+    "Section": (
+        FRONT_CENTER[0] - 0.034,
+        FRONT_CENTER[1] - ROD_LENGTH / 2000.0 - 0.012,
+    ),
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] - 0.034, TOP_CENTER[1]),
@@ -216,22 +228,51 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen-rod slide face finish",
     )
 
-    # Stays at 0.014 even though that prints through the DRAWN border rule at
-    # 0.0159 -- unlike every other sheet, this note cannot be moved off it.
+    # 0.015 -- centred in the corridor. The tight window is REAL: this note is
+    # 246.2 mm of text in a 251.2 mm corridor, bounded at BOTH ends, so 0.020 (the
+    # safe anchor on every other sheet) drives the tail into the title block.
     #
-    # Its first line is one 250.1 mm run, and the gap between that rule and the
-    # title-block keep-out at 0.2672 is 251.1 mm: 1.0 mm of total slack. x=0.020
-    # (the safe anchor elsewhere) drives the tail 2.9 mm into the title block and
-    # fails the audit outright; x=0.017 splits the difference at +1.0 mm from the
-    # rule and +0.1 mm from the title block, which is worse than what it fixes.
-    # It cannot move UP either: the band above is the Ra body, the Section callout
-    # and then the view itself.
+    # ALL NUMBERS BELOW ARE MEASURED ON THE REBUILT 2026-07-16 SHEET, black-ink
+    # only (threshold 200 sees the gray frame rule too; the note is black, the rule
+    # is gray, and they are 0.6 mm apart -- only the black/gray split separates
+    # them, an ALL-ink bbox reads the rule as the note's first glyph). Note ink at
+    # anchor 0.013 measured x 0.0134..0.2596, i.e. ink_start = anchor + 0.0004.
     #
-    # This is the template's fault, not the coordinate's -- the frame is drawn
-    # 3.2 mm left of the 12.7 mm margin it declares. Once the DRWDOT is re-centred
-    # onto its declared margins, 0.014 clears the rule by 1.4 mm and the title
-    # block by 3.1 mm, and this comment can go.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.058)
+    # The bounds, tighter of drawn-vs-gated on each side:
+    #     left   drawn rule right edge 0.0128 | gate bound (12.7 zone margin) 0.0127
+    #     right  drawn title block     0.2658 | gate bound _TITLE_BLOCK_LEFT_M 0.264
+    # so the governing corridor is 0.0128 -> 0.264 = 251.2 mm, slack 5.0 mm, and
+    # centring puts ink at 0.0154..0.2616: 2.6 mm off the drawn rule, 2.4 mm off
+    # the gate's keep-out, 4.2 mm off the drawn block. At the previous 0.013 the
+    # note cleared both ends but sat 0.6 mm off the left rule with 6.2 mm unused on
+    # the right -- legal, but visually jammed and inside render noise of touching.
+    #
+    # THE TITLE BLOCK DID NOT TRANSLATE WITH THE FRAME, and that is the whole
+    # story here. A superseded comment predicted the tail would overrun the block
+    # by ~0.1 mm, reasoning that the block is format geometry that moved with the
+    # re-centred frame (keep-out 0.2672 -> ~0.2640, corridor MOVED not widened).
+    # The block stayed put. Proof, measured: the block's horizontal cell rules
+    # still run out to x=0.4223 -- exactly where the OLD right frame rule sat
+    # (0.4221..0.4225) -- while the frame's right rule is now at 0.4188..0.4192.
+    # The rules moved inward ~3.3 mm; the block did not follow, so it now
+    # protrudes past the frame (a template defect, tracked separately). Hence the
+    # corridor WIDENED rather than moved:
+    #     old  0.2658 - 0.0159 = 249.9 mm
+    #     now  0.2658 - 0.0126 = 253.2 mm
+    # which is the ~3.3 mm of new room the ORIGINAL comment claimed and the
+    # superseded one denied.
+    #
+    # The 0.2672 in that superseded comment was NOT an error: the block's leftmost
+    # BLACK TEXT measures 0.2675 (its outer RULE is 0.2658). Both are real bounds;
+    # text is the tighter keep-out for a note on this y band. Do not "correct" it
+    # to the rule. (It is also within 0.3 mm of the old TOP rule's y=0.2672 --
+    # a coincidence that makes an axis-confusion story look compelling and wrong.)
+    #
+    # It cannot move UP: the band above is the Ra body, the Section callout, then
+    # the view. 5 mm of slack on a 246 mm note is fragile by construction and no
+    # anchor fixes that; shortening the "Manufacturing Notes" property is the only
+    # durable answer, and that is a content call.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.015, 0.058)
     add_property_linked_note(adapter, "Top View Note", 0.036, 0.266)
 
     return await finalize_drawing(

@@ -277,12 +277,9 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.117, 0.196),
         label="guide-lock screw holes",
     )
-    # x=0.020, not the 0.014 that reads as "the zone margin plus a hair": the
-    # sheet's DRAWN border rule sits at 0.0159, not at the 0.0127 margin
-    # ISheet::GetZoneMargin declares, and the note anchor IS the text's left
-    # edge -- measured ink began at 0.0141, i.e. printed straight through the
-    # border line. The audit cannot catch it (it bounds notes by the declared
-    # margin, which is 3.2 mm left of the rule), so this is eye-verified.
+    # x=0.020: the note anchor IS the text's left edge, so the ink starts here.
+    # The 0.0127 margin ISheet::GetZoneMargin declares and the re-centred border
+    # rule (~0.0126) now agree; 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.160)
 

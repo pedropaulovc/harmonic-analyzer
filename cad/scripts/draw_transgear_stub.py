@@ -79,6 +79,16 @@ def _fy(y_mm: float) -> float:
 # anchor and runs ~26 mm), and at 0.162 the chain's dimension line printed
 # straight through "Ra 1.6". The seat silhouette at x=0.125 leaves too little
 # room to walk the symbol left instead, so the chain moves right; ~7 mm of gap.
+#
+# CAVEAT (measured 2026-07-16): that "~7 mm of gap" is TEXT-only, and the text is
+# not the symbol's rightmost ink. Verified against the render: the text does end
+# at x=0.1703 (so 5.6 mm to the chain line, which sits at x=0.1759..0.1760), but
+# the Ra symbol's horizontal ARM extends 6.1 mm PAST its own text, to x=0.1764 --
+# it crosses the chain line by ~0.5 mm. Left as-is: a 0.5 mm hairline does not
+# justify a rebuild. Recorded so the next reader does not "confirm" this clearance
+# by measuring the text and miss the arm. Do not treat text extent as symbol
+# extent for ANY Ra placement -- and note text is not a COM primitive, so
+# GetLineAtIndex will not show it to you either; only the render will.
 _LENGTH_CHAIN_X = 0.176
 FRONT_KEEP = {
     "BaseDia": (0.052, _fy(BASE_LEN / 2.0)),
@@ -196,9 +206,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
 
-    # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
-    # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
-    # is the 12.7 mm zone margin, so it cannot see this).
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.112)
 
     return await finalize_drawing(

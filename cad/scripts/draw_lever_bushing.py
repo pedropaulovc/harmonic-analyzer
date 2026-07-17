@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the lever-bank spacer bushing."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -127,9 +128,29 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    outer_edge = (
-        FRONT_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 2000.0,
-        FRONT_CENTER[1],
+    outer_radius = OUTER_DIA * SHEET_SCALE[0] / 2000.0
+    # 45 deg on the OD, NOT its 3 o'clock (the old `outer_edge`, which is where
+    # `bore_edge` and the Ra's own anchor also sit at centre height).  The Ra
+    # symbol is at x=0.120 -- OUTSIDE the OD, which ends at 0.104 -- so its
+    # leader runs from (0.120, 0.212) back to bore_edge (0.093, 0.205) and
+    # passes through (0.1041, 0.2079), measured INSIDE this frame's arrowhead
+    # (ink bbox x 0.1038..0.1045, y 0.2061..0.2088).  The two merged into a
+    # single ink blob -- confirmed twice: analytically from the leader's
+    # straight path, and by an ink map at 0.08 mm/cell showing the OD circle,
+    # this leader and the Ra leader collapsing into one run at (0.1041, 0.2088).
+    #
+    # The FRAME's terminus is what has to move, not the Ra: any Ra leader from
+    # x>0.104 to the bore at 0.093 must cross the 3 o'clock ray, so no Ra
+    # placement on this side can avoid a 3-o'clock anchor.  At 45 deg this
+    # leader spans y 0.222..0.252 while the Ra's spans y 0.205..0.212 --
+    # DISJOINT in y, so they cannot cross at any x (a stronger guarantee than
+    # any clearance number).  The arc there is empty: an ink map of the OD's
+    # upper-right quadrant finds only the circle itself at (0.0970, 0.2220) --
+    # datum A's leader is 17 mm left at x=0.080, and the Ø12.00 diametral line
+    # stays below y=0.213.
+    outer_runout = (
+        FRONT_CENTER[0] + outer_radius * math.cos(math.radians(45.0)),
+        FRONT_CENTER[1] + outer_radius * math.sin(math.radians(45.0)),
     )
     bore_edge = (
         FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -169,7 +190,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=outer_edge,
+        edge_xy=outer_runout,
         frame_xy=(0.115, 0.255),
         characteristic="circular_runout",
         tolerance="0.05",
@@ -193,8 +214,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # x+0.039, y+0.019) and the leader leaves the anchor itself, so anchoring
     # just above/right of the bore keeps the leader short and the body in the
     # empty band between the views: clear of the Ø6.50 callout below (it ends at
-    # y=0.205), the runout frame above (y=0.251) and the OD-runout leader that
-    # drops down x~0.104..0.115.
+    # y=0.205), the runout frame above (y=0.251) and the OD-runout leader, which
+    # now drops down x~0.097..0.112 (it was x~0.104..0.115 while that frame
+    # picked the OD's 3 o'clock -- see `outer_runout` above).
+    #
+    # NOTE this reasoning bounds the symbol BODY only.  What actually collided
+    # was this Ra's own LEADER, which the body's clearances say nothing about:
+    # it runs (0.120, 0.212) -> bore_edge and crossed the runout frame's
+    # arrowhead at (0.1041, 0.2079).  Fixed on the frame's side; if this symbol
+    # moves, re-check the LEADER's path, not just where the body lands.
     add_surface_finish(
         adapter,
         front,
@@ -204,10 +232,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bushing bore finish",
     )
 
-    # x=0.020: the DRAWN border rule is at 0.0159, not the 0.0127 zone margin the
-    # sheet declares, and the anchor is the text's left edge -- 0.014 put the ink
-    # at 0.0141, printing through the rule. The audit bounds notes by the declared
-    # margin, so it cannot see this; eye-verified.
+    # x=0.020: the anchor is the text's left edge, so the ink starts here. The
+    # sheet's 0.0127 zone margin and the re-centred border rule (~0.0126) now
+    # agree, so 0.020 clears the rule and the audit enforces the same bound.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.095)
     return await finalize_drawing(
         adapter,

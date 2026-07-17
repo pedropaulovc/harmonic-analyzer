@@ -77,9 +77,25 @@ def _front_y(model_y: float) -> float:
 
 
 FRONT_KEEP = {
+    # Anchored ABOVE the flange's top face, not at its mid-height.  The flange is
+    # 1.5 mm thick, so at 3:1 its two extension lines are just 4.5 mm apart
+    # (measured 2026-07-16 at x=0.115, clear of the text: y=0.1437 and y=0.1392).
+    # `_front_y(WASHER_T / 2.0)` put the text INSIDE that 4.5 mm gap, and the text
+    # is a two-line block ~9.4 mm tall ("1.50" over the "+/-0.10" callout) -- it
+    # cannot fit, so the dimension printed through itself: at x=0.1305 the upper
+    # extension line reappears at y=0.1437..0.1439, dead through the middle of
+    # "1.50" (glyphs y=0.1417..0.1451), the lower line at y=0.1392 clips the top of
+    # "+/-0.10", and the vertical dim line at x=0.130 crosses both.  SolidWorks has
+    # already flipped the arrows outside the gap (y=0.1472 / 0.1357); only the text
+    # was left behind.
+    #
+    # `_front_y(WASHER_T) + 0.013` tracks the flange's TOP FACE (y=0.14305, which
+    # the measured 0.1437 extension line confirms) rather than freezing a literal,
+    # and 13 mm of standoff clears the upper arrowhead by 4.1 mm.  The band above
+    # is empty: probed x=0.105..0.152 at y=0.152/0.156/0.160 -- no ink at all.
     "WasherT": (
         FRONT_CENTER[0] + WASHER_DIA * _S / 2.0 + 0.028,
-        _front_y(WASHER_T / 2.0),
+        _front_y(WASHER_T) + 0.013,
     ),
     "BodyTop": (
         FRONT_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.024,
@@ -96,7 +112,7 @@ FRONT_KEEP = {
 }
 # x=0.030 for the two leadered diameters, not the old washer-derived 0.018: a
 # horizontal "O13.00" is ~19 mm wide and CENTRED on its anchor, so 0.018 ran its
-# text out to x=0.008 -- across the border rule at ~0.0158.  The layout audit
+# text out to x=0.008 -- across the border rule at ~0.0126.  The layout audit
 # cannot see this: it boxes a dim as a nominal 4 mm half-square
 # (_NOMINAL_DIM_HALF_M), which at 0.018 still cleared the 12.7 mm zone margin.
 # 0.030 puts the text at ~0.021..0.039: inside the frame, outside the view.
@@ -289,9 +305,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="dome crown finish",
     )
 
-    # 0.020, not 0.014 -- the border rule is drawn at ~0.0158 and the note is
-    # left-aligned on its anchor, so 0.014 printed the first character on the
-    # frame line (the audit only checks the wider 12.7 mm zone margin).
+    # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
+    # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame
+    # rule now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
     return await finalize_drawing(
         adapter,

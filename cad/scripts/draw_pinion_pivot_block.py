@@ -330,10 +330,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore finish",
     )
 
-    # 0.020, not 0.014: the DRAWN border rule sits at ~0.0158, well inside the
-    # 12.7 mm zone margin the layout gate measures against, so a note anchored
-    # at 0.014 clears the gate and still prints its first character on the frame
-    # line. Only the render shows it.
+    # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127) the layout gate measures against,
+    # which the re-centred frame rule now matches (~0.0126); 0.020 clears both.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.180)
 

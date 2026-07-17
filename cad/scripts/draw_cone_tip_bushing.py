@@ -144,9 +144,24 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bushing side-view axis centerline",
     )
 
-    outer_top = (
-        END_CENTER[0],
-        END_CENTER[1] + OUTER_DIA * SHEET_SCALE[0] / 2000.0,
+    # The OD runout attaches at the OD's UPPER-LEFT 45 deg point, NOT its 12
+    # o'clock -- and this is the whole reason the frame's own anchor is up-left.
+    #
+    # Datum A (below) leaders RADIALLY out of the bore at 12 o'clock, so it is a
+    # vertical line along x = END_CENTER[0]. The OD's 12 o'clock lies exactly ON
+    # that line, so an `outer_top` pick put the runout's arrowhead on top of the
+    # datum leader: measured on the 2026-07-16 render, arrow tip (0.0852, 0.2146)
+    # against the datum leader at x=0.0850 -- 0.2 mm apart, the stacked-arrowhead
+    # tell. 45 deg moves the arrow to (0.0680, 0.2070), a clear 17 mm away, and
+    # keeps the leader radial (it approaches the OD from OUTSIDE, so it never
+    # crosses the circle). This is draw_pivot_bushing.py's `outer_edge_upper`
+    # spelling and its stated rationale -- "so the four leaders do not converge
+    # on one spot".
+    _diag = 2.0**-0.5
+    _outer_r = OUTER_DIA * SHEET_SCALE[0] / 2000.0
+    outer_upper_left = (
+        END_CENTER[0] - _outer_r * _diag,
+        END_CENTER[1] + _outer_r * _diag,
     )
     bore_edge = (
         END_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -178,6 +193,25 @@ async def build(adapter: Any) -> dict[str, str]:
     # The bore's straight side-view flank is NOT an alternative here: it is
     # unpickable as both an EDGE and a SILHOUETTE ("failed to select" at
     # x=0.186825, and likewise at the right flank x=0.193175).
+    #
+    # KNOWN AND STRUCTURAL, do not "fix": this leader CROSSES the O6.00 OD on its
+    # way out (measured 2026-07-16 -- one unbroken ink run at x=0.085 from
+    # y=0.1852 to y=0.2270, of which the 20.8 mm from the bore at y=0.1932 to the
+    # OD at y=0.2140 is inside the part).  It is forced, not chosen -- the four
+    # alternatives are each ruled out ABOVE or here:
+    #   * symbol OUTSIDE the OD -> a radial ray from a concentric inner circle to
+    #     any point beyond the outer circle must cross it.  Topology, not layout;
+    #   * symbol INSIDE the OD (the 20.8 mm annulus does fit the ~8 x 6 mm box) ->
+    #     the box then prints inside the part outline, which is exactly the defect
+    #     fixed in draw_crank_arm.py's datum C;
+    #   * symbol NOT radial -> dot(symbol_xy - edge_xy, outward_normal) <= 0 on a
+    #     circle, which re-collapses the tag onto the bore (the failure the
+    #     paragraph above documents);
+    #   * attach in the side view -> flank unpickable (measured, just above).
+    # draw_pivot_bushing.py carries the identical spelling and reads fine because
+    # its bore nearly fills its OD (O6.5 in O10 -> a 7 mm crossing).  Here the bore
+    # is O0.794 in a O6 OD, so the same convention spans a 20.8 mm annulus and
+    # reads heavy.  The fixable half was the stacked runout arrow, done above.
     bore_top = (
         END_CENTER[0],
         END_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -201,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         end,
-        edge_xy=outer_top,
+        edge_xy=outer_upper_left,
         frame_xy=(0.072, 0.254),
         characteristic="circular_runout",
         tolerance="0.05",

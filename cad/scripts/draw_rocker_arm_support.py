@@ -230,10 +230,9 @@ async def build(adapter: Any) -> dict[str, str]:
         #   x: the tag DRAWS LEFT of its anchor (measured ~7.6 mm wide, its right
         #      edge on the anchor, leader running right to the face). The former
         #      -0.014 offset from the view's left edge at x=0.0306 put it far
-        #      into the margin; even x=0.023 left its edge at 0.0156, over the
-        #      DRAWN frame rule at 0.0159 -- which the audit cannot see, since it
-        #      bounds against the 12.7 mm zone margin. 0.027 clears the rule by
-        #      ~3.5 mm and still leaves ~3.6 mm to the view.
+        #      into the margin. 0.027 leaves its edge at 0.0194: clear of the
+        #      12.7 mm zone margin (~0.0127, which the re-centred frame rule now
+        #      matches) by ~6.7 mm, and still ~3.6 mm short of the view.
         #   y: at the edge's mid-height the tag landed ON the hole table's origin
         #      indicator, whose "Y" label and axis arrow occupy x 0.0165..0.0194
         #      up to y=0.1205; y=0.131 lifts it clear into empty sheet.
@@ -270,9 +269,9 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="4X",
         label="support hole-pattern position",
     )
-    # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
-    # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
-    # is the 12.7 mm zone margin, so it cannot see this).
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
 
     return await finalize_drawing(

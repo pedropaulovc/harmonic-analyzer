@@ -216,9 +216,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("C",),
         label="crossbar end-seat parallelism",
     )
-    # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
-    # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
-    # is the 12.7 mm zone margin, so it cannot see this).
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     # y=0.084, not 0.090: the anchor is the block's TOP and it grows down, so at
     # 0.090 its first line ran to y=0.0898 against datum A's tag bottom at
     # 0.0914 -- a measured 1.6 mm, which one more note line would close. The 6 mm

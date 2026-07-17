@@ -60,10 +60,9 @@ FRONT_LEFT_X_M = 0.040
 FRONT_VIEW_Y_M = 0.110
 FRONT_HOLE_Y_M = 0.1111
 FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
-# 0.020, not 0.014: the sheet's DRAWN frame rule is at x=0.0159, inboard of the
-# 12.7 mm zone margin the audit checks, so a table left edge at 0.0143 passed the
-# gate while printing 1.6 mm over the frame (measured). 0.020 clears the rule
-# whether or not the DRWDOT is later re-centred onto its declared margins.
+# 0.020: the table's left edge lands ~0.3 mm right of its anchor (measured). The
+# bound is the 12.7 mm zone margin (~0.0127) the audit checks, which the
+# re-centred frame rule now matches (~0.0126); 0.020 keeps the edge clear of both.
 HOLE_TABLE_X_M = 0.020
 HOLE_TABLE_Y_M = 0.258
 THREAD_DESIGNATION = "#4-40 UNC-2B"
@@ -192,11 +191,42 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="guide bottom edge",
     )
+    # Dropped to y=0.098 from FRONT_HOLE_Y_M (0.1111): level with the edge, the
+    # box is UNAVOIDABLY struck through. `insert_hole_table` gives no control over
+    # where SolidWorks auto-places the hole table's origin indicator, and it does
+    # NOT land on datum_xy -- measured, it sits ~13.5 mm left of the bar's end, as
+    # a vertical Y-axis shaft at x=0.0265 spanning y 0.107..0.122, an origin circle
+    # at (0.0266, 0.1076), and a "0" glyph at x 0.0250..0.0279 / y 0.1036..0.1059.
+    # At y=0.1111 the tag's box (x 0.0210..0.0281) swallowed that shaft: it ran the
+    # box's full height, 0.4 mm from the "C" glyph. So the indicator cannot move
+    # and datum C must.
+    #
+    # LEFT is not available: the 7.1 mm box would now fit the ~12.3 mm corridor
+    # between the frame bound (~0.0127) and the shaft, but any box left of the
+    # shaft puts its horizontal leader ACROSS the shaft instead -- trading a
+    # strikethrough for a crossing. UP hits the "Y" label and the 300.00
+    # extension line.
+    #
+    # y=0.098 is the HIGHEST that clears: box y 0.0945..0.1015 leaves 2.1 mm under
+    # the "0" glyph, ~8.3 mm off the re-centred frame rule, and 8 mm left of the
+    # "0 -> X" row (x>=0.036, y 0.091..0.0955); the band x 0.017..0.039 is
+    # otherwise empty (probed y=0.096/0.100/0.102 -- only the rule and the
+    # x=0.0399 extension line).
+    #
+    # TRADEOFF, deliberate: a datum tag re-attaches at the point on its entity
+    # NEAREST the symbol (draw_fulcrum_shaft.py; wheel-axle's datum A proves it for
+    # straight edges too -- pick x=0.13125, symbol x=0.13725, triangle rendered at
+    # 0.1376). The end edge spans only y 0.1086..0.1136, so a symbol below it slides
+    # the triangle to the bottom corner (0.040, 0.1086) rather than mid-edge. The
+    # triangle stays ON the end face and the symbol stays outboard of it
+    # (dot((-0.012, -0.0106), (-1,0)) = +0.012 > 0), so it still reads as the end
+    # datum -- but there is no placement that keeps it mid-edge, because the edge's
+    # whole 5 mm lies inside the shaft's span.
     add_datum_feature(
         adapter,
         front,
         edge_xy=datum_c_edge,
-        symbol_xy=(0.028, FRONT_HOLE_Y_M),
+        symbol_xy=(0.028, 0.098),
         datum="C",
         label="guide end edge",
     )
@@ -244,9 +274,9 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="9X",
         label="guide hole-pattern position",
     )
-    # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
-    # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
-    # is the 12.7 mm zone margin, so it cannot see this).
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
     return await finalize_drawing(

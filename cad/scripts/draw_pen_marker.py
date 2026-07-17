@@ -248,11 +248,28 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen-marker barrel axis",
         entity_type="SILHOUETTE",
     )
+    # frame_xy is the frame's TOP-LEFT corner and the box grows RIGHT from it:
+    # measured, the anchor (APEX[0]-0.014 = 0.076) rendered the box at
+    # x 0.0759..0.1012, y 0.2062..0.2121 -- 25.3 mm wide. The overall-length
+    # dimension below picks the apex VERTEX, so its left extension line rises at
+    # exactly APEX[0] = 0.090, which fell 14 mm INSIDE that box and struck out
+    # the "0.10" tolerance cell. (The 60.00 is a GRAY reference dimension, so a
+    # crop thresholded at 128 cannot see the line at all -- only the render or a
+    # 200-threshold crop shows it.)
+    #
+    # -0.032 puts the box at 0.058..0.0833: its right edge clears APEX[0] by
+    # 6.7 mm, and it lands in empty sheet (the only ink measured in
+    # x 0.030..0.076, y 0.204..0.214 was the box's own left border). It may NOT
+    # go right instead: the Ra body's ink starts at x=0.1119, so a box left-
+    # anchored past the extension line would end at 0.1173 and run 5.4 mm into
+    # it -- the "x<=0.111" bound noted below is real and tight. The leader now
+    # crosses the gray extension line on its way to the cone flank, which is
+    # ordinary ASME routing; a struck-out tolerance value is not.
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=CONE_FLANK,
-        frame_xy=(APEX[0] - 0.014, FRONT_CENTER[1] + 0.032),
+        frame_xy=(APEX[0] - 0.032, FRONT_CENTER[1] + 0.032),
         characteristic="circular_runout",
         tolerance="0.10",
         datums=("A",),
@@ -280,10 +297,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
 
-    # x=0.020: the DRAWN border rule is at 0.0159, not the 0.0127 zone margin the
-    # sheet declares, and the anchor is the text's left edge -- 0.014 put the ink
-    # at 0.0141, printing through the rule. The audit bounds notes by the declared
-    # margin, so it cannot see this; eye-verified.
+    # x=0.020: the anchor is the text's left edge, so the ink starts here. The
+    # sheet's 0.0127 zone margin and the re-centred border rule (~0.0126) now
+    # agree, so 0.020 clears the rule and the audit enforces the same bound.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
     add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.135)
 

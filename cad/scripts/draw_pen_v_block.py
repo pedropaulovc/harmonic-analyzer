@@ -297,7 +297,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # under the view is full of bore stations and chamfer/screw callouts.
     #
     # The LEFT column cannot take bore 0 either, though it looks empty: the body
-    # would have to clear the DRAWN border rule at 0.0159 (ink >= 0.020, so
+    # would have to clear the left frame bound at ~0.0127 (ink >= 0.020, so
     # ax >= 0.026) AND stop before the view at 0.0658 (ax <= 0.0248) -- an empty
     # window. Dropping it lower-left instead puts its bore up-RIGHT of the anchor,
     # the one direction that makes the leader strike through its own text.
@@ -324,17 +324,17 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen bore finish (bore 1)",
     )
 
-    # x=0.020: the DRAWN border rule is at 0.0159, not the 0.0127 zone margin the
-    # sheet declares, and the anchor is the text's left edge -- 0.014 put the ink
-    # at 0.0141, printing through the rule. The audit bounds notes by the declared
-    # margin, so it cannot see this; eye-verified.
+    # x=0.020: the anchor is the text's left edge, so the ink starts here. The
+    # sheet's 0.0127 zone margin and the re-centred border rule (~0.0126) now
+    # agree, so 0.020 clears the rule and the audit enforces the same bound.
     # y=0.046, not 0.070: this block is SIX lines (26.6 mm tall, anchored at its
     # top line) and the front view's bottom edge is only at y=0.079, so anchoring
     # it at 0.070 overlapped the whole 32.00/26.00 locator chain -- both dimension
     # lines span the view's full width and printed through the note text like
     # strikethrough. Dimensions are CollisionScope.NONE, so no gate sees this.
     # 0.046 drops the block clear below the 32.00 text (bottom y 0.055) while
-    # keeping its own bottom at 0.0194 -- 6.1 mm inside the drawn frame rule.
+    # keeping its own bottom at 0.0194 -- ~6.8 mm above the drawn bottom rule
+    # (~0.0126, now on the declared 12.7 mm margin).
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.046)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.180)
 
