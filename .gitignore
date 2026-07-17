@@ -435,3 +435,6 @@ comparisons/bench/out/
 # machine-local dev-tooling binaries (Jaeger + native Aspire dashboard + dotnet
 # runtime for local OTel trace/log viewing — see memory/otel-trace-local-viewing.md)
 .tools/
+
+# Agent worktrees (transient, per-session; never an artefact of the repo)
+.claude/worktrees/

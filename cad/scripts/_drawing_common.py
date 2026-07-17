@@ -22,6 +22,7 @@ from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
     LayoutElement,
+    LeaderCrossing,
     LeaderSegment,
     audit_layout,
     format_findings,
@@ -2290,7 +2291,24 @@ def collect_layout_elements(
     return elements, leaders, region
 
 
-def check_drawing_layout(adapter: Any) -> None:
+# RATCHET, drive to ZERO. One entry, one number: the leader-vs-leader crossings a
+# sheet is KNOWN to still carry, grandfathered so the gate can protect the other
+# 22 sheets today instead of waiting on a design decision.
+#
+# pen-assembly's 2 are PRE-EXISTING -- the _spread_balloons ring bug predates the
+# gate and predates this PR; they were found by eye on the shipped sheet. The
+# remedy is a ring-SHAPE change (a column layout for a tall skinny sub), which
+# changes how the sheet LOOKS and is therefore the owner's call, not something to
+# pick at random until the gate goes green. See _spread_balloons.
+#
+# The check below demands an EXACT match, so this cannot rot in either direction:
+# a NEW crossing fails, and fixing one of pen-assembly's two ALSO fails until the
+# number here comes down with it. Nothing may be added to this dict to make a
+# build pass -- a new crossing is a defect to fix, not to record.
+_KNOWN_LEADER_CROSSINGS: dict[str, int] = {"pen-assembly": 2}
+
+
+def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     """Fail loud on a colliding, border-crossing, or leader-crossed layout.
 
     Runs at the end of every recipe's layout, right before the drawing is saved
@@ -2298,18 +2316,51 @@ def check_drawing_layout(adapter: Any) -> None:
     on a view, an element run into the zone border, or a leader driven across a
     view it does not annotate -- defects the dimensional and format gates cannot
     see.
+
+    ``stem`` keys the :data:`_KNOWN_LEADER_CROSSINGS` ratchet; omitted, a sheet is
+    held to zero, which is the right default for every caller that does not know
+    it is grandfathered.
     """
     with _telemetry.span("drawing.layout_audit") as span:
         elements, leaders, region = collect_layout_elements(adapter)
         overlaps, overflows, crossings = audit_layout(
             elements, region, leaders=leaders
         )
+        # Only leader-vs-LEADER crossings are ratchetable. A leader driven across
+        # a foreign VIEW is always a hard failure: it has no grandfathered case,
+        # and lumping the two would let the exemption cover a defect class it was
+        # never argued for.
+        leader_leader = [c for c in crossings if isinstance(c, LeaderCrossing)]
+        allowed = _KNOWN_LEADER_CROSSINGS.get(stem, 0)
         if span is not None:
             span.set_attribute("elements", len(elements))
             span.set_attribute("leaders", len(leaders))
             span.set_attribute("overlaps", len(overlaps))
             span.set_attribute("overflows", len(overflows))
             span.set_attribute("crossings", len(crossings))
+            span.set_attribute("known_leader_crossings", allowed)
+        if allowed and len(leader_leader) == allowed and not overlaps and not overflows:
+            _telemetry.warn(
+                f"drawing layout: {len(leader_leader)} KNOWN leader crossing(s) "
+                f"on {stem!r}, grandfathered by _KNOWN_LEADER_CROSSINGS -- this "
+                "is a defect, not a pass; drive it to zero:\n"
+                + format_findings([], [], leader_leader)
+            )
+            return
+        if allowed and len(leader_leader) != allowed:
+            raise RuntimeError(
+                f"{stem!r} is on the _KNOWN_LEADER_CROSSINGS ratchet at "
+                f"{allowed}, but this build found {len(leader_leader)}. "
+                + (
+                    "FEWER is progress -- lower the number (to 0, delete the "
+                    "entry) so it cannot silently regress."
+                    if len(leader_leader) < allowed
+                    else "MORE is a new defect -- fix the layout; do not raise "
+                    "the number."
+                )
+                + "\n"
+                + format_findings([], [], leader_leader)
+            )
         if not overlaps and not overflows and not crossings:
             _telemetry.success(
                 f"drawing layout clean: {len(elements)} elements, "
@@ -2400,7 +2451,7 @@ async def finalize_drawing(
     # The layout is now complete -- audit element collisions / sheet overflow on
     # the finished sheet before the first save, so a broken layout never reaches
     # the saved SLDDRW / PDF / PNG.
-    check_drawing_layout(adapter)
+    check_drawing_layout(adapter, stem=outputs.slddrw.stem)
 
     artifacts = save_drawing(adapter, str(outputs.slddrw))
     drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)

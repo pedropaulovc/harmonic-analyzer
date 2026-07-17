@@ -23,6 +23,7 @@ from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
     LayoutElement,
+    LeaderCrossing,
     LeaderSegment,
     audit_layout,
     format_findings,
@@ -840,3 +841,56 @@ def test_a_shared_terminus_does_not_mask_a_real_crossing_elsewhere():
     (crossing,) = find_leader_leader_crossings([b4, b6])
     assert crossing.x == pytest.approx(0.2285, abs=5e-4)
     assert crossing.y == pytest.approx(0.1161, abs=5e-4)
+
+
+# --- the _KNOWN_LEADER_CROSSINGS ratchet -------------------------------------
+
+
+def _stub_layout(monkeypatch, leader_crossings):
+    """Drive check_drawing_layout with a chosen number of leader crossings."""
+    seg = LeaderSegment("a", "gdt", 0.0, 0.0, 0.1, 0.1, owner="Front")
+    found = [LeaderCrossing(seg, seg, 0.05, 0.05) for _ in range(leader_crossings)]
+    monkeypatch.setattr(
+        drawing_common, "collect_layout_elements",
+        lambda _adapter: ([], [], WHOLE_SHEET),
+    )
+    monkeypatch.setattr(
+        drawing_common, "audit_layout",
+        lambda *_a, **_k: ([], [], found),
+    )
+
+
+def test_ratchet_grandfathers_a_known_sheet_at_its_exact_count(monkeypatch):
+    _stub_layout(monkeypatch, 2)
+    drawing_common.check_drawing_layout(None, stem="pen-assembly")  # must not raise
+
+
+def test_ratchet_fails_when_a_known_sheet_IMPROVES(monkeypatch):
+    # The direction that makes a ratchet a ratchet. Fixing one of pen-assembly's
+    # two must FAIL until the number comes down with it -- otherwise the entry
+    # outlives the defect and silently re-permits it later.
+    _stub_layout(monkeypatch, 1)
+    with pytest.raises(RuntimeError, match="lower the number"):
+        drawing_common.check_drawing_layout(None, stem="pen-assembly")
+
+
+def test_ratchet_fails_on_a_new_crossing_on_a_known_sheet(monkeypatch):
+    _stub_layout(monkeypatch, 3)
+    with pytest.raises(RuntimeError, match="do not raise the number"):
+        drawing_common.check_drawing_layout(None, stem="pen-assembly")
+
+
+def test_an_unlisted_sheet_is_held_to_zero(monkeypatch):
+    # The exemption must not leak: every sheet not named in the dict gets the
+    # strict gate, and an omitted stem defaults to strict too.
+    _stub_layout(monkeypatch, 1)
+    with pytest.raises(RuntimeError):
+        drawing_common.check_drawing_layout(None, stem="crank-arm")
+    with pytest.raises(RuntimeError):
+        drawing_common.check_drawing_layout(None)
+
+
+def test_the_ratchet_names_only_pen_assembly():
+    # A tripwire on the dict itself: it exists to shrink. If a second sheet is
+    # added to make a build pass, this fails and forces the conversation.
+    assert drawing_common._KNOWN_LEADER_CROSSINGS == {"pen-assembly": 2}
