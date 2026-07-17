@@ -25,9 +25,16 @@ kick.
   stalled with work unfinished; a part-built-but-drawing-unbuilt state is the common
   stall.
 - Gate-complete = commit subject "…curated manufacturing drawing slice" AND PNG AND
-  codex review file all present. Run a persistent [[com-seat-lock]] Monitor per wave
-  keyed on those three, then open the PR (`gh pr create --draft` → `gh pr ready`) the
-  moment a part flips DONE (the standing "PRs as drawings are ready" rule).
+  codex review file AND **the slice's pytest passing**. A PNG only proves the COM task
+  emitted an image; it says nothing about the offline contract the test owns (kept ==
+  marked dims, spec-is-single-source, config metadata), so keying the monitor on the
+  first three advances an UNTESTED slice. The test is a file-less signal, so the monitor
+  cannot poll for it like the other three — have the agent write the pytest result into
+  its report and check it before `gh pr ready`, or run
+  `uv run python -m pytest cad/scripts/test_<part>_drawing.py -q` yourself in the wave
+  sweep. Run a persistent [[com-seat-lock]] Monitor per wave keyed on the three file
+  signals, then open the PR (`gh pr create --draft` → `gh pr ready`) the moment a part
+  flips DONE **and its test is green**.
 - A checkpoint commit (slice files only, no PNG/review) is NOT PR-ready — agents
   legitimately commit early to rebase onto origin/main, per AGENTS.md.
 

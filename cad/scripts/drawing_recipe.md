@@ -138,11 +138,18 @@ git status --short                    # FIRST: see everything you actually touch
 git add cad/scripts/<part>_spec.py cad/scripts/draw_<part>.py cad/scripts/test_<part>_drawing.py \
         cad/scripts/build_<part>.py cad/scripts/_drawing_registry.py \
         cad/config/parts/<artifact-stem>.yaml          # dashed, NOT <part>
-# AND, only if you deliberately changed it, the shared helper your draw script needs:
-git add cad/scripts/_drawing_common.py
+# AND, each only if you actually added/changed it:
+git add cad/scripts/<part>_geom.py         # if you did the piece-1b split (NEW FILE -- easy to miss)
+git add cad/scripts/_drawing_common.py     # if your draw script needed a shared helper
 git commit -m "Add the <part> curated manufacturing drawing slice"
 git show --stat HEAD    # confirm ONLY the intended files are in the commit
 ```
+
+The two conditional adds are the ones that bite, and both fail the same way: a NEW or
+CHANGED module that the committed files IMPORT, left out of the commit. The slice looks
+complete, and the build dies in a fresh checkout on an import of something that is not in
+the tree. `<part>_geom.py` is the sneakier of the two because it is untracked — `git status`
+lists it under "Untracked files", not "Changes not staged", so it is easy to skim past.
 
 **If your slice needed a shared helper, it MUST ride in the same commit.** Some
 legitimately do — a revolve has no model edges on its flanks, so its GD&T needs
@@ -208,8 +215,10 @@ reads AGENTS.md and the review stops being blind. mkdir the report dir first or 
   NEUTRAL=$(mktemp -d) || exit 1
   ( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check -i "{WORKTREE}/cad/out/png/{ARTIFACT_STEM}_drawing.png" ) 2>&1 | tee "{WORKTREE}/cad/out/reports/codex_machinist_review.txt"
   rmdir "$NEUTRAL"
-  READ the review file back before trusting it: one opening with a shell error, or naming the
-  part / citing repo files, did not run blind and does not count.
+  READ the review file back before trusting it. The failure is a transcript with NO verdict
+  (only a shell error, because the cd aborted the command). Naming the part is NOT a tell --
+  the title block is in the image. The tell is a review citing what the drawing cannot show:
+  a repo file, a spec constant, design intent, a sibling part.
   Address clearly valid findings (1–2 iterations); leave repo-wide house-style items for a follow-up. Keep the review text, include it in your report.
 Slice-ready (NOT the merge gate — AGENTS.md owns that, and it is repo-wide): drawing builds
 clean + test passes + PNG visually correct + codex review addressed. The lead runs the full
