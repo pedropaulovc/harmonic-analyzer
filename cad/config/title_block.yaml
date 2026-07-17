@@ -37,6 +37,7 @@ surface:    { value_uin: 125,  display: "Ra 3.2" }  # µm (= 125 µin), machined
 # (docs/tolerance-policy.md — only the few critical features carry explicit
 # callouts, via _holes.wizard_holes dia_tolerance_mm when TIGHTER is needed).
 # Stamped as TOL_HOLE_MINUS / TOL_HOLE_PLUS; the title block's DRILLED HOLES row
-# reads them via $PRPSHEET. display_* are magnitudes — the template row supplies
-# the +/- around them.
-drilled_hole: { minus_mm: 0.0, plus_mm: 0.10, display_minus: "0", display_plus: "0.10" }
+# reads them via $PRPSHEET. display_* carry their own signs (the template pastes
+# them verbatim, like "±0.51"); the ASME order is upper-then-lower, so the
+# template row should read TOL_HOLE_PLUS then TOL_HOLE_MINUS -> "+0.10 / -0".
+drilled_hole: { minus_mm: 0.0, plus_mm: 0.10, display_minus: "-0", display_plus: "+0.10" }
