@@ -269,9 +269,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # The block stayed put. Proof, measured: the block's horizontal cell rules
     # still run out to x=0.4223 -- exactly where the OLD right frame rule sat
     # (0.4221..0.4225) -- while the frame's right rule is now at 0.4188..0.4192.
-    # The rules moved inward ~3.3 mm; the block did not follow, so it now
-    # protrudes past the frame (a template defect, tracked separately). Hence the
-    # corridor WIDENED rather than moved:
+    # The rules moved inward ~3.3 mm; the block did not follow AT FIRST, so it
+    # protruded past the frame -- a template defect since FIXED (Codex #334): the
+    # DRWDOT title-block right rules were re-anchored inward onto the frame
+    # border. Measured on the current render, the frame's right rule and the
+    # block's right rule now COINCIDE at x=0.4189 (both 0.4188..0.4192), no
+    # protrusion. The note corridor is governed by the block's LEFT edge
+    # (0.2658), which did not move, so this placement is unchanged; the corridor
+    # WIDENED rather than moved:
     #     old  0.2658 - 0.0159 = 249.9 mm
     #     now  0.2658 - 0.0126 = 253.2 mm
     # which is the ~3.3 mm of new room the ORIGINAL comment claimed and the
