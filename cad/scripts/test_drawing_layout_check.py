@@ -499,3 +499,66 @@ def test_titleblock_keepout_is_not_border_checked():
     # content -- border-checking it would report its own definition forever.
     title = _el("title-block", 0.264, 0.0, SHEET_W, 0.064, kind="titleblock")
     assert find_overflows([title], ZONE_REGION) == []
+
+
+def _gdt(x, y, kind, label):
+    annotation = SimpleNamespace(
+        GetPosition=[x, y, 0.0], GetType=lambda k=kind: k, GetName=lambda n=label: n
+    )
+    return drawing_common._gdt_element(
+        _FakeAdapter(None), annotation, label, kind
+    )
+
+
+def test_surface_finish_box_matches_the_measured_symbol_anatomy():
+    """An Ra symbol's anchor is its BOTTOM VERTEX and its body draws UP-RIGHT.
+
+    Measured on the shipped sheets by three agents independently. A symmetric box
+    is the wrong SHAPE here, not merely the wrong size.
+    """
+    ax, ay = 0.100, 0.200
+    element = _gdt(ax, ay, drawing_common._ANNOT_SFSYM, "Ra")
+
+    assert element.xmin == ax - drawing_common._SF_BOX_LEFT_M
+    assert element.xmax == ax + drawing_common._SF_BOX_RIGHT_M
+    assert element.ymin == ay              # the vertex IS the bottom edge
+    assert element.ymax == ay + drawing_common._SF_BOX_UP_M
+    # The body is far wider than tall and sits entirely above its anchor.
+    assert element.xmax - element.xmin > 2 * (element.ymax - element.ymin)
+
+
+def test_datum_and_control_frame_stay_centred_on_their_anchor():
+    """Only the surface-finish symbol is asymmetric; the others are centred."""
+    half = drawing_common._NOMINAL_GDT_HALF_M
+    for kind in (drawing_common._ANNOT_DATUM, drawing_common._ANNOT_GTOL):
+        element = _gdt(0.100, 0.200, kind, "tag")
+        assert (element.xmin, element.ymin) == (0.100 - half, 0.200 - half)
+        assert (element.xmax, element.ymax) == (0.100 + half, 0.200 + half)
+
+
+def test_surface_finish_over_the_top_border_is_now_caught():
+    """Regression: wheel_axle's Ra printed over the zone label, audit silent.
+
+    Its anchor sat at y=0.255 -- inside the 0.2667 top bound -- so the old
+    +/-8 mm box topped out at 0.263 and reported clean, while the real body
+    reached ay+0.018 = 0.273 and printed over the border.
+    """
+    ra = _gdt(0.030, 0.255, drawing_common._ANNOT_SFSYM, "Ra")
+    overflows = find_overflows([ra], ZONE_REGION)
+    assert overflows, "the Ra body crosses the top zone bound and must be flagged"
+    assert "top" in format_findings([], overflows).lower()
+
+    # The old symmetric box is the negative control: it does NOT reach the bound.
+    half = drawing_common._NOMINAL_GDT_HALF_M
+    old = _el("Ra", 0.030 - half, 0.255 - half, 0.030 + half, 0.255 + half,
+              kind="gdt", scope=CollisionScope.NONE)
+    assert not find_overflows([old], ZONE_REGION), (
+        "negative control: the old box was blind here -- that is the bug"
+    )
+
+
+def test_surface_finish_clear_of_the_border_still_passes():
+    """Positive control: draw-D's verified-safe bounds must audit clean."""
+    for ax, ay in ((0.045, 0.1045), (0.133, 0.1992)):
+        ra = _gdt(ax, ay, drawing_common._ANNOT_SFSYM, "Ra")
+        assert not find_overflows([ra], ZONE_REGION)

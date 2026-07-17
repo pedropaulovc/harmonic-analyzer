@@ -63,6 +63,27 @@ _ANNOT_SFSYM = 7
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
 _NOMINAL_GDT_HALF_M = 0.008
 
+# A SURFACE-FINISH symbol is NOT centred on its anchor, so the symmetric box
+# above is the wrong shape for it and silently under-reports.
+# ``GetPosition`` returns the LEADER'S ATTACHMENT POINT -- the bottom vertex of
+# the check-mark triangle -- and the whole body draws UP and to the RIGHT of it:
+# triangle x [ax-0.006, ax+0.006] y [ay, ay+0.011]; the "Ra 1.6" text
+# x [ax+0.013, ax+0.039] y [ay+0.010, ay+0.017]; the arm at y ~= ay+0.018.
+# Boxed +/-8 mm about a point that is the symbol's own BOTTOM EDGE, the gate
+# missed ~10 mm of body above and ~31 mm of text to the right: wheel_axle's Ra
+# printed over the zone label while the audit stayed silent (its real top is
+# ay+0.018 = 0.273, 5.6 mm past the rule, but the box topped out at 0.263).
+# Measured independently on 3+ sheets by three agents; every sample draws
+# up-right regardless of which side the target sits on (a leader running
+# up-LEFT out of the vertex does not mirror the body), so the offsets are
+# orientation-stable for ``add_surface_finish``'s SetLeader3(BENT, SMART) call.
+# LEFT keeps the old 8 mm rather than the measured 7: strictly no less
+# conservative than what it replaces, on every side.
+_SF_BOX_LEFT_M = 0.008
+_SF_BOX_RIGHT_M = 0.039
+_SF_BOX_UP_M = 0.018
+_SF_BOX_DOWN_M = 0.0
+
 # swAnnotationType_e.swDisplayDimension -- every linear/diameter dimension AND
 # the native hole callouts (a diameter dim carrying "/ THRU" text). Like GD&T
 # they expose only a text-anchor GetPosition (no clean box) and by design sit
@@ -1741,14 +1762,24 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     return LayoutElement(name, "table", x, y - height, x + width, y)
 
 
-def _gdt_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
-    """Box a native GD&T symbol as a nominal square around its GetPosition anchor.
+def _gdt_element(
+    adapter: Any, annotation: Any, name: str, kind: int
+) -> LayoutElement | None:
+    """Box a native GD&T symbol around its GetPosition anchor.
 
     Datum tags / feature-control frames / surface-finish symbols expose no real
-    bounding box, so a fixed nominal half-span is used -- good enough to catch a
-    symbol placed clear off the sheet. Given ``NONE`` collision scope: the nominal
-    box is too coarse to assert an overlap (a datum tag placed beside its own
-    control frame would self-collide), so the symbol is overflow-checked only.
+    bounding box, so a nominal span is used -- good enough to catch a symbol
+    placed clear off the sheet. Given ``NONE`` collision scope: the nominal box is
+    too coarse to assert an overlap (a datum tag placed beside its own control
+    frame would self-collide), so the symbol is overflow-checked only.
+
+    The box is per-KIND because the anchor's meaning is per-kind. A datum tag and
+    a feature-control frame sit roughly CENTRED on their anchor, so a symmetric
+    square fits. A surface-finish symbol does NOT -- its anchor is the leader's
+    attachment point at the body's bottom-left, so it gets the measured
+    asymmetric box (``_SF_BOX_*``). Boxing it symmetrically put the entire symbol
+    outside its own bounds and let an Ra print over the sheet border with the
+    audit reporting clean.
     """
     position = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetPosition")
@@ -1756,6 +1787,19 @@ def _gdt_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
     if not position:
         return None
     x, y = float(position[0]), float(position[1])
+    if kind == _ANNOT_SFSYM:
+        # Anchor is the symbol's bottom vertex, body up-right -- see the
+        # _SF_BOX_* constants. A symmetric box here is the wrong SHAPE, not
+        # merely the wrong size, and hides the whole body.
+        return LayoutElement(
+            name,
+            "gdt",
+            x - _SF_BOX_LEFT_M,
+            y - _SF_BOX_DOWN_M,
+            x + _SF_BOX_RIGHT_M,
+            y + _SF_BOX_UP_M,
+            scope=CollisionScope.NONE,
+        )
     half = _NOMINAL_GDT_HALF_M
     return LayoutElement(
         name, "gdt", x - half, y - half, x + half, y + half, scope=CollisionScope.NONE
@@ -1811,7 +1855,7 @@ def _iter_view_annotations(adapter: Any, view: Any):
         if kind == _ANNOT_NOTE:
             element = _note_element(adapter, annotation, name)
         elif kind in _GDT_TYPES:
-            element = _gdt_element(adapter, annotation, name)
+            element = _gdt_element(adapter, annotation, name, kind)
         elif kind == _ANNOT_DIM:
             element = _dim_element(adapter, annotation, name)
         else:
