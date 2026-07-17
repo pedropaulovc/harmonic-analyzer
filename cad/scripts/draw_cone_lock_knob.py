@@ -94,15 +94,15 @@ FRONT_KEEP = {
         _front_y(BODY_TOP) + 0.012,
     ),
 }
+# x=0.030 for the two leadered diameters, not the old washer-derived 0.018: a
+# horizontal "O13.00" is ~19 mm wide and CENTRED on its anchor, so 0.018 ran its
+# text out to x=0.008 -- across the border rule at ~0.0158.  The layout audit
+# cannot see this: it boxes a dim as a nominal 4 mm half-square
+# (_NOMINAL_DIM_HALF_M), which at 0.018 still cleared the 12.7 mm zone margin.
+# 0.030 puts the text at ~0.021..0.039: inside the frame, outside the view.
 TOP_KEEP = {
-    "WasherDia": (
-        TOP_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.030,
-        TOP_CENTER[1] - 0.016,
-    ),
-    "BodyDia": (
-        TOP_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.030,
-        TOP_CENTER[1] + 0.018,
-    ),
+    "WasherDia": (0.030, TOP_CENTER[1] - 0.016),
+    "BodyDia": (0.030, TOP_CENTER[1] + 0.018),
     "StudDia": (
         TOP_CENTER[0] + WASHER_DIA * _S / 2.0 + 0.026,
         TOP_CENTER[1] - 0.012,
@@ -232,11 +232,23 @@ async def build(adapter: Any) -> dict[str, str]:
         TOP_CENTER[0] + tdx + WASHER_DIA * _S / 2.0,
         TOP_CENTER[1] + tdy,
     )
+    # Both top-view symbols sit RIGHT of the view, not above it: the washer OD
+    # is 18 at 3:1, so the top view already reaches y=0.262 against the zone
+    # margin at 0.2667 and nothing clears above it.  (Their old +0.014/+0.024
+    # offsets stacked on the 45-deg body-circle anchor put them at y=0.2628 and
+    # 0.259, whose 8 mm half-boxes overran the top border by 4.1 and 0.3 mm.)
+    #
+    # The right side carries THREE annotations, so each gets its own Y band:
+    # datum A at 0.255, this frame at 0.238, and the StudDia callout, whose
+    # drawn text occupies x=0.111..0.145 / y=0.218..0.228.  None of that is
+    # mechanically checked -- GD&T and dims both carry CollisionScope.NONE, so
+    # a frame printed straight through a callout (which 0.228 did) is invisible
+    # to the audit and only shows up on the render.
     add_datum_feature(
         adapter,
         top,
         edge_xy=body_circle,
-        symbol_xy=(body_circle[0] + 0.016, body_circle[1] + 0.014),
+        symbol_xy=(0.128, 0.255),
         datum="A",
         label="knob body axis",
     )
@@ -244,7 +256,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=washer_circle,
-        frame_xy=(washer_circle[0] + 0.026, washer_circle[1] + 0.024),
+        frame_xy=(0.140, 0.238),
         characteristic="circular_runout",
         tolerance="0.10",
         datums=("A",),
@@ -269,7 +281,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="dome crown finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.100)
+    # 0.020, not 0.014 -- the border rule is drawn at ~0.0158 and the note is
+    # left-aligned on its anchor, so 0.014 printed the first character on the
+    # frame line (the audit only checks the wider 12.7 mm zone margin).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

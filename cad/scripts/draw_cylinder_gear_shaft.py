@@ -63,11 +63,13 @@ PROFILE_ROTATION = -math.pi / 2.0  # model +Y (arbor axis) -> sheet +x
 ISO_CENTER = (0.355, 0.140)
 ISO_SCALE = (1, 2)
 
+# Left of the end circle, ON its centre height so the diameter line runs
+# horizontally through the centre rather than diagonally.  x=0.032, not the old
+# bbox-derived 0.022: the callout is centred on its anchor and ~22 mm wide now
+# that it renders horizontally, so it needs to start clear of the border rule
+# at ~0.0158.
 END_KEEP = {
-    "ShaftDia": (
-        END_CENTER[0] - SHAFT_DIA * END_VIEW_SCALE / 1000.0 - 0.014,
-        END_CENTER[1] + 0.008,
-    ),
+    "ShaftDia": (0.032, END_CENTER[1]),
 }
 PROFILE_KEEP = {
     "Depth": (PROFILE_CENTER[0], PROFILE_CENTER[1] - 0.025),
@@ -179,19 +181,45 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     left_end = (PROFILE_CENTER[0] - SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
     right_end = (PROFILE_CENTER[0] + SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
+    # Picked at 12 o'clock (not `end_circle`, which is the 3 o'clock point the
+    # cylindricity/Ra leaders use) because this symbol goes straight ABOVE the
+    # circle.  A datum tag is pinned to the entity it attaches to -- on a circle
+    # that is the circumference, so it re-attaches at the point nearest the
+    # symbol and symbol_xy goes inert.  Picking 3 o'clock while placing the
+    # symbol at 12 collapsed the tag onto the circle, printing its box over the
+    # geometry with the triangle across the "A".  Matching the pick to the
+    # symbol's clock position lets the leader run radially out to it (the
+    # draw_pivot_bushing.py spelling).
+    end_top = (
+        END_CENTER[0],
+        END_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+    )
     add_datum_feature(
         adapter,
         end,
-        edge_xy=end_circle,
+        edge_xy=end_top,
         symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.024),
         datum="A",
         label="arbor axis",
     )
+    # Up-RIGHT of the end circle it annotates, not out at PROFILE_CENTER[0]
+    # (0.194): that put the frame 130 mm from its own anchor, so its leader ran
+    # as one long diagonal across the whole sheet, skimming just over the
+    # profile view.  The profile view starts at x=0.100 and tops out at y=0.210,
+    # so this band is empty; the 8 mm half-box tops out at 0.260, inside the
+    # 0.2667 zone margin.
+    #
+    # x=0.068 sits the frame almost directly ABOVE the end_circle pick, which
+    # makes its leader near-vertical (it hugs x=0.065..0.068 the whole way down).
+    # That matters because the Ra symbol below shares this anchor: at x=0.080 the
+    # leader raked down at an angle and printed straight through the Ra symbol's
+    # bar and triangle.  Near-vertical, it passes x=0.067 at the Ra's top edge --
+    # clear left of the Ra's arm at 0.075.
     add_feature_control_frame(
         adapter,
         end,
         edge_xy=end_circle,
-        frame_xy=(PROFILE_CENTER[0], 0.232),
+        frame_xy=(0.068, 0.252),
         characteristic="cylindricity",
         tolerance="0.01",
         label="arbor bearing cylindricity",
@@ -212,11 +240,26 @@ async def build(adapter: Any) -> dict[str, str]:
             datums=("A",),
             label=label,
         )
+    # Up-RIGHT of the end circle, on the same side as the `end_circle` pick
+    # (the circle's RIGHTMOST point), so the leader comes in from the right and
+    # never crosses the circle.  Two constraints forced this side:
+    #   * it used to sit at PROFILE_CENTER[0] and drag a 130 mm diagonal leader
+    #     back to this circle; and
+    #   * placing it up-LEFT instead only traded that for a leader that raked
+    #     across the circle and landed on the datum A tag -- which rests ON the
+    #     circle at ~(0.051..0.058, 0.214..0.222) and cannot be moved away.
+    #     IAnnotation::SetPosition2 on a DATUM FEATURE symbol sets the "point
+    #     where the leader hits the symbol", so a tag that attaches straight to
+    #     its edge ignores the requested Y and sits against the geometry.
+    # The symbol's ARM extends left of the anchor and its TEXT renders ABOVE the
+    # arm and to the RIGHT (ASME Y14.36): ~x=0.075..0.114 / y=0.222..0.237,
+    # which clears the profile view (it tops out at y=0.210) and leaves the arm
+    # at 0.075, right of the cylindricity frame's near-vertical leader above.
     add_surface_finish(
         adapter,
         end,
         edge_xy=end_circle,
-        symbol_xy=(PROFILE_CENTER[0], 0.245),
+        symbol_xy=(0.078, 0.222),
         roughness_ra="1.6",
         label="arbor bearing finish",
     )

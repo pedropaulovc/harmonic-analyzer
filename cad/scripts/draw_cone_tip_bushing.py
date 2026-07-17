@@ -155,10 +155,37 @@ async def build(adapter: Any) -> dict[str, str]:
     half_length = LENGTH * SHEET_SCALE[0] / 2000.0
     bottom_end = (SIDE_CENTER[0], SIDE_CENTER[1] - half_length)
     top_end = (SIDE_CENTER[0], SIDE_CENTER[1] + half_length)
+    # Pick the bore at 12 o'clock, because the symbol goes straight ABOVE it.
+    #
+    # A datum feature symbol is not freely placeable: IAnnotation::SetPosition2
+    # sets "the point where the leader hits the symbol", and its Remarks restrict
+    # a symbol inserted directly on an edge to "along that edge or extensions of
+    # that edge", otherwise landing "as near as possible" to the request.  On a
+    # CIRCLE the permitted set IS the circumference, so the tag re-attaches at
+    # the circle point nearest the symbol.  Picking `bore_edge` (3 o'clock) while
+    # placing the symbol at 12 fought that: the tag collapsed onto the bore,
+    # printing its box over the centerline with the triangle across the "A", and
+    # symbol_xy went inert (0.227 and 0.150 rendered pixel-identical).  Picking
+    # the clock position the symbol sits at lets the leader run RADIALLY out to
+    # it -- the draw_pivot_bushing.py spelling.
+    #
+    # Measured, with the pick at 12 o'clock: symbol_xy IS now honoured exactly,
+    # and it is the box's BOTTOM edge that lands on it (the documented "point
+    # where the leader hits the symbol") -- +0.037 puts that edge at y=0.227,
+    # +0.055 at y=0.245.  0.037 is the keeper: at 0.055 the box collides with the
+    # OD-runout frame's text at y=0.254.
+    #
+    # The bore's straight side-view flank is NOT an alternative here: it is
+    # unpickable as both an EDGE and a SILHOUETTE ("failed to select" at
+    # x=0.186825, and likewise at the right flank x=0.193175).
+    bore_top = (
+        END_CENTER[0],
+        END_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
+    )
     add_datum_feature(
         adapter,
         end,
-        edge_xy=bore_edge,
+        edge_xy=bore_top,
         symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.037),
         datum="A",
         label="bushing bore axis",
@@ -191,11 +218,18 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("B",),
         label="bushing end-face parallelism",
     )
+    # Right of the end view at just above bore height, not up at (0.148, 0.234):
+    # that was ~50 mm from the bore it annotates and dragged a long diagonal
+    # leader back across the view.  The symbol's ARM extends left of the anchor
+    # and its TEXT renders ABOVE the arm and to the RIGHT (ASME Y14.36), so it
+    # occupies roughly x=0.112..0.151 / y=0.200..0.215 -- right of the OD circle
+    # (which ends at x=0.109), clear of the BoreDiaDim callout below it (that
+    # text tops out at y=0.190) and well left of the side view (x=0.166).
     add_surface_finish(
         adapter,
         end,
         edge_xy=bore_edge,
-        symbol_xy=(0.148, 0.234),
+        symbol_xy=(0.115, 0.200),
         roughness_ra="1.6",
         label="bushing bore finish",
     )

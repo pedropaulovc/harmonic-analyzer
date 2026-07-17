@@ -190,7 +190,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="taper seating finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.108)
+    # 0.020, not 0.014 -- the border rule is drawn at ~0.0158 and the note is
+    # left-aligned on its anchor, so 0.014 printed the first character on the
+    # frame line (the audit only checks the wider 12.7 mm zone margin).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", RIGHT_CENTER[0] - 0.022, 0.162)
 
     return await finalize_drawing(
