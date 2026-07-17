@@ -1612,9 +1612,33 @@ def _spread_balloons(
         items.append((theta, annotation))
     items.sort(key=lambda item: item[0])
     count = len(items)
-    # Anchor the ring on the first ATTACHMENT's angle, so slot k sits in the same
-    # direction as the component it serves and the k-th ring slot serves the k-th
-    # attachment going round -- the non-crossing condition itself.
+    # Anchor the ring on the first ATTACHMENT's angle. Sorting on the attachment
+    # (above) is what fixed B4xB6; this start makes slot 0 point at the component
+    # slot 0 serves rather than at wherever AutoBalloon5 happened to drop it.
+    #
+    # KNOWN INCOMPLETE -- this still leaves 2 crossings on pen-assembly, and the
+    # remedy is NOT a better sort. Even spacing preserves the attachments' ORDER
+    # but not their DIRECTIONS: the pen sub is tall and skinny, so its 8
+    # attachments cluster into a narrow angular band while evenly-spaced slots
+    # span 360 degrees. Measured, an attachment at ~-72 deg drew a slot at
+    # ~+93 deg and hauled an 87 mm leader across the model, crossing two others.
+    #
+    # RADIAL PLACEMENT WAS TRIED AND IS WORSE -- do not re-run this experiment.
+    # Putting each balloon at its own attachment's angle makes every leader
+    # radial, and radial segments about a shared centre cannot intersect, so it
+    # PROVABLY kills every crossing. Measured on pen-assembly: crossings 2 -> 0.
+    # But clustered attachments then give clustered balloons -- the exact defect
+    # AutoBalloon5 has and this function exists to undo -- and the audit reported
+    # overlaps 0 -> 9. Trading a crossing for an unreadable balloon pile is a bad
+    # trade, so even spacing stays.
+    #
+    # The real fix is a THIRD option: keep the radial direction but enforce a
+    # minimum angular separation (a monotone push-apart over the sorted angles),
+    # so leaders stay near-radial while balloon circles stay clear. That needs the
+    # balloon's rendered diameter, which nothing here reads yet. Alternatively,
+    # match the ring's SHAPE to the aspect (IAutoBalloonOptions.Layout 5=Right /
+    # 6=Left gives a single column for a tall skinny sub) -- but this function
+    # overrides Layout by re-ringing, so that is inert until this changes too.
     start = items[0][0]
     for slot, (_theta, annotation) in enumerate(items):
         angle = start + 2.0 * math.pi * slot / count
