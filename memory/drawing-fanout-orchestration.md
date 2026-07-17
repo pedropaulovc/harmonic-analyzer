@@ -86,9 +86,12 @@ dirties the registry of all remaining PRs, forcing a rebase per merge. Mechanics
   the shared helper the branch's draw script needs is already present from the first merge.
 - One reusable `merge_pr()` bash fn (rebase → resolve registry → `--ours` drawing_common →
   `rebase --continue` loop → verify registry import + pytest → `push --force-with-lease` →
-  `gh pr merge --merge`). A mechanical registry-only rebase preserves a standing Codex 👍 (the
-  reviewed draw-script bytes are untouched), so merge on green without waiting for the
-  post-rebase re-review.
+  WAIT for Codex on the pushed head → `gh pr merge --merge`). Do NOT carry a standing 👍
+  across the rebase: it belongs to the pre-rebase commit, and the force-push lands a head
+  Codex has never reviewed. "The reviewed draw-script bytes are untouched" is not the gate —
+  the gate (AGENTS.md) is a clean Codex review of the LATEST push, and the rebase itself
+  rewrites `_drawing_registry.py`, which is exactly where a union-merge corruption would
+  surface. Re-review is cheap; an unreviewed head is the failure the gate exists to stop.
 
 **Codex RE-REVIEWS after every fix push and often finds a ROUND-2 (and 3) issue** on the same
 PR (e.g. #318 pen_v_block: 2X FCF → then basic-dim boxing + finish-both-bores; #319
