@@ -844,7 +844,7 @@ def test_a_shared_terminus_does_not_mask_a_real_crossing_elsewhere():
     assert crossing.y == pytest.approx(0.1161, abs=5e-4)
 
 
-# --- the _KNOWN_LEADER_CROSSINGS ratchet -------------------------------------
+# --- every sheet is held to zero; there is no grandfathered case -------------
 
 
 def _stub_layout(monkeypatch, leader_crossings):
@@ -861,40 +861,26 @@ def _stub_layout(monkeypatch, leader_crossings):
     )
 
 
-def test_ratchet_grandfathers_a_known_sheet_at_its_exact_count(monkeypatch):
-    _stub_layout(monkeypatch, 2)
-    drawing_common.check_drawing_layout(None, stem="pen-assembly")  # must not raise
+def test_a_clean_sheet_passes(monkeypatch):
+    _stub_layout(monkeypatch, 0)
+    drawing_common.check_drawing_layout(None, stem="pen-assembly")
 
 
-def test_ratchet_fails_when_a_known_sheet_IMPROVES(monkeypatch):
-    # The direction that makes a ratchet a ratchet. Fixing one of pen-assembly's
-    # two must FAIL until the number comes down with it -- otherwise the entry
-    # outlives the defect and silently re-permits it later.
-    _stub_layout(monkeypatch, 1)
-    with pytest.raises(RuntimeError, match="lower the number"):
-        drawing_common.check_drawing_layout(None, stem="pen-assembly")
-
-
-def test_ratchet_fails_on_a_new_crossing_on_a_known_sheet(monkeypatch):
-    _stub_layout(monkeypatch, 3)
-    with pytest.raises(RuntimeError, match="do not raise the number"):
-        drawing_common.check_drawing_layout(None, stem="pen-assembly")
-
-
-def test_an_unlisted_sheet_is_held_to_zero(monkeypatch):
-    # The exemption must not leak: every sheet not named in the dict gets the
-    # strict gate, and an omitted stem defaults to strict too.
+@pytest.mark.parametrize("stem", ["pen-assembly", "crank-arm", ""])
+def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
+    """pen-assembly USED to be grandfathered for 2 crossings while the fix was
+    thought to need a design decision. It needed the balloon radius, which
+    GetBalloonInfo always exposed. The exemption died with the defect, and no
+    sheet -- named, unnamed, or formerly-grandfathered -- may reintroduce one."""
     _stub_layout(monkeypatch, 1)
     with pytest.raises(RuntimeError):
-        drawing_common.check_drawing_layout(None, stem="crank-arm")
-    with pytest.raises(RuntimeError):
-        drawing_common.check_drawing_layout(None)
+        drawing_common.check_drawing_layout(None, stem=stem)
 
 
-def test_the_ratchet_names_only_pen_assembly():
-    # A tripwire on the dict itself: it exists to shrink. If a second sheet is
-    # added to make a build pass, this fails and forces the conversation.
-    assert drawing_common._KNOWN_LEADER_CROSSINGS == {"pen-assembly": 2}
+def test_the_grandfather_machinery_is_gone():
+    """A tripwire on the retirement: re-adding an allowlist must be a deliberate
+    act that trips a test, not a quiet way to make a red build green."""
+    assert not hasattr(drawing_common, "_KNOWN_LEADER_CROSSINGS")
 
 
 # --- the shared-terminus exemption must not swallow real crossings -----------
@@ -931,20 +917,15 @@ def test_the_converging_arrowhead_artefact_is_still_exempt():
 
 
 def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
-    """Codex #3601319575, pinned.
+    """Codex #3601319575, kept after the ratchet's retirement.
 
-    pen-assembly is grandfathered for its two leader-vs-LEADER crossings only.
-    A leader run across a foreign VIEW is a different, always-hard failure -- so
-    if one appears ON the grandfathered sheet, the exemption must NOT swallow it.
-    Counting only leader_leader and returning did exactly that.
+    The bug was an exemption swallowing a leader-through-VIEW crossing. The
+    exemption is gone, but the class it endangered must stay fatal -- so this
+    keeps proving a view crossing fails, whatever the surrounding policy.
     """
     seg = LeaderSegment("a", "gdt", 0.0, 0.0, 0.1, 0.1, owner="Front")
     view = _el("OtherView", 0.05, 0.05, 0.15, 0.15)
-    mixed = [
-        LeaderCrossing(seg, seg, 0.05, 0.05),
-        LeaderCrossing(seg, seg, 0.06, 0.06),
-        Crossing(seg, view),  # the one that must still fail the build
-    ]
+    mixed = [Crossing(seg, view)]  # a leader across a foreign view: always fatal
 
     class _Stub:
         pass
@@ -959,3 +940,59 @@ def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
             dc.check_drawing_layout(None, stem="pen-assembly")
     finally:
         dc.collect_layout_elements, dc.audit_layout = real_collect, real_audit
+
+
+# --- balloon ring separation (SolidWorks-free) -------------------------------
+
+import math as _math
+
+
+def test_push_apart_never_reorders_the_balloons():
+    """The property the whole no-crossing argument rests on.
+
+    Balloons placed about a shared centre IN their attachments' angular order
+    cannot have crossing leaders. So a separation pass that reorders silently
+    destroys the guarantee. The predecessor -- an iterative pairwise relaxation
+    -- did exactly that: it measured gaps modulo 2*pi, so an inverted pair read
+    as a ~6 rad gap and was never repaired. These are the REAL pen-assembly
+    attachment angles it was probed with, and it returned them reordered.
+    """
+    angles = [-1.865, -1.661, -1.629, -1.407, -1.152, 1.684, 1.805, 1.838]
+    out = drawing_common._push_apart_on_ring(angles, min_gap=0.4211)
+    assert out == sorted(out), f"push-apart reordered the balloons: {out}"
+
+
+def test_push_apart_actually_separates_to_the_gap():
+    angles = [-1.865, -1.661, -1.629, -1.407, -1.152, 1.684, 1.805, 1.838]
+    gap = 0.4211
+    out = drawing_common._push_apart_on_ring(angles, min_gap=gap)
+    for a, b in zip(out, out[1:]):
+        assert b - a >= gap - 1e-9, f"gap {b - a} < {gap}"
+    # and the wrap-around pair, which the linear chain cannot see
+    assert (out[0] + 2.0 * _math.pi) - out[-1] >= gap - 1e-9
+
+
+def test_push_apart_leaves_already_separated_angles_alone():
+    """Minimum movement: balloons that already clear must not be herded."""
+    angles = [0.0, 1.0, 2.0, 3.0]
+    out = drawing_common._push_apart_on_ring(angles, min_gap=0.5)
+    assert out == pytest.approx(angles)
+
+
+def test_push_apart_falls_back_to_even_spacing_when_it_cannot_fit():
+    # 20 balloons x 0.5 rad = 10 rad > 2*pi: packing tighter than their own
+    # circles would trade crossings for overlaps, the trade radial already lost.
+    angles = [i * 0.01 for i in range(20)]
+    out = drawing_common._push_apart_on_ring(angles, min_gap=0.5)
+    spacing = [round(b - a, 6) for a, b in zip(out, out[1:])]
+    assert len(set(spacing)) == 1, "fallback must space evenly"
+
+
+def test_min_angular_gap_clears_the_audits_SQUARE_not_just_the_circle():
+    """_note_element boxes the balloon's circumscribed square, so two balloons
+    on a ring diagonal still collide after their circles part. The gap must be
+    set against the model that grades it, or placement and audit disagree --
+    measured as 9 overlaps when this used 2*r."""
+    ring, balloon = 0.05, 0.00472
+    gap = drawing_common._min_angular_gap(ring, balloon, clearance=0.0)
+    assert gap * ring == pytest.approx(2.0 * _math.sqrt(2.0) * balloon, rel=1e-9)

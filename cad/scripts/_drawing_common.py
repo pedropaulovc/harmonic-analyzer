@@ -166,6 +166,10 @@ _DIM_DETAILING_SCOPES = {
 # font; its GetExtent is leader-polluted (see _note_element), so it gets this
 # nominal half-span box around its IAnnotation.GetPosition anchor instead.
 _NOMINAL_BALLOON_HALF_M = 0.006
+# Ink gap left between two balloon circles pushed apart on the ring. Their radius
+# is MEASURED per sheet (INote::GetBalloonInfo -- 4.72 mm on pen-assembly), so
+# this is only the clearance between them, not a stand-in for the circle itself.
+_BALLOON_CLEARANCE_M = 0.0015
 
 # The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
 # format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
@@ -1545,6 +1549,101 @@ def insert_bom_table(
     return table
 
 
+def _min_angular_gap(ring_radius: float, balloon_radius: float, *, clearance: float) -> float:
+    """Smallest angle between two balloon centres that keeps their circles apart.
+
+    Separation is set against the SQUARE the audit boxes a balloon with, not the
+    circle the sheet draws: :func:`_note_element` boxes the circle's circumscribed
+    square, and two such squares whose centres lie on a ring DIAGONAL still
+    intersect after their circles have parted -- ``dx = dy = d/sqrt(2)``, so they
+    only clear once ``d >= 2*sqrt(2)*balloon_radius``. Separating to ``2*r`` (the
+    circles just touching) measured 9 overlaps on pen-assembly: correct about the
+    ink, wrong about the checker. Placement must satisfy the model that grades it.
+
+    Measured against ARC length rather than the true chord, which is conservative
+    (arc >= chord) and avoids a domain error as the required separation
+    approaches the ring's diameter.
+
+    ``ring_radius`` must be the ring ellipse's SMALLER semi-axis: a point's local
+    speed along the ellipse is ``sqrt(Rx^2 sin^2 t + Ry^2 cos^2 t)``, whose
+    minimum is ``min(Rx, Ry)`` -- so using it can only over-separate, never leave
+    two circles touching.
+    """
+    if ring_radius <= 0.0:
+        raise ValueError("balloon spread: ring radius must be positive")
+    return (2.0 * math.sqrt(2.0) * balloon_radius + clearance) / ring_radius
+
+
+def _push_apart_on_ring(
+    angles: list[float], *, min_gap: float, iterations: int = 400
+) -> list[float]:
+    """Separate ``angles`` to at least ``min_gap`` apart, preserving their order.
+
+    ``angles`` must be sorted. Order preservation is the whole point, not a
+    nicety: balloons placed about a shared centre in their attachments' angular
+    ORDER cannot have crossing leaders, so a separation pass that never reorders
+    cannot reintroduce one. That argument only holds if the solver actually
+    preserves order, so this does it BY CONSTRUCTION rather than by assertion.
+
+    Substituting ``z_i = x_i - i*min_gap`` turns the spacing constraint
+    ``x_{i+1} - x_i >= min_gap`` into plain monotonicity ``z_{i+1} >= z_i``, so
+    the minimum-movement placement is the isotonic regression of ``z`` -- solved
+    exactly by pool-adjacent-violators, in one pass, with no convergence
+    question.
+
+    (History: this WAS an iterative pairwise relaxation, and it silently BROKE
+    the order it was written to preserve. It measured each gap as
+    ``(x[j] - x[i]) % 2pi``, so an inverted pair read as a ~6 rad gap -- huge,
+    apparently fine -- and was never repaired; in-place sequential updates then
+    kept inverting more. Probed on pen-assembly, it returned
+    ``[..., -1.553, -1.817, ...]`` from sorted input while its own docstring
+    claimed "it cannot swap them". Do not reintroduce a relaxation here.)
+
+    Falls back to EVEN spacing when the balloons cannot all fit at ``min_gap``
+    (``n * min_gap > 2*pi``); packing them tighter than their own circles would
+    trade this function's crossings for overlaps, which is the trade the pure-
+    radial experiment already lost.
+    """
+    count = len(angles)
+    if count < 2:
+        return list(angles)
+    span_needed = count * min_gap
+    if span_needed > 2.0 * math.pi:
+        _telemetry.warn(
+            f"balloon spread: {count} balloons need {span_needed:.2f} rad of "
+            f"ring but only {2.0 * math.pi:.2f} is available -- falling back to "
+            "even spacing (leaders may run long)"
+        )
+        start = angles[0]
+        return [start + 2.0 * math.pi * i / count for i in range(count)]
+
+    # Blocks of (weighted mean, weight) merged while the previous block outranks
+    # the next -- the pool-adjacent-violators algorithm.
+    blocks: list[list[float]] = []
+    for index, angle in enumerate(angles):
+        blocks.append([angle - index * min_gap, 1.0])
+        while len(blocks) >= 2 and blocks[-2][0] > blocks[-1][0] - 1e-15:
+            value_b, weight_b = blocks.pop()
+            value_a, weight_a = blocks.pop()
+            weight = weight_a + weight_b
+            blocks.append(
+                [(value_a * weight_a + value_b * weight_b) / weight, weight]
+            )
+    fitted: list[float] = []
+    for value, weight in blocks:
+        fitted.extend([value] * int(weight))
+    spread = [value + i * min_gap for i, value in enumerate(fitted)]
+
+    # The wrap-around pair (last -> first) is the one constraint the linear chain
+    # cannot see. With the whole run compressed into span_needed <= 2*pi there is
+    # room by construction; centre the run in the slack if it still bites.
+    if (spread[0] + 2.0 * math.pi) - spread[-1] < min_gap:
+        centre = (spread[0] + spread[-1]) / 2.0
+        start = centre - span_needed / 2.0
+        spread = [start + i * min_gap for i in range(count)]
+    return spread
+
+
 def _spread_balloons(
     adapter: Any, view: Any, balloons: list[Any], *, margin: float = 0.014
 ) -> None:
@@ -1585,8 +1684,23 @@ def _spread_balloons(
     radius_x = (vxmax - vxmin) / 2.0 + margin
     radius_y = (vymax - vymin) / 2.0 + margin
     items = []
+    radii: list[float] = []
     for note in balloons:
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+        note = _sw_type_info.early_bound_or_flag(
+            note, "INote", "GetAnnotation", "GetBalloonInfo"
+        )
+        # The balloon circle's own rendered radius. GetBalloonInfo returns
+        # (centre xyz, arc-point xyz, radius) -- unlike GetExtent it describes
+        # the CIRCLE, not the note+leader box, so the leader cannot pollute it.
+        info = adapter._attempt(lambda n=note: n.GetBalloonInfo())
+        if not info or len(info) < 7:
+            raise RuntimeError(
+                "balloon spread: GetBalloonInfo did not return the balloon "
+                "circle -- the separation below is derived from the MEASURED "
+                "radius, so a balloon whose circle cannot be read cannot be "
+                "placed without guessing"
+            )
+        radii.append(float(info[6]))
         annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
         if annotation is None:
             raise RuntimeError("balloon spread: balloon without an annotation")
@@ -1611,38 +1725,44 @@ def _spread_balloons(
         attach_x, attach_y = float(raw[-3]), float(raw[-2])
         theta = math.atan2(attach_y - center_y, attach_x - center_x)
         items.append((theta, annotation))
-    items.sort(key=lambda item: item[0])
-    count = len(items)
-    # Anchor the ring on the first ATTACHMENT's angle. Sorting on the attachment
-    # (above) is what fixed B4xB6; this start makes slot 0 point at the component
-    # slot 0 serves rather than at wherever AutoBalloon5 happened to drop it.
+    order = sorted(range(len(items)), key=lambda i: items[i][0])
+    items = [items[i] for i in order]
+    radii = [radii[i] for i in order]
+
+    # Place each balloon at its OWN attachment's angle, then separate only the
+    # circles that actually collide. Two earlier placements both failed, each in
+    # the way the other avoided, and this is the synthesis of what they proved:
     #
-    # KNOWN INCOMPLETE -- this still leaves 2 crossings on pen-assembly, and the
-    # remedy is NOT a better sort. Even spacing preserves the attachments' ORDER
-    # but not their DIRECTIONS: the pen sub is tall and skinny, so its 8
-    # attachments cluster into a narrow angular band while evenly-spaced slots
-    # span 360 degrees. Measured, an attachment at ~-72 deg drew a slot at
-    # ~+93 deg and hauled an 87 mm leader across the model, crossing two others.
+    #   EVEN SPACING (was here) preserved the attachments' ORDER but not their
+    #   DIRECTIONS. The pen sub is tall and skinny, so its 8 attachments cluster
+    #   in a narrow angular band while evenly-spaced slots span 360 deg. Measured
+    #   on the shipped sheet: balloon DetailItem347 sat at y=0.1908 serving an
+    #   attachment at y=0.1035 -- an 87 mm near-vertical leader hauled across the
+    #   model, and it alone caused BOTH remaining crossings.
     #
-    # RADIAL PLACEMENT WAS TRIED AND IS WORSE -- do not re-run this experiment.
-    # Putting each balloon at its own attachment's angle makes every leader
-    # radial, and radial segments about a shared centre cannot intersect, so it
-    # PROVABLY kills every crossing. Measured on pen-assembly: crossings 2 -> 0.
-    # But clustered attachments then give clustered balloons -- the exact defect
-    # AutoBalloon5 has and this function exists to undo -- and the audit reported
-    # overlaps 0 -> 9. Trading a crossing for an unreadable balloon pile is a bad
-    # trade, so even spacing stays.
+    #   PURE RADIAL placement fixed that (crossings 2 -> 0: radial segments about
+    #   a shared centre cannot intersect) but piled the clustered balloons on top
+    #   of each other -- overlaps 0 -> 9, the very defect AutoBalloon5 has and
+    #   this function exists to undo. It failed for ONE reason: nothing separated
+    #   the colliding circles.
     #
-    # The real fix is a THIRD option: keep the radial direction but enforce a
-    # minimum angular separation (a monotone push-apart over the sorted angles),
-    # so leaders stay near-radial while balloon circles stay clear. That needs the
-    # balloon's rendered diameter, which nothing here reads yet. Alternatively,
-    # match the ring's SHAPE to the aspect (IAutoBalloonOptions.Layout 5=Right /
-    # 6=Left gives a single column for a tall skinny sub) -- but this function
-    # overrides Layout by re-ringing, so that is inert until this changes too.
-    start = items[0][0]
-    for slot, (_theta, annotation) in enumerate(items):
-        angle = start + 2.0 * math.pi * slot / count
+    # So: keep the radial direction, enforce a minimum angular separation. The
+    # separation is derived from the balloon's MEASURED radius (GetBalloonInfo,
+    # above), not a guess -- 4.72 mm on this sheet. A monotone push-apart cannot
+    # reorder the balloons, and order-preserving placement about a shared centre
+    # is what rules crossings out, so this keeps radial's proof while paying
+    # radial's price only where circles genuinely touch.
+    #
+    # (History: this WAS documented as blocked -- "needs the balloon's rendered
+    # diameter, which nothing here reads yet". True of this file, never of the
+    # API: INote::GetBalloonInfo returns the circle's centre and radius outright,
+    # and had been in the generated binding all along. The claim was never tested
+    # and the sheet carried the defect for it.)
+    gap = _min_angular_gap(
+        min(radius_x, radius_y), max(radii), clearance=_BALLOON_CLEARANCE_M
+    )
+    angles = _push_apart_on_ring([theta for theta, _ in items], min_gap=gap)
+    for angle, (_theta, annotation) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle)
         target_y = center_y + radius_y * math.sin(angle)
         if not annotation.SetPosition(target_x, target_y, 0.0):
@@ -1760,22 +1880,29 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     )
     if note is None:
         return None
-    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetExtent", "IsBomBalloon")
+    note = _sw_type_info.early_bound_or_flag(
+        note, "INote", "GetExtent", "IsBomBalloon", "GetBalloonInfo"
+    )
     # A BOM balloon's GetExtent includes its LEADER -- the box spans from the
     # balloon circle to the pointed-at component (same leader-polluted-box dead
     # end as GD&T symbols), so neighboring balloons' boxes always intersect near
-    # the view. Box a balloon nominally around its anchor instead; NON_VIEW scope
-    # still catches two stacked balloons or a balloon dropped on a table.
+    # the view. GetBalloonInfo describes the CIRCLE instead -- centre + radius,
+    # no leader -- so box the circle it actually draws.
     if bool(adapter._attempt(lambda: note.IsBomBalloon(), default=False)):
-        position = adapter._attempt(
-            lambda: adapter._get_attr_or_call(annotation, "GetPosition")
-        )
-        if not position:
-            return None
-        x, y = float(position[0]), float(position[1])
-        half = _NOMINAL_BALLOON_HALF_M
+        info = adapter._attempt(lambda: note.GetBalloonInfo())
+        if not info or len(info) < 7:
+            raise RuntimeError(
+                f"{name}: GetBalloonInfo did not return the balloon circle -- "
+                "refusing to fall back to a nominal box, which would audit a "
+                "guess against placement derived from the measured radius and "
+                "silently disagree with it"
+            )
+        # Centre from GetBalloonInfo, NOT GetPosition: GetPosition is the
+        # annotation ANCHOR, which is measurably offset from the circle centre
+        # (probed on pen-assembly), so it boxed the balloon off-centre.
+        cx, cy, half = float(info[0]), float(info[1]), float(info[6])
         return LayoutElement(
-            name, "note", x - half, y - half, x + half, y + half,
+            name, "note", cx - half, cy - half, cx + half, cy + half,
             scope=CollisionScope.NON_VIEW,
         )
     extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
@@ -2291,21 +2418,6 @@ def collect_layout_elements(
     return elements, leaders, region
 
 
-# RATCHET, drive to ZERO. One entry, one number: the leader-vs-leader crossings a
-# sheet is KNOWN to still carry, grandfathered so the gate can protect the other
-# 22 sheets today instead of waiting on a design decision.
-#
-# pen-assembly's 2 are PRE-EXISTING -- the _spread_balloons ring bug predates the
-# gate and predates this PR; they were found by eye on the shipped sheet. The
-# remedy is a ring-SHAPE change (a column layout for a tall skinny sub), which
-# changes how the sheet LOOKS and is therefore the owner's call, not something to
-# pick at random until the gate goes green. See _spread_balloons.
-#
-# The check below demands an EXACT match, so this cannot rot in either direction:
-# a NEW crossing fails, and fixing one of pen-assembly's two ALSO fails until the
-# number here comes down with it. Nothing may be added to this dict to make a
-# build pass -- a new crossing is a defect to fix, not to record.
-_KNOWN_LEADER_CROSSINGS: dict[str, int] = {"pen-assembly": 2}
 
 
 def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
@@ -2317,62 +2429,18 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     view it does not annotate -- defects the dimensional and format gates cannot
     see.
 
-    ``stem`` keys the :data:`_KNOWN_LEADER_CROSSINGS` ratchet; omitted, a sheet is
-    held to zero, which is the right default for every caller that does not know
-    it is grandfathered.
+    ``stem`` names the sheet in failures. Every sheet is held to ZERO on every
+    defect class -- there is no grandfathered case. There WAS one: pen-assembly
+    carried 2 leader crossings behind a `_KNOWN_LEADER_CROSSINGS` ratchet, on the
+    reasoning that fixing them needed a design decision. It did not -- it needed
+    the balloon's rendered radius, which INote::GetBalloonInfo had all along (see
+    :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
     with _telemetry.span("drawing.layout_audit") as span:
         elements, leaders, region = collect_layout_elements(adapter)
         overlaps, overflows, crossings = audit_layout(
             elements, region, leaders=leaders
         )
-        # Only leader-vs-LEADER crossings are ratchetable. A leader driven across
-        # a foreign VIEW is always a hard failure: it has no grandfathered case,
-        # and lumping the two would let the exemption cover a defect class it was
-        # never argued for.
-        leader_leader = [c for c in crossings if isinstance(c, LeaderCrossing)]
-        # Everything that is NOT leader-vs-leader is a leader through a foreign
-        # VIEW. Split it out and keep it OUT of the exemption: counting only
-        # leader_leader and returning would let the pen-assembly entry swallow a
-        # view crossing too, which is the class the comment above calls a hard
-        # failure (Codex #3601319575).
-        view_crossings = [c for c in crossings if not isinstance(c, LeaderCrossing)]
-        allowed = _KNOWN_LEADER_CROSSINGS.get(stem, 0)
-        if span is not None:
-            span.set_attribute("elements", len(elements))
-            span.set_attribute("leaders", len(leaders))
-            span.set_attribute("overlaps", len(overlaps))
-            span.set_attribute("overflows", len(overflows))
-            span.set_attribute("crossings", len(crossings))
-            span.set_attribute("known_leader_crossings", allowed)
-        if (
-            allowed
-            and len(leader_leader) == allowed
-            and not overlaps
-            and not overflows
-            and not view_crossings
-        ):
-            _telemetry.warn(
-                f"drawing layout: {len(leader_leader)} KNOWN leader crossing(s) "
-                f"on {stem!r}, grandfathered by _KNOWN_LEADER_CROSSINGS -- this "
-                "is a defect, not a pass; drive it to zero:\n"
-                + format_findings([], [], leader_leader)
-            )
-            return
-        if allowed and len(leader_leader) != allowed:
-            raise RuntimeError(
-                f"{stem!r} is on the _KNOWN_LEADER_CROSSINGS ratchet at "
-                f"{allowed}, but this build found {len(leader_leader)}. "
-                + (
-                    "FEWER is progress -- lower the number (to 0, delete the "
-                    "entry) so it cannot silently regress."
-                    if len(leader_leader) < allowed
-                    else "MORE is a new defect -- fix the layout; do not raise "
-                    "the number."
-                )
-                + "\n"
-                + format_findings([], [], leader_leader)
-            )
         if not overlaps and not overflows and not crossings:
             _telemetry.success(
                 f"drawing layout clean: {len(elements)} elements, "
