@@ -356,15 +356,35 @@ _CROSSING_TOUCH_TOL_M = 1e-4
 _SHARED_TERMINUS_M = 1e-3
 
 
-def _shares_a_terminus(a: LeaderSegment, b: LeaderSegment, *, tol: float) -> bool:
-    """True if any endpoint of ``a`` coincides with any endpoint of ``b``."""
-    ends_a = ((a.x0, a.y0), (a.x1, a.y1))
-    ends_b = ((b.x0, b.y0), (b.x1, b.y1))
-    return any(
-        math.hypot(pa[0] - pb[0], pa[1] - pb[1]) < tol
-        for pa in ends_a
-        for pb in ends_b
-    )
+def _crossing_is_under_a_shared_terminus(
+    a: LeaderSegment, b: LeaderSegment, x: float, y: float, *, tol: float
+) -> bool:
+    """True if the crossing at ``(x, y)`` is buried under a shared arrowhead.
+
+    The artefact this exempts is two leaders CONVERGING on one attachment: their
+    last few tenths of a millimetre meet under a ~2.4 mm arrowhead, which reads
+    as a crossing but prints as one arrow.  Measured on platen-guide: the
+    artefact pair's ends are 0.2 mm apart, the tightest TRUE positive 4.7 mm.
+
+    Testing "do they share an endpoint?" ALONE is not sound, and the difference
+    is not academic -- two segments whose ends are a hair apart still cross once,
+    and that crossing can be anywhere along the runs.  Codex #3601319580 gave the
+    counterexample: ``(0,0)->(10,0)`` and ``(0,0.0009)->(10,-0.0009)`` start
+    0.9 mm apart (inside ``tol``) yet cross at ``(5, 0)``, 5 mm away -- a real
+    mid-span crossing that an endpoint-only test throws away.  So the crossing
+    POINT must itself be at the shared terminus, which is what "buried under the
+    arrowhead" actually means.
+    """
+    for pa in ((a.x0, a.y0), (a.x1, a.y1)):
+        for pb in ((b.x0, b.y0), (b.x1, b.y1)):
+            if math.hypot(pa[0] - pb[0], pa[1] - pb[1]) >= tol:
+                continue  # not a shared terminus
+            if (
+                math.hypot(x - pa[0], y - pa[1]) < tol
+                and math.hypot(x - pb[0], y - pb[1]) < tol
+            ):
+                return True
+    return False
 
 
 def _side(
@@ -456,11 +476,17 @@ def find_leader_leader_crossings(
     for a, b in combinations(segments, 2):
         if a.label == b.label:
             continue
-        if _shares_a_terminus(a, b, tol=shared_terminus):
-            continue
         point = _proper_crossing(a, b, tol=tol)
-        if point is not None:
-            crossings.append(LeaderCrossing(a, b, *point))
+        if point is None:
+            continue
+        # Locate the crossing BEFORE exempting it: a shared terminus only excuses
+        # a crossing that happens AT that terminus (see the counterexample in
+        # _crossing_is_under_a_shared_terminus).
+        if _crossing_is_under_a_shared_terminus(
+            a, b, *point, tol=shared_terminus
+        ):
+            continue
+        crossings.append(LeaderCrossing(a, b, *point))
     return crossings
 
 

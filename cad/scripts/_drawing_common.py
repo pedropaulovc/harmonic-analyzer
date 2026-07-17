@@ -2331,6 +2331,12 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
         # and lumping the two would let the exemption cover a defect class it was
         # never argued for.
         leader_leader = [c for c in crossings if isinstance(c, LeaderCrossing)]
+        # Everything that is NOT leader-vs-leader is a leader through a foreign
+        # VIEW. Split it out and keep it OUT of the exemption: counting only
+        # leader_leader and returning would let the pen-assembly entry swallow a
+        # view crossing too, which is the class the comment above calls a hard
+        # failure (Codex #3601319575).
+        view_crossings = [c for c in crossings if not isinstance(c, LeaderCrossing)]
         allowed = _KNOWN_LEADER_CROSSINGS.get(stem, 0)
         if span is not None:
             span.set_attribute("elements", len(elements))
@@ -2339,7 +2345,13 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
             span.set_attribute("overflows", len(overflows))
             span.set_attribute("crossings", len(crossings))
             span.set_attribute("known_leader_crossings", allowed)
-        if allowed and len(leader_leader) == allowed and not overlaps and not overflows:
+        if (
+            allowed
+            and len(leader_leader) == allowed
+            and not overlaps
+            and not overflows
+            and not view_crossings
+        ):
             _telemetry.warn(
                 f"drawing layout: {len(leader_leader)} KNOWN leader crossing(s) "
                 f"on {stem!r}, grandfathered by _KNOWN_LEADER_CROSSINGS -- this "

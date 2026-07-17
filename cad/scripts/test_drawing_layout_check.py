@@ -21,6 +21,7 @@ from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
     DEFAULT_OVERLAP_TOL_M,
     CollisionScope,
+    Crossing,
     DrawableRegion,
     LayoutElement,
     LeaderCrossing,
@@ -894,3 +895,67 @@ def test_the_ratchet_names_only_pen_assembly():
     # A tripwire on the dict itself: it exists to shrink. If a second sheet is
     # added to make a build pass, this fails and forces the conversation.
     assert drawing_common._KNOWN_LEADER_CROSSINGS == {"pen-assembly": 2}
+
+
+# --- the shared-terminus exemption must not swallow real crossings -----------
+
+
+def test_a_shared_terminus_does_not_excuse_a_crossing_ELSEWHERE():
+    """Codex #3601319580's counterexample, pinned.
+
+    Two segments whose starts are 0.9 mm apart -- INSIDE _SHARED_TERMINUS_M --
+    still cross once, and here that crossing is at (5, 0): 5 mm from the shared
+    end, mid-span, plainly visible in ink. The old endpoint-only test skipped the
+    pair outright and threw it away. The exemption is for crossings buried under
+    a shared arrowhead, so it must key on where the CROSSING is, not merely on
+    whether two ends are near each other.
+    """
+    a = LeaderSegment("A", "gdt", 0.0, 0.0, 0.010, 0.0, owner="Front")
+    b = LeaderSegment("B", "gdt", 0.0, 0.0009, 0.010, -0.0009, owner="Front")
+    found = find_leader_leader_crossings([a, b])
+    assert len(found) == 1, "a mid-span crossing must survive a nearby shared end"
+    assert found[0].x == pytest.approx(0.005, abs=1e-4)
+    assert found[0].y == pytest.approx(0.0, abs=1e-4)
+
+
+def test_the_converging_arrowhead_artefact_is_still_exempt():
+    """The positive control for the fix: the real platen-guide shape stays clean.
+
+    Two leaders converging on ONE attachment meet AT that attachment, so the
+    crossing sits under the ~2.4 mm arrowhead and prints as one arrow. Tightening
+    the exemption must not start flagging this.
+    """
+    a = LeaderSegment("A", "dim", 0.3650, 0.1000, 0.3400, 0.1200, owner="Front")
+    b = LeaderSegment("B", "dim", 0.3652, 0.1000, 0.3900, 0.1200, owner="Front")
+    assert find_leader_leader_crossings([a, b]) == []
+
+
+def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
+    """Codex #3601319575, pinned.
+
+    pen-assembly is grandfathered for its two leader-vs-LEADER crossings only.
+    A leader run across a foreign VIEW is a different, always-hard failure -- so
+    if one appears ON the grandfathered sheet, the exemption must NOT swallow it.
+    Counting only leader_leader and returning did exactly that.
+    """
+    seg = LeaderSegment("a", "gdt", 0.0, 0.0, 0.1, 0.1, owner="Front")
+    view = _el("OtherView", 0.05, 0.05, 0.15, 0.15)
+    mixed = [
+        LeaderCrossing(seg, seg, 0.05, 0.05),
+        LeaderCrossing(seg, seg, 0.06, 0.06),
+        Crossing(seg, view),  # the one that must still fail the build
+    ]
+
+    class _Stub:
+        pass
+
+    import _drawing_common as dc
+
+    real_collect, real_audit = dc.collect_layout_elements, dc.audit_layout
+    dc.collect_layout_elements = lambda _a: ([], [], WHOLE_SHEET)
+    dc.audit_layout = lambda *_a, **_k: ([], [], mixed)
+    try:
+        with pytest.raises(RuntimeError):
+            dc.check_drawing_layout(None, stem="pen-assembly")
+    finally:
+        dc.collect_layout_elements, dc.audit_layout = real_collect, real_audit
