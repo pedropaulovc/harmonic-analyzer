@@ -1,11 +1,46 @@
 ---
 name: drawing-sheet-zone-border
-description: The DRWDOT's drawn border frame is a pure (+3.217, +0.656) mm translation off its declared 12.7 mm zone margins — ONE defect, not three; the zone grid is CORRECT (region=Sheet, EvenlySized 2x4) and must not be "fixed"
+description: RESOLVED 2026-07-16 — Pedro re-centred the DRWDOT frame to 12.7 uniform (was off-centre by +3.217/+0.656 mm) and changed the zone grid to EvenlySized 4x4 (was 2x4); the border gate's left/bottom blindness is gone. Keeps the measurement recipe, the early-binding trap, and the gray-threshold trap.
 metadata:
   type: project
 ---
 
 Measured 2026-07-16 (PR #334) while adding the sheet-zone-border gate.
+
+> [!IMPORTANT]
+> **RESOLVED — the template was edited 2026-07-16 22:01 and BOTH defects this
+> note tracked are fixed. Re-measured after the edit, do not act on the historical
+> numbers below.**
+>
+> | | before | after | declared |
+> |---|---|---|---|
+> | left rule | 15.917 | **12.446** | 12.7 |
+> | right rule | 9.483 | **12.615** | 12.7 |
+> | bottom rule | 13.335 | **12.446** | 12.7 |
+> | top rule | 12.023 | **12.531** | 12.7 |
+> | zone grid | EvenlySized **2x4** | EvenlySized **4x4** | — |
+>
+> The rules are 0.4 mm wide (they span e.g. x 0.0124..0.0128), so their
+> CENTRELINES sit at ~12.6 mm — within a line width of the declared 12.7.
+> **Declared now equals drawn on all four sides, so the border gate is no longer
+> blind on the left (3.2 mm) or bottom (0.6 mm)**; the whole "query the drawn
+> frame instead of the margin" workaround is unnecessary — the real defect was
+> fixed instead of modelled around.
+>
+> Two consequences to chase:
+> - **Nine draw scripts carry comments citing "the drawn frame rule is at
+>   x=0.0159"** and reasoning that the audit cannot see the left strip. Those
+>   numbers are now STALE (the rule is at ~0.0126). The PLACEMENTS are still safe
+>   (they anchor at x=0.020, clear of both old and new rules), so this is a
+>   comment-accuracy problem, not a layout one.
+> - **pen_rod's note should now fit.** It was "genuinely unsatisfiable" only
+>   against the OLD left rule at 0.0159; with the rule at 0.0126 the note gains
+>   ~3.3 mm of run. Re-check it rather than assuming either way.
+>
+> `GetZoneSizeDistribution()` now returns **(1, 4, 4)**; anything pinning (1, 2, 4)
+> is stale. Region is still `1 = swRegionTypeSheet` and margins are still 12.7
+> uniform, so the "do not touch the zone grid" warning below still stands — the
+> grid divides the SHEET, now into 4 rows x 4 columns.
 
 **Query zone margins, never hardcode them.** `ISheet::GetZoneMargin(code)` with
 `swZoneMargin_e` = {top:0, bottom:1, right:2, left:3}. The project DRWDOT reports
