@@ -192,11 +192,26 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="pen-rod opposite slide face parallelism",
     )
+    # BELOW the rod, not right of it. At (+0.032, -0.042) the frame sat up-right
+    # of its own target, so its leader descended left to the rod's bottom corner
+    # and crossed the Ra's leader -- which rises from its symbol right of the rod
+    # up-left to the slide face -- in an X at (0.0802, 0.0958). Opposite diagonals
+    # through one corner. (The Ra comment below documents why the Ra cannot move:
+    # its target must sit on the slide face, so passing UNDER the frame's terminus
+    # puts it off the face and passing OVER drives it through the frame's box.)
+    #
+    # So the frame moves. Measured against the live leader geometry: the Ra's
+    # leader runs (0.1637, 0.0680) -> (0.0675, 0.1001), i.e. y = 0.0869..0.0976
+    # across this box's x span, clearing its top (0.080) by 6.9 mm. The box also
+    # clears the Section dim's text (ends x=0.0483) by 26.7 mm, the notes
+    # (top y=0.0628) by 10.2 mm, and the right view (y>=0.090, x>=0.137) entirely.
+    # Its leader now approaches the rod's bottom from BELOW, so the two run on
+    # opposite sides of the corner instead of through each other.
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=front_bottom,
-        frame_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] - 0.042),
+        frame_xy=(FRONT_CENTER[0] + 0.005, FRONT_CENTER[1] - 0.070),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
