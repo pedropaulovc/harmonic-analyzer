@@ -212,7 +212,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=datum_a_edge,
-        symbol_xy=(0.210, datum_a_edge[1]),
+        # The standoff must be PERPENDICULAR to the edge. This edge is the right
+        # view's horizontal bottom (the mounting seat), so it needs a Y offset:
+        # at the edge's own y the attachment triangle had nowhere to go and drew
+        # INSIDE the box, its apex striking through the "A". The x-offset alone
+        # runs ALONG the edge and buys no room. (datum C below is the pattern.)
+        # x stays at 0.210 to clear the 63.50 FootSpan callout at (0.155, 0.147).
+        symbol_xy=(0.210, datum_a_edge[1] - 0.012),
         datum="A",
         label="support mounting seat",
     )

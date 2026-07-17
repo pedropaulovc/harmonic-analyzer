@@ -101,7 +101,11 @@ FRONT_KEEP = {
     "SlitWidth": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[1] + 2.0)),
     "Chamfer2dx": (_sheet_x(BLOCK_LENGTH - CHAMFER / 2.0), _front_y(BLOCK_HEIGHT) + 0.012),
     "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] - 5.0), _front_y(BLOCK_HEIGHT) + 0.026),
-    "ScrewHoleCz": (_sheet_x(BLOCK_LENGTH) + 0.020, _front_y(SCREW_HOLE_XY[1])),
+    # +0.012 keeps this vertical dimension's line (drawn at the text's x, from the
+    # block bottom up to the hole centre) out of datum C's box in the crowded
+    # corridor between the front and right views; its text still clears the front
+    # view's right edge (x=0.194) by ~3 mm.
+    "ScrewHoleCz": (_sheet_x(BLOCK_LENGTH) + 0.012, _front_y(SCREW_HOLE_XY[1])),
     "ScrewHoleDiaDim": (_sheet_x(BLOCK_LENGTH) + 0.024, _front_y(16.0)),
 }
 TOP_KEEP = {
@@ -223,11 +227,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # Native datum/GD&T/surface annotations.  A = the bottom face the block
     # seats on; B = the left end the slit and both bore stations run from;
     # C = the broad front face.
+    # Hangs below the bottom edge (a perpendicular standoff -- an X offset would
+    # run along the edge and leave the attachment triangle no room). x=30 mm is
+    # the one pocket in the band below the view: the 26.00 dimension line stops
+    # at x=0.170 and the 32.00 sits down at y=0.058, so x 0.175..0.194 is clear
+    # between the edge and the 32.00 line. The 7.1 mm box lands at y 0.0639..0.071
+    # on an 8 mm leader, clearing the 32.00 line by 5.9 mm and the 32.00's right
+    # extension line (x=0.194) by 4.5 mm.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(_sheet_x(24.0), _front_y(0.0)),
-        symbol_xy=(_sheet_x(24.0) + 0.012, _front_y(0.0) - 0.016),
+        edge_xy=(_sheet_x(30.0), _front_y(0.0)),
+        symbol_xy=(_sheet_x(30.0), _front_y(0.0) - 0.008),
         datum="A",
         label="block bottom face",
     )
@@ -243,7 +254,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        symbol_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z - 0.016, RIGHT_CENTER[1] - 0.020),
+        # -0.010, not -0.016: symbol_xy is the box's RIGHT edge here (the leader
+        # arrives from the right), so the 7.1 mm box grows LEFT -- at -0.016 it
+        # spanned x 0.2097..0.2168 and the ScrewHoleCz dimension line, vertical at
+        # x=0.214, ran straight through it and struck out the "C". Pairs with the
+        # ScrewHoleCz move to x=0.206: box left edge 0.2157 now clears it by 9.7 mm.
+        symbol_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z - 0.010, RIGHT_CENTER[1] - 0.020),
         datum="C",
         label="block broad face",
     )
@@ -312,7 +328,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet declares, and the anchor is the text's left edge -- 0.014 put the ink
     # at 0.0141, printing through the rule. The audit bounds notes by the declared
     # margin, so it cannot see this; eye-verified.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    # y=0.046, not 0.070: this block is SIX lines (26.6 mm tall, anchored at its
+    # top line) and the front view's bottom edge is only at y=0.079, so anchoring
+    # it at 0.070 overlapped the whole 32.00/26.00 locator chain -- both dimension
+    # lines span the view's full width and printed through the note text like
+    # strikethrough. Dimensions are CollisionScope.NONE, so no gate sees this.
+    # 0.046 drops the block clear below the 32.00 text (bottom y 0.055) while
+    # keeping its own bottom at 0.0194 -- 6.1 mm inside the drawn frame rule.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.046)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.180)
 
     return await finalize_drawing(

@@ -174,7 +174,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=lower_end,
-        symbol_xy=(TOP_CENTER[0] + 0.018, lower_end[1]),
+        # The standoff must be PERPENDICULAR to the edge. This edge is the top
+        # view's horizontal lower end face, so it needs a Y offset: at the edge's
+        # own y the attachment triangle had nowhere to go and drew INSIDE the
+        # box, its apex striking into the "C". The x-offset alone runs ALONG the
+        # edge and buys no room. y-0.012 drops it into empty sheet -- clear of
+        # the TOP VIEW SCALE note (which ends at x=0.092) and of the top view
+        # itself (whose outline starts at y=0.158).
+        symbol_xy=(TOP_CENTER[0] + 0.018, lower_end[1] - 0.012),
         datum="C",
         label="crossbar reference end seat",
     )
@@ -212,7 +219,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # x=0.020: a note is left-aligned on its anchor, and the drawn frame rule is
     # at x=0.0159 -- 0.014 printed the first glyph through it (the audit's bound
     # is the 12.7 mm zone margin, so it cannot see this).
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.090)
+    # y=0.084, not 0.090: the anchor is the block's TOP and it grows down, so at
+    # 0.090 its first line ran to y=0.0898 against datum A's tag bottom at
+    # 0.0914 -- a measured 1.6 mm, which one more note line would close. The 6 mm
+    # drop takes it to ~7.6 mm and costs nothing: the block's bottom lands at
+    # ~0.071, still ~58 mm above the frame, and it ends at x=0.206 so it never
+    # approaches the title block (x>=0.264).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.084)
     add_property_linked_note(adapter, "Top View Note", 0.045, 0.155)
     add_native_hole_callout(
         adapter,

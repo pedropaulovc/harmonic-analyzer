@@ -206,18 +206,22 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="lock rail-mating face",
     )
-    # Symbol sits RIGHT of the plate at bottom-edge height, not under it: the
-    # whole band below the view (y 0.088..0.104) is the nested locator chain
-    # (22.00 / 18.00 / 4.00), and the old (0.148, 0.098) spot put this box
-    # exactly on the 18.00 dimension line's right terminus at x=0.148 -- the
-    # arrow landed inside the box. Nothing else lives right of the plate at this
-    # height (the position FCF is up at y=0.134), so the leader stays short and
-    # horizontal.
+    # The standoff MUST be perpendicular to the attached edge: this is the
+    # plate's horizontal bottom edge, so the symbol offsets in Y. An X offset
+    # runs ALONG the edge, leaving zero room for the attachment triangle, which
+    # then renders inside the box on top of the letter (measured: a symbol at
+    # bottom-edge height put the triangle in the "B"'s bowl).
+    #
+    # X=0.156 drops it into the one pocket the locator chain leaves: the
+    # 22.00/18.00 dimension lines (y 0.0851/0.0932) span only x 0.076..0.164 and
+    # the 4.00 (y 0.1013) stops at x=0.096, so x 0.148..0.164 is clear from the
+    # 18.00 line up to the plate edge -- an 18.6 mm gap, centred here. The 7.1 mm
+    # box hangs 8 mm below the edge, clearing the 18.00 line by 3.7 mm.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + 0.038, BOTTOM_EDGE_Y),
-        symbol_xy=(0.184, BOTTOM_EDGE_Y),
+        edge_xy=(FRONT_CENTER[0] + 0.036, BOTTOM_EDGE_Y),
+        symbol_xy=(FRONT_CENTER[0] + 0.036, BOTTOM_EDGE_Y - 0.008),
         datum="B",
         label="lock guide-side edge",
     )
