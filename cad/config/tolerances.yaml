@@ -47,3 +47,20 @@ fits:
   fastener_clearance:
     close_mm: 0.10
     normal_mm: 0.25
+    # Drawing callout tolerance for a clearance hole (mm, [minus, plus]).
+    #
+    # The MINUS side is a hard zero and is the whole point: the nominal diameter
+    # (_holes.CLEARANCE_MM) ALREADY has the clearance above baked in, so a hole
+    # under nominal has eaten it. A #4 close hole is 3.048 against a 2.845 screw
+    # -- 0.203 of clearance total -- while the title block's general two-decimal
+    # rule is +/-0.51, FIVE TIMES the entire clearance: under it the hole may be
+    # made at 2.54 and the screw will not pass. A general bilateral block cannot
+    # govern a close-fit clearance hole, which is why docs/tolerance-policy.md
+    # lists fastener<->clearance-hole as a CRITICAL interface -- it must ride a
+    # feature callout, never a note and never the block. (Codex #3601451730 /
+    # #3601552628 found this after the general notes were retired.)
+    #
+    # The PLUS side is shop allowance: a clearance hole may run oversize without
+    # functional harm, and 0.10 keeps a close hole inside roughly the next fit
+    # class (normal, +0.216 on a #4) rather than drifting past it.
+    drill_tolerance_mm: [0.00, 0.10]

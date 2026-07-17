@@ -634,7 +634,16 @@ def add_native_hole_callout(
     callout_xy: tuple[float, float],
     label: str,
 ) -> Any:
-    """Insert an associative Hole Wizard callout on a selected drawing edge."""
+    """Insert an associative Hole Wizard callout on a selected drawing edge.
+
+    The callout DISPLAYS the part's hole tolerance; it does not own one. Set the
+    fit on the hole feature in the SLDPRT (``_holes.wizard_holes``'s
+    ``dia_tolerance_mm``) and it renders here as
+    ``<MOD-DIAM>3.05 +0.10/0.00 THRU ALL``. Toleranceing the drawing dimension
+    instead silently does nothing: ``IDimensionTolerance::SetValues`` returns
+    True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
+    callout still prints the bare nominal.
+    """
     _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)

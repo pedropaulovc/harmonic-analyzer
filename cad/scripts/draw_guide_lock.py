@@ -39,6 +39,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+
 from guide_lock_spec import (
     HOLE_DIA_MM,
     HOLE_XY,

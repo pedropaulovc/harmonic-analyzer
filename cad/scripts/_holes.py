@@ -212,6 +212,56 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
 
 
 @_telemetry.traced("feature.hole_wizard", label_param="label")
+def _tolerance_hole_diameter(
+    feat: Any, tolerance_mm: tuple[float, float], *, label: str
+) -> None:
+    """Put the diameter tolerance on the hole feature IN THE PART.
+
+    The drawing's native hole callout DISPLAYS the part's tolerance; it does not
+    own one. Setting it on the drawing dimension instead is the trap this exists
+    to avoid: ``IDimensionTolerance::SetValues`` there returns True and stores
+    the value (``GetMaxValue2`` reads it straight back), and the callout renders
+    the bare nominal anyway -- a print that looks specified and is not.
+
+    ``tolerance_mm`` is ``(minus, plus)``. For a clearance hole the minus side is
+    a hard zero: the nominal from :data:`CLEARANCE_MM` ALREADY carries the fit
+    clearance over the fastener, so an undersize hole has eaten it. A #4 close
+    hole is 3.048 against a 2.845 screw -- 0.203 total -- while the title block's
+    general two-decimal rule is +/-0.51, five times the whole clearance, and
+    permits a 2.54 hole the screw cannot pass. That is why
+    docs/tolerance-policy.md lists fastener<->clearance-hole as a CRITICAL
+    interface: the general block cannot govern it.
+    """
+    minus_mm, plus_mm = tolerance_mm
+    matches = []
+    display = feat.GetFirstDisplayDimension()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = display.GetDimension()
+        if dimension is not None and "Dia" in str(dimension.FullName):
+            matches.append(dimension)
+        display = feat.GetNextDisplayDimension(display)
+    # Named, never positional: a wizard hole carries several display dimensions
+    # ("Thru Hole Dia." + "Thru Hole Depth"), and toleranceing the depth because
+    # it happened to come first would be silent and wrong.
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"hole wizard {label}: expected exactly ONE diameter display "
+            f"dimension, found {len(matches)} -- refusing to guess which hole "
+            "dimension carries the fit"
+        )
+    tolerance = _early_bound(matches[0], "IDimension").Tolerance
+    tolerance = _early_bound(tolerance, "IDimensionTolerance")
+    tolerance.Type = 2  # swTolType_e.swTolBILAT
+    if not tolerance.SetValues(-minus_mm / 1000.0, plus_mm / 1000.0):  # METERS
+        raise RuntimeError(
+            f"hole wizard {label}: SetValues rejected -{minus_mm}/+{plus_mm} mm"
+        )
+    _telemetry.debug(
+        f"hole wizard {label}: diameter toleranced -{minus_mm}/+{plus_mm} mm"
+    )
+
+
 def wizard_holes(
     adapter,
     spec: HoleSpec,
@@ -222,6 +272,7 @@ def wizard_holes(
     name: str = "",
     expect_dia_mm: float = 0.0,
     placement_dims: list[PlacementDimensions] | None = None,
+    dia_tolerance_mm: tuple[float, float] | None = None,
 ) -> WizardHoleResult:
     """Create ONE ``HoleWzd`` feature with an instance at each of ``points_mm``
     (model X,Y,Z in mm, all on the planar face whose outward normal is
@@ -323,6 +374,9 @@ def wizard_holes(
             )
     feat = _early_bound(feat, "IFeature")
     _telemetry.debug(f"hole wizard {label}: feature created, placing points")
+
+    if dia_tolerance_mm is not None:
+        _tolerance_hole_diameter(feat, dia_tolerance_mm, label=label)
 
     # Locate the wizard's 1-point placement sketch.
     place_sk = place_name = None
