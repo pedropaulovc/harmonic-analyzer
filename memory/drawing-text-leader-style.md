@@ -84,13 +84,36 @@ what is left. Budget them before adding a datum tag or Ra symbol.
 **A datum feature symbol is not freely placeable — the ATTACHED ENTITY decides.**
 `IAnnotation::SetPosition2` sets "the point where the leader hits the symbol",
 and its Remarks restrict a symbol on an edge to "along that edge or extensions of
-that edge", otherwise landing "as near as possible". So: on a STRAIGHT edge, y is
-honoured and x is projected back onto the line; on a CIRCLE the permitted set is
-the circumference, so the tag re-attaches at the circle point NEAREST the symbol
-and prints on the geometry — regardless of the circle's SIZE. Fix a stuck tag by
-picking the circle at the clock position you want (`edge_xy=bore_top` with the
-symbol above — the `draw_pivot_bushing.py` spelling), or by attaching to a
-straight flank in a side view instead. Two signatures of a mis-picked clock
+that edge", otherwise landing "as near as possible". On a STRAIGHT edge, y is
+honoured and x is projected back onto the line.
+
+**On a CIRCLE the rule that fits all six measured samples is: the tag always
+re-attaches at the circle point NEAREST the symbol, but the requested STANDOFF
+survives only when `edge_xy`'s clock position AGREES with the direction the symbol
+sits in.** Disagree, and the symbol is dragged down onto the circumference and
+`symbol_xy` goes inert.
+
+- pick 3 o'clock + symbol at 12 → **collapses**: pivot-shaft asked 17.6 mm, got
+  1.05 mm; cone-tip-bushing rendered 0.227 and 0.150 pixel-identically.
+- pick 12 + symbol at 12 → **honoured exactly**: cone-tip-bushing's box bottom
+  lands ON the requested y (0.227 → 0.227, 0.245 → 0.2442), confirming the anchor
+  is the box's bottom edge, i.e. the documented "point where the leader hits".
+- pick 45° + symbol up-right (already agreeing) → cone-lock-knob's tag sits ~57 mm
+  from a radius-19.5 mm circle with a real leader, and never looked broken.
+
+An earlier version of this note said a circle "traps the tag on the circumference
+regardless of SIZE". That is wrong — cone-lock-knob disproves it, and the size
+framing it replaced was wrong too. It is neither size nor trapping: it is whether
+the pick and the symbol agree on direction (draw-A, from 6 samples).
+
+Fix a stuck tag by picking the circle at the clock position the symbol sits at
+(`edge_xy=bore_top` with the symbol above — the `draw_pivot_bushing.py` spelling).
+**The "attach to a straight flank in a side view instead" escape does NOT exist
+for a bore seen end-on**: the bore's hidden inner line is unpickable as BOTH
+`EDGE` and `SILHOUETTE` (two hard `RuntimeError`s, no render, at two different x).
+A shaft's OD flank IS pickable as `SILHOUETTE` — a true outer silhouette is a
+different animal from a bore's hidden inner line. So for an end-on bore the
+clock-position fix is the only lever. Two signatures of a mis-picked clock
 position, both measured 2026-07-16 and both INVISIBLE to every gate (a datum
 symbol exposes no `GetExtent`, so it is `CollisionScope.NONE`):
 - **inert `symbol_xy`** — picked at 3 o'clock with the symbol at 12, the tag
