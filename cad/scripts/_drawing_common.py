@@ -9,7 +9,9 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import math
+from collections import Counter
 from dataclasses import dataclass, replace
+from itertools import combinations
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 from xml.etree import ElementTree
@@ -1999,6 +2001,78 @@ def sheet_drawable_region(
     return region
 
 
+def _closed_rectangle(
+    lines: list[tuple[tuple[float, float], tuple[float, float]]], tol: float = 1e-6
+) -> set[int]:
+    """Indices of the 4 lines forming a closed axis-aligned rectangle, if any.
+
+    A datum tag's geometry is ``[leader..., box(4 lines)]``; this finds the box so
+    the caller can treat everything else as leader. Identified STRUCTURALLY (four
+    axis-aligned lines meeting at exactly 4 corners, each used twice) rather than
+    by position in the list or by its 7 mm size -- both of those are incidental.
+    """
+    axis = [
+        i for i, (a, b) in enumerate(lines)
+        if abs(a[0] - b[0]) < tol or abs(a[1] - b[1]) < tol
+    ]
+    for quad in combinations(axis, 4):
+        pts = [p for i in quad for p in lines[i]]
+        counts = Counter((round(x, 6), round(y, 6)) for x, y in pts)
+        if len(counts) != 4 or any(v != 2 for v in counts.values()):
+            continue
+        if len({p[0] for p in counts} ) == 2 and len({p[1] for p in counts}) == 2:
+            return set(quad)
+    return set()
+
+
+def _datum_leader_segments(
+    adapter: Any, annotation: Any, *, label: str, owner: str
+) -> list[LeaderSegment]:
+    """A DATUM TAG's leader, which ``_leader_segments_of`` structurally cannot see.
+
+    A leader is only REGISTERED if ``SetLeader3`` created it, and
+    ``add_datum_feature`` never calls it -- nor can it: datum FEATURE symbols are
+    absent from ``SetLeader3``'s support list (only datum TARGET symbols are). So
+    ``GetLeaderCount()`` returns 0 for every ``swDatumTag`` (measured: 3 tags on
+    rocker-arm-support report 0, while a ``swGtol`` on the same sheet reports 1).
+
+    But the leader IS DRAWN, and it IS readable -- as ordinary geometry via
+    ``IDatumTag::GetLineAtIndex``. Without this, a datum tag routed straight
+    across a neighbouring view is invisible to BOTH audits: its box is
+    ``CollisionScope.NONE`` so it is never overlap-checked, and it contributes no
+    leader segments so it is never crossing-checked (codex #334). That is not
+    hypothetical -- the eye pass found exactly this on cone-tip-bushing (datum A's
+    leader driven 41.8 mm down through the whole end view) and crank-arm (datum A
+    across a 16 mm section), both passing every gate.
+    """
+    spec = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
+    )
+    if spec is None:
+        return []
+    spec = _sw_type_info.early_bound_or_flag(spec, "IDatumTag")
+    count = int(
+        adapter._attempt(lambda: adapter._get_attr_or_call(spec, "GetLineCount"))
+        or 0
+    )
+    lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
+    for index in range(count):
+        raw = adapter._attempt(lambda i=index: spec.GetLineAtIndex(i))
+        if not raw:
+            continue
+        v = [float(t) for t in raw]  # [lineType, startPt[3], endPt[3]]
+        lines.append(((v[1], v[2]), (v[4], v[5])))
+    # Drop the tag's own BOX -- it is not a leader, and a box legitimately abuts
+    # its own view. Everything else (the leader run, and the shoulder some tags
+    # draw along the attached edge) is a straight run that can cross a view.
+    box = _closed_rectangle(lines)
+    return [
+        LeaderSegment(label, "gdt", a[0], a[1], b[0], b[1], owner)
+        for i, (a, b) in enumerate(lines)
+        if i not in box
+    ]
+
+
 def _leader_segments_of(
     adapter: Any, annotation: Any, *, label: str, kind: str, owner: str
 ) -> list[LeaderSegment]:
@@ -2100,6 +2174,23 @@ def collect_layout_elements(
                     owner=name,
                 )
             )
+            # A datum tag registers NO IAnnotation leader (SetLeader3 never made
+            # one, and cannot for a datum FEATURE symbol), so the call above
+            # returns nothing for it however well it is routed. Its leader is
+            # real, drawn, and readable only as IDatumTag geometry -- collect it
+            # separately or a datum leader driven through a neighbouring view is
+            # invisible to every gate (codex #334).
+            if int(
+                adapter._attempt(
+                    lambda a=annotation: adapter._get_attr_or_call(a, "GetType")
+                )
+                or 0
+            ) == _ANNOT_DATUM:
+                leaders.extend(
+                    _datum_leader_segments(
+                        adapter, annotation, label=element.label, owner=name
+                    )
+                )
             # A SMALL note centered inside its owning view is a hole tag / balloon
             # sitting on the geometry -- give it NON_VIEW scope so it does not
             # collide with the view it sits on (but still collides with a free

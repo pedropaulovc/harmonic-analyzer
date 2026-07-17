@@ -469,6 +469,77 @@ def test_leader_routed_clear_of_other_views_is_clean():
     assert find_leader_crossings([leader], _views()) == []
 
 
+def _datum_tag(x, y, lines, label="A"):
+    spec = SimpleNamespace(
+        GetLineCount=lambda: len(lines),
+        GetLineAtIndex=lambda i: [1.0, *lines[i][0], 0.0, *lines[i][1], 0.0],
+    )
+    return SimpleNamespace(
+        GetPosition=[x, y, 0.0],
+        GetType=lambda: drawing_common._ANNOT_DATUM,
+        GetName=lambda: label,
+        GetLeaderCount=lambda: 0,          # the whole point: it registers none
+        GetSpecificAnnotation=lambda: spec,
+    )
+
+
+def test_datum_tag_leader_is_collected_even_though_it_registers_none():
+    """rocker-arm-support datum A as probed: 4 box lines + a 12.6mm leader.
+
+    GetLeaderCount() is 0 for every swDatumTag (SetLeader3 never made a leader,
+    and cannot for a datum FEATURE symbol), so _leader_segments_of returns
+    nothing however badly the tag is routed. The leader is real and drawn --
+    readable only as IDatumTag geometry.
+    """
+    ax, ay = 0.2100, 0.1436
+    box = [((0.2065, 0.1366), (0.2065, ay)), ((0.2065, ay), (0.2135, ay)),
+           ((0.2135, ay), (0.2135, 0.1366)), ((0.2135, 0.1366), (0.2065, 0.1366))]
+    leader = [((ax, 0.1562), (ax, ay))]
+    ann = _datum_tag(ax, ay, box + leader)
+
+    segs = drawing_common._datum_leader_segments(
+        _FakeAdapter(None), ann, label="A", owner="Front")
+
+    # The BOX must be excluded -- it is not a leader, and a tag's box legitimately
+    # abuts its own view. Only the leader run survives.
+    assert len(segs) == 1
+    assert (segs[0].x0, segs[0].y0) == pytest.approx((ax, 0.1562))
+    assert (segs[0].x1, segs[0].y1) == pytest.approx((ax, ay))
+
+
+def test_datum_leader_across_a_foreign_view_now_flags():
+    """The defect the eye pass found on cone-tip-bushing and crank-arm.
+
+    A datum leader driven through a neighbouring view used to pass EVERY gate:
+    the box is CollisionScope.NONE so it is never overlap-checked, and the tag
+    contributes no leader segments so it was never crossing-checked either.
+    """
+    # Tag below the view, leader driven straight UP through it to a pick above.
+    box = [((0.14, 0.05), (0.14, 0.057)), ((0.14, 0.057), (0.147, 0.057)),
+           ((0.147, 0.057), (0.147, 0.05)), ((0.147, 0.05), (0.14, 0.05))]
+    leader = [((0.1435, 0.25), (0.1435, 0.057))]
+    ann = _datum_tag(0.1435, 0.057, box + leader)
+    segs = drawing_common._datum_leader_segments(
+        _FakeAdapter(None), ann, label="A", owner="Front")
+
+    (crossing,) = find_leader_crossings(segs, _views())
+    assert crossing.view.label == "Top"
+
+
+def test_closed_rectangle_ignores_a_tag_with_no_box():
+    """No rectangle found -> treat every line as leader, never crash.
+
+    Conservative on purpose: an unrecognised tag shape yields MORE crossing
+    checks, not fewer. Silently returning [] would restore the blind spot.
+    """
+    lines = [((0.10, 0.10), (0.15, 0.18))]  # a lone diagonal, no box
+    assert drawing_common._closed_rectangle(lines) == set()
+    ann = _datum_tag(0.10, 0.10, lines)
+    segs = drawing_common._datum_leader_segments(
+        _FakeAdapter(None), ann, label="A", owner="Front")
+    assert len(segs) == 1
+
+
 def test_leader_clipping_a_pictorial_view_is_not_a_crossing():
     """An isometric view's outline is mostly EMPTY diagonal space.
 
