@@ -15,7 +15,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "UOS, DIMENSIONS IN MM. DEBURR; BREAK FRONT END EDGE 0.15 MAX.",
         f"CROWN BACK END SR{CAP_R} +/-0.25 FULL DOME TO THE {ROD_LEN} RIM "
         f"({CAP_SAG} REF PROUD; OAL {ROD_LEN + CAP_SAG} REF); "
         "BLEND SMOOTH, NO STEP.",

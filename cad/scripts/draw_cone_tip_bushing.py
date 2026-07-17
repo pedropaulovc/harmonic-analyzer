@@ -144,13 +144,24 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bushing side-view axis centerline",
     )
 
-    outer_edge = (
-        END_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 2000.0,
-        END_CENTER[1],
-    )
-    outer_top = (
-        END_CENTER[0],
-        END_CENTER[1] + OUTER_DIA * SHEET_SCALE[0] / 2000.0,
+    # The OD runout attaches at the OD's UPPER-LEFT 45 deg point, NOT its 12
+    # o'clock -- and this is the whole reason the frame's own anchor is up-left.
+    #
+    # Datum A (below) leaders RADIALLY out of the bore at 12 o'clock, so it is a
+    # vertical line along x = END_CENTER[0]. The OD's 12 o'clock lies exactly ON
+    # that line, so an `outer_top` pick put the runout's arrowhead on top of the
+    # datum leader: measured on the 2026-07-16 render, arrow tip (0.0852, 0.2146)
+    # against the datum leader at x=0.0850 -- 0.2 mm apart, the stacked-arrowhead
+    # tell. 45 deg moves the arrow to (0.0680, 0.2070), a clear 17 mm away, and
+    # keeps the leader radial (it approaches the OD from OUTSIDE, so it never
+    # crosses the circle). This is draw_pivot_bushing.py's `outer_edge_upper`
+    # spelling and its stated rationale -- "so the four leaders do not converge
+    # on one spot".
+    _diag = 2.0**-0.5
+    _outer_r = OUTER_DIA * SHEET_SCALE[0] / 2000.0
+    outer_upper_left = (
+        END_CENTER[0] - _outer_r * _diag,
+        END_CENTER[1] + _outer_r * _diag,
     )
     bore_edge = (
         END_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -159,10 +170,56 @@ async def build(adapter: Any) -> dict[str, str]:
     half_length = LENGTH * SHEET_SCALE[0] / 2000.0
     bottom_end = (SIDE_CENTER[0], SIDE_CENTER[1] - half_length)
     top_end = (SIDE_CENTER[0], SIDE_CENTER[1] + half_length)
+    # Pick the bore at 12 o'clock, because the symbol goes straight ABOVE it.
+    #
+    # A datum feature symbol is not freely placeable: IAnnotation::SetPosition2
+    # sets "the point where the leader hits the symbol", and its Remarks restrict
+    # a symbol inserted directly on an edge to "along that edge or extensions of
+    # that edge", otherwise landing "as near as possible" to the request.  On a
+    # CIRCLE the permitted set IS the circumference, so the tag re-attaches at
+    # the circle point nearest the symbol.  Picking `bore_edge` (3 o'clock) while
+    # placing the symbol at 12 fought that: the tag collapsed onto the bore,
+    # printing its box over the centerline with the triangle across the "A", and
+    # symbol_xy went inert (0.227 and 0.150 rendered pixel-identical).  Picking
+    # the clock position the symbol sits at lets the leader run RADIALLY out to
+    # it -- the draw_pivot_bushing.py spelling.
+    #
+    # Measured, with the pick at 12 o'clock: symbol_xy IS now honoured exactly,
+    # and it is the box's BOTTOM edge that lands on it (the documented "point
+    # where the leader hits the symbol") -- +0.037 puts that edge at y=0.227,
+    # +0.055 at y=0.245.  0.037 is the keeper: at 0.055 the box collides with the
+    # OD-runout frame's text at y=0.254.
+    #
+    # The bore's straight side-view flank is NOT an alternative here: it is
+    # unpickable as both an EDGE and a SILHOUETTE ("failed to select" at
+    # x=0.186825, and likewise at the right flank x=0.193175).
+    #
+    # KNOWN AND STRUCTURAL, do not "fix": this leader CROSSES the O6.00 OD on its
+    # way out (measured 2026-07-16 -- one unbroken ink run at x=0.085 from
+    # y=0.1852 to y=0.2270, of which the 20.8 mm from the bore at y=0.1932 to the
+    # OD at y=0.2140 is inside the part).  It is forced, not chosen -- the four
+    # alternatives are each ruled out ABOVE or here:
+    #   * symbol OUTSIDE the OD -> a radial ray from a concentric inner circle to
+    #     any point beyond the outer circle must cross it.  Topology, not layout;
+    #   * symbol INSIDE the OD (the 20.8 mm annulus does fit the ~8 x 6 mm box) ->
+    #     the box then prints inside the part outline, which is exactly the defect
+    #     fixed in draw_crank_arm.py's datum C;
+    #   * symbol NOT radial -> dot(symbol_xy - edge_xy, outward_normal) <= 0 on a
+    #     circle, which re-collapses the tag onto the bore (the failure the
+    #     paragraph above documents);
+    #   * attach in the side view -> flank unpickable (measured, just above).
+    # draw_pivot_bushing.py carries the identical spelling and reads fine because
+    # its bore nearly fills its OD (O6.5 in O10 -> a 7 mm crossing).  Here the bore
+    # is O0.794 in a O6 OD, so the same convention spans a 20.8 mm annulus and
+    # reads heavy.  The fixable half was the stacked runout arrow, done above.
+    bore_top = (
+        END_CENTER[0],
+        END_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
+    )
     add_datum_feature(
         adapter,
         end,
-        edge_xy=bore_edge,
+        edge_xy=bore_top,
         symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.037),
         datum="A",
         label="bushing bore axis",
@@ -178,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         end,
-        edge_xy=outer_top,
+        edge_xy=outer_upper_left,
         frame_xy=(0.072, 0.254),
         characteristic="circular_runout",
         tolerance="0.05",
@@ -195,37 +252,20 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("B",),
         label="bushing end-face parallelism",
     )
+    # Right of the end view at just above bore height, not up at (0.148, 0.234):
+    # that was ~50 mm from the bore it annotates and dragged a long diagonal
+    # leader back across the view.  The symbol's ARM extends left of the anchor
+    # and its TEXT renders ABOVE the arm and to the RIGHT (ASME Y14.36), so it
+    # occupies roughly x=0.112..0.151 / y=0.200..0.215 -- right of the OD circle
+    # (which ends at x=0.109), clear of the BoreDiaDim callout below it (that
+    # text tops out at y=0.190) and well left of the side view (x=0.166).
     add_surface_finish(
         adapter,
         end,
         edge_xy=bore_edge,
-        symbol_xy=(0.148, 0.234),
+        symbol_xy=(0.115, 0.200),
         roughness_ra="1.6",
         label="bushing bore finish",
-    )
-    add_surface_finish(
-        adapter,
-        end,
-        edge_xy=outer_edge,
-        symbol_xy=(0.128, 0.158),
-        roughness_ra="3.2",
-        label="bushing OD finish",
-    )
-    add_surface_finish(
-        adapter,
-        side,
-        edge_xy=bottom_end,
-        symbol_xy=(0.222, 0.156),
-        roughness_ra="3.2",
-        label="bushing datum end-face finish",
-    )
-    add_surface_finish(
-        adapter,
-        side,
-        edge_xy=(top_end[0] + 0.015, top_end[1]),
-        symbol_xy=(0.250, 0.208),
-        roughness_ra="3.2",
-        label="bushing opposite end-face finish",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.022, 0.095)

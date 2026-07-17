@@ -45,12 +45,36 @@ real defect (Codex #269):
 
 Every element -- whatever its scope -- is still checked for OVERFLOW, so a
 pictorial view or leadered note mis-placed off the sheet is always caught.
+
+Two further audits keep a print readable rather than merely well-boxed:
+
+* OVERFLOW is measured against the sheet's ZONE FRAME (:class:`DrawableRegion`),
+  not the raw sheet rectangle.  The border/zone band carrying the A/B and 1..4
+  zone labels is reserved by the sheet format, so an element that stops inside
+  the paper but crosses into that band is still a defect.  The region is QUERIED
+  from the live sheet (``ISheet::GetZoneMargin``) -- it is sheet metadata, never
+  a measured constant, so it tracks a template edit automatically.
+* LEADER CROSSINGS (:func:`find_leader_crossings`).  A bounding box cannot see a
+  leader line: the shipped crank-arm sheet ran its ``Ra 1.6`` leader as one long
+  diagonal straight THROUGH the top view to reach the front view's bore, and
+  every box-based check passed.  A leader may land on the view it annotates (its
+  ``owner``), but crossing any OTHER view's interior is a defect -- fix it by
+  moving the anchor or the text placement.
+* LEADER-vs-LEADER crossings (:func:`find_leader_leader_crossings`).  ASME
+  leaders may not cross each other, and this fell between the other checks: the
+  box audits cannot see a leader, and the check above compares leaders only
+  against VIEW outlines.  Two independent findings in one review round proved
+  the gap real -- pen-rod's ``Ra 1.6`` crossing its own perpendicularity frame's
+  leader, and ``_spread_balloons``' docstring promising non-crossing balloon
+  leaders that it never delivered.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
+from itertools import combinations
 
 
 class CollisionScope(Enum):
@@ -104,6 +128,52 @@ class LayoutElement:
 
 
 @dataclass(frozen=True)
+class DrawableRegion:
+    """The usable sheet region: inside the border/zone band, in sheet meters.
+
+    The sheet format reserves a band around the paper edge for the zone grid
+    (the ``A``/``B`` row labels and ``1``..``4`` column labels) and the border
+    frame.  Content may not cross into it.
+
+    Built by :meth:`from_margins` out of values QUERIED from the live sheet
+    (``ISheet::GetZoneMargin``), so it follows the template rather than
+    duplicating it -- edit the zone margins in the DRWDOT and the gate moves
+    with them, no constant to re-measure.
+    """
+
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
+
+    @classmethod
+    def from_margins(
+        cls,
+        sheet_width: float,
+        sheet_height: float,
+        *,
+        left: float,
+        right: float,
+        bottom: float,
+        top: float,
+    ) -> "DrawableRegion":
+        """The region inside ``ISheet::GetZoneMargin``'s four margins."""
+        region = cls(left, bottom, sheet_width - right, sheet_height - top)
+        if region.xmin >= region.xmax or region.ymin >= region.ymax:
+            raise ValueError(
+                "sheet zone margins leave no drawable region: "
+                f"left={left} right={right} bottom={bottom} top={top} on a "
+                f"{sheet_width} x {sheet_height} m sheet"
+            )
+        return region
+
+    @classmethod
+    def whole_sheet(cls, sheet_width: float, sheet_height: float) -> "DrawableRegion":
+        """The full sheet -- the region when a sheet declares no zone margins."""
+        return cls(0.0, 0.0, sheet_width, sheet_height)
+
+
+@dataclass(frozen=True)
 class Overlap:
     a: LayoutElement
     b: LayoutElement
@@ -129,9 +199,295 @@ class Overflow:
             f"{side} by {amount * 1000:.1f} mm" for side, amount in self.sides
         )
         return (
-            f"{self.element.kind} {self.element.label!r} overflows the sheet: "
-            f"{breaches}"
+            f"{self.element.kind} {self.element.label!r} crosses the sheet zone "
+            f"border: {breaches}"
         )
+
+
+@dataclass(frozen=True)
+class LeaderSegment:
+    """One straight run of an annotation's leader, in sheet meters.
+
+    A bent leader is two segments (elbow + tail); a straight leader is one.
+    ``owner`` is the view the annotation points at -- the leader is EXPECTED to
+    land there, so that view is exempt.
+    """
+
+    label: str
+    kind: str  # the owning annotation's kind: "gdt" | "note" | "dim"
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    owner: str = ""
+
+
+@dataclass(frozen=True)
+class Crossing:
+    segment: LeaderSegment
+    view: LayoutElement
+
+    def describe(self) -> str:
+        return (
+            f"{self.segment.kind} {self.segment.label!r} runs its leader across "
+            f"view {self.view.label!r} -- move the anchor or the text placement"
+        )
+
+
+def _segment_crosses_box(
+    segment: LeaderSegment, box: tuple[float, float, float, float], *, inset: float
+) -> bool:
+    """True if ``segment`` passes through ``box``, shrunk by ``inset``.
+
+    Liang-Barsky clipping.  The box is INSET so a leader that merely grazes a
+    neighbouring view's padded ``GetOutline`` whitespace is not reported -- only
+    a genuine run through the view's interior is.
+    """
+    xmin, ymin, xmax, ymax = box
+    xmin, ymin = xmin + inset, ymin + inset
+    xmax, ymax = xmax - inset, ymax - inset
+    if xmin >= xmax or ymin >= ymax:  # inset collapsed a tiny box
+        return False
+    dx = segment.x1 - segment.x0
+    dy = segment.y1 - segment.y0
+    t0, t1 = 0.0, 1.0
+    for p, q in (
+        (-dx, segment.x0 - xmin),
+        (dx, xmax - segment.x0),
+        (-dy, segment.y0 - ymin),
+        (dy, ymax - segment.y0),
+    ):
+        if p == 0:
+            if q < 0:  # parallel to this edge and outside it
+                return False
+            continue
+        t = q / p
+        if p < 0:
+            if t > t1:
+                return False
+            t0 = max(t0, t)
+        else:
+            if t < t0:
+                return False
+            t1 = min(t1, t)
+    return t0 < t1
+
+
+# How far inside a view's padded outline a leader must run before it counts as
+# crossing it.  ``GetOutline`` pads a few mm of whitespace, so a leader routed
+# cleanly past a neighbouring view can clip the padding without touching any
+# geometry; ~2 mm clears that while a leader driven across a view penetrates by
+# centimetres.
+DEFAULT_CROSSING_INSET_M = 0.002
+
+
+def find_leader_crossings(
+    segments: list[LeaderSegment],
+    elements: list[LayoutElement],
+    *,
+    inset: float = DEFAULT_CROSSING_INSET_M,
+) -> list[Crossing]:
+    """Every leader segment that runs through a view it does not annotate.
+
+    An annotation's leader must reach its own view (``owner``), so that view is
+    skipped.  Any OTHER view's interior is off limits: a leader crossing it is
+    the defect a bounding-box audit structurally cannot see.
+
+    Scope, stated honestly: this compares leaders against view OUTLINES, not
+    against the actual drawn edges inside a view.  It therefore catches a leader
+    driven across a NEIGHBOURING view (the real, repeated defect) and does not
+    attempt to judge a leader's path within its own view -- that needs real
+    geometry, and a wrong call there would be worse than no call.
+
+    PICTORIAL views are skipped, for exactly the reason ``_view_scope`` already
+    gives them ``CollisionScope.NONE``: an isometric view's axis-aligned outline
+    is mostly EMPTY diagonal space, so its box is not evidence of ink.  Judging
+    leaders against it would fail a leader that merely clips an empty corner --
+    re-introducing, in this audit, the false positive the overlap audit
+    deliberately avoids.  Keying on ``kind == "view"`` alone is what let that in
+    (codex #334).
+    """
+    views = [
+        element
+        for element in elements
+        if element.kind == "view" and element.scope is not CollisionScope.NONE
+    ]
+    crossings: list[Crossing] = []
+    for segment in segments:
+        for view in views:
+            if view.label == segment.owner:
+                continue
+            if _segment_crosses_box(segment, view.box, inset=inset):
+                crossings.append(Crossing(segment, view))
+    return crossings
+
+
+# Two leaders that merely TOUCH are not a crossing, and the distinction has to
+# be geometric rather than a fudge factor: a BENT leader's elbow and tail share
+# an endpoint BY CONSTRUCTION, and two arrows landing on one edge is a stacking
+# question the overlap audit owns.  Only a TRANSVERSAL crossing -- each segment
+# strictly separating the other's endpoints -- is reported.
+#
+# The tolerance is a DISTANCE, not a raw cross-product.  The orientation
+# determinant is twice a triangle's AREA, so its magnitude scales with segment
+# length: one fixed area epsilon would be strict on a 5 mm leader and slack on a
+# 200 mm one, and this sheet carries both.  Dividing by the segment length makes
+# 0.1 mm mean 0.1 mm everywhere.  0.1 mm is also below the 300 dpi render's own
+# resolution (1/300 in = 0.085 mm), so anything reported is ink a reader can see.
+_CROSSING_TOUCH_TOL_M = 1e-4
+
+# Two leaders that CONVERGE ON THE SAME ATTACHMENT POINT are STACKED, not
+# crossing, and must not be reported here.  Arrowheads render ~2.4 mm long, so
+# the last fraction of a millimetre before a shared terminus is buried under
+# them: whatever the segments do in there, no reader can see a crossing.  Stacked
+# arrows ARE a defect -- just a different one, that a human owns (the audit has
+# no view of arrowhead geometry).
+#
+# The threshold is MEASURED, not tuned.  Across the five crossings the gate found
+# on its first fleet-wide sweep (2026-07-16), the distance between the nearest
+# endpoint of one leader and the nearest of the other was:
+#     platen-guide  0.2 mm   <- both leaders end at x=0.3650, 0.2 mm apart in y
+#     pen-assembly  4.7 mm / 11.6 mm / 29.2 mm
+#     pen-rod      10.3 mm
+# The one false positive sits at 0.2 mm and the tightest TRUE positive at 4.7 mm,
+# so 1 mm splits them with ~5x margin on the real side and ~5x on the artefact
+# side.  If a future sheet legitimately crosses two leaders within 1 mm of a
+# shared terminus, that crossing is invisible anyway and the stack is the finding.
+_SHARED_TERMINUS_M = 1e-3
+
+
+def _crossing_is_under_a_shared_terminus(
+    a: LeaderSegment, b: LeaderSegment, x: float, y: float, *, tol: float
+) -> bool:
+    """True if the crossing at ``(x, y)`` is buried under a shared arrowhead.
+
+    The artefact this exempts is two leaders CONVERGING on one attachment: their
+    last few tenths of a millimetre meet under a ~2.4 mm arrowhead, which reads
+    as a crossing but prints as one arrow.  Measured on platen-guide: the
+    artefact pair's ends are 0.2 mm apart, the tightest TRUE positive 4.7 mm.
+
+    Testing "do they share an endpoint?" ALONE is not sound, and the difference
+    is not academic -- two segments whose ends are a hair apart still cross once,
+    and that crossing can be anywhere along the runs.  Codex #3601319580 gave the
+    counterexample: ``(0,0)->(10,0)`` and ``(0,0.0009)->(10,-0.0009)`` start
+    0.9 mm apart (inside ``tol``) yet cross at ``(5, 0)``, 5 mm away -- a real
+    mid-span crossing that an endpoint-only test throws away.  So the crossing
+    POINT must itself be at the shared terminus, which is what "buried under the
+    arrowhead" actually means.
+    """
+    for pa in ((a.x0, a.y0), (a.x1, a.y1)):
+        for pb in ((b.x0, b.y0), (b.x1, b.y1)):
+            if math.hypot(pa[0] - pb[0], pa[1] - pb[1]) >= tol:
+                continue  # not a shared terminus
+            if (
+                math.hypot(x - pa[0], y - pa[1]) < tol
+                and math.hypot(x - pb[0], y - pb[1]) < tol
+            ):
+                return True
+    return False
+
+
+def _side(
+    ax: float, ay: float, bx: float, by: float, cx: float, cy: float
+) -> float:
+    """Signed perpendicular distance of point ``c`` from the line ``ab``, in meters."""
+    dx, dy = bx - ax, by - ay
+    length = math.hypot(dx, dy)
+    if length == 0.0:  # degenerate segment: no side to be on
+        return 0.0
+    return (dx * (cy - ay) - dy * (cx - ax)) / length
+
+
+def _proper_crossing(
+    a: LeaderSegment, b: LeaderSegment, *, tol: float
+) -> tuple[float, float] | None:
+    """Where ``a`` and ``b`` cross transversally, or None if they merely touch."""
+    d1 = _side(b.x0, b.y0, b.x1, b.y1, a.x0, a.y0)
+    d2 = _side(b.x0, b.y0, b.x1, b.y1, a.x1, a.y1)
+    d3 = _side(a.x0, a.y0, a.x1, a.y1, b.x0, b.y0)
+    d4 = _side(a.x0, a.y0, a.x1, a.y1, b.x1, b.y1)
+    # Any endpoint sitting ON the other line (within tol) is a touch, not a
+    # crossing -- this is what exempts a bent leader's shared elbow, and it is
+    # deliberately the CONSERVATIVE call: a T-junction is ambiguous drafting and
+    # a wrong failure here is worse than no call.
+    if min(abs(d1), abs(d2), abs(d3), abs(d4)) < tol:
+        return None
+    if (d1 > 0) == (d2 > 0) or (d3 > 0) == (d4 > 0):
+        return None
+    # d3/d4 straddle line a with opposite signs, so this lands strictly inside b.
+    s = d3 / (d3 - d4)
+    return (b.x0 + s * (b.x1 - b.x0), b.y0 + s * (b.y1 - b.y0))
+
+
+@dataclass(frozen=True)
+class LeaderCrossing:
+    """Two annotations whose leaders cross each other."""
+
+    a: LeaderSegment
+    b: LeaderSegment
+    x: float
+    y: float
+
+    def describe(self) -> str:
+        # The endpoints are part of the message, not debug noise: the labels are
+        # SolidWorks' own ("DetailItem372"), which name nothing a reader can find
+        # in the source, so without coordinates the finding is unactionable.
+        return (
+            f"{self.a.kind} {self.a.label!r} and {self.b.kind} {self.b.label!r} "
+            f"cross their leaders at ({self.x:.4f}, {self.y:.4f}) -- move an "
+            "anchor or a text placement so one routes clear of the other "
+            f"[{self.a.label}: ({self.a.x0:.4f},{self.a.y0:.4f})->"
+            f"({self.a.x1:.4f},{self.a.y1:.4f}); "
+            f"{self.b.label}: ({self.b.x0:.4f},{self.b.y0:.4f})->"
+            f"({self.b.x1:.4f},{self.b.y1:.4f})]"
+        )
+
+
+def find_leader_leader_crossings(
+    segments: list[LeaderSegment],
+    *,
+    tol: float = _CROSSING_TOUCH_TOL_M,
+    shared_terminus: float = _SHARED_TERMINUS_M,
+) -> list[LeaderCrossing]:
+    """Every pair of leaders that cross each other.
+
+    ASME leaders may not cross.  Nothing was watching for this: the box audits
+    cannot see a leader at all, and :func:`find_leader_crossings` compares
+    leaders against VIEW outlines -- so leader-vs-LEADER fell between them.  Two
+    independent findings landed in the same review round (2026-07-16): pen-rod's
+    ``Ra 1.6`` crossing its own perpendicularity frame's leader at (0.0805,
+    0.0959), and ``_spread_balloons`` promising non-crossing balloon leaders it
+    never delivered.  Both are this gate's shape.
+
+    The pen-rod case is the instructive one -- its source comment reasoned that
+    the Ra "passes below ... the squareness frame, [which starts] at y>=0.095",
+    which is TRUE OF THE BOX and false of the box's LEADER, descending from it to
+    the rod at y~0.091.  Reasoning about an annotation while forgetting its
+    leader is exactly the error a machine check does not make.
+
+    Segments of the SAME annotation are skipped: a bent leader is two segments
+    that meet at an elbow, and an annotation cannot cross itself.  Leaders
+    converging on a SHARED terminus are skipped too -- see
+    :data:`_SHARED_TERMINUS_M`; that pair is stacked, not crossed, and the gate's
+    first sweep proved the difference is 0.2 mm vs 4.7 mm rather than a judgement
+    call.
+    """
+    crossings: list[LeaderCrossing] = []
+    for a, b in combinations(segments, 2):
+        if a.label == b.label:
+            continue
+        point = _proper_crossing(a, b, tol=tol)
+        if point is None:
+            continue
+        # Locate the crossing BEFORE exempting it: a shared terminus only excuses
+        # a crossing that happens AT that terminus (see the counterexample in
+        # _crossing_is_under_a_shared_terminus).
+        if _crossing_is_under_a_shared_terminus(
+            a, b, *point, tol=shared_terminus
+        ):
+            continue
+        crossings.append(LeaderCrossing(a, b, *point))
+    return crossings
 
 
 def _penetration(a: LayoutElement, b: LayoutElement) -> tuple[float, float]:
@@ -213,33 +569,41 @@ def find_overlaps(
 
 def find_overflows(
     elements: list[LayoutElement],
-    sheet_width: float,
-    sheet_height: float,
+    region: DrawableRegion,
     *,
     allowance: float = DEFAULT_BOUNDARY_ALLOWANCE_M,
 ) -> list[Overflow]:
-    """Every element whose box runs past the sheet edge by more than its slack.
+    """Every element whose box crosses the sheet's ZONE BORDER past its slack.
 
-    The sheet origin is its lower-left corner (SolidWorks sheet space), so the
-    usable region is ``[-slack, width + slack] x [-slack, height + slack]``.
+    The bound is the sheet's :class:`DrawableRegion` -- the area inside the
+    border/zone band -- NOT the paper rectangle.  The band carries the zone grid
+    labels and the border frame, so an element that stays on the paper but runs
+    into the band is still a defect (it prints over the zone letters and reads as
+    a clipped sheet).
+
     EVERY element is checked -- a pictorial view or leadered callout can still be
     mis-placed off the sheet.  The outward ``allowance`` applies ONLY to ``view``
-    boxes, which ``IView.GetOutline`` pads a millimetre or two past an on-sheet
-    edge; notes / tables / GD&T carry EXACT extents, so they get zero slack and
-    any real off-sheet clip is flagged (Codex #269 thread 7).
+    boxes, which ``IView.GetOutline`` pads a millimetre or two; notes / tables /
+    GD&T carry EXACT extents, so they get zero slack and any real breach is
+    flagged (Codex #269 thread 7).
     """
     overflows: list[Overflow] = []
     for element in elements:
+        # The title-block keep-out is a RESERVED REGION, not content: it is
+        # defined to run to the sheet's bottom-right corner, so measuring it
+        # against the zone frame just re-reports its own definition.
+        if element.kind == "titleblock":
+            continue
         slack = allowance if element.kind == "view" else 0.0
         sides: list[tuple[str, float]] = []
-        if element.xmin < -slack:
-            sides.append(("left", -slack - element.xmin))
-        if element.ymin < -slack:
-            sides.append(("bottom", -slack - element.ymin))
-        if element.xmax > sheet_width + slack:
-            sides.append(("right", element.xmax - (sheet_width + slack)))
-        if element.ymax > sheet_height + slack:
-            sides.append(("top", element.ymax - (sheet_height + slack)))
+        if element.xmin < region.xmin - slack:
+            sides.append(("left", region.xmin - slack - element.xmin))
+        if element.ymin < region.ymin - slack:
+            sides.append(("bottom", region.ymin - slack - element.ymin))
+        if element.xmax > region.xmax + slack:
+            sides.append(("right", element.xmax - (region.xmax + slack)))
+        if element.ymax > region.ymax + slack:
+            sides.append(("top", element.ymax - (region.ymax + slack)))
         if sides:
             overflows.append(Overflow(element, tuple(sides)))
     return overflows
@@ -247,21 +611,39 @@ def find_overflows(
 
 def audit_layout(
     elements: list[LayoutElement],
-    sheet_width: float,
-    sheet_height: float,
+    region: DrawableRegion,
     *,
+    leaders: list[LeaderSegment] | None = None,
     overlap_tol: float = DEFAULT_OVERLAP_TOL_M,
     allowance: float = DEFAULT_BOUNDARY_ALLOWANCE_M,
-) -> tuple[list[Overlap], list[Overflow]]:
-    """Return (overlaps, overflows) for a laid-out sheet."""
+    crossing_inset: float = DEFAULT_CROSSING_INSET_M,
+) -> tuple[list[Overlap], list[Overflow], list[Crossing | LeaderCrossing]]:
+    """Return (overlaps, overflows, leader crossings) for a laid-out sheet.
+
+    The third list mixes both leader defects -- a leader driven across a foreign
+    VIEW, and two leaders crossing EACH OTHER.  They are one bucket because they
+    are one class to the reader ("a leader is where it should not be") and one
+    fix ("move the anchor or the text placement"); both types answer
+    ``describe()``, which is all the caller needs.
+    """
+    segments = leaders or []
     return (
         find_overlaps(elements, overlap_tol=overlap_tol),
-        find_overflows(elements, sheet_width, sheet_height, allowance=allowance),
+        find_overflows(elements, region, allowance=allowance),
+        [
+            *find_leader_crossings(segments, elements, inset=crossing_inset),
+            *find_leader_leader_crossings(segments),
+        ],
     )
 
 
-def format_findings(overlaps: list[Overlap], overflows: list[Overflow]) -> str:
+def format_findings(
+    overlaps: list[Overlap],
+    overflows: list[Overflow],
+    crossings: list[Crossing | LeaderCrossing] = (),
+) -> str:
     """One human-readable block listing every layout finding."""
     lines = [finding.describe() for finding in overlaps]
     lines += [finding.describe() for finding in overflows]
+    lines += [finding.describe() for finding in crossings]
     return "\n".join(f"  - {line}" for line in lines)

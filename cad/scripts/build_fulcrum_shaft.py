@@ -48,6 +48,7 @@ from fulcrum_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
+    ISO_VIEW_NOTE,
     SHAFT_DIA,
     SHAFT_LENGTH,
 )
@@ -112,6 +113,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "End View Note": END_VIEW_NOTE,
+            "Iso View Note": ISO_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

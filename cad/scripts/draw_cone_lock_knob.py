@@ -77,9 +77,25 @@ def _front_y(model_y: float) -> float:
 
 
 FRONT_KEEP = {
+    # Anchored ABOVE the flange's top face, not at its mid-height.  The flange is
+    # 1.5 mm thick, so at 3:1 its two extension lines are just 4.5 mm apart
+    # (measured 2026-07-16 at x=0.115, clear of the text: y=0.1437 and y=0.1392).
+    # `_front_y(WASHER_T / 2.0)` put the text INSIDE that 4.5 mm gap, and the text
+    # is a two-line block ~9.4 mm tall ("1.50" over the "+/-0.10" callout) -- it
+    # cannot fit, so the dimension printed through itself: at x=0.1305 the upper
+    # extension line reappears at y=0.1437..0.1439, dead through the middle of
+    # "1.50" (glyphs y=0.1417..0.1451), the lower line at y=0.1392 clips the top of
+    # "+/-0.10", and the vertical dim line at x=0.130 crosses both.  SolidWorks has
+    # already flipped the arrows outside the gap (y=0.1472 / 0.1357); only the text
+    # was left behind.
+    #
+    # `_front_y(WASHER_T) + 0.013` tracks the flange's TOP FACE (y=0.14305, which
+    # the measured 0.1437 extension line confirms) rather than freezing a literal,
+    # and 13 mm of standoff clears the upper arrowhead by 4.1 mm.  The band above
+    # is empty: probed x=0.105..0.152 at y=0.152/0.156/0.160 -- no ink at all.
     "WasherT": (
         FRONT_CENTER[0] + WASHER_DIA * _S / 2.0 + 0.028,
-        _front_y(WASHER_T / 2.0),
+        _front_y(WASHER_T) + 0.013,
     ),
     "BodyTop": (
         FRONT_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.024,
@@ -94,15 +110,15 @@ FRONT_KEEP = {
         _front_y(BODY_TOP) + 0.012,
     ),
 }
+# x=0.030 for the two leadered diameters, not the old washer-derived 0.018: a
+# horizontal "O13.00" is ~19 mm wide and CENTRED on its anchor, so 0.018 ran its
+# text out to x=0.008 -- across the border rule at ~0.0126.  The layout audit
+# cannot see this: it boxes a dim as a nominal 4 mm half-square
+# (_NOMINAL_DIM_HALF_M), which at 0.018 still cleared the 12.7 mm zone margin.
+# 0.030 puts the text at ~0.021..0.039: inside the frame, outside the view.
 TOP_KEEP = {
-    "WasherDia": (
-        TOP_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.030,
-        TOP_CENTER[1] - 0.016,
-    ),
-    "BodyDia": (
-        TOP_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.030,
-        TOP_CENTER[1] + 0.018,
-    ),
+    "WasherDia": (0.030, TOP_CENTER[1] - 0.016),
+    "BodyDia": (0.030, TOP_CENTER[1] + 0.018),
     "StudDia": (
         TOP_CENTER[0] + WASHER_DIA * _S / 2.0 + 0.026,
         TOP_CENTER[1] - 0.012,
@@ -222,7 +238,6 @@ async def build(adapter: Any) -> dict[str, str]:
     seat_y = _front_y(0.0) + fdy
     seat_half_x = (STUD_DIA / 2.0 + WASHER_DIA / 2.0) / 2.0 * _S
     seat_right = (FRONT_CENTER[0] + fdx + seat_half_x, seat_y)
-    seat_left = (FRONT_CENTER[0] + fdx - seat_half_x, seat_y)
     crown_flat = (FRONT_CENTER[0] + fdx, _front_y(BODY_TOP) + fdy)
     _diag = 2.0 ** -0.5
     body_circle = (
@@ -233,11 +248,31 @@ async def build(adapter: Any) -> dict[str, str]:
         TOP_CENTER[0] + tdx + WASHER_DIA * _S / 2.0,
         TOP_CENTER[1] + tdy,
     )
+    # Both top-view symbols sit RIGHT of the view, not above it: the washer OD
+    # is 18 at 3:1, so the top view already reaches y=0.262 against the zone
+    # margin at 0.2667 and nothing clears above it.  (Their old +0.014/+0.024
+    # offsets stacked on the 45-deg body-circle anchor put them at y=0.2628 and
+    # 0.259, whose 8 mm half-boxes overran the top border by 4.1 and 0.3 mm.)
+    #
+    # STALE ARITHMETIC, placement still good: the "8 mm half-box" was the audit's
+    # old model, so those two top-border overruns were false alarms -- an FCF's
+    # anchor is its frame's TOP-LEFT corner and a datum tag's is its box top, so
+    # neither reaches more than ~0.1 mm above its anchor. Kept as-is: the Y bands
+    # below are what keep these three annotations off each other, which is a real
+    # constraint independent of the box model. The side that under-read was the
+    # RIGHT (a frame grows right by its full 20-30 mm width).
+    #
+    # The right side carries THREE annotations, so each gets its own Y band:
+    # datum A at 0.255, this frame at 0.238, and the StudDia callout, whose
+    # drawn text occupies x=0.111..0.145 / y=0.218..0.228.  None of that is
+    # mechanically checked -- GD&T and dims both carry CollisionScope.NONE, so
+    # a frame printed straight through a callout (which 0.228 did) is invisible
+    # to the audit and only shows up on the render.
     add_datum_feature(
         adapter,
         top,
         edge_xy=body_circle,
-        symbol_xy=(body_circle[0] + 0.016, body_circle[1] + 0.014),
+        symbol_xy=(0.128, 0.255),
         datum="A",
         label="knob body axis",
     )
@@ -245,7 +280,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=washer_circle,
-        frame_xy=(washer_circle[0] + 0.026, washer_circle[1] + 0.024),
+        frame_xy=(0.140, 0.238),
         characteristic="circular_runout",
         tolerance="0.10",
         datums=("A",),
@@ -264,21 +299,16 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=seat_left,
-        symbol_xy=(seat_left[0] - 0.028, seat_y - 0.038),
-        roughness_ra="3.2",
-        label="washer clamp seat finish",
-    )
-    add_surface_finish(
-        adapter,
-        front,
         edge_xy=crown_flat,
         symbol_xy=(crown_flat[0] + 0.024, crown_flat[1] + 0.012),
         roughness_ra="1.6",
         label="dome crown finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.100)
+    # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
+    # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame
+    # rule now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

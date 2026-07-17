@@ -79,9 +79,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # $PRPSHEET links, so the print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "UOS, DIMENSIONS IN MM: LINEAR +/-0.25; ANGLES +/-0.5 DEG.",
-        "HOLE CENTRES +/-0.10; DRILLED DIAMETERS +/-0.10.",
-        "DEBURR; BREAK EDGES 0.2 MAX.",
         "BORES AND HOLD-DOWN HOLES SYMMETRIC ABOUT THE BLOCK MID-PLANE.",
         "PIVOT AND LIFT BORES: 1/4 IN REAM THRU;",
         "RUNNING FIT ON THE <MOD-DIAM>6.35 TORQUE SHAFT / LIFT ROD.",

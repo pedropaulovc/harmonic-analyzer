@@ -63,11 +63,13 @@ PROFILE_ROTATION = -math.pi / 2.0  # model +Y (arbor axis) -> sheet +x
 ISO_CENTER = (0.355, 0.140)
 ISO_SCALE = (1, 2)
 
+# Left of the end circle, ON its centre height so the diameter line runs
+# horizontally through the centre rather than diagonally.  x=0.032, not the old
+# bbox-derived 0.022: the callout is centred on its anchor and ~22 mm wide now
+# that it renders horizontally, so it needs to start clear of the border rule
+# at ~0.0126.
 END_KEEP = {
-    "ShaftDia": (
-        END_CENTER[0] - SHAFT_DIA * END_VIEW_SCALE / 1000.0 - 0.014,
-        END_CENTER[1] + 0.008,
-    ),
+    "ShaftDia": (0.032, END_CENTER[1]),
 }
 PROFILE_KEEP = {
     "Depth": (PROFILE_CENTER[0], PROFILE_CENTER[1] - 0.025),
@@ -173,25 +175,80 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to arbor end view")
 
+    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
     end_circle = (
-        END_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+        END_CENTER[0] + end_radius,
         END_CENTER[1],
+    )
+    # The cylindricity frame's terminus: 55 deg up the arc, NOT `end_circle`.
+    # The frame and the Ra BOTH used to pick `end_circle` (3 o'clock), so their
+    # two leaders ended on the same point and printed as ONE blob: measured
+    # arrowheads x 0.0638..0.0645 and x 0.0651..0.0660 -- a 0.6 mm gap
+    # edge-to-edge, centroids 1.2 mm apart.
+    #
+    # 55 deg is not a guess: it is the angle maximising the MINIMUM clearance to
+    # everything already landing on this arc, swept at 5 deg steps against three
+    # measured obstacles -- the Ra's arrowhead at 0 deg, the ShaftDia diametral
+    # line's terminus at 33 deg / (0.0624, 0.2098), and datum A's triangle whose
+    # BASE rests on the circle at 90 deg spanning x 0.0527..0.0571.  At 55 deg
+    # those read 8.8 / 3.6 / 3.7 mm (the binding pair is dia-vs-tri; 45 deg
+    # gives 2.0 and 60 deg gives 2.9).
+    end_upper = (
+        END_CENTER[0] + end_radius * math.cos(math.radians(55.0)),
+        END_CENTER[1] + end_radius * math.sin(math.radians(55.0)),
     )
     left_end = (PROFILE_CENTER[0] - SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
     right_end = (PROFILE_CENTER[0] + SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
+    # Picked at 12 o'clock (not `end_circle`, which is the 3 o'clock point the
+    # cylindricity/Ra leaders use) because this symbol goes straight ABOVE the
+    # circle.  A datum tag is pinned to the entity it attaches to -- on a circle
+    # that is the circumference, so it re-attaches at the point nearest the
+    # symbol and symbol_xy goes inert.  Picking 3 o'clock while placing the
+    # symbol at 12 collapsed the tag onto the circle, printing its box over the
+    # geometry with the triangle across the "A".  Matching the pick to the
+    # symbol's clock position lets the leader run radially out to it (the
+    # draw_pivot_bushing.py spelling).
+    end_top = (
+        END_CENTER[0],
+        END_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+    )
     add_datum_feature(
         adapter,
         end,
-        edge_xy=end_circle,
+        edge_xy=end_top,
         symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.024),
         datum="A",
         label="arbor axis",
     )
+    # Up-RIGHT of the end circle it annotates, not out at PROFILE_CENTER[0]
+    # (0.194): that put the frame 130 mm from its own anchor, so its leader ran
+    # as one long diagonal across the whole sheet, skimming just over the
+    # profile view.  The profile view starts at x=0.100 and tops out at y=0.210,
+    # so this band is empty; the 8 mm half-box tops out at 0.260, inside the
+    # 0.2667 zone margin.  (STALE ARITHMETIC, conclusion unchanged: the "8 mm
+    # half-box" was the audit's old model. An FCF's anchor is its frame's
+    # TOP-LEFT corner, so it reaches ~0.1 mm above the anchor, not 8 -- even
+    # further inside the margin. The side that under-reads is the RIGHT, where
+    # the frame grows by its full 20-30 mm width; this one is far from it.)
+    #
+    # x=0.068 sits the frame almost directly ABOVE the end_circle pick, which
+    # makes its leader near-vertical (it hugs x=0.065..0.068 the whole way down).
+    # That matters because the Ra symbol below shares this anchor: at x=0.080 the
+    # leader raked down at an angle and printed straight through the Ra symbol's
+    # bar and triangle.  Near-vertical, it passes x=0.067 at the Ra's top edge --
+    # clear left of the Ra's arm at 0.075.
+    #
+    # That arm-clearance reasoning still HOLDS, and re-terminating at `end_upper`
+    # only strengthens it: the leader now runs x=0.0605..0.066, i.e. it moves
+    # FURTHER LEFT, away from the Ra's arm at 0.075, and stays near-vertical
+    # (5.5 mm of horizontal run over 37 mm of drop).  It also stays outside the
+    # circle (its low end IS the circle) and clears datum A's box (x<=0.0585) by
+    # 4.4 mm at y=0.229.  The Ra keeps `end_circle`; only this terminus moved.
     add_feature_control_frame(
         adapter,
         end,
-        edge_xy=end_circle,
-        frame_xy=(PROFILE_CENTER[0], 0.232),
+        edge_xy=end_upper,
+        frame_xy=(0.068, 0.252),
         characteristic="cylindricity",
         tolerance="0.01",
         label="arbor bearing cylindricity",
@@ -212,32 +269,33 @@ async def build(adapter: Any) -> dict[str, str]:
             datums=("A",),
             label=label,
         )
+    # Up-RIGHT of the end circle, on the same side as the `end_circle` pick
+    # (the circle's RIGHTMOST point), so the leader comes in from the right and
+    # never crosses the circle.  Two constraints forced this side:
+    #   * it used to sit at PROFILE_CENTER[0] and drag a 130 mm diagonal leader
+    #     back to this circle; and
+    #   * placing it up-LEFT instead only traded that for a leader that raked
+    #     across the circle and landed on the datum A tag -- which rests ON the
+    #     circle at ~(0.051..0.058, 0.214..0.222) and cannot be moved away.
+    #     IAnnotation::SetPosition2 on a DATUM FEATURE symbol sets the "point
+    #     where the leader hits the symbol", so a tag that attaches straight to
+    #     its edge ignores the requested Y and sits against the geometry.
+    # The symbol's ARM extends left of the anchor and its TEXT renders ABOVE the
+    # arm and to the RIGHT (ASME Y14.36): ~x=0.075..0.114 / y=0.222..0.237,
+    # which clears the profile view (it tops out at y=0.210) and leaves the arm
+    # at 0.075, right of the cylindricity frame's near-vertical leader above.
     add_surface_finish(
         adapter,
         end,
         edge_xy=end_circle,
-        symbol_xy=(PROFILE_CENTER[0], 0.245),
+        symbol_xy=(0.078, 0.222),
         roughness_ra="1.6",
         label="arbor bearing finish",
     )
-    # The left-end symbol sits BELOW the view: at the above-the-view spot its
-    # leader would cross the long Ra/cylindricity leaders converging on the
-    # nearby end view (pivot-shaft machinist-review finding).
-    for edge, xy, label in (
-        (left_end, (left_end[0] - 0.018, 0.155), "left end finish"),
-        (right_end, (right_end[0] + 0.020, 0.218), "right end finish"),
-    ):
-        add_surface_finish(
-            adapter,
-            profile,
-            edge_xy=edge,
-            symbol_xy=xy,
-            roughness_ra="3.2",
-            label=label,
-        )
 
-    # 0.020, not 0.014 -- the border rule sits at ~0.016, so a note anchored
-    # at 0.014 starts its first character on the frame line.
+    # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
     add_property_linked_note(adapter, "Iso View Note", 0.325, 0.092)

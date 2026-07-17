@@ -47,3 +47,7 @@ fits:
   fastener_clearance:
     close_mm: 0.10
     normal_mm: 0.25
+    # The drilled-hole DRAWING tolerance is a title-block general tolerance, not
+    # a fit class -- it lives in title_block.yaml (drilled_hole) with the other
+    # $PRPSHEET-stamped tolerances, so a display edit re-stamps parts without a
+    # geometry FULL rebuild.

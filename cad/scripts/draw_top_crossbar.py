@@ -14,7 +14,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
     add_edge_dimension,
     curate_view_dimensions,
     finalize_drawing,
@@ -51,7 +50,10 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-TOP_CENTER = (0.090, 0.215)
+# The 202 mm bar at the view's 1:2 override is ~101 mm tall, so y=0.215 put its
+# outline 1.4 mm into the top zone band. 0.211 clears it by ~2.6 mm while its
+# lower edge (~0.158) still stays above the TOP VIEW SCALE note at y=0.155.
+TOP_CENTER = (0.090, 0.211)
 FRONT_CENTER = (0.165, 0.135)
 ISO_CENTER = (0.355, 0.200)
 
@@ -60,7 +62,11 @@ TOP_KEEP = {
 }
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.034),
-    "Height": (FRONT_CENTER[0] - 0.035, FRONT_CENTER[1]),
+    # -0.047, not -0.035: datum B's tag sits at x=0.138 (16 mm off the bar's
+    # left face), and the now-horizontal "41.00" text centred on x=0.130 ran
+    # straight through it ("41.0B"). This lane clears the tag by ~5 mm and still
+    # starts right of the top view (which ends at x~0.100).
+    "Height": (FRONT_CENTER[0] - 0.047, FRONT_CENTER[1]),
 }
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -147,7 +153,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=front_bottom,
-        symbol_xy=(FRONT_CENTER[0], front_bottom[1] - 0.016),
+        # Offset in X from the bottom face's midpoint: directly below it the
+        # tag's leader ran down through the 22.00 width text, which is centred
+        # on the same x. From here the leader passes x~0.186 at the dimension
+        # line's height -- outside the bar's right face (0.176) -- so it reaches
+        # the face without touching the dimension.
+        symbol_xy=(FRONT_CENTER[0] + 0.025, front_bottom[1] - 0.016),
         datum="A",
         label="crossbar bottom face",
     )
@@ -163,7 +174,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=lower_end,
-        symbol_xy=(TOP_CENTER[0] + 0.018, lower_end[1]),
+        # The standoff must be PERPENDICULAR to the edge. This edge is the top
+        # view's horizontal lower end face, so it needs a Y offset: at the edge's
+        # own y the attachment triangle had nowhere to go and drew INSIDE the
+        # box, its apex striking into the "C". The x-offset alone runs ALONG the
+        # edge and buys no room. y-0.012 drops it into empty sheet -- clear of
+        # the TOP VIEW SCALE note (which ends at x=0.092) and of the top view
+        # itself (whose outline starts at y=0.158).
+        symbol_xy=(TOP_CENTER[0] + 0.018, lower_end[1] - 0.012),
         datum="C",
         label="crossbar reference end seat",
     )
@@ -198,19 +216,16 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("C",),
         label="crossbar end-seat parallelism",
     )
-    for edge, y, label in (
-        (lower_end, 0.165, "lower end-seat finish"),
-        (upper_end, 0.245, "upper end-seat finish"),
-    ):
-        add_surface_finish(
-            adapter,
-            top,
-            edge_xy=edge,
-            symbol_xy=(0.175, y),
-            roughness_ra="3.2",
-            label=label,
-        )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.090)
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    # y=0.084, not 0.090: the anchor is the block's TOP and it grows down, so at
+    # 0.090 its first line ran to y=0.0898 against datum A's tag bottom at
+    # 0.0914 -- a measured 1.6 mm, which one more note line would close. The 6 mm
+    # drop takes it to ~7.6 mm and costs nothing: the block's bottom lands at
+    # ~0.071, still ~58 mm above the frame, and it ends at x=0.206 so it never
+    # approaches the title block (x>=0.264).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.084)
     add_property_linked_note(adapter, "Top View Note", 0.045, 0.155)
     add_native_hole_callout(
         adapter,

@@ -72,6 +72,10 @@ MATERIAL = "Plain Carbon Steel"
 # (Ø3.048, the wizard-table twin of the old Ø3.0 artefact dim; nearest UNC to
 # the ~Ø2.9 screw -- memory/fastener-policy-us-customary).
 HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
+# These #4 CLOSE clearance holes ride the DRILLED HOLES title-block row UOS
+# (+TOL_HOLE_PLUS/-0), like every drilled hole -- no per-feature callout. The
+# hard-zero minus keeps them from being cut under the screw; the +0.10 slop is
+# fine for a hand-cranked brass replica (title_block.yaml drilled_hole).
 
 
 async def build(adapter) -> dict[str, str]:

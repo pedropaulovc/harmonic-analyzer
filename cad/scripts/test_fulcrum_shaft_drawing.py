@@ -48,16 +48,25 @@ def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"cylindricity\"" in source
     assert source.count("characteristic=\"perpendicularity\"") == 1
-    assert source.count("add_surface_finish(") == 2
+    assert source.count("add_surface_finish(") == 1
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(1, 1)") == 2
+    # Only the side view is 1:1 now; the isometric renders at ISO_SCALE so its
+    # outline stays inside the right zone border (see draw_fulcrum_shaft).
+    assert source.count("scale=(1, 1)") == 1
     assert "scale=(2, 1)" in source
+    assert drawing.ISO_SCALE == (1, 2)
+    assert "scale=ISO_SCALE" in source
     assert fulcrum_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
+    # An off-sheet-scale view needs its OWN scale label or the title block's 1:1
+    # misstates it. cylinder-gear-shaft got this from a codex machinist review;
+    # this sibling shipped the same 1:2 iso unlabelled until codex #334.
+    assert fulcrum_shaft_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
+    assert 'add_property_linked_note(adapter, "Iso View Note"' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

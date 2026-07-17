@@ -46,10 +46,6 @@ def test_native_gdt_controls_crossbar_end_seats_and_hole() -> None:
     assert "characteristic=\"position\"" in source
     assert "characteristic=\"perpendicularity\"" in source
     assert "characteristic=\"parallelism\"" in source
-    assert source.count("add_surface_finish(") == 1
-    assert '"lower end-seat finish"' in source
-    assert '"upper end-seat finish"' in source
-    assert '"crossbar stud-hole finish"' not in source
 
 
 def test_view_scales_are_explicit() -> None:

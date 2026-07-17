@@ -72,7 +72,8 @@ def test_linked_notes_and_fit_callouts() -> None:
     assert drawing.DIMENSION_CALLOUTS["BaseDia"] == "+0.00/-0.05"
     # 3/8" conversions display all three decimals so the view matches the note.
     assert drawing.DIMENSION_PRECISION == {"BaseDia": 3}
-    assert "DEBURR" in notes
+    # Deburr/edge-break is a title-block note; repeating it here would duplicate it.
+    assert "DEBURR" not in notes
     assert "ONE SETUP" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -87,7 +88,7 @@ def test_native_gdt_controls_seat_form_runout_and_finish() -> None:
     assert 'characteristic="cylindricity"' in source
     assert 'characteristic="circular_runout"' in source
     assert 'datums=("A",)' in source
-    assert source.count("add_surface_finish(") == 2
+    assert source.count("add_surface_finish(") == 1
 
 
 def test_view_scales_are_explicit() -> None:

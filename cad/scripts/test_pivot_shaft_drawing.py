@@ -51,7 +51,7 @@ def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"cylindricity\"" in source
     assert source.count("characteristic=\"perpendicularity\"") == 1
-    assert source.count("add_surface_finish(") == 2
+    assert source.count("add_surface_finish(") == 1
 
 
 def test_view_scales_are_explicit() -> None:

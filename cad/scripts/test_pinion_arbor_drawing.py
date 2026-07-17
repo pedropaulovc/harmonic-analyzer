@@ -55,7 +55,7 @@ def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
     assert "characteristic=\"cylindricity\"" in source
     # Only the flat front tip is squared to the axis -- the back end is the crown.
     assert source.count("characteristic=\"perpendicularity\"") == 1
-    assert source.count("add_surface_finish(") == 3
+    assert source.count("add_surface_finish(") == 1
 
 
 def test_view_scales_are_explicit() -> None:

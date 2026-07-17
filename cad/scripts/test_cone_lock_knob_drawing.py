@@ -73,7 +73,7 @@ def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert source.count('characteristic="perpendicularity"') == 1
     assert source.count('characteristic="circular_runout"') == 1
-    assert source.count("add_surface_finish(") == 2
+    assert source.count("add_surface_finish(") == 1
 
 
 def test_view_scales_are_explicit() -> None:

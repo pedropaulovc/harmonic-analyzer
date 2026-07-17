@@ -190,7 +190,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="taper seating finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.108)
+    # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
+    # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame
+    # rule now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", RIGHT_CENTER[0] - 0.022, 0.162)
 
     return await finalize_drawing(

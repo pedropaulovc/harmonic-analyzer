@@ -105,7 +105,11 @@ FRONT_KEEP = {
     "PivotBoreX": (_front_x(BORE_HALF_SPACING / 2.0), 0.162),
     "LiftBoreX": (_front_x(-BORE_HALF_SPACING / 2.0), 0.172),
     "LiftBoreCz": (0.086, 0.146),
-    "PivotBoreDia": (0.205, 0.180),
+    # Lifted out of the between-views band to the clear sheet RIGHT of the top
+    # view (which ends at x=0.189). Horizontal text makes this callout ~46 mm
+    # wide, and at (0.205, 0.180) it filled the band the bore's Ra symbol needs;
+    # the bore-centre leader now passes ~35 mm clear of the top view's corner.
+    "PivotBoreDia": (0.235, 0.205),
     "LiftBoreDia": (0.078, 0.184),
 }
 RIGHT_KEEP = {"Depth": (0.280, 0.168)}
@@ -225,15 +229,30 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="block base seat",
     )
+    # Tagged at the bore's LOWER-RIGHT (299 deg), not its top-right.
+    # PivotBoreDia is a DIAMETRAL dimension, so SolidWorks draws it as a line
+    # across the whole bore with an arrowhead on each end -- the up-right end
+    # landing on the circle at 49.3 deg.  A datum symbol placed up-right of the
+    # bore re-attaches to the circle point NEAREST it (SetPosition2 confines a
+    # symbol to "along that edge"; on a circle the permitted set IS the
+    # circumference), which resolved to 49.4 deg: 0.9 mm from the diameter
+    # arrow, so the two arrowheads stacked on one point and the B box straddled
+    # the diameter line.  Moving the SYMBOL is the only lever -- edge_xy just
+    # picks the circle, it cannot pin where the tag lands.
+    # 3 o'clock is spoken for by the bore's Ra symbol and 225 deg by the
+    # diameter line's far arrow, which leaves the lower right: 16.4 mm of clear
+    # circumference from one and 9.6 mm from the other, with the symbol 10 mm
+    # inside the block's bottom edge and clear of BlockHeight's extension lines
+    # (those start at x=0.189).
     pivot_edge = (
         _front_x(BORE_HALF_SPACING),
-        _front_y(0.0) + BORE_R_SHEET,
+        _front_y(0.0) - BORE_R_SHEET,
     )
     add_datum_feature(
         adapter,
         front,
         edge_xy=pivot_edge,
-        symbol_xy=(pivot_edge[0] + 0.024, _front_y(0.0) + 0.028),
+        symbol_xy=(_front_x(BORE_HALF_SPACING) + 0.0145, _front_y(0.0) - 0.026),
         datum="B",
         label="pivot bore axis",
     )
@@ -286,16 +305,35 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="2X",
         label="hold-down hole position",
     )
+    # Anchored on the bore's RIGHT quadrant, not its top (which datum B already
+    # uses), so the pull is a short one into the band between the two views.
+    # At (0.188, 0.196) the symbol's arm -- which reaches ~6 mm LEFT of the
+    # anchor -- printed over the top view's lower-right corner; the leader only
+    # grazed the view boundary, so the crossing gate stayed silent and just the
+    # render showed it. Three things box in the replacement:
+    #   * y=0.163 keeps the leader BELOW datum B's frame (y=0.166..0.174) the
+    #     whole way -- routed at B's own height it drew straight through it;
+    #   * the arm (x=0.194..0.210) sits above BlockHeight's upper extension line
+    #     at y=0.155 and right of the front view, which ends at x=0.189; and
+    #   * the text, which renders ABOVE the arm and to its RIGHT (~0.213..0.239
+    #     at y~0.177), stays under PivotBoreDia's leader shoulder at y=0.196.
+    pivot_right_edge = (
+        _front_x(BORE_HALF_SPACING) + BORE_R_SHEET,
+        _front_y(0.0),
+    )
     add_surface_finish(
         adapter,
         front,
-        edge_xy=pivot_edge,
-        symbol_xy=(0.188, 0.196),
+        edge_xy=pivot_right_edge,
+        symbol_xy=(0.200, 0.163),
         roughness_ra="1.6",
         label="pivot bore finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
+    # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127) the layout gate measures against,
+    # which the re-centred frame rule now matches (~0.0126); 0.020 clears both.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.180)
 
     return await finalize_drawing(

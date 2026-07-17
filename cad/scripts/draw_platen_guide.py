@@ -22,7 +22,6 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     import_cosmetic_threads,
@@ -61,7 +60,10 @@ FRONT_LEFT_X_M = 0.040
 FRONT_VIEW_Y_M = 0.110
 FRONT_HOLE_Y_M = 0.1111
 FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
-HOLE_TABLE_X_M = 0.014
+# 0.020: the table's left edge lands ~0.3 mm right of its anchor (measured). The
+# bound is the 12.7 mm zone margin (~0.0127) the audit checks, which the
+# re-centred frame rule now matches (~0.0126); 0.020 keeps the edge clear of both.
+HOLE_TABLE_X_M = 0.020
 HOLE_TABLE_Y_M = 0.258
 THREAD_DESIGNATION = "#4-40 UNC-2B"
 THREAD_MAJOR_DIA_MM = 2.845
@@ -110,7 +112,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Front", 0.190, FRONT_VIEW_Y_M, scale=(1, 1)
     )
     right = place_view(adapter, str(SOURCE), "*Right", 0.370, 0.110, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.210, scale=(1, 1))
+    # A 300 mm bar drawn isometrically at the 1:1 sheet scale spans ~237 x 133 mm,
+    # so this view's outline nearly fills the sheet's upper half: at y=0.210 its
+    # top ran 11.2 mm into the 12.7 mm zone band. Dropped to 0.196 (~2.8 mm of
+    # top clearance). It cannot shrink instead -- a view at a scale other than
+    # the sheet's must be labelled, and the only note helpers are property-linked
+    # (this part declares no "Isometric View Note"); nor move left (the hole
+    # table ends at x=0.159) or right (its box already reaches x~0.410 against
+    # the 0.4191 margin).
+    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.196, scale=(1, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -163,7 +173,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=datum_a_edge,
-        symbol_xy=(0.350, 0.132),
+        # Level with the face it names, in the 25 mm gap between the front view's
+        # end (x=0.340) and the right view (x=0.365), so the leader is short and
+        # horizontal and its arrow lands ON the face. Below the view instead, the
+        # arrow ran onto the 10.00 dimension's extension line ~22 mm down, where
+        # a datum tag reads as the center plane rather than the surface. The box
+        # top (y=0.118) still clears the isometric's outline at y=0.131.
+        symbol_xy=(0.352, 0.110),
         datum="A",
         label="platen-mating face",
     )
@@ -175,11 +191,42 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="guide bottom edge",
     )
+    # Dropped to y=0.098 from FRONT_HOLE_Y_M (0.1111): level with the edge, the
+    # box is UNAVOIDABLY struck through. `insert_hole_table` gives no control over
+    # where SolidWorks auto-places the hole table's origin indicator, and it does
+    # NOT land on datum_xy -- measured, it sits ~13.5 mm left of the bar's end, as
+    # a vertical Y-axis shaft at x=0.0265 spanning y 0.107..0.122, an origin circle
+    # at (0.0266, 0.1076), and a "0" glyph at x 0.0250..0.0279 / y 0.1036..0.1059.
+    # At y=0.1111 the tag's box (x 0.0210..0.0281) swallowed that shaft: it ran the
+    # box's full height, 0.4 mm from the "C" glyph. So the indicator cannot move
+    # and datum C must.
+    #
+    # LEFT is not available: the 7.1 mm box would now fit the ~12.3 mm corridor
+    # between the frame bound (~0.0127) and the shaft, but any box left of the
+    # shaft puts its horizontal leader ACROSS the shaft instead -- trading a
+    # strikethrough for a crossing. UP hits the "Y" label and the 300.00
+    # extension line.
+    #
+    # y=0.098 is the HIGHEST that clears: box y 0.0945..0.1015 leaves 2.1 mm under
+    # the "0" glyph, ~8.3 mm off the re-centred frame rule, and 8 mm left of the
+    # "0 -> X" row (x>=0.036, y 0.091..0.0955); the band x 0.017..0.039 is
+    # otherwise empty (probed y=0.096/0.100/0.102 -- only the rule and the
+    # x=0.0399 extension line).
+    #
+    # TRADEOFF, deliberate: a datum tag re-attaches at the point on its entity
+    # NEAREST the symbol (draw_fulcrum_shaft.py; wheel-axle's datum A proves it for
+    # straight edges too -- pick x=0.13125, symbol x=0.13725, triangle rendered at
+    # 0.1376). The end edge spans only y 0.1086..0.1136, so a symbol below it slides
+    # the triangle to the bottom corner (0.040, 0.1086) rather than mid-edge. The
+    # triangle stays ON the end face and the symbol stays outboard of it
+    # (dot((-0.012, -0.0106), (-1,0)) = +0.012 > 0), so it still reads as the end
+    # datum -- but there is no placement that keeps it mid-edge, because the edge's
+    # whole 5 mm lies inside the shaft's span.
     add_datum_feature(
         adapter,
         front,
         edge_xy=datum_c_edge,
-        symbol_xy=(0.028, FRONT_HOLE_Y_M),
+        symbol_xy=(0.028, 0.098),
         datum="C",
         label="guide end edge",
     )
@@ -187,7 +234,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=datum_a_edge,
-        frame_xy=(0.325, 0.145),
+        # Was (0.325, 0.145) -- under the isometric, so its leader ran across
+        # that view. Below the view instead; the leader reaches the face at
+        # y=0.110 while staying under the front view's lower edge (y=0.104).
+        frame_xy=(0.312, 0.092),
         characteristic="flatness",
         tolerance="0.10",
         label="platen-mating face flatness",
@@ -196,7 +246,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=(0.375, 0.110),
-        frame_xy=(0.382, 0.145),
+        # Below-right of the view (was (0.382, 0.145), under the isometric).
+        # x=0.390, NOT 0.400: an FCF's anchor is its frame's TOP-LEFT corner and
+        # the frame grows RIGHT from it by its full width -- it is not centred.
+        # This one ("|//| 0.10 |A|") measures 25.2 mm wide, so x=0.400 put its
+        # right edge at 0.4252, over the 0.4191 margin by 6.1 mm. The old comment
+        # here reasoned from an "8 mm half-box" -- the audit's since-corrected
+        # model, which had it stopping at 0.408 and passed it clean. 0.390 lands
+        # the right edge at 0.4152, 3.9 mm inside the margin, and the frame sits
+        # at y 0.079..0.086 so it stays clear of the 5.00 height dimension up at
+        # (0.385, 0.110).
+        frame_xy=(0.390, 0.086),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
@@ -214,16 +274,10 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="9X",
         label="guide hole-pattern position",
     )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=datum_a_edge,
-        symbol_xy=(0.335, 0.170),
-        roughness_ra="3.2",
-        label="platen-mating face finish",
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.075)
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
     return await finalize_drawing(
         adapter, OUTPUTS, pdf_title="Platen Guide Manufacturing Drawing"

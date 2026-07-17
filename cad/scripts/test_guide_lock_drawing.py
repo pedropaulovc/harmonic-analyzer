@@ -54,8 +54,10 @@ def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
 def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
     notes = guide_lock_spec.DRAWING_NOTES
     assert "#4 CLEARANCE DRILL THRU" in notes
-    assert "LINEAR +/-0.25" in notes
     assert "HOLE POSITION PER FCF" in notes
+    # General tolerances live in the title block ONLY -- a second general
+    # tolerance in the notes would conflict with it.
+    assert "LINEAR +/-" not in notes
     assert "4 REQUIRED" in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series; no display-zero tolerances.
@@ -80,7 +82,6 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
     assert 'characteristic="position"' in source
     assert 'characteristic="flatness"' in source
     assert 'quantity="2X"' in source
-    assert source.count("add_surface_finish(") == 1
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

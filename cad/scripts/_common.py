@@ -1143,6 +1143,10 @@ def part_properties(part_name: str) -> dict[str, str]:
     props["TOL_LIN_XXX"] = str(_config.title_block("linear_3pl")["display"])
     props["TOL_ANG"] = str(_config.title_block("angular")["display"])
     props["TOL_SURFACE"] = str(_config.title_block("surface")["display"])
+    # DRILLED HOLES general tolerance (unilateral); the title block's DRILLED
+    # HOLES row reads these via $PRPSHEET and supplies the +/- around them.
+    props["TOL_HOLE_MINUS"] = str(_config.title_block("drilled_hole")["display_minus"])
+    props["TOL_HOLE_PLUS"] = str(_config.title_block("drilled_hole")["display_plus"])
     # Per-channel stretched springs (build_channel_assembly) are length variants of
     # the registered base part -- they inherit its material / tolerance / fit so
     # the tolerance audit stays clean without 10 redundant registry rows.

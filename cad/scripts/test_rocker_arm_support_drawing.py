@@ -62,7 +62,6 @@ def test_native_gdt_defines_mounting_reference_frame() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"flatness\"" in source
     assert "characteristic=\"position\"" in source
-    assert "add_surface_finish(" in source
 
 
 def test_sheet_runs_1_to_2_with_explicit_view_scales() -> None:

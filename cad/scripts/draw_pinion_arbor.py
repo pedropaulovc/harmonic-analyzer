@@ -3,7 +3,6 @@ r"""Create the curated machinist drawing for the alignment-pinion arbor."""
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -54,18 +53,31 @@ RIGHT_CENTER = (
     FRONT_CENTER[1],
 )
 # 226-long arbor: a 1:1 isometric would run off the ASME B sheet, so 1:2.
-ISO_CENTER = (0.377, 0.205)
+# NOT (0.377, 0.205): even at 1:2 the iso is ~86 x 52, so up there it overran
+# the right zone margin (the border gate measured 2.1 mm) and crowded the side
+# view's right end. The empty band below the side view and right of the notes
+# block takes it whole, clear of the 226.25 dimension line at y=0.180.
+ISO_CENTER = (0.345, 0.145)
+
+# The shaft's flank in the *Right view: an 8-dia cylinder at 1:1, so its top
+# silhouette runs 4 mm above the view centre. The cylindrical callouts anchor
+# HERE rather than on the front view's end circle -- see the GD&T block below.
+SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "ShaftDia": (
-        FRONT_CENTER[0] - SHAFT_DIA * END_VIEW_SCALE / 1000.0 - 0.025,
-        FRONT_CENTER[1] + 0.008,
-    ),
+    # x=0.030, not the bbox-derived 0.014: horizontal text made this callout
+    # ~25 mm wide ("+0.00/-0.02"), so centred on 0.014 it ran over the 12.7 mm
+    # zone margin (the border gate measured 2.7 mm). 0.030 clears the margin on
+    # the left and stops short of the end circle at x=0.047 on the right.
+    "ShaftDia": (0.030, 0.220),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
+    # Held 20 mm clear of the view's left end, not the old 4 mm: horizontal text
+    # makes "SR7.27 CROWN" ~35 mm wide, so a 4 mm offset ran the text's right
+    # half back over the crown dimension's own extension lines.
     "CapSagDim": (
-        RIGHT_CENTER[0] - OVERALL_LEN / 2000.0 - 0.004,
+        RIGHT_CENTER[0] - OVERALL_LEN / 2000.0 - 0.020,
         RIGHT_CENTER[1] + 0.022,
     ),
 }
@@ -134,81 +146,79 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to arbor end view")
 
-    end_circle = (
-        FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-        FRONT_CENTER[1],
+    # Pick the end circle at 12 o'clock, because the symbol goes straight ABOVE
+    # it. Picked at 3 o'clock (the +r,0 point) with the symbol at 12, the tag
+    # fought SetPosition2's along-the-edge rule -- on a CIRCLE the permitted set
+    # IS the circumference, so the symbol collapsed to the nearest circle point
+    # and its Y went inert: the requested 16 mm standoff rendered as ~1 mm, too
+    # little for the ~3 mm attachment triangle, which then overlapped the box
+    # and struck through the "A". Picking the clock position the symbol actually
+    # sits at lets the leader run radially out to it -- the same spelling
+    # draw_pivot_shaft.py / draw_pivot_bushing.py use. No gate sees this: a
+    # datum symbol exposes no GetExtent, so only the render shows it.
+    end_top = (
+        FRONT_CENTER[0],
+        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
     )
     # Screen-right in *Right is model -Z: the flat front tip (z 0) lands on the
     # RIGHT end of the side view, the crowned back end on the LEFT.
-    crown_end = (RIGHT_CENTER[0] - OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
     flat_end = (RIGHT_CENTER[0] + OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
-    # The crown apex is a vertical-tangent point on the view outline boundary,
-    # where an edge pick can miss; pick the arc 0.5 mm off-apex instead -- an
-    # exact on-curve point (half-width sqrt(2*R*d - d^2)) well clear of the
-    # shaft silhouette line.
-    crown_pick_dz = 0.5
-    crown_arc = (
-        crown_end[0] + crown_pick_dz / 1000.0,
-        RIGHT_CENTER[1]
-        + math.sqrt(2.0 * CAP_R * crown_pick_dz - crown_pick_dz**2) / 1000.0,
-    )
     add_datum_feature(
         adapter,
         front,
-        edge_xy=end_circle,
+        edge_xy=end_top,
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
         datum="A",
         label="pinion arbor axis",
     )
+    # Cylindricity and the bearing finish both control the shaft's CYLINDRICAL
+    # face, which the side view shows edge-on -- so both anchor to its flank
+    # there instead of to the front view's end circle. Anchored on the front
+    # circle they had to sit out at the side view's x to find free sheet, and
+    # the leader then ran the whole way back across the side view (the leader
+    # gate caught both). Off the flank the leader is a short vertical drop into
+    # the empty band above the view. A cylinder carries no model edge along its
+    # side, so these picks are SILHOUETTE entities (as in draw_transgear_stub).
     add_feature_control_frame(
         adapter,
-        front,
-        edge_xy=end_circle,
-        frame_xy=(RIGHT_CENTER[0], 0.232),
+        right,
+        edge_xy=(RIGHT_CENTER[0] - 0.050, SHAFT_FLANK_Y),
+        frame_xy=(RIGHT_CENTER[0] - 0.050, 0.236),
         characteristic="cylindricity",
         tolerance="0.01",
         label="arbor bearing cylindricity",
+        entity_type="SILHOUETTE",
     )
     # Only the flat FRONT tip gets a perpendicularity control -- the back end
     # is the SR crown, which has no face to square to the axis.
+    # Above the view, not below it at y=0.180: the isometric now occupies that
+    # band, and the leader ran across it.
     add_feature_control_frame(
         adapter,
         right,
         edge_xy=flat_end,
-        frame_xy=(flat_end[0] + 0.014, 0.180),
+        frame_xy=(flat_end[0] + 0.018, 0.228),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
         label="front tip perpendicularity",
     )
+    # Sits right of the cylindricity frame, whose text ends near x=0.184; the
+    # Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=end_circle,
-        symbol_xy=(RIGHT_CENTER[0], 0.245),
+        right,
+        edge_xy=(RIGHT_CENTER[0] + 0.050, SHAFT_FLANK_Y),
+        symbol_xy=(RIGHT_CENTER[0] + 0.050, 0.222),
         roughness_ra="1.6",
         label="arbor bearing finish",
-    )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=flat_end,
-        symbol_xy=(flat_end[0] + 0.020, 0.218),
-        roughness_ra="3.2",
-        label="front tip finish",
-    )
-    # Below-left of the crown: the symbol text grows RIGHT of its anchor, so an
-    # above-left anchor would land it on the sag dimension's SR callout text.
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=crown_arc,
-        symbol_xy=(crown_end[0] - 0.030, 0.162),
-        roughness_ra="3.2",
-        label="back crown finish",
+        entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.108)
+    # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
 
     return await finalize_drawing(

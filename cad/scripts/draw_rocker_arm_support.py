@@ -28,7 +28,6 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
@@ -70,7 +69,10 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 FRONT_CENTER = (0.075, 0.200)
 RIGHT_CENTER = (0.155, 0.200)
 BOTTOM_CENTER = (0.075, 0.115)
-ISO_CENTER = (0.360, 0.210)
+# Dropped from 0.210: the isometric's outline ran 6.8 mm into the top zone band.
+# It cannot shrink to buy the room -- it already runs at the 1:2 sheet scale, and
+# a view at any other scale would need a label this part declares no property for.
+ISO_CENTER = (0.360, 0.201)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).
@@ -79,9 +81,16 @@ FRONT_KEEP = {
     "WinWidth": (0.075, 0.235),   # 165.1 window square, inside the opening
     # Both window dims INSIDE the opening: outside the view a 165.1 vertical
     # reads as an overall height and contradicts the 177.8 wall height.
-    "WinHeight": (0.042, 0.200),
+    #
+    # The two VERTICAL dims sit in symmetric lanes either side of centre rather
+    # than 14 mm apart at x=0.042/0.056, where their now-horizontal ~15 mm texts
+    # printed as one string ("165.10127.00"). Each text lands inside the 127
+    # cavity (x 0.0433..0.1068) -- the only region of this view with no outline
+    # through it -- leaving a ~19 mm gap between them; their dimension lines stay
+    # clear of the two horizontal dims' texts, which are centred on x=0.075.
+    "WinHeight": (0.058, 0.200),
     "CavWidth": (0.075, 0.172),   # 127 cavity square, seen through the window
-    "CavDepth": (0.056, 0.200),
+    "CavDepth": (0.092, 0.200),
 }
 RIGHT_KEEP = {
     "WallHeight": (0.182, 0.200),  # 177.8 wall height, right of the taper
@@ -89,11 +98,13 @@ RIGHT_KEEP = {
     "TopSpan": (0.155, 0.252),     # 16.93 top section, above the view
 }
 
-# Top-left anchor (meters); the table grows down. Raised from 0.135 so the table
-# bottom (~83 mm) clears the title block's top rule (80 mm) with a ~3 mm gap
-# instead of sharing/crossing it -- the layout audit flags the 0.6 mm overlap the
-# old 0.135 produced; the table top (~139 mm) still clears the iso view (~143 mm).
-HOLE_TABLE_ANCHOR = (0.284, 0.139)
+# Top-left anchor (meters); the table grows down and RIGHT. It is ~145 mm wide,
+# so x=0.284 ran its right edge 9.7 mm past the 0.4191 margin -- 0.270 leaves
+# ~4 mm there while still clearing the notes block (which ends at x~0.246).
+# y drops with the isometric above it (see ISO_CENTER): the table top must stay
+# below the iso's lower edge, and its bottom (~74 mm) clears both the audit's
+# title-block keep-out (64 mm) and the block's drawn top rule (~68 mm).
+HOLE_TABLE_ANCHOR = (0.270, 0.130)
 
 
 # 9/16-12 tap drill (the modeled hole) — the edge pick must land ON the rim.
@@ -201,7 +212,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=datum_a_edge,
-        symbol_xy=(0.210, datum_a_edge[1]),
+        # The standoff must be PERPENDICULAR to the edge. This edge is the right
+        # view's horizontal bottom (the mounting seat), so it needs a Y offset:
+        # at the edge's own y the attachment triangle had nowhere to go and drew
+        # INSIDE the box, its apex striking through the "A". The x-offset alone
+        # runs ALONG the edge and buys no room. (datum C below is the pattern.)
+        # x stays at 0.210 to clear the 63.50 FootSpan callout at (0.155, 0.147).
+        symbol_xy=(0.210, datum_a_edge[1] - 0.012),
         datum="A",
         label="support mounting seat",
     )
@@ -209,7 +226,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         bottom,
         edge_xy=datum_b_edge,
-        symbol_xy=(datum_b_edge[0] - 0.014, BOTTOM_CENTER[1]),
+        # Three constraints leave only a narrow window here.
+        #   x: the tag DRAWS LEFT of its anchor (measured ~7.6 mm wide, its right
+        #      edge on the anchor, leader running right to the face). The former
+        #      -0.014 offset from the view's left edge at x=0.0306 put it far
+        #      into the margin. 0.027 leaves its edge at 0.0194: clear of the
+        #      12.7 mm zone margin (~0.0127, which the re-centred frame rule now
+        #      matches) by ~6.7 mm, and still ~3.6 mm short of the view.
+        #   y: at the edge's mid-height the tag landed ON the hole table's origin
+        #      indicator, whose "Y" label and axis arrow occupy x 0.0165..0.0194
+        #      up to y=0.1205; y=0.131 lifts it clear into empty sheet.
+        symbol_xy=(0.027, 0.131),
         datum="B",
         label="support seat side",
     )
@@ -242,16 +269,10 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="4X",
         label="support hole-pattern position",
     )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=datum_a_edge,
-        symbol_xy=(0.225, 0.145),
-        roughness_ra="3.2",
-        label="support mounting-seat finish",
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
 
     return await finalize_drawing(
         adapter,

@@ -31,7 +31,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -248,15 +247,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="mating-face parallelism",
     )
-    bore_45 = BORE_RADIUS / 2.0**0.5
-    add_surface_finish(
-        adapter,
-        top,
-        edge_xy=(_plan_x(bore_45), TOP_CENTER[1] - bore_45 * _M),
-        symbol_xy=(0.138, 0.162),
-        roughness_ra="3.2",
-        label="column-relief bore finish",
-    )
     add_native_hole_callout(
         adapter,
         right,
@@ -268,7 +258,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="ear holes",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
+    # 0.020: the note is left-aligned ON its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.168)
 
     return await finalize_drawing(

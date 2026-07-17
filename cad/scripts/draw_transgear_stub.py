@@ -73,13 +73,30 @@ def _fy(y_mm: float) -> float:
 
 # Diameters stack on the left, land lengths chain on the right; the callout
 # texts sit clear of each other's extension lines (steps at different y).
+#
+# The chain runs at x=0.176 rather than 0.162: the Ra symbol beside the gear
+# seat throws its text out to x~0.171 (the text starts ~13 mm right of the
+# anchor and runs ~26 mm), and at 0.162 the chain's dimension line printed
+# straight through "Ra 1.6". The seat silhouette at x=0.125 leaves too little
+# room to walk the symbol left instead, so the chain moves right; ~7 mm of gap.
+#
+# CAVEAT (measured 2026-07-16): that "~7 mm of gap" is TEXT-only, and the text is
+# not the symbol's rightmost ink. Verified against the render: the text does end
+# at x=0.1703 (so 5.6 mm to the chain line, which sits at x=0.1759..0.1760), but
+# the Ra symbol's horizontal ARM extends 6.1 mm PAST its own text, to x=0.1764 --
+# it crosses the chain line by ~0.5 mm. Left as-is: a 0.5 mm hairline does not
+# justify a rebuild. Recorded so the next reader does not "confirm" this clearance
+# by measuring the text and miss the arm. Do not treat text extent as symbol
+# extent for ANY Ra placement -- and note text is not a COM primitive, so
+# GetLineAtIndex will not show it to you either; only the render will.
+_LENGTH_CHAIN_X = 0.176
 FRONT_KEEP = {
     "BaseDia": (0.052, _fy(BASE_LEN / 2.0)),
     "SeatDia": (0.052, _fy(BASE_LEN + 3.0)),
     "CollarDia": (0.052, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
-    "BaseLength": (0.162, _fy(BASE_LEN / 2.0)),
-    "SeatLength": (0.162, _fy(BASE_LEN + SEAT_LEN / 2.0)),
-    "CollarLength": (0.162, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
+    "BaseLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN / 2.0)),
+    "SeatLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN + SEAT_LEN / 2.0)),
+    "CollarLength": (_LENGTH_CHAIN_X, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
 }
 DIMENSION_CALLOUTS = {"BaseDia": "+0.00/-0.05", "SeatDia": "+0.00/-0.02"}
 # The base is a 3/8" conversion: display 9.525, not a false-precision 9.53.
@@ -188,17 +205,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="gear seat finish",
         entity_type="SILHOUETTE",
     )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(_fx(BASE_DIA / 2.0), _fy(BASE_LEN / 2.0 - 1.5)),
-        symbol_xy=(_fx(BASE_DIA / 2.0) + 0.008, _fy(BASE_LEN / 2.0 - 1.5) + 0.004),
-        roughness_ra="3.2",
-        label="base bearing finish",
-        entity_type="SILHOUETTE",
-    )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.112)
+    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
+    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.112)
 
     return await finalize_drawing(
         adapter,

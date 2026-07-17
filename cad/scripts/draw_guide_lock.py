@@ -29,7 +29,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -40,6 +39,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+
 from guide_lock_spec import (
     HOLE_DIA_MM,
     HOLE_XY,
@@ -207,11 +207,22 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="lock rail-mating face",
     )
+    # The standoff MUST be perpendicular to the attached edge: this is the
+    # plate's horizontal bottom edge, so the symbol offsets in Y. An X offset
+    # runs ALONG the edge, leaving zero room for the attachment triangle, which
+    # then renders inside the box on top of the letter (measured: a symbol at
+    # bottom-edge height put the triangle in the "B"'s bowl).
+    #
+    # X=0.156 drops it into the one pocket the locator chain leaves: the
+    # 22.00/18.00 dimension lines (y 0.0851/0.0932) span only x 0.076..0.164 and
+    # the 4.00 (y 0.1013) stops at x=0.096, so x 0.148..0.164 is clear from the
+    # 18.00 line up to the plate edge -- an 18.6 mm gap, centred here. The 7.1 mm
+    # box hangs 8 mm below the edge, clearing the 18.00 line by 3.7 mm.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + 0.020, BOTTOM_EDGE_Y),
-        symbol_xy=(FRONT_CENTER[0] + 0.028, BOTTOM_EDGE_Y - 0.014),
+        edge_xy=(FRONT_CENTER[0] + 0.036, BOTTOM_EDGE_Y),
+        symbol_xy=(FRONT_CENTER[0] + 0.036, BOTTOM_EDGE_Y - 0.008),
         datum="B",
         label="lock guide-side edge",
     )
@@ -254,23 +265,23 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.10",
         label="rail-mating face flatness",
     )
+    # The bent leader elbows at the text's LEFT end, so the text must start just
+    # RIGHT of the hole it points at or the tail rakes back across the view: the
+    # old (0.094, 0.198) centred the ~45 mm wide "2X Ø3.05 THRU ALL" so its
+    # elbow fell at x=0.071, left of hole 1 at x=0.093, and the tail ran as one
+    # long diagonal down across the whole plate face. Centred at 0.117 the text
+    # starts at ~0.094 and the tail drops nearly vertically into the bore.
     add_native_hole_callout(
         adapter,
         front,
         edge_xy=(HOLE_1_X_SHEET, HOLE_Y_SHEET + HOLE_R_SHEET),
-        callout_xy=(0.094, 0.198),
+        callout_xy=(0.117, 0.196),
         label="guide-lock screw holes",
     )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=(DATUM_FACE_X, RIGHT_CENTER[1] + 0.030),
-        symbol_xy=(0.252, 0.180),
-        roughness_ra="3.2",
-        label="rail-mating face finish",
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
+    # x=0.020: the note anchor IS the text's left edge, so the ink starts here.
+    # The 0.0127 margin ISheet::GetZoneMargin declares and the re-centred border
+    # rule (~0.0126) now agree; 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.160)
 
     return await finalize_drawing(

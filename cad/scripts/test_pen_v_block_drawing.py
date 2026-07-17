@@ -58,9 +58,11 @@ def test_linked_notes_cover_the_stopped_slit_and_functional_tolerances() -> None
     # or the clamp jaw separates from the block.
     assert "FROM LEFT END ONLY" in notes
     assert "FLEX HINGE" in notes
-    assert "LINEAR +/-0.25" in notes
-    assert "HOLE CENTRES +/-0.10" in notes
     assert "PAINT MACHINE GREEN" in notes
+    # General tolerances live in the title block ONLY -- a second general
+    # tolerance in the notes would conflict with it.
+    assert "LINEAR +/-" not in notes
+    assert "HOLE CENTRES" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source

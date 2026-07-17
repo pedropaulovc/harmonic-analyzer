@@ -9,7 +9,9 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import math
+from collections import Counter
 from dataclasses import dataclass, replace
+from itertools import combinations
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 from xml.etree import ElementTree
@@ -18,7 +20,10 @@ import _telemetry
 from _common import _early_bound, check
 from _drawing_layout_check import (
     CollisionScope,
+    DrawableRegion,
     LayoutElement,
+    LeaderCrossing,
+    LeaderSegment,
     audit_layout,
     format_findings,
 )
@@ -59,7 +64,38 @@ _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
+# The interface each GD&T kind's geometry actually lives on -- reached via
+# IAnnotation::GetSpecificAnnotation, never off IAnnotation itself.
+_GDT_IFACE = {
+    _ANNOT_DATUM: "IDatumTag",
+    _ANNOT_GTOL: "IGtol",
+    _ANNOT_SFSYM: "ISFSymbol",
+}
+# Fallback only, for an annotation whose geometry cannot be read. Every GD&T
+# symbol that CAN be measured is (see _measured_gdt_box) -- a fixed square is
+# wrong for an FCF by construction, since its width tracks its compartments.
 _NOMINAL_GDT_HALF_M = 0.008
+
+# A SURFACE-FINISH symbol is NOT centred on its anchor, so the symmetric box
+# above is the wrong shape for it and silently under-reports.
+# ``GetPosition`` returns the LEADER'S ATTACHMENT POINT -- the bottom vertex of
+# the check-mark triangle -- and the whole body draws UP and to the RIGHT of it:
+# triangle x [ax-0.006, ax+0.006] y [ay, ay+0.011]; the "Ra 1.6" text
+# x [ax+0.013, ax+0.039] y [ay+0.010, ay+0.017]; the arm at y ~= ay+0.018.
+# Boxed +/-8 mm about a point that is the symbol's own BOTTOM EDGE, the gate
+# missed ~10 mm of body above and ~31 mm of text to the right: wheel_axle's Ra
+# printed over the zone label while the audit stayed silent (its real top is
+# ay+0.018 = 0.273, 5.6 mm past the rule, but the box topped out at 0.263).
+# Measured independently on 3+ sheets by three agents; every sample draws
+# up-right regardless of which side the target sits on (a leader running
+# up-LEFT out of the vertex does not mirror the body), so the offsets are
+# orientation-stable for ``add_surface_finish``'s SetLeader3(BENT, SMART) call.
+# LEFT keeps the old 8 mm rather than the measured 7: strictly no less
+# conservative than what it replaces, on every side.
+_SF_BOX_LEFT_M = 0.008
+_SF_BOX_RIGHT_M = 0.039
+_SF_BOX_UP_M = 0.018
+_SF_BOX_DOWN_M = 0.0
 
 # swAnnotationType_e.swDisplayDimension -- every linear/diameter dimension AND
 # the native hole callouts (a diameter dim carrying "/ THRU" text). Like GD&T
@@ -73,10 +109,67 @@ _NOMINAL_GDT_HALF_M = 0.008
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
 
+# swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
+# is bent: a straight leader runs at whatever angle its anchor-to-text vector
+# happens to take, which is what drove the old Ra symbol's leader diagonally
+# across two views. A bent leader lands its elbow horizontally at the text.
+_LEADER_BENT = 2
+_LEADER_SIDE_SMART = 0
+
+# swUserPreferenceIntegerValue_e.swDetailingDimensionTextAndLeaderStyle and
+# swDisplayDimensionLeaderText_e.swBrokenLeaderHorizontalText.
+#
+# Dimensions do NOT take IAnnotation::SetLeader3 (its documented support list is
+# notes / GTols / surface-finish / weld / datum-target / block instances only);
+# a dimension's leader+text style comes from this DOCUMENT property instead,
+# with IDisplayDimension::SetBrokenLeader2 as the per-dimension override.
+# swBrokenLeaderHorizontalText delivers BOTH requirements at once: the leader is
+# broken (bent) and the text is always horizontal rather than rotated to follow
+# the leader.
+#
+# These ints are READ OFF the installed swconst.tlb, not the published docs: the
+# API reference prints "See System Options and Document Properties" instead of a
+# value for every swUserPreferenceIntegerValue_e / swUserPreferenceOption_e
+# member, and that page documents none of them. Re-read them from the type
+# library (swconst.tlb, SOLIDWORKS Constant type library) rather than guessing
+# if they ever need revisiting.
+_PREF_DIM_TEXT_AND_LEADER_STYLE = 372
+_BROKEN_LEADER_HORIZONTAL_TEXT = 2
+
+# swUserPreferenceOption_e's dimension scopes. Two live-probed facts pin this
+# list, neither of them documented:
+#
+#  * the style REQUIRES a dimension scope -- writing it under
+#    swDetailingNoOptionSpecified(0) returns False and leaves the document on
+#    swSolidLeaderAlignedText(1), the aligned-text default this fix exists to
+#    replace; and
+#  * the umbrella swDetailingDimension(200) does NOT propagate -- after setting
+#    it, every per-type scope still read 1, so a drawing whose dimensions are
+#    linear/radius/diameter would have kept rotated text.
+#
+# So every scope is set explicitly and read back. Values are from swconst.tlb
+# (the docs print no integer for any swUserPreferenceOption_e member).
+_DIM_DETAILING_SCOPES = {
+    "swDetailingDimension": 200,
+    "swDetailingAngleDimension": 201,
+    "swDetailingArcLengthDimension": 202,
+    "swDetailingChamferDimension": 203,
+    "swDetailingDiameterDimension": 204,
+    "swDetailingHoleDimension": 205,
+    "swDetailingLinearDimension": 206,
+    "swDetailingOrdinateDimension": 207,
+    "swDetailingRadiusDimension": 208,
+    "swDetailingAngularRunningDimension": 209,
+}
+
 # A circular 2-character BOM balloon renders ~10-12 mm across at the template
 # font; its GetExtent is leader-polluted (see _note_element), so it gets this
 # nominal half-span box around its IAnnotation.GetPosition anchor instead.
 _NOMINAL_BALLOON_HALF_M = 0.006
+# Ink gap left between two balloon circles pushed apart on the ring. Their radius
+# is MEASURED per sheet (INote::GetBalloonInfo -- 4.72 mm on pen-assembly), so
+# this is only the clearance between them, not a stand-in for the circle itself.
+_BALLOON_CLEARANCE_M = 0.0015
 
 # The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
 # format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
@@ -336,11 +429,28 @@ def add_feature_control_frame(
         "GetAttachedEntityCount3",
         "SetAttachedEntities",
         "SetPosition2",
+        "SetLeader3",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
-    gtol.SetLeader(True, 0, False, False)  # swLeaderSide_e.swLS_SMART
+    # Bent leader: a straight leader runs at whatever angle the anchor-to-frame
+    # vector takes and can cut clean across a neighbouring view.
+    leader_status = int(
+        annotation.SetLeader3(
+            _LEADER_BENT,
+            _LEADER_SIDE_SMART,
+            True,  # smart arrowhead
+            False,  # perpendicular (GTol-only; not wanted here)
+            False,  # all-around
+            False,  # dashed
+        )
+    )
+    if leader_status != 0:
+        raise RuntimeError(
+            f"failed to set a bent leader on the feature-control frame ({label}): "
+            f"SetLeader3 status {leader_status}"
+        )
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     draw.EditRebuild3()
@@ -374,7 +484,7 @@ def add_surface_finish(
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
-        1,  # swLeaderStyle_e.swSTRAIGHT
+        _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
         symbol_xy[0],
         symbol_xy[1],
         0.0,
@@ -400,8 +510,23 @@ def add_surface_finish(
     if str(symbol.GetText(8) or "").strip() != f"Ra {roughness_ra}":
         raise RuntimeError(f"surface-finish roughness did not persist ({label})")
     annotation = _sw_type_info.early_bound_or_flag(
-        symbol.GetAnnotation(), "IAnnotation", "SetPosition2"
+        symbol.GetAnnotation(), "IAnnotation", "SetPosition2", "SetLeader3"
     )
+    leader_status = int(
+        annotation.SetLeader3(
+            _LEADER_BENT,
+            _LEADER_SIDE_SMART,
+            True,  # smart arrowhead
+            False,  # perpendicular (GTol-only)
+            False,  # all-around
+            False,  # dashed
+        )
+    )
+    if leader_status != 0:
+        raise RuntimeError(
+            f"failed to set a bent leader on the Ra {roughness_ra} symbol "
+            f"({label}): SetLeader3 status {leader_status}"
+        )
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position surface-finish symbol ({label})")
     draw.ClearSelection2(True)
@@ -509,7 +634,16 @@ def add_native_hole_callout(
     callout_xy: tuple[float, float],
     label: str,
 ) -> Any:
-    """Insert an associative Hole Wizard callout on a selected drawing edge."""
+    """Insert an associative Hole Wizard callout on a selected drawing edge.
+
+    The callout DISPLAYS the part's hole tolerance; it does not own one. Set the
+    fit on the hole feature in the SLDPRT (``_holes.wizard_holes``'s
+    ``dia_tolerance_mm``) and it renders here as
+    ``<MOD-DIAM>3.05 +0.10/0.00 THRU ALL``. Toleranceing the drawing dimension
+    instead silently does nothing: ``IDimensionTolerance::SetValues`` returns
+    True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
+    callout still prints the bare nominal.
+    """
     _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -541,6 +675,11 @@ def add_native_hole_callout(
 # the linked model so a stale part can't ship blank tolerance cells.
 TITLE_BLOCK_TOLERANCE_PROPERTIES = (
     "TOL_LIN_XX", "TOL_LIN_XXX", "TOL_ANG", "TOL_SURFACE",
+    # The DRILLED HOLES row's two cells. Required like the rest: with holes now
+    # relying on this general tolerance UOS (no per-feature callout), a blank row
+    # would silently drop every clearance hole's fit -- so a stale source part
+    # that predates the TOL_HOLE_* stamp must fail loud here, not ship blank.
+    "TOL_HOLE_MINUS", "TOL_HOLE_PLUS",
 )
 
 
@@ -611,6 +750,40 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     return seed_count, instance_count
 
 
+def _pin_dimension_text_and_leader_style(draw: Any) -> None:
+    """Force every dimension on ``draw`` to a bent leader with HORIZONTAL text.
+
+    Set on the DOCUMENT (``IModelDocExtension::SetUserPreferenceInteger``), not
+    the application, so a build can never drift the seat's global preferences.
+
+    This is the only mechanism that reaches dimensions: ``SetLeader3`` covers
+    notes / GD&T / surface-finish symbols but explicitly not dimensions. Read
+    back and raise on mismatch -- the preference's value enum is undocumented
+    (read from swconst.tlb), so a silent no-op is exactly the failure mode to
+    guard against.
+    """
+    for name, option in _DIM_DETAILING_SCOPES.items():
+        ok = draw.Extension.SetUserPreferenceInteger(
+            _PREF_DIM_TEXT_AND_LEADER_STYLE, option, _BROKEN_LEADER_HORIZONTAL_TEXT
+        )
+        applied = int(
+            draw.Extension.GetUserPreferenceInteger(
+                _PREF_DIM_TEXT_AND_LEADER_STYLE, option
+            )
+        )
+        if not ok or applied != _BROKEN_LEADER_HORIZONTAL_TEXT:
+            raise RuntimeError(
+                "failed to pin dimension text/leader style to broken-leader + "
+                f"horizontal-text for {name} (set returned {ok!r}, document "
+                f"reads {applied})"
+            )
+    _telemetry.event(
+        "drawing.dim_text_leader_style",
+        style=_BROKEN_LEADER_HORIZONTAL_TEXT,
+        scopes=len(_DIM_DETAILING_SCOPES),
+    )
+
+
 def new_project_drawing(
     adapter: Any,
     *,
@@ -653,6 +826,7 @@ def new_project_drawing(
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
+    _pin_dimension_text_and_leader_style(draw)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
@@ -1389,6 +1563,140 @@ def insert_bom_table(
     return table
 
 
+def _min_angular_gap(ring_radius: float, balloon_radius: float, *, clearance: float) -> float:
+    """Smallest angle between two balloon centres that keeps their circles apart.
+
+    Separation is set against the SQUARE the audit boxes a balloon with, not the
+    circle the sheet draws: :func:`_note_element` boxes the circle's circumscribed
+    square, and two such squares whose centres lie on a ring DIAGONAL still
+    intersect after their circles have parted -- ``dx = dy = d/sqrt(2)``, so they
+    only clear once ``d >= 2*sqrt(2)*balloon_radius``. Separating to ``2*r`` (the
+    circles just touching) measured 9 overlaps on pen-assembly: correct about the
+    ink, wrong about the checker. Placement must satisfy the model that grades it.
+
+    Measured against ARC length rather than the true chord, which is conservative
+    (arc >= chord) and avoids a domain error as the required separation
+    approaches the ring's diameter.
+
+    ``ring_radius`` must be the ring ellipse's SMALLER semi-axis: a point's local
+    speed along the ellipse is ``sqrt(Rx^2 sin^2 t + Ry^2 cos^2 t)``, whose
+    minimum is ``min(Rx, Ry)`` -- so using it can only over-separate, never leave
+    two circles touching.
+    """
+    if ring_radius <= 0.0:
+        raise ValueError("balloon spread: ring radius must be positive")
+    return (2.0 * math.sqrt(2.0) * balloon_radius + clearance) / ring_radius
+
+
+def _wrap_angle(angle: float) -> float:
+    """Fold ``angle`` back into ``(-pi, pi]`` -- the range ``atan2`` returns."""
+    return (angle + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def _push_apart_on_ring(
+    angles: list[float], *, min_gap: float, iterations: int = 400
+) -> list[float]:
+    """Separate ``angles`` to at least ``min_gap`` apart, preserving their order.
+
+    ``angles`` must be sorted. Order preservation is the whole point, not a
+    nicety: balloons placed about a shared centre in their attachments' angular
+    ORDER cannot have crossing leaders, so a separation pass that never reorders
+    cannot reintroduce one. That argument only holds if the solver actually
+    preserves order, so this does it BY CONSTRUCTION rather than by assertion.
+
+    Substituting ``z_i = x_i - i*min_gap`` turns the spacing constraint
+    ``x_{i+1} - x_i >= min_gap`` into plain monotonicity ``z_{i+1} >= z_i``, so
+    the minimum-movement placement is the isotonic regression of ``z`` -- solved
+    exactly by pool-adjacent-violators, in one pass, with no convergence
+    question.
+
+    (History: this WAS an iterative pairwise relaxation, and it silently BROKE
+    the order it was written to preserve. It measured each gap as
+    ``(x[j] - x[i]) % 2pi``, so an inverted pair read as a ~6 rad gap -- huge,
+    apparently fine -- and was never repaired; in-place sequential updates then
+    kept inverting more. Probed on pen-assembly, it returned
+    ``[..., -1.553, -1.817, ...]`` from sorted input while its own docstring
+    claimed "it cannot swap them". Do not reintroduce a relaxation here.)
+
+    Falls back to EVEN spacing when the balloons cannot all fit at ``min_gap``
+    (``n * min_gap > 2*pi``); packing them tighter than their own circles would
+    trade this function's crossings for overlaps, which is the trade the pure-
+    radial experiment already lost.
+
+    **Seam-safe.** Angles are a circular quantity, so the isotonic solver must
+    run on a LINEAR run that never crosses the +-pi seam. The occupied
+    attachments always leave one largest angular gap; unwrapping the run to
+    START just after that gap places the seam inside empty space, where a linear
+    chain is exact. Without this, a cluster straddling +-pi (attachments on the
+    LEFT of the view) reads as two far-apart sub-runs, the solver under-separates
+    them, and the wrap-around re-centre below -- an ORDINARY average of the two
+    endpoints -- lands on the OPPOSITE side of the view, hauling every leader
+    across the model (Codex #3605056589: ``[-3.10, 3.10]`` -> ``[-0.4, 0.0]``).
+    """
+    count = len(angles)
+    if count < 2:
+        return list(angles)
+    two_pi = 2.0 * math.pi
+    span_needed = count * min_gap
+    if span_needed > two_pi:
+        _telemetry.warn(
+            f"balloon spread: {count} balloons need {span_needed:.2f} rad of "
+            f"ring but only {two_pi:.2f} is available -- falling back to "
+            "even spacing (leaders may run long)"
+        )
+        start = angles[0]
+        return [start + two_pi * i / count for i in range(count)]
+
+    # Unwrap around the LARGEST gap: sort by angle, find the widest gap between
+    # cyclically-adjacent attachments, and read the run off as a single strictly
+    # increasing sequence starting just after it. The seam then falls in that
+    # empty gap, so nothing below straddles +-pi.
+    order = sorted(range(count), key=lambda i: angles[i])
+    ordered = [angles[i] for i in order]
+    gaps = [(ordered[(j + 1) % count] - ordered[j]) % two_pi for j in range(count)]
+    cut = max(range(count), key=lambda j: gaps[j])
+    run_index = [order[(cut + 1 + step) % count] for step in range(count)]
+    base = angles[run_index[0]]
+    run = []
+    for i in run_index:
+        value = angles[i]
+        while value < base - 1e-12:
+            value += two_pi
+        run.append(value)
+
+    # Blocks of (weighted mean, weight) merged while the previous block outranks
+    # the next -- the pool-adjacent-violators algorithm.
+    blocks: list[list[float]] = []
+    for index, angle in enumerate(run):
+        blocks.append([angle - index * min_gap, 1.0])
+        while len(blocks) >= 2 and blocks[-2][0] > blocks[-1][0] - 1e-15:
+            value_b, weight_b = blocks.pop()
+            value_a, weight_a = blocks.pop()
+            weight = weight_a + weight_b
+            blocks.append(
+                [(value_a * weight_a + value_b * weight_b) / weight, weight]
+            )
+    fitted: list[float] = []
+    for value, weight in blocks:
+        fitted.extend([value] * int(weight))
+    spread = [value + i * min_gap for i, value in enumerate(fitted)]
+
+    # The wrap-around pair (last -> first) is the one constraint the linear chain
+    # cannot see. Unwrapping put the widest gap at the seam, so there is room by
+    # construction unless the run fills nearly the whole ring; then centre it in
+    # the slack. The endpoints share one linear frame now, so their average is
+    # the true midpoint -- no seam to jump.
+    if (spread[0] + two_pi) - spread[-1] < min_gap:
+        centre = (spread[0] + spread[-1]) / 2.0
+        start = centre - span_needed / 2.0
+        spread = [start + i * min_gap for i in range(count)]
+
+    result = [0.0] * count
+    for step, i in enumerate(run_index):
+        result[i] = _wrap_angle(spread[step])
+    return result
+
+
 def _spread_balloons(
     adapter: Any, view: Any, balloons: list[Any], *, margin: float = 0.014
 ) -> None:
@@ -1397,9 +1705,29 @@ def _spread_balloons(
     ``AutoBalloon5`` stacks balloons whose attachment points cluster, and on a
     pictorial view its square layout can even drop balloons INSIDE the outline
     box. Deterministic fix: place every balloon's box center on an ellipse
-    ``margin`` outside the view outline, evenly spaced, each assigned the ring
-    slot nearest its landed angle so leaders do not cross. Leaders stay
+    ``margin`` outside the view outline, evenly spaced, and assign the ring slots
+    in the angular order of the balloons' ATTACHMENT POINTS. Leaders stay
     attached; only the balloon anchor moves (``IAnnotation.SetPosition``).
+
+    **Sort on the ATTACHMENT, not on where the balloon landed.** For straight
+    leaders from points on a convex ring to points inside it, the non-crossing
+    condition is that the ring order matches the ATTACHMENTS' angular order --
+    ring slot k must serve the k-th attachment going round. Sorting on the
+    balloon's own landed angle (the ``GetPosition`` this used to read) merely
+    preserves AutoBalloon5's ordering, which was never non-crossing to begin
+    with, so the ring was re-spacing the balloons while faithfully reproducing
+    the crossings.
+
+    This docstring used to CLAIM "each assigned the ring slot nearest its landed
+    angle so leaders do not cross". That claim was never true and never tested;
+    the shipped pen-assembly sheet crossed B4xB6 at (0.2285, 0.1161) under it.
+    ``find_leader_leader_crossings`` is now the repro, so the claim is a gate
+    rather than a comment.
+
+    Attachment = the LAST point of ``GetLeaderPointsAtIndex(0)``; the first is
+    the balloon end. Measured on pen-assembly's 8 balloons: the first points
+    spread over 61 mm of x (the ring) while the last cluster within 13 mm (the
+    tall, skinny pen sub they point at).
     """
     outline = adapter._attempt(lambda: view.GetOutline())
     if not outline:
@@ -1409,28 +1737,85 @@ def _spread_balloons(
     radius_x = (vxmax - vxmin) / 2.0 + margin
     radius_y = (vymax - vymin) / 2.0 + margin
     items = []
+    radii: list[float] = []
     for note in balloons:
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+        note = _sw_type_info.early_bound_or_flag(
+            note, "INote", "GetAnnotation", "GetBalloonInfo"
+        )
+        # The balloon circle's own rendered radius. GetBalloonInfo returns
+        # (centre xyz, arc-point xyz, radius) -- unlike GetExtent it describes
+        # the CIRCLE, not the note+leader box, so the leader cannot pollute it.
+        info = adapter._attempt(lambda n=note: n.GetBalloonInfo())
+        if not info or len(info) < 7:
+            raise RuntimeError(
+                "balloon spread: GetBalloonInfo did not return the balloon "
+                "circle -- the separation below is derived from the MEASURED "
+                "radius, so a balloon whose circle cannot be read cannot be "
+                "placed without guessing"
+            )
+        radii.append(float(info[6]))
         annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
         if annotation is None:
             raise RuntimeError("balloon spread: balloon without an annotation")
         annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetPosition", "SetPosition"
+            annotation,
+            "IAnnotation",
+            "GetPosition",
+            "SetPosition",
+            "GetLeaderPointsAtIndex",
         )
-        # Work from the ANCHOR, never GetExtent: a balloon note's extent box
-        # includes its LEADER, so it spans to the pointed-at component and is
-        # useless for placing the balloon circle itself.
-        position = adapter._attempt(lambda a=annotation: a.GetPosition())
-        if not position:
-            raise RuntimeError("balloon spread: balloon without a position")
-        px, py = float(position[0]), float(position[1])
-        theta = math.atan2(py - center_y, px - center_x)
+        # Never GetExtent: a balloon note's extent box includes its LEADER, so it
+        # spans to the pointed-at component and is useless for placing the
+        # balloon circle itself.
+        raw = adapter._attempt(lambda a=annotation: a.GetLeaderPointsAtIndex(0))
+        if not raw or len(raw) < 6:
+            raise RuntimeError(
+                "balloon spread: balloon without a readable leader -- the ring "
+                "order is derived from the ATTACHMENT point, so a balloon whose "
+                "leader cannot be read cannot be placed without crossing"
+            )
+        # Flat x,y,z stream; the LAST triple is the attachment on the component.
+        attach_x, attach_y = float(raw[-3]), float(raw[-2])
+        theta = math.atan2(attach_y - center_y, attach_x - center_x)
         items.append((theta, annotation))
-    items.sort(key=lambda item: item[0])
-    count = len(items)
-    start = items[0][0]  # anchor the ring on the first balloon's own angle
-    for slot, (_theta, annotation) in enumerate(items):
-        angle = start + 2.0 * math.pi * slot / count
+    order = sorted(range(len(items)), key=lambda i: items[i][0])
+    items = [items[i] for i in order]
+    radii = [radii[i] for i in order]
+
+    # Place each balloon at its OWN attachment's angle, then separate only the
+    # circles that actually collide. Two earlier placements both failed, each in
+    # the way the other avoided, and this is the synthesis of what they proved:
+    #
+    #   EVEN SPACING (was here) preserved the attachments' ORDER but not their
+    #   DIRECTIONS. The pen sub is tall and skinny, so its 8 attachments cluster
+    #   in a narrow angular band while evenly-spaced slots span 360 deg. Measured
+    #   on the shipped sheet: balloon DetailItem347 sat at y=0.1908 serving an
+    #   attachment at y=0.1035 -- an 87 mm near-vertical leader hauled across the
+    #   model, and it alone caused BOTH remaining crossings.
+    #
+    #   PURE RADIAL placement fixed that (crossings 2 -> 0: radial segments about
+    #   a shared centre cannot intersect) but piled the clustered balloons on top
+    #   of each other -- overlaps 0 -> 9, the very defect AutoBalloon5 has and
+    #   this function exists to undo. It failed for ONE reason: nothing separated
+    #   the colliding circles.
+    #
+    # So: keep the radial direction, enforce a minimum angular separation. The
+    # separation is derived from the balloon's MEASURED radius (GetBalloonInfo,
+    # above), not a guess -- 4.72 mm on this sheet. A monotone push-apart cannot
+    # reorder the balloons, and order-preserving placement about a shared centre
+    # is what rules crossings out, so this keeps radial's proof while paying
+    # radial's price only where circles genuinely touch.
+    #
+    # (History: this WAS documented as blocked -- "needs the balloon's rendered
+    # diameter, which nothing here reads yet". True of this file, never of the
+    # API: INote::GetBalloonInfo returns the circle's centre and radius outright,
+    # and had been in the generated binding all along. The claim was never tested
+    # and the sheet carried the defect for it.)
+    gap = _min_angular_gap(
+        min(radius_x, radius_y), max(radii), clearance=_BALLOON_CLEARANCE_M
+    )
+    angles = _push_apart_on_ring([theta for theta, _ in items], min_gap=gap)
+    for angle, (_theta, annotation) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle)
         target_y = center_y + radius_y * math.sin(angle)
         if not annotation.SetPosition(target_x, target_y, 0.0):
@@ -1548,22 +1933,29 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     )
     if note is None:
         return None
-    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetExtent", "IsBomBalloon")
+    note = _sw_type_info.early_bound_or_flag(
+        note, "INote", "GetExtent", "IsBomBalloon", "GetBalloonInfo"
+    )
     # A BOM balloon's GetExtent includes its LEADER -- the box spans from the
     # balloon circle to the pointed-at component (same leader-polluted-box dead
     # end as GD&T symbols), so neighboring balloons' boxes always intersect near
-    # the view. Box a balloon nominally around its anchor instead; NON_VIEW scope
-    # still catches two stacked balloons or a balloon dropped on a table.
+    # the view. GetBalloonInfo describes the CIRCLE instead -- centre + radius,
+    # no leader -- so box the circle it actually draws.
     if bool(adapter._attempt(lambda: note.IsBomBalloon(), default=False)):
-        position = adapter._attempt(
-            lambda: adapter._get_attr_or_call(annotation, "GetPosition")
-        )
-        if not position:
-            return None
-        x, y = float(position[0]), float(position[1])
-        half = _NOMINAL_BALLOON_HALF_M
+        info = adapter._attempt(lambda: note.GetBalloonInfo())
+        if not info or len(info) < 7:
+            raise RuntimeError(
+                f"{name}: GetBalloonInfo did not return the balloon circle -- "
+                "refusing to fall back to a nominal box, which would audit a "
+                "guess against placement derived from the measured radius and "
+                "silently disagree with it"
+            )
+        # Centre from GetBalloonInfo, NOT GetPosition: GetPosition is the
+        # annotation ANCHOR, which is measurably offset from the circle centre
+        # (probed on pen-assembly), so it boxed the balloon off-centre.
+        cx, cy, half = float(info[0]), float(info[1]), float(info[6])
         return LayoutElement(
-            name, "note", x - half, y - half, x + half, y + half,
+            name, "note", cx - half, cy - half, cx + half, cy + half,
             scope=CollisionScope.NON_VIEW,
         )
     extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
@@ -1619,14 +2011,76 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     return LayoutElement(name, "table", x, y - height, x + width, y)
 
 
-def _gdt_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | None:
-    """Box a native GD&T symbol as a nominal square around its GetPosition anchor.
+def _measured_gdt_box(
+    adapter: Any, annotation: Any, kind: int
+) -> tuple[float, float, float, float] | None:
+    """Box a GD&T symbol from the geometry SolidWorks actually renders.
 
-    Datum tags / feature-control frames / surface-finish symbols expose no real
-    bounding box, so a fixed nominal half-span is used -- good enough to catch a
-    symbol placed clear off the sheet. Given ``NONE`` collision scope: the nominal
-    box is too coarse to assert an overlap (a datum tag placed beside its own
-    control frame would self-collide), so the symbol is overflow-checked only.
+    ``IDatumTag`` / ``IGtol`` / ``ISFSymbol`` all expose the symbol's real
+    primitives -- ``GetLineAtIndex(i)`` -> ``[lineType, startPt[3], endPt[3]]``,
+    ``GetTriangleAtIndex(i)`` -> ``[vtx1[3], vtx2[3], vtx3[3], isFilled,
+    lineType]``, ``GetArcAtIndex(i)`` -> ``[lineType, startPt[3], endPt[3],
+    centerPt[3], rotationDir]``. Their union is the symbol's ink, leader
+    included, which is exactly the question an OVERFLOW check asks.
+
+    They are NOT on ``IAnnotation``: go through ``GetSpecificAnnotation()``
+    first, or every call raises. (``GetExtent`` is not the route -- the type
+    library declares it on ``IBomTable`` and ``INote`` only, verified against a
+    working ``INote.GetExtent()`` in the same probe run.)
+    """
+    spec = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
+    )
+    if spec is None:
+        return None
+    spec = _sw_type_info.early_bound_or_flag(spec, _GDT_IFACE[kind])
+
+    points: list[tuple[float, float]] = []
+    for count_name, at_name, offsets in (
+        ("GetLineCount", "GetLineAtIndex", ((1, 2), (4, 5))),
+        ("GetArcCount", "GetArcAtIndex", ((1, 2), (4, 5))),
+        ("GetTriangleCount", "GetTriangleAtIndex", ((0, 1), (3, 4), (6, 7))),
+    ):
+        n = adapter._attempt(
+            lambda c=count_name: int(adapter._get_attr_or_call(spec, c) or 0)
+        ) or 0
+        for i in range(n):
+            raw = adapter._attempt(lambda a=at_name, j=i: getattr(spec, a)(j))
+            if not raw:
+                continue
+            v = [float(t) for t in raw]
+            points.extend((v[ix], v[iy]) for ix, iy in offsets if iy < len(v))
+    if not points:
+        return None
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _gdt_element(
+    adapter: Any, annotation: Any, name: str, kind: int
+) -> LayoutElement | None:
+    """Box a native GD&T symbol from its rendered geometry where possible.
+
+    Given ``NONE`` collision scope -- a datum tag legitimately sits beside its
+    own control frame, so these are overflow-checked only, never overlap-checked.
+
+    Datum tags and feature-control frames are MEASURED (``_measured_gdt_box``).
+    They have to be: an FCF's anchor is its frame's TOP-LEFT corner and its width
+    grows with compartment count (measured: 41.6 mm for "Ø0.20|A|B|C" vs 32.2 mm
+    for "0.10|A|B", both 7.0 mm tall), so the old symmetric ±8 mm square wasted
+    8 mm above on empty sheet while missing ~34 mm of frame body to the right --
+    a border crossing in an FCF's right half read clean. No fixed box can be
+    right when the width depends on the text.
+
+    A surface-finish symbol keeps its measured ``_SF_BOX_*`` constants, because
+    measuring it would be WORSE: its "Ra 1.6" text overhangs the bar drawn above
+    it by ~1.3 mm, and text is not among the primitives, so a geometry-derived
+    box quietly clips it. The constants were measured off renders (which do show
+    the text) and cover it. Same reason the box is asymmetric at all: the anchor
+    is the leader's attachment at the body's bottom-left, so a symmetric box is
+    the wrong SHAPE, not merely the wrong size, and once let an Ra print over the
+    sheet border with the audit reporting clean.
     """
     position = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetPosition")
@@ -1634,6 +2088,24 @@ def _gdt_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
     if not position:
         return None
     x, y = float(position[0]), float(position[1])
+    if kind == _ANNOT_SFSYM:
+        return LayoutElement(
+            name,
+            "gdt",
+            x - _SF_BOX_LEFT_M,
+            y - _SF_BOX_DOWN_M,
+            x + _SF_BOX_RIGHT_M,
+            y + _SF_BOX_UP_M,
+            scope=CollisionScope.NONE,
+        )
+    measured = _measured_gdt_box(adapter, annotation, kind)
+    if measured is not None:
+        x0, y0, x1, y1 = measured
+        return LayoutElement(name, "gdt", x0, y0, x1, y1, scope=CollisionScope.NONE)
+    # No geometry came back (an unexpected kind, or a PMI-only annotation whose
+    # GetSpecificAnnotation is None). Fall back to the nominal square rather than
+    # dropping the symbol from the audit entirely -- a coarse box still catches
+    # one placed clear off the sheet.
     half = _NOMINAL_GDT_HALF_M
     return LayoutElement(
         name, "gdt", x - half, y - half, x + half, y + half, scope=CollisionScope.NONE
@@ -1660,13 +2132,16 @@ def _dim_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | No
 
 
 def _iter_view_annotations(adapter: Any, view: Any):
-    """Yield each free ``LayoutElement`` (note, GD&T symbol or dimension) a view owns.
+    """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
     ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
     callouts, notes and GD&T symbols; NOTES (swNote), native GD&T symbols (datum
     tag / feature-control frame / surface-finish) and DISPLAY DIMENSIONS / hole
     callouts (swDisplayDimension) become elements. Tables come from
     ``GetTableAnnotations`` instead.
+
+    The live annotation rides along so the caller can pull its leader geometry
+    (see :func:`_leader_segments_of`) without a second COM walk.
     """
     annotations = adapter._attempt(
         lambda: adapter._get_attr_or_call(view, "GetAnnotations")
@@ -1686,13 +2161,13 @@ def _iter_view_annotations(adapter: Any, view: Any):
         if kind == _ANNOT_NOTE:
             element = _note_element(adapter, annotation, name)
         elif kind in _GDT_TYPES:
-            element = _gdt_element(adapter, annotation, name)
+            element = _gdt_element(adapter, annotation, name, kind)
         elif kind == _ANNOT_DIM:
             element = _dim_element(adapter, annotation, name)
         else:
             continue
         if element is not None:
-            yield element
+            yield element, annotation
 
 
 def _iter_tables(adapter: Any, view: Any):
@@ -1721,10 +2196,216 @@ def _iter_tables(adapter: Any, view: Any):
             yield element
 
 
+# swZoneMargin_e -- the four margins reserved by the sheet format's zone band.
+_ZONE_MARGINS = {"top": 0, "bottom": 1, "right": 2, "left": 3}
+
+
+def sheet_drawable_region(
+    adapter: Any, sheet: Any, *, width: float, height: float
+) -> DrawableRegion:
+    """The region inside the sheet's border/zone band, QUERIED from the sheet.
+
+    The zone band is sheet metadata (``ISheet::GetZoneMargin``), so the audit
+    reads it rather than carrying a measured copy: edit the zone margins in the
+    DRWDOT and the keep-out follows automatically.
+
+    A sheet format that declares no zone margins returns 0 for every side; that
+    is reported as the whole sheet rather than treated as an error, so a plain
+    unzoned sheet still audits.
+    """
+    margins: dict[str, float] = {}
+    for side, code in _ZONE_MARGINS.items():
+        value = adapter._attempt(lambda c=code: sheet.GetZoneMargin(c))
+        if value is None:
+            raise RuntimeError(
+                f"cannot read the sheet's {side} zone margin -- the border "
+                "keep-out cannot be audited"
+            )
+        margins[side] = float(value)
+    if not any(margins.values()):
+        _telemetry.warn(
+            "sheet declares no zone margins; auditing against the full sheet"
+        )
+        return DrawableRegion.whole_sheet(width, height)
+    region = DrawableRegion.from_margins(width, height, **margins)
+    _telemetry.event(
+        "drawing.zone_region",
+        left=margins["left"],
+        right=margins["right"],
+        bottom=margins["bottom"],
+        top=margins["top"],
+    )
+    return region
+
+
+def _closed_rectangle(
+    lines: list[tuple[tuple[float, float], tuple[float, float]]], tol: float = 1e-6
+) -> set[int]:
+    """Indices of the 4 lines forming a closed axis-aligned rectangle, if any.
+
+    A datum tag's geometry is ``[leader..., box(4 lines)]``; this finds the box so
+    the caller can treat everything else as leader. Identified STRUCTURALLY (four
+    axis-aligned lines meeting at exactly 4 corners, each used twice) rather than
+    by position in the list or by its 7 mm size -- both of those are incidental.
+    """
+    axis = [
+        i for i, (a, b) in enumerate(lines)
+        if abs(a[0] - b[0]) < tol or abs(a[1] - b[1]) < tol
+    ]
+    for quad in combinations(axis, 4):
+        pts = [p for i in quad for p in lines[i]]
+        counts = Counter((round(x, 6), round(y, 6)) for x, y in pts)
+        if len(counts) != 4 or any(v != 2 for v in counts.values()):
+            continue
+        if len({p[0] for p in counts} ) == 2 and len({p[1] for p in counts}) == 2:
+            return set(quad)
+    return set()
+
+
+def _datum_leader_segments(
+    adapter: Any, annotation: Any, *, label: str, owner: str
+) -> list[LeaderSegment]:
+    """A DATUM TAG's leader, which ``_leader_segments_of`` structurally cannot see.
+
+    A leader is only REGISTERED if ``SetLeader3`` created it, and
+    ``add_datum_feature`` never calls it -- nor can it: datum FEATURE symbols are
+    absent from ``SetLeader3``'s support list (only datum TARGET symbols are). So
+    ``GetLeaderCount()`` returns 0 for every ``swDatumTag`` (measured: 3 tags on
+    rocker-arm-support report 0, while a ``swGtol`` on the same sheet reports 1).
+
+    But the leader IS DRAWN, and it IS readable -- as ordinary geometry via
+    ``IDatumTag::GetLineAtIndex``. Without this, a datum tag routed straight
+    across a neighbouring view is invisible to BOTH audits: its box is
+    ``CollisionScope.NONE`` so it is never overlap-checked, and it contributes no
+    leader segments so it is never crossing-checked (codex #334). That is not
+    hypothetical -- the eye pass found exactly this on cone-tip-bushing (datum A's
+    leader driven 41.8 mm down through the whole end view) and crank-arm (datum A
+    across a 16 mm section), both passing every gate.
+    """
+    spec = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
+    )
+    if spec is None:
+        return []
+    spec = _sw_type_info.early_bound_or_flag(spec, "IDatumTag")
+    count = int(
+        adapter._attempt(lambda: adapter._get_attr_or_call(spec, "GetLineCount"))
+        or 0
+    )
+    lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
+    for index in range(count):
+        raw = adapter._attempt(lambda i=index: spec.GetLineAtIndex(i))
+        if not raw:
+            continue
+        v = [float(t) for t in raw]  # [lineType, startPt[3], endPt[3]]
+        lines.append(((v[1], v[2]), (v[4], v[5])))
+    # Drop the tag's own BOX -- it is not a leader, and a box legitimately abuts
+    # its own view. Everything else (the leader run, and the shoulder some tags
+    # draw along the attached edge) is a straight run that can cross a view.
+    box = _closed_rectangle(lines)
+    return [
+        LeaderSegment(label, "gdt", a[0], a[1], b[0], b[1], owner)
+        for i, (a, b) in enumerate(lines)
+        if i not in box
+    ]
+
+
+def _display_dimension_leader_segments(
+    adapter: Any, annotation: Any, *, label: str, owner: str
+) -> list[LeaderSegment]:
+    """A HOLE CALLOUT's ACTUAL leader lines, which ``_leader_segments_of`` cannot see.
+
+    The same blind spot as :func:`_datum_leader_segments`, one annotation type
+    over. A native hole callout is an ``IDisplayDimension`` whose leader was NOT
+    made by ``SetLeader3``, so ``GetLeaderCount()`` returns 0 (measured: RD3 on
+    pen-rod) and ``_leader_segments_of`` yields nothing -- while its box is
+    ``CollisionScope.NONE`` and never overlap-checked. So a callout whose offset
+    text is routed across a neighbouring view escapes BOTH audits (codex
+    #3605215320), and it is not hypothetical: pen-rod's callout text sits at
+    sheet (0.104, 0.222), OUTSIDE its owning view (x 0.062..0.078).
+
+    Read the REAL rendered ink, not a reconstruction. ``_pin_dimension_text_and_
+    leader_style`` forces every dimension to ``swBrokenLeaderHorizontalText``, so
+    the leader is BENT -- a sloped run from the arrow up to an elbow, then a
+    horizontal shoulder to the text. A straight attachment->text chord misses
+    that elbow: it can fail a clean print or miss a real crossing when the bent
+    route and the chord fall on opposite sides of a view (codex #3605558274).
+    ``IDisplayDimension::GetDisplayData`` hands back the actual per-primitive
+    geometry -- the display-dimension analog of ``IDatumTag::GetLineAtIndex`` --
+    in SHEET space (probed on RD3: 3 lines, stub (0.069,0.204)->(0.071,0.206),
+    slope ->(0.084,0.219), shoulder ->(0.123,0.219); the shoulder runs PAST the
+    text at x=0.104, ground the chord never covered). Every line is leader ink
+    that can cross a view; a hole callout has no witness/box lines to exclude.
+    Only hole callouts get a leader here -- a plain linear/radius dimension keeps
+    its text on the dimension line between its witness lines.
+    """
+    display = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
+    )
+    if display is None:
+        return []
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "IsHoleCallout", "GetDisplayData"
+    )
+    if not adapter._attempt(lambda: display.IsHoleCallout()):
+        return []
+    data = adapter._attempt(lambda: display.GetDisplayData())
+    if data is None:
+        return []
+    data = _sw_type_info.early_bound_or_flag(
+        data, "IDisplayData", "GetLineCount", "GetLineAtIndex2"
+    )
+    count = int(adapter._attempt(lambda: data.GetLineCount(), default=0) or 0)
+    segments: list[LeaderSegment] = []
+    for index in range(count):
+        raw = adapter._attempt(lambda i=index: data.GetLineAtIndex2(i))
+        if not raw or len(raw) < 10:
+            continue
+        # GetLineAtIndex2 -> [color, lineType, _, _, startPt[3], endPt[3]].
+        values = [float(v) for v in raw]
+        segments.append(
+            LeaderSegment(
+                label, "dim",
+                values[4], values[5], values[7], values[8],
+                owner,
+            )
+        )
+    return segments
+
+
+def _leader_segments_of(
+    adapter: Any, annotation: Any, *, label: str, kind: str, owner: str
+) -> list[LeaderSegment]:
+    """Every straight run of ``annotation``'s leader(s), in sheet meters.
+
+    ``GetLeaderPointsAtIndex`` returns a flat x,y,z triple stream; consecutive
+    points are joined, so a bent leader yields its elbow AND its tail. The
+    documentation does not state the points' coordinate space -- the sibling
+    ``IAnnotation::GetPosition`` is documented as sheet space and the live
+    probe agrees, which is why the audit compares them against sheet-space
+    ``IView::GetOutline`` boxes.
+    """
+    count = int(adapter._attempt(lambda: annotation.GetLeaderCount(), default=0) or 0)
+    segments: list[LeaderSegment] = []
+    for index in range(count):
+        raw = adapter._attempt(lambda i=index: annotation.GetLeaderPointsAtIndex(i))
+        if not raw:
+            continue
+        values = [float(v) for v in raw]
+        points = [
+            (values[i], values[i + 1]) for i in range(0, len(values) - 2, 3)
+        ]
+        for start, end in zip(points, points[1:]):
+            segments.append(
+                LeaderSegment(label, kind, start[0], start[1], end[0], end[1], owner)
+            )
+    return segments
+
+
 def collect_layout_elements(
     adapter: Any,
-) -> tuple[list[LayoutElement], float, float]:
-    """Gather every free-standing drawing element and the sheet size (meters).
+) -> tuple[list[LayoutElement], list[LeaderSegment], DrawableRegion]:
+    """Gather every drawing element, its leader geometry, and the drawable region.
 
     Elements are:
 
@@ -1742,6 +2423,9 @@ def collect_layout_elements(
     * two reserved KEEP-OUT boxes -- the checked-in title block and its
       projection symbol -- so no content may land on either.
 
+    Also returned: every annotation's LEADER geometry (for the crossing audit)
+    and the sheet's :class:`DrawableRegion`, queried from its zone margins.
+
     Notes owned by the SHEET view are the sheet-format frame + zone labels (at
     the sheet edges by design) and are excluded.
     """
@@ -1756,6 +2440,7 @@ def collect_layout_elements(
     width, height = float(properties[5]), float(properties[6])
 
     elements: list[LayoutElement] = []
+    leaders: list[LeaderSegment] = []
     # Tables are deduped by name: SolidWorks can surface the same table under both
     # its owning view and the sheet, and a duplicated box would self-collide.
     tables: dict[str, LayoutElement] = {}
@@ -1775,11 +2460,48 @@ def collect_layout_elements(
                     scope=_view_scope(adapter, view),
                 )
             )
-        for element in _iter_view_annotations(adapter, view):
+        for element, annotation in _iter_view_annotations(adapter, view):
             # Record the owning view: a NON_VIEW annotation is exempt from
             # colliding with THIS view only, not other drawing views (Codex #269
             # thread 3).
             element = replace(element, owner=name)
+            leaders.extend(
+                _leader_segments_of(
+                    adapter,
+                    annotation,
+                    label=element.label,
+                    kind=element.kind,
+                    owner=name,
+                )
+            )
+            # A datum tag registers NO IAnnotation leader (SetLeader3 never made
+            # one, and cannot for a datum FEATURE symbol), so the call above
+            # returns nothing for it however well it is routed. Its leader is
+            # real, drawn, and readable only as IDatumTag geometry -- collect it
+            # separately or a datum leader driven through a neighbouring view is
+            # invisible to every gate (codex #334).
+            if int(
+                adapter._attempt(
+                    lambda a=annotation: adapter._get_attr_or_call(a, "GetType")
+                )
+                or 0
+            ) == _ANNOT_DATUM:
+                leaders.extend(
+                    _datum_leader_segments(
+                        adapter, annotation, label=element.label, owner=name
+                    )
+                )
+            # A native hole callout is an IDisplayDimension whose leader is NOT a
+            # SetLeader3 leader, so GetLeaderCount()==0 and the call above returns
+            # nothing -- yet its offset text can drive a leader across a
+            # neighbouring view. Reconstruct it from the text + the projected
+            # attachment (codex #3605215320); a no-op for non-callout dimensions.
+            if element.kind == "dim":
+                leaders.extend(
+                    _display_dimension_leader_segments(
+                        adapter, annotation, label=element.label, owner=name,
+                    )
+                )
             # A SMALL note centered inside its owning view is a hole tag / balloon
             # sitting on the geometry -- give it NON_VIEW scope so it does not
             # collide with the view it sits on (but still collides with a free
@@ -1819,34 +2541,45 @@ def collect_layout_elements(
             _TITLE_BLOCK_TOP_M,
         )
     )
-    return elements, width, height
+    region = sheet_drawable_region(adapter, sheet, width=width, height=height)
+    return elements, leaders, region
 
 
-def check_drawing_layout(adapter: Any) -> None:
-    """Fail loud if any two drawing elements collide or one runs off the sheet.
+
+
+def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
+    """Fail loud on a colliding, border-crossing, or leader-crossed layout.
 
     Runs at the end of every recipe's layout, right before the drawing is saved
     (see :func:`finalize_drawing`), so a print can never ship with a note landed
-    on a view or a table hanging over the border -- defects the dimensional and
-    format gates cannot see.
+    on a view, an element run into the zone border, or a leader driven across a
+    view it does not annotate -- defects the dimensional and format gates cannot
+    see.
+
+    ``stem`` names the sheet in failures. Every sheet is held to ZERO on every
+    defect class -- there is no grandfathered case. There WAS one: pen-assembly
+    carried 2 leader crossings behind a `_KNOWN_LEADER_CROSSINGS` ratchet, on the
+    reasoning that fixing them needed a design decision. It did not -- it needed
+    the balloon's rendered radius, which INote::GetBalloonInfo had all along (see
+    :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
     with _telemetry.span("drawing.layout_audit") as span:
-        elements, width, height = collect_layout_elements(adapter)
-        overlaps, overflows = audit_layout(elements, width, height)
-        if span is not None:
-            span.set_attribute("elements", len(elements))
-            span.set_attribute("overlaps", len(overlaps))
-            span.set_attribute("overflows", len(overflows))
-        if not overlaps and not overflows:
+        elements, leaders, region = collect_layout_elements(adapter)
+        overlaps, overflows, crossings = audit_layout(
+            elements, region, leaders=leaders
+        )
+        if not overlaps and not overflows and not crossings:
             _telemetry.success(
                 f"drawing layout clean: {len(elements)} elements, "
-                "no overlaps or overflows"
+                f"{len(leaders)} leader segment(s); no overlaps, border "
+                "crossings or leader crossings"
             )
             return
         raise RuntimeError(
             "drawing layout audit failed "
-            f"({len(overlaps)} overlap(s), {len(overflows)} overflow(s)):\n"
-            + format_findings(overlaps, overflows)
+            f"({len(overlaps)} overlap(s), {len(overflows)} border "
+            f"crossing(s), {len(crossings)} leader crossing(s)):\n"
+            + format_findings(overlaps, overflows, crossings)
         )
 
 
@@ -1925,7 +2658,7 @@ async def finalize_drawing(
     # The layout is now complete -- audit element collisions / sheet overflow on
     # the finished sheet before the first save, so a broken layout never reaches
     # the saved SLDDRW / PDF / PNG.
-    check_drawing_layout(adapter)
+    check_drawing_layout(adapter, stem=outputs.slddrw.stem)
 
     artifacts = save_drawing(adapter, str(outputs.slddrw))
     drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)

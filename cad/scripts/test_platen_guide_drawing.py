@@ -85,9 +85,11 @@ def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
 
 def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
     notes = guide.DRAWING_NOTES
-    assert "LENGTH +/-0.5" in notes
-    assert "STOCK SECTION +/-0.25" in notes
     assert "HOLE POSITION PER FCF" in notes
+    # General tolerances live in the title block ONLY -- a second general
+    # tolerance in the notes would conflict with it.
+    assert "LENGTH +/-" not in notes
+    assert "STOCK SECTION" not in notes
     assert "X.XXX" not in notes
 
 
@@ -98,7 +100,6 @@ def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
     assert "characteristic=\"flatness\"" in source
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source
-    assert "add_surface_finish(" in source
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
