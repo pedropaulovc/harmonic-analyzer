@@ -69,10 +69,34 @@ landing on exactly the declared size is not coincidence. 12.7 uniform IS the
 design intent; the frame got dragged. The fix is a re-centring, not a redraw, and
 matching the margins to the frame instead would codify the slip.
 
-**Measuring the frame off a render:** the PNGs are 5100x3300 @300dpi = exactly
-431.8 x 279.4 mm, so pixels map linearly to sheet metres. The RIGHT border renders
-light-grey (value **192**), not black — a `< 128` threshold finds nothing. Use
-`< 200`.
+**Measuring ANY render: a sheet has TWO ink populations, and `< 128` sees only
+one. DEFAULT YOUR THRESHOLD TO `< 200`.** The PNGs are 5100x3300 @300dpi =
+exactly 431.8 x 279.4 mm, so pixels map linearly to sheet metres. Histogram of a
+real sheet (platen-guide, 2026-07-16):
+
+- level **0** (~217k px) — BLACK: geometry, dimensions, GD&T frames, notes;
+- level **192** (~91k px) — GRAY: **reference dimensions, native hole callouts,
+  AND ALL FOUR DRAWN FRAME RULES**.
+
+`< 128` discards the entire gray population, and it fails in the WORST direction:
+it reports **"BLANK (no ink)"** for a region holding a full-height frame rule, and
+"clear" for one holding a 39 mm gray callout. Demonstrated: the right frame-rule
+region reads `x 0.4221..0.4225` at threshold 200 and **"BLANK"** at 128. So a
+clearance measured against a margin or a gray annotation at `< 128` **is not
+evidence** — it is a false pass.
+
+This note has said "use < 200" since it was written, and the session's own crop
+helper still shipped `< 128` to four review agents; eye-1 nearly lost a real
+crank-arm strikethrough to it and eye-4 independently re-derived the frame rules
+because of it. Recording a threshold is not the same as defaulting to it — so:
+**any render-measuring tool defaults to 200**, and drops to 128 only to
+deliberately separate black geometry from a gray reference dim, never to answer
+"does X clear Y".
+
+Measured frame rules (gray, invisible below 200): **left x=0.0159, right
+x=0.4221..0.4225, top y=0.2672..0.2675**. Note the right RULE (0.4221) and the
+12.7 mm zone MARGIN (0.4191) are different, and the margin is the tighter bound —
+an annotation can clear the rule and still bust the margin.
 
 **Editing the template is GUI-only, and expensive.** `ISketchPoint::SetCoords`
 "adheres to any constraints that are active in the sketch" — it can return true
