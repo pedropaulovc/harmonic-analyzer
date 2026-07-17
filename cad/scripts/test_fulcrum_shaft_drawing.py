@@ -62,6 +62,11 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=ISO_SCALE" in source
     assert fulcrum_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
+    # An off-sheet-scale view needs its OWN scale label or the title block's 1:1
+    # misstates it. cylinder-gear-shaft got this from a codex machinist review;
+    # this sibling shipped the same 1:2 iso unlabelled until codex #334.
+    assert fulcrum_shaft_spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
+    assert 'add_property_linked_note(adapter, "Iso View Note"' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the lever fulcrum shaft."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -62,7 +63,7 @@ ISO_SCALE = (1, 2)
 # horizontally through the centre instead of diagonally.  x=0.030, not the old
 # bbox-derived 0.0173: the callout is centred on its anchor and ~22 mm wide now
 # that it renders horizontally, so 0.0173 printed it across the border rule at
-# ~0.0158.  The layout audit cannot catch that: it boxes a dim as a nominal 4 mm
+# ~0.0126.  The layout audit cannot catch that: it boxes a dim as a nominal 4 mm
 # half-square (_NOMINAL_DIM_HALF_M), far narrower than the real text, and even
 # that box cleared the 12.7 mm zone margin at 0.0173.
 FRONT_KEEP = {
@@ -90,6 +91,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "End View Note",
+            "Iso View Note",
         ),
         required=(
             "Number",
@@ -98,6 +100,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "End View Note",
+            "Iso View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -132,9 +135,33 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
+    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
     end_circle = (
-        FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+        FRONT_CENTER[0] + end_radius,
         FRONT_CENTER[1],
+    )
+    # The cylindricity frame's terminus: 50 deg up the arc, NOT `end_circle`.
+    # Identical defect to MHA-028's 187 arbor, identical cause -- the frame and
+    # the Ra both picked `end_circle` (3 o'clock), so their leaders ended on the
+    # same point and printed as ONE blob: measured arrowheads x 0.0609..0.0613
+    # and x 0.0620..0.0628, a 0.7 mm gap edge-to-edge, centroids 1.3 mm apart.
+    #
+    # 50 deg, not the arbor's 55 deg, because this circle is SMALLER (r=6.35 mm
+    # at 2:1 vs the arbor's 9.525) while carrying the same three obstacles, so
+    # the same angles buy less arc length and the optimum shifts.  Swept at
+    # 5 deg steps against the measured obstacles -- Ra arrowhead at 0 deg, the
+    # ShaftDia diametral line's terminus at 27 deg / (0.0605, 0.2078), and
+    # datum A's triangle base on the circle at 90 deg spanning x 0.0531..0.0568
+    # -- 50 deg reads 5.4 / 2.5 / 2.7 mm.
+    #
+    # Honest limit: 2.5 mm is the best available here, vs 3.6 mm on the arbor.
+    # It clears the ~1 mm stacking tell by 2.5x and the Ra separation (the
+    # actual defect) goes 0.7 -> 5.4 mm, but this arc is genuinely crowded: no
+    # angle on it exceeds 2.5 mm.  Anything tighter would need an obstacle to
+    # move, not this terminus.
+    end_upper = (
+        FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
+        FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
     )
     left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
@@ -176,10 +203,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # leader raked down at an angle and printed straight through the Ra symbol's
     # bar and triangle.  Near-vertical, it passes x=0.064 at the Ra's top edge --
     # clear left of the Ra's arm at 0.072.
+    #
+    # That arm-clearance reasoning still HOLDS, and re-terminating at `end_upper`
+    # only strengthens it: the leader now runs x=0.0591..0.063, i.e. it moves
+    # FURTHER LEFT, away from the Ra's arm at 0.072, and stays near-vertical
+    # (3.9 mm of horizontal run over 38 mm of drop).  It also stays outside the
+    # circle (its low end IS the circle) and clears datum A's box (x<=0.0585) by
+    # 2.6 mm at y=0.229.  The Ra keeps `end_circle`; only this terminus moved.
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=end_circle,
+        edge_xy=end_upper,
         frame_xy=(0.065, 0.250),
         characteristic="cylindricity",
         tolerance="0.01",
@@ -227,11 +261,16 @@ async def build(adapter: Any) -> dict[str, str]:
         label="fulcrum bearing finish",
     )
 
-    # 0.020, not 0.014 -- the border rule is drawn at ~0.0158 and the note is
-    # left-aligned on its anchor, so 0.014 printed the first character on the
-    # frame line (the audit only checks the wider 12.7 mm zone margin).
+    # 0.020: the note is left-aligned on its anchor, so the ink starts here. The
+    # left bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame
+    # rule now matches (~0.0126); 0.020 clears both, and the audit enforces it.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
+    # The iso renders at 1:2 while the title block reads 1:1, so the pictorial
+    # needs its own scale callout or the sheet misstates it. Placed at the same
+    # offset from ISO_CENTER that cylinder-gear-shaft uses for its identical 1:2
+    # iso (dx -0.030, dy -0.048), so the two sibling shafts read alike.
+    add_property_linked_note(adapter, "Iso View Note", 0.325, 0.157)
 
     return await finalize_drawing(
         adapter,
