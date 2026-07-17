@@ -516,6 +516,69 @@ def test_datum_tag_leader_is_collected_even_though_it_registers_none():
     assert (segs[0].x1, segs[0].y1) == pytest.approx((ax, ay))
 
 
+def _hole_callout(text_xy, model_attach, sheet_attach, *, is_callout=True):
+    """A fake native hole callout as probed on pen-rod (RD3).
+
+    GetLeaderCount()==0 (no SetLeader3 leader); the attachment is an IDimension
+    reference point in MODEL space that projects to ``sheet_attach`` through the
+    view's ModelToViewTransform (fake: MultiplyTransform returns the projection).
+    """
+    projected = SimpleNamespace(ArrayData=[*sheet_attach, 0.0])
+    ref0 = SimpleNamespace(
+        ArrayData=[*model_attach, 0.0],
+        MultiplyTransform=lambda _x: projected,
+    )
+    origin = SimpleNamespace(
+        ArrayData=[0.0, 0.0, 0.0],
+        MultiplyTransform=lambda _x: SimpleNamespace(ArrayData=[0.0, 0.0, 0.0]),
+    )
+    dim = SimpleNamespace(ReferencePoints=[ref0, ref0, origin])
+    display = SimpleNamespace(
+        IsHoleCallout=lambda: is_callout,
+        GetDimension=lambda: dim,
+    )
+    return SimpleNamespace(
+        GetPosition=[*text_xy, 0.0],
+        GetType=lambda: drawing_common._ANNOT_DIM,
+        GetName=lambda: "RD3",
+        GetLeaderCount=lambda: 0,             # the whole point: registers none
+        GetSpecificAnnotation=lambda: display,
+    )
+
+
+def test_hole_callout_leader_is_collected_even_though_it_registers_none():
+    """pen-rod's RD3 as probed: IsHoleCallout, GetLeaderCount()==0.
+
+    _leader_segments_of returns nothing (no registered leader), so the callout's
+    offset-text leader was invisible to the crossing audit. Reconstruct it from
+    the text position and the model->sheet-projected attachment (codex
+    #3605215320): model (0, 0.115) -> sheet (0.070, 0.205), text at (0.104,
+    0.222).
+    """
+    view = SimpleNamespace(ModelToViewTransform=object())
+    ann = _hole_callout((0.104, 0.222), (0.0, 0.115), (0.070, 0.205))
+
+    segs = drawing_common._display_dimension_leader_segments(
+        _FakeAdapter(None), ann, view, label="RD3", owner="Front")
+
+    assert len(segs) == 1
+    assert (segs[0].x0, segs[0].y0) == pytest.approx((0.070, 0.205))  # attachment
+    assert (segs[0].x1, segs[0].y1) == pytest.approx((0.104, 0.222))  # text
+    assert segs[0].kind == "dim"
+
+
+def test_plain_dimension_contributes_no_leader():
+    """A non-callout display dimension keeps its text on the dimension line, not
+    at the end of a free leader -- so it must yield NO leader segment (else every
+    linear/radius dimension would spray phantom leaders across the audit)."""
+    view = SimpleNamespace(ModelToViewTransform=object())
+    ann = _hole_callout((0.104, 0.222), (0.0, 0.115), (0.070, 0.205),
+                        is_callout=False)
+    segs = drawing_common._display_dimension_leader_segments(
+        _FakeAdapter(None), ann, view, label="Length", owner="Front")
+    assert segs == []
+
+
 def test_datum_leader_across_a_foreign_view_now_flags():
     """The defect the eye pass found on cone-tip-bushing and crank-arm.
 

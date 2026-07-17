@@ -2310,6 +2310,74 @@ def _datum_leader_segments(
     ]
 
 
+def _display_dimension_leader_segments(
+    adapter: Any, annotation: Any, view: Any, *, label: str, owner: str
+) -> list[LeaderSegment]:
+    """A HOLE CALLOUT's leader, which ``_leader_segments_of`` structurally cannot see.
+
+    The same blind spot as :func:`_datum_leader_segments`, one annotation type
+    over. A native hole callout is an ``IDisplayDimension`` whose leader was NOT
+    made by ``SetLeader3``, so ``GetLeaderCount()`` returns 0 (measured: RD3 on
+    pen-rod) and ``_leader_segments_of`` yields nothing -- while its box is
+    ``CollisionScope.NONE`` and never overlap-checked. So a callout whose offset
+    text is routed across a neighbouring view escapes BOTH audits (codex
+    #3605215320), and it is not hypothetical: pen-rod's callout text sits at
+    sheet (0.104, 0.222), OUTSIDE its owning view (x 0.062..0.078), so its leader
+    already exits the view.
+
+    ``IDisplayDimension`` exposes no ``GetLineAtIndex`` (unlike ``IDatumTag``),
+    but the leader's two ends ARE readable: the TEXT end is the annotation's
+    ``GetPosition`` (sheet space), and the ATTACHMENT end is the dimension's
+    first ``IDimension`` reference point -- a MODEL-space ``IMathPoint`` that
+    projects to sheet space through the view's ``ModelToViewTransform`` (probed:
+    model (0, 0.115, 0) -> sheet (0.070, 0.205), landing inside the view). Only
+    hole callouts get a leader here; a plain linear/radius dimension keeps its
+    text on the dimension line between its witness lines, not at the end of a
+    free leader across the sheet.
+    """
+    display = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
+    )
+    if display is None:
+        return []
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "IsHoleCallout", "GetDimension"
+    )
+    if not adapter._attempt(lambda: display.IsHoleCallout()):
+        return []
+    text = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetPosition")
+    )
+    dim = adapter._attempt(lambda: display.GetDimension())
+    transform = adapter._attempt(
+        lambda: adapter._get_attr_or_call(view, "ModelToViewTransform")
+    )
+    references = (
+        adapter._attempt(lambda: dim.ReferencePoints) if dim is not None else None
+    )
+    if not text or transform is None or not references:
+        return []
+    # Reference point 1 is the callout's attachment (the hole edge); three are
+    # always returned (linear uses 1 and 2, angular adds the vertex as 3). Project
+    # it from model space to the sheet through the view transform.
+    projected = adapter._attempt(lambda: references[0].MultiplyTransform(transform))
+    data = (
+        adapter._attempt(lambda: projected.ArrayData)
+        if projected is not None
+        else None
+    )
+    if not data or len(data) < 2:
+        return []
+    return [
+        LeaderSegment(
+            label, "dim",
+            float(data[0]), float(data[1]),
+            float(text[0]), float(text[1]),
+            owner,
+        )
+    ]
+
+
 def _leader_segments_of(
     adapter: Any, annotation: Any, *, label: str, kind: str, owner: str
 ) -> list[LeaderSegment]:
@@ -2426,6 +2494,18 @@ def collect_layout_elements(
                 leaders.extend(
                     _datum_leader_segments(
                         adapter, annotation, label=element.label, owner=name
+                    )
+                )
+            # A native hole callout is an IDisplayDimension whose leader is NOT a
+            # SetLeader3 leader, so GetLeaderCount()==0 and the call above returns
+            # nothing -- yet its offset text can drive a leader across a
+            # neighbouring view. Reconstruct it from the text + the projected
+            # attachment (codex #3605215320); a no-op for non-callout dimensions.
+            if element.kind == "dim":
+                leaders.extend(
+                    _display_dimension_leader_segments(
+                        adapter, annotation, view,
+                        label=element.label, owner=name,
                     )
                 )
             # A SMALL note centered inside its owning view is a hole tag / balloon
