@@ -312,3 +312,65 @@ triangle against the bbox of ALL the tag's lines — that bbox spans the leader,
 which by definition runs to the triangle, so it reports "inside" for a
 perfectly clean tag. The first cut of the probe did exactly this and called
 every tag defective.
+
+## Leader-vs-leader: the gate, and the two traps that shape it
+
+ASME leaders may not cross each other, and until 2026-07-16 **nothing watched
+for it**: the box audits cannot see a leader at all, and `find_leader_crossings`
+compares leaders only against VIEW outlines — so leader-vs-LEADER fell between
+them. `find_leader_leader_crossings` (`_drawing_layout_check.py`) closes it as
+pure segment intersection over the segments already collected. On its first
+fleet sweep: **5 crossings across 23 sheets, 21 clean** — not noisy.
+
+It is worth more than the hand fixes it replaced, and the evidence is that it
+reproduced two findings humans got by eye, mechanically and to sub-millimetre:
+eye-2's hand-measured balloon crossing at (0.2285, 0.1157) → gate (0.2285,
+0.1161); pen-rod's, read off a render at (0.080, 0.096) → gate (0.0802, 0.0958).
+It also caught one on platen-guide that the eye pass had inspected and passed.
+
+**`GetLeaderPointsAtIndex(i)` — the point order, measured (eye-2's open
+question).** It returns a flat x,y,z stream. The **FIRST** point is the
+annotation end (the balloon circle / the symbol); the **LAST** is the
+ATTACHMENT on the component. Proof, on pen-assembly's 8 balloons: first points
+spread over **61 mm** of x (they sit on the spread ring) while last points
+cluster within **13 mm** (the tall skinny pen sub they all point at). A ring
+spreads; attachments cluster.
+
+**TRAP 1 — a shared TERMINUS is a stack, not a crossing.** Two leaders
+converging on ONE attachment point cross in their last fraction of a
+millimetre, buried under their own ~2.4 mm arrowheads: invisible ink. The gate's
+first sweep reported exactly this on platen-guide (datum A + a frame, both
+ending at x=0.3650, 0.2 mm apart in y) and it was the ONLY false positive in 23
+sheets. Stacked arrows ARE a defect — just a different one, that a human owns.
+The exemption threshold is MEASURED, not tuned: artefact at **0.2 mm**, tightest
+TRUE positive at **4.7 mm**, so 1 mm splits them ~5x either way.
+
+**TRAP 2 — radial balloons: provably no crossings, and worse. Do not re-run
+it.** Placing each balloon at its own attachment's angle makes every leader
+radial, and radial segments about a shared centre cannot intersect, so it
+provably kills every crossing. Measured on pen-assembly: **crossings 2 → 0**.
+But the pen sub's attachments cluster into a narrow angular band, so radial
+placement clusters the BALLOONS with them — the exact pile `AutoBalloon5`
+produces and `_spread_balloons` exists to undo: **overlaps 0 → 9**. An
+unreadable balloon stack beats no crossing. Even spacing stays.
+
+**The balloon ring's remaining defect is SHAPE, not ORDER.** Sorting the ring by
+each balloon's ATTACHMENT angle (not its landed `GetPosition` angle) is correct
+and necessary — it is what killed B4xB6 (3 crossings → 2) — because for straight
+leaders from a convex ring to interior points the non-crossing condition is that
+ring order matches the ATTACHMENTS' order. But it is NOT sufficient: even
+spacing preserves their ORDER while destroying their DIRECTIONS, so on a tall
+skinny sub an attachment at ~-72° still draws a slot at ~+93° and hauls an 87 mm
+leader across the model. Both live candidate fixes are design calls, recorded at
+the call site: a monotone push-apart keeping leaders near-radial while separating
+circles (needs the balloon's rendered diameter, which nothing reads), or
+`IAutoBalloonOptions.Layout` 5/6 for a single column (inert until
+`_spread_balloons` stops overriding Layout by re-ringing).
+
+**The generalisable lesson, from the comment that caused pen-rod's crossing:** it
+reasoned the Ra "passes below … the squareness frame, [which starts] at
+y>=0.095" — TRUE of the BOX and false of the box's LEADER, which descends from
+it to the rod at y~0.091. **Reasoning about an annotation while forgetting its
+leader** is the error the box audits also make by construction, and it is what
+this gate exists to catch. See [[drawing-sheet-zone-border]] and
+[[load-bearing-claims-need-a-repro]].
