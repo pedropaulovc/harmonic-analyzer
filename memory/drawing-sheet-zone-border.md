@@ -61,6 +61,32 @@ The one real defect:
 2. **drawn border frame** — left 15.917 / right 9.483 / bottom 13.335 / top
    12.023 mm: off-centre, and the only thing needing an edit.
 
+**CONSEQUENCE: the border gate is BLIND on the LEFT and BOTTOM until the frame is
+re-centred.** The gate bounds on the DECLARED margins (12.7), but ink is judged by
+a reader against the DRAWN rule. Where the rule sits further in than the margin,
+ink can pass the gate and still print on/through the rule. Quantified by draw-C
+across five sheets (2026-07-16), independently reproducing the insets above:
+
+| rule | drawn at | gate bound | gate is |
+|---|---|---|---|
+| left | **0.0159** | 0.0127 | **BLIND by 3.2 mm** |
+| bottom | **0.0133** | 0.0127 | **BLIND by 0.6 mm** |
+| right | 0.4223 | 0.4191 | conservative — safe |
+| top | 0.2673 | 0.2667 | conservative — safe |
+
+So "the audit passed" is not evidence for the left 3.2 mm strip. **Nine draw
+scripts already carry a hand-written workaround comment** for exactly this (e.g.
+"x=0.020: … the drawn frame rule is at x=0.0159 — 0.014 printed the first glyph
+through it (the audit's bound is the 12.7 mm zone margin, so it cannot see
+this)"). Nine manual compensations for one missing check is the tell that this
+should be gated, not commented.
+
+Re-centring the frame closes it at the source (declared == drawn, all four sides).
+The tempting shortcut — bounding the gate on the *measured* 0.0159 — **codifies the
+slip** (see below) and goes stale the moment the frame moves. If it must be gated
+before the template edit, QUERY the drawn frame's position rather than hardcoding
+it, so the bound tracks the frame instead of freezing today's error.
+
 **The frame is the right SIZE, only in the wrong PLACE** — this is the decisive
 fact. Drawn: 406.400 x 254.042 mm = 16.000 x 10.002 in. Implied by the 12.7 mm
 margins: 406.4 x 254.0 = 16.000 x 10.000 in. Identical to within half a pixel, so
@@ -92,6 +118,17 @@ because of it. Recording a threshold is not the same as defaulting to it — so:
 **any render-measuring tool defaults to 200**, and drops to 128 only to
 deliberately separate black geometry from a gray reference dim, never to answer
 "does X clear Y".
+
+**The pixel-scan failure mode is measuring your own WINDOW and narrating it as the
+drawing.** Three separate times in one session (draw-C) a scan reported back its
+own scan-window start column, or found "content" in every column that was really
+the bottom frame rule caught by an over-wide row band. **The tell: independent
+sheets agreeing to four decimal places.** Real content never agrees that
+precisely — five sheets all reporting 0.0165 means the number is the template, the
+frame, or the window, not the geometry. Sanity-check any cross-sheet constant
+against that before believing it (it is the same shape as the first GD&T probe
+"finding" every datum triangle inside its own box: a measurement true by
+construction, see [[drawing-text-leader-style]]).
 
 Measured frame rules (gray, invisible below 200): **left x=0.0159, right
 x=0.4221..0.4225, top y=0.2672..0.2675**. Note the right RULE (0.4221) and the
