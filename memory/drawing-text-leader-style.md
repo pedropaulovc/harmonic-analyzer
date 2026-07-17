@@ -196,6 +196,38 @@ survives only when `edge_xy`'s clock position AGREES with the direction the symb
 sits in.** Disagree, and the symbol is dragged down onto the circumference and
 `symbol_xy` goes inert.
 
+> [!IMPORTANT]
+> **The re-attach rule is a DATUM-TAG rule, not a leader rule — surface finish
+> HONOURS its pick.** Easy to over-generalise into "SolidWorks always re-anchors to
+> the nearest point", which is false and would block a fix that works. Controlled
+> experiment (crank-arm, 2026-07-16, same symbol_xy=(0.022, 0.125), ONLY `edge_xy`
+> moved between two points on the SAME bore circle):
+>
+> | `edge_xy` | arrow rendered at | leader slope |
+> |---|---|---|
+> | bore TOP (0.077, 0.1445) | 0.0763, 0.1441 — **at the pick** | 0.355 |
+> | bore BOTTOM (0.077, 0.1255) | 0.0746, 0.1256 — **at the pick** | 0.009 |
+>
+> Both landed at the PICK, not at the circle point nearest the symbol (which would
+> be ~9 o'clock in both cases). So `add_surface_finish` lets you choose WHERE on an
+> edge the arrow lands, and that is a real routing lever a datum tag does not give
+> you. It fixed a live strikethrough: aimed at the bore's top the Ra leader climbed
+> through its own "Ra 1.6" text; aimed at the bottom it runs level, 10 mm clear.
+>
+> **And re-pointing a surface finish along ONE edge is not a respec.** In an
+> orthographic view a bore projects as a SINGLE circular edge, so 6 o'clock and 12
+> o'clock select the same edge ⇒ same specified surface. Contrast pen-rod, where
+> moving the Ra would have changed WHICH FACE was specified — that one is a
+> drafting-intent call and must go to the owner, not be "fixed" by an agent.
+>
+> **eye-4's separate generalisation, also measured: the datum re-attach rule is NOT
+> circles-only.** `draw_fulcrum_shaft.py`'s note says "on a circle that is the
+> circumference", implying circles. Wheel-axle's datum A disproves it on a STRAIGHT
+> edge: pick x=0.13125, symbol x=0.13725, triangle rendered at x≈0.1376 — it slid
+> 6 mm along the edge to the symbol, ignoring the pick. The rule is "a datum tag
+> re-attaches at the nearest point on its entity, whatever the entity is", which is
+> what makes `edge_xy` a selector of the ENTITY, not of the attachment point.
+
 - pick 3 o'clock + symbol at 12 → **collapses**: pivot-shaft asked 17.6 mm, got
   1.05 mm; cone-tip-bushing rendered 0.227 and 0.150 pixel-identically.
 - pick 12 + symbol at 12 → **honoured exactly**: cone-tip-bushing's box bottom

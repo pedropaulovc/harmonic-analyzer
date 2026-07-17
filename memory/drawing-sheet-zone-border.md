@@ -22,6 +22,23 @@ Measured 2026-07-16 (PR #334) while adding the sheet-zone-border gate.
 >
 > The rules are 0.4 mm wide (they span e.g. x 0.0124..0.0128), so their
 > CENTRELINES sit at ~12.6 mm — within a line width of the declared 12.7.
+>
+> **CONFIRMED ON THE RENDERS (not only the template probe), 2026-07-16:** left
+> `0.0124..0.0128`, right `0.4188..0.4192`, bottom `0.0124..0.0128`, top
+> `0.2665..0.2669` — measured on crank-arm / platen-guide / wheel-axle, identical
+> to 4 decimals. That agreement is EXPECTED here and is not the "measuring your own
+> window" tell below: the frame IS template geometry, so every sheet must report it
+> identically. The tell applies to CONTENT, never to the format.
+>
+> **Zone TICKS legitimately cross the frame rules.** Short GRAY verticals at the
+> sheet's quarters — x = **0.10795 / 0.2159 / 0.32385** — run from the top rule up
+> into the margin toward the zone glyphs. They are correct template geometry (the
+> grid divides the SHEET, see below). An eye pass reported one as "the top view's
+> centerline crossing the top frame rule, ~2.8 mm into the margin" and it was a
+> false alarm that would have "fixed" correct geometry. **Two tells separate them
+> from a real bust:** a tick is GRAY (level 192) while view geometry is BLACK, and a
+> tick lands exactly on a quarter. On cone-lock-knob the only BLACK ink above the
+> top rule was the zone glyph "3" at x 0.1599..0.1637 — nothing crossed.
 > **Declared now equals drawn on all four sides, so the border gate is no longer
 > blind on the left (3.2 mm) or bottom (0.6 mm)**; the whole "query the drawn
 > frame instead of the margin" workaround is unnecessary — the real defect was
@@ -181,11 +198,40 @@ DRWDOT is in `DrawingSpec.assets` unconditionally, feeding both `file_dep` and
 `_cache_key`, so ANY template touch rebuilds **23/23** drawings and busts the
 shared Azure cache key for every seat in the fleet — batch template edits into one.
 
-**If the frame moves, re-measure the title-block keep-out.** The block is nested in
-the frame's bottom-right corner (its bottom rule sits exactly on the frame's bottom
-line) and translates with it, so `_TITLE_BLOCK_LEFT_M` (0.264) /
-`_TITLE_BLOCK_TOP_M` (0.064) in `_drawing_common.py` go stale. The right/bottom
-sides stay safe (the keep-out runs to the sheet edge) but a stale LEFT edge leaves
-the block's leftmost 3.2 mm unguarded. The keep-out is deliberately exempt from the
-border audit — it legitimately reaches the sheet corner. See
-[[drawing-text-leader-style]].
+**The title block does NOT translate with the frame — measured, and this note
+claimed the opposite.** The earlier version said the block "is nested in the frame's
+bottom-right corner and translates with it", so `_TITLE_BLOCK_LEFT_M` (0.264) /
+`_TITLE_BLOCK_TOP_M` (0.064) would go stale on a frame move. **False, and it cost
+real work**: an agent reasoned from it that pen-rod's note corridor MOVED rather than
+widened (keep-out 0.2672 → 0.2640) and predicted a 0.1 mm overrun that does not
+exist; the lead then repeated the claim to the user and into a source comment before
+measuring.
+
+The proof is one number. After the 2026-07-16 re-centring pulled the frame's rules
+inward 3.3 mm, **the block's horizontal cell rules still run out to x=0.4223 —
+exactly where the OLD right rule sat (0.4221..0.4225)** — while the drawn right rule
+is now 0.4188..0.4192. The block stayed put; only the frame moved. Consequences:
+
+- **The block now PROTRUDES ~3.1 mm past the right frame rule into the margin** (the
+  topmost cell rule reaches 0.4288, 9.7 mm past), on ALL 23 sheets, beside the "A"
+  zone glyph. A live template defect CREATED by the re-centring — the frame and the
+  block are independent format geometry, and moving one does not move the other.
+  Fixing it is another GUI DRWDOT edit (and another 23/23 cache bust).
+- **The corridor between the left rule and the block WIDENED**, it did not move:
+  0.2658 − 0.0159 = 249.9 mm → 0.2658 − 0.0126 = **253.2 mm**. The ~3.3 mm of new
+  room the original comment predicted was real.
+- `_TITLE_BLOCK_LEFT_M` = 0.264 vs the DRAWN left rule at **0.2658** ⇒ the gate's
+  keep-out starts 1.8 mm OUTSIDE the block. Wrong, but in the SAFE direction: it
+  over-reserves, so it can false-positive but never miss a strike. It did not go
+  stale because the thing it approximates never moved.
+
+**Measured block geometry (2026-07-16 renders, template-constant across 5 sheets):**
+outer left rule **0.2658**; leftmost BLACK TEXT **0.2675**. Both are real bounds and
+the TEXT is the tighter keep-out for a note on the block's y band — do not "correct"
+a 0.267x figure to the rule. Beware: 0.2672 is ALSO within 0.3 mm of the old TOP
+rule's y — a numerical coincidence that makes an "axis confusion" story look
+compelling and wrong. The lead accused an agent of exactly that error, in a source
+comment, on the strength of the coincidence. Specificity is not evidence.
+
+The keep-out is deliberately exempt from the border audit — it legitimately reaches
+the sheet corner. See [[drawing-text-leader-style]] and [[load-bearing-claims-need-a-repro]].
