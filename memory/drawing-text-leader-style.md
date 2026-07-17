@@ -95,9 +95,37 @@ the Ra box died: it wastes 8 mm above and 5.4 mm left on empty sheet while
 **missing ~34 mm of frame body to the right** — a border crossing or overflow in
 an FCF's right half is invisible to the audit. And because the width is
 content-dependent, the Ra fix's trick (a per-kind constant box) does NOT
-transfer. It needs either a measured extent or a width derived from the frame's
-compartments; `_probe_datum_leader.py` tests `GetExtent` on GTOLs (with a swNote
-as the positive control) to decide which.
+transfer.
+
+**STOP MODELLING THE BOX — MEASURE IT. `GetLineAtIndex` hands you the real
+rendered geometry** (probed 2026-07-16 on rocker-arm-support). Three findings,
+each of which kills an approach that looked reasonable:
+
+- **`GetExtent` is a dead end, and the inherited claim was RIGHT**: the type
+  library declares it on **`IBomTable` and `INote` ONLY**. Verified with a
+  positive control in the same run — `INote.GetExtent()` returns a real 6-tuple
+  `(x0,y0,z0,x1,y1,z1)`, so the API works and the call shape is right; GTOLs and
+  datum tags genuinely lack it.
+- **But `IGtol`/`IDatumTag` expose the geometry directly.**
+  `GetLineAtIndex(i)` → `[lineType, startPt[3], endPt[3]]`,
+  `GetTriangleAtIndex(i)` → `[vtx1[3], vtx2[3], vtx3[3], isFilled, lineType]`,
+  plus `GetArcAtIndex`/`GetArrowHeadAtIndex`. **This is better than `GetExtent`
+  would have been** — it is the actual ink, per primitive.
+- **The line list is [leader..., then the frame/box rectangles]** — or for a
+  GTOL, `[compartment rects..., shoulder, diagonal leader]`. A GTOL's frame is N
+  abutting 7.0 mm-tall rectangles (one per compartment); a datum tag's box is
+  **always the LAST 4 lines**, a 7.0 × 7.0 rectangle.
+
+COM geometry and the render agree to 0.1 mm on the position frame (COM: anchor
++0.0 left / +41.6 right / +0.0 up / −7.0 down; render: −2.6 / +41.6 / +0.1 /
+−7.1). The render's −2.6 mm on the left is the **leader shoulder**, which COM
+separates out as its own line — two independent methods, same answer, and the
+disagreement explained rather than averaged.
+
+**For an OVERFLOW gate, box a GTOL/datum by the bbox of ALL its lines** (frame +
+leader): GD&T carries `CollisionScope.NONE`, so the only question asked of it is
+"does this ink cross the border", and the leader is ink. Do NOT bother separating
+frame from leader for that. Separation matters only for the collapse gate below.
 
 **Ra symbol anatomy — `symbol_xy` is the leader's attachment point, NOT the
 centre.** Measured across three sheets, and matching the doc's "lower-left point of
@@ -203,3 +231,28 @@ A near-miss gap of ~1 mm is the tell. There is no `add_datum_feature` lever:
 datum FEATURE symbols are absent from `SetLeader3`'s support list (only datum
 TARGET symbols are), `IDatumTag::LeaderOrientation` is round-tags-only, and
 `SetDisplayStyle` sets shape, not attachment.
+
+**A LEADER-LENGTH gate on a datum tag is IMPOSSIBLE — measured, not assumed.**
+`IAnnotation::GetLeaderCount()` returns **0** for every `swDatumTag` (three
+tags, rocker-arm-support, 2026-07-16), while a `swGtol` on the same sheet
+returns **1**. So GTOLs expose leaders and datum tags do not — consistent with
+`IDatumTag` having no `GetLeaderCount` member in the type library at all. There
+is no leader to measure, so the proposed "fail a tag whose leader is shorter
+than X" gate cannot be built, and draw-D's ink-measured (1.05, 4.1) mm window
+can never be read back through COM. **I asserted this gate was "strictly better"
+and let a threshold get bounded for it before ever checking the premise** — the
+[[load-bearing-claims-need-a-repro]] failure, committed by the person who wrote
+that note down.
+
+**The replacement is better anyway: gate the DEFECT, not a proxy for it.**
+`IDatumTag::GetTriangleAtIndex` gives the attachment triangle's three vertices
+and the last 4 `GetLineAtIndex` lines give the box rectangle, so the actual
+defect — *the triangle is drawn inside its own box* — is a direct geometric
+test with **no threshold to calibrate**. Measured on the three rocker tags after
+the 93a7a29 fix, every triangle sits clear of its box (datum A's is 10 mm above
+it; datum B, the tightest correct tag, is 1.7 mm to the right of its box on a
+4.2 mm leader — matching draw-D's 4.1 mm ink reading). TRAP: do NOT test the
+triangle against the bbox of ALL the tag's lines — that bbox spans the leader,
+which by definition runs to the triangle, so it reports "inside" for a
+perfectly clean tag. The first cut of the probe did exactly this and called
+every tag defective.
