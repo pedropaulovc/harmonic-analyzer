@@ -46,9 +46,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "UOS, DIMENSIONS IN MM: LINEAR +/-0.25; ANGLES +/-0.5 DEG.",
-        "HOLE CENTRES +/-0.10; DRILLED DIAMETERS +/-0.10.",
-        "DEBURR; BREAK EDGES 0.2 MAX.",
         "GRAY IRON CASTING; MACHINE ALL SURFACES SHOWN.",
         "EAR HOLES: #8 CLEARANCE DRILL THRU, 2 PLACES, AT MID-HEIGHT;",
         "PASS THE #8-32 CLAMP SCREWS (TAPPED IN BACK ARC, MHA-106).",

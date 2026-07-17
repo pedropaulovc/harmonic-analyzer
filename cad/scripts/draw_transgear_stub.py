@@ -188,15 +188,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="gear seat finish",
         entity_type="SILHOUETTE",
     )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(_fx(BASE_DIA / 2.0), _fy(BASE_LEN / 2.0 - 1.5)),
-        symbol_xy=(_fx(BASE_DIA / 2.0) + 0.008, _fy(BASE_LEN / 2.0 - 1.5) + 0.004),
-        roughness_ra="3.2",
-        label="base bearing finish",
-        entity_type="SILHOUETTE",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.112)
 

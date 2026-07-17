@@ -20,8 +20,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "UOS, DIMENSIONS IN MM: DIAMETERS +/-0.05. DEBURR; BREAK EDGES 0.15 MAX; AVOID "
-        "BORE BELL-MOUTH.",
+        "AVOID BORE BELL-MOUTH.",
         "TURN OD/FACES IN ONE SETUP; DRILL 1/32 IN (0.794) BORE THRU; SLIP FIT ON TIP "
         "STUB.",
     )

@@ -133,8 +133,6 @@ async def build(adapter: Any) -> dict[str, str]:
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
     hole_bottom = (FRONT_CENTER[0], hole_center_y - WIRE_HOLE_DIA / 2000.0)
     hole_side = (FRONT_CENTER[0] + WIRE_HOLE_DIA / 2000.0, hole_center_y)
-    right_bottom = (RIGHT_CENTER[0], RIGHT_CENTER[1] - ROD_LENGTH / 2000.0)
-    right_top = (RIGHT_CENTER[0], RIGHT_CENTER[1] + ROD_LENGTH / 2000.0)
 
     add_edge_dimension(
         adapter,
@@ -200,18 +198,6 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="pen-rod slide face finish",
     )
-    for edge, y, label in (
-        (right_bottom, right_bottom[1] - 0.016, "bottom end finish"),
-        (right_top, right_top[1] + 0.016, "top end finish"),
-    ):
-        add_surface_finish(
-            adapter,
-            right,
-            edge_xy=edge,
-            symbol_xy=(RIGHT_CENTER[0] + 0.018, y),
-            roughness_ra="3.2",
-            label=label,
-        )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.058)
     add_property_linked_note(adapter, "Top View Note", 0.036, 0.266)

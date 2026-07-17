@@ -166,18 +166,6 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="fulcrum bearing finish",
     )
-    for edge, x, label in (
-        (left_end, left_end[0] - 0.020, "left end finish"),
-        (right_end, right_end[0] + 0.020, "right end finish"),
-    ):
-        add_surface_finish(
-            adapter,
-            right,
-            edge_xy=edge,
-            symbol_xy=(x, 0.218),
-            roughness_ra="3.2",
-            label=label,
-        )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.108)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)

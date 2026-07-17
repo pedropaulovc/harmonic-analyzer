@@ -222,7 +222,6 @@ async def build(adapter: Any) -> dict[str, str]:
     seat_y = _front_y(0.0) + fdy
     seat_half_x = (STUD_DIA / 2.0 + WASHER_DIA / 2.0) / 2.0 * _S
     seat_right = (FRONT_CENTER[0] + fdx + seat_half_x, seat_y)
-    seat_left = (FRONT_CENTER[0] + fdx - seat_half_x, seat_y)
     crown_flat = (FRONT_CENTER[0] + fdx, _front_y(BODY_TOP) + fdy)
     _diag = 2.0 ** -0.5
     body_circle = (
@@ -260,14 +259,6 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.05",
         datums=("A",),
         label="clamp seat perpendicularity",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=seat_left,
-        symbol_xy=(seat_left[0] - 0.028, seat_y - 0.038),
-        roughness_ra="3.2",
-        label="washer clamp seat finish",
     )
     add_surface_finish(
         adapter,

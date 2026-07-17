@@ -182,30 +182,6 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="bushing bore finish",
     )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=outer_edge,
-        symbol_xy=(0.140, 0.165),
-        roughness_ra="3.2",
-        label="bushing OD finish",
-    )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=left_end,
-        symbol_xy=(left_end[0] - 0.030, 0.245),
-        roughness_ra="3.2",
-        label="bushing datum end-face finish",
-    )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=right_end,
-        symbol_xy=(right_end[0] + 0.025, 0.225),
-        roughness_ra="3.2",
-        label="bushing opposite end-face finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.095)
     return await finalize_drawing(

@@ -31,7 +31,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -247,15 +246,6 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.10",
         datums=("A",),
         label="mating-face parallelism",
-    )
-    bore_45 = BORE_RADIUS / 2.0**0.5
-    add_surface_finish(
-        adapter,
-        top,
-        edge_xy=(_plan_x(bore_45), TOP_CENTER[1] - bore_45 * _M),
-        symbol_xy=(0.138, 0.162),
-        roughness_ra="3.2",
-        label="column-relief bore finish",
     )
     add_native_hole_callout(
         adapter,

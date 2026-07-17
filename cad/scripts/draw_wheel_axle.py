@@ -315,18 +315,6 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="stud bearing finish",
     )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=_find_edge(
-            adapter, front,
-            fpt(FRONT_CENTER[0] - FLANGE_DIA / 4.0 * _K, _front_y(0.0)),
-            axis="y", label="flange face finish pick",
-        ),
-        symbol_xy=fpt(FRONT_CENTER[0] - 0.058, _front_y(0.0) - 0.018),
-        roughness_ra="3.2",
-        label="flange seating-face finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.048)
 

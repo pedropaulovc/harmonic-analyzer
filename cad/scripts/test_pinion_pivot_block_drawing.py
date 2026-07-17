@@ -56,8 +56,10 @@ def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> 
     assert "#19 DRILL THRU" in notes
     assert "1/4 IN REAM THRU" in notes
     assert "1/4 IN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
-    assert "LINEAR +/-0.25" in notes
-    assert "HOLE CENTRES +/-0.10" in notes
+    # General tolerances live in the title block ONLY -- a second general
+    # tolerance in the notes would conflict with it.
+    assert "LINEAR +/-" not in notes
+    assert "HOLE CENTRES" not in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series.
     assert "BA" not in notes

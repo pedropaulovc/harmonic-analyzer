@@ -29,7 +29,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -261,15 +260,6 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.094, 0.198),
         label="guide-lock screw holes",
     )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=(DATUM_FACE_X, RIGHT_CENTER[1] + 0.030),
-        symbol_xy=(0.252, 0.180),
-        roughness_ra="3.2",
-        label="rail-mating face finish",
-    )
-
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.160)
 

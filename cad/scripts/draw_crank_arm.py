@@ -271,11 +271,14 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="crank broad-face parallelism",
     )
+    # Placed LEFT of the front view, below the top view's lower edge (0.189):
+    # the symbol used to sit at (0.140, 0.235), above the top view, so its
+    # leader ran diagonally down through the whole top view to reach this bore.
     add_surface_finish(
         adapter,
         front,
         edge_xy=shaft_edge,
-        symbol_xy=(0.140, 0.235),
+        symbol_xy=(0.040, 0.170),
         roughness_ra="1.6",
         label="shaft bore finish",
     )

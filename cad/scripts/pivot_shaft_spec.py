@@ -18,8 +18,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # note carries just the finishing requirements.
 DRAWING_NOTES = "\n".join(
     (
-        "UOS, DIMENSIONS IN MM: DEBURR; BREAK ENDS 0.15 MAX; CENTRE MARKS "
-        "1.0 DEEP MAX.",
+        "CENTRE MARKS 1.0 DEEP MAX.",
         "TURN OR CENTRELESS-GRIND FULL BEARING LENGTH; NO FLATS OR STEPS.",
     )
 )

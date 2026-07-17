@@ -21,8 +21,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "UOS, DIMENSIONS IN MM: DIAMETERS +/-0.05, LENGTHS +/-0.25. DEBURR; "
-        "BREAK EDGES 0.15 MAX.",
         "TURN COMPLETE IN ONE SETUP; STUD OD IS THE WHEEL BEARING SURFACE -- "
         "NO TOOL MARKS OR STEPS.",
     )

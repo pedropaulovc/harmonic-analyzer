@@ -14,7 +14,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
     add_edge_dimension,
     curate_view_dimensions,
     finalize_drawing,
@@ -198,18 +197,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("C",),
         label="crossbar end-seat parallelism",
     )
-    for edge, y, label in (
-        (lower_end, 0.165, "lower end-seat finish"),
-        (upper_end, 0.245, "upper end-seat finish"),
-    ):
-        add_surface_finish(
-            adapter,
-            top,
-            edge_xy=edge,
-            symbol_xy=(0.175, y),
-            roughness_ra="3.2",
-            label=label,
-        )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.090)
     add_property_linked_note(adapter, "Top View Note", 0.045, 0.155)
     add_native_hole_callout(

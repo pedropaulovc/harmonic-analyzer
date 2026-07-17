@@ -52,8 +52,10 @@ def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> 
     assert "3/8 IN" in drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
     assert "15/64 DRILL THRU" in notes
     assert "#14 DRILL" in notes
-    assert "LINEAR +/-0.25" in notes
-    assert "HOLE CENTRES +/-0.10" in notes
+    # General tolerances live in the title block ONLY -- a second general
+    # tolerance in the notes would conflict with it.
+    assert "LINEAR +/-" not in notes
+    assert "HOLE CENTRES" not in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series.
     assert "BA" not in notes
@@ -88,7 +90,13 @@ def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
     assert common.index("SetFrameSymbols2") < common.index("ConvertFormat()")
     assert "if not migrated and not frame.SetSymbolXml(xml)" in common
     assert "annotation.SetAttachedEntities(dispatch_array([edge]))" in common
-    assert "gtol.SetLeader(True, 0, False, False)" in common
+    # Bent, not straight: a straight leader runs at whatever angle the
+    # anchor-to-frame vector takes, which is what drove the Ra symbol's leader
+    # across two views. IGtol::SetLeader cannot ask for bent, so the recipe goes
+    # through IAnnotation::SetLeader3 and checks its int status (0 == set).
+    assert "annotation.SetLeader3(" in common
+    assert "_LEADER_BENT," in common
+    assert "gtol.SetLeader(True, 0, False, False)" not in common
     assert "not bool(gtol.IsAttached())" in common
     assert "int(gtol.GetLeaderCount()) != 1" in common
 

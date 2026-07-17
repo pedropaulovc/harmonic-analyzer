@@ -144,10 +144,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bushing side-view axis centerline",
     )
 
-    outer_edge = (
-        END_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 2000.0,
-        END_CENTER[1],
-    )
     outer_top = (
         END_CENTER[0],
         END_CENTER[1] + OUTER_DIA * SHEET_SCALE[0] / 2000.0,
@@ -202,30 +198,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.148, 0.234),
         roughness_ra="1.6",
         label="bushing bore finish",
-    )
-    add_surface_finish(
-        adapter,
-        end,
-        edge_xy=outer_edge,
-        symbol_xy=(0.128, 0.158),
-        roughness_ra="3.2",
-        label="bushing OD finish",
-    )
-    add_surface_finish(
-        adapter,
-        side,
-        edge_xy=bottom_end,
-        symbol_xy=(0.222, 0.156),
-        roughness_ra="3.2",
-        label="bushing datum end-face finish",
-    )
-    add_surface_finish(
-        adapter,
-        side,
-        edge_xy=(top_end[0] + 0.015, top_end[1]),
-        symbol_xy=(0.250, 0.208),
-        roughness_ra="3.2",
-        label="bushing opposite end-face finish",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.022, 0.095)

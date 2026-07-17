@@ -28,7 +28,6 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
@@ -242,15 +241,6 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="4X",
         label="support hole-pattern position",
     )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=datum_a_edge,
-        symbol_xy=(0.225, 0.145),
-        roughness_ra="3.2",
-        label="support mounting-seat finish",
-    )
-
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
 
     return await finalize_drawing(

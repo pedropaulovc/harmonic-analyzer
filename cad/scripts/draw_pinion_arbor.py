@@ -3,7 +3,6 @@ r"""Create the curated machinist drawing for the alignment-pinion arbor."""
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -140,18 +139,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Screen-right in *Right is model -Z: the flat front tip (z 0) lands on the
     # RIGHT end of the side view, the crowned back end on the LEFT.
-    crown_end = (RIGHT_CENTER[0] - OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
     flat_end = (RIGHT_CENTER[0] + OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
-    # The crown apex is a vertical-tangent point on the view outline boundary,
-    # where an edge pick can miss; pick the arc 0.5 mm off-apex instead -- an
-    # exact on-curve point (half-width sqrt(2*R*d - d^2)) well clear of the
-    # shaft silhouette line.
-    crown_pick_dz = 0.5
-    crown_arc = (
-        crown_end[0] + crown_pick_dz / 1000.0,
-        RIGHT_CENTER[1]
-        + math.sqrt(2.0 * CAP_R * crown_pick_dz - crown_pick_dz**2) / 1000.0,
-    )
     add_datum_feature(
         adapter,
         front,
@@ -188,24 +176,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(RIGHT_CENTER[0], 0.245),
         roughness_ra="1.6",
         label="arbor bearing finish",
-    )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=flat_end,
-        symbol_xy=(flat_end[0] + 0.020, 0.218),
-        roughness_ra="3.2",
-        label="front tip finish",
-    )
-    # Below-left of the crown: the symbol text grows RIGHT of its anchor, so an
-    # above-left anchor would land it on the sag dimension's SR callout text.
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=crown_arc,
-        symbol_xy=(crown_end[0] - 0.030, 0.162),
-        roughness_ra="3.2",
-        label="back crown finish",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.108)

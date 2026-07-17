@@ -177,14 +177,6 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="lift rod bearing finish",
     )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=flat_end,
-        symbol_xy=(flat_end[0] + 0.020, 0.218),
-        roughness_ra="3.2",
-        label="front end finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.108)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)

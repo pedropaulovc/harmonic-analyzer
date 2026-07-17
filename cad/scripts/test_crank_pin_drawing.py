@@ -46,7 +46,8 @@ def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
 
 def test_linked_notes_define_remaining_pin_operations() -> None:
     notes = crank_pin_spec.DRAWING_NOTES
-    assert "DEBURR" in notes
+    # Deburr/edge-break is a title-block note; repeating it here would duplicate it.
+    assert "DEBURR" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source

@@ -50,7 +50,8 @@ def test_stud_callout_keeps_wheel_bore_running_clearance() -> None:
     assert round(clearance_min, 2) == 0.02
     assert round(clearance_max, 2) == 0.05
     notes = wheel_axle_spec.DRAWING_NOTES
-    assert "DEBURR" in notes
+    # Deburr/edge-break is a title-block note; repeating it here would duplicate it.
+    assert "DEBURR" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -63,7 +64,7 @@ def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert source.count("characteristic=\"perpendicularity\"") == 1
     assert source.count("characteristic=\"circular_runout\"") == 1
-    assert source.count("add_surface_finish(") == 2
+    assert source.count("add_surface_finish(") == 1
 
 
 def test_view_scales_are_explicit() -> None:

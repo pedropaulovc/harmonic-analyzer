@@ -63,8 +63,10 @@ def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> 
     assert "#8 CLEARANCE" in notes
     assert "#8-32" in notes
     assert "MHA-106" in notes  # the mating back arc the pair is bored with
-    assert "LINEAR +/-0.25" in notes
-    assert "HOLE CENTRES +/-0.10" in notes
+    # General tolerances live in the title block ONLY -- a second general
+    # tolerance in the notes would conflict with it.
+    assert "LINEAR +/-" not in notes
+    assert "HOLE CENTRES" not in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series ("BACK ARC" is not a BA thread).
     assert "0BA" not in notes and "2BA" not in notes and "4BA" not in notes
@@ -87,7 +89,6 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source
     assert "quantity=\"2X\"" in source  # both ear holes under one FCF
-    assert "add_surface_finish(" in source
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

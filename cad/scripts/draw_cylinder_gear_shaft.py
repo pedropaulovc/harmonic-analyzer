@@ -220,21 +220,6 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="arbor bearing finish",
     )
-    # The left-end symbol sits BELOW the view: at the above-the-view spot its
-    # leader would cross the long Ra/cylindricity leaders converging on the
-    # nearby end view (pivot-shaft machinist-review finding).
-    for edge, xy, label in (
-        (left_end, (left_end[0] - 0.018, 0.155), "left end finish"),
-        (right_end, (right_end[0] + 0.020, 0.218), "right end finish"),
-    ):
-        add_surface_finish(
-            adapter,
-            profile,
-            edge_xy=edge,
-            symbol_xy=xy,
-            roughness_ra="3.2",
-            label=label,
-        )
 
     # 0.020, not 0.014 -- the border rule sits at ~0.016, so a note anchored
     # at 0.014 starts its first character on the frame line.

@@ -143,10 +143,6 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0] + outer_r * diag,
         FRONT_CENTER[1] + outer_r * diag,
     )
-    outer_edge_lower = (
-        FRONT_CENTER[0] + outer_r * diag,
-        FRONT_CENTER[1] - outer_r * diag,
-    )
     bore_edge = (
         FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
         FRONT_CENTER[1],
@@ -201,30 +197,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.160, 0.225),
         roughness_ra="1.6",
         label="bushing bore finish",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=outer_edge_lower,
-        symbol_xy=(0.140, 0.165),
-        roughness_ra="3.2",
-        label="bushing OD finish",
-    )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=left_end,
-        symbol_xy=(left_end[0] - 0.030, 0.245),
-        roughness_ra="3.2",
-        label="bushing datum end-face finish",
-    )
-    add_surface_finish(
-        adapter,
-        right,
-        edge_xy=right_end,
-        symbol_xy=(right_end[0] + 0.025, 0.225),
-        roughness_ra="3.2",
-        label="bushing opposite end-face finish",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.095)
