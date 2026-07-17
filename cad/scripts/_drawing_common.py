@@ -1588,6 +1588,11 @@ def _min_angular_gap(ring_radius: float, balloon_radius: float, *, clearance: fl
     return (2.0 * math.sqrt(2.0) * balloon_radius + clearance) / ring_radius
 
 
+def _wrap_angle(angle: float) -> float:
+    """Fold ``angle`` back into ``(-pi, pi]`` -- the range ``atan2`` returns."""
+    return (angle + math.pi) % (2.0 * math.pi) - math.pi
+
+
 def _push_apart_on_ring(
     angles: list[float], *, min_gap: float, iterations: int = 400
 ) -> list[float]:
@@ -1617,24 +1622,52 @@ def _push_apart_on_ring(
     (``n * min_gap > 2*pi``); packing them tighter than their own circles would
     trade this function's crossings for overlaps, which is the trade the pure-
     radial experiment already lost.
+
+    **Seam-safe.** Angles are a circular quantity, so the isotonic solver must
+    run on a LINEAR run that never crosses the +-pi seam. The occupied
+    attachments always leave one largest angular gap; unwrapping the run to
+    START just after that gap places the seam inside empty space, where a linear
+    chain is exact. Without this, a cluster straddling +-pi (attachments on the
+    LEFT of the view) reads as two far-apart sub-runs, the solver under-separates
+    them, and the wrap-around re-centre below -- an ORDINARY average of the two
+    endpoints -- lands on the OPPOSITE side of the view, hauling every leader
+    across the model (Codex #3605056589: ``[-3.10, 3.10]`` -> ``[-0.4, 0.0]``).
     """
     count = len(angles)
     if count < 2:
         return list(angles)
+    two_pi = 2.0 * math.pi
     span_needed = count * min_gap
-    if span_needed > 2.0 * math.pi:
+    if span_needed > two_pi:
         _telemetry.warn(
             f"balloon spread: {count} balloons need {span_needed:.2f} rad of "
-            f"ring but only {2.0 * math.pi:.2f} is available -- falling back to "
+            f"ring but only {two_pi:.2f} is available -- falling back to "
             "even spacing (leaders may run long)"
         )
         start = angles[0]
-        return [start + 2.0 * math.pi * i / count for i in range(count)]
+        return [start + two_pi * i / count for i in range(count)]
+
+    # Unwrap around the LARGEST gap: sort by angle, find the widest gap between
+    # cyclically-adjacent attachments, and read the run off as a single strictly
+    # increasing sequence starting just after it. The seam then falls in that
+    # empty gap, so nothing below straddles +-pi.
+    order = sorted(range(count), key=lambda i: angles[i])
+    ordered = [angles[i] for i in order]
+    gaps = [(ordered[(j + 1) % count] - ordered[j]) % two_pi for j in range(count)]
+    cut = max(range(count), key=lambda j: gaps[j])
+    run_index = [order[(cut + 1 + step) % count] for step in range(count)]
+    base = angles[run_index[0]]
+    run = []
+    for i in run_index:
+        value = angles[i]
+        while value < base - 1e-12:
+            value += two_pi
+        run.append(value)
 
     # Blocks of (weighted mean, weight) merged while the previous block outranks
     # the next -- the pool-adjacent-violators algorithm.
     blocks: list[list[float]] = []
-    for index, angle in enumerate(angles):
+    for index, angle in enumerate(run):
         blocks.append([angle - index * min_gap, 1.0])
         while len(blocks) >= 2 and blocks[-2][0] > blocks[-1][0] - 1e-15:
             value_b, weight_b = blocks.pop()
@@ -1649,13 +1682,19 @@ def _push_apart_on_ring(
     spread = [value + i * min_gap for i, value in enumerate(fitted)]
 
     # The wrap-around pair (last -> first) is the one constraint the linear chain
-    # cannot see. With the whole run compressed into span_needed <= 2*pi there is
-    # room by construction; centre the run in the slack if it still bites.
-    if (spread[0] + 2.0 * math.pi) - spread[-1] < min_gap:
+    # cannot see. Unwrapping put the widest gap at the seam, so there is room by
+    # construction unless the run fills nearly the whole ring; then centre it in
+    # the slack. The endpoints share one linear frame now, so their average is
+    # the true midpoint -- no seam to jump.
+    if (spread[0] + two_pi) - spread[-1] < min_gap:
         centre = (spread[0] + spread[-1]) / 2.0
         start = centre - span_needed / 2.0
         spread = [start + i * min_gap for i in range(count)]
-    return spread
+
+    result = [0.0] * count
+    for step, i in enumerate(run_index):
+        result[i] = _wrap_angle(spread[step])
+    return result
 
 
 def _spread_balloons(

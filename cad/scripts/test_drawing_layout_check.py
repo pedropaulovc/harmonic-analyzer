@@ -972,6 +972,58 @@ def test_push_apart_actually_separates_to_the_gap():
     assert (out[0] + 2.0 * _math.pi) - out[-1] >= gap - 1e-9
 
 
+def _cyclic_order_preserved(inp, out):
+    """``out`` traces the same cyclic order round the ring as ``inp``.
+
+    Balloons cannot cross iff their ring order is a rotation of their
+    attachments' angular order, so this -- not strict linear monotonicity -- is
+    the property to check across the +-pi seam.
+    """
+    n = len(inp)
+    in_order = sorted(range(n), key=lambda i: inp[i])
+    out_order = sorted(range(n), key=lambda i: out[i])
+    doubled = in_order + in_order
+    return any(doubled[k : k + n] == out_order for k in range(n))
+
+
+def test_push_apart_keeps_a_seam_straddling_cluster_at_the_seam():
+    """Codex #3605056589: attachments straddling +-pi must stay near the seam.
+
+    ``[-3.10, 3.10]`` are 0.083 rad apart THROUGH the seam (both left of the
+    view), not 6.20 apart. The buggy predecessor solved them in raw-sorted
+    linear space -- under-separated, then re-centred on the ORDINARY average of
+    the endpoints (~0), flipping both to ``[-0.4, 0.0]`` on the RIGHT of the
+    view and hauling their leaders across the model. The unwrap-around-the-
+    largest-gap frame must instead separate them to the gap AT the seam.
+    """
+    angles = [-3.10, 3.10]
+    gap = 0.4
+    out = drawing_common._push_apart_on_ring(angles, min_gap=gap)
+    # Separated to the gap, measured cyclically (the pair spans the seam).
+    cyclic = [(b - a) % (2.0 * _math.pi) for a, b in zip(out, out[1:])]
+    cyclic.append((out[0] - out[-1]) % (2.0 * _math.pi))
+    assert min(cyclic) >= gap - 1e-9, f"seam pair not separated: {out}"
+    # Still near +-pi (left of the view), NOT flipped to angle ~0 (right).
+    for angle in out:
+        assert abs(abs(angle) - _math.pi) < 0.3, f"balloon flipped off the seam: {out}"
+    assert _cyclic_order_preserved(angles, out)
+
+
+def test_push_apart_never_reorders_across_the_seam():
+    """The no-crossing property, checked cyclically for a left-clustered view.
+
+    A run whose attachments sit on the left (values near +-pi with the empty gap
+    on the RIGHT) must come back in the same cyclic order -- the unwrap frame
+    must not shuffle indices when it rotates the run off the seam.
+    """
+    angles = sorted([-3.0, -2.8, -2.6, 2.7, 2.9, 3.05])
+    out = drawing_common._push_apart_on_ring(angles, min_gap=0.35)
+    assert _cyclic_order_preserved(angles, out), f"seam run reordered: {out}"
+    cyclic = [(b - a) % (2.0 * _math.pi) for a, b in zip(sorted(out), sorted(out)[1:])]
+    cyclic.append((min(out) + 2.0 * _math.pi) - max(out))
+    assert min(cyclic) >= 0.35 - 1e-9, f"seam run not separated: {out}"
+
+
 def test_push_apart_leaves_already_separated_angles_alone():
     """Minimum movement: balloons that already clear must not be herded."""
     angles = [0.0, 1.0, 2.0, 3.0]
