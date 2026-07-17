@@ -2311,9 +2311,9 @@ def _datum_leader_segments(
 
 
 def _display_dimension_leader_segments(
-    adapter: Any, annotation: Any, view: Any, *, label: str, owner: str
+    adapter: Any, annotation: Any, *, label: str, owner: str
 ) -> list[LeaderSegment]:
-    """A HOLE CALLOUT's leader, which ``_leader_segments_of`` structurally cannot see.
+    """A HOLE CALLOUT's ACTUAL leader lines, which ``_leader_segments_of`` cannot see.
 
     The same blind spot as :func:`_datum_leader_segments`, one annotation type
     over. A native hole callout is an ``IDisplayDimension`` whose leader was NOT
@@ -2322,18 +2322,22 @@ def _display_dimension_leader_segments(
     ``CollisionScope.NONE`` and never overlap-checked. So a callout whose offset
     text is routed across a neighbouring view escapes BOTH audits (codex
     #3605215320), and it is not hypothetical: pen-rod's callout text sits at
-    sheet (0.104, 0.222), OUTSIDE its owning view (x 0.062..0.078), so its leader
-    already exits the view.
+    sheet (0.104, 0.222), OUTSIDE its owning view (x 0.062..0.078).
 
-    ``IDisplayDimension`` exposes no ``GetLineAtIndex`` (unlike ``IDatumTag``),
-    but the leader's two ends ARE readable: the TEXT end is the annotation's
-    ``GetPosition`` (sheet space), and the ATTACHMENT end is the dimension's
-    first ``IDimension`` reference point -- a MODEL-space ``IMathPoint`` that
-    projects to sheet space through the view's ``ModelToViewTransform`` (probed:
-    model (0, 0.115, 0) -> sheet (0.070, 0.205), landing inside the view). Only
-    hole callouts get a leader here; a plain linear/radius dimension keeps its
-    text on the dimension line between its witness lines, not at the end of a
-    free leader across the sheet.
+    Read the REAL rendered ink, not a reconstruction. ``_pin_dimension_text_and_
+    leader_style`` forces every dimension to ``swBrokenLeaderHorizontalText``, so
+    the leader is BENT -- a sloped run from the arrow up to an elbow, then a
+    horizontal shoulder to the text. A straight attachment->text chord misses
+    that elbow: it can fail a clean print or miss a real crossing when the bent
+    route and the chord fall on opposite sides of a view (codex #3605558274).
+    ``IDisplayDimension::GetDisplayData`` hands back the actual per-primitive
+    geometry -- the display-dimension analog of ``IDatumTag::GetLineAtIndex`` --
+    in SHEET space (probed on RD3: 3 lines, stub (0.069,0.204)->(0.071,0.206),
+    slope ->(0.084,0.219), shoulder ->(0.123,0.219); the shoulder runs PAST the
+    text at x=0.104, ground the chord never covered). Every line is leader ink
+    that can cross a view; a hole callout has no witness/box lines to exclude.
+    Only hole callouts get a leader here -- a plain linear/radius dimension keeps
+    its text on the dimension line between its witness lines.
     """
     display = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
@@ -2341,41 +2345,32 @@ def _display_dimension_leader_segments(
     if display is None:
         return []
     display = _sw_type_info.early_bound_or_flag(
-        display, "IDisplayDimension", "IsHoleCallout", "GetDimension"
+        display, "IDisplayDimension", "IsHoleCallout", "GetDisplayData"
     )
     if not adapter._attempt(lambda: display.IsHoleCallout()):
         return []
-    text = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetPosition")
-    )
-    dim = adapter._attempt(lambda: display.GetDimension())
-    transform = adapter._attempt(
-        lambda: adapter._get_attr_or_call(view, "ModelToViewTransform")
-    )
-    references = (
-        adapter._attempt(lambda: dim.ReferencePoints) if dim is not None else None
-    )
-    if not text or transform is None or not references:
+    data = adapter._attempt(lambda: display.GetDisplayData())
+    if data is None:
         return []
-    # Reference point 1 is the callout's attachment (the hole edge); three are
-    # always returned (linear uses 1 and 2, angular adds the vertex as 3). Project
-    # it from model space to the sheet through the view transform.
-    projected = adapter._attempt(lambda: references[0].MultiplyTransform(transform))
-    data = (
-        adapter._attempt(lambda: projected.ArrayData)
-        if projected is not None
-        else None
+    data = _sw_type_info.early_bound_or_flag(
+        data, "IDisplayData", "GetLineCount", "GetLineAtIndex2"
     )
-    if not data or len(data) < 2:
-        return []
-    return [
-        LeaderSegment(
-            label, "dim",
-            float(data[0]), float(data[1]),
-            float(text[0]), float(text[1]),
-            owner,
+    count = int(adapter._attempt(lambda: data.GetLineCount(), default=0) or 0)
+    segments: list[LeaderSegment] = []
+    for index in range(count):
+        raw = adapter._attempt(lambda i=index: data.GetLineAtIndex2(i))
+        if not raw or len(raw) < 10:
+            continue
+        # GetLineAtIndex2 -> [color, lineType, _, _, startPt[3], endPt[3]].
+        values = [float(v) for v in raw]
+        segments.append(
+            LeaderSegment(
+                label, "dim",
+                values[4], values[5], values[7], values[8],
+                owner,
+            )
         )
-    ]
+    return segments
 
 
 def _leader_segments_of(
@@ -2504,8 +2499,7 @@ def collect_layout_elements(
             if element.kind == "dim":
                 leaders.extend(
                     _display_dimension_leader_segments(
-                        adapter, annotation, view,
-                        label=element.label, owner=name,
+                        adapter, annotation, label=element.label, owner=name,
                     )
                 )
             # A SMALL note centered inside its owning view is a hole tag / balloon

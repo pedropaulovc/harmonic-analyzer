@@ -516,29 +516,25 @@ def test_datum_tag_leader_is_collected_even_though_it_registers_none():
     assert (segs[0].x1, segs[0].y1) == pytest.approx((ax, ay))
 
 
-def _hole_callout(text_xy, model_attach, sheet_attach, *, is_callout=True):
-    """A fake native hole callout as probed on pen-rod (RD3).
-
-    GetLeaderCount()==0 (no SetLeader3 leader); the attachment is an IDimension
-    reference point in MODEL space that projects to ``sheet_attach`` through the
-    view's ModelToViewTransform (fake: MultiplyTransform returns the projection).
+def _hole_callout(lines, *, is_callout=True):
+    """A fake native hole callout. ``lines`` are (start_xy, end_xy) SHEET-space
+    leader segments, returned as IDisplayData.GetLineAtIndex2 does:
+    ``[color, lineType, _, _, startPt[3], endPt[3]]``. GetLeaderCount()==0 (no
+    SetLeader3 leader) -- the geometry is read from GetDisplayData instead.
     """
-    projected = SimpleNamespace(ArrayData=[*sheet_attach, 0.0])
-    ref0 = SimpleNamespace(
-        ArrayData=[*model_attach, 0.0],
-        MultiplyTransform=lambda _x: projected,
+    def _line(index):
+        (sx, sy), (ex, ey) = lines[index]
+        return [0.0, 0.0, 0.0, 0.0, sx, sy, 0.0, ex, ey, 0.0]
+
+    data = SimpleNamespace(
+        GetLineCount=lambda: len(lines),
+        GetLineAtIndex2=_line,
     )
-    origin = SimpleNamespace(
-        ArrayData=[0.0, 0.0, 0.0],
-        MultiplyTransform=lambda _x: SimpleNamespace(ArrayData=[0.0, 0.0, 0.0]),
-    )
-    dim = SimpleNamespace(ReferencePoints=[ref0, ref0, origin])
     display = SimpleNamespace(
         IsHoleCallout=lambda: is_callout,
-        GetDimension=lambda: dim,
+        GetDisplayData=lambda: data,
     )
     return SimpleNamespace(
-        GetPosition=[*text_xy, 0.0],
         GetType=lambda: drawing_common._ANNOT_DIM,
         GetName=lambda: "RD3",
         GetLeaderCount=lambda: 0,             # the whole point: registers none
@@ -546,36 +542,40 @@ def _hole_callout(text_xy, model_attach, sheet_attach, *, is_callout=True):
     )
 
 
-def test_hole_callout_leader_is_collected_even_though_it_registers_none():
+def test_hole_callout_leader_reads_the_true_bent_geometry():
     """pen-rod's RD3 as probed: IsHoleCallout, GetLeaderCount()==0.
 
-    _leader_segments_of returns nothing (no registered leader), so the callout's
-    offset-text leader was invisible to the crossing audit. Reconstruct it from
-    the text position and the model->sheet-projected attachment (codex
-    #3605215320): model (0, 0.115) -> sheet (0.070, 0.205), text at (0.104,
-    0.222).
+    _leader_segments_of returns nothing (no registered leader). The leader is a
+    BROKEN leader (swBrokenLeaderHorizontalText), so a straight attachment->text
+    chord would miss the elbow (codex #3605558274). GetDisplayData hands back the
+    real per-primitive ink in sheet space: stub, sloped run, horizontal shoulder.
     """
-    view = SimpleNamespace(ModelToViewTransform=object())
-    ann = _hole_callout((0.104, 0.222), (0.0, 0.115), (0.070, 0.205))
+    lines = [
+        ((0.0707, 0.20571), (0.08389, 0.2192)),   # sloped run up to the elbow
+        ((0.0693, 0.20429), (0.0707, 0.20571)),   # stub at the hole
+        ((0.08389, 0.2192), (0.12252, 0.2192)),   # horizontal shoulder past text
+    ]
+    ann = _hole_callout(lines)
 
     segs = drawing_common._display_dimension_leader_segments(
-        _FakeAdapter(None), ann, view, label="RD3", owner="Front")
+        _FakeAdapter(None), ann, label="RD3", owner="Front")
 
-    assert len(segs) == 1
-    assert (segs[0].x0, segs[0].y0) == pytest.approx((0.070, 0.205))  # attachment
-    assert (segs[0].x1, segs[0].y1) == pytest.approx((0.104, 0.222))  # text
-    assert segs[0].kind == "dim"
+    assert len(segs) == 3
+    assert all(s.kind == "dim" for s in segs)
+    assert (segs[2].x0, segs[2].y0, segs[2].x1, segs[2].y1) == pytest.approx(
+        (0.08389, 0.2192, 0.12252, 0.2192))
+    # The shoulder reaches x=0.12252, PAST the text at 0.104 -- ground a straight
+    # attachment->text chord never covered, so the chord could miss a crossing.
+    assert max(s.x1 for s in segs) == pytest.approx(0.12252)
 
 
 def test_plain_dimension_contributes_no_leader():
     """A non-callout display dimension keeps its text on the dimension line, not
     at the end of a free leader -- so it must yield NO leader segment (else every
     linear/radius dimension would spray phantom leaders across the audit)."""
-    view = SimpleNamespace(ModelToViewTransform=object())
-    ann = _hole_callout((0.104, 0.222), (0.0, 0.115), (0.070, 0.205),
-                        is_callout=False)
+    ann = _hole_callout([((0.0, 0.0), (0.1, 0.1))], is_callout=False)
     segs = drawing_common._display_dimension_leader_segments(
-        _FakeAdapter(None), ann, view, label="Length", owner="Front")
+        _FakeAdapter(None), ann, label="Length", owner="Front")
     assert segs == []
 
 
