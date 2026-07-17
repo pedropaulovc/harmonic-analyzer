@@ -72,6 +72,15 @@ target UP-RIGHT strikes the leader through the symbol's own text (needs slope
 anchor — always clean. The pick height, not the symbol position, is the cheap
 knob.
 
+**A Ø dimension OCCUPIES TWO clock positions on the circle, not one.** SolidWorks
+renders a diametral dimension as a LINE ACROSS THE FULL CIRCLE with an arrowhead
+at each end (the leader continues out of the far side to the text). That line
+through the bore is CORRECT ASME rendering, NOT a leader striking through the
+feature — it looks exactly like the defect and nearly cost a "fix" to correct
+geometry. Consequence when placing anything else on that circle: two antipodal
+points are already taken (e.g. 49 deg and 229 deg), so the free quadrants are
+what is left. Budget them before adding a datum tag or Ra symbol.
+
 **A datum feature symbol is not freely placeable — the ATTACHED ENTITY decides.**
 `IAnnotation::SetPosition2` sets "the point where the leader hits the symbol",
 and its Remarks restrict a symbol on an edge to "along that edge or extensions of
@@ -81,7 +90,18 @@ the circumference, so the tag re-attaches at the circle point NEAREST the symbol
 and prints on the geometry — regardless of the circle's SIZE. Fix a stuck tag by
 picking the circle at the clock position you want (`edge_xy=bore_top` with the
 symbol above — the `draw_pivot_bushing.py` spelling), or by attaching to a
-straight flank in a side view instead. There is no `add_datum_feature` lever:
+straight flank in a side view instead. Two signatures of a mis-picked clock
+position, both measured 2026-07-16 and both INVISIBLE to every gate (a datum
+symbol exposes no `GetExtent`, so it is `CollisionScope.NONE`):
+- **inert `symbol_xy`** — picked at 3 o'clock with the symbol at 12, the tag
+  collapses onto the circle and the requested standoff is discarded (pivot-shaft:
+  17.6 mm requested, 1.05 mm rendered — too little for the ~3 mm attachment
+  triangle, which then overlapped its own box and struck through the "A").
+- **stacked arrowheads** — a symbol placed toward a Ø dimension's arrow resolves
+  to that same circle point (pinion-pivot-block: datum B at 49.4 deg vs the
+  diameter arrow at 49.3 deg, 0.90 mm apart), so two arrowheads print on one
+  spot and the box straddles the diameter line.
+A near-miss gap of ~1 mm is the tell. There is no `add_datum_feature` lever:
 datum FEATURE symbols are absent from `SetLeader3`'s support list (only datum
 TARGET symbols are), `IDatumTag::LeaderOrientation` is round-tags-only, and
 `SetDisplayStyle` sets shape, not attachment.
