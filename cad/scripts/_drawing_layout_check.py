@@ -289,8 +289,20 @@ def find_leader_crossings(
     driven across a NEIGHBOURING view (the real, repeated defect) and does not
     attempt to judge a leader's path within its own view -- that needs real
     geometry, and a wrong call there would be worse than no call.
+
+    PICTORIAL views are skipped, for exactly the reason ``_view_scope`` already
+    gives them ``CollisionScope.NONE``: an isometric view's axis-aligned outline
+    is mostly EMPTY diagonal space, so its box is not evidence of ink.  Judging
+    leaders against it would fail a leader that merely clips an empty corner --
+    re-introducing, in this audit, the false positive the overlap audit
+    deliberately avoids.  Keying on ``kind == "view"`` alone is what let that in
+    (codex #334).
     """
-    views = [element for element in elements if element.kind == "view"]
+    views = [
+        element
+        for element in elements
+        if element.kind == "view" and element.scope is not CollisionScope.NONE
+    ]
     crossings: list[Crossing] = []
     for segment in segments:
         for view in views:

@@ -469,6 +469,26 @@ def test_leader_routed_clear_of_other_views_is_clean():
     assert find_leader_crossings([leader], _views()) == []
 
 
+def test_leader_clipping_a_pictorial_view_is_not_a_crossing():
+    """An isometric view's outline is mostly EMPTY diagonal space.
+
+    _view_scope already exempts it from the overlap audit for this reason
+    (CollisionScope.NONE); the leader audit must agree, or a leader clipping an
+    empty corner fails a drawing that is correct (codex #334). Keying on
+    kind == "view" alone was what let this in.
+    """
+    iso = _el("Isometric", 0.10, 0.10, 0.30, 0.30, kind="view",
+              scope=CollisionScope.NONE)
+    leader = LeaderSegment("Ra 1.6", "gdt", 0.05, 0.12, 0.35, 0.12, owner="Front")
+    assert find_leader_crossings([leader], [iso]) == []
+
+    # Positive control: the SAME leader across an ORTHO view still flags, so the
+    # skip is scoped to pictorials and has not disabled the gate.
+    ortho = _el("Top", 0.10, 0.10, 0.30, 0.30, kind="view", scope=CollisionScope.ALL)
+    (crossing,) = find_leader_crossings([leader], [ortho])
+    assert crossing.view.label == "Top"
+
+
 def test_leader_grazing_outline_padding_is_not_a_crossing():
     # Runs along Top's bottom edge, inside the GetOutline whitespace only.
     leader = LeaderSegment("n", "note", 0.05, 0.2005, 0.30, 0.2005, owner="Front")
