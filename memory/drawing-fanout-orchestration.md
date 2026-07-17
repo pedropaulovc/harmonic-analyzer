@@ -55,12 +55,23 @@ and FOLD IT INTO the commit — its draw script depends on it, so committing the
 files alone breaks the CI build. Expect trivial additive conflicts; land infra PRs first,
 rebase the rest.
 
-**codex-on-this-machine is NOT truly blind** — a SessionStart hook forces a memory lookup,
-so `codex exec ... -i sheet.png` explores the filesystem (rg for MEMORY.md, follows the
-image path back into the repo) even from a neutral cwd with `--skip-git-repo-check`. The
-machinist verdict is still produced (buried in ~400 lines of tool-call log; grep
-"can it be made|Disposition|Verdict"), but treat it as advisory and do a LEAD visual pass
-as the real gate. See [[codex-drawing-image-review]].
+**codex-on-this-machine IS blind under the DEFAULT sandbox — and the broken Windows sandbox
+is what makes it so.** A SessionStart hook does force a memory lookup, so `codex exec ...
+-i sheet.png` TRIES to explore the filesystem (rg for MEMORY.md, follow the image path back
+into the repo) even from a neutral cwd with `--skip-git-repo-check`. But on this seat every
+one of those tool calls dies at the sandbox (`orchestrator_helper_launch_failed: failed to
+launch setup helper`), so it never reaches the repo and the verdict is image-only.
+Re-verified 2026-07-16 on `pivot-shaft_drawing.png`: a full machinist review came back that
+volunteered "without the other views, it resembles a rectangular bar" — impossible for a
+reviewer who had read the repo. (An earlier version of this note said the reviews are NOT
+blind and are only advisory; that generalized from a run with the sandbox opened up.)
+
+**So do NOT add `--sandbox danger-full-access` to the image-review command.** It is the right
+flag for a codex task that must read/write ([[codex-windows-sandbox]]) and it would un-break
+exactly the exploration this gate exists to prevent. The tool-call errors in the transcript
+are the gate working; the failure mode to watch for is the ABSENCE of a verdict, not their
+presence. A LEAD VISUAL PASS is still the real gate regardless — see
+[[codex-drawing-image-review]].
 
 **2026-07-15 run outcome:** fanned out ~18 Fable drawing agents in 4 waves; **17 PRs
 landed** (#305-308, #312-324) before Fable hit **96% weekly (critical)** — the wall. The
@@ -75,11 +86,17 @@ when the agent is genuinely idle/done, and be ready to reconcile.
 **Merge-cascade phase (the "merge all PRs once Codex green" ask).** Every drawing PR appends
 one `DrawingSpec` row to the SAME `DRAWINGS` tuple, so merges are STRICTLY SERIAL — each merge
 dirties the registry of all remaining PRs, forcing a rebase per merge. Mechanics that worked:
-- **Deterministic registry resolver** (`scratchpad/resolve_registry.py`): takes `origin/main`'s
-  authoritative registry + inserts ONLY the branch's missing `DrawingSpec` block(s) (keyed by
-  `name=`), validates with BOTH `ast.parse` AND `compile()` (Py3.14 parses repeated kwargs but
-  rejects at compile — a union-merge corruption signature). NEVER use git `merge=union` on the
-  registry — it fuses multi-line specs into one with repeated `name=`.
+- **Resolve the registry deterministically — do NOT hand-merge it.** The last run used a
+  throwaway `scratchpad/resolve_registry.py`; **that file is GONE and was never committed**, so
+  do not go looking for it — the durable part is the algorithm, which is ~30 lines: take
+  `origin/main`'s registry as authoritative, `ast.parse` both sides, insert ONLY the
+  `DrawingSpec` block(s) whose `name=` is missing from main, then validate the result with BOTH
+  `ast.parse` AND `compile()` — Py3.14 PARSES repeated kwargs but rejects them at compile, and
+  repeated `name=` is the union-merge corruption signature, so parse-only validation passes the
+  exact bug you are guarding against. NEVER set git `merge=union` on the registry: it fuses
+  multi-line specs into one spec with repeated `name=`. Re-implementing this beats hand-resolving
+  N conflicts; reaching for a manual merge because the script is missing is how the corruption
+  gets in.
 - **`_drawing_common.py` conflicts are docstring-only.** Multiple slices add the SAME
   `entity_type`/`add_view_centerline`/basic helpers — git auto-merges the CODE and only flags
   the divergent doc prose. Resolve with `git checkout --ours` (main is canonical post-merge);

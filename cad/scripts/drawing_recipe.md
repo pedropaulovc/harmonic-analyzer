@@ -20,6 +20,28 @@ Invariant the test pins: the spec module is the **single source** of the marked
 dims (`build.DRAWING_DIMENSIONS is <part>_spec.DRAWING_DIMENSIONS`) and the draw
 script keeps exactly that set (`FRONT_KEEP ∪ RIGHT_KEEP == marked`).
 
+### If an ASSEMBLY imports any of the part's nominals, split them out (piece 1b)
+
+`_buildgraph.module_deps_of` makes a task depend on **whatever module it imports a
+constant from** — the whole module, not the constant. So the moment an assembly
+imports one nominal from `<part>_spec.py`, that spec's *drawing* contract
+(`DRAWING_NOTES`, `DRAWING_DIMENSIONS`) enters the assembly's recipe digest, and
+editing a print note forces a full assembly rebuild that cannot change its
+geometry. Minutes of COM seat, per note edit.
+
+Fix, and the shipped precedent is `column_clamp_front`:
+
+| file | holds | imported by |
+|---|---|---|
+| `<part>_geom.py` | pure nominals, **no drawing data** | the part build, the spec, **and the assemblies** |
+| `<part>_spec.py` | re-exports the geom nominals, adds `DRAWING_DIMENSIONS` / `DRAWING_NOTES` | the part build + the draw script only |
+
+`build_magnifier_assembly` / `build_paper_drive_assembly` anchor off the clamp
+depth and import `column_clamp_front_geom` alone, so the assemblies never see the
+drawing contract. Only do this when an assembly actually imports a nominal — for a
+part nothing else consumes, one `<part>_spec.py` is right and the extra module is
+dead weight.
+
 ## Pick the reference by shape
 
 - turned shaft / pin / dowel → **`fulcrum_shaft`**
@@ -59,19 +81,39 @@ the repo**, where `--skip-git-repo-check` only skips the safety check — it doe
 stop codex reading `AGENTS.md`, so the review is no longer blind. `mktemp -d` has
 neither failure mode, and `set -e` turns a missing temp dir into a loud stop.
 
+**Do NOT add `--sandbox danger-full-access`, and do not "fix" the sandbox errors
+in the transcript.** They are what makes this gate work. On this Windows seat the
+default sandbox fails every shell command
+(`orchestrator_helper_launch_failed: failed to launch setup helper`), so the
+SessionStart hook's memory lookup cannot run and codex never reaches the
+filesystem — the review is genuinely blind. `danger-full-access` (correct for a
+codex task that must read/write, per `memory/codex-windows-sandbox.md`) would
+un-break exactly the exploration this gate exists to prevent. Verified 2026-07-16
+by running the real command on `pivot-shaft_drawing.png` under the default
+sandbox: a complete machinist verdict came back, image-only, and volunteered
+"without the other views, it resembles a rectangular bar" — a reviewer that had
+read the repo could not have written that sentence.
+
+So the tee'd transcript legitimately contains tool-call errors AND a real review.
+That is the healthy state. The failure to watch for is the *absence* of a verdict.
+
 ```
-mkdir -p "<ABS>/cad/out/reports"
+mkdir -p "{WORKTREE}/cad/out/reports"
 NEUTRAL=$(mktemp -d) || exit 1
 ( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." \
   | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check \
-      -i "<ABS>/cad/out/png/<artifact-stem>_drawing.png" ) \
-  2>&1 | tee "<ABS>/cad/out/reports/codex_machinist_review.txt"
+      -i "{WORKTREE}/cad/out/png/<artifact-stem>_drawing.png" ) \
+  2>&1 | tee "{WORKTREE}/cad/out/reports/codex_machinist_review.txt"
 rmdir "$NEUTRAL"
 ```
 
-Then **read the review file before believing the gate ran** — a review that opens
-with a shell error, or that mentions the part by name or cites repo files, did not
-happen blind and does not count.
+Then **read the review file before believing the gate ran.** A transcript with no
+verdict in it — only a shell error, because the `cd` aborted the command — is the
+failure to catch.
+
+Naming the part is NOT a tell: the title block is in the image, so a blind
+reviewer reads it there. The tell is a review citing something the drawing cannot
+show — a repo file, a spec constant, the machine's design intent, a sibling part.
 
 Address clearly valid accuracy/clarity/standards findings (bounded: 1–2 layout
 iterations); leave repo-wide house-style/template items (title-block tolerance
@@ -92,12 +134,25 @@ underscored stem to the config path either fails with a bad pathspec or — wors
 silently leaves the metadata change unstaged.
 
 ```
+git status --short                    # FIRST: see everything you actually touched
 git add cad/scripts/<part>_spec.py cad/scripts/draw_<part>.py cad/scripts/test_<part>_drawing.py \
         cad/scripts/build_<part>.py cad/scripts/_drawing_registry.py \
         cad/config/parts/<artifact-stem>.yaml          # dashed, NOT <part>
+# AND, only if you deliberately changed it, the shared helper your draw script needs:
+git add cad/scripts/_drawing_common.py
 git commit -m "Add the <part> curated manufacturing drawing slice"
 git show --stat HEAD    # confirm ONLY the intended files are in the commit
 ```
+
+**If your slice needed a shared helper, it MUST ride in the same commit.** Some
+legitimately do — a revolve has no model edges on its flanks, so its GD&T needs
+`entity_type="SILHOUETTE"` on `add_datum_feature`/`add_feature_control_frame`/
+`add_surface_finish`. Committing the six slice files while leaving
+`_drawing_common.py` dirty breaks the build for everyone: your draw script imports
+a helper that is not in the tree. This is why the `git status --short` comes first
+— the six-file list is a floor, not a ceiling. (Conversely: do not "tidy" a helper
+you did not need. A shared-file edit is a merge point for every other open drawing
+PR.)
 
 ## Slice-ready checklist (all four)
 
@@ -149,9 +204,9 @@ pipe prompt on stdin so -i doesn't swallow it; run from a neutral dir with --ski
 Use mktemp -d, NOT $TMPDIR — it is unset here, and `cd ""` either aborts the whole command
 (codex never runs, tee writes only the shell error) or drops codex INSIDE the repo, where it
 reads AGENTS.md and the review stops being blind. mkdir the report dir first or tee fails:
-  mkdir -p "<ABS>/cad/out/reports"
+  mkdir -p "{WORKTREE}/cad/out/reports"
   NEUTRAL=$(mktemp -d) || exit 1
-  ( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check -i "<ABS>/cad/out/png/{ARTIFACT_STEM}_drawing.png" ) 2>&1 | tee "<ABS>/cad/out/reports/codex_machinist_review.txt"
+  ( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check -i "{WORKTREE}/cad/out/png/{ARTIFACT_STEM}_drawing.png" ) 2>&1 | tee "{WORKTREE}/cad/out/reports/codex_machinist_review.txt"
   rmdir "$NEUTRAL"
   READ the review file back before trusting it: one opening with a shell error, or naming the
   part / citing repo files, did not run blind and does not count.
