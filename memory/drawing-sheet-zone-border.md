@@ -1,6 +1,6 @@
 ---
 name: drawing-sheet-zone-border
-description: The DRWDOT's drawn border frame is a pure (+3.217, +0.656) mm translation off its declared 12.7 mm zone margins, and its zone ticks follow SHEET quarters not zone-area quarters — three inconsistent systems in one template
+description: The DRWDOT's drawn border frame is a pure (+3.217, +0.656) mm translation off its declared 12.7 mm zone margins — ONE defect, not three; the zone grid is CORRECT (region=Sheet, EvenlySized 2x4) and must not be "fixed"
 metadata:
   type: project
 ---
@@ -13,16 +13,53 @@ a uniform **12.7 mm (0.5 in)** on all four sides. `_drawing_layout_check.py`'s
 `DrawableRegion` is built from that query, so a template edit moves the gate with
 it.
 
-**The template has THREE mutually inconsistent systems** — do not assume any one
-of them agrees with another:
+**The zone-SIZE queries need an EARLY-BOUND `ISheet`; late-bound they all fail —
+each differently, none saying "use early binding".** `GetZoneMargin` works
+late-bound (simple int in, double out), which makes the object look fine and sends
+you hunting the wrong thing. Anything returning a VARIANT or carrying OUT params
+does not:
 
-1. **declared zone area** — 12.7 mm uniform, centred (what `GetZoneMargin` says);
+| call | late-bound (`CDispatch`) | early-bound |
+|---|---|---|
+| `GetZoneMargin(3)` | `0.0127` ✓ | `0.0127` ✓ |
+| `GetProperties2()` | `TypeError: 'tuple' object is not callable` | `(2.0, 12.0, 1.0, 1.0, 0.0, 0.4318, 0.2794, 1.0)` |
+| `GetZoneSizeRegion()` | `TypeError: 'int' object is not callable` | `1` |
+| `GetZoneSizeDistribution()` | `com_error: Parameter not optional` | `(1, 2, 4)` |
+| `GetZoneSizeDistribution(0,0)` | `com_error: Type mismatch` | `(1, 2, 4)` |
+
+The "'tuple'/'int' object is not callable" pair is the giveaway: late binding
+resolved the NAME to the property VALUE, so calling it calls the result. Fix:
+`_early_bound(sheet, "ISheet")`. The two OUT params come back in the return tuple
+`(retval, rows, columns)` — passing placeholders is unnecessary and harmless. And
+`adapter._attempt()` swallows all of this into a bare `None`, which cannot
+distinguish "missing" from "raised" — call raw when probing.
+
+**Exactly ONE thing is wrong: the frame's POSITION.** An earlier version of this
+note claimed "three mutually inconsistent systems", the third being that the zone
+grid ticks divide the SHEET rather than the declared 12.7-inset zone area, so
+`GetDrawingZone` would disagree with the printed labels. **That is FALSE** — it was
+inferred from the frame's margins without ever asking the sheet, and acting on it
+would have dragged correct geometry to wrong coordinates. Probed live 2026-07-16:
+
+- `GetZoneSizeRegion()` → **1 = `swRegionTypeSheet`** — the zone divisions are
+  computed over the WHOLE SHEET, deliberately, not over the margin-inset area;
+- `GetZoneSizeDistribution()` → **(1, 2, 4)** = `swZoneSizeDistribution_EvenlySized`,
+  rows=2, columns=4.
+
+So the ticks BELONG on the sheet's quarters (107.95 / 215.90 / 323.85) and the
+column centres on its eighths (53.97 / 161.92 / 269.88 / 377.82) — which is exactly
+where the printed labels are. `GetDrawingZone` AGREES with them: it flips B4→B3 at
+107.95, B3→B2 at 215.90, B2→B1 at 323.85. The margins-region alternative would put
+centres at 63.50 / 165.10 / 266.70 / 368.30, matching nothing on the sheet. **Do not
+touch the zone grid**; it is correct, it is independent of both the frame position
+and the margins, and re-centring the frame will not move it.
+
+The one real defect:
+
+1. **declared zone margins** — 12.7 mm uniform (`GetZoneMargin`), so the frame
+   SHOULD sit 12.7 from each sheet edge;
 2. **drawn border frame** — left 15.917 / right 9.483 / bottom 13.335 / top
-   12.023 mm, i.e. off-centre;
-3. **drawn zone grid ticks** — outer column dividers at 107.91 / 323.81, which are
-   the SHEET's quarters, not the declared zone area's (114.30 / 317.50). Off by
-   6.39 mm, so `ISheet::GetDrawingZone(x, y)` disagrees with the printed labels
-   near the outer boundaries.
+   12.023 mm: off-centre, and the only thing needing an edit.
 
 **The frame is the right SIZE, only in the wrong PLACE** — this is the decisive
 fact. Drawn: 406.400 x 254.042 mm = 16.000 x 10.002 in. Implied by the 12.7 mm
