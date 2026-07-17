@@ -42,19 +42,36 @@ Once the PNG looks correct and before committing, get an independent review: sen
 **only the image** (no part context, so the review is unbiased) to a machinist
 persona via the codex CLI, using `gpt-5.6-sol` at high reasoning.
 
-Two gotchas the command below works around: (1) codex's `-i` takes multiple
+Three gotchas the command below works around: (1) codex's `-i` takes multiple
 values and will **swallow a positional prompt** placed after it — pipe the prompt
 on **stdin** instead; (2) run from a **neutral dir outside the repo** with
 `--skip-git-repo-check` so codex does not read `AGENTS.md` and start exploring the
-repo (which would make the review non-blind). Write the output to
-`cad/out/reports/` (that subdir *is* gitignored; the `cad/out/` root is not).
+repo (which would make the review non-blind); (3) `cad/out/reports/` is gitignored
+and a fresh worktree may not have it — a drawing task has no stamp target there —
+so `mkdir -p` it or the `tee` fails and the gate leaves no review file behind.
+
+Do NOT use `$TMPDIR` as the neutral dir. It is **unset on this machine**, and the
+two ways that breaks are both silent-looking: bash rejects `cd ""` with "null
+directory", so `cd "$TMPDIR" && codex …` short-circuits and codex NEVER RUNS while
+`tee` still writes a plausible-looking review file containing only the shell error;
+and in a POSIX `sh` that accepts `cd ""` as a no-op, codex instead runs **inside
+the repo**, where `--skip-git-repo-check` only skips the safety check — it does not
+stop codex reading `AGENTS.md`, so the review is no longer blind. `mktemp -d` has
+neither failure mode, and `set -e` turns a missing temp dir into a loud stop.
 
 ```
-( cd "$TMPDIR" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." \
+mkdir -p "<ABS>/cad/out/reports"
+NEUTRAL=$(mktemp -d) || exit 1
+( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." \
   | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check \
       -i "<ABS>/cad/out/png/<artifact-stem>_drawing.png" ) \
   2>&1 | tee "<ABS>/cad/out/reports/codex_machinist_review.txt"
+rmdir "$NEUTRAL"
 ```
+
+Then **read the review file before believing the gate ran** — a review that opens
+with a shell error, or that mentions the part by name or cites repo files, did not
+happen blind and does not count.
 
 Address clearly valid accuracy/clarity/standards findings (bounded: 1–2 layout
 iterations); leave repo-wide house-style/template items (title-block tolerance
@@ -68,17 +85,30 @@ codex review file at `cad/out/reports/…` is safe but a stray `git add -A` can
 still catch other root-level `cad/out` artifacts. Stage the slice files by name
 and verify:
 
+Mind the two spellings: the **script** stem is underscored (`draw_fulcrum_shaft.py`,
+`doit part:fulcrum_shaft`) but the **config** file is dashed
+(`cad/config/parts/fulcrum-shaft.yaml`, the `artifact_stem`). Feeding the
+underscored stem to the config path either fails with a bad pathspec or — worse —
+silently leaves the metadata change unstaged.
+
 ```
 git add cad/scripts/<part>_spec.py cad/scripts/draw_<part>.py cad/scripts/test_<part>_drawing.py \
-        cad/scripts/build_<part>.py cad/scripts/_drawing_registry.py cad/config/parts/<part>.yaml
+        cad/scripts/build_<part>.py cad/scripts/_drawing_registry.py \
+        cad/config/parts/<artifact-stem>.yaml          # dashed, NOT <part>
 git commit -m "Add the <part> curated manufacturing drawing slice"
 git show --stat HEAD    # confirm ONLY the intended files are in the commit
 ```
 
-## Merge gate (all four)
+## Slice-ready checklist (all four)
 
-1. `doit drawing:<part>` exits 0.
-2. `test_<part>_drawing.py` passes.
+This is what makes a slice ready to hand to the lead — it is **not** the merge
+gate. AGENTS.md owns that, and it is repo-wide: a full `uv run python -m doit -n 4`
+green on the PR head, a clean Codex auto-review of the **latest** push, and an eye
+pass over every touched render. These four checks are drawing-local and cannot see
+a repo-wide regression, so clearing them is necessary and not sufficient.
+
+1. `uv run python -m doit drawing:<part>` exits 0.
+2. `uv run python -m pytest cad/scripts/test_<part>_drawing.py -q` passes.
 3. The PNG is visually correct: views + dimensions + GD&T not overlapping each
    other or the title block; every key dimension present; title block populated.
    A build that passes checks can still *look* wrong — trust your eyes.
@@ -103,9 +133,11 @@ Geometry facts (from build_{PART}.py): {GEOMETRY_FACTS}
 DRAWING_DIMENSIONS = {DIM_MAP}          # feature -> {marked dim names}
 artifact_stem = {ARTIFACT_STEM}          # dashed; outputs land at cad/out/{slddrw,pdf,png}/{ARTIFACT_STEM}*
 
-Do all 6 pieces, then BUILD + ITERATE:
-  doit part:{PART}  ->  doit drawing:{PART}  ->  Read the PNG  ->  adjust  ->  repeat
-  ->  pytest cad/scripts/test_{PART}_drawing.py -q
+Do all 6 pieces, then BUILD + ITERATE (always via uv — bare doit/pytest may be missing
+or a stale global install on a machine where only `uv sync` ran):
+  uv run python -m doit part:{PART}  ->  uv run python -m doit drawing:{PART}
+  ->  Read the PNG  ->  adjust  ->  repeat
+  ->  uv run python -m pytest cad/scripts/test_{PART}_drawing.py -q
 The seat is shared; "[com.seat] ... waiting for the SolidWorks seat" is EXPECTED — let it wait.
 Run this whole build -> iterate -> review -> commit sequence to completion WITHIN your working
 turns; do NOT end your turn between steps (e.g. after building the part, or while the seat is
@@ -113,11 +145,22 @@ busy) — wait for the seat and continue. Only stop and report when the slice is
 you hit a hard error you cannot resolve (paste the exact error). Going idle with the drawing
 unbuilt just stalls the fan-out until the lead re-nudges you.
 When the PNG looks right, run the independent machinist review (image only, no context;
-pipe prompt on stdin so -i doesn't swallow it; run from a neutral dir with --skip-git-repo-check):
-  ( cd "$TMPDIR" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check -i "<ABS>/cad/out/png/{ARTIFACT_STEM}_drawing.png" ) 2>&1 | tee "<ABS>/cad/out/reports/codex_machinist_review.txt"
+pipe prompt on stdin so -i doesn't swallow it; run from a neutral dir with --skip-git-repo-check).
+Use mktemp -d, NOT $TMPDIR — it is unset here, and `cd ""` either aborts the whole command
+(codex never runs, tee writes only the shell error) or drops codex INSIDE the repo, where it
+reads AGENTS.md and the review stops being blind. mkdir the report dir first or tee fails:
+  mkdir -p "<ABS>/cad/out/reports"
+  NEUTRAL=$(mktemp -d) || exit 1
+  ( cd "$NEUTRAL" && echo "You are an experienced machinist. Review this manufacturing drawing for accuracy, clarity, and standards conformance. List any problems and say whether the part can be made as drawn." | codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" --skip-git-repo-check -i "<ABS>/cad/out/png/{ARTIFACT_STEM}_drawing.png" ) 2>&1 | tee "<ABS>/cad/out/reports/codex_machinist_review.txt"
+  rmdir "$NEUTRAL"
+  READ the review file back before trusting it: one opening with a shell error, or naming the
+  part / citing repo files, did not run blind and does not count.
   Address clearly valid findings (1–2 iterations); leave repo-wide house-style items for a follow-up. Keep the review text, include it in your report.
-Merge gate: drawing builds clean + test passes + PNG visually correct + codex review addressed.
-No CadQuery. Stage explicit slice paths (NOT git add -A) and commit on branch draw-{PART}; do not push/PR.
+Slice-ready (NOT the merge gate — AGENTS.md owns that, and it is repo-wide): drawing builds
+clean + test passes + PNG visually correct + codex review addressed. The lead runs the full
+`uv run python -m doit -n 4` and the Codex PR review; do not claim those.
+No CadQuery. Stage explicit slice paths (NOT git add -A; the config file is DASHED,
+cad/config/parts/{ARTIFACT_STEM}.yaml) and commit on branch draw-{PART}; do not push/PR.
 Report SHA, files, PNG path, gate status, and the codex review verbatim.
 ```
 
