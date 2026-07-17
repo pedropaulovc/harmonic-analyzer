@@ -190,11 +190,19 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("B",),
         label="bushing end-face parallelism",
     )
+    # Held close to the bore it controls: at (0.160, 0.225) the leader ran back
+    # across the whole front view as a long shallow diagonal and converged on
+    # the bore with the two diameter leaders. Here it is a short, roughly
+    # horizontal pull into the gap between the two views. The symbol arm reaches
+    # ~6 mm LEFT of the anchor (clearing the OD circle at x=0.100) and the text
+    # renders ABOVE the arm and to its RIGHT, spanning ~0.131..0.157 at y~0.224:
+    # clear of the O6.50 callout below (its text tops out at y=0.201), of the
+    # runout frame above, and of the right view starting at x=0.174.
     add_surface_finish(
         adapter,
         front,
         edge_xy=bore_edge,
-        symbol_xy=(0.160, 0.225),
+        symbol_xy=(0.118, 0.210),
         roughness_ra="1.6",
         label="bushing bore finish",
     )
