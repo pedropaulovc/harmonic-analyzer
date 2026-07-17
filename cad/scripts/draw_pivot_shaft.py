@@ -56,11 +56,17 @@ RIGHT_CENTER = (
 # title block's 0.064 top rule).
 ISO_CENTER = (0.320, 0.120)
 
+# The shaft's flank in the *Right view: a 6.35-dia cylinder at 1:1, so its top
+# silhouette runs ~3.2 mm above the view centre. The cylindrical callouts anchor
+# HERE rather than on the front view's end circle -- see the GD&T block below.
+SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
+
 FRONT_KEEP = {
-    "ShaftDia": (
-        FRONT_CENTER[0] - SHAFT_DIA * END_VIEW_SCALE / 1000.0 - 0.025,
-        FRONT_CENTER[1] + 0.008,
-    ),
+    # x=0.030, not the bbox-derived 0.017: horizontal text made this callout
+    # ~25 mm wide ("+0.00/-0.02"), so centred that far left it ran over the
+    # 12.7 mm zone margin. 0.030 clears the margin on the left and stops short
+    # of the end circle at x=0.049 on the right.
+    "ShaftDia": (0.030, 0.220),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
@@ -138,28 +144,47 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    end_circle = (
-        FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-        FRONT_CENTER[1],
+    # Pick the end circle at 12 o'clock, because the symbol goes straight ABOVE
+    # it. Picked at 3 o'clock (the +r,0 point) with the symbol at 12, the tag
+    # fought SetPosition2's along-the-edge rule -- on a CIRCLE the permitted set
+    # IS the circumference, so the symbol collapsed to the nearest circle point
+    # and its Y went inert: the requested 17.6 mm standoff rendered as 1.05 mm,
+    # too little for the ~3 mm attachment triangle, which then overlapped the
+    # box and struck through the "A". Picking the clock position the symbol
+    # actually sits at lets the leader run radially out to it -- the same
+    # spelling draw_pivot_bushing.py and draw_cone_tip_bushing.py use. No gate
+    # sees this: a datum symbol exposes no GetExtent, so only the render shows it.
+    end_top = (
+        FRONT_CENTER[0],
+        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
     )
     left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     add_datum_feature(
         adapter,
         front,
-        edge_xy=end_circle,
+        edge_xy=end_top,
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
         datum="A",
         label="pivot shaft axis",
     )
+    # Cylindricity and the bearing finish both control the shaft's CYLINDRICAL
+    # face, which the side view shows edge-on -- so both anchor to its flank
+    # there instead of to the front view's end circle. Anchored on the front
+    # circle they had to sit out at the side view's x to find free sheet, and
+    # the leader then ran the whole way back across the side view. Off the flank
+    # the leader is a short vertical drop into the empty band above the view. A
+    # cylinder carries no model edge along its side, so these picks are
+    # SILHOUETTE entities (as in draw_transgear_stub).
     add_feature_control_frame(
         adapter,
-        front,
-        edge_xy=end_circle,
-        frame_xy=(RIGHT_CENTER[0], 0.232),
+        right,
+        edge_xy=(RIGHT_CENTER[0] - 0.045, SHAFT_FLANK_Y),
+        frame_xy=(RIGHT_CENTER[0] - 0.045, 0.236),
         characteristic="cylindricity",
         tolerance="0.01",
         label="pivot bearing cylindricity",
+        entity_type="SILHOUETTE",
     )
     # The frame extends ~0.027 m right of its anchor; 0.042 keeps the left
     # frame's far edge clear of the Depth extension line at the shaft's end.
@@ -177,13 +202,16 @@ async def build(adapter: Any) -> dict[str, str]:
             datums=("A",),
             label=label,
         )
+    # Sits right of the cylindricity frame, whose text ends near x=0.177; the
+    # Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=end_circle,
-        symbol_xy=(RIGHT_CENTER[0], 0.245),
+        right,
+        edge_xy=(RIGHT_CENTER[0] + 0.045, SHAFT_FLANK_Y),
+        symbol_xy=(RIGHT_CENTER[0] + 0.045, 0.222),
         roughness_ra="1.6",
         label="pivot bearing finish",
+        entity_type="SILHOUETTE",
     )
 
     # 0.020, not the fulcrum's 0.014 -- the border rule sits at ~0.016, so a
