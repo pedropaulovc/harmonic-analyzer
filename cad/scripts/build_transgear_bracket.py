@@ -53,7 +53,7 @@ PLATE_THICK = 4.0
 # drill to the old Ø9.6 seat -- bare pivot seat, memory/fastener-policy).
 STUD_BORE_SPEC = HoleSpec("drilled_letter", "V")
 SCREW_HOLE_DX = 10.0  # bar sockets at stud x +-10 (support-bar BRACKET_HOLE_X)
-SCREW_HOLE_Y = 40.533  # bar mid-height above the stud (338.5 - 297.967)
+SCREW_HOLE_Y = 40.533  # bar mid-height above the stud (295.6 - 255.067)
 # The ~Ø4 bracket screws pass through (they thread into the support bar): #8
 # clearance (normal Ø4.978, the wizard twin of the old Ø4.4 seat).
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#8")

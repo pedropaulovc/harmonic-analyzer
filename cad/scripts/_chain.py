@@ -31,9 +31,10 @@ from __future__ import annotations
 import math
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (54.575, 284.1332)  # build_paper_drive_assembly KNOB_SHAFT_XY:
-# stud (12, 297.9667) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
-# mesh -- paper-drive rework E8; ch30 p002 cross-check knob ~(55-58, 279-287))
+KNOB_CENTRE = (54.575, 241.2332)  # build_paper_drive_assembly KNOB_SHAFT_XY:
+# stud (12, 255.0667) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
+# mesh -- paper-drive rework E8; ch30 p002 pose-studio re-anchor 2026-07-18:
+# the whole bar-hung reducer stack dropped 42.9 with the support-bar)
 # The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_CRANK)
 # (the ch30 GT crank axis, ABOVE the drive line since the 2026-07-02 re-anchor).
 # Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from

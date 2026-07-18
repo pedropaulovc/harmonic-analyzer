@@ -30,7 +30,7 @@ from _assembly import (
 )
 
 PLATE_X0 = -258.0
-PLATE_Y0 = 305.0
+PLATE_Y0 = 262.1
 PLATE_FRONT_Z = -142.9
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
