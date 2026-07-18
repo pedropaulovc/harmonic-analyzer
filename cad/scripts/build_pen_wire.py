@@ -12,7 +12,7 @@ the run stands 0.25 off the rim surface so the interference gate reads zero.
 
 Endpoint derivation lives HERE; ``build_pen_assembly`` imports
 ``WIRE_BOTTOM``/``WIRE_LEN`` and asserts them against its own layout anchors
-(pen-rod wire hole at machine y 513, wheel bar y 565), so a layout move
+(pen-rod wire hole at machine y 513, wheel bar y 575.7), so a layout move
 fails loud instead of leaving a floating wire.
 
 Dimensions: cad/config/dimensions.yaml ch. 21/24 -- wire dia photo-scaled
@@ -55,7 +55,7 @@ CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
 
 # --- endpoint anchors (machine frame; asserted by build_pen_assembly) --------
 WHEEL_X = 53.0  # magnifying-wheel centre (build_magnifier_assembly.WHEEL_X)
-WHEEL_BAR_Y = 565.0  # wheel axis height = the vertical-tangent point's y
+WHEEL_BAR_Y = 575.7  # wheel axis height = the vertical-tangent point's y
 RIM_DIA = 100.0  # ch. 21 annotated (build_magnifying_wheel.RIM_OUTER_DIA)
 WHEEL_MID_Z = -146.9  # rim groove mid-plane (wheel mid-plane)
 WIRE_HOLE_Y = 513.0  # pen-rod wire hole: PEN_ROD_POS y 398 + local 115
@@ -65,7 +65,7 @@ WIRE_HOLE_Y = 513.0  # pen-rod wire hole: PEN_ROD_POS y 398 + local 115
 # rod's z -149 front face -- the tie-off through the hole is implied).
 WIRE_X = WHEEL_X - RIM_DIA / 2.0 - WIRE_DIA / 2.0 - CLEARANCE  # 2.35
 WIRE_BOTTOM = (WIRE_X, WIRE_HOLE_Y, WHEEL_MID_Z)
-WIRE_LEN = WHEEL_BAR_Y - WIRE_HOLE_Y  # 52.0
+WIRE_LEN = WHEEL_BAR_Y - WIRE_HOLE_Y  # 62.7
 
 
 async def build(adapter) -> dict[str, str]:

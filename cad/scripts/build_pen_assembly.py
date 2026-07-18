@@ -78,7 +78,7 @@ from _transforms import IDENTITY, ROT_Y_180
 ASM_NAME = "pen"
 
 # --- machine anchors ---------------------------------------------------------
-WHEEL_BAR_Y = 565.0  # the wheel-bar the pen-hanger clamps (magnifier.SLDASM)
+WHEEL_BAR_Y = 575.7  # the wheel-bar the pen-hanger clamps (magnifier.SLDASM)
 
 # --- pen ---------------------------------------------------------------------
 PEN_ROD_X = 3.0

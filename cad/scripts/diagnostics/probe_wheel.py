@@ -25,7 +25,7 @@ from _assembly import (
 )
 
 WHEEL_X = 53.0
-WHEEL_BAR_Y = 565.0
+WHEEL_BAR_Y = 575.7
 BAR_FRONT_Z = -138.9
 WHEEL_MID_Z = -146.9
 ROT_X_NEG90 = [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]]

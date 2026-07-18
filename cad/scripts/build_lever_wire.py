@@ -82,7 +82,7 @@ CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
 # back groove band. Solving the clearance system (>= 0.25 surface everywhere;
 # rim back-face bound at radius 43.35, axle-flange bound inside radius 17.9,
 # spoke fronts at -144.9) gives the hook/hub-end pair below: a 10 mm z drop
-# over the ~371 run = 1.5 deg, visually plumb.
+# over the ~363 run = 1.6 deg, visually plumb.
 CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 # The wire TIES through the fixture's cross hole and hangs beside the vertical
 # rod, just under the collar's bottom face: wire r + 0.25 below it in y, and
@@ -95,7 +95,7 @@ CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 HOOK_Y = 925.35  # FIXTURE_Y0 926 - wire r 0.4 - 0.25 (under the collar bottom)
 HOOK_Z = -137.95
 WHEEL_X = 53.0  # magnifying-wheel centre
-WHEEL_BAR_Y = 565.0
+WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
 HUB_DIA = 20.0  # ch. 21 annotated (build_magnifying_wheel.HUB_DIA)
 # Hub-end Z: in the hub's back groove band, between the rim-duck bound
 # (z >= -142.25 while the run is radially inside the rim ring) and the
