@@ -199,6 +199,19 @@ relaunch SolidWorks via the 3DEXPERIENCE Platform desktop shortcut (never
 COM-start it), rerun the build. The fatal/log-only contract is pinned by
 `check:watchdog` (`test_watchdog.py`).
 
+**Every watchdog action is traceable post-hoc.** All watchdog records carry the
+`watchdog_signal` attribute, so `logs.jsonl` yields the full story with one
+filter (`rg watchdog_signal … | jq …`): one "COM watchdog armed" info per COM
+session (timeout/poll/baseline pids — its absence means the session ran
+unprotected), throttled hung-window warns with `hung_s`/`idle_s`, a "responsive
+again" info closing each hung episode, and on a fatal an error carrying
+`reason`/`idle_s`/`last_op`/`exit_code`. Fatals ALSO emit a `watchdog.abort`
+ERROR span (same attrs) so `traces.jsonl` shows the abort even though the
+watchdog thread has no ambient span context. `last_op` is
+`_telemetry.last_activity_op()` — the heartbeat remembers *what* last poked it
+(`span-start <name>` / `span-end <name>` / `log <head>`), so an idle-timeout
+abort names the COM operation it was wedged inside, no scrollback needed.
+
 ## Incremental rebuilds — refresh vs full
 
 doit hashes script + config **content** (immune to git/worktree mtime churn) and

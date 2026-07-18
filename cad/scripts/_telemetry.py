@@ -152,16 +152,28 @@ _LAST_TICK = _T0
 # operation (the @traced helpers, the gate spans, the severity logs), so "no
 # activity" is a faithful proxy for "stuck inside one COM call".
 _last_activity = time.monotonic()
+_last_activity_op = "process-start"
 
 
-def _touch_activity() -> None:
-    global _last_activity
+def _touch_activity(op: str | None = None) -> None:
+    global _last_activity, _last_activity_op
     _last_activity = time.monotonic()
+    if op:
+        _last_activity_op = op
 
 
 def last_activity() -> float:
     """Monotonic time of the last span boundary or log record (see _watchdog)."""
     return _last_activity
+
+
+def last_activity_op() -> str:
+    """What the last activity WAS (``span-start <name>`` / ``span-end <name>`` /
+    ``log <message head>``). When the watchdog aborts on idle timeout this names
+    the operation the pipeline was last seen in -- i.e. the COM call it is
+    almost certainly wedged inside -- so the abort is traceable without
+    scrollback archaeology."""
+    return _last_activity_op
 
 
 class _ActivityFilter(logging.Filter):
@@ -175,7 +187,7 @@ class _ActivityFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         if not getattr(record, "watchdog_signal", False):
-            _touch_activity()
+            _touch_activity(f"log {str(record.msg)[:80]}")
         return True
 
 # Span nesting depth for the compact console tracer, so the boundary lines
@@ -473,7 +485,7 @@ def event(name: str, **attributes: Any) -> None:
 
 
 def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, Any, int]:
-    _touch_activity()
+    _touch_activity(f"span-start {name}")
     tracer = get_tracer()
     depth = _depth.get()
     attrs = {"harmonic.depth": depth}
@@ -493,10 +505,10 @@ def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, 
 
 
 def _exit_span(handle: Any, exc: BaseException | None) -> None:
-    _touch_activity()
     cm, token = handle
     _depth.reset(token)
     span = trace.get_current_span()
+    _touch_activity(f"span-end {getattr(span, 'name', '?')}")
     if exc is not None:
         span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, str(exc)))

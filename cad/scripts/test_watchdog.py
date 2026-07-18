@@ -99,7 +99,7 @@ def test_hung_window_warns_but_never_exits(monkeypatch: pytest.MonkeyPatch) -> N
     # Capture via a test double, not caplog: the harmonic logger has
     # propagate=False, so records never reach caplog's root handler (codex #344).
     warns: list[str] = []
-    monkeypatch.setattr(_watchdog, "_warn", warns.append)
+    monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: warns.append(msg))
     dog, exits = _make(hung=True, idle=100.0)
     assert dog.tick() == "hung"
     assert exits == []
@@ -108,11 +108,53 @@ def test_hung_window_warns_but_never_exits(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_hung_warn_is_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
     warns: list[str] = []
-    monkeypatch.setattr(_watchdog, "_warn", warns.append)
+    monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: warns.append(msg))
     dog, _ = _make(hung=True, idle=100.0)
     dog.tick()
     dog.tick()  # same clock instant -> inside the throttle window
     assert len([w for w in warns if "not responding" in w]) == 1
+
+
+def test_hung_recovery_closes_the_episode(monkeypatch: pytest.MonkeyPatch) -> None:
+    infos: list[str] = []
+    monkeypatch.setattr(_watchdog, "_warn", lambda msg, **f: None)
+    monkeypatch.setattr(_watchdog, "_info", lambda msg, **f: infos.append(msg))
+    dog, _ = _make(hung=True, idle=100.0)
+    assert dog.tick() == "hung"
+    dog._hung_probe = lambda: False
+    assert dog.tick() is None
+    assert any("responsive again" in m for m in infos)
+    # A later episode warns afresh (throttle reset on recovery).
+    assert dog._hung_since is None
+
+
+def test_fatal_signals_carry_structured_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The abort must be reconstructable from logs.jsonl/traces.jsonl alone:
+    # reason, idle, and the operation the pipeline was last seen in.
+    aborts: list[tuple[str, int, dict]] = []
+    monkeypatch.setattr(
+        _watchdog,
+        "_abort",
+        lambda reason, msg, code, **f: aborts.append((reason, code, f)),
+    )
+    dog, _ = _make(baseline=set(), crash={4242})
+    with pytest.raises(_Exit):
+        dog.tick()
+    reason, code, fields = aborts[0]
+    assert (reason, code) == ("crash", EXIT_CRASH)
+    assert "4242" in fields["pids"]
+    assert "last_op" in fields and "idle_s" in fields
+
+    aborts.clear()
+    dog2, _ = _make(idle=901.0, timeout=900.0)
+    with pytest.raises(_Exit):
+        dog2.tick()
+    reason, code, fields = aborts[0]
+    assert (reason, code) == ("op-timeout", EXIT_OP_TIMEOUT)
+    assert fields["idle_s"] == 901 and fields["timeout_s"] == 900
+    assert "last_op" in fields
 
 
 def test_watchdog_self_logs_do_not_reset_the_idle_clock() -> None:
@@ -149,14 +191,31 @@ def test_start_stop_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _watchdog._active is None
 
 
+def test_start_logs_the_armed_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("HARMONIC_COM_WATCHDOG", raising=False)
+    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "900")
+    monkeypatch.setattr(_watchdog, "_WINDOWS", True)
+    infos: list[str] = []
+    monkeypatch.setattr(_watchdog, "_info", lambda msg, **f: infos.append(msg))
+    try:
+        assert _watchdog.start() is not None
+    finally:
+        _watchdog.stop()
+    assert any("watchdog armed" in m and "900s" in m for m in infos)
+
+
 def test_span_boundaries_poke_the_heartbeat() -> None:
     _telemetry._last_activity = 0.0
     with _telemetry.span("watchdog.test"):
         pass
     assert _telemetry.last_activity() > 0.0
+    # The op label names the boundary, so an idle-timeout abort can say WHICH
+    # operation the pipeline was last seen in.
+    assert _telemetry.last_activity_op() == "span-end watchdog.test"
 
 
 def test_log_records_poke_the_heartbeat() -> None:
     _telemetry._last_activity = 0.0
     _telemetry.debug("watchdog heartbeat probe")
     assert _telemetry.last_activity() > 0.0
+    assert _telemetry.last_activity_op().startswith("log watchdog heartbeat")

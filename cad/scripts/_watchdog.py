@@ -65,16 +65,42 @@ _HUNG_WARN_INTERVAL = 300.0
 _WINDOWS = os.name == "nt"
 
 
-def _warn(message: str) -> None:
+def _warn(message: str, **fields: object) -> None:
     """A watchdog SELF-log. ``watchdog_signal=True`` exempts it from the
     activity heartbeat (``_telemetry._ActivityFilter``): the periodic
     hung-window warn must never reset the idle clock it is warning about,
-    or a permanently wedged SolidWorks would warn forever and never time out."""
-    _telemetry.warn(message, watchdog_signal=True)
+    or a permanently wedged SolidWorks would warn forever and never time out.
+    The same field also makes every watchdog record findable in ``logs.jsonl``
+    with one filter (``attributes.watchdog_signal``)."""
+    _telemetry.warn(message, watchdog_signal=True, **fields)
 
 
-def _error(message: str) -> None:
-    _telemetry.error(message, watchdog_signal=True)
+def _error(message: str, **fields: object) -> None:
+    _telemetry.error(message, watchdog_signal=True, **fields)
+
+
+def _info(message: str, **fields: object) -> None:
+    _telemetry.info(message, watchdog_signal=True, **fields)
+
+
+def _abort(reason: str, message: str, code: int, **fields: object) -> None:
+    """Record a fatal watchdog signal on BOTH telemetry channels, then flush.
+
+    The error log (tagged ``watchdog_signal``) is the human-facing line; the
+    ``watchdog.abort`` ERROR span makes the abort visible in ``traces.jsonl``
+    too -- the watchdog thread has no ambient span context, so without an
+    explicit span a fatal exit would leave no trace-side record at all. Both
+    carry the same structured attrs (reason / idle_s / last_op / exit code),
+    so either channel alone reconstructs what happened."""
+    _error(message, reason=reason, exit_code=code, **fields)
+    with contextlib.suppress(Exception):
+        with _telemetry.span(
+            "watchdog.abort", reason=reason, exit_code=code, **fields
+        ) as sp:
+            sp.set_status(
+                _telemetry.Status(_telemetry.StatusCode.ERROR, f"{reason}: {message}")
+            )
+    _telemetry.shutdown()
 
 # --------------------------------------------------------------------------- #
 # Win32 probes (ctypes only -- no psutil dependency). Each is best-effort:    #
@@ -185,6 +211,7 @@ class Watchdog:
         self._clock = clock
         self._stop = threading.Event()
         self._last_hung_warn = -float("inf")
+        self._hung_since: float | None = None
         # A dialog already up when we start is a leftover from a PREVIOUS crash;
         # the user may be running a healthy new SolidWorks beside it. Baseline
         # those pids so only a NEW sldexitapp is treated as OUR crash.
@@ -198,40 +225,66 @@ class Watchdog:
 
     def tick(self) -> str | None:
         """One evaluation of all signals. Returns which signal fired (tests)."""
+        idle = self._clock() - self._activity()
+        last_op = _telemetry.last_activity_op()
+
         fresh_crash = self._crash_pids() - self._baseline_crash_pids
         if fresh_crash:
-            _error(
+            _abort(
+                "crash",
                 "SolidWorks CRASHED: crash-report handler sldexitapp.exe is "
                 f"running (pids {sorted(fresh_crash)}, dialog 'SOLIDWORKS "
-                f"Design') -- aborting COM task (exit {EXIT_CRASH})"
+                f"Design') -- aborting COM task (exit {EXIT_CRASH}); last "
+                f"activity {idle:.0f}s ago: {last_op}",
+                EXIT_CRASH,
+                pids=str(sorted(fresh_crash)),
+                idle_s=round(idle),
+                last_op=last_op,
             )
-            _telemetry.shutdown()
             self._exit(EXIT_CRASH)
             return "crash"
 
-        idle = self._clock() - self._activity()
         if self.op_timeout > 0 and idle > self.op_timeout:
-            _error(
+            _abort(
+                "op-timeout",
                 f"COM operation timed out: no telemetry activity for {idle:.0f}s "
                 f"(> HARMONIC_COM_OP_TIMEOUT={self.op_timeout:.0f}s; longest "
-                f"healthy single op on record is ~230s) -- SolidWorks is wedged, "
-                f"aborting COM task (exit {EXIT_OP_TIMEOUT})"
+                f"healthy single op on record is ~230s) -- SolidWorks is wedged "
+                f"inside: {last_op} -- aborting COM task (exit {EXIT_OP_TIMEOUT})",
+                EXIT_OP_TIMEOUT,
+                idle_s=round(idle),
+                timeout_s=round(self.op_timeout),
+                last_op=last_op,
             )
-            _telemetry.shutdown()
             self._exit(EXIT_OP_TIMEOUT)
             return "timeout"
 
         if self._hung_probe():
             now = self._clock()
+            if self._hung_since is None:
+                self._hung_since = now
             if now - self._last_hung_warn >= self.hung_warn_interval:
                 self._last_hung_warn = now
                 _warn(
-                    f"SolidWorks window not responding (idle {idle:.0f}s) -- "
-                    "normal while resolving complex geometry; the op timeout "
-                    "aborts if no progress by "
-                    f"{self.op_timeout:.0f}s"
+                    f"SolidWorks window not responding for {now - self._hung_since:.0f}s "
+                    f"(idle {idle:.0f}s, in: {last_op}) -- normal while resolving "
+                    f"complex geometry; the op timeout aborts at {self.op_timeout:.0f}s",
+                    hung_s=round(now - self._hung_since),
+                    idle_s=round(idle),
+                    last_op=last_op,
                 )
             return "hung"
+
+        if self._hung_since is not None:
+            # Episode over -- close the loop so a log reader can bound every
+            # hung window without inferring it from warn silence.
+            _info(
+                f"SolidWorks window responsive again after "
+                f"{self._clock() - self._hung_since:.0f}s hung",
+                hung_s=round(self._clock() - self._hung_since),
+            )
+            self._hung_since = None
+            self._last_hung_warn = -float("inf")
         return None
 
     def _loop(self) -> None:
@@ -270,6 +323,16 @@ def start() -> Watchdog | None:
         timeout = DEFAULT_OP_TIMEOUT
     _active = Watchdog(op_timeout=timeout)
     _active.start()
+    # One armed line per COM session so any post-hoc read of logs.jsonl can
+    # tell whether -- and with what limits -- the session was protected.
+    _info(
+        f"COM watchdog armed: crash detect (sldexitapp.exe), op timeout "
+        f"{timeout:.0f}s, poll {_active.poll_interval:.0f}s, hung-window "
+        f"warns throttled to {_active.hung_warn_interval:.0f}s",
+        timeout_s=round(timeout),
+        poll_s=round(_active.poll_interval),
+        baseline_crash_pids=str(sorted(_active._baseline_crash_pids)),
+    )
     return _active
 
 
