@@ -23,3 +23,14 @@ The PR-lifecycle monitors show a `finished: CLOSED` (not MERGED) event when
 this happens — reopen with `gh pr reopen`, retarget, and the diff is intact
 as long as the child branch itself still exists (rebasing it onto the new
 base first keeps the diff exactly the child's own changes).
+
+**2026-07-18 recurrence (#339/#340) + full recovery recipe.** Hit again — the
+memory existed but was not consulted before `gh pr merge 339 --merge
+--delete-branch`; #340 (based on it) went CLOSED. Recovery when the base
+branch is already deleted (a closed PR can neither be retargeted nor
+reopened while its base is gone):
+1. restore the base ref: `git push origin <merged-tip-sha>:refs/heads/<base-branch>`,
+2. `gh pr reopen <child>`,
+3. `gh pr edit <child> --base main`,
+4. delete the restored branch again: `git push origin :refs/heads/<base-branch>`.
+Diff and review state (Codex 👍) survive intact.
