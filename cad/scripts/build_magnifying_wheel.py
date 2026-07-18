@@ -86,8 +86,8 @@ from build_lever_wire import (  # noqa: E402
 # to survive the chirality mirror's double flip -- the imported tangency
 # azimuth was itself in the mirrored frame, so the two negations cancelled to
 # the same +10.1225 the machine-handed layout gives directly.)
-YOKE_LOCAL_X = _YOKE_POINT[0] - _YOKE_WHEEL_X  # +10.1156 (pitch r 10.4 @ tangency)
-YOKE_LOCAL_Y = _YOKE_POINT[1] - _YOKE_WHEEL_Y  # -2.4156
+YOKE_LOCAL_X = _YOKE_POINT[0] - _YOKE_WHEEL_X  # +10.099 (pitch r 10.4 @ tangency)
+YOKE_LOCAL_Y = _YOKE_POINT[1] - _YOKE_WHEEL_Y  # -2.485
 
 
 async def build(adapter) -> dict[str, str]:

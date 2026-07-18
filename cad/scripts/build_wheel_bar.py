@@ -24,7 +24,7 @@ Holes (all along local Z, the machine front-back axis):
   _clamp_arc.EAR_HOLE_Z): heads on the bar's front face, threading into
   the back arc -- exactly the support-bar stack.
 * 1x O3.8 pen-hanger screw hole at local (-114.5, 0) (machine
-  (-5.5, 565) = local + 109)
+  (-5.5, 575.7) = local + 109)
   taking the pen-hanger screw from behind the bar. The hole sits in the
   5-wide strap/bar overlap at the free end (0.6 edge wall to the end
   face -- thin but photo-consistent: the bar end runs "just past" the

@@ -1350,7 +1350,7 @@ sections:
         - scaled
         - low
       - - Wheel bar (M6.4/M6.8; clamp unified with the platen bar 2026-07)
-        - '10 tall × 9 deep steel HALF-width bar (`wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar) at y 565, back face −129.9 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 22 × 9-family stock depth as the ONE 22 × 9 × 452 `support-bar` at y 338.5 (see ch. 22)'
+        - '10 tall × 9 deep steel HALF-width bar (`wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar) at y 575.7, back face −129.9 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 22 × 9-family stock depth as the ONE 22 × 9 × 452 `support-bar` at y 338.5 (see ch. 22)'
         - —
         - 'M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112)'
         - derived
@@ -1369,7 +1369,7 @@ sections:
       the outer rim → 5× motion magnification). Six straight spokes. Hex-nut axle on
       a horizontal support bar. The two annotated diameters self-validate against
       the stated magnification — strongest-sourced part in chapters 18–21.
-      M6.4 placement: wheel at machine x −53 on the y-565 bar, wheel mid-plane
+      M6.4 placement: wheel at machine x −53 on the y-575.7 bar, wheel mid-plane
       z −146.9 (axle flange on the bar front −138.9).
 
       Wires modeled (2026-07-04): the two amplification wires are now geometry —
@@ -1673,7 +1673,7 @@ sections:
         - scaled + derived
         - low
       - - Hanger screw ×1 (M6.10)
-        - 'AF-7 hex head × 2.5 + Ø3.5 × 12.5 shank at machine (−5.5, 565), driven from BEHIND the bar (the wheel rim back face passes 1.0 in front of the strap — no front-side head fits): head on the bar back face (z −128.9), shank through the bar''s Ø3.8 hole + the strap''s Ø3.6 hole, tip 0.5 behind the strap front face (−141.9); hole 0.6 off the bar''s free-end face (machine −8)'
+        - 'AF-7 hex head × 2.5 + Ø3.5 × 12.5 shank at machine (−5.5, 575.7), driven from BEHIND the bar (the wheel rim back face passes 1.0 in front of the strap — no front-side head fits): head on the bar back face (z −128.9), shank through the bar''s Ø3.8 hole + the strap''s Ø3.6 hole, tip 0.5 behind the strap front face (−141.9); hole 0.6 off the bar''s free-end face (machine −8)'
         - —
         - p.60–63 (the strap is bolted to the bar)
         - scaled + derived

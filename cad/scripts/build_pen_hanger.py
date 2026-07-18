@@ -9,7 +9,7 @@ the first build wrongly tunnelled it along Z). The block reaches
 forward (-Z in the machine) so the pen rod hangs clear of the platen
 paper plane while the strap stays flush on the bar. M6.10 fasteners
 pass: an O3.6 through-hole near the strap top (local (-8.5, 60) =
-machine (-5.5, 565): placed IDENTITY at machine x +3, locals map
+machine (-5.5, 575.7): placed IDENTITY at machine x +3, locals map
 directly) takes the hanger-screw shank coming through
 the bar FROM BEHIND (the magnifying wheel's rim back face passes 1.0 in
 front of the strap, so no front-side head fits); the tip sits 0.5
@@ -64,15 +64,17 @@ BLOCK_HALF = 6.0  # guide block 12 x 12 (low)
 BLOCK_Z = (-4.0, 12.6)  # deep block: back face on the bar front (derived)
 GUIDE_HOLE_HALF = 2.7  # 5.4 square: the 5-square pen rod slides (derived)
 STRAP_Z = (9.6, 12.6)  # strap 3 thick, flush with the block back (derived)
-STRAP_TOP_Y = 65.0  # machine 570: support bar top (derived)
+STRAP_TOP_Y = 75.7  # machine 580.7: bar top after the ch30 p002 wheel-bar
+# re-anchor (y 575.7) -- the strap stretches up to the raised bar while the
+# guide block stays put on the pen line (the pen geometry did not move)
 STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low; lean runs machine-east)
 STRAP_BOT_X = (-5.0, 5.0)  # 10 wide at the block (low)
 # M6.10: the hanger screw threads into the strap near its top, so this is a
 # #6-32 tapped Hole Wizard hole (tap drill Ø2.705) --
 # memory/fastener-policy-us-customary.
-SCREW_HOLE_XY = (-8.5, 60.0)  # machine (-5.5, 565) = block centre +3 + local:
+SCREW_HOLE_XY = (-8.5, 70.7)  # machine (-5.5, 575.7) = block centre +3 + local:
 # within the 5-wide strap/bar overlap east of the bar's free end (machine
-# -8); strap band at y 60 is local -15.1..0.4, so the hole sits 4.8/7.1
+# -8); strap band at y 70.7 is local -15.3..0.3, so the hole sits 6.8/8.8
 # from the strap edges
 
 
