@@ -26,32 +26,32 @@ def test_assembly_fallback_does_not_require_retired_step(
 ) -> None:
     src = tmp_path / "sldasm" / "frame.SLDASM"
     boxes = tmp_path / "boxes"
-    stl = tmp_path / "stl"
+    gltf = tmp_path / "gltf"
     step = tmp_path / "step"
     now = time.time()
     _write(src, now - 10)
     _write(boxes / "frame.json", now)
-    _write(stl / "frame.STL", now)
+    _write(gltf / "frame.glb", now)
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
-    monkeypatch.setattr(export_models, "OUT_STL", stl)
+    monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "OUT_STEP", step)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
     assert not export_models.asm_source_changed("frame", src, {})
 
 
-def test_assembly_fallback_still_requires_current_scene_and_stl(
+def test_assembly_fallback_still_requires_current_scene_and_glb(
     tmp_path: Path, monkeypatch
 ) -> None:
     src = tmp_path / "sldasm" / "frame.SLDASM"
     boxes = tmp_path / "boxes"
-    stl = tmp_path / "stl"
+    gltf = tmp_path / "gltf"
     now = time.time()
     _write(src, now)
     _write(boxes / "frame.json", now - 10)
-    _write(stl / "frame.STL", now + 10)
+    _write(gltf / "frame.glb", now + 10)
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
-    monkeypatch.setattr(export_models, "OUT_STL", stl)
+    monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
     assert export_models.asm_source_changed("frame", src, {})
@@ -61,11 +61,11 @@ def test_subassembly_fallback_does_not_require_a_scene(
     tmp_path: Path, monkeypatch,
 ) -> None:
     src = tmp_path / "sldasm" / "frame.SLDASM"
-    stl = tmp_path / "stl"
+    gltf = tmp_path / "gltf"
     now = time.time()
     _write(src, now - 10)
-    _write(stl / "frame.STL", now)
-    monkeypatch.setattr(export_models, "OUT_STL", stl)
+    _write(gltf / "frame.glb", now)
+    monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
     assert not export_models.asm_source_changed(
@@ -76,6 +76,7 @@ def test_subassembly_fallback_does_not_require_a_scene(
 def test_release_inventory_reuses_build_owned_pngs(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(export_models, "OUT_STEP", tmp_path / "step-cache")
     monkeypatch.setattr(export_models, "OUT_STL", tmp_path / "stl-cache")
+    monkeypatch.setattr(export_models, "OUT_GLTF", tmp_path / "gltf-cache")
     monkeypatch.setattr(export_models, "OUT_PNG", tmp_path / "build-renders")
     monkeypatch.setattr(export_models, "OUT_BOXES", tmp_path / "scene-cache")
 
@@ -96,8 +97,8 @@ def test_release_inventory_reuses_build_owned_pngs(tmp_path: Path, monkeypatch) 
         "png/sample-part/sample-part_isometric.png": (
             tmp_path / "build-renders/sample-part/sample-part_isometric.png"
         ),
+        "gltf/sample-assembly.glb": tmp_path / "gltf-cache/sample-assembly.glb",
         "step/sample-part.STEP": tmp_path / "step-cache/sample-part.STEP",
-        "stl/sample-assembly.STL": tmp_path / "stl-cache/sample-assembly.STL",
         "stl/generated-spring.STL": tmp_path / "stl-cache/generated-spring.STL",
         "stl/sample-part--c1.STL": tmp_path / "stl-cache/sample-part--c1.STL",
         "stl/sample-part.STL": tmp_path / "stl-cache/sample-part.STL",
@@ -278,13 +279,14 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     sldprt = tmp_path / "sldprt"
     sldasm = tmp_path / "sldasm"
     stl = tmp_path / "stl"
+    gltf = tmp_path / "gltf"
     step = tmp_path / "step"
     boxes = tmp_path / "boxes"
     png = tmp_path / "png"
     for path in (sldprt / "sample-part.SLDPRT",
                  sldasm / "harmonic-analyzer.SLDASM",
                  stl / "sample-part.STL",
-                 stl / "harmonic-analyzer.STL"):
+                 gltf / "harmonic-analyzer.glb"):
         _write(path, time.time())
     boxes.mkdir(parents=True)
     _write(png / "harmonic-analyzer/harmonic-analyzer_isometric.png", time.time())
@@ -344,6 +346,7 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "OUT_SLDPRT", sldprt)
     monkeypatch.setattr(export_models, "OUT_SLDASM", sldasm)
     monkeypatch.setattr(export_models, "OUT_STL", stl)
+    monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "OUT_STEP", step)
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
     monkeypatch.setattr(export_models, "OUT_PNG", png)

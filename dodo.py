@@ -19,7 +19,7 @@ Task groups (the prefix says whether SolidWorks is required):
   drawing:<stem>     build one manufacturing drawing (COM)
   verify:<suite>     soundness/subsystems/kinematics gates (COM)
   check:<name>       math/config/graph/nameplate/recipe gates (NO SolidWorks)
-  export             neutral STEP/STL/scene export (COM)
+  export             neutral STEP/STL/glTF/scene export (COM)
   release            cut a tagged GitHub release (COM + gh; opt-in)
   build              EVERY part + assembly + EVERY gate -- the one safe entry
   build_bare         parts + assemblies only -- a quick rebuild
@@ -47,7 +47,7 @@ Run through uv (SolidWorks already open for the COM tasks)::
     uv run python -m doit assembly:paper_drive  # just that assembly + its stale prereqs
     uv run python -m doit part:summing_lever    # just that part
     uv run python -m doit verify:soundness      # one SW gate; check:math one offline gate
-    uv run python -m doit export                # neutral STEP/STL/scene export
+    uv run python -m doit export                # neutral STEP/STL/glTF/scene export
     uv run python -m doit release               # cut the next vNN release (opt-in)
     uv run python -m doit list --all            # every task
     uv run python -m doit clean                 # remove targets (+ wipe png/<asm>)
@@ -1879,7 +1879,7 @@ def task_check():
 
 
 def task_export():
-    """Complete release-neutral export (STEP / STL / PNG manifest + scene). COM seat.
+    """Complete release-neutral export (STEP / STL / assembly glTF / PNG manifest + scene). COM seat.
 
     Always runs ``export_models.py`` (``uptodate: False``) -- it self-checks every
     output's per-file staleness cheaply and prints "all exports fresh" when there

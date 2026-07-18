@@ -534,6 +534,14 @@ scripts that `from _common import log, check` are instrumented unchanged.
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
   (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to
   suppress the console channels without touching capture.
+- **Debug from the capture, not scrollback.** Each line of those two files is one
+  OTel record: `traces.jsonl` spans carry `name`, start/end, `status`, the task
+  `attributes` (label, cmd) and a `resource` whose `service.name` is the pipeline
+  stage; `logs.jsonl` records carry `severity_text`/`body` plus the correlated
+  trace/span ids. When diagnosing a failed, slow, or mysteriously-rebuilt task,
+  query these with `rg`/`jq` (filter by span name, ERROR status, stage, or a
+  trace id lifted from a log line) — and pair them with the per-task console logs
+  teed under `cad/out/logs/` — rather than scraping the doit console output.
 - Safety net: `cad/scripts/test_telemetry.py` (SolidWorks-free, `check:telemetry`)
   asserts the severity split, no-gap span status, log↔trace correlation, and
   cross-process propagation. Run it after editing `_telemetry.py`.

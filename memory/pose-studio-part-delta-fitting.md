@@ -18,7 +18,7 @@ delta to a SolidWorks build-script edit.
   object. Stage from a release bundle when `cad/out` is empty: `gh release download
   <tag> -p "*.zip"`, extract `boxes/` + `stl/` → `cad/out/`, and the SLDASM →
   `cad/out/sldasm/harmonic-analyzer.SLDASM` (its presence gates the per-part branch
-  vs the monolithic `stl/harmonic-analyzer.STL`), and the prepared ref →
+  vs a monolithic assembly mesh — the per-assembly export is now `gltf/<asm>.glb`, the mono STL is retired), and the prepared ref →
   `comparisons/ref/<id>.jpg`. All gitignored.
 - **Fit:** `uv run comparisons/tools/pose_studio.py --pair ch30-p003` → N-panel →
   Build/Reload Scene. Native Blender `G` move / `S` resize on a selected part

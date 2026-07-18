@@ -812,8 +812,9 @@ def bundle(sw: Any, revision: str, version: str,
         raise RuntimeError(f"release bundle not produced at {zip_path}")
     facts["size_mb"] = zip_path.stat().st_size / 1e6
     log(f"release bundle: {zip_path.name} ({facts['size_mb']:.1f} MB) -- "
-        f"solidworks/ + {facts['parts']} part STEP + {facts['documents']} doc STL "
-        f"(+{facts['config_meshes']} per-config STLs) + {facts['pngs']} PNGs + boxes/")
+        f"solidworks/ + {facts['parts']} part STEP+STL + {facts['assemblies']} "
+        f"assembly glTF (+{facts['config_meshes']} per-config STLs) + "
+        f"{facts['pngs']} PNGs + boxes/")
     return zip_path, facts
 
 
@@ -864,9 +865,12 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"- `solidworks/` -- native Pack-and-Go ({facts['documents']} referenced "
         f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
         f"- `step/` -- AP214 STEP for {facts['parts']} parts; `stl/` fine binary "
-        f"STL (mm) for all {facts['parts']} parts + {facts['assemblies']} assemblies "
+        f"STL (mm) for all {facts['parts']} parts "
         f"plus {facts['config_meshes']} per-configuration STLs (cone gears / "
         f"transgears)\n"
+        f"- `gltf/` -- glTF binary (.glb) for all {facts['assemblies']} assemblies "
+        f"(metre units, per-component named nodes, appearance materials): drop "
+        f"`{TOP_ASSEMBLY}.glb` into any glTF viewer\n"
         f"- `boxes/{TOP_ASSEMBLY}.json` -- assembly scene graph (mm): per-component "
         f"transform, mesh key and colour, so the comparison gallery renders from "
         f"this bundle with `comparisons/tools/render_offline.py` (no SolidWorks)\n"
@@ -1101,7 +1105,8 @@ def main() -> int:
             _telemetry.success(f"Done in {time.perf_counter() - started:.1f}s.")
             _telemetry.info(f"version: {version}")
             _telemetry.info(f"bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
-                            f"{facts['documents']} docs x STEP+STL (+{facts['config_meshes']} "
+                            f"{facts['parts']} parts x STEP+STL + {facts['assemblies']} "
+                            f"assembly glTF (+{facts['config_meshes']} "
                             f"per-config) + {facts['pngs']} PNGs + boxes/")
             _telemetry.info(f"log:     {log_path}")
             if facts.get("logs_asset"):

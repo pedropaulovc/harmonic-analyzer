@@ -38,7 +38,7 @@ flowchart TD
     VERIFY --> VG{Gates: DOF · healthy ·<br/>interference · gear ratios ·<br/>BOM · pen-trace ±0.01mm}
     VG -->|fail| FAILV["✗ report failures"]
     VG -->|pass| EXPORT["⑧ export_models.py<br/>neutral-format export"]
-    EXPORT -.->|ASSETS| AEXP[("cad/out/step/*.STEP (AP214)<br/>cad/out/stl/*.STL (mm, per-config)<br/>cad/out/stl/colors.json<br/>cad/out/boxes/&lt;asm&gt;.json")]
+    EXPORT -.->|ASSETS| AEXP[("cad/out/step/*.STEP (AP214)<br/>cad/out/stl/*.STL (mm, per-config parts)<br/>cad/out/gltf/&lt;asm&gt;.glb (m, named nodes)<br/>cad/out/stl/colors.json<br/>cad/out/boxes/&lt;asm&gt;.json")]
 
     EXPORT --> COMMIT["⑨ git commit + push<br/>(lint/test first)"]
 
@@ -47,7 +47,7 @@ flowchart TD
     PRE -->|fail| FAILR["✗ SystemExit"]
 
     PRE -->|pass| PNG["⑩a Pack-and-Go +<br/>re-export STEP/STL/PNG<br/>into stage/"]
-    PNG -.->|ASSETS| APNG[("stage/solidworks/ (flattened P&amp;G)<br/>stage/step/ · stage/stl/<br/>stage/png/ · stage/boxes/")]
+    PNG -.->|ASSETS| APNG[("stage/solidworks/ (flattened P&amp;G)<br/>stage/step/ · stage/stl/ · stage/gltf/<br/>stage/png/ · stage/boxes/")]
 
     PNG --> DIFF["⑩b render_diff.py (uv run)<br/>download prev release →<br/>offscreen render changed parts<br/>(Hausdorff, noise-filtered)"]
     DIFF -->|no prior / render fails| SKIP["⚠ non-fatal: skip<br/>release continues"]
