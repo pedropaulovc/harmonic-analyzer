@@ -596,11 +596,15 @@ def _stamping_modules() -> frozenset[str]:
 
 
 def stamps_part_properties(script: Path) -> bool:
-    """True if this build script stamps a registry row for a part with NO separate
-    part task -- i.e. one it GENERATES in-script (e.g. build_channel_assembly's
-    stretched springs). Drives whether an ASSEMBLY depends on parts rows directly;
-    a non-stamping assembly's parts metadata propagates via the rebuilt ``.SLDPRT``
-    -> REFRESH. Resolved by the function-level call graph in ``_stamping_modules``."""
+    """True if this build script stamps properties in-script: a registry row for a
+    part with NO separate part task -- one it GENERATES in-script (e.g.
+    build_channel_assembly's stretched springs) -- or, since the pen assembly
+    drawing, its OWN assembly doc's title-block/BOM properties
+    (build_pen_assembly). Drives whether an ASSEMBLY depends on parts rows /
+    title_block.yaml / the part template directly; a non-stamping assembly's
+    parts metadata propagates via the rebuilt ``.SLDPRT`` -> REFRESH. Flagging is
+    conservative in the over-rebuild direction only. Resolved by the
+    function-level call graph in ``_stamping_modules``."""
     return script.stem in _stamping_modules()
 
 
