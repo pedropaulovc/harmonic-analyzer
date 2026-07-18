@@ -160,6 +160,45 @@ COM task block on the seat, so the `check:*` gates can be starved toward the end
 the run (they still run N-wide once COM drains) — a few tens of seconds on a ~25 min
 cold build; the incremental/cache-hit common case keeps restores parallel.
 
+## COM watchdog — crash + wedge detection
+
+Every COM subprocess runs a daemon watchdog thread (`_watchdog.py`;
+`_common.run_build` starts it right before `sw.connect` and stops it after
+`sw.disconnect`) so a dead SolidWorks can never hold the seat forever. Three
+signals, two fatal, one log-only:
+
+- **Crash — fatal, exit 86.** A NEW `sldexitapp.exe` process (SolidWorks' own
+  crash-report handler; owner of the `#32770` dialog titled "SOLIDWORKS Design" /
+  "…has encountered a problem… Generating crash report") means SLDWORKS.exe
+  crashed. Do NOT wait on the Windows event log: sldexitapp intercepts WER, so
+  the `AppCrash_sldworks.exe` entry lands only once the report completes
+  (observed stuck 8.5 h+) — process appearance is the earliest reliable event.
+  A pid already alive when the watchdog starts is a stale dialog from an earlier
+  crash and is ignored (warned once), so a healthy new SolidWorks can build next
+  to a lingering dialog.
+- **Op timeout — fatal, exit 87.** No telemetry activity — span boundary or log
+  record (`_telemetry.last_activity()`, poked by every span/log) — for
+  `HARMONIC_COM_OP_TIMEOUT` seconds (default 900). Calibrated from ~3 weeks of
+  `traces.jsonl`: the longest single healthy COM op on record is ~230 s
+  (`verify.rebuild`), so 15 min is ~4× headroom — while whole COM tasks
+  legitimately run ~27 min (`assembly:summing`), which is why the timeout keys
+  on per-op activity, never on process lifetime. Any task-level watchdog must
+  use ≥ 40 min.
+- **Hung window — log-only, never fatal.** A SLDWORKS.exe top-level window
+  failing `IsHungAppWindow` gets a throttled `!!` warn (once per 5 min):
+  SolidWorks legitimately stops pumping messages while resolving complex
+  geometry, so "not Responding" alone is too noisy to kill on — but the warn
+  makes a wedge visible in the log timeline before the op timeout fires.
+
+A fatal signal logs `xx`, flushes telemetry, and hard-exits (`os._exit`) — the
+main thread is blocked inside the dead COM call, so only a process exit frees
+it. The doit parent then fails the task, and since the seat lock is held by the
+PARENT's `_com_seat`, the machine-global seat releases cleanly. Kill switch:
+`HARMONIC_COM_WATCHDOG=0`. Recovery after exit 86: clear the crash dialog,
+relaunch SolidWorks via the 3DEXPERIENCE Platform desktop shortcut (never
+COM-start it), rerun the build. The fatal/log-only contract is pinned by
+`check:watchdog` (`test_watchdog.py`).
+
 ## Incremental rebuilds — refresh vs full
 
 doit hashes script + config **content** (immune to git/worktree mtime churn) and

@@ -146,6 +146,31 @@ def _resolve_otlp_endpoint() -> str | None:
 _T0 = time.perf_counter()
 _LAST_TICK = _T0
 
+# Monotonic timestamp of the last telemetry ACTIVITY -- a span boundary or a log
+# record. This is the per-operation heartbeat the COM watchdog (_watchdog.py)
+# keys its idle timeout on: the instrumentation already brackets every COM
+# operation (the @traced helpers, the gate spans, the severity logs), so "no
+# activity" is a faithful proxy for "stuck inside one COM call".
+_last_activity = time.monotonic()
+
+
+def _touch_activity() -> None:
+    global _last_activity
+    _last_activity = time.monotonic()
+
+
+def last_activity() -> float:
+    """Monotonic time of the last span boundary or log record (see _watchdog)."""
+    return _last_activity
+
+
+class _ActivityFilter(logging.Filter):
+    """Logger-level filter: every record pokes the watchdog heartbeat."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        _touch_activity()
+        return True
+
 # Span nesting depth for the compact console tracer, so the boundary lines
 # indent into a tree and a missing parent is visible at a glance.
 _depth: contextvars.ContextVar[int] = contextvars.ContextVar("_telemetry_depth", default=0)
@@ -335,6 +360,8 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     pylog = logging.getLogger(_LOGGER_NAME)
     pylog.setLevel(logging.DEBUG)
     pylog.handlers.clear()
+    pylog.filters.clear()
+    pylog.addFilter(_ActivityFilter())
     pylog.propagate = False
     # Bridge into OTel's logs SDK: carries SeverityNumber + the active span's
     # trace/span id onto every record, so logs and traces correlate.
@@ -439,6 +466,7 @@ def event(name: str, **attributes: Any) -> None:
 
 
 def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, Any, int]:
+    _touch_activity()
     tracer = get_tracer()
     depth = _depth.get()
     attrs = {"harmonic.depth": depth}
@@ -458,6 +486,7 @@ def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, 
 
 
 def _exit_span(handle: Any, exc: BaseException | None) -> None:
+    _touch_activity()
     cm, token = handle
     _depth.reset(token)
     span = trace.get_current_span()

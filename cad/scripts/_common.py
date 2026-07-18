@@ -57,6 +57,7 @@ from pathlib import Path
 from typing import Any
 
 import _telemetry  # observability spine: console logging + tracing, preconfigured
+import _watchdog  # COM crash/hang watchdog (started per session in run_build)
 
 CAD_ROOT = Path(__file__).resolve().parents[1]
 OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
@@ -2024,6 +2025,11 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 "COM build launched under doit without holding the SolidWorks seat "
                 "(HARMONIC_COM_SEAT unset) -- a COM task is missing _com_seat(); "
                 "see dodo.py._com_seat")
+        # Crash/hang protection for the whole COM session (see _watchdog.py):
+        # a new sldexitapp.exe (SolidWorks' crash-report dialog) or 15 min of
+        # telemetry silence hard-exits this process so the doit parent can fail
+        # the task and release the seat lock; a hung SW window only logs.
+        _watchdog.start()
         adapter = PyWin32Adapter({})
         async with _telemetry.aspan("sw.connect"):
             _telemetry.info("connecting to SolidWorks")
@@ -2056,6 +2062,9 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                     _telemetry.success("disconnected")
                 except Exception as exc:  # noqa: BLE001
                     _telemetry.warn(f"disconnect failed: {exc}")
+            # COM session over: stop the watchdog so a long SolidWorks-free
+            # tail (pure-python post-processing) can't trip the idle timeout.
+            _watchdog.stop()
 
     # build_session continues the doit task span when one was injected (so we add
     # no duplicate root layer under the spine) and opens a local root only when run
