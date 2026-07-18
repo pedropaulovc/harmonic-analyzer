@@ -1805,8 +1805,12 @@ def task_check():
             # hard-exits the COM subprocess (releasing the seat via the doit
             # parent); a hung SW window only warns. Pure python, injectable
             # probes -- so the fatal/log-only contract can't silently regress.
+            # _common.py is a dep because the gate also pins the INTEGRATION
+            # (run_build arms/disarms the watchdog): an edit that drops those
+            # calls must re-run this gate, not reuse the old stamp (codex #344).
             "file_dep": [str((SCRIPTS_DIR / "_watchdog.py").resolve()),
                          str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                         str((SCRIPTS_DIR / "_common.py").resolve()),
                          str((SCRIPTS_DIR / "test_watchdog.py").resolve())],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],
         },

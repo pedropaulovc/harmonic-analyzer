@@ -12,6 +12,8 @@ idle timeout is only as good as the instrumentation poking it.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 import _telemetry
@@ -202,6 +204,19 @@ def test_start_logs_the_armed_configuration(monkeypatch: pytest.MonkeyPatch) -> 
     finally:
         _watchdog.stop()
     assert any("watchdog armed" in m and "900s" in m for m in infos)
+
+
+def test_run_build_wires_the_watchdog() -> None:
+    # Pin the INTEGRATION, not just the unit: run_build is the single COM entry
+    # and the only caller of start()/stop() -- if a refactor drops either call,
+    # every COM subprocess silently runs unprotected while this gate stays
+    # green (codex #344). Source-text pin (not an import) so the gate needs no
+    # SolidWorks adapter on the machine running it.
+    src = (Path(__file__).with_name("_common.py")).read_text(encoding="utf-8")
+    assert src.count("def run_build(") == 1
+    run_build_src = src.split("def run_build(", 1)[1]
+    assert "_watchdog.start()" in run_build_src, "run_build no longer arms the watchdog"
+    assert "_watchdog.stop()" in run_build_src, "run_build no longer disarms the watchdog"
 
 
 def test_span_boundaries_poke_the_heartbeat() -> None:
