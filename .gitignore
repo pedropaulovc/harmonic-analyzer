@@ -438,3 +438,6 @@ comparisons/bench/out/
 
 # Agent worktrees (transient, per-session; never an artefact of the repo)
 .claude/worktrees/
+
+# meshprobe inspection-session state (local tool cache, never versioned)
+.meshprobe/
