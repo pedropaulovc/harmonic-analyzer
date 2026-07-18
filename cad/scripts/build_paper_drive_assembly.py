@@ -173,11 +173,18 @@ from build_platen_rack import (  # noqa: E402
 )
 
 PLATE_X0 = -150.0  # centred between the columns (ch30 rest pose)
-PLATE_Y0 = 305.0
+# ch30 p002 pose-studio re-anchor (2026-07-18): the support-bar + reducer
+# cluster fit 42.9 LOWER than the old layout (support-bar 338.5 -> 295.6);
+# the platen hangs on the bar and the stud/knob derive from the rack, so the
+# WHOLE stack rides down together (mesh + hang preserved). y-only -- the
+# fit's z component was front-view drag leakage. The platen's own position/
+# size gets fine-tuned over several later rounds (memory/ch30-p002-refit-
+# roadmap).
+PLATE_Y0 = 262.1
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
-GUIDE_Y = (315.5, 349.5)  # bottom / top rail seats (machine y)
+GUIDE_Y = (272.6, 306.6)  # bottom / top rail seats (machine y)
 BAR_TOP_Y = GUIDE_Y[1]  # 349.5
 BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 338.5
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
