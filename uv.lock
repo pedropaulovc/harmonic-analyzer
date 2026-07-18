@@ -1972,7 +1972,7 @@ wheels = [
 
 [[package]]
 name = "meshprobe"
-version = "0.3.0"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mcp" },
@@ -1981,9 +1981,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/39/141eca007cb2b670256b7bee1ec3cd90255cab92f8588385edab18ae27b7/meshprobe-0.3.0.tar.gz", hash = "sha256:0eecad6efa36a6097609fb4c6819a07da0695f8bb19823306bbc1c6d31591665", size = 959435, upload-time = "2026-07-17T16:15:49.083Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/9b/eb207627a858a0b2215f6e0bbec7ce7bcc0912ef36224fd4e1d40e085df3/meshprobe-0.4.0.tar.gz", hash = "sha256:ed7f22297c8c6e8a7e789aea9dbf5d7f0aa9d0dbc6005cf9923b751dbe6c31a4", size = 2301215, upload-time = "2026-07-18T21:47:48.665Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f6/88/3ab6d5c75c2cfc7fdfa2c99a3fdfc2eadd1638ef5749c1a769f5fd818f17/meshprobe-0.3.0-py3-none-any.whl", hash = "sha256:55f8b326e93874530531868c222c2d647933db2131e681a757e52189907b15f8", size = 202472, upload-time = "2026-07-17T16:15:47.624Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/b3/b77e26470db50740a6c28f8947ca62aa1d01bb8ada45e34ba8e49a926c0e/meshprobe-0.4.0-py3-none-any.whl", hash = "sha256:9fc231d0029af440f77985c456bda37e9e6599895ec682ccb550c57de6edb397", size = 242159, upload-time = "2026-07-18T21:47:46.98Z" },
 ]
 
 [[package]]
