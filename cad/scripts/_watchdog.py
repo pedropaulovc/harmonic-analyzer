@@ -60,6 +60,22 @@ DEFAULT_OP_TIMEOUT = 900.0
 _POLL_INTERVAL = 15.0
 _HUNG_WARN_INTERVAL = 300.0
 
+# Gate for the process-wide ``start()``: the probes are Win32-only. Module-level
+# so the offline gate can monkeypatch it and exercise start/stop off-Windows.
+_WINDOWS = os.name == "nt"
+
+
+def _warn(message: str) -> None:
+    """A watchdog SELF-log. ``watchdog_signal=True`` exempts it from the
+    activity heartbeat (``_telemetry._ActivityFilter``): the periodic
+    hung-window warn must never reset the idle clock it is warning about,
+    or a permanently wedged SolidWorks would warn forever and never time out."""
+    _telemetry.warn(message, watchdog_signal=True)
+
+
+def _error(message: str) -> None:
+    _telemetry.error(message, watchdog_signal=True)
+
 # --------------------------------------------------------------------------- #
 # Win32 probes (ctypes only -- no psutil dependency). Each is best-effort:    #
 # a probe failure must never take down a healthy build, so callers get the    #
@@ -174,7 +190,7 @@ class Watchdog:
         # those pids so only a NEW sldexitapp is treated as OUR crash.
         self._baseline_crash_pids = set(self._crash_pids())
         if self._baseline_crash_pids:
-            _telemetry.warn(
+            _warn(
                 "stale SolidWorks crash dialog present at watchdog start "
                 f"(sldexitapp pids {sorted(self._baseline_crash_pids)}) -- "
                 "ignoring it; only a NEW crash dialog aborts this task"
@@ -184,7 +200,7 @@ class Watchdog:
         """One evaluation of all signals. Returns which signal fired (tests)."""
         fresh_crash = self._crash_pids() - self._baseline_crash_pids
         if fresh_crash:
-            _telemetry.error(
+            _error(
                 "SolidWorks CRASHED: crash-report handler sldexitapp.exe is "
                 f"running (pids {sorted(fresh_crash)}, dialog 'SOLIDWORKS "
                 f"Design') -- aborting COM task (exit {EXIT_CRASH})"
@@ -195,7 +211,7 @@ class Watchdog:
 
         idle = self._clock() - self._activity()
         if self.op_timeout > 0 and idle > self.op_timeout:
-            _telemetry.error(
+            _error(
                 f"COM operation timed out: no telemetry activity for {idle:.0f}s "
                 f"(> HARMONIC_COM_OP_TIMEOUT={self.op_timeout:.0f}s; longest "
                 f"healthy single op on record is ~230s) -- SolidWorks is wedged, "
@@ -209,7 +225,7 @@ class Watchdog:
             now = self._clock()
             if now - self._last_hung_warn >= self.hung_warn_interval:
                 self._last_hung_warn = now
-                _telemetry.warn(
+                _warn(
                     f"SolidWorks window not responding (idle {idle:.0f}s) -- "
                     "normal while resolving complex geometry; the op timeout "
                     "aborts if no progress by "
@@ -242,7 +258,7 @@ def start() -> Watchdog | None:
     idle timeout. Returns ``None`` when disabled (``HARMONIC_COM_WATCHDOG=0``)
     or off-Windows."""
     global _active
-    if os.name != "nt":
+    if not _WINDOWS:
         return None
     if os.environ.get("HARMONIC_COM_WATCHDOG", "1").lower() in {"0", "off", "false"}:
         return None

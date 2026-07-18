@@ -12,8 +12,6 @@ idle timeout is only as good as the instrumentation poking it.
 
 from __future__ import annotations
 
-import logging
-
 import pytest
 
 import _telemetry
@@ -97,21 +95,37 @@ def test_timeout_zero_disables_idle_check() -> None:
     assert exits == []
 
 
-def test_hung_window_warns_but_never_exits(caplog: pytest.LogCaptureFixture) -> None:
+def test_hung_window_warns_but_never_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Capture via a test double, not caplog: the harmonic logger has
+    # propagate=False, so records never reach caplog's root handler (codex #344).
+    warns: list[str] = []
+    monkeypatch.setattr(_watchdog, "_warn", warns.append)
     dog, exits = _make(hung=True, idle=100.0)
-    with caplog.at_level(logging.WARNING, logger="harmonic"):
-        assert dog.tick() == "hung"
+    assert dog.tick() == "hung"
     assert exits == []
-    assert any("not responding" in r.message for r in caplog.records)
+    assert any("not responding" in w for w in warns)
 
 
-def test_hung_warn_is_throttled(caplog: pytest.LogCaptureFixture) -> None:
+def test_hung_warn_is_throttled(monkeypatch: pytest.MonkeyPatch) -> None:
+    warns: list[str] = []
+    monkeypatch.setattr(_watchdog, "_warn", warns.append)
     dog, _ = _make(hung=True, idle=100.0)
-    with caplog.at_level(logging.WARNING, logger="harmonic"):
-        dog.tick()
-        dog.tick()  # same clock instant -> inside the throttle window
-    warns = [r for r in caplog.records if "not responding" in r.message]
-    assert len(warns) == 1
+    dog.tick()
+    dog.tick()  # same clock instant -> inside the throttle window
+    assert len([w for w in warns if "not responding" in w]) == 1
+
+
+def test_watchdog_self_logs_do_not_reset_the_idle_clock() -> None:
+    # The P1 regression (codex #344): the periodic hung-window warn goes through
+    # the harmonic logger, whose _ActivityFilter pokes the heartbeat -- so a
+    # permanently wedged SolidWorks would reset its own idle clock every 5 min
+    # and never hit the op timeout. watchdog_signal=True exempts it.
+    _telemetry._last_activity = 0.0
+    _watchdog._warn("hung-window self log")
+    _watchdog._error("crash self log")
+    assert _telemetry.last_activity() == 0.0
+    _telemetry.warn("a real pipeline warn")
+    assert _telemetry.last_activity() > 0.0
 
 
 def test_env_kill_switch(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,6 +136,10 @@ def test_env_kill_switch(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_start_stop_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("HARMONIC_COM_WATCHDOG", raising=False)
     monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "900")
+    # The check:* gates are pure-python and must pass off-Windows too, where the
+    # real platform gate would return None (codex #344) -- force it open; the
+    # Win32 probes inside are themselves guarded no-ops off-Windows.
+    monkeypatch.setattr(_watchdog, "_WINDOWS", True)
     first = _watchdog.start()
     try:
         assert first is not None

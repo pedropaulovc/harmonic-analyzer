@@ -165,10 +165,17 @@ def last_activity() -> float:
 
 
 class _ActivityFilter(logging.Filter):
-    """Logger-level filter: every record pokes the watchdog heartbeat."""
+    """Logger-level filter: every record pokes the watchdog heartbeat.
+
+    EXCEPT records the watchdog emits about itself (``watchdog_signal=True``
+    field): its periodic hung-window warn would otherwise reset the very idle
+    clock the op timeout reads, so a permanently wedged SolidWorks would be
+    warned about every 5 min forever and never aborted (codex #344 P1).
+    """
 
     def filter(self, record: logging.LogRecord) -> bool:
-        _touch_activity()
+        if not getattr(record, "watchdog_signal", False):
+            _touch_activity()
         return True
 
 # Span nesting depth for the compact console tracer, so the boundary lines

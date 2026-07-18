@@ -158,9 +158,13 @@ def _local_modules() -> dict[str, Path]:
     logging-only edit would then invalidate the whole remote cache and force every
     SolidWorks part to rebuild. Telemetry output can never change saved CAD bytes,
     so dropping it cannot under-invalidate (the one cardinal sin here) -- it only
-    stops a spurious over-rebuild.
+    stops a spurious over-rebuild. ``_watchdog`` is excluded for the same reason:
+    also imported by ``_common``, it only ever aborts-or-logs (crash/idle/hung
+    detection) -- a build it kills produces NO artefact at all, so its content can
+    never change saved CAD bytes either (codex #344).
     """
-    skip = {"_buildgraph.py", "_extract.py", "_rewrite_imports.py", "_telemetry.py"}
+    skip = {"_buildgraph.py", "_extract.py", "_rewrite_imports.py", "_telemetry.py",
+            "_watchdog.py"}
     out: dict[str, Path] = {}
     for p in sorted(SCRIPTS_DIR.glob("*.py")):
         if p.name not in skip and not p.name.startswith("test_"):
