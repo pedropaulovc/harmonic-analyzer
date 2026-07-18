@@ -109,3 +109,6 @@
 - [Paper-drive rework evidence](paper-drive-rework.md) — the full E1-E8 dossier + part-change table behind PR #196 (moved from docs/); anchors, z-stacks, mate chain, photo cross-checks
 - [Codex review diminishing returns](codex-review-diminishing-returns.md) — judge Codex rounds by finding quality, not count: keep fixing real bugs, decline only over-pinning
 - [Mirror retirement sweep](mirror-retirement-sweep.md) — #151 golden-pose gate, rulebook, accepted deltas
+- [SW glTF export](sw-gltf-export.md) — assemblies export .glb via plain SaveAs3 (extension-inferred, SW2023+): metres, Name2-named nodes, PBR materials; pattern-generated instances become numeric node ids (no friendly name); shipped as cad/out/gltf/ since PR #339
+- [meshprobe usage](meshprobe-usage.md) — needs Blender >= 5.2 via --blender (gpu.init); glTF must be METRES; view-orbit requires --projection-json (DX 100mm recipe inside); high_key + white bg for SW PBR metals; .meshprobe/ session state is gitignored
+- [ch30 p002 refit roadmap](ch30-p002-refit-roadmap.md) — staged front-view refit: wheel +10.7 done (#340); reducer group (support-bar+rack-pinion+transgears) down 42.9 mm next per pose-studio deltas; then platen/rack lowered + resized smaller (owns the final rack mesh)
