@@ -22,7 +22,7 @@ offline-render feed consumed by render_offline.py —
   millimetres) and RGB. The old monolithic per-assembly STL SaveAs3 is
   retired — nothing ever read its mesh bytes, and the GLB carries colours +
   component identity it never had. (The scene JSON is slated to be retired in
-  favour of reading the GLB directly — issue #336.) Every referenced part gets
+  favour of reading the GLB directly — issue #338.) Every referenced part gets
   its own STL, shared across assemblies and instanced by the Blender worker
   (so 20 cone gears cost one mesh). STL geometry is in millimetres (mesh
   units == the scene-graph transform units, so they pair directly).
