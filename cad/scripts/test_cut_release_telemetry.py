@@ -31,9 +31,9 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
     part = tmp_path / "cad/out/sldprt/sample-part.SLDPRT"
     assembly = tmp_path / "cad/out/sldasm/sample-assembly.SLDASM"
     step = tmp_path / "cad/out/step/sample-part.STEP"
-    stl = tmp_path / "cad/out/stl/sample-assembly.STL"
+    glb = tmp_path / "cad/out/gltf/sample-assembly.glb"
     for path, body in ((part, b"part"), (assembly, b"assembly"),
-                       (step, b"step"), (stl, b"stl")):
+                       (step, b"step"), (glb, b"glb")):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(body)
 
@@ -48,9 +48,9 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
                 "source": step.relative_to(tmp_path).as_posix(), "bytes": step.stat().st_size,
                 "sha256": export_models._file_sha256(step),
             },
-            "stl/sample-assembly.STL": {
-                "source": stl.relative_to(tmp_path).as_posix(), "bytes": stl.stat().st_size,
-                "sha256": export_models._file_sha256(stl),
+            "gltf/sample-assembly.glb": {
+                "source": glb.relative_to(tmp_path).as_posix(), "bytes": glb.stat().st_size,
+                "sha256": export_models._file_sha256(glb),
             },
         },
     }), encoding="utf-8")
@@ -70,7 +70,7 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
         export_models, "_release_inventory",
         lambda _parts, _assemblies, _cfg, _scenes: {
             "step/sample-part.STEP": step,
-            "stl/sample-assembly.STL": stl,
+            "gltf/sample-assembly.glb": glb,
         },
     )
     monkeypatch.setattr(export_models, "_exporter_digest", lambda: "exporter-v1")
@@ -92,7 +92,7 @@ def test_neutral_stage_is_one_aggregate_span_without_document_work(
         "config_meshes": 0,
     }
     assert (tmp_path / "stage/step/sample-part.STEP").read_bytes() == b"step"
-    assert (tmp_path / "stage/stl/sample-assembly.STL").read_bytes() == b"stl"
+    assert (tmp_path / "stage/gltf/sample-assembly.glb").read_bytes() == b"glb"
 
     finished = spans.get_finished_spans()
     neutral = [span for span in finished if span.name == "release.neutral_stage"]

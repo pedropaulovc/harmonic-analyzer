@@ -1,0 +1,2187 @@
+{
+  "op": "render.image",
+  "request_id": "render-image-e6ba5cf1e842",
+  "result": {
+    "blender_version": "5.2.0 LTS",
+    "color": {
+      "bytes": 900402,
+      "media_type": "image/png",
+      "path": "C:\\Users\\pedro\\AppData\\Local\\Temp\\claude\\C--src-harmonic-analyzer\\316351ad-2e65-4206-a5d6-0b11afea9545\\scratchpad\\before-front.png",
+      "sha256": "665749eebf3fe5db91672111d6e41f2dc8189d459c7e64e8c34e4590d00fea5f"
+    },
+    "device": "graphics_hardware",
+    "engine": "eevee",
+    "evaluator": null,
+    "graphics": {
+      "backend": "OPENGL",
+      "blender_device_type": "AMD",
+      "device_class": "hardware",
+      "renderer": "AMD Radeon PRO V710 MxGPU",
+      "vendor": "ATI Technologies Inc.",
+      "version": "4.6.0 Core Profile Context 25.10.17.02.251114",
+      "warnings": []
+    },
+    "graphics_policy": "software_allowed",
+    "height": 1658,
+    "luminance": {
+      "clipped_fraction": 0.0,
+      "crushed_fraction": 4.819277108433735e-05,
+      "maximum": 0.812315364909172,
+      "median": 0.0313725508749485,
+      "minimum": 0.0
+    },
+    "resolved_depth_of_field": null,
+    "samples": 64,
+    "schema_version": 2,
+    "session": {
+      "camera": {
+        "pose": {
+          "frame": "world",
+          "orientation_xyzw": [
+            -0.0008649373993946313,
+            -0.7079696237391987,
+            -0.7062109886508435,
+            0.006656069010362227
+          ],
+          "position_mm": [
+            -50.88278278708458,
+            6265.422821044922,
+            681.8432807922363
+          ]
+        },
+        "projection": {
+          "depth_of_field": {
+            "aperture_fstop": 2.8,
+            "focus": null,
+            "focus_distance_mm": null,
+            "mode": "disabled"
+          },
+          "far_clip_mm": 20000.0,
+          "focal_length_mm": 100.0,
+          "mode": "perspective",
+          "near_clip_mm": 0.5,
+          "sensor_fit": "vertical",
+          "sensor_height_mm": 23.6,
+          "sensor_width_mm": 15.8
+        }
+      },
+      "camera_diagnostics": {
+        "aspect_ratio": 0.4222,
+        "forward": [
+          0.008202933706343174,
+          -0.9999633431434631,
+          0.0024435906670987606
+        ],
+        "frustum_corners_mm": [
+          [
+            -50.85441097617149,
+            6264.923095703125,
+            681.7852258682251
+          ],
+          [
+            -50.904203206300735,
+            6264.922618865967,
+            681.7857623100281
+          ],
+          [
+            -50.85315927863121,
+            6264.923095703125,
+            681.9032430648804
+          ],
+          [
+            -50.90295150876045,
+            6264.922618865967,
+            681.9037795066833
+          ],
+          [
+            1085.5940580368042,
+            -13761.011123657227,
+            -1643.1578397750854
+          ],
+          [
+            -908.9889526367188,
+            -13777.320861816406,
+            -1621.9210624694824
+          ],
+          [
+            1135.822057723999,
+            -13749.05014038086,
+            3083.4856033325195
+          ],
+          [
+            -858.7609529495239,
+            -13765.359878540039,
+            3104.722499847412
+          ]
+        ],
+        "horizontal_fov_degrees": 5.704189593624085,
+        "projected_bounds": {},
+        "right": [
+          -0.9999098777770996,
+          -0.008176478557288647,
+          0.010646245442330837
+        ],
+        "target_depth_mm": 6202.999591827393,
+        "up": [
+          0.010625877417623997,
+          0.0025304644368588924,
+          0.9999403357505798
+        ],
+        "vertical_fov_degrees": 13.459564137784403
+      },
+      "camera_operation": null,
+      "components": {
+        "cmp_00913d2b34c473cb365f6717": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_01493a66fd0bf55998fce305": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_023a9f00cce2a86c29c28eea": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_02c2d3cfa5ffa95b1a1f919c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_030f66917460b4729a1c96a3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_03352eb9d3716c883a0840e9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_037b3322ff186aa6ec6ff58b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_04a7f530dcf95d692ea693b7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_05de0481eca5339d7df2c68b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_06062c501a9c1431f1fbc786": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0682104dc46dbeb24ac236ba": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_07aa8009ac9479187a5f88f7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_07fad7fbd19c4aba62a43c98": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_085a137fdd9c5b0eb4e528f8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_091c3a98967d89cbf0ae33d1": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0a0181324c4a94b719c811ee": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0a79b4b7d995a59a07049f37": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0a88eaf75af02db5c31b70c9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0b15871a6eadfac9799aabac": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0c80ba7afcb54922d13ea1c9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0d4ca1bc6dbdf8dd58ab10dd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0d9b83654b201a1dba8e22c3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0e1f08553f39f91b0d22db32": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0e3cba9f41ef3894219e6fc8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0eafd2a3788b627a931da6c3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0f1dc652c17136288a499a9d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_0f9b9e72d77e2e06a122661a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_11ef5567b04807d5e10c22c2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_142356ce368f8db14bc14854": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_148f90de6f3410527a05d78c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_16bef9258ed3c515e3adc928": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_16fcd62c1afcb2167e8f587d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_170d0443cdbd87bf7d0d6a89": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_176839f11d552f57a8c7d6b3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_185f3714f348cf2b85ef68c6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_19ac85dee7ac6de7faad1ea9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1a5a66de8d244307222395b5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1a5c535b05f85f13395d226f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1a820ad2c0e105fffb8a9dea": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1b2e5c19ccc8875699cd42ab": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1b415ab7083d936bcd1d286b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1c34442efc23c27991509d4b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1d39f574959b023f062c7d9b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1d5cdc5ead473147cca54cf0": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1d8f565578812a2ca8487ba5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1de90e0b24a72144a451ea27": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1e34fadda330794da8ea05f4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1e66c78543fe76ae8d96aa62": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_1f277d144f403a26fa571ce3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_203d7f0f3aa3dbf8820c20e1": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_209a71a04d603b88abcd486c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2166e8269b031c62aaf8334d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_21bac954121982986e31deb3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_21fe93fd6b988e365f981b0b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_22bf28b44778bb2b98416582": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_23778b98d5b8edaf06d6fad4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_239b89f47bec9f2c3ab0edb7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2476b4eccacd97aaa3c60be7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_26914c0fe438c98539e5b750": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_27b2b2c0f8b1ab18005b8cc8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_280c2ce37509ebd363889694": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_29a6a8ad2a287bf1e5eb3e2f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2a0d497dc142f86bc0a588b7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2af923cf2081c084cea67a1b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2b0bf935c1e6c3ca5a2c29f8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2b7d54290af207bc5cd2cdc8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2c35ef9e7d79d6b46bc20843": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2c4656da7658fae9392b70bf": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2cde271904e7d39aa164f171": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2d6ac57e149c9b61d29b029d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_2f68f26a94455ed4950e97eb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3102f1884d7b32775a23b934": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3126c14ed95cfc2aacb2c4fa": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_31af5cf11d58072cb5ef365a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3311530212025f0df06ba651": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_37935c6833068d027226f4a2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3870a4b75f90421ee533c907": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_38d8dcea1fedddcc59b799e2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3a7052a0a232a7f263972423": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3a7bccc644d0a7347a2fc942": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3b4fc3c065657466e3510454": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3bca2da64caf57c5b383845c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3bd1b333df22b2b8cd96a9bb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3bfec7eda3ee473861baac9a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3c008ffb27d9d9737ae0fc63": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3ca9b2724c4f0558cd248dca": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3e63604e4f82417593d81bcd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3fcd7a90c50c1563c0f6deff": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_3fedb196ae68f169a946e1e1": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4061df78e7940f00a0a133db": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_40a2a7c5a28294df858ef3b6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_40b81752b6c51dc192edc399": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_40d6052c02a859b975da3d4f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_40f8ce1a9e0c12939d26cad5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4125b3dffa0cb6d34f5ece5a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_413c16d80b6e922cd27fa96f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4181dcbb25ae72ce16b7a334": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_41935362de448863b85006f3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_42a881968f021d91efe7258c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_42f90c9a533e3e1214a022cb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_439f42cc5f191eefa3b57598": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_43da2858320ab8be865259bb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_441c7d1e307fa0763d456157": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_445721e64b868af13ab7fdbf": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_449bb4db1aac730f5e7c4507": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_462b13ed37b045d46eecb108": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_47043510a043b2aa09935923": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_47ee4c97b074b17be38c4226": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4806cdd05fa80c85571a1e1f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_489a1b43268631698cb1069b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_48a3e250ff2271aaad77777c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_48a9f930e6a93f256ebdaf6f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_48c262e0f6538ba9373a72ee": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_48e61b5905b464167289418f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_49524a7f79512bdda44d1c88": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4a05ea07120e32fd3ddc15aa": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4a33ea8b88964c4657c72802": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4a9d2d31693bbb5cfb101ae2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4b74e27be353820c2b1afe24": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4bc2e9066eecf11c06436fb9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4c4149d6fafbb5b2b421f401": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4cc9b7581cd36cc2f0d14634": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4dcceca0e9873a1a6389d031": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4df418c152082769a0d418cd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4eaaf6ec5496ee61798457a8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_4ed1918991754d37b292a5dc": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_50c2f66fed781fd59f2b4170": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5140da138bc1b8e5354d4b58": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_51b3666e5c157a679a1298fd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_51d79ee428d4085ffcfc1f37": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5237c1b57c5cc02cdf9ae984": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_532d63ad43850f27543dc202": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_53bcfffa20ea9f6b4d02cbd2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_54259bcd9456ff198a3529ad": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_59448521777fdc8ca34f2862": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5977f75b101ce5e79f1e7053": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5aa72013b9dcb3098ccad6d7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5abe915a6e57672e3ec9beaf": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5b497945fa02d935a518dcc7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5b74f34865630bca9f4c8d7c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5c384a567fc3374ad248c96a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5c3f19bb0a356770d1f0a33a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5eb7a611c34108785a509d18": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_5f611e3ea3531b0848f198a4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_604c1a3c235c031110a12a31": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6059e34b174adf32f7eed95b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6134a5686dade5892517ff04": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_61552d0350977a02c1011d49": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_61ecb0a1a87aa5d9366a7301": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_63fe905fa33210afd90c090b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_64466fdf2b68706f626275af": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_645b32c9fb3c28d49704fd1a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_64fc830f70d7d172f2ec85e9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_672ddd866620ce8f6f242613": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6775cbb6ca389189e81eee59": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_67a06745d6589228b82effd8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6834b9da950ee0a1d9b64acb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_687aa8aabcfb3f4d657fab27": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_691fc2f33dd8819141933677": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6b212a4f22d9b2d7ad7e434c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6b2621cb738f137c9d8c157d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6b3219ae9b1d961b414d7610": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6bdbb7192cd18ebe83dccf81": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6bddd005d4f90d4c91540e2c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6cb1507f58acc488ce9c25ac": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6d08de13570a29dd11831124": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6d1f2e975642a284cbc226e6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6d65c62d7efa1308f0b81a82": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_6d6f94a3f1b3c8be0c050062": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_707ffa1bde7b8c48580ced45": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_70b3c57610643e185c9fc2ce": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7169d9766bb98f788d9eb786": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7193445259f0a01fed1396b5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_73fe75e71f612d80cf5e5b57": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_750d7d9f1e944e424c21516a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_769095e89e418ab7295f5db8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_77bbc9bd6d80d271444c55ca": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_78429c1190efb1fdc8b01f59": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_78bde91d390d2e5eff1712a3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_796cbd2e2ce9f5ca0cc483a5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_798ae591fe4b06ff01f0a0ea": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7a9ef7138c28a6496c792e40": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7acdd5fdfe397a2b3dffa444": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7b5cff71defca7c600d94ba1": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7cc4e9278d2b97d14368bb90": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7d44e76088cee8e0be074518": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7e0843823cf1fa213bc3972c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7e4b51d8a9ddff18bdb3b1b8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7e6ff536afaed0edf8084675": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7e7f2afe5ef9501a37b8b34a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7e958d85a6a21c6751b7657c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7e9d73c261f414b11bdf39b6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7f1241cb437bee55473d1a77": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_7fe3061a01c3a1a0ed92a27b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_806925513f5120ef307313da": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_80917af927906ef0a31b8cd1": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_809ad6728e93602772604ed0": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_80a98e9220335ece23da6633": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_81030a3492c362217d5be4f2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_81b8511e3627837177c3b97a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_81c40a4d3779228939bb5dbf": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_834bacf114e6a0857f78ecaf": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8388e4745630f4dceb021ebc": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8398ee4df4c37b7dc8e65463": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_83fb5f32117092ba02093dbd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8446f0960037150e9a5adef3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_84959b36e5f5a8cbd7049bee": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_85c5cbade62ad54dd386216a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_85d74d533e3e93416a2e12bb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_86fe8097293a3c33c6c3afe5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8720ddaea2d920b2e8d98b6f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_877709e49b45854b8270d979": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_87e76e5716b5673375bbaf6b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_89056eeb3c9e73c4042f74e6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8945c68de8509bffe0f71b07": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_89514f416798b669711b201d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_897325219a6a11c2196793bf": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_89def72bd4d6ebae723c90bb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8a9b0c970750b5047a76bfe4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8b10974da8a1aeb030e154cb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8b43420f5a979ae083da5dea": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8cdc19589928941fe61c4ef5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8cf8942ec190970dcc2617b2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8d5584703717f21336ffcea7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8d768fb1d1ac42844f56b074": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8db02fae2d69ef1077b53294": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8ea61d230c3fd02a2895a1d0": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8f37dd861cfd129eb35a8ea7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_8f78bc5bce5b85e1a6c0a28e": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_91566b0423b6fed2ed7ed54e": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_91ad9b5a4230ac85718507b4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_926d1d9fccb1952c5c98c5a0": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_9287e3a9a76b6076d5c4358d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_92ed3443df386ef767f6c375": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_935ab270425ced8717da02b5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_94b949e666280b9fafdd9a4f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_950eecea42ca98c6bc2bab59": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_95aac7c15cfed609b3febd45": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_95d1be4d577c103cd246c03e": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_979a4df875609d14c092ea65": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_99670d355b010261c76d4c30": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_9972d229c22c0a5669790aa0": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_99b3330cccdbd3c5619b95e2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_99c6067a8d6ab0158ab6a626": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_9b165f47fe98802fbed0d54d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_9b32a015ab3ff569baa86894": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_9cbaaf9ef3f3464cdddea4d2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_9de252e1f62b425b84fd53f6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_9e8b313820e2bdf662dd170c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a01a337c2f3b780da9e10912": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a0f43e27f74429b37193701e": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a176cbc380ed0135b3f80d35": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a17eb919b3e168172aaf7e2d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a1aaa87d7d1da68b88d6e3fd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a1d76fc83a69afd060d79101": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a247a2a25ffc8e279a750c30": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a25d32742a3cb1132731c6ac": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a3716672b2c774d15895b88c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a3b4f49063d4e90299d8bbcd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a3d1f1b18702d70a5d2b6df4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a40ba8bb5f111f06035696f1": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a4a7679c3abafe1908d7582d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a50e0feb3b6980965408e17c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a5abcc4c428fa27909fe491f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a60850fd0c34c3b48308e3a3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a6a98849edbcedf6096ab0e6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a84dfe8e5bb4ea4496be2851": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a926f7341cacb480543c86f5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_a967a77a2bb4460739ba1542": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_aad6848962448eea92ddb1cb": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ab1709ced4efe4d85404fe37": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ac9312bb382ee18d1a05fb4b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ae2c2c554837e479ba38b865": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ae3de7b1a5cbb6dcb61f041d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ae4fbcf4bdb7322d2383ecde": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ae70671e7636f9c631ac0592": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b02305a688480f6a017c879a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b142f1a46154434a09efa72e": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b248c07edeb2afdcd6e25d17": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b3e9075733bdd35b9b6c9519": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b4c9946be225d191691e2261": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b524edcf243e888e08b9336b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b5675393f68ef9f608329d1d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b57a43599046c3a6b4b7f68f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b5da47b9ef0c564ee0050298": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b785674f3074ba7496c92e97": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b8211b118048aa34a8a783e5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b833902d7822ca727afbdd29": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b867f444b32b1d04d5deb48c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b8d2c1c97471227229588785": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b960eef6e8fb1e3680ab2cd5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b966531076724c9f381dfb8b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b9a03e367da144c20f96c404": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_b9f18ccb68856295ce1e1265": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_bad1a253efd0ab5df63cedaa": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_bb2545aa6bec16df1bfcc0fd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_bb55970e1ef120237ed6bbdf": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_bb8ef6f37ee85278f445a11f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_bc89f228294c6e78553ad80f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_bdb517a21af9a66cb4958c79": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_be35e6fdb8573f8a601ca830": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_be595efe508f000b274715c6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_befa1f930f79cdecef22d468": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_bf737e734fbd9e02010f9b68": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_bfd0cb13e1170b74e388b237": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c0787c4eb88d8f0065733b28": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c247e4de7bb7365d3f9e0766": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c4014e65e619d29d15780b10": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c47425bb1db4fbfb443ea887": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c4807f2b999bd1aa1a06bbb7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c49cf0ab27d4b2daa300c748": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c4d282aea868f449f2a804c6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c4f4653e6dbdb56a5b05006d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c62bf1d788266c508bf5b335": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c783325f63e2de47eed1a65f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_c9a681877a7de5800baface9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cb8abac64694447e05728694": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cbac79d2ef46e4405077e2c5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cc479459502f99b29a8cc7a4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cc5cf4a63fd4384298da2a2b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cc923649a64721a267edf89b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cc9fc1211206c3c51feb2615": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cd1e474fcc314b949505765f": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cd2391662bb393a5e9aa6d0a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cd51f8c47e53672abeb90909": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cd57f649bd2c726521bb56b9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cde249f9e1f9c96b5eb29592": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cdfc06f0c68d474b968d4822": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_cfaca7c97a6376f75055f288": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d0bdf6e40a874cc59c4896ca": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d1afb1b22e50017790f44dfd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d1c0f96bd79a04796a7441f2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d2f18dafe4206dccd335c4a4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d3c2b6991ca490319a7f1473": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d4a8967e66345b87e1f53474": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d5c6d7f456b4fd37de8ada27": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d66ff78c82b5c19ad24b5b05": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d6814147027c901f13034935": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d692579af2015f3733a33f61": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d842e0c960e14fc44494fc35": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d8a71e02d3f00b49766c85b7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_d91da26daf261d2b12674ede": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_da5b8d380ae476a52098a579": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_dd01a5abfb8c5a2a657fa654": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ddf34e4c3cfb95e3126efd80": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ddf59a972e9bde106a3d7112": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_df7e23d94ff2414228da95a8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e0f3eb8fbb7ee33193002974": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e1859355b2992eac9bcaeba9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e190b412be85f137e47fe3d7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e2a78efc10d688591814aa70": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e2a802f617ab51e642f9f76d": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e30ed8c7875a3e28d2d17353": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e30f1d1dea6d2cae1f537e06": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e3454a49e7a72aac557e6d8b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e3c67ea9e464f6507b2a593e": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e4d8f733c64375a9f9f93cd3": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e52622f93a27b59d0315c7ac": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e754791c29efca26586bacd5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e7bd5100dbfa84e83b0c69d2": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e91ede2d3fc9107223aaa4c5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_e9650e7c7195da9b23eb38cd": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ec215251c27c0655819fb2c9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ec367fa480cdde4cd9f364a6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ec3c81776247fe1515cda057": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ecd33807e65cce45fde1e0c0": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ed9902bcd26624fe8d9043b0": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_edc22ae25478b4302840a896": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ee6c25d3fb6b44e6a6fe37fa": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ee724f45a955f758ab5fcf9c": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_eef435d4e25d9599de8efcce": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ef5f0d32a9fcf76db6c50df4": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f06b2006f2a84c586f84c27a": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f0f625d8665acecf4742670b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f12b12bdbb9c526a46a81ba6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f1f7c46691042f132e89bd46": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f2a4559b52c23e058c0b5867": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f31b230dce4a719603553119": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f387c62f4a52f075a74d41bf": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f415fb8f51c41828dba802aa": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f4bb198b051ed123009b802e": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f58b5a03ec00e7bf75a0bbf6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f5d5f66674ee1bfab4e842c9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f62142c99ee11f677c806aca": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f6f75ee8995cb28059425dec": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f7dd860b397a28e0f63ef766": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f87216fb3cddcb67a8d145d7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f99893179c9cdc513df8de35": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f9be3926c4ca1d026d03bc23": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f9d1aaee663178356d87914b": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_f9ff9a334e9c225b4a2472f6": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fa28f08c177756ab41f750f0": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fa986148d3c4d604ab7b4f77": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fabafaea7265ee1c291d77f8": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fb88c8bc9a4c8e070c3b51e9": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fbff0fbd6db1f02aaed32b42": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fc495ce5f91e2720f59b3b85": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fc65c70c8f2f7095bd26e5ba": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fc807b1b6b52183054802a91": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fce21a843798cc82129e9169": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fd27e27b7067cdd06a9d0652": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fd53029b978d1b6f4bf03401": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_fdcfc16b52eeaab812608631": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ff715df5501a3c3329ce0aa7": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        },
+        "cmp_ff9f94a5c066d11e5a8bf4d5": {
+          "display": "shown",
+          "mark": "unmarked",
+          "mark_color": null
+        }
+      },
+      "illumination": {
+        "background_rgb": [
+          0.03,
+          0.03,
+          0.03
+        ],
+        "background_strength": 0.15,
+        "preset": "neutral_studio"
+      },
+      "state_sha256": "ce3e4cce301f0abda56b8dd60a9d16d967ea151c26c6922bf79c7f6a582384a3"
+    },
+    "shaded_edges": {
+      "crease_angle_degrees": 120.0,
+      "edge_types": [
+        "silhouette",
+        "border",
+        "crease",
+        "material_boundary"
+      ],
+      "line_color": "#202020",
+      "line_width": 1.5
+    },
+    "source_sha256": "41fa4974f7e6fc4daa108758d2dff384bc6204dafcfd33986e5bc26bd1fe0cda",
+    "state_sha256": "ce3e4cce301f0abda56b8dd60a9d16d967ea151c26c6922bf79c7f6a582384a3",
+    "style": "shaded",
+    "width": 700
+  }
+}

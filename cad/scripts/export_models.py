@@ -1,25 +1,31 @@
-"""Export one complete recipe-keyed neutral cache: STL + STEP + scene JSON.
+"""Export one complete recipe-keyed neutral cache: STL + STEP + scene + GLB.
 
 doit task: ``export`` (on the COM spine). Normally invoked via ``doit export``
 or as a prerequisite of ``doit release``; runnable standalone too.
 
 
-For every built part/assembly: part AP214 STEP, per-document STL, and the
-build-owned isometric PNG certified in ``reports/release-neutral.json``. The
-release task validates and stages that complete set without reopening native
-documents. For every model referenced by comparisons/manifest.json it also
-produces the offline-render feed consumed by render_offline.py —
+For every built part: AP214 STEP, per-part STL, and the build-owned isometric
+PNG certified in ``reports/release-neutral.json``. For every built assembly:
+a boxes/scene JSON and a composed glTF binary. The release task validates and
+stages that complete set without reopening native documents. This is also the
+offline-render feed consumed by render_offline.py —
 
 * parts: fine binary STL in MILLIMETRES, untranslated (cad/out/stl/<dashed>.STL)
   plus an appearance colour in cad/out/stl/colors.json;
-* assemblies: a monolithic cad/out/stl/<dashed>.STL and cad/out/boxes/
-  <dashed>.json with per-component bounding boxes (framing) plus a scene
-  graph: one entry per visible leaf component with its part stem,
-  assembly-space transform (IMathTransform.ArrayData, row-vector
-  convention, translation in millimetres) and RGB. Every referenced part gets
-  its own STL, shared across assemblies and instanced by the Blender
-  worker (so 20 cone gears cost one mesh). All geometry is in millimetres
-  (mesh units == the scene-graph transform units, so they pair directly).
+* assemblies: cad/out/gltf/<dashed>.glb — SolidWorks' own glTF exporter
+  (SaveAs3, format inferred from the .glb extension; SW2023+), which carries
+  metre units, per-component nodes named after the components, and the
+  appearance colours as glTF materials — plus cad/out/boxes/<dashed>.json with
+  per-component bounding boxes (framing) and a scene graph: one entry per
+  visible leaf component with its part stem, assembly-space transform
+  (IMathTransform.ArrayData, row-vector convention, translation in
+  millimetres) and RGB. The old monolithic per-assembly STL SaveAs3 is
+  retired — nothing ever read its mesh bytes, and the GLB carries colours +
+  component identity it never had. (The scene JSON is slated to be retired in
+  favour of reading the GLB directly — issue #336.) Every referenced part gets
+  its own STL, shared across assemblies and instanced by the Blender worker
+  (so 20 cone gears cost one mesh). STL geometry is in millimetres (mesh
+  units == the scene-graph transform units, so they pair directly).
 
 Colours cascade: component-level override -> part doc colour -> the
 material-name table below (the build scripts only ever assign database
@@ -63,6 +69,7 @@ from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 
 import _telemetry  # noqa: E402
 
+OUT_GLTF = CAD_ROOT / "out" / "gltf"
 OUT_STL = CAD_ROOT / "out" / "stl"
 OUT_STEP = CAD_ROOT / "out" / "step"
 OUT_BOXES = CAD_ROOT / "out" / "boxes"
@@ -83,7 +90,7 @@ SRC_DIGESTS = OUT_STL / "export-src.json"
 # mismatch invalidates the whole cache -> full regeneration through the new logic.
 _EXPORTER_KEY = "__exporter__"
 NEUTRAL_MANIFEST = CAD_ROOT / "out" / "reports" / "release-neutral.json"
-NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@2"
+NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@3"
 TOP_ASSEMBLY = "harmonic-analyzer"
 
 # Comparison gallery, produced by THIS export stage from the STLs written above
@@ -564,7 +571,7 @@ def _release_inventory(
         )
     for stem in assemblies:
         dashed = stem.replace("_", "-")
-        files[f"stl/{dashed}.STL"] = OUT_STL / f"{dashed}.STL"
+        files[f"gltf/{dashed}.glb"] = OUT_GLTF / f"{dashed}.glb"
         files[f"png/{dashed}/{dashed}_isometric.png"] = (
             OUT_PNG / dashed / f"{dashed}_isometric.png"
         )
@@ -733,12 +740,9 @@ def stage_release_neutral(stage: Path) -> dict[str, int]:
 
     parts = part_stems()
     assemblies = list(ASSEMBLY_ORDER)
-    assembly_set = set(assemblies)
-    scene_assemblies = {
-        model.replace("-", "_") for model in manifest_models()
-        if model.replace("-", "_") in assembly_set
-    }
-    scene_assemblies.add("harmonic_analyzer")
+    # Every assembly is scene-bearing: each ships a boxes/scene JSON + a GLB
+    # composed from it (the old manifest-only subset predated the GLB export).
+    scene_assemblies = set(assemblies)
     scene_meshes = all_scene_part_meshes(scene_assemblies)
     cfg_meshes = {
         stem: [(cfg, mesh) for cfg, mesh in entries if mesh != stem]
@@ -825,7 +829,7 @@ def validated_outputs(
 ) -> set[Path]:
     """Every render-cache output whose freshness THIS run establishes for the current
     manifest: each manifest part's STL + STEP; each manifest assembly's boxes JSON +
-    mono STL and every part-mesh STL its scene references; plus the colours /
+    composed GLB and every part-mesh STL its scene references; plus the colours /
     digests sidecars. Only existing files are returned. Used to SCOPE the stamp so it
     can't refresh a non-manifest leftover (a stale subassembly scene) it never checked."""
     out: set[Path] = {COLORS, SRC_DIGESTS}
@@ -836,7 +840,7 @@ def validated_outputs(
     for m in assemblies:
         d = m.replace("_", "-")
         bj = OUT_BOXES / f"{d}.json"
-        out.add(OUT_STL / f"{d}.STL")
+        out.add(OUT_GLTF / f"{d}.glb")
         if m in scene_assemblies:
             out.add(bj)
         if m in scene_assemblies and bj.exists():
@@ -900,7 +904,7 @@ def asm_source_changed(
         # Digest-unavailable fallback: check every assembly output that is still
         # produced. Assembly STEP was retired; requiring it here would make every
         # standalone export stale forever.
-        outs = [OUT_STL / f"{dashed}.STL"]
+        outs = [OUT_GLTF / f"{dashed}.glb"]
         if require_scene:
             outs.append(OUT_BOXES / f"{dashed}.json")
         return any(not _nonempty(o) or o.stat().st_mtime < src.stat().st_mtime
@@ -1203,7 +1207,6 @@ def main() -> int:
     # (codex review). Standalone still READS the cache (fast "all fresh"); it just
     # never writes, so it can never poison it.
     record = "--record-digests" in sys.argv[1:]
-    comparison_models = manifest_models()
     colors = load_colors()
     digests = load_src_digests()
     certified = _certified_outputs()
@@ -1214,12 +1217,9 @@ def main() -> int:
 
     parts = part_stems()
     assemblies = list(ASSEMBLY_ORDER)
-    assembly_set = set(assemblies)
-    scene_assemblies = {
-        model.replace("-", "_") for model in comparison_models
-        if model.replace("-", "_") in assembly_set
-    }
-    scene_assemblies.add("harmonic_analyzer")
+    # Every assembly is scene-bearing (boxes/scene JSON + composed GLB) — the
+    # comparison manifest no longer scopes which assemblies get a scene.
+    scene_assemblies = set(assemblies)
 
     missing_asm_png = {
         stem for stem in assemblies
@@ -1234,19 +1234,16 @@ def main() -> int:
     for stem in assemblies:
         dashed = stem.replace("_", "-")
         src = OUT_SLDASM / f"{dashed}.SLDASM"
-        require_scene = stem in scene_assemblies
         scene_path = OUT_BOXES / f"{dashed}.json"
-        scene_invalid = require_scene and (
+        scene_invalid = (
             not scene_is_valid(scene_path)
             or not scene_sources_exist(scene_path)
             or neutral_changed(scene_path)
         )
         if (force or stem in missing_asm_png or scene_invalid
-                or not _nonempty(OUT_STL / f"{dashed}.STL")
-                or neutral_changed(OUT_STL / f"{dashed}.STL")
-                or asm_source_changed(
-                    dashed, src, digests, require_scene=require_scene,
-                )):
+                or not _nonempty(OUT_GLTF / f"{dashed}.glb")
+                or neutral_changed(OUT_GLTF / f"{dashed}.glb")
+                or asm_source_changed(dashed, src, digests)):
             stale_asms.append(stem)
 
     missing_part_png = {
@@ -1293,7 +1290,7 @@ def main() -> int:
         f"exporting parts={stale_parts or sorted(stale_scene_mesh_stems) or '[]'} "
         f"assemblies={stale_asms or '[]'}"
     )
-    for d in (OUT_STL, OUT_STEP, OUT_BOXES):
+    for d in (OUT_STL, OUT_STEP, OUT_BOXES, OUT_GLTF):
         d.mkdir(parents=True, exist_ok=True)
 
     async def build(adapter: Any) -> dict[str, str]:
@@ -1340,28 +1337,29 @@ def main() -> int:
                 check(f"open {src.name}", await adapter.open_model(str(src)))
                 doc = adapter.currentModel
                 # Assembly STEP is deliberately omitted: native Pack-and-Go plus
-                # the monolithic STL/scene graph cover assembly consumption, while
+                # the scene graph + glTF cover assembly consumption, while
                 # assembly STEP was the dominant export cost (413 s top, 379 s frame
                 # in v0.20.0). Part STEP remains the archival exact-BREP surface.
+                # The old monolithic assembly STL is retired too (nothing read its
+                # mesh bytes) — assemblies export SolidWorks' own glTF binary
+                # instead: metre units, per-component named nodes (pattern-
+                # generated instances lose their friendly name — SW exporter
+                # quirk), appearance materials.
                 (OUT_STEP / f"{dashed}.STEP").unlink(missing_ok=True)
-                mono = OUT_STL / f"{dashed}.STL"  # mm, like every other STL
-                _save_as(doc, mono)
-                log(f"saved {mono.name} ({mono.stat().st_size / 1e6:.1f} MB, mm)")
-                if stem in scene_assemblies:
-                    # Fresh cache: only resolved-component doc reads land in
-                    # scan_colors, so a lightweight scan never masks a stale colour.
-                    scan_colors: dict = {}
-                    boxes, scene, stems = scan_assembly(adapter, scan_colors)
-                    colors.update(scan_colors)
-                    pending_scenes[stem] = (boxes, scene, stems)
-                    all_scene_stems.update(stems)
+                (OUT_STL / f"{dashed}.STL").unlink(missing_ok=True)
+                glb = OUT_GLTF / f"{dashed}.glb"
+                _save_as(doc, glb)
+                log(f"saved {glb.name} ({glb.stat().st_size / 1e6:.1f} MB)")
+                # Fresh cache: only resolved-component doc reads land in
+                # scan_colors, so a lightweight scan never masks a stale colour.
+                scan_colors: dict = {}
+                boxes, scene, stems = scan_assembly(adapter, scan_colors)
+                colors.update(scan_colors)
+                pending_scenes[stem] = (boxes, scene, stems)
+                all_scene_stems.update(stems)
                 if stem in missing_asm_png:
                     await export_build_png(adapter, dashed)
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-                if stem not in scene_assemblies:
-                    d = src_digest(src) if record else None
-                    if d is not None:
-                        digests[dashed] = d
                 done[stem] = "exported"
 
             for stem in sorted(scene_assemblies - set(pending_scenes)):
@@ -1458,7 +1456,7 @@ def main() -> int:
             restore_export_prefs(adapter, old)
 
     rc = run_build(build)
-    # Only produce the gallery once the STL/boxes export actually succeeded --
+    # Only produce the gallery once the glTF/STL/boxes export actually succeeded --
     # a failed COM export leaves the render cache half-written (fail loud there);
     # the stamp keeps mtime-based downstream guards satisfied.
     if rc == 0:

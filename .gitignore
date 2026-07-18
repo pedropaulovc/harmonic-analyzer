@@ -366,11 +366,11 @@ cad/out/reports/
 # Per-task build/verify logs teed by dodo.py:_run (shipped in a release bundle)
 cad/out/logs/
 
-# Offline-render cache (regenerable: cad/scripts/export_models.py;
-# the assembly STL alone is >100 MB — over GitHub's file limit)
+# Offline-render + neutral-export cache (regenerable: cad/scripts/export_models.py)
 cad/out/stl/
 cad/out/step/
 cad/out/boxes/
+cad/out/gltf/
 # Changed-parts diff renders (regenerable: comparisons/tools/render_diff.py)
 cad/out/diff/
 # Regenerable STEP/STL/PNG exports written to cad/out/ root
