@@ -693,7 +693,7 @@ PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
 _VERIFY_NAMES = ("soundness", "kinematics")   # need SW (spine); subsystems retired
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry",
-                "freshness", "flagonly", "partiso")
+                "watchdog", "freshness", "flagonly", "partiso")
 # Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
 # depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
 # through a mock SolidWorks to pin span SHAPE (~20-30 s, ~20x the other offline
@@ -1798,6 +1798,21 @@ def task_check():
             "cmd": [*pytest_cmd,
                     str(SCRIPTS_DIR / "test_telemetry.py"),
                     str(SCRIPTS_DIR / "test_cut_release_telemetry.py")],
+        },
+        "watchdog": {
+            # The COM crash/hang watchdog (_watchdog.py): a NEW sldexitapp.exe
+            # (SolidWorks' crash-report dialog) or 15 min of telemetry silence
+            # hard-exits the COM subprocess (releasing the seat via the doit
+            # parent); a hung SW window only warns. Pure python, injectable
+            # probes -- so the fatal/log-only contract can't silently regress.
+            # _common.py is a dep because the gate also pins the INTEGRATION
+            # (run_build arms/disarms the watchdog): an edit that drops those
+            # calls must re-run this gate, not reuse the old stamp (codex #344).
+            "file_dep": [str((SCRIPTS_DIR / "_watchdog.py").resolve()),
+                         str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                         str((SCRIPTS_DIR / "_common.py").resolve()),
+                         str((SCRIPTS_DIR / "test_watchdog.py").resolve())],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],
         },
         "verify_telemetry": {
             # The verify-gate span SHAPE, driven by a mock SolidWorks whose COM

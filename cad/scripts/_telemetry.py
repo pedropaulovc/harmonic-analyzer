@@ -146,6 +146,50 @@ def _resolve_otlp_endpoint() -> str | None:
 _T0 = time.perf_counter()
 _LAST_TICK = _T0
 
+# Monotonic timestamp of the last telemetry ACTIVITY -- a span boundary or a log
+# record. This is the per-operation heartbeat the COM watchdog (_watchdog.py)
+# keys its idle timeout on: the instrumentation already brackets every COM
+# operation (the @traced helpers, the gate spans, the severity logs), so "no
+# activity" is a faithful proxy for "stuck inside one COM call".
+_last_activity = time.monotonic()
+_last_activity_op = "process-start"
+
+
+def _touch_activity(op: str | None = None) -> None:
+    global _last_activity, _last_activity_op
+    _last_activity = time.monotonic()
+    if op:
+        _last_activity_op = op
+
+
+def last_activity() -> float:
+    """Monotonic time of the last span boundary or log record (see _watchdog)."""
+    return _last_activity
+
+
+def last_activity_op() -> str:
+    """What the last activity WAS (``span-start <name>`` / ``span-end <name>`` /
+    ``log <message head>``). When the watchdog aborts on idle timeout this names
+    the operation the pipeline was last seen in -- i.e. the COM call it is
+    almost certainly wedged inside -- so the abort is traceable without
+    scrollback archaeology."""
+    return _last_activity_op
+
+
+class _ActivityFilter(logging.Filter):
+    """Logger-level filter: every record pokes the watchdog heartbeat.
+
+    EXCEPT records the watchdog emits about itself (``watchdog_signal=True``
+    field): its periodic hung-window warn would otherwise reset the very idle
+    clock the op timeout reads, so a permanently wedged SolidWorks would be
+    warned about every 5 min forever and never aborted (codex #344 P1).
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not getattr(record, "watchdog_signal", False):
+            _touch_activity(f"log {str(record.msg)[:80]}")
+        return True
+
 # Span nesting depth for the compact console tracer, so the boundary lines
 # indent into a tree and a missing parent is visible at a glance.
 _depth: contextvars.ContextVar[int] = contextvars.ContextVar("_telemetry_depth", default=0)
@@ -335,6 +379,8 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     pylog = logging.getLogger(_LOGGER_NAME)
     pylog.setLevel(logging.DEBUG)
     pylog.handlers.clear()
+    pylog.filters.clear()
+    pylog.addFilter(_ActivityFilter())
     pylog.propagate = False
     # Bridge into OTel's logs SDK: carries SeverityNumber + the active span's
     # trace/span id onto every record, so logs and traces correlate.
@@ -439,6 +485,7 @@ def event(name: str, **attributes: Any) -> None:
 
 
 def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, Any, int]:
+    _touch_activity(f"span-start {name}")
     tracer = get_tracer()
     depth = _depth.get()
     attrs = {"harmonic.depth": depth}
@@ -461,6 +508,7 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
     cm, token = handle
     _depth.reset(token)
     span = trace.get_current_span()
+    _touch_activity(f"span-end {getattr(span, 'name', '?')}")
     if exc is not None:
         span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, str(exc)))
