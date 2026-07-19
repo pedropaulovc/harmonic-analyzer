@@ -52,7 +52,7 @@ dependencies = [
     "pypdfium2>=5.11.0",
     "pypdf>=6.14.2",
     # Read-only inspection and evidence rendering for release glTF/GLB models.
-    "meshprobe>=1.0.0,<2",
+    "meshprobe>=1.1.0,<2",
 ]
 
 [dependency-groups]
