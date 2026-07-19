@@ -1273,7 +1273,7 @@ requires-dist = [
     { name = "doit", specifier = ">=0.36" },
     { name = "filelock", specifier = ">=3.13" },
     { name = "matplotlib", specifier = ">=3.8" },
-    { name = "meshprobe", specifier = ">=1.0.0,<2" },
+    { name = "meshprobe", specifier = ">=1.1.0,<2" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "opentelemetry-api", specifier = ">=1.20" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.20" },
@@ -1972,7 +1972,7 @@ wheels = [
 
 [[package]]
 name = "meshprobe"
-version = "1.0.0"
+version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mcp" },
@@ -1981,9 +1981,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b9/8c/f299e95bfbb52861eef860dac27c3cd83ee837db6e165b86cb60c0cdd220/meshprobe-1.0.0.tar.gz", hash = "sha256:d976111c41259f3364efd1015f036291d32da3fb6ace9e6ba3824ca3c209c3e2", size = 2312606, upload-time = "2026-07-19T04:25:19.413Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2a/14/6c9d3a67beba40faec526a51cbd4c6a217f58cf8c62206188703a9cfb9ca/meshprobe-1.1.0.tar.gz", hash = "sha256:6bbe7a5c62b831613e726b56b76f2e8f8e4a426d31bf5be388f9cfa98423e9f4", size = 2322642, upload-time = "2026-07-19T16:38:48.194Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/e2/a8560322a02c01b55ddfe86cebe6a2e14c09221fa63595bec8dad83d5f41/meshprobe-1.0.0-py3-none-any.whl", hash = "sha256:2a0999aee8e5d20cef4d3991fe916c2fc631a9dc60c7359d3af0294fbacf5f12", size = 247734, upload-time = "2026-07-19T04:25:17.955Z" },
+    { url = "https://files.pythonhosted.org/packages/91/a7/64c15bac998f0b80ef96d3eb8c3ad5a9a9554ce903212e63ec7a89f59f4f/meshprobe-1.1.0-py3-none-any.whl", hash = "sha256:2f61ede36b5ebfbb29cbddd38cb6f2d271b971775fde3614e313876821c0f6ba", size = 253585, upload-time = "2026-07-19T16:38:46.779Z" },
 ]
 
 [[package]]
