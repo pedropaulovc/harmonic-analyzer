@@ -106,7 +106,13 @@ def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
     assert "PinHoleProfile" not in arm.DRAWING_DIMENSIONS
     source = Path(arm.__file__).read_text(encoding="utf-8")
     assert 'HoleSpec("drilled_fractional", "15/64")' in source
-    assert 'HoleSpec("drilled_number", "#14")' in source
+    # The cross-pin hole is no longer a straight #14 wizard pilot: the model
+    # carries the AS-REAMED 1:48 cone (revolve-cut sized from crank_pin_spec),
+    # so the tapered crank pin can seat through hub and shaft in one line. The
+    # #14 pilot survives only as a machining instruction in DRAWING_NOTES.
+    assert 'HoleSpec("drilled_number", "#14")' not in source
+    assert "hole_dia_at(PIN_SEAT_PROUD" in source
+    assert "RevolveParameters(angle=360.0, is_cut=True)" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

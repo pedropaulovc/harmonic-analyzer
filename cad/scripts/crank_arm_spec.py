@@ -39,7 +39,21 @@ ARM_C2C = 66.0  # shaft-to-handle-pivot centres -- REDERIVED from the ch30 eight
 # down-pointing 150 arm would drive the handle below the table (med).
 ARM_WIDTH = 16.0  # arm width (low)
 ARM_THICKNESS = 8.0  # ~half the arm width, p.12 photo (low)
-SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)
+SQUARE_END_OVERHANG = 10.0  # stock end past the pivot (low); the ch11 photos
+# show the end FULL-ROUNDED -- modeled as two corner fillets on the stock end
+# (END_ROUND_R below), so ArmEndX keeps dimensioning the 76 stock span.
+END_ROUND_R = 7.98  # a hair under ARM_WIDTH/2: the two corner fillets meet at
+# the centreline within 0.02 without the degenerate exact-tangency case
+HUB_DIA = 16.0  # rear hub boss = the boss circle carried through (ch11
+# page002_img03: hub reads the arm's own width)
+HUB_LEN = 9.2  # north face (-167) to 0.3 clear of the crankshaft's SeatT12
+# datum (-157.5) where the T12 chain wheel's boss seats (machine z)
+PIN_HOLE_Z = -4.0  # pin cross-hole station: 4.0 behind the plate's north face
+# (machine z -163) -- matches build_crankshaft.PIN_HOLE_HEIGHT 12 exactly
+KEEPER_X = 13.0  # keeper screw station down the arm edge (photo: just clear
+# of the hub flank, ch11 page002_img03)
+KEEPER_PROUD = 1.2  # under-head face proud of the edge: the brass chain
+# eyelet's wire hangs on the exposed shank band
 SHAFT_BORE_DIA = 0.375 * MM_PER_IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
 # rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
 DIMPLE_DIA = 8.0  # fiducial indentation (low)
@@ -69,10 +83,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "SHAFT BORE AND HANDLE PIVOT CENTRED ACROSS 16 WIDTH.",
+        "FULL-ROUND THE HANDLE END (R8).",
+        "REAR HUB BOSS <MOD-DIAM>16 X 9.2 LONG, COAXIAL WITH SHAFT BORE.",
         "HANDLE PIVOT: 15/64 DRILL THRU.",
-        "CROSS-PIN: #14 DRILL AT ASSEMBLY THROUGH SHAFT-BORE AXIS, MID-THICKNESS;",
-        "TAPER-REAM WITH SHAFT FOR NO. 2 TAPER PIN,",
-        "1:48, LARGE END OUTBOARD.",
+        "TAPER PIN CROSS-HOLE: #14 DRILL PILOT AT ASSEMBLY THROUGH HUB AND",
+        "SHAFT-BORE AXIS, 4.0 BEHIND HUB-SIDE FACE; TAPER-REAM WITH SHAFT 1:48,",
+        "LARGE END OUTBOARD (HOLE AS-REAMED IN MODEL).",
+        "KEEPER: 1/8 DRILL 3.4 DEEP IN EDGE AT 13.0 FOR THE EYELET SCREW.",
         "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
     )
 )

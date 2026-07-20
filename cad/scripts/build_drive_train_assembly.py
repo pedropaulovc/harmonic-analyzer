@@ -466,6 +466,18 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
 # authored stations.
 from build_crank_arm import ARM_THICKNESS  # noqa: E402
+from crank_arm_spec import (  # noqa: E402
+    ARM_WIDTH,
+    HUB_DIA as CP_HUB_DIA,
+    KEEPER_PROUD,
+    KEEPER_X,
+    PIN_HOLE_Z as ARM_PIN_HOLE_Z,
+)
+from crank_pin_spec import (  # noqa: E402
+    NECK_LEN as CP_NECK_LEN,
+    PIN_SEAT_PROUD,
+    RING_MEAN_R as CP_RING_MEAN_R,
+)
 from build_crankshaft import (  # noqa: E402
     SEAT_ARM as CS_SEAT_ARM,
     SEAT_PINION as CS_SEAT_PINION,
@@ -2004,6 +2016,52 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Right Plane@{arm}", "PLANE"),
         label="handle anti-spin (grip rest)", verify=(handle, hd_o),
     )
+
+    # =============== crank pull hardware (ch11 close-ups) ==================
+    # The removable tapered pin in its AS-REAMED 1:48 cone through the arm's
+    # rear hub + shaft (the straight-pilot interference that kept it out is
+    # gone -- see crank_pin_spec/build_crank_arm/build_crankshaft), the brass
+    # pull ring hanging from the pin's neck cross-hole, and the keeper screw
+    # + chain eyelet on the arm's outboard edge ("small chain eyelet (chain
+    # lost)", ch11 text). All ride the free crank spin: each is LOCKED to the
+    # arm at its exact rest-pose transform (cosmetic rigid hardware -- the
+    # _lock_static idiom, referenced to the moving arm instead of the seed).
+    # At the rest pose the arm's local +Y (the pin's big-end side) reads
+    # machine -X, so the pin protrudes outboard, head to the machine east.
+    pin_big_end_x = X_CRANK - (CP_HUB_DIA / 2.0 + PIN_SEAT_PROUD)  # -135.3
+    pin_z = CRANK_ARM_ORIGIN_Z + ARM_PIN_HOLE_Z  # -163: the reamed station
+    ring_x = pin_big_end_x - CP_NECK_LEN / 2.0  # mid-neck cross-hole
+    keeper_edge_x = X_CRANK - ARM_WIDTH / 2.0  # arm edge face, -130.8
+    screw_head_x = keeper_edge_x - KEEPER_PROUD  # under-head plane
+    eyelet_x = keeper_edge_x - KEEPER_PROUD / 2.0  # loop mid-band
+    keeper_y = Y_CRANK - KEEPER_X
+    keeper_z = CRANK_ARM_ORIGIN_Z - ARM_THICKNESS / 2.0  # mid-plate edge
+    ROWS_RING = [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
+    ROWS_EYELET = [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+    for part_name, pos, rows in (
+        ("crank-pin", [pin_big_end_x, Y_CRANK, pin_z], IDENTITY),
+        (
+            "crank-pin-ring",
+            [ring_x, Y_CRANK - CP_RING_MEAN_R, pin_z],
+            ROWS_RING,
+        ),
+        ("fillister-screw", [screw_head_x, keeper_y, keeper_z], ROT_Y_POS90),
+        (
+            "crank-chain-eyelet",
+            [eyelet_x, keeper_y - 1.25, keeper_z],
+            ROWS_EYELET,
+        ),
+    ):
+        hw = await place_component(
+            adapter, part_name, pos, euler_from_rows(rows), rows,
+            ground=False, label=f"crank hardware {part_name}",
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{hw}", "PLANE"),
+            named_ref(f"Front Plane@{arm}", "PLANE"),
+            label=f"{part_name} locked to crank arm",
+        )
 
     # =============== cone platform swing (p1 disengage DOF) ==============
     # The platform is the swing bracket: the whole cone set -- post, shaft,

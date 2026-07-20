@@ -20,7 +20,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from crank_pin_spec import BIG_END_DIA, PIN_LENGTH, SMALL_END_DIA
+from crank_pin_spec import (
+    BIG_END_DIA,  # noqa: F401 -- lockstep re-export pinned by test_crank_pin_drawing
+    HEAD_LEN,
+    NECK_LEN,
+    PIN_LENGTH,
+    SMALL_END_DIA,  # noqa: F401 -- lockstep re-export pinned by test_crank_pin_drawing
+)
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -45,17 +51,27 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 END_VIEW_SCALE = 4.0
 FRONT_CENTER = (0.110, 0.195)
+# Full model span now includes the pull head + neck ahead of the barrel:
+# bbox runs -(HEAD_LEN+NECK_LEN)..PIN_LENGTH, centred in the view.
+_SPAN = PIN_LENGTH + NECK_LEN + HEAD_LEN
+_BBOX_CENTER = (PIN_LENGTH - (NECK_LEN + HEAD_LEN)) / 2.0
 RIGHT_CENTER = (
-    FRONT_CENTER[0] + PIN_LENGTH * SHEET_SCALE[0] / 2000.0 + 0.080,
+    FRONT_CENTER[0] + _SPAN * SHEET_SCALE[0] / 2000.0 + 0.080,
     FRONT_CENTER[1],
 )
 ISO_CENTER = (0.340, 0.205)
 
-# Side-view landmarks (sheet meters): the pin is centred on its bounding box,
-# big end (model x=0) to the left, small end (x=PIN_LENGTH) to the right.
-_HALF_LENGTH = PIN_LENGTH * SHEET_SCALE[0] / 2000.0
-BIG_END_EDGE = (FRONT_CENTER[0] - _HALF_LENGTH, FRONT_CENTER[1])
-SMALL_END_EDGE = (FRONT_CENTER[0] + _HALF_LENGTH, FRONT_CENTER[1])
+# Side-view landmarks (sheet meters): the view is centred on the model bbox;
+# the barrel's big-end circle sits at model x=0 (the neck junction), the
+# small end at x=PIN_LENGTH.
+BIG_END_EDGE = (
+    FRONT_CENTER[0] + (0.0 - _BBOX_CENTER) * SHEET_SCALE[0] / 1000.0,
+    FRONT_CENTER[1],
+)
+SMALL_END_EDGE = (
+    FRONT_CENTER[0] + (PIN_LENGTH - _BBOX_CENTER) * SHEET_SCALE[0] / 1000.0,
+    FRONT_CENTER[1],
+)
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.033),
