@@ -44,8 +44,10 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from crank_arm_spec import (
     ARM_C2C,
     ARM_END_X,
+    ARM_THICKNESS,
     DIMPLE_X,
     HALF_WIDTH,
+    HUB_LEN,
     SHAFT_BORE_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -82,6 +84,18 @@ def _sheet_x(model_x_mm: float) -> float:
     """Sheet X of a model-X point in the front/top views (2:1, bbox-centred)."""
     bbox_center = (ARM_END_X - HALF_WIDTH) / 2.0
     return FRONT_CENTER[0] + (model_x_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
+
+
+def _sheet_rx(model_z_mm: float) -> float:
+    """Sheet X of a model-Z station in the right view (2:1, bbox-centred).
+
+    The hub boss extends the section's Z bbox to -HUB_LEN..ARM_THICKNESS, so
+    the view centre is no longer the plate's own mid-thickness -- picks that
+    hardcoded offsets from RIGHT_CENTER landed on the hub's silhouette (a
+    curved-face silhouette, not a selectable edge) once the hub shipped.
+    """
+    bbox_center = (ARM_THICKNESS - HUB_LEN) / 2.0
+    return RIGHT_CENTER[0] + (model_z_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -192,11 +206,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # (0.270..0.278) an 11.7 mm gap and its leader a clean run to the face.  The
     # dim's own extension lines stay at y=0.119/0.151, above and below that
     # leader, so nothing crosses.
+    # Pick the flat edges at the PLATE band's mid-thickness: at the view centre
+    # (inside the hub band) the +/-8 silhouette belongs to the hub cylinder --
+    # a silhouette, not a model edge, so the pick finds nothing there.
     add_edge_dimension(
         adapter,
         right,
-        p0=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.016),
-        p1=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.016),
+        p0=(_sheet_rx(ARM_THICKNESS / 2.0), RIGHT_CENTER[1] - 0.016),
+        p1=(_sheet_rx(ARM_THICKNESS / 2.0), RIGHT_CENTER[1] + 0.016),
         text_xy=(RIGHT_CENTER[0] - 0.048, RIGHT_CENTER[1]),
         label="arm-width overall",
     )
@@ -228,16 +245,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # parallelism frame's arrowhead on the RIGHT face at (0.3082, 0.1337), the
     # stacked-arrowhead tell.  Both symptoms are the same wrong-side offset.
     #
-    # -0.022 rather than a symmetric -0.030: the box is drawn ~8 mm wide ending at
-    # symbol_xy, so -0.022 spans 0.270..0.278 and leaves a 14 mm leader to the
-    # face at 0.2918 -- entirely outside the section, crossing nothing.  -0.030
-    # would reach x=0.262..0.270, which is clear only because the 16.00 dimension
-    # was moved outboard above; 0.278 keeps the tag close to the face it names.
+    # Datum A moved to the SOUTH broad face (z=ARM_THICKNESS, the handle side):
+    # the former north-face pick is dead -- the hub boss now grows out of that
+    # face, so in HLR its z=0 boundary (the hub-root circle) is hidden behind
+    # the plate and un-pickable, while the south face stays the one full
+    # uninterrupted broad face (also the better functional datum).  Its edge is
+    # the view's RIGHT outline; the symbol sits outboard on that side
+    # (dot(symbol - edge, +X normal) > 0), in open sheet past the view.
     add_datum_feature(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] - 0.008, RIGHT_CENTER[1]),
-        symbol_xy=(RIGHT_CENTER[0] - 0.022, RIGHT_CENTER[1]),
+        edge_xy=(_sheet_rx(ARM_THICKNESS), RIGHT_CENTER[1]),
+        symbol_xy=(_sheet_rx(ARM_THICKNESS) + 0.022, RIGHT_CENTER[1]),
         datum="A",
         label="crank broad face",
     )
@@ -336,15 +355,21 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.258, 0.110),
         label="handle pivot hole",
     )
+    # Parallelism retargets the HUB SEAT face (z=-HUB_LEN, the view's LEFT
+    # outline): with datum A on the south face, the opposite broad face (z=0)
+    # is HLR-hidden behind the hub, and the hub's end face is the surface the
+    # T12 chain-wheel boss actually seats against -- the parallelism that
+    # matters for the chain running true.  Frame sits below-left of the view,
+    # under the 16.00 dim's y=0.119 extension line so nothing crosses its text.
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] + 0.008, RIGHT_CENTER[1]),
-        frame_xy=(0.316, 0.118),
+        edge_xy=(_sheet_rx(-HUB_LEN), RIGHT_CENTER[1]),
+        frame_xy=(0.262, 0.106),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
-        label="crank broad-face parallelism",
+        label="hub seat parallelism",
     )
     # Sits LEFT of the boss and BELOW bore height. Three constraints pin it:
     #   * not above the top view (its old (0.140, 0.235) spot) -- the leader

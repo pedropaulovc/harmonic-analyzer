@@ -2029,7 +2029,9 @@ async def build(adapter) -> dict[str, str]:
     # At the rest pose the arm's local +Y (the pin's big-end side) reads
     # machine -X, so the pin protrudes outboard, head to the machine east.
     pin_big_end_x = X_CRANK - (CP_HUB_DIA / 2.0 + PIN_SEAT_PROUD)  # -135.3
-    pin_z = CRANK_ARM_ORIGIN_Z + ARM_PIN_HOLE_Z  # -163: the reamed station
+    # The arm's Ry(180) pose maps part +Z to machine -Z, so the part-local
+    # hole station (-4) lands NORTH of the origin: -167 - (-4) = -163.
+    pin_z = CRANK_ARM_ORIGIN_Z - ARM_PIN_HOLE_Z  # -163: the reamed station
     ring_x = pin_big_end_x - CP_NECK_LEN / 2.0  # mid-neck cross-hole
     keeper_edge_x = X_CRANK - ARM_WIDTH / 2.0  # arm edge face, -130.8
     screw_head_x = keeper_edge_x - KEEPER_PROUD  # under-head plane
