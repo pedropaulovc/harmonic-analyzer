@@ -1,0 +1,5 @@
+crank-chain-eyelet:
+  number: MHA-113
+  material: Brass
+  tolerance_class: machined_block
+  process: "formed brass wire"
