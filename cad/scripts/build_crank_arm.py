@@ -49,7 +49,7 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import HoleSpec, wizard_hole_on_cylinder, wizard_holes
+from _holes import HoleSpec, wizard_holes
 
 import _telemetry
 from _drawing_marks import (
@@ -107,7 +107,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "RearHubDia", f"{REAR_HUB_DIA}mm")
     await set_global(adapter, "RearHubLength", f"{REAR_HUB_LENGTH}mm")
-    await set_global(adapter, "PinStation", f"{PIN_STATION_FROM_NORTH_FACE}mm")
     await set_global(adapter, "PinBoreDia", f"{PIN_BORE_DIA}mm")
     await set_global(adapter, "SquareEndOverhang", f"{SQUARE_END_OVERHANG}mm")
     await set_global(adapter, "ShaftBoreDia", f"{SHAFT_BORE_DIA}mm")
@@ -264,29 +263,37 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after dimple: {vol:.1f} mm^3")
 
-    # Assembly-ream envelope for the 1:48 tapered pin. It crosses the plate's
-    # shaft boss at local Z=+4 (machine z=-171), keeping the retaining hardware
-    # outboard of the chain's z=-158.35..-151.65 envelope.
-    # A straight maximum-envelope cut keeps the saved part interference-free;
-    # the manufacturing note carries the final matched 1:48 ream operation.
-    drive_jobs += wizard_hole_on_cylinder(
+    # Native #14 pilot from the arm's planar +Y edge face.  This face is normal
+    # to the installed pin axis, so the pilot stays coaxial with the final ream;
+    # the former cylindrical-face Hole Wizard chose an unstable radial frame.
+    pilot_cut = wizard_holes(
         adapter,
         HoleSpec("drilled_number", "#14"),
-        [0.0, ARM_WIDTH / 2.0, PIN_STATION_FROM_NORTH_FACE],
+        [[0.0, ARM_WIDTH / 2.0, PIN_STATION_FROM_NORTH_FACE]],
+        (0.0, 1.0, 0.0),
         "plate-boss taper-pin pilot (#14)",
         name="PinPilot",
     )
+    drive_jobs += pilot_cut.placement_drive_jobs
+
+    # Finished assembly-ream envelope for the 1:48 tapered pin. It crosses the
+    # plate's shaft boss at local Z=+2 (machine z=-169), keeping the retaining
+    # hardware outboard of the chain's z=-158.35..-151.65 envelope.
     pin_hole = SketchDims()
     check("create_sketch plate-boss pin hole", await adapter.create_sketch("Top"))
     await define_circle(
         adapter,
         0.0,
-        PIN_STATION_FROM_NORTH_FACE,
+        -PIN_STATION_FROM_NORTH_FACE,
         PIN_BORE_DIA / 2.0,
         "plate-boss pin hole",
         dims=pin_hole,
         names=("PinHoleX", "PinHoleZ", "PinHoleDia"),
-        drives=(None, '"PinStation"', '"PinBoreDia"'),
+        # Top-plane sketch +Y maps to part -Z; the authored station is part +Z.
+        # Keep this signed placement as a native sketch dimension: SolidWorks
+        # rejects a negative equation on the unsigned distance and a positive
+        # equation flips the circle to the wrong side of the boss.
+        drives=(None, None, '"PinBoreDia"'),
     )
     await ensure_fully_defined(adapter, "plate-boss pin-hole sketch")
     check("exit_sketch plate-boss pin hole", await adapter.exit_sketch())
