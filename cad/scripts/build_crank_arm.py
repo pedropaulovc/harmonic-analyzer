@@ -70,7 +70,7 @@ from crank_arm_spec import (
     HALF_WIDTH,
     ISOMETRIC_VIEW_NOTE,
     PIN_BORE_DIA,
-    PIN_STATION_FROM_NORTH_FACE,
+    PIN_STATION_FROM_OUTBOARD_FACE,
     REAR_HUB_DIA,
     REAR_HUB_LENGTH,
     SHAFT_BORE_DIA,
@@ -107,7 +107,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "RearHubDia", f"{REAR_HUB_DIA}mm")
     await set_global(adapter, "RearHubLength", f"{REAR_HUB_LENGTH}mm")
-    await set_global(adapter, "PinStation", f"{PIN_STATION_FROM_NORTH_FACE}mm")
+    await set_global(adapter, "PinStation", f"{PIN_STATION_FROM_OUTBOARD_FACE}mm")
     await set_global(adapter, "PinBoreDia", f"{PIN_BORE_DIA}mm")
     await set_global(adapter, "SquareEndOverhang", f"{SQUARE_END_OVERHANG}mm")
     await set_global(adapter, "ShaftBoreDia", f"{SHAFT_BORE_DIA}mm")
@@ -264,36 +264,36 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after dimple: {vol:.1f} mm^3")
 
-    # Assembly-ream envelope for the 1:48 tapered pin.  It crosses the REAR
-    # HUB, not the plate: local Z=-4 maps to machine z=-163, exactly the shaft's
-    # existing pin station and inside the formerly empty arm-to-wheel span.
+    # Assembly-ream envelope for the 1:48 tapered pin. It crosses the plate's
+    # shaft boss at local Z=+4 (machine z=-171), keeping the retaining hardware
+    # outboard of the chain's z=-158.35..-151.65 envelope.
     # A straight maximum-envelope cut keeps the saved part interference-free;
     # the manufacturing note carries the final matched 1:48 ream operation.
     drive_jobs += wizard_hole_on_cylinder(
         adapter,
         HoleSpec("drilled_number", "#14"),
-        [0.0, REAR_HUB_DIA / 2.0, -PIN_STATION_FROM_NORTH_FACE],
-        "rear-hub taper-pin pilot (#14)",
+        [0.0, ARM_WIDTH / 2.0, PIN_STATION_FROM_OUTBOARD_FACE],
+        "plate-boss taper-pin pilot (#14)",
         name="PinPilot",
     )
     pin_hole = SketchDims()
-    check("create_sketch rear-hub pin hole", await adapter.create_sketch("Top"))
+    check("create_sketch plate-boss pin hole", await adapter.create_sketch("Top"))
     await define_circle(
         adapter,
         0.0,
-        PIN_STATION_FROM_NORTH_FACE,
+        PIN_STATION_FROM_OUTBOARD_FACE,
         PIN_BORE_DIA / 2.0,
-        "rear-hub pin hole",
+        "plate-boss pin hole",
         dims=pin_hole,
         names=("PinHoleX", "PinHoleZ", "PinHoleDia"),
         drives=(None, '"PinStation"', '"PinBoreDia"'),
     )
-    await ensure_fully_defined(adapter, "rear-hub pin-hole sketch")
-    check("exit_sketch rear-hub pin hole", await adapter.exit_sketch())
+    await ensure_fully_defined(adapter, "plate-boss pin-hole sketch")
+    check("exit_sketch plate-boss pin hole", await adapter.exit_sketch())
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
     check(
-        "cut rear-hub pin hole",
+        "cut plate-boss pin hole",
         await adapter.create_cut_extrude(
             ExtrusionParameters(depth=REAR_HUB_DIA + 2.0, both_directions=True)
         ),

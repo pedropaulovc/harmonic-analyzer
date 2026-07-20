@@ -43,11 +43,7 @@ from _common import (
     volume_check,
 )
 from _holes import HoleSpec, cross_hole_volume_mm3, wizard_hole_on_cylinder
-from crank_arm_spec import (
-    ARM_THICKNESS,
-    PIN_BORE_DIA,
-    PIN_STATION_FROM_NORTH_FACE,
-)
+from crank_arm_spec import PIN_BORE_DIA, PIN_STATION_FROM_OUTBOARD_FACE
 
 PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -59,10 +55,9 @@ SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats);
 # -145..-125) while the inboard 16T station stayed, so the shaft spans
 # -175..-30. The arm/handle sweep entirely in front of the chain plane and
 # cannot foul the chain when turning (book ch30 p005/p002).
-# The rear hub begins at shaft station ARM_THICKNESS (the plate's north face),
-# and its radial pin sits 4 mm farther inboard.  This is machine z=-163 in the
-# assembly, centered in the formerly empty arm-to-T12 span.
-PIN_HOLE_HEIGHT = ARM_THICKNESS + PIN_STATION_FROM_NORTH_FACE
+# The radial pin crosses the arm plate at its midplane, machine z=-171 in the
+# assembly, safely outboard of the chain plates that begin at z=-158.35.
+PIN_HOLE_HEIGHT = PIN_STATION_FROM_OUTBOARD_FACE
 # Keyed-chain seat stations (local +Y from the outboard origin): named datum
 # planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
 # assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
