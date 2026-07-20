@@ -11,7 +11,7 @@ Dimensions: cad/DIMENSIONS.md "Chapter 11" - dia legacy (med), length
 derived from eight-views 8/8 pedestal proportions (low).
 
 Layout: shaft axis along +Y, outboard (crank) end at the origin;
-tapered-pin cross-hole along Z at the crank-seat height.
+tapered-pin cross-hole along X at the rear-hub station.
 
 Run (SolidWorks already open)::
 
@@ -26,6 +26,7 @@ import sys
 from _common import (
     IN,
     SketchDims,
+    apply_color,
     apply_material,
     check,
     define_circle,
@@ -34,17 +35,18 @@ from _common import (
     force_rebuild,
     name_bore_axis,
     name_last_feature,
+    POLISHED_STEEL,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
     volume_check,
 )
-from _holes import (
-    NUMBER_DRILL_MM,
-    HoleSpec,
-    cross_hole_volume_mm3,
-    wizard_hole_on_cylinder,
+from _holes import HoleSpec, cross_hole_volume_mm3, wizard_hole_on_cylinder
+from crank_arm_spec import (
+    ARM_THICKNESS,
+    PIN_BORE_DIA,
+    PIN_STATION_FROM_NORTH_FACE,
 )
 
 PART_NAME = "crankshaft"
@@ -57,9 +59,10 @@ SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats);
 # -145..-125) while the inboard 16T station stayed, so the shaft spans
 # -175..-30. The arm/handle sweep entirely in front of the chain plane and
 # cannot foul the chain when turning (book ch30 p005/p002).
-# pin cross-hole: was Ø5.0 photo-read, now #9 drill (Ø4.978, wizard) -- the
-# nearest number drill; radial through the shaft at the crank-seat height.
-PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
+# The rear hub begins at shaft station ARM_THICKNESS (the plate's north face),
+# and its radial pin sits 4 mm farther inboard.  This is machine z=-163 in the
+# assembly, centered in the formerly empty arm-to-T12 span.
+PIN_HOLE_HEIGHT = ARM_THICKNESS + PIN_STATION_FROM_NORTH_FACE
 # Keyed-chain seat stations (local +Y from the outboard origin): named datum
 # planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
 # assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
@@ -95,10 +98,8 @@ async def build(adapter) -> dict[str, str]:
     # already mm (0.375 * IN), so it serialises as its mm value.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+    await set_global(adapter, "PinBoreDia", f"{PIN_BORE_DIA}mm")
     await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
-    # (The old PinHoleDia/PinHoleHeight knobs are gone: the cross-hole is a
-    # native Hole Wizard #9 feature; its size comes from the drill table and
-    # its station is baked into the placement point.)
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -123,25 +124,56 @@ async def build(adapter) -> dict[str, str]:
     v_shaft = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
 
-    # Tapered-pin cross-hole through the crank seat: a native Hole Wizard #9
-    # drill placed RADIALLY on the shaft's cylindrical face (3D-sketch
-    # placement; no planar face carries the drill axis). The placement point
-    # sits on the surface at the crank-seat height, +Z side; through-all
-    # drills diametrally out the -Z wall.
+    # Assembly-ream envelope, authored on the Right plane so the hole axis is
+    # local X.  ROT_X_POS90 maps local X to machine X, collinear with the arm's
+    # rear-hub hole; the former local-Z wizard hole mapped to machine -Y and
+    # could never accept the pin.
     drive_jobs += wizard_hole_on_cylinder(
         adapter,
         HoleSpec("drilled_number", "#9"),
-        [0.0, PIN_HOLE_HEIGHT, SHAFT_DIA / 2.0],
-        "tapered-pin cross-hole (#9)",
-        name="PinHole",
-        y_dim=("PinHeight", '"PinHoleHeight"'),
+        [SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0],
+        "shaft taper-pin pilot (#9)",
+        name="PinPilot",
+        y_dim=("PinPilotHeight", '"PinHoleHeight"'),
     )
+    pin_hole = SketchDims()
+    check("create_sketch shaft pin hole", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        0.0,
+        PIN_HOLE_HEIGHT,
+        PIN_BORE_DIA / 2.0,
+        "shaft pin hole",
+        dims=pin_hole,
+        names=("PinHoleZ", "PinHoleHeight", "PinHoleDia"),
+        drives=(None, '"PinHoleHeight"', '"PinBoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "shaft pin-hole sketch")
+    check("exit_sketch shaft pin hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinHoleProfile")
+    drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
+    check(
+        "cut shaft pin hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=SHAFT_DIA + 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "PinHole")
     # Cross-drill removal = the perpendicular cylinder-cylinder intersection,
     # integrated numerically (probe-exact; replaces the old ~178 as-built
     # constant for the retired Ø5.0).
-    v_pin = cross_hole_volume_mm3(NUMBER_DRILL_MM["#9"], SHAFT_DIA)
-    v_final = v_shaft - v_pin
-    await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
+    v_pin = cross_hole_volume_mm3(PIN_BORE_DIA, SHAFT_DIA)
+    measured = await adapter.get_mass_properties()
+    if not measured.is_success:
+        raise RuntimeError(f"crankshaft mass properties failed: {measured.error}")
+    v_final = float(measured.data.volume)
+    actual_removal = v_shaft - v_final
+    if abs(actual_removal - v_pin) > 0.10 * v_pin:
+        raise RuntimeError(
+            "shaft pin-hole removal differs from its analytic envelope: "
+            f"{actual_removal:.1f} mm^3 vs {v_pin:.1f} mm^3"
+        )
+    await volume_check(adapter, "shaft + pilot/ream envelope", v_final, 0.5)
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
@@ -177,6 +209,7 @@ async def build(adapter) -> dict[str, str]:
         name_last_feature(adapter, seat_name)
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 

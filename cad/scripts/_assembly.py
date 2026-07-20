@@ -1968,8 +1968,8 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
     "drive-train": (
         "alignment-pinion", "cone-gear", "cone-gear-shaft", "cone-pivot-post",
         "cone-swing-platform", "cone-tip-adjuster", "cone-tip-block",
-        "cone-tip-bushing", "cone-tip-pinch-screw", "crank-arm",
-        "crank-drive-gear", "crank-handle", "crank-pinion", "crankshaft",
+        "cone-tip-bushing", "cone-tip-pinch-screw", "crank-arm", "crank-pin",
+        "crank-pin-ring", "crank-drive-gear", "crank-handle", "crank-pinion", "crankshaft",
         "cylinder-gear", "pinion-arbor", "pinion-bracket", "pinion-cam",
         "pinion-cam-pin", "pinion-handle", "pinion-lever", "pinion-lift-rod",
     ),

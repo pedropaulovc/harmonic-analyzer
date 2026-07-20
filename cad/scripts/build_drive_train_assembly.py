@@ -29,9 +29,9 @@ drive plane at y 104.8, not the old 126.8):
   removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
   -- is NOT placed here: paper-drive now owns the whole crank->paper chain
   drive, so the single crank wheel lives there, avoiding a duplicate at the
-  top level -- codex #189 :605. The removable's tapered pin is OMITTED
-  regardless: a tapered pin cannot sit in the straight 5 mm cross-holes
-  without solid interference.)
+  top level -- codex #189 :605.) The crank arm's rear hub bridges to that
+  wheel, and the photo-faithful removable tapered pin + brass pull ring lock
+  the arm to the shaft through their aligned assembly-ream envelope.
 * alignment pinion (ch. 25): the 42T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 
@@ -465,7 +465,14 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
 # authored stations.
-from build_crank_arm import ARM_THICKNESS  # noqa: E402
+from build_crank_arm import (  # noqa: E402
+    ARM_THICKNESS,
+    PIN_STATION_FROM_NORTH_FACE,
+    REAR_HUB_DIA,
+    REAR_HUB_LENGTH,
+)
+from build_crank_pin_ring import MAJOR_RADIUS as PIN_RING_RADIUS  # noqa: E402
+from crank_pin_spec import RING_HOLE_X as PIN_RING_HOLE_X  # noqa: E402
 from build_crankshaft import (  # noqa: E402
     SEAT_ARM as CS_SEAT_ARM,
     SEAT_PINION as CS_SEAT_PINION,
@@ -484,6 +491,17 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) 
     raise AssertionError("crankshaft SeatPinion datum off the 16T station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
     raise AssertionError("crankshaft SeatArm datum off the arm origin station")
+
+# Ch. 11's close-up stack: the arm's integral rear boss fills the old 10.8 mm
+# bare-shaft span, stopping 0.25 short of the paper-drive-owned T12 south face
+# (-156.2).  Its cross-pin axis lands at the crankshaft's station 12 (-163).
+CRANK_REAR_HUB_TIP_Z = CRANK_ARM_ORIGIN_Z + REAR_HUB_LENGTH
+CRANK_PIN_Z = CRANK_ARM_ORIGIN_Z + PIN_STATION_FROM_NORTH_FACE
+CRANK_PIN_X0 = X_CRANK - REAR_HUB_DIA / 2.0 - 0.25
+if abs(CRANK_REAR_HUB_TIP_Z - (-156.45)) > 1e-6:
+    raise AssertionError("crank rear hub no longer bridges to the T12 wheel")
+if abs(CRANK_PIN_Z - (CRANKSHAFT_Z0 + 12.0)) > 1e-6:
+    raise AssertionError("crank arm/shaft pin stations are not collinear")
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
 # plate labelled "pivot" at its tip end). The green pivot post (big-end
@@ -1878,7 +1896,7 @@ async def build(adapter) -> dict[str, str]:
     # single crank chain wheel lives in paper-drive (codex #189 :605). Placing it
     # here too made two coincident T12 wheels at the crank centre once both
     # subassemblies are inserted at the top level -> interference. drive-train keeps
-    # only the crankshaft, arm, handle and 16T pinion; the crank spin DOF is
+    # the crankshaft, arm, handle, retaining pin/ring and 16T pinion; crank spin is
     # unchanged (crankshaft/arm, free_dof_key="crank_angle").
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
@@ -1899,6 +1917,28 @@ async def build(adapter) -> dict[str, str]:
         adapter, "crank-handle",
         [X_CRANK, Y_CRANK - ARM_C2C, CRANK_ARM_Z0], [0.0, 90.0, 0.0], ROT_Y_POS90,
         ground=False,
+    )
+    crank_pin = await place_component(
+        adapter,
+        "crank-pin",
+        [CRANK_PIN_X0, Y_CRANK, CRANK_PIN_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="crank tapered pin (large end outboard)",
+    )
+    # The torus is authored with symmetry axis local +X. Ry(+90) maps that
+    # axis onto machine +Z, so its plane is vertical XY; offset the centre one
+    # major radius below the head hole and the upper wire segment threads it.
+    ring_hole_x = CRANK_PIN_X0 + PIN_RING_HOLE_X
+    crank_pin_ring = await place_component(
+        adapter,
+        "crank-pin-ring",
+        [ring_hole_x, Y_CRANK - PIN_RING_RADIUS, CRANK_PIN_Z],
+        [0.0, 90.0, 0.0],
+        ROT_Y_POS90,
+        ground=False,
+        label="brass pull ring through crank-pin head",
     )
 
     # =================== joints ================================================
@@ -1969,6 +2009,18 @@ async def build(adapter) -> dict[str, str]:
     await parallel_mate(
         adapter, named_ref(f"Top Plane@{arm}", "PLANE"), cs_right,
         label="crank-arm anti-spin (keyed phase)", verify=(arm, arm_o),
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{crank_pin}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="tapered pin rigid in crank hub",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{crank_pin_ring}", "PLANE"),
+        named_ref(f"Front Plane@{crank_pin}", "PLANE"),
+        label="pull ring parked hanging from crank pin",
     )
 
     # Crank handle: rides the arm's PIVOT pin (Axis2@arm), NOT the crankshaft --

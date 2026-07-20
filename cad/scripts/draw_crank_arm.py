@@ -151,7 +151,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (right, iso):
         set_hidden_lines_removed(adapter, view)
     # The front view carries the far-side dimple dimensions; HLV exposes its
-    # circular edge. The top view exposes the #9 cross-drill meeting the shaft bore.
+    # circular edge. The top view exposes the #14 pilot and assembly-ream envelope.
     for view in (front, top):
         set_hidden_lines_visible(adapter, view)
 

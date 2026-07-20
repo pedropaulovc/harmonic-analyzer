@@ -1,0 +1,5 @@
+crank-pin-ring:
+  number: MHA-113
+  material: Brass
+  tolerance_class: machined_block
+  process: "bent brass wire"

@@ -11,9 +11,10 @@ Dimensions: cad/DIMENSIONS.md "Chapter 11" — all photo-scaled (low) except
 the legacy 3/8" crankshaft bore (med).
 
 Layout: arm length along +X from the origin (shaft bore axis = global Z
-through the origin), thickness extruded +Z (0..8). The cross-pin hole runs
-along global Y at mid-thickness: probed live, a Top-plane sketch maps
-(x, y) -> global (X, -Z), so the hole circle sits at sketch (0, -4).
+through the origin), thickness extruded +Z (0..8), with the crankshaft boss
+extending along -Z behind the plate. The cross-pin hole runs along global Y
+inside that boss: a Top-plane sketch maps (x, y) -> global (X, -Z), so the
+hole at boss station Z=-4 sits at sketch (0, +4).
 Through-cuts use mid-plane blind cuts (depth > extent) because the
 ThroughAll+both_directions combination fails live on SW 2026 (MCP issue
 #38); the dimple uses a mid-plane cut of twice its depth so the cut
@@ -31,6 +32,7 @@ import sys
 from _common import (
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     name_bore_axis,
     check,
@@ -40,13 +42,14 @@ from _common import (
     force_rebuild,
     name_dimensions,
     name_last_feature,
+    POLISHED_STEEL,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
     volume_check,
 )
-from _holes import HoleSpec, wizard_holes
+from _holes import HoleSpec, wizard_hole_on_cylinder, wizard_holes
 
 import _telemetry
 from _drawing_marks import (
@@ -66,6 +69,10 @@ from crank_arm_spec import (
     DRAWING_DIMENSIONS,
     HALF_WIDTH,
     ISOMETRIC_VIEW_NOTE,
+    PIN_BORE_DIA,
+    PIN_STATION_FROM_NORTH_FACE,
+    REAR_HUB_DIA,
+    REAR_HUB_LENGTH,
     SHAFT_BORE_DIA,
     SQUARE_END_OVERHANG,
 )
@@ -73,11 +80,8 @@ from crank_arm_spec import (
 PART_NAME = "crank-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-# (The old PivotBoreDia Ø6.0 and PinHoleDia Ø5.0 constants are gone: the handle-
-# pivot hole and the tapered-pin cross-hole are now native Hole Wizard features
-# whose diameters come from the drill standard -- 15/64 (Ø5.953) and #14 (Ø4.623)
-# -- not equation-driven sketch dims. The 3/8 shaft bore stays a reamed circle
-# cut: it is a precision running fit, not a twist-drill hole.)
+# The handle pivot remains a native 15/64 Hole Wizard feature. The crankshaft
+# journal and the assembly-ream envelope are explicit driven circle cuts.
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
 
@@ -101,6 +105,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmC2C", f"{ARM_C2C}mm")
     await set_global(adapter, "ArmWidth", f"{ARM_WIDTH}mm")
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
+    await set_global(adapter, "RearHubDia", f"{REAR_HUB_DIA}mm")
+    await set_global(adapter, "RearHubLength", f"{REAR_HUB_LENGTH}mm")
+    await set_global(adapter, "PinStation", f"{PIN_STATION_FROM_NORTH_FACE}mm")
+    await set_global(adapter, "PinBoreDia", f"{PIN_BORE_DIA}mm")
     await set_global(adapter, "SquareEndOverhang", f"{SQUARE_END_OVERHANG}mm")
     await set_global(adapter, "ShaftBoreDia", f"{SHAFT_BORE_DIA}mm")
     await set_global(adapter, "DimpleDia", f"{DIMPLE_DIA}mm")
@@ -168,6 +176,31 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
+    # The reference crank is not a flat plate at the shaft end: a cylindrical
+    # rear hub fills the axial space from the plate to the removable T12 chain
+    # wheel.  The part is assembled with local +Z pointing machine -Z, so this
+    # reverse extrusion becomes the machine-inboard (north) boss.
+    hub = SketchDims()
+    check("create_sketch rear hub", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, 0.0, 0.0, REAR_HUB_DIA / 2.0, "rear hub", dims=hub,
+        names=("HubCx", "HubCy", "HubDia"),
+        drives=(None, None, '"RearHubDia"'),
+    )
+    await ensure_fully_defined(adapter, "rear hub sketch")
+    check("exit_sketch rear hub", await adapter.exit_sketch())
+    name_last_feature(adapter, "RearHubProfile")
+    drive_jobs += hub.apply(adapter, "RearHubProfile")
+    check(
+        "extrude rear hub",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=REAR_HUB_LENGTH, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "RearHub")
+    hub_depth = name_dimensions(adapter, "RearHub", ["Depth"])
+    drive_jobs += [(hub_depth[0], '"RearHubLength"')]
+
     # Shaft bore: the 3/8 reamed journal the crankshaft runs in -- a precision
     # running fit, kept a plain circle cut (NOT a twist-drill Hole Wizard hole).
     # On the origin, so only its diameter is a dim.
@@ -231,22 +264,41 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after dimple: {vol:.1f} mm^3")
 
-    # Tapered-pin cross-hole: pilot below the No. 2 taper pin's small end, then
-    # taper-reamed with the shaft at assembly.
-    # number drill (Ø4.978) along global Y through the boss + shaft bore at
-    # mid-thickness (memory/fastener-policy-us-customary). Drilled from the +Y
-    # side face (a pristine planar face, normal +Y) at (x 0, z ArmThickness/2);
-    # through-all is geometrically identical to the old mid-plane cut.
-    pin_cut = wizard_holes(
+    # Assembly-ream envelope for the 1:48 tapered pin.  It crosses the REAR
+    # HUB, not the plate: local Z=-4 maps to machine z=-163, exactly the shaft's
+    # existing pin station and inside the formerly empty arm-to-wheel span.
+    # A straight maximum-envelope cut keeps the saved part interference-free;
+    # the manufacturing note carries the final matched 1:48 ream operation.
+    drive_jobs += wizard_hole_on_cylinder(
         adapter,
         HoleSpec("drilled_number", "#14"),
-        [[0.0, HALF_WIDTH, ARM_THICKNESS / 2.0]],
-        (0.0, 1.0, 0.0),
-        "tapered-pin cross-hole (#14)",
-        name="PinHole",
-        placement_dims=[((None, None), ("PinHoleZ", '"ArmThickness" / 2'))],
+        [0.0, REAR_HUB_DIA / 2.0, -PIN_STATION_FROM_NORTH_FACE],
+        "rear-hub taper-pin pilot (#14)",
+        name="PinPilot",
     )
-    drive_jobs += pin_cut.placement_drive_jobs
+    pin_hole = SketchDims()
+    check("create_sketch rear-hub pin hole", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter,
+        0.0,
+        PIN_STATION_FROM_NORTH_FACE,
+        PIN_BORE_DIA / 2.0,
+        "rear-hub pin hole",
+        dims=pin_hole,
+        names=("PinHoleX", "PinHoleZ", "PinHoleDia"),
+        drives=(None, '"PinStation"', '"PinBoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "rear-hub pin-hole sketch")
+    check("exit_sketch rear-hub pin hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinHoleProfile")
+    drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
+    check(
+        "cut rear-hub pin hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=REAR_HUB_DIA + 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "PinHole")
     vol = await _volume(adapter)
     _telemetry.info(f"volume after pin hole: {vol:.1f} mm^3")
 
@@ -303,6 +355,7 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
 
     await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,

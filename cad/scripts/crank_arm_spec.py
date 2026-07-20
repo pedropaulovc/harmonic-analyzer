@@ -39,6 +39,10 @@ ARM_C2C = 66.0  # shaft-to-handle-pivot centres -- REDERIVED from the ch30 eight
 # down-pointing 150 arm would drive the handle below the table (med).
 ARM_WIDTH = 16.0  # arm width (low)
 ARM_THICKNESS = 8.0  # ~half the arm width, p.12 photo (low)
+REAR_HUB_DIA = 20.0  # cylindrical crankshaft boss behind the plate (ch11 closeups, low)
+REAR_HUB_LENGTH = 10.55  # bridges the plate to 0.25 mm shy of the T12 wheel
+PIN_STATION_FROM_NORTH_FACE = 4.0  # tapered-pin axis inside the rear hub (low)
+PIN_BORE_DIA = 6.10  # modeled taper-ream envelope; clears the pin's 5.94 mm large end
 SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)
 SHAFT_BORE_DIA = 0.375 * MM_PER_IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
 # rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
@@ -70,9 +74,8 @@ DRAWING_NOTES = "\n".join(
     (
         "SHAFT BORE AND HANDLE PIVOT CENTRED ACROSS 16 WIDTH.",
         "HANDLE PIVOT: 15/64 DRILL THRU.",
-        "CROSS-PIN: #14 DRILL AT ASSEMBLY THROUGH SHAFT-BORE AXIS, MID-THICKNESS;",
-        "TAPER-REAM WITH SHAFT FOR NO. 2 TAPER PIN,",
-        "1:48, LARGE END OUTBOARD.",
+        "CROSS-PIN: #14 DRILL PILOT THROUGH REAR HUB AND SHAFT AT ASSEMBLY;",
+        "TAPER PIN: REAM 1:48 TO THE 6.10 MAXIMUM ENVELOPE, LARGE END OUTBOARD.",
         "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
     )
 )
