@@ -26,11 +26,16 @@ GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93�
   PR #339 (Codex caught it committed).
 - Schema discovery: `meshprobe schema --kind commands` (no per-command lookup);
   invalid preset/enum values error with the valid list — cheap discovery trick.
-- **GPU TDR crash on heavy scenes (2026-07-20):** the current VM's GPU is an
-  NVIDIA A10-4Q 4 GB vGPU slice (~2.3 GB already committed at idle). Rendering
-  the full-machine ~105 MB GLB in Eevee exceeds the 2 s Windows TDR watchdog →
+- **GPU TDR crash (2026-07-20, refined same day):** the current VM's GPU is an
+  NVIDIA A10-4Q 4 GB vGPU slice (~2.3 GB already committed at idle). Any Eevee
+  dispatch that pushes total GPU pressure past the 2 s Windows TDR watchdog →
   nvlddmkm event 153, Blender dies 0xC0000409, session lost ("NVIDIA OpenGL
-  Driver Error code: 7" dialog). No TdrDelay registry keys are set. Workaround:
-  render small GLBs (subassembly exports like `crank-closeup-check.glb`) or
-  `display --mode isolated` on a subtree before rendering; keep only one live
-  session. Positive control: small GLBs render fine on the same session.
+  Driver Error code: 7" dialog). No TdrDelay registry keys are set. The trigger
+  is TOTAL pressure, not GLB size: the ~105 MB full-machine GLB crashes on an
+  idle GPU, and a small rig GLB that renders fine solo crashes while a
+  SolidWorks `doit` build hammers the same slice (SW survives the reset, the
+  Blender worker dies). Rule: treat the GPU like the COM seat -- ONE heavy
+  client at a time. Render small GLBs / `display --mode isolated` subtrees,
+  keep one live session, and never open/render meshprobe while a SolidWorks
+  build is running. Complete fixes (Pedro's call): raise TdrDelay/TdrDdiDelay
+  in HKLM GraphicsDrivers + reboot, or a larger vGPU profile.
