@@ -209,7 +209,7 @@ async def build(adapter) -> dict[str, str]:
         RING_HOLE_DIA / 2.0,
         "pull-ring hole",
         dims=ring_hole,
-        names=("RingHoleX", "RingHoleY", "RingHoleDia"),
+        names=("RingHoleOffset", "RingHoleY", "RingHoleDia"),
         drives=('"RingHoleX"', None, '"RingHoleDia"'),
     )
     await ensure_fully_defined(adapter, "pull-ring hole")

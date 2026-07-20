@@ -223,9 +223,21 @@ sections:
         - scaled
         - low
       - - Tapered-pin cross-hole
-        - ~Ø5 mm
-        - ~0.20
-        - p.14 photo, pin small end
+        - '#14 pilot, reamed to Ø6.10 maximum envelope'
+        - ~0.24
+        - p.14 photo; assembled pilot/ream sequence sized for the 1:48 pin's large end
+        - scaled + fit
+        - low
+      - - Crank-arm rear hub
+        - Ø20 × 10.55 long beyond the 8 mm arm plate
+        - —
+        - p.14 close-up; bridges the arm north face to 0.25 shy of the T12 sprocket
+        - scaled + derived
+        - low
+      - - Taper-pin pull head and ring
+        - Ø10 × 9 head; Ø2 ring hole; brass ring R7 with Ø1.4 wire
+        - —
+        - p.14 close-up proportions
         - scaled
         - low
       - - Crankshaft length

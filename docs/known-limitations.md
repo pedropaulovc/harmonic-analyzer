@@ -29,8 +29,8 @@ These are tracked against the book photos and are fidelity-only, not mechanism-b
 
 ## Omitted hardware (documented)
 
-Drive-train tapered pin, output-fixture clamp screw, clevis hardware, nameplate screws, and
-fillister slots are below render resolution and currently omitted.
+The crank-pin tether eyelet/chain, output-fixture clamp screw, clevis hardware,
+nameplate screws, and fillister slots are below render resolution and currently omitted.
 
 ## Manufacturing outputs
 

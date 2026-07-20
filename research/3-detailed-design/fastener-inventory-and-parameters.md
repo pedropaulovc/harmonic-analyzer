@@ -132,7 +132,7 @@ CAD-mm columns are **low-fi scale cues only** (see warning above).
 
 | # | Part (MHA #) | Type | CAD dims (mm) | Qty book / CAD | Location | In model | Period note |
 |---|---|---|---|---|---|---|---|
-| 16 | **crank-pin** (MHA-024) | tapered pin, no head | big 6 → small 5, L 45 | 1 / **0** | Removable taper pin affixing crank arm to crankshaft (pulled to swap crankshaft gear) — self-labeled "tapered pin" in ch11 | ✗ | period taper ≈ **1:48** (0.021″/in); driven/drifted, brass split-ring + retaining chain (ch11 shows both) |
+| 16 | **crank-pin** (MHA-024) | tapered pin with mushroom pull head | big 6 → small 5, L 45 shank + 9 head | 1 / 1 | Removable taper pin affixing crank arm to crankshaft (pulled to swap crankshaft gear) — self-labeled "tapered pin" in ch11 | ✓ | period taper ≈ **1:48** (0.021″/in); driven/drifted, with separate brass pull ring (MHA-113) |
 | 17 | **pinion-cam-pin** (MHA-100) | cylindrical dowel pin | Ø3 × 17.5 | 2 / 2 | Cam-follower pin pressed through each pinion swing-strap tail | ✓ | plain ground dowel, press fit (no thread) |
 
 ⚑ transgear-knob-shaft is a **control knob**, not a clamping fastener — listed for completeness.
@@ -164,7 +164,7 @@ none exist as a placed CAD fastener today.
 | N | **Chain-sprocket central nut / retaining screw** | ch23 page002, ch30 page002/009 | 1–2 | hex nut / slotted | **¼″** | ✗ | sprocket retention omitted |
 | O | **Base leveling feet / base-plate corner screws** | ch19 img03, ch22 img06, ch30 base corners (faint) | ~4 | slotted / leveling foot | **¼″** | ✗ | uncertain in imagery; not modeled |
 | P | **Crank wood-handle end retaining screw** | ch11 page002_img03/06, ch13 page002_05 (slotted cap on the turned handle) | 1 | slotted, capping handle spindle | **⅛″** | ✗ | `crank-handle` modeled; end screw omitted |
-| Q | **Crank tapered-pin retaining ring + brass screw-eyes/chain** | ch11 page002 (brass ring under pin head + wire eyes/chain) | 1 ring + ~2 eyes | brass split-ring + screw-eyes | small | ✗ | chain "lost" on original; ring/eyes omitted |
+| Q | **Crank tapered-pin retaining ring + brass screw-eyes/chain** | ch11 page002 (brass ring under pin head + wire eyes/chain) | 1 ring + ~2 eyes | brass split-ring + screw-eyes | small | ◐ | `crank-pin-ring` (MHA-113) modeled and placed; tether eyelet/chain omitted (chain "lost" on original) |
 | R | **Pinion-rig T-handle / tommy-bar clamp screws** | ch25 page002_img07/08 (2 tommy-bar clamps, "6 mm") | 2 | tommy-bar clamp screw | **¼″** | ◐ | partially covered by `pinion-handle`; verify against imagery |
 
 ---
@@ -189,9 +189,9 @@ none exist as a placed CAD fastener today.
 - **Grub / set / adjuster screws** — cone-tip adjuster & pinch, gear-hub set-screws.
 - **Pins** — crank taper pin (≈1:48), pinion cam dowels, gear cross-pin.
 
-**In-model coverage:** 15 fastener parts + 2 pins are built; of those, ~12 are
+**In-model coverage:** 16 fastener parts + 2 pins are built; of those, ~14 are
 placed as intended, `fillister-screw`/`thumb-screw` are under-placed, and
-`hex-bolt`/`crank-pin` are built but **placed in no assembly**. The real machine
+`hex-bolt` is built but **placed in no assembly**. The real machine
 carries **dozens more** slotted bearing-cap / bracket / rack / nameplate screws
 (§2 A–R) that are currently omitted or collapsed — the largest being the **frame-
 corner column clamp screws (§2-A)** and the pervasive **gear bearing-cap screws
