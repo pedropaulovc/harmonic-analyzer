@@ -76,7 +76,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HeadLength", f"{HEAD_LENGTH}mm")
     await set_global(adapter, "HeadDia", f"{HEAD_DIA}mm")
     await set_global(adapter, "RingHoleDia", f"{RING_HOLE_DIA}mm")
-    await set_global(adapter, "RingHoleX", f"{RING_HOLE_X}mm")
+    await set_global(adapter, "RingHoleOffset", f"{abs(RING_HOLE_X)}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -210,7 +210,7 @@ async def build(adapter) -> dict[str, str]:
         "pull-ring hole",
         dims=ring_hole,
         names=("RingHoleOffset", "RingHoleY", "RingHoleDia"),
-        drives=('"RingHoleX"', None, '"RingHoleDia"'),
+        drives=('"RingHoleOffset"', None, '"RingHoleDia"'),
     )
     await ensure_fully_defined(adapter, "pull-ring hole")
     check("exit_sketch ring hole", await adapter.exit_sketch())
