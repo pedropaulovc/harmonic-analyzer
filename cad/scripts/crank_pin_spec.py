@@ -38,10 +38,11 @@ HEAD_DIA = 8.0
 HEAD_LEN = 6.0
 HEAD_DOME_R = 3.9  # near-full-radius rim fillet -> the mushroom dome
 TIP_DOME_R = 2.4  # bullet-nose fillet on the Ø5 small end
-RING_HOLE_DIA = 2.6  # cross-hole through the neck carrying the pull ring --
-# sized so the CURVED ring wire clears the hole-mouth corners by the 0.25
-# design margin (a Ø2.0 hole grazes the wire at the mouths: 0.00 mm^3
-# checker slivers)
+RING_HOLE_DIA = 3.2  # cross-hole through the neck carrying the pull ring --
+# budget at the hole mouths: radial clearance (3.2-1.5)/2 = 0.85 minus the
+# curved wire's sag over the half-length (~0.28, the 0.00 mm^3 sliver war a
+# Ø2.0 hole lost) minus the wire's RING_SWING_DEG tilt drift (~0.35 at the
+# 10 deg chain-relief swing in drive-train) leaves ~0.22 margin
 
 # Brass pull ring (open C, round wire) riding the neck cross-hole.
 RING_WIRE_DIA = 1.5
