@@ -41,6 +41,11 @@ discovered during harmonic-analyzer M6.4:
   COM error, not as a clean no-op). Don't hardcode the sign: use the
   amplitude-bar probe pattern (try +u, read volume back, flip on failure)
   and hold the sketch's drive jobs back until the winning side is proven.
+  Full mapping (probed live 2026-07-20, scratch part, circle at (5,2) read
+  back at COM (1,2,−5)): **Right-plane (u,v) → part (−Z,+Y), extrude
+  normal +X**. For reference, Front (u,v)→(X,Y) extrudes +Z, Top
+  (u,v)→(X,−Z) extrudes +Y. Used for the crank-arm taper-ream cone: the
+  revolve profile's u axis carries −(part z station), v carries y.
 - **On-axis revolve's SEAM EDGE poisons inference-ON circles on it**: a
   360° revolve of a Top-plane profile leaves its seam edge along +X on
   the z=0 face; an inference-ON `add_circle` whose CENTRE lies on that
