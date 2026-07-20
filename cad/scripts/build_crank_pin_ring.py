@@ -5,8 +5,8 @@ head of the removable crank pin.  The tiny tether chain once attached to the
 separate arm eyelet is documented as lost; this part is only the pull ring.
 
 Layout: a torus centred at the origin, ring plane YZ, symmetry axis +X.
-The drive-train rotates that axis onto machine Z so the ring hangs in the
-vertical XY plane through the pin-head hole.
+The drive-train keeps that orientation: its top wire segment runs along the
+pin-head hole's machine-Z axis, then the ring hangs below in the vertical YZ plane.
 """
 
 from __future__ import annotations

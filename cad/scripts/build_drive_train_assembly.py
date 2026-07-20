@@ -1927,16 +1927,17 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="crank tapered pin (large end outboard)",
     )
-    # The torus is authored with symmetry axis local +X. Ry(+90) maps that
-    # axis onto machine +Z, so its plane is vertical XY; offset the centre one
-    # major radius below the head hole and the upper wire segment threads it.
+    # The torus is authored in local YZ and stays there: its top wire segment
+    # runs along machine Z through the pin-head hole, then the ring hangs one
+    # major radius below it.  Rotating the torus into XY instead made the wire
+    # turn sideways inside the head and necessarily intersect both pin and arm.
     ring_hole_x = CRANK_PIN_X0 + PIN_RING_HOLE_X
     crank_pin_ring = await place_component(
         adapter,
         "crank-pin-ring",
         [ring_hole_x, Y_CRANK - PIN_RING_RADIUS, CRANK_PIN_Z],
-        [0.0, 90.0, 0.0],
-        ROT_Y_POS90,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
         ground=False,
         label="brass pull ring through crank-pin head",
     )
