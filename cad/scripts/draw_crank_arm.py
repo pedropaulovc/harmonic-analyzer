@@ -89,13 +89,18 @@ def _sheet_x(model_x_mm: float) -> float:
 def _sheet_rx(model_z_mm: float) -> float:
     """Sheet X of a model-Z station in the right view (2:1, bbox-centred).
 
-    The hub boss extends the section's Z bbox to -HUB_LEN..ARM_THICKNESS, so
-    the view centre is no longer the plate's own mid-thickness -- picks that
-    hardcoded offsets from RIGHT_CENTER landed on the hub's silhouette (a
-    curved-face silhouette, not a selectable edge) once the hub shipped.
+    Sheet-right is part -Z -- pinned EMPIRICALLY by
+    diagnostics/probe_crank_arm_rview.py (the selection-hit band on the
+    bottom outline matches the cross-pin cone's hub-exit curve at part
+    z -6.9..-1.1 only under this sign), so larger z stations sit further
+    LEFT: the z=8 south face is the view's left outline, the z=-9.2 hub end
+    its right.  The hub boss extends the section's Z bbox to
+    -HUB_LEN..ARM_THICKNESS, so the view centre is no longer the plate's own
+    mid-thickness -- picks that offset from RIGHT_CENTER by eye broke the day
+    the hub shipped.
     """
     bbox_center = (ARM_THICKNESS - HUB_LEN) / 2.0
-    return RIGHT_CENTER[0] + (model_z_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
+    return RIGHT_CENTER[0] - (model_z_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -206,14 +211,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # (0.270..0.278) an 11.7 mm gap and its leader a clean run to the face.  The
     # dim's own extension lines stay at y=0.119/0.151, above and below that
     # leader, so nothing crosses.
-    # Pick the flat edges at the PLATE band's mid-thickness: at the view centre
-    # (inside the hub band) the +/-8 silhouette belongs to the hub cylinder --
-    # a silhouette, not a model edge, so the pick finds nothing there.
+    # Pick the two long x-running corner edges at (z=8, y=+/-8) -- they
+    # project to the LEFT outline's endpoints.  Probe-verified
+    # (probe_crank_arm_rview.py): both select there and AddDimension2
+    # returns a dimension; mid-band stations instead grab the cross-pin
+    # cone's hub-exit curves or the keeper-hole mouth, which cannot form a
+    # linear width dim (AddDimension2 -> None).
     add_edge_dimension(
         adapter,
         right,
-        p0=(_sheet_rx(ARM_THICKNESS / 2.0), RIGHT_CENTER[1] - 0.016),
-        p1=(_sheet_rx(ARM_THICKNESS / 2.0), RIGHT_CENTER[1] + 0.016),
+        p0=(_sheet_rx(ARM_THICKNESS), RIGHT_CENTER[1] - 0.016),
+        p1=(_sheet_rx(ARM_THICKNESS), RIGHT_CENTER[1] + 0.016),
         text_xy=(RIGHT_CENTER[0] - 0.048, RIGHT_CENTER[1]),
         label="arm-width overall",
     )
@@ -245,18 +253,23 @@ async def build(adapter: Any) -> dict[str, str]:
     # parallelism frame's arrowhead on the RIGHT face at (0.3082, 0.1337), the
     # stacked-arrowhead tell.  Both symptoms are the same wrong-side offset.
     #
-    # Datum A moved to the SOUTH broad face (z=ARM_THICKNESS, the handle side):
-    # the former north-face pick is dead -- the hub boss now grows out of that
-    # face, so in HLR its z=0 boundary (the hub-root circle) is hidden behind
-    # the plate and un-pickable, while the south face stays the one full
-    # uninterrupted broad face (also the better functional datum).  Its edge is
-    # the view's RIGHT outline; the symbol sits outboard on that side
-    # (dot(symbol - edge, +X normal) > 0), in open sheet past the view.
+    # Datum A moves to the SOUTH broad face (z=ARM_THICKNESS, the handle
+    # side): the pre-hub datum was the NORTH face, whose edge-on outline is
+    # gone -- the hub boss grows out of it, so its z=0 boundary is interior
+    # to the widened section (HLR-hidden hub-root circle), un-pickable.  The
+    # south face stays the one full uninterrupted broad face (and the better
+    # functional datum).  Its edge-on outline is the view's LEFT edge at
+    # _sheet_rx(8)=0.2828, picked at y=+5 (0.145) -- probe-verified, clear of
+    # the pivot mouth circle's +/-2.98 band and the y=+8 corner.  Symbol
+    # outboard LEFT (the face's +z normal reads sheet -X) and DOWN at
+    # y=0.106: the leader then runs diagonally to the face without reaching
+    # the 16.00 dim's vertical line at x=0.252 (a level leader at y=0.145
+    # would cross it), crossing only that dim's y=0.119 extension line.
     add_datum_feature(
         adapter,
         right,
-        edge_xy=(_sheet_rx(ARM_THICKNESS), RIGHT_CENTER[1]),
-        symbol_xy=(_sheet_rx(ARM_THICKNESS) + 0.022, RIGHT_CENTER[1]),
+        edge_xy=(_sheet_rx(ARM_THICKNESS), RIGHT_CENTER[1] + 0.010),
+        symbol_xy=(_sheet_rx(ARM_THICKNESS) - 0.022, 0.106),
         datum="A",
         label="crank broad face",
     )
@@ -292,8 +305,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # At x=0.219 the 66.00 line has ended (11.7 mm clear) and the band from the
     # arm's bottom edge (0.1190) to the 76.00 dimension line (0.0832) is 35.7 mm
     # of empty sheet, so the tag drops straight down into open space.
+    # x=67.5, not (ARM_C2C+ARM_END_X)/2=71: the full-round end fillets
+    # (R7.98, tangent at x~68.02) consumed the flat bottom edge past 68 --
+    # at 71 the outline has already lifted 0.6 mm off y=-8 and the pick
+    # misses.  67.5 is still on the flat (66 pivot < 67.5 < 68.02 tangent)
+    # and its sheet x (~0.212) stays clear of the 66.00 basic dim line
+    # ending at 0.2073 (the constraint that pushed the station out here).
     datum_c_edge = (
-        _sheet_x((ARM_C2C + ARM_END_X) / 2.0),
+        _sheet_x(67.5),
         FRONT_CENTER[1] - HALF_WIDTH * SHEET_SCALE[0] / 1000.0,
     )
     # MINUS 0.022, not plus: `datum_c_edge` is the front view's BOTTOM edge, whose
@@ -355,17 +374,19 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.258, 0.110),
         label="handle pivot hole",
     )
-    # Parallelism retargets the HUB SEAT face (z=-HUB_LEN, the view's LEFT
-    # outline): with datum A on the south face, the opposite broad face (z=0)
-    # is HLR-hidden behind the hub, and the hub's end face is the surface the
-    # T12 chain-wheel boss actually seats against -- the parallelism that
-    # matters for the chain running true.  Frame sits below-left of the view,
-    # under the 16.00 dim's y=0.119 extension line so nothing crosses its text.
+    # Parallelism retargets the HUB SEAT face (z=-HUB_LEN, the view's RIGHT
+    # outline at _sheet_rx(-9.2)=0.3172 -- the hub end circle, a real model
+    # edge, probe-verified at y=+5): the face the old pick tagged (the south
+    # broad face) is now datum A itself, and the hub's end face is the
+    # surface the T12 chain-wheel boss actually seats against -- the
+    # parallelism that matters for the chain running true.  Frame below-right
+    # at (0.322, 0.106): right of the Depth text (ending ~0.306 at y=0.108),
+    # so the diagonal leader up to the face never crosses it.
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(_sheet_rx(-HUB_LEN), RIGHT_CENTER[1]),
-        frame_xy=(0.262, 0.106),
+        edge_xy=(_sheet_rx(-HUB_LEN), RIGHT_CENTER[1] + 0.010),
+        frame_xy=(0.322, 0.106),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
