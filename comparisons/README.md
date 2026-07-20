@@ -99,3 +99,50 @@ Pair ids are `<model>--<source-id>`; `model` maps to
 az 0 / el 0 = SolidWorks Front, +az = camera toward the model's +X (right)
 side, el = elevation; `target_mm`/`zoom` frame close-ups; poses are refined
 by editing the manifest and re-rendering `--only <id>` (no rebuild needed).
+
+## Head-less inspection — meshprobe
+
+`pose_to_meshprobe.py` replays a manifest pose into
+[meshprobe](https://github.com/pedropaulovc/meshprobe) — the same vantage,
+head-less, on the assembly **GLB** instead of the STL cache. It reads a pose
+(a `manifest.json` pair, a `findings/<pair>_deltas.json`, or a bare camera
+dict) and **emits** the `meshprobe` command sequence (`open → view-orbit →
+illumination-set → render-image`); it does not run meshprobe itself.
+
+**Prerequisite — the machine GLB** at `cad/out/gltf/<dashed>.glb` (the same
+metre-unit glTF `export_models.py` writes). Produce one either way:
+
+```powershell
+# from the SolidWorks seat: open a .SLDASM and SaveAs3 it to .glb
+uv run python cad/scripts/export_glb.py <dir-with-the-assembly>/harmonic-analyzer.SLDASM
+# or add --fetch-glb below to pull gltf/<model>.glb from the latest release bundle
+```
+
+```powershell
+# print the commands for one pair (id substring)
+uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002
+
+# actually render it: pipe the emitted commands to a shell (bash — see quoting note)
+uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002 | bash
+uv run meshprobe close --all            # stop the Blender daemon when done
+
+# just the computed params, no shell
+uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002 --format json
+```
+
+The render lands in `comparisons/render/meshprobe/<id>.png`. Useful flags:
+`--canvas WxH` (forces the render canvas — **distance depends on its
+portrait/landscape aspect**, so pass it when no reference image is available or
+the run warns about the landscape default), `--glb <path>` / `--fetch-glb`
+(GLB source), `--boxes <path>` (scene-bbox source; by default it derives the
+bbox straight from the local GLB), `--blender <path>` (Blender ≥ 5.2).
+
+Mapping (verified against the `open` receipt): pose_studio model coords
+`(x, y, z)` → meshprobe world `(x, −z, y)`; `azimuth = az − 90`,
+`elevation = el`, roll passthrough; distance = the same fitted `cam_dist` as
+`render_offline`. The GLB is metres and meshprobe reports/accepts mm, so the
+default `--unit-scale 1.0` is correct.
+
+> **PowerShell quoting**: the emitted `--projection-json '{…}'` uses bash
+> single-quotes. On PowerShell run the pipe under `bash`/Git Bash, or use
+> `--format json` and build the call yourself.

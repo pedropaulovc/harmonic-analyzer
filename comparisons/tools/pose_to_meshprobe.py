@@ -24,11 +24,13 @@ Under that rotation the orbit angles fall out exactly:
     target_mm(world) = (tx, -tz, ty)   from the model-space framing centre
     distance_mm      = blender_worker's fitted cam_dist (reproduced below)
 
-Units: SolidWorks exports the GLB in METRES (glTF spec; see memory/sw-gltf-export),
-while meshprobe's --target/--distance are millimetres, so the default --unit-scale
-of 1.0 assumes meshprobe reconciles mm<->m internally. VERIFY on first run: the
-``open`` receipt's bounds should read ~[0.457, 1.39, 0.40] m for this machine; if it
-instead reports ~457 (a mm-authored GLB read as metres) pass --unit-scale 0.001.
+Units: SolidWorks exports the GLB in METRES (glTF spec; see memory/sw-gltf-export).
+meshprobe auto-detects that (open receipt: units=meter, unit_scale=1.0) and reports
+AND accepts every distance in millimetres, so the default --unit-scale of 1.0 is
+correct and --target/--distance line up 1:1 with the model mm here. Confirmed against
+the v24 machine GLB: open's root_bounds read [457.2, 404.7, 1394.0] mm and its
+source_to_world is exactly the (x,-z,y) map used below. (Override --unit-scale only
+for a mis-authored asset whose open bounds come back 1000x off.)
 
 The framing math below MIRRORS comparisons/tools/blender_worker.py (its bpy-free
 half). blender_worker imports bpy at module scope so it cannot be imported here;
@@ -179,28 +181,52 @@ def load_pairs(path: Path) -> tuple[list[dict], str]:
     raise SystemExit(f"{path}: not a manifest, deltas, or camera JSON")
 
 
-def scene_bbox(model: str, boxes_path: Path | None, fetch: bool,
-               tag: str | None) -> tuple[tuple, tuple, float, list]:
-    """(mesh_lo, mesh_hi, ext, boxes) in mm from a boxes/scene JSON (release or cad/out)."""
+def scene_bbox(model: str, boxes_path: Path | None, glb_hint: str | None,
+               fetch: bool, tag: str | None) -> tuple[tuple, tuple, float, list]:
+    """(mesh_lo, mesh_hi, ext, boxes) in mm for the framing math.
+
+    Prefers a boxes/scene JSON (it also carries per-part boxes, needed only if a
+    camera uses ``frame_components``). Falls back to deriving the scene bbox
+    straight from the local GLB you already need for ``open`` -- it is the same
+    untranslated model geometry in metres, so bounds*1000 gives an identical mm
+    bbox (boxes=[], so ``frame_components`` framing is unavailable in this mode)."""
     dashed = model.replace("_", "-")
     member = f"boxes/{dashed}.json"
     candidates = [boxes_path] if boxes_path else [CAD_OUT / "boxes" / f"{dashed}.json"]
     src = next((c for c in candidates if c and c.exists()), None)
-    if src is None and fetch:
+    if src is not None:
+        data = json.loads(src.read_text(encoding="utf-8"))
+        boxes = [(e["name"], e["box"]) for e in data.get("boxes", [])]
+        if not boxes:
+            raise SystemExit(f"{src}: no boxes[] to derive the scene bbox from")
+        lo = tuple(min(b[i] for _n, b in boxes) for i in range(3))
+        hi = tuple(max(b[i + 3] for _n, b in boxes) for i in range(3))
+        return lo, hi, max(hi[i] - lo[i] for i in range(3)), boxes
+
+    glb = Path(glb_hint) if glb_hint else CAD_OUT / "gltf" / f"{dashed}.glb"
+    if glb.exists():
+        return _bbox_from_glb(glb)
+    if fetch:
         src = release_member(member, tag)
-    if src is None:
-        raise SystemExit(
-            f"no boxes JSON for {model} (looked for {[str(c) for c in candidates]}); "
-            f"pass --boxes, --fetch-glb to pull {member} from the latest release, "
-            f"or build locally (doit export)")
-    data = json.loads(src.read_text(encoding="utf-8"))
-    boxes = [(e["name"], e["box"]) for e in data.get("boxes", [])]
-    if not boxes:
-        raise SystemExit(f"{src}: no boxes[] to derive the scene bbox from")
-    lo = tuple(min(b[i] for _n, b in boxes) for i in range(3))
-    hi = tuple(max(b[i + 3] for _n, b in boxes) for i in range(3))
-    ext = max(hi[i] - lo[i] for i in range(3))
-    return lo, hi, ext, boxes
+        data = json.loads(src.read_text(encoding="utf-8"))
+        boxes = [(e["name"], e["box"]) for e in data.get("boxes", [])]
+        lo = tuple(min(b[i] for _n, b in boxes) for i in range(3))
+        hi = tuple(max(b[i + 3] for _n, b in boxes) for i in range(3))
+        return lo, hi, max(hi[i] - lo[i] for i in range(3)), boxes
+    raise SystemExit(
+        f"no scene bbox for {model}: no boxes JSON (cad/out/boxes/{dashed}.json) and no "
+        f"GLB (cad/out/gltf/{dashed}.glb). Pass --boxes/--glb, --fetch-glb to pull from "
+        f"the latest release, or build locally (doit export / export_glb.py).")
+
+
+def _bbox_from_glb(glb: Path) -> tuple[tuple, tuple, float, list]:
+    """Scene AABB in mm from a metre-authored GLB (SW glTF export)."""
+    import trimesh
+    scene = trimesh.load(str(glb))
+    lo, hi = scene.bounds  # metres, untranslated model coords
+    lo = tuple(float(v) * 1000.0 for v in lo)
+    hi = tuple(float(v) * 1000.0 for v in hi)
+    return lo, hi, max(hi[i] - lo[i] for i in range(3)), []
 
 
 # --------------------------------------------------------------------------- #
@@ -426,7 +452,8 @@ def main() -> int:
     for pair in pairs:
         model = pair["model"]
         if model not in bbox_cache:
-            bbox_cache[model] = scene_bbox(model, args.boxes, args.fetch_glb, args.release_tag)
+            bbox_cache[model] = scene_bbox(model, args.boxes, args.glb,
+                                           args.fetch_glb, args.release_tag)
         w, h, src = canvas_for(pair, 1600, override)
         cvt = convert(pair, bbox_cache[model], w, h)
         cvt["canvas_source"] = src
