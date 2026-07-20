@@ -118,6 +118,11 @@ from _drawing_registry import (  # noqa: E402
     DRAWINGS_BY_NAME,
     PROJECT_DRWDOT,
 )
+from _task_catalog import (  # noqa: E402
+    CHECK_NAMES as _CHECK_NAMES,
+    OPTIONAL_CHECK_NAMES as _OPTIONAL_CHECK_NAMES,
+    VERIFY_NAMES as _VERIFY_NAMES,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
@@ -687,19 +692,9 @@ EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
 
-# The gate suites, by SolidWorks-dependence -- the single source of truth for the
-# verify:/check: task names (reused by build + release so a new gate is wired in
-# one place).
-_VERIFY_NAMES = ("soundness", "kinematics")   # need SW (spine); subsystems retired
-# Offline checks REQUIRED on every build/release (fast, high-value):
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry",
-                "watchdog", "freshness", "flagonly", "partiso")
-# Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
-# depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
-# through a mock SolidWorks to pin span SHAPE (~20-30 s, ~20x the other offline
-# checks) and has never caught a product defect -- so it is off the every-build
-# required path. Union of both MUST match task_check's specs keys.
-_OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
+# Gate names come from the side-effect-free task catalog shared with cmdhelp.
+# Required and optional sets still stay distinct: verify_telemetry is a slower
+# performance/shape probe and is deliberately absent from build/release.
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str, com: bool = False) -> None:
@@ -1872,6 +1867,25 @@ def task_check():
                   for dep in module_deps_of(SCRIPTS_DIR / f"build_{s}_assembly.py")),
             }),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
+        },
+        "cli": {
+            # cmdhelp v0.1 is the machine-readable public task inventory. Pin the
+            # canonical schema, live graph registries, installed entrypoint, every
+            # renderer/parser source, and its tests so the stamp cannot survive a
+            # help-surface change. Pure Python: no SolidWorks or COM seat.
+            "file_dep": [
+                str((REPO_ROOT / "pyproject.toml").resolve()),
+                str((REPO_ROOT / "uv.lock").resolve()),
+                str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
+                str((SCRIPTS_DIR / "_task_catalog.py").resolve()),
+                str((SCRIPTS_DIR / "test_cli_help.py").resolve()),
+                str((SCRIPTS_DIR / "fixtures" / "cmdhelp.schema.json").resolve()),
+                *(str(path.resolve()) for path in sorted(
+                    (REPO_ROOT / "src" / "harmonic_analyzer").glob("*.py")
+                )),
+            ],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_cli_help.py")],
         },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a

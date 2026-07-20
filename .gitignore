@@ -278,6 +278,8 @@ __pycache__/
 
 # uv / Python virtual environment (uv.lock IS committed; .venv is not)
 .venv/
+dist/
+*.egg-info/
 
 # Cake - Uncomment if you are using it
 # tools/**
