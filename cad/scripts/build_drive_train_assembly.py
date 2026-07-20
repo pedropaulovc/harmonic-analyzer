@@ -2028,8 +2028,7 @@ async def build(adapter) -> dict[str, str]:
     # _lock_static idiom, referenced to the moving arm instead of the seed).
     # At the rest pose the arm's local +Y (the pin's big-end side) reads
     # machine -X, so the pin protrudes outboard, head to the machine east.
-    RING_SWING_DEG = 10.0  # ring hang swung south off vertical (chain relief)
-    pin_big_end_x = X_CRANK - (CP_HUB_DIA / 2.0 + PIN_SEAT_PROUD)  # -135.3
+    pin_big_end_x = X_CRANK - (CP_HUB_DIA / 2.0 + PIN_SEAT_PROUD)  # -137.8
     # The arm's Ry(180) pose maps part +Z to machine -Z, so the part-local
     # hole station (-4) lands NORTH of the origin: -167 - (-4) = -163.
     pin_z = CRANK_ARM_ORIGIN_Z - ARM_PIN_HOLE_Z  # -163: the reamed station
@@ -2039,32 +2038,21 @@ async def build(adapter) -> dict[str, str]:
     eyelet_x = keeper_edge_x - KEEPER_PROUD / 2.0  # loop mid-band
     keeper_y = Y_CRANK - KEEPER_X
     keeper_z = CRANK_ARM_ORIGIN_Z - ARM_THICKNESS / 2.0  # mid-plate edge
-    # The ring hangs SWUNG 10 deg south about the pin axis, not straight down:
-    # a straight hang's north wire surface reaches z -156.0, 0.2 INTO the
-    # paper-drive chain plates wrapping the crank T12 (band -156.2..-153.8
-    # about CHAIN_MID_Z -155; caught by the top assembly's interference gate).
-    # The swing pivots on the wire's support point in the neck cross-hole, so
-    # every ring<->pin clearance is preserved exactly; max ring z drops to
-    # -163 - RING_MEAN_R*sin(10deg) + OD/2 = -157.1, 0.9 clear of the chain.
-    # The wire's 10 deg tilt inside the cross-hole is budgeted in
-    # crank_pin_spec.RING_HOLE_DIA (3.2).
-    _ring_c = math.cos(math.radians(RING_SWING_DEG))
-    _ring_s = math.sin(math.radians(RING_SWING_DEG))
-    ROWS_RING = [
-        [0.0, -_ring_c, -_ring_s],
-        [1.0, 0.0, 0.0],
-        [0.0, -_ring_s, _ring_c],
-    ]
+    # The ring hangs straight down in its natural face-on plane (normal along
+    # the pin axis), as the ch11 photo shows it. Chain clearance comes from
+    # PIN_SEAT_PROUD (see crank_pin_spec): the neck -- and with it the ring's
+    # whole x-slab -- sits west of everything the paper-drive chain and the
+    # T12 sprocket reach, so the ring's full OD along machine z is harmless.
+    # (An in-plane swing about the pin axis cannot clear the 6.7-wide chain
+    # band: the hole-tilt budget caps it at ~12 deg where ~27 deg was needed
+    # -- probed 2026-07-20, probe_chain_ring_gap.py.)
+    ROWS_RING = [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
     ROWS_EYELET = [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
     for part_name, pos, rows in (
         ("crank-pin", [pin_big_end_x, Y_CRANK, pin_z], IDENTITY),
         (
             "crank-pin-ring",
-            [
-                ring_x,
-                Y_CRANK - CP_RING_MEAN_R * _ring_c,
-                pin_z - CP_RING_MEAN_R * _ring_s,
-            ],
+            [ring_x, Y_CRANK - CP_RING_MEAN_R, pin_z],
             ROWS_RING,
         ),
         ("fillister-screw", [screw_head_x, keeper_y, keeper_z], ROT_Y_POS90),

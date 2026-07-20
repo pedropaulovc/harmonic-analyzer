@@ -37,6 +37,7 @@ from crank_arm_spec import (  # noqa: E402
     HUB_DIA,
     KEEPER_PROUD,
     KEEPER_X,
+    PIN_HOLE_Z,
 )
 from crank_pin_spec import (  # noqa: E402
     NECK_LEN,
@@ -49,7 +50,10 @@ X_CRANK = -122.8
 Y_CRANK = 142.985
 CRANK_ARM_ORIGIN_Z = -167.0
 CRANKSHAFT_Z0 = -175.0
-PIN_STATION_Z = -163.0  # machine z of the pin axis (arm PIN_HOLE_Z station)
+# Machine z of the pin axis: DERIVED via the same mapping the real assembly
+# uses (arm Ry(180) pose: part +Z -> machine -Z), not a -163 literal -- the
+# literal masked the assembly's sign bug (ORIGIN + PIN_HOLE_Z = -171) once.
+PIN_STATION_Z = CRANK_ARM_ORIGIN_Z - PIN_HOLE_Z  # -163
 T12_Z0 = -156.2  # paper-drive REMOVABLE_Z0
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
@@ -68,8 +72,8 @@ RING_ROWS = [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
 EYELET_ROWS = [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 
 # Pin: big-end face PIN_SEAT_PROUD outboard of the hub flank.
-PIN_BIG_END_X = X_CRANK - (HUB_DIA / 2.0 + PIN_SEAT_PROUD)  # -135.3
-RING_HOLE_X = PIN_BIG_END_X - NECK_LEN / 2.0  # -136.8: mid-neck cross-hole
+PIN_BIG_END_X = X_CRANK - (HUB_DIA / 2.0 + PIN_SEAT_PROUD)  # -137.8
+RING_HOLE_X = PIN_BIG_END_X - NECK_LEN / 2.0  # -139.3: mid-neck cross-hole
 # Keeper screw on the arm's outboard edge (arm local +Y face at machine -X).
 KEEPER_FACE_X = X_CRANK - HUB_DIA / 2.0  # the edge face, -130.8
 SCREW_HEAD_X = KEEPER_FACE_X - KEEPER_PROUD  # under-head plane, -132.0
@@ -87,7 +91,10 @@ EYELET_DROP = 1.25  # eyelet hangs this far below the screw shank axis
 # whole keyed cluster (arm, handle, pin, screw) rotates about the shaft
 # axis; the gravity-hung ring and eyelet keep their hanging orientation and
 # only their anchor points rotate.
-CRANK_POSE_DEG = 180.0
+CRANK_POSE_DEG = 0.0  # true rest pose (pin head outboard machine-west), as
+# drive-train ships it -- the ch11 photo views the crank from ITS LEFT (the
+# machine-west side), so the camera goes west, not the crank east (the old
+# 180 pose faked the composition mirrored; Pedro caught it 2026-07-20)
 
 
 def _crank_rot(pos: list[float], rows: list[list[float]]):

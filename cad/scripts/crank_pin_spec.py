@@ -38,11 +38,11 @@ HEAD_DIA = 8.0
 HEAD_LEN = 6.0
 HEAD_DOME_R = 3.9  # near-full-radius rim fillet -> the mushroom dome
 TIP_DOME_R = 2.4  # bullet-nose fillet on the Ø5 small end
-RING_HOLE_DIA = 3.2  # cross-hole through the neck carrying the pull ring --
-# budget at the hole mouths: radial clearance (3.2-1.5)/2 = 0.85 minus the
-# curved wire's sag over the half-length (~0.28, the 0.00 mm^3 sliver war a
-# Ø2.0 hole lost) minus the wire's RING_SWING_DEG tilt drift (~0.35 at the
-# 10 deg chain-relief swing in drive-train) leaves ~0.22 margin
+RING_HOLE_DIA = 2.6  # cross-hole through the neck carrying the pull ring --
+# sized so the CURVED ring wire clears the hole-mouth corners by the 0.25
+# design margin (a Ø2.0 hole grazes the wire at the mouths: 0.00 mm^3
+# checker slivers); the ring hangs straight (no in-hole tilt), so no extra
+# tilt budget is needed
 
 # Brass pull ring (open C, round wire) riding the neck cross-hole.
 RING_WIRE_DIA = 1.5
@@ -54,7 +54,15 @@ RING_SWEEP_DEG = 300.0  # open C: 60 deg gap
 # plus the standard diametral running clearance, seated with the barrel
 # PIN_SEAT_PROUD mm proud of the arm hub's outboard flank.
 HOLE_CLEARANCE_DIA = 0.25
-PIN_SEAT_PROUD = 4.5
+PIN_SEAT_PROUD = 7.0  # was the photo-scaled 4.5; +2.5 moves the neck -- and
+# the pull ring's whole hanging plane -- west of the paper-drive chain
+# wrapping the crank T12 (measured westmost link plate x -137.84, sprocket
+# rim reach x -137.2 at the ring's closest y; ring slab lands
+# -140.05..-138.55, 0.7 clear). A Z-axis neck hole forces the ring's full
+# OD along machine z, so no permissible in-hole swing could clear the
+# 6.7-wide chain band in z -- x separation is the only clean escape, and
+# the extra exposed neck is the least-visible deviation: the ring itself
+# hangs over and hides that region in the ch11 photos.
 
 
 def pin_dia_at(dist_from_big_end_mm: float) -> float:
