@@ -471,7 +471,6 @@ from build_crank_arm import (  # noqa: E402
     REAR_HUB_DIA,
     REAR_HUB_LENGTH,
 )
-from build_crank_pin_ring import MAJOR_RADIUS as PIN_RING_RADIUS  # noqa: E402
 from crank_pin_spec import RING_HOLE_X as PIN_RING_HOLE_X  # noqa: E402
 from build_crankshaft import (  # noqa: E402
     SEAT_ARM as CS_SEAT_ARM,
@@ -1927,19 +1926,20 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="crank tapered pin (large end outboard)",
     )
-    # The torus is authored in local YZ and stays there: its top wire segment
-    # runs along machine Z through the pin-head hole, then the ring hangs one
-    # major radius below it.  Rotating the torus into XY instead made the wire
-    # turn sideways inside the head and necessarily intersect both pin and arm.
+    # The close-up shows the brass loop encircling the pin-head neck.  The torus
+    # is authored in local YZ and stays coaxial with the machine-X pin; its
+    # 6.3 mm inner radius clears the 10 mm head.  The earlier one-radius hanging
+    # offset forced a closed torus through the straight transverse bore and left
+    # two unavoidable exit-rim interferences.
     ring_hole_x = CRANK_PIN_X0 + PIN_RING_HOLE_X
     crank_pin_ring = await place_component(
         adapter,
         "crank-pin-ring",
-        [ring_hole_x, Y_CRANK - PIN_RING_RADIUS, CRANK_PIN_Z],
+        [ring_hole_x, Y_CRANK, CRANK_PIN_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
-        label="brass pull ring through crank-pin head",
+        label="brass pull ring around crank-pin neck",
     )
 
     # =================== joints ================================================
