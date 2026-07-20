@@ -42,8 +42,8 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import HoleSpec, cross_hole_volume_mm3, wizard_hole_on_cylinder
-from crank_arm_spec import PIN_BORE_DIA, PIN_STATION_FROM_OUTBOARD_FACE
+from _holes import cross_hole_volume_mm3
+from crank_arm_spec import ARM_THICKNESS, PIN_BORE_DIA, PIN_STATION_FROM_NORTH_FACE
 
 PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -55,9 +55,10 @@ SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats);
 # -145..-125) while the inboard 16T station stayed, so the shaft spans
 # -175..-30. The arm/handle sweep entirely in front of the chain plane and
 # cannot foul the chain when turning (book ch30 p005/p002).
-# The radial pin crosses the arm plate at its midplane, machine z=-171 in the
-# assembly, safely outboard of the chain plates that begin at z=-158.35.
-PIN_HOLE_HEIGHT = PIN_STATION_FROM_OUTBOARD_FACE
+# The radial pin crosses the arm plate 2 mm behind its photographed north face,
+# at machine z=-169 in the assembly.  Six millimetres from the shaft end also
+# leaves a robust end land around the finished assembly-reamed hole.
+PIN_HOLE_HEIGHT = ARM_THICKNESS - PIN_STATION_FROM_NORTH_FACE
 # Keyed-chain seat stations (local +Y from the outboard origin): named datum
 # planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
 # assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
@@ -119,18 +120,12 @@ async def build(adapter) -> dict[str, str]:
     v_shaft = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
 
-    # Assembly-ream envelope, authored on the Right plane so the hole axis is
-    # local X.  ROT_X_POS90 maps local X to machine X, collinear with the arm's
-    # rear-hub hole; the former local-Z wizard hole mapped to machine -Y and
-    # could never accept the pin.
-    drive_jobs += wizard_hole_on_cylinder(
-        adapter,
-        HoleSpec("drilled_number", "#9"),
-        [SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0],
-        "shaft taper-pin pilot (#9)",
-        name="PinPilot",
-        y_dim=("PinPilotHeight", '"PinHoleHeight"'),
-    )
+    # Finished assembly-ream envelope, authored on the Right plane so the hole
+    # axis is local X.  ROT_X_POS90 maps local X to machine X, collinear with
+    # the arm's rear-hub hole.  The #9 pilot is a manufacturing operation in
+    # the crank-arm drawing note, not a second finished-part feature: a radial
+    # Hole Wizard pilot on this small cylinder does not remain coaxial with the
+    # planar ream envelope when its placement equation rebuilds.
     pin_hole = SketchDims()
     check("create_sketch shaft pin hole", await adapter.create_sketch("Right"))
     await define_circle(
@@ -168,7 +163,7 @@ async def build(adapter) -> dict[str, str]:
             "shaft pin-hole removal differs from its analytic envelope: "
             f"{actual_removal:.1f} mm^3 vs {v_pin:.1f} mm^3"
         )
-    await volume_check(adapter, "shaft + pilot/ream envelope", v_final, 0.5)
+    await volume_check(adapter, "shaft + assembly-ream envelope", v_final, 0.5)
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built

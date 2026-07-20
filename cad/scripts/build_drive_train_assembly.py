@@ -467,7 +467,7 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # authored stations.
 from build_crank_arm import (  # noqa: E402
     ARM_THICKNESS,
-    PIN_STATION_FROM_OUTBOARD_FACE,
+    PIN_STATION_FROM_NORTH_FACE,
     REAR_HUB_DIA,
     REAR_HUB_LENGTH,
 )
@@ -493,13 +493,15 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
 
 # Ch. 11's close-up stack: the arm's integral rear boss fills the old 10.8 mm
 # bare-shaft span, stopping 0.25 short of the paper-drive-owned T12 south face
-# (-156.2). The retaining pin crosses the arm plate midplane outboard at -171.
+# (-156.2). The retaining pin crosses the arm plate 2 mm behind its north face
+# at -169; the pull ring's nearest edge remains 2.95 mm clear of the chain.
 CRANK_REAR_HUB_TIP_Z = CRANK_ARM_ORIGIN_Z + REAR_HUB_LENGTH
-CRANK_PIN_Z = CRANK_ARM_ORIGIN_Z - PIN_STATION_FROM_OUTBOARD_FACE
+CRANK_PIN_Z = CRANK_ARM_ORIGIN_Z - PIN_STATION_FROM_NORTH_FACE
 CRANK_PIN_X0 = X_CRANK - REAR_HUB_DIA / 2.0 - 0.25
 if abs(CRANK_REAR_HUB_TIP_Z - (-156.45)) > 1e-6:
     raise AssertionError("crank rear hub no longer bridges to the T12 wheel")
-if abs(CRANK_PIN_Z - (CRANKSHAFT_Z0 + PIN_STATION_FROM_OUTBOARD_FACE)) > 1e-6:
+_CRANKSHAFT_PIN_Z = CRANKSHAFT_Z0 + ARM_THICKNESS - PIN_STATION_FROM_NORTH_FACE
+if abs(CRANK_PIN_Z - _CRANKSHAFT_PIN_Z) > 1e-6:
     raise AssertionError("crank arm/shaft pin stations are not collinear")
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge

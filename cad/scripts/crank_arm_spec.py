@@ -41,7 +41,12 @@ ARM_WIDTH = 16.0  # arm width (low)
 ARM_THICKNESS = 8.0  # ~half the arm width, p.12 photo (low)
 REAR_HUB_DIA = 18.0  # clears the T12 chain plates by 0.6 mm radially (ch11 closeups, low)
 REAR_HUB_LENGTH = 10.55  # bridges the plate to 0.25 mm shy of the T12 wheel
-PIN_STATION_FROM_OUTBOARD_FACE = ARM_THICKNESS / 2.0  # plate midplane, away from chain
+# Local +Z distance behind the arm's north/outboard face.  Two millimetres keeps
+# the retaining hardware visibly on the photographed side of the arm while its
+# ring remains clear of the chain envelope.  The corresponding shaft station is
+# ``ARM_THICKNESS - PIN_STATION_FROM_NORTH_FACE`` because the placed arm composes
+# a Ry(180).
+PIN_STATION_FROM_NORTH_FACE = 2.0
 PIN_BORE_DIA = 6.10  # modeled taper-ream envelope; clears the pin's 5.94 mm large end
 SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)
 SHAFT_BORE_DIA = 0.375 * MM_PER_IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5

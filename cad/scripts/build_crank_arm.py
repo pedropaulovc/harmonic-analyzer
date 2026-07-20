@@ -70,7 +70,7 @@ from crank_arm_spec import (
     HALF_WIDTH,
     ISOMETRIC_VIEW_NOTE,
     PIN_BORE_DIA,
-    PIN_STATION_FROM_OUTBOARD_FACE,
+    PIN_STATION_FROM_NORTH_FACE,
     REAR_HUB_DIA,
     REAR_HUB_LENGTH,
     SHAFT_BORE_DIA,
@@ -107,7 +107,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "RearHubDia", f"{REAR_HUB_DIA}mm")
     await set_global(adapter, "RearHubLength", f"{REAR_HUB_LENGTH}mm")
-    await set_global(adapter, "PinStation", f"{PIN_STATION_FROM_OUTBOARD_FACE}mm")
+    await set_global(adapter, "PinStation", f"{PIN_STATION_FROM_NORTH_FACE}mm")
     await set_global(adapter, "PinBoreDia", f"{PIN_BORE_DIA}mm")
     await set_global(adapter, "SquareEndOverhang", f"{SQUARE_END_OVERHANG}mm")
     await set_global(adapter, "ShaftBoreDia", f"{SHAFT_BORE_DIA}mm")
@@ -272,7 +272,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += wizard_hole_on_cylinder(
         adapter,
         HoleSpec("drilled_number", "#14"),
-        [0.0, ARM_WIDTH / 2.0, PIN_STATION_FROM_OUTBOARD_FACE],
+        [0.0, ARM_WIDTH / 2.0, PIN_STATION_FROM_NORTH_FACE],
         "plate-boss taper-pin pilot (#14)",
         name="PinPilot",
     )
@@ -281,7 +281,7 @@ async def build(adapter) -> dict[str, str]:
     await define_circle(
         adapter,
         0.0,
-        PIN_STATION_FROM_OUTBOARD_FACE,
+        PIN_STATION_FROM_NORTH_FACE,
         PIN_BORE_DIA / 2.0,
         "plate-boss pin hole",
         dims=pin_hole,
