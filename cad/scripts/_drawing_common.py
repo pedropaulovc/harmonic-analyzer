@@ -67,6 +67,7 @@ _TEMPLATE_EDGE_NOTE = (
 _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
+_SEL_DIMENSION = 14  # swSelectType_e.swSelDIMENSIONS
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
 # The interface each GD&T kind's geometry actually lives on -- reached via
 # IAnnotation::GetSpecificAnnotation, never off IAnnotation itself.
@@ -379,10 +380,20 @@ def add_datum_feature(
     if shoulder:
         tag.Shoulder = True
     tag_annotation = _sw_type_info.early_bound_or_flag(
-        tag.GetAnnotation(), "IAnnotation", "SetPosition2"
+        tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
     )
     if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
+    actual_position = tag_annotation.GetPosition()
+    if (
+        not actual_position
+        or abs(float(actual_position[0]) - symbol_xy[0]) > 1e-6
+        or abs(float(actual_position[1]) - symbol_xy[1]) > 1e-6
+    ):
+        raise RuntimeError(
+            f"datum {datum} position did not persist ({label}): "
+            f"{tuple(actual_position[:2]) if actual_position else None}"
+        )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
     draw.ClearSelection2(True)
@@ -2493,6 +2504,18 @@ def _measured_gdt_box(
     library declares it on ``IBomTable`` and ``INote`` only, verified against a
     working ``INote.GetExtent()`` in the same probe run.)
     """
+    if kind == _ANNOT_DATUM:
+        attachment_types = adapter._attempt(
+            lambda: adapter._get_attr_or_call(annotation, "GetAttachedEntityTypes")
+        ) or ()
+        if _SEL_DIMENSION in (int(value) for value in attachment_types):
+            # A datum attached to a display dimension reports IDatumTag primitive
+            # coordinates in that dimension's local frame, unlike the sheet-space
+            # primitives of an edge-attached tag. Its IAnnotation.GetPosition is
+            # still the documented sheet-space symbol origin, so the nominal datum
+            # box below is the truthful overflow check for this attachment type.
+            return None
+
     spec = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
     )

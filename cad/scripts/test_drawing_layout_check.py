@@ -13,6 +13,7 @@ print.
 from __future__ import annotations
 
 from inspect import getsource
+import math as _math
 from types import SimpleNamespace
 
 import pytest
@@ -774,6 +775,32 @@ def _gdt_with_geometry(x, y, kind, label, lines=(), triangles=()):
     return drawing_common._gdt_element(_FakeAdapter(None), annotation, label, kind)
 
 
+def test_dimension_attached_datum_uses_its_sheet_position_not_local_primitives():
+    """A datum on a display dimension reports its tag lines in dimension space."""
+    x, y = 0.180, 0.210
+    local_lines = [((-0.014, -0.013), (0.006, 0.007))]
+    spec = SimpleNamespace(
+        GetLineCount=lambda: len(local_lines),
+        GetLineAtIndex=lambda i: [1.0, *local_lines[i][0], 0.0, *local_lines[i][1], 0.0],
+        GetArcCount=lambda: 0,
+        GetArcAtIndex=lambda _i: None,
+        GetTriangleCount=lambda: 0,
+        GetTriangleAtIndex=lambda _i: None,
+    )
+    annotation = SimpleNamespace(
+        GetPosition=[x, y, 0.0],
+        GetAttachedEntityTypes=lambda: [drawing_common._SEL_DIMENSION],
+        GetSpecificAnnotation=lambda: spec,
+    )
+
+    element = drawing_common._gdt_element(
+        _FakeAdapter(None), annotation, "datum A", drawing_common._ANNOT_DATUM
+    )
+
+    assert element.xmin == x - drawing_common._NOMINAL_GDT_HALF_M
+    assert element.ymin == y - drawing_common._NOMINAL_GDT_HALF_M
+
+
 def test_control_frame_is_measured_from_its_rendered_lines():
     """An FCF's box is its real geometry, NOT a square around its anchor.
 
@@ -1062,8 +1089,6 @@ def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
 
 
 # --- balloon ring separation (SolidWorks-free) -------------------------------
-
-import math as _math
 
 
 def test_push_apart_never_reorders_the_balloons():
