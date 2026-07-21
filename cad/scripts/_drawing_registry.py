@@ -397,6 +397,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="cone-gear-shaft",
         script_name="draw_cone_gear_shaft.py",
     ),
+    DrawingSpec(
+        name="cone_pivot_post",
+        part="cone_pivot_post",
+        artifact_stem="cone-pivot-post",
+        script_name="draw_cone_pivot_post.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

@@ -55,6 +55,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -63,6 +64,12 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from cone_pivot_post_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
 
 PART_NAME = "cone-pivot-post"
 MATERIAL = "Gray Cast Iron"  # ONE green casting: big-end journal + crank pedestal
@@ -154,6 +161,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
     name_last_feature(adapter, "Block")
+    # Name the extrude DEPTH (a feature parameter) so the column height is a
+    # markable manufacturing dimension for the drawing, driven by its global.
+    block_depth_dim = name_dimensions(adapter, "Block", ["BlockHt"])
+    drive_jobs += [(block_depth_dim[0], '"BlockHeight"')]
     v_block = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
@@ -263,6 +274,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
