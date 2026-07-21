@@ -187,7 +187,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(adapter, spring_c2c, label="fulcrum-to-spring c2c")
 
     # Section thickness (3.0) + bar height (9.5) on the right end view.
-    bar_height = add_edge_dimension(
+    add_edge_dimension(
         adapter,
         right,
         p0=(RIGHT_CENTER[0] - LEVER_THICKNESS / 2000.0, RIGHT_CENTER[1]),
@@ -195,7 +195,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.028),
         label="lever thickness",
     )
-    add_edge_dimension(
+    bar_height = add_edge_dimension(
         adapter,
         right,
         p0=(RIGHT_CENTER[0], RIGHT_CENTER[1] - BAR_TALL / 2000.0),
