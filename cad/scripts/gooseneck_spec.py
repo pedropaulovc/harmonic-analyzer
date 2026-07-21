@@ -23,7 +23,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # tube elevation and the title block (x >= 0.264 m); it grows DOWNWARD.
 DRAWING_NOTES = "\n".join(
     (
-        "1. POLISHED CHROME STEEL TUBE <MOD-DIAM>16, 90-DEG BEND.",
+        "1. POLISHED CHROME STEEL TUBE <MOD-DIAM>16; 90-DEG BEND,",
+        "   R51 AT TUBE CENTERLINE.",
         "2. VERTICAL LEG ~455 LONG PASSES THROUGH THE TOP-FRAME",
         "   RAIL BORE; HORIZONTAL ARM REACHES OVER THE SUMMING",
         "   LEVER BOSS.",
