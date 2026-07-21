@@ -22,6 +22,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
@@ -43,8 +44,10 @@ from build_pinion_spring import (
     FOOT_Y,
     HOLE_DIA,
     HOLE_FROM_END,
+    KINK_EXIT,
     KINK_START,
 )
+from pinion_spring_spec import TERMINAL_CALLOUT
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -92,17 +95,12 @@ FRONT_KEEP = {
     "FootLen": (_front_x(_FOOT_MID_X), 0.088),
     "BendR": (0.036, 0.120),
     "KinkR": (0.125, 0.225),
-    "FlatLen": (0.205, 0.220),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {
     "FootLen": "+/-0.10 TRUE LENGTH\nFREE END TO BEND TANGENCY",
     "BendR": "+/-0.10 INSIDE RADIUS",
     "KinkR": "+/-0.10 INSIDE RADIUS",
-    "FlatLen": (
-        "+/-0.10 TRUE LENGTH - SHORT TERMINAL INSIDE EDGE\n"
-        "97.62+/-1 DEG CCW FROM FOOT INSIDE PATH"
-    ),
 }
 
 
@@ -161,6 +159,19 @@ async def build(adapter: Any) -> dict[str, str]:
     else:
         curate_view_dimensions(adapter, top, keep={}, view_label="top")
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    terminal_mid = (
+        (KINK_EXIT[0] + FLAT_TIP[0]) / 2.0,
+        (KINK_EXIT[1] + FLAT_TIP[1]) / 2.0,
+    )
+    add_attached_note(
+        adapter,
+        front,
+        text=TERMINAL_CALLOUT,
+        entity_xy=(_front_x(terminal_mid[0]), _front_y(terminal_mid[1])),
+        note_xy=(0.185, 0.225),
+        label="spring short terminal inside edge",
+        entity_type="SILHOUETTE",
+    )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 

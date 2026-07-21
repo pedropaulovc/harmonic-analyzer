@@ -29,8 +29,15 @@ from pinion_spring_geometry import (
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "SpringProfile": {"FootLen", "BendR", "KinkR", "FlatLen"},
+    "SpringProfile": {"FootLen", "BendR", "KinkR"},
 }
+
+TERMINAL_CALLOUT = "\n".join(
+    (
+        "2.00+/-0.10 TRUE LENGTH - SHORT TERMINAL INSIDE EDGE",
+        "97.62+/-1 DEG CCW FROM FOOT INSIDE PATH",
+    )
+)
 
 DRAWING_NOTES = "\n".join(
     (

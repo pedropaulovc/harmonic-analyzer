@@ -739,6 +739,56 @@ def add_property_linked_callout(
     return note
 
 
+@_telemetry.traced("drawing.attached_note", label_param="label")
+def add_attached_note(
+    adapter: Any,
+    view: Any,
+    *,
+    text: str,
+    entity_xy: tuple[float, float],
+    note_xy: tuple[float, float],
+    label: str,
+    entity_type: str = "EDGE",
+) -> Any:
+    """Attach one literal arrowed note to a drawing-view entity."""
+    entity = _select_view_entity(
+        adapter, view, entity_type, entity_xy, label=label
+    )
+    draw = adapter.currentModel
+    note = draw.InsertNote(text)
+    if note is None:
+        raise RuntimeError(f"failed to insert attached note ({label})")
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"attached note has no annotation ({label})")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation,
+        "IAnnotation",
+        "GetAttachedEntityCount3",
+        "SetAttachedEntities",
+        "SetLeader3",
+        "SetPosition2",
+        "GetLeaderCount",
+    )
+    if int(annotation.GetAttachedEntityCount3()) != 1:
+        if not annotation.SetAttachedEntities(dispatch_array([entity])):
+            raise RuntimeError(f"failed to attach note ({label})")
+    status = annotation.SetLeader3(1, 0, True, False, False, False)
+    if status != 0:
+        raise RuntimeError(f"failed to create attached-note leader ({label}): {status}")
+    if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
+        raise RuntimeError(f"failed to position attached note ({label})")
+    draw.EditRebuild3()
+    if (
+        int(annotation.GetAttachedEntityCount3()) != 1
+        or int(annotation.GetLeaderCount()) != 1
+    ):
+        raise RuntimeError(f"attached note lacks one arrow ({label})")
+    draw.ClearSelection2(True)
+    return note
+
+
 @_telemetry.traced("drawing.hole_callout", label_param="label")
 def add_native_hole_callout(
     adapter: Any,
