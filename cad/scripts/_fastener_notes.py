@@ -44,8 +44,7 @@ def thread_control_notes(
         f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX; THREAD LIMITS APPLY "
         "AFTER FINISH.",
         "DATUM A = THREAD PITCH-DIAMETER AXIS; END FACE PERP 0.10 TO A.",
-        "THREAD GEOMETRY OMITTED IN VIEWS;",
-        "CYLINDRICAL SHANK OUTLINE IS REFERENCE ONLY. THREAD CALLOUT CONTROLS.",
+        "THREAD GEOMETRY OMITTED IN VIEWS; SHANK OUTLINE REFERENCE ONLY.",
     )
 
 
@@ -55,10 +54,10 @@ def slotted_round_head_notes(
     """Return controls for a cylindrical head with a straight driver slot."""
     return (
         f"HEAD DIA {head_dia_mm:.2f} +/-0.10 X {head_height_mm:.2f} +/-0.10 HIGH.",
-        "HEAD OD TOTAL RUNOUT 0.10 TO A; BEARING FACE PERPENDICULAR 0.10 TO A.",
+        "HEAD OD TOTAL RUNOUT 0.10 TO A; BEARING FACE PERP 0.10 TO A.",
         f"STRAIGHT SLOT {slot_width_mm:.2f} +/-0.10 WIDE X "
         f"{slot_depth_mm:.2f} +/-0.10 DEEP.",
-        "SLOT FLAT BOTTOM; DEPTH FROM TOP FACE; CENTER PLANE WITHIN 0.10 OF A.",
+        "SLOT FLAT BOTTOM; DEPTH FROM TOP; CENTER PLANE WITHIN 0.10 OF A.",
     )
 
 
