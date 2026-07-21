@@ -25,7 +25,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_draw_view_math_matches_the_spec() -> None:
-    assert drawing.ROD_DIA == spring_hook_spec.ROD_DIA
     assert spring_hook_spec.ROD_DIA == hook.ROD_DIA
     assert spring_hook_spec.SHANK_RISE == hook.SHANK_RISE
     assert spring_hook_spec.ARM_RUN == hook.ARM_RUN
@@ -48,7 +47,7 @@ def test_linked_notes_describe_the_form() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_surface_finish(" in source
-    assert "_shank_end_edge(adapter, top)" in source
+    assert "_shank_silhouette(adapter, front)" in source
     assert "edge_entity=shank_edge" in source
 
 

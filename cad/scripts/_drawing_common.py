@@ -486,7 +486,12 @@ def add_surface_finish(
     draw = adapter.currentModel
     if edge_entity is not None:
         draw.ClearSelection2(True)
-        if not view.SelectEntity(edge_entity, False):
+        selection_data = draw.SelectionManager.CreateSelectData()
+        selection_data.View = view
+        selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
+        if not selected:
+            selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
+        if not selected:
             raise RuntimeError(f"failed to select {label} edge entity in drawing view")
     elif edge_xy is not None:
         _select_view_entity(adapter, view, entity_type, edge_xy, label=label)

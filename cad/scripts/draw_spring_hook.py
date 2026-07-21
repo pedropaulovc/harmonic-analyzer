@@ -31,7 +31,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from spring_hook_spec import (
     ARM_HEIGHT,
-    ROD_DIA,
+    SHANK_RISE,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
@@ -70,30 +70,36 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
-def _shank_end_edge(adapter: Any, view: Any) -> Any:
-    """Return the visible circular edge at the shank's model-space origin."""
+def _shank_silhouette(adapter: Any, view: Any) -> Any:
+    """Return the longest visible straight silhouette of the shank."""
     components = adapter._attempt(lambda: view.GetVisibleComponents()) or ()
-    candidates: list[tuple[float, float, Any]] = []
+    candidates: list[tuple[float, Any]] = []
     for component in components:
-        edges = adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 1)) or ()
-        for edge in edges:
-            curve = adapter._attempt(lambda e=edge: e.GetCurve())
-            if curve is None or not adapter._attempt(lambda c=curve: c.IsCircle()):
-                continue
-            params = adapter._get_attr_or_call(curve, "CircleParams")
-            if not params or len(params) < 7:
-                continue
-            center_distance = sum(float(value) ** 2 for value in params[:3]) ** 0.5
-            candidates.append((center_distance, abs(float(params[6]) - ROD_DIA / 2000.0), edge))
-    if not candidates:
-        raise RuntimeError("top view exposes no circular spring-hook end edge")
-    center_distance, radius_error, edge = min(candidates, key=lambda item: item[:2])
-    if center_distance > 1e-6 or radius_error > 1e-6:
-        raise RuntimeError(
-            "could not identify the shank end edge: "
-            f"center distance={center_distance:g}m radius error={radius_error:g}m"
+        silhouettes = (
+            adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 4)) or ()
         )
-    return edge
+        for silhouette in silhouettes:
+            start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
+            end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
+            if start is None or end is None:
+                continue
+            start_xyz = adapter._get_attr_or_call(start, "ArrayData")
+            end_xyz = adapter._get_attr_or_call(end, "ArrayData")
+            if not start_xyz or not end_xyz:
+                continue
+            length = sum(
+                (float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz)
+            ) ** 0.5
+            candidates.append((length, silhouette))
+    if not candidates:
+        raise RuntimeError("front view exposes no spring-hook silhouette edges")
+    length, silhouette = max(candidates, key=lambda item: item[0])
+    if length < SHANK_RISE / 2000.0:
+        raise RuntimeError(
+            "could not identify the straight shank silhouette: "
+            f"longest visible silhouette is only {length * 1000:g} mm"
+        )
+    return silhouette
 
 
 FRONT_KEEP = {
@@ -156,15 +162,15 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # Attach Ra to the visible shank-end rim in the top view.  The leader denotes
-    # the adjacent cylindrical seating surface.  Entity selection avoids the
-    # ambiguity of this small circle overlapping the projected formed-wire path.
-    shank_edge = _shank_end_edge(adapter, top)
+    # Attach Ra to the longest front-view cylindrical outline: the straight
+    # seating shank.  Swept wire exposes this as a drawing-native silhouette,
+    # not a model edge, so select the returned entity rather than guessing a pick.
+    shank_edge = _shank_silhouette(adapter, front)
     add_surface_finish(
         adapter,
-        top,
+        front,
         edge_entity=shank_edge,
-        symbol_xy=(0.180, 0.160),
+        symbol_xy=(0.060, 0.165),
         roughness_ra="1.6",
         label="shank seating finish",
     )
