@@ -157,6 +157,33 @@ def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
     return candidates[0]
 
 
+def _visible_shaft_silhouette(adapter: Any, view: Any) -> Any:
+    """Return an OD silhouette backed by the modeled shaft cylinder."""
+    expected_radius_m = SHAFT_DIA / 2000.0
+    candidates: list[Any] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        silhouettes = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 4),
+            default=(),
+        ) or ()
+        for silhouette in silhouettes:
+            silhouette = _early_bound(silhouette, "ISilhouetteEdge")
+            face = _early_bound(silhouette.GetFace(), "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if not surface.IsCylinder():
+                continue
+            parameters = surface.CylinderParams
+            if abs(float(parameters[6]) - expected_radius_m) <= 1e-6:
+                candidates.append(silhouette)
+    if not candidates:
+        raise RuntimeError(
+            f"crankshaft side view has no OD silhouette at radius "
+            f"{expected_radius_m:g} m"
+        )
+    return candidates[0]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
