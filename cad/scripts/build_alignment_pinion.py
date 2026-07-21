@@ -131,6 +131,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+
+    # Mark the arbor bore as the manufacturing model dimension and stamp the
+    # title-block + gear-data properties the curated drawing requires.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

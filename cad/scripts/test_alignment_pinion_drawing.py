@@ -53,8 +53,10 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
 
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+    assert "clear_dimensions_for_drawing(adapter)" in source
+    assert "mark_dimensions_for_drawing(adapter, feature_name, dimension_names)" in source
+    assert '"Gear Data": GEAR_DATA' in source
+    assert '"Manufacturing Notes": DRAWING_NOTES' in source
     import _config
 
     config = _config.parts("alignment-pinion")
