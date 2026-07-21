@@ -43,8 +43,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_handle_spec.DRAWING_NOTES
-    assert "BLIND" in notes
-    assert "8.010-8.025" in notes
+    assert "SPHERICAL CROWN" in notes
+    assert "TIR 0.05" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -55,9 +55,11 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 def test_handle_interfaces_are_fully_released_for_manufacture() -> None:
     notes = pinion_handle_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "6.000-6.012" in notes
-    assert "ISO 8734" in notes
-    assert "PRESS" in notes
+    assert "AT ASSEMBLY" not in notes
+    assert "DOWEL" not in notes
+    assert "PRESSED CROSS ROD" in notes
+    assert "6.000/6.010" in drawing.DIMENSION_CALLOUTS["RodDia"]
+    assert "6.015/6.020" in drawing.DIMENSION_CALLOUTS["RodDia"]
 
 
 def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
@@ -68,8 +70,8 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     assert {"GripLen", "TubeLen", "RodSpan"} <= set().union(
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()
     )
-    assert "8.010/8.025" in drawing.DIMENSION_CALLOUTS["TubeId"]
-    assert drawing.DIMENSION_CALLOUTS["TubeId"].count("\n") == 4
+    assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["TubeId"]
+    assert "GRIP CYLINDRICAL LENGTH" in drawing.DIMENSION_CALLOUTS["GripLen"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

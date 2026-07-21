@@ -42,9 +42,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
-    assert "8.0 DEEP" in notes
-    assert "REAM 6.360-6.375" in notes
-    assert "SLIDING FIT" in notes
+    assert "SPHERICAL CROWN" in notes
+    assert "PERPENDICULAR 0.05" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -55,8 +54,9 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 def test_lever_drive_is_fully_released_for_manufacture() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "ISO 8734" in notes
-    assert "THRU HUB AND LIFT ROD" in notes
+    assert "AT ASSEMBLY" not in notes
+    assert "LIFT ROD" not in notes
+    assert "INTERSECTS BORE AXIS" in notes
 
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
@@ -64,10 +64,10 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "add_datum_feature(" not in source
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
-    assert "6.360-6.375" in drawing.DIMENSION_CALLOUTS["HubBore"]
-    assert drawing.DIMENSION_CALLOUTS["HubBore"].count("\n") == 4
-    assert drawing.DIMENSION_CALLOUTS["RodRootR"] == "R2.00 AT HUB"
-    assert drawing.DIMENSION_CALLOUTS["RodTipR"] == "R3.00 AT TIP"
+    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["HubBore"]
+    assert "8.00+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["HubBore"]
+    assert "<MOD-DIAM>4.00" in drawing.DIMENSION_CALLOUTS["RodRootR"]
+    assert "<MOD-DIAM>6.00" in drawing.DIMENSION_CALLOUTS["RodTipR"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

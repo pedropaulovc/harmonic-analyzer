@@ -83,9 +83,10 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "HubBore": "8.00 MIN FULL-DIA\nFROM FLAT FACE\nFINAL REAM LIMITS\n6.360-6.375\nRa 1.6",
-    "RodRootR": "R2.00 AT HUB",
-    "RodTipR": "R3.00 AT TIP",
+    "HubOd": "TIR 0.05 TO FINAL\nREAMED BORE AXIS",
+    "HubBore": "8.00+0.10/-0.00 FULL-DIA\nFROM FLAT FACE\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN\nRa 1.6; RELIEVE DRILL POINT",
+    "RodRootR": "RESULTING <MOD-DIAM>4.00 AT HUB",
+    "RodTipR": "RESULTING <MOD-DIAM>6.00 AT TIP",
     "RodTipY": "+/-0.25 FROM HUB AXIS",
 }
 

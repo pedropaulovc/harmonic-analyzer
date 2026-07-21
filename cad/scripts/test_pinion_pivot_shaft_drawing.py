@@ -42,10 +42,9 @@ def test_sheet_runs_at_1_to_1_with_2_to_1_end_view_and_1_to_2_iso() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_pivot_shaft_spec.DRAWING_NOTES
-    assert "6.330-6.350" in notes
-    assert "194.40 OVERALL" in notes
-    assert "6.330/6.350" in drawing.DIMENSION_CALLOUTS["ShaftDia"]
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"].count("\n") == 2
+    assert "SPHERICAL CROWN" in notes
+    assert "194.40 OVERALL" not in notes
+    assert "6.350 MAX / 6.330 MIN" in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert " BA " not in f" {notes} "
@@ -60,6 +59,7 @@ def test_direct_limits_and_native_cylindricity_control_the_body() -> None:
     assert "add_feature_control_frame(" in source
     assert "add_surface_finish(" not in source
     assert "CYLINDRICITY" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
+    assert "CROWN ROOT CIRCLES" in drawing.DIMENSION_CALLOUTS["Depth"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

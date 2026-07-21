@@ -97,7 +97,12 @@ FRONT_KEEP = {
     "FlatLen": (0.190, 0.176),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS: dict[str, str] = {}
+DIMENSION_CALLOUTS: dict[str, str] = {
+    "FootLen": "+/-0.10 TRUE LENGTH\nFREE END TO BEND TANGENCY",
+    "BendR": "+/-0.10 INSIDE RADIUS",
+    "KinkR": "+/-0.10 INSIDE RADIUS",
+    "FlatLen": "+/-0.10 TRUE LENGTH",
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:

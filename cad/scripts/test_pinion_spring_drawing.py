@@ -54,7 +54,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_spring_spec.DRAWING_NOTES
     assert "TANGENT LENGTH 39.64" in notes
-    assert "FOOT MOUNTING FACE FLATNESS 0.10" in notes
+    assert "LOWER BROAD FACE" in notes
+    assert "97.62+/-1.00 DEG" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -68,6 +69,8 @@ def test_feature_requirements_are_unambiguous_without_unused_datums() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
     assert abs(spring._BLADE_LEN - pinion_spring_spec.BLADE_STRAIGHT_LEN) < 1e-9
+    assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["BendR"]
+    assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["KinkR"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
