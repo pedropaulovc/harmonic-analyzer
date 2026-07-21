@@ -14,7 +14,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -74,6 +74,33 @@ DIMENSION_CALLOUTS = {
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
+def _visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
+    """Return a visible circular model edge matching ``diameter_mm``."""
+    candidates: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+        ) or ()
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            radius_mm = float(curve.CircleParams[6]) * 1000.0
+            candidates.append((radius_mm, edge))
+    target_radius = diameter_mm / 2.0
+    if not candidates:
+        raise RuntimeError("front view has no visible circular model edge")
+    radius_mm, edge = min(candidates, key=lambda item: abs(item[0] - target_radius))
+    if abs(radius_mm - target_radius) > 0.01:
+        raise RuntimeError(
+            f"no visible circle matches radius {target_radius:.4f} mm; "
+            f"nearest is {radius_mm:.4f} mm"
+        )
+    return edge
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -128,6 +155,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
+    bore_edge = _visible_circle_edge(adapter, front, BORE_DIA)
 
     # Datum A: the bore axis (front view, 12 o'clock pick with the symbol above,
     # the draw_pivot_bushing spelling so the standoff is honoured).
@@ -139,6 +167,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
         datum="A",
         label="cylinder gear bore axis",
+        entity=bore_edge,
     )
     # Gear face perpendicular to the bore axis (datum A), attached to the front
     # face (z=0) silhouette in the profile view. The gear disc runs +z from the
@@ -167,6 +196,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] - 0.052),
         roughness_ra="1.6",
         label="cylinder gear bore finish",
+        entity=bore_edge,
     )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS)
