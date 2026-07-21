@@ -333,6 +333,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="gooseneck",
         script_name="draw_gooseneck.py",
     ),
+    DrawingSpec(
+        name="gooseneck_clamp",
+        part="gooseneck_clamp",
+        artifact_stem="gooseneck-clamp",
+        script_name="draw_gooseneck_clamp.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
