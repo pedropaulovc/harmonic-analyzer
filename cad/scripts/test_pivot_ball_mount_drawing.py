@@ -48,6 +48,7 @@ def test_notes_specify_ball_bore_and_shaft_without_title_block_duplicates() -> N
     assert "NICKEL" not in notes
     assert "DATUM A" in notes
     assert "X.XX" not in notes
+    assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 

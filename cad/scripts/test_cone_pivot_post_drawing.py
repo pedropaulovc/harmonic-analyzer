@@ -45,6 +45,7 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     assert "12.52 +/-0.10 DEG" in notes
     assert "CLOCKWISE FROM B" in notes
     assert "X.XX" not in notes
+    assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 

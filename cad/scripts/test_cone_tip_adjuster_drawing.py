@@ -45,6 +45,8 @@ def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> N
     assert "MATERIAL" not in notes
     assert "OXIDE" not in notes
     assert "X.XX" not in notes
+    assert "BREAK EDGES" not in notes
+    assert notes.endswith("OVERALL LENGTH 14.00 +/-0.10.")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 

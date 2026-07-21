@@ -44,6 +44,7 @@ def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
     assert "JAPANNED" not in notes
     assert "DATUM A" in notes
     assert "X.XX" not in notes
+    assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 

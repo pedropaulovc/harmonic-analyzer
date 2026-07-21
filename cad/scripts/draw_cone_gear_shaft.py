@@ -3,11 +3,12 @@ r"""Create the curated machinist drawing for the stepped cone gear shaft."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -79,6 +80,66 @@ DIMENSION_CALLOUTS = {name: "+0.00/-0.02" for name in END_KEEP}
 DIMENSION_PRECISION = {name: 3 for name in END_KEEP}
 
 
+def _outer_end_edge(adapter: Any, view: Any) -> Any:
+    """Return the largest visible circular model edge in the end view."""
+    drawing_view = _early_bound(view, "IView")
+    components = drawing_view.GetVisibleComponents() or []
+    circles: list[tuple[float, Any]] = []
+    for component in components:
+        edges = drawing_view.GetVisibleEntities2(component, 1) or []
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = edge.GetCurve()
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = curve.CircleParams
+            if params is None or len(params) < 7:
+                continue
+            circles.append((float(params[6]), edge))
+    if not circles:
+        raise RuntimeError("end view has no visible circular model edge")
+    circles.sort(key=lambda item: item[0])
+    _telemetry.info(
+        "end-view circular edge radii (mm): "
+        + ", ".join(f"{radius * 1000.0:.4f}" for radius, _edge in circles)
+    )
+    return circles[-1][1]
+
+
+def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
+    """Return the visible cylindrical face for one shaft diameter."""
+    drawing_view = _early_bound(view, "IView")
+    components = drawing_view.GetVisibleComponents() or []
+    candidates: list[tuple[float, Any]] = []
+    for component in components:
+        faces = drawing_view.GetVisibleEntities2(component, 3) or []
+        for face in faces:
+            face = _early_bound(face, "IFace2")
+            surface = face.GetSurface()
+            if surface is None:
+                continue
+            surface = _early_bound(surface, "ISurface")
+            if not surface.IsCylinder():
+                continue
+            radius_mm = float(surface.CylinderParams[6]) * 1000.0
+            candidates.append((radius_mm, face))
+    if not candidates:
+        raise RuntimeError("side view has no visible cylindrical faces")
+    target_radius = diameter_mm / 2.0
+    radius_mm, face = min(
+        candidates, key=lambda item: abs(item[0] - target_radius)
+    )
+    if abs(radius_mm - target_radius) > 0.01:
+        raise RuntimeError(
+            f"no cylindrical face matches radius {target_radius:.4f} mm; "
+            f"nearest is {radius_mm:.4f} mm"
+        )
+    return face
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -130,13 +191,15 @@ async def build(adapter: Any) -> dict[str, str]:
             lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
         )
         _telemetry.info(f"PROBE {label} outline={outline}")
+    pivot_face = _cylindrical_face(adapter, side, SECTION_DIAS[0])
+    tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[3])
     add_view_centerline(
         adapter,
         side,
-        face_xy=(SIDE_CENTER[0], SIDE_CENTER[1] + SECTION_DIAS[0] / 4000.0),
+        face_xy=(SIDE_CENTER[0] + 0.050, SIDE_CENTER[1]),
         label="shaft longitudinal axis",
+        entity=pivot_face,
     )
-
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"
@@ -153,9 +216,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # Ø9.525 pivot journal as its outermost circle; the side view's tip journal
     # silhouette hugs the axis line (half-height 0.79 mm x scale / 2).
     pivot_circle = (
-        END_CENTER[0] + SECTION_DIAS[0] * END_VIEW_SCALE / 2000.0,
-        END_CENTER[1],
+        END_CENTER[0]
+        + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
+        END_CENTER[1]
+        + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
     )
+    pivot_edge = _outer_end_edge(adapter, end)
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
     tip_top = (
@@ -169,6 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.082, 0.132),
         datum="A",
         label="cone gear shaft axis",
+        entity=pivot_edge,
     )
     add_feature_control_frame(
         adapter,
@@ -178,6 +245,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="cylindricity",
         tolerance="0.01",
         label="pivot journal cylindricity",
+        entity=pivot_edge,
     )
     add_feature_control_frame(
         adapter,
@@ -188,7 +256,8 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.05",
         datums=("A",),
         label="tip journal runout",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
+        entity=tip_face,
     )
     add_surface_finish(
         adapter,
@@ -197,7 +266,9 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.230, 0.242),
         roughness_ra="1.6",
         label="pivot journal finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
+        entity=pivot_face,
+        leader_attach_xy=pivot_top,
     )
     add_surface_finish(
         adapter,
@@ -206,7 +277,9 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.102, 0.240),
         roughness_ra="1.6",
         label="tip journal finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
+        entity=tip_face,
+        leader_attach_xy=(tip_top[0] + 0.010, tip_top[1]),
     )
 
     # Notes block sits lower-left, below the enlarged end view (its bottom

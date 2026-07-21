@@ -49,6 +49,7 @@ def test_notes_specify_journal_adjuster_and_functional_pinch_joint() -> None:
     assert "OXIDE" not in notes
     assert "DATUM A" in notes
     assert "X.XX" not in notes
+    assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     part_source = Path(part.__file__).read_text(encoding="utf-8")

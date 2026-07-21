@@ -58,6 +58,7 @@ def test_linked_notes_cover_the_remaining_shaft_operations() -> None:
     assert "FRAGILE BY DESIGN" in notes
     assert "FOLLOWER-REST" in notes
     assert "X.XX" not in notes
+    assert "BREAK EXTERNAL EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source

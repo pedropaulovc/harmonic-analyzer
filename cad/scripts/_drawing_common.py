@@ -50,6 +50,11 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 # are enumerated separately via IView.GetTableAnnotations.
 _ANNOT_NOTE = 6
 
+_TEMPLATE_EDGE_NOTE_SNIPPET = "R.01 OR CHAMFER .01 MAX"
+_TEMPLATE_EDGE_NOTE = (
+    "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
+)
+
 # swAnnotationType_e for the native GD&T symbols the recipes place at explicit
 # sheet coordinates (datum tags, feature-control frames, surface-finish symbols).
 # None of these interfaces expose a real bounding box (IDisplayData returns only
@@ -275,18 +280,28 @@ def _select_view_entity(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
     draw.ClearSelection2(True)
+    selected = False
     if entity is not None:
-        selected = view.SelectEntity(entity, False)
-        if not selected:
-            raise RuntimeError(f"failed to select {label} {entity_type.lower()}")
-    elif xy is None:
-        raise ValueError(f"{label} requires either a sheet pick or an entity")
-    elif not draw.Extension.SelectByID2(
-        "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
-    ):
+        if entity_type == "SILHOUETTE":
+            selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            selection_data = selection_manager.CreateSelectData()
+            selection_data.View = view
+            selectable = _sw_type_info.early_bound_or_flag(
+                entity, "ISilhouetteEdge", "Select2"
+            )
+            selected = bool(selectable.Select2(False, selection_data))
+        else:
+            selected = bool(view.SelectEntity(entity, False))
+    elif xy is not None:
+        selected = bool(
+            draw.Extension.SelectByID2(
+                "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
+            )
+        )
+    if not selected:
+        where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
         raise RuntimeError(
-            f"failed to select {label} {entity_type.lower()} at "
-            f"sheet ({xy[0]:g}, {xy[1]:g})"
+            f"failed to select {label} {entity_type.lower()} {where}"
         )
     count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
     entity = draw.SelectionManager.GetSelectedObject6(count, -1)
@@ -346,9 +361,12 @@ def add_view_centerline(
     *,
     face_xy: tuple[float, float],
     label: str,
+    entity: Any | None = None,
 ) -> Any:
     """Insert the axis centerline of a cylindrical face seen side-on in a view."""
-    _select_view_entity(adapter, view, "FACE", face_xy, label=label)
+    _select_view_entity(
+        adapter, view, "FACE", face_xy, label=label, entity=entity
+    )
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     centerline = ddoc.InsertCenterLine2()
@@ -508,6 +526,7 @@ def add_surface_finish(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    leader_attach_xy: tuple[float, float] | None = None,
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
 
@@ -527,7 +546,7 @@ def add_surface_finish(
             selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
         if not selected:
             raise RuntimeError(f"failed to select {label} edge entity in drawing view")
-    elif edge_xy is not None or entity is not None:
+    elif entity is not None or edge_xy is not None:
         _select_view_entity(
             adapter, view, entity_type, edge_xy, label=label, entity=entity
         )
@@ -563,7 +582,11 @@ def add_surface_finish(
     if str(symbol.GetText(8) or "").strip() != f"Ra {roughness_ra}":
         raise RuntimeError(f"surface-finish roughness did not persist ({label})")
     annotation = _sw_type_info.early_bound_or_flag(
-        symbol.GetAnnotation(), "IAnnotation", "SetPosition2", "SetLeader3"
+        symbol.GetAnnotation(),
+        "IAnnotation",
+        "SetPosition2",
+        "SetLeader3",
+        "SetLeaderAttachmentPointAtIndex",
     )
     leader_status = int(
         annotation.SetLeader3(
@@ -582,6 +605,10 @@ def add_surface_finish(
         )
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position surface-finish symbol ({label})")
+    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
+        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
+    ):
+        raise RuntimeError(f"failed to position surface-finish leader ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return symbol
@@ -594,6 +621,7 @@ def add_view_centerline(
     *,
     face_xy: tuple[float, float],
     label: str,
+    entity: Any | None = None,
 ) -> Any:
     """Insert the axis centerline of a cylindrical face shown in ``view``.
 
@@ -605,7 +633,9 @@ def add_view_centerline(
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    _select_view_entity(adapter, view, "FACE", face_xy, label=label)
+    _select_view_entity(
+        adapter, view, "FACE", face_xy, label=label, entity=entity
+    )
     centerline = adapter._attempt(lambda: ddoc.InsertCenterLine2())
     if centerline is None:
         raise RuntimeError(f"failed to insert view centerline ({label})")
@@ -876,6 +906,29 @@ def new_project_drawing(
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
+    sheet_view = adapter._get_attr_or_call(ddoc, "GetFirstView")
+    annotations = adapter._attempt(
+        lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
+    ) or []
+    replaced = 0
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
+        )
+        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
+            continue
+        note = adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetText", "SetText")
+        text = str(adapter._get_attr_or_call(note, "GetText") or "")
+        if _TEMPLATE_EDGE_NOTE_SNIPPET not in text:
+            continue
+        if not note.SetText(_TEMPLATE_EDGE_NOTE):
+            raise RuntimeError("failed to replace template edge-break note")
+        replaced += 1
+    if replaced != 1:
+        raise RuntimeError(
+            f"expected one template edge-break note, replaced {replaced}"
+        )
     # 2 decimals by default: 3-decimal display (76.000) reads as false precision
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3.
