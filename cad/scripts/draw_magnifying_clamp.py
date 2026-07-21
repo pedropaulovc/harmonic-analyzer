@@ -80,10 +80,11 @@ def _front_y(model_y_mm: float) -> float:
 
 
 FRONT_KEEP = {
-    # x pushed right of the notes paragraph (x <= ~0.16): at the old centred
-    # position the 20.00 text landed inside the notes text (eye pass; display
-    # dims are overlap-exempt in the audit, so only the eye catches it).
-    "Width": (FRONT_CENTER[0] + 0.052, _front_y(0.0) - 0.016),
+    # In the 0.176..0.201 free band between the notes paragraph (whose longest
+    # line reaches ~0.175) and the right view's left edge: at a centred or
+    # +0.052 position the 20.00 text landed inside the notes text (eye pass;
+    # display dims are overlap-exempt in the audit, so only the eye catches it).
+    "Width": (FRONT_CENTER[0] + 0.072, _front_y(0.0) - 0.014),
     "Height": (FRONT_CENTER[0] - BLOCK_WIDTH * 2.0 / 1000.0 - 0.022, FRONT_CENTER[1]),
     "LeverBoreYDim": (FRONT_CENTER[0] + BLOCK_WIDTH * 2.0 / 1000.0 + 0.020, _front_y(LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (FRONT_CENTER[0] - 0.045, _front_y(LEVER_BORE_Y) + 0.030),
@@ -187,13 +188,14 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Datum A = the block bottom seat (front view); Ra 1.6 on the lever bore (the
     # functional sliding surface), tagged on its rim.
+    # Datum A hangs off the END view's bottom edge: everything below the front
+    # view belongs to the notes paragraph, which swallowed the flag at both
+    # round-1 positions (obscured, then inside the notes text).
     add_datum_feature(
         adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0], _front_y(0.0)),
-        # off-centre and lower so the flag stays clear of the bottom-face
-        # extension lines (round 1: read as obscured)
-        symbol_xy=(FRONT_CENTER[0] - 0.012, _front_y(0.0) - 0.026),
+        right,
+        edge_xy=(RIGHT_CENTER[0] + 0.010, _front_y(0.0)),
+        symbol_xy=(RIGHT_CENTER[0] + 0.024, _front_y(0.0) - 0.020),
         datum="A",
         label="block bottom seat",
     )
