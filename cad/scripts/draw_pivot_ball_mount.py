@@ -337,9 +337,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(BALL_CENTER_H) + _bore_r),  # bore top
-        # Route the bore-axis control into the open left field.  The ball-size,
-        # runout and finish leaders all fan rightward from the sphere outline.
-        frame_xy=(0.025, 0.165),
+        # Keep this leader wholly to the right of the bore.  SolidWorks retains
+        # a long native association leader on the stem-axis control below; a
+        # left-side bore leader necessarily intersects that diagonal.
+        frame_xy=(0.205, 0.165),
         characteristic="position",
         tolerance="0.05",
         datums=("A", "B"),
