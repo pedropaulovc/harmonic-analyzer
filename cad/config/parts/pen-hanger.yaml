@@ -1,6 +1,9 @@
 pen-hanger:
   number: MHA-049
   material: Plain Carbon Steel
+  material_specification: "AISI 1018 cold-finished steel"
+  finish: "black oxide"
+  quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (steel)"
