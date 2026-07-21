@@ -257,6 +257,19 @@ def aim_camera(cam, cam_data, c, boxes, mesh_lo, mesh_hi, ext, w, h, frozen=None
             cam_data.sensor_fit = "HORIZONTAL"
             cam_data.sensor_width = sensor_long
 
+    # Depth of field from the pair's aperture (f-number), focused on the target
+    # plane. Records the real lens and blurs on a DoF-capable engine; the shipping
+    # BLENDER_WORKBENCH renderer ignores DoF, so a pair with no f_stop leaves
+    # use_dof off and renders byte-identically.
+    p = c.get("perspective") or {}
+    fstop = p.get("f_stop")
+    if fstop and f["lens"] is not None:
+        cam_data.dof.use_dof = True
+        cam_data.dof.focus_distance = f["cam_dist"]
+        cam_data.dof.aperture_fstop = float(fstop)
+    else:
+        cam_data.dof.use_dof = False
+
     rot = Matrix(((r[0], u[0], o[0]), (r[1], u[1], o[1]), (r[2], u[2], o[2])))
     m = rot.to_4x4()
     m.translation = Vector(f["target"]) + Vector(o) * f["cam_dist"]

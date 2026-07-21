@@ -179,6 +179,21 @@ def _bbox_center() -> tuple[float, float, float]:
     return tuple((lo[i] + hi[i]) / 2 for i in range(3))
 
 
+def _perspective_dict(props) -> dict | None:
+    """The manifest ``perspective`` sub-dict for the current sliders, or None (ortho).
+
+    ``f_stop`` is emitted only when set (> 0), so an untouched pair's camera dict
+    stays byte-identical (no needless re-render) until an aperture is actually
+    chosen. The f-number records the shot's real aperture and drives Blender's
+    camera DoF — visible only on a DoF-capable engine (see aim_camera)."""
+    if not props.perspective:
+        return None
+    p = {"focal_length_mm": round(props.focal_mm, 2)}
+    if props.f_stop > 0:
+        p["f_stop"] = round(props.f_stop, 2)
+    return p
+
+
 def _camera_spec(props) -> dict:
     """Manifest euler camera dict synthesised from the current sliders.
 
@@ -193,7 +208,7 @@ def _camera_spec(props) -> dict:
         "roll_deg": props.roll_deg,
         "zoom": props.zoom,
         "target_mm": target,
-        "perspective": {"focal_length_mm": props.focal_mm} if props.perspective else None,
+        "perspective": _perspective_dict(props),
     }
 
 
@@ -372,6 +387,11 @@ class HACPoseProps(bpy.types.PropertyGroup):
                                         update=_on_pose_update)
     focal_mm: bpy.props.FloatProperty(name="Lens (mm)", default=100.0, min=4.0, max=600.0,
                                       update=_on_pose_update)
+    f_stop: bpy.props.FloatProperty(name="Aperture f/", default=0.0, min=0.0, max=32.0,
+                                    update=_on_pose_update, step=10, precision=1,
+                                    description="Lens f-number — records the shot's aperture "
+                                    "and drives camera depth-of-field; visible only on a "
+                                    "DoF-capable engine (0 = unset, no DoF)")
 
     lock_to_view: bpy.props.BoolProperty(
         name="Lock camera to view", default=False, update=_on_lock_update,
@@ -575,6 +595,7 @@ class HAC_OT_build_scene(bpy.types.Operator):
         props.perspective = bool(persp)
         if persp and persp.get("focal_length_mm"):
             props.focal_mm = float(persp["focal_length_mm"])
+        props.f_stop = float(persp.get("f_stop", 0.0)) if persp else 0.0
 
         _aim(props)
         _shade_like_render(context)
@@ -609,6 +630,24 @@ class HAC_OT_capture_view(bpy.types.Operator):
         _aim(props)  # re-centre framing on the captured angle + target
         self.report({"INFO"}, f"az {az:.1f}  el {el:.1f}  roll {roll:.1f}  "
                               f"target ({loc.x:.0f},{loc.y:.0f},{loc.z:.0f})")
+        return {"FINISHED"}
+
+
+class HAC_OT_lens_preset(bpy.types.Operator):
+    bl_idname = "hac.lens_preset"
+    bl_label = "Lens preset"
+    bl_description = "Apply a focal-length + aperture preset (switches to perspective)"
+
+    focal: bpy.props.FloatProperty()
+    fstop: bpy.props.FloatProperty()
+
+    def execute(self, context):
+        props = context.scene.hac_pose
+        props.perspective = True
+        props.focal_mm = self.focal
+        props.f_stop = self.fstop
+        _aim(props)
+        self.report({"INFO"}, f"{self.focal:.0f} mm  f/{self.fstop:.1f}")
         return {"FINISHED"}
 
 
@@ -743,7 +782,7 @@ class HAC_OT_save_manifest(bpy.types.Operator):
         c["zoom"] = round(props.zoom, 3)
         c["target_mm"] = ([round(props.target_x, 2), round(props.target_y, 2),
                            round(props.target_z, 2)] if props.free_target else None)
-        c["perspective"] = {"focal_length_mm": round(props.focal_mm, 2)} if props.perspective else None
+        c["perspective"] = _perspective_dict(props)
         # The studio previews an EXPLICIT euler target/zoom (it never applies
         # frame_components). Drop that seed-time auto-frame hint so the offline
         # render reproduces what was posed here, instead of silently re-deriving
@@ -901,6 +940,13 @@ class HAC_PT_panel(bpy.types.Panel):
         sub = row.row(align=True)
         sub.enabled = props.perspective
         sub.prop(props, "focal_mm")
+        sub.prop(props, "f_stop")
+        prow = box.row(align=True)
+        prow.enabled = props.perspective
+        op = prow.operator(HAC_OT_lens_preset.bl_idname, text="100mm f/2.8")
+        op.focal, op.fstop = 100.0, 2.8
+        op = prow.operator(HAC_OT_lens_preset.bl_idname, text="20mm f/3.8")
+        op.focal, op.fstop = 20.0, 3.8
 
         box = layout.box()
         box.label(text="Navigate")
@@ -941,6 +987,7 @@ _CLASSES = (
     HACPoseProps,
     HAC_OT_build_scene,
     HAC_OT_capture_view,
+    HAC_OT_lens_preset,
     HAC_OT_reset_target,
     HAC_OT_look_camera,
     HAC_OT_toggle_camera,
