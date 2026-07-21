@@ -119,9 +119,11 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (right, iso):
-        set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, front)
+    set_hidden_lines_removed(adapter, iso)
+    # Front carries the hole circles; the end view shows the transverse bores
+    # dashed (blind review round 1: an empty end rectangle hid them).
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
