@@ -25,7 +25,6 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_symmetric_tolerances,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -121,12 +120,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
 
-    side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="side"
-    )
-    set_dimension_symmetric_tolerances(
-        adapter, side_annotations, {"ShankLg": 0.20}
-    )
+    curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
 
     # The threaded shank establishes datum axis A. Native feature-control
     # frames make the head relationship directly inspectable; the linked notes

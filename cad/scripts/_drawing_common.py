@@ -1366,60 +1366,6 @@ def set_dimension_callouts(
     adapter.currentModel.EditRebuild3()
 
 
-def set_dimension_symmetric_tolerances(
-    adapter: Any, annotations: Iterable[Any], tolerances_mm: dict[str, float]
-) -> None:
-    """Apply and verify explicit symmetric tolerances on named model dimensions."""
-    remaining = dict(tolerances_mm)
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetSpecificAnnotation"
-        )
-        name = dimension_name(adapter, annotation)
-        tolerance_mm = remaining.pop(name, None)
-        if tolerance_mm is None:
-            continue
-        if tolerance_mm <= 0.0:
-            raise ValueError(f"dimension {name!r} tolerance must be positive")
-        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
-        if display is None:
-            raise RuntimeError(f"dimension {name!r} has no display annotation")
-        display = _sw_type_info.early_bound_or_flag(
-            display, "IDisplayDimension", "GetDimension"
-        )
-        dimension = _sw_type_info.early_bound_or_flag(
-            display.GetDimension(), "IDimension", "Tolerance"
-        )
-        tolerance = _sw_type_info.early_bound_or_flag(
-            adapter._get_attr_or_call(dimension, "Tolerance"),
-            "IDimensionTolerance",
-            "Type",
-            "SetValues2",
-            "GetMinValue",
-            "GetMaxValue",
-        )
-        tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
-        tolerance_m = tolerance_mm / 1000.0
-        if not tolerance.SetValues2(
-            -tolerance_m,
-            tolerance_m,
-            1,  # swSetValueInConfiguration_e.swSetValue_InThisConfiguration
-            "",
-        ):
-            raise RuntimeError(f"failed to tolerance dimension {name!r}")
-        if int(tolerance.Type) != 4:
-            raise RuntimeError(f"dimension {name!r} did not retain symmetric tolerance")
-        if abs(float(tolerance.GetMinValue()) + tolerance_m) > 1e-9:
-            raise RuntimeError(f"dimension {name!r} minimum tolerance did not persist")
-        if abs(float(tolerance.GetMaxValue()) - tolerance_m) > 1e-9:
-            raise RuntimeError(f"dimension {name!r} maximum tolerance did not persist")
-    if remaining:
-        raise RuntimeError(
-            f"dimension tolerances not applied: {sorted(remaining)}"
-        )
-    adapter.currentModel.EditRebuild3()
-
-
 def set_dimension_precision(
     adapter: Any, annotations: Iterable[Any], precision: dict[str, int]
 ) -> None:

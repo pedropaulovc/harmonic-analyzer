@@ -50,6 +50,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from fillister_screw_spec import (
     DRAWING_DIMENSIONS,
@@ -142,6 +143,7 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_symmetric_tolerance(adapter, "Shank", "ShankLg", 0.20)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

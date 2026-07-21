@@ -40,10 +40,11 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
 
 def test_lengths_are_inserted_from_named_model_dimensions() -> None:
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg"}
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_symmetric_tolerances" in source
-    assert "add_datum_feature" in source
-    assert source.count("add_feature_control_frame(") == 3
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_symmetric_tolerance" in part_source
+    assert "add_datum_feature" in drawing_source
+    assert drawing_source.count("add_feature_control_frame(") == 3
 
 
 def test_made_part_note_states_standards_conformance() -> None:

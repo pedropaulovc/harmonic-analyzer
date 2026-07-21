@@ -19,6 +19,8 @@ import _telemetry
 from _common import (
     apply_custom_properties,
     _dim_owner_feature,
+    _early_bound,
+    _feature_by_name,
     _iter_features,
     _read_member,
 )
@@ -46,6 +48,59 @@ def _feature_by_name_deep(adapter: Any, name: str) -> Any:
         if str(_read_member(feature, "Name")) == name:
             return feature
     raise RuntimeError(f"feature {name!r} not found in the active document")
+
+
+def set_dimension_symmetric_tolerance(
+    adapter: Any,
+    feature_name: str,
+    dimension_name: str,
+    tolerance_mm: float,
+) -> None:
+    """Tolerance one named source-model dimension and verify the stored values."""
+    if tolerance_mm <= 0.0:
+        raise ValueError("symmetric dimension tolerance must be positive")
+    feature = _feature_by_name(adapter, feature_name)
+    matches: list[Any] = []
+    display = _read_member(feature, "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if not display:
+            break
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        name = str(_read_member(dimension, "Name"))
+        if _dim_owner_feature(dimension) == feature_name and name == dimension_name:
+            matches.append(dimension)
+        display = feature.GetNextDisplayDimension(display)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: expected exactly one dimension, "
+            f"found {len(matches)}"
+        )
+    tolerance = _early_bound(matches[0].Tolerance, "IDimensionTolerance")
+    tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
+    tolerance_m = tolerance_mm / 1000.0
+    if not tolerance.SetValues2(
+        -tolerance_m,
+        tolerance_m,
+        2,  # swSetValueInConfiguration_e.swSetValue_InAllConfigurations
+        "",
+    ):
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: SetValues2 rejected +/-{tolerance_mm} mm"
+        )
+    if int(tolerance.Type) != 4:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: symmetric tolerance type did not persist"
+        )
+    minimum = float(tolerance.GetMinValue())
+    maximum = float(tolerance.GetMaxValue())
+    if abs(minimum + tolerance_m) > 1e-9 or abs(maximum - tolerance_m) > 1e-9:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: tolerance readback "
+            f"{minimum:g}/{maximum:g} m != +/-{tolerance_m:g} m"
+        )
+    _telemetry.success(
+        f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_mm:.2f} mm"
+    )
 
 
 def mark_dimensions_for_drawing(
