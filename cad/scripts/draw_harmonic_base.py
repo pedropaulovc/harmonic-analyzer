@@ -150,11 +150,7 @@ def _visible_hole_table_entities(
         raise RuntimeError("harmonic-base plan has no visible footprint vertices")
 
     x_min = min(point[0] for point, _entity in vertices)
-    x_max = max(point[0] for point, _entity in vertices)
-    z_min = min(point[2] for point, _entity in vertices)
     z_max = max(point[2] for point, _entity in vertices)
-    x_offset_m = (x_min + x_max) / 2.0
-    z_offset_m = (z_min + z_max) / 2.0
     datum_candidates = [
         (point[1], entity)
         for point, entity in vertices
@@ -170,8 +166,8 @@ def _visible_hole_table_entities(
     used: set[int] = set()
     for x_mm, z_mm, diameter_mm in ALL_HOLES:
         expected = (
-            x_offset_m + x_mm / 1000.0,
-            z_offset_m - z_mm / 1000.0,
+            x_mm / 1000.0,
+            z_mm / 1000.0,
             diameter_mm / 2000.0,
         )
         candidates = sorted(
