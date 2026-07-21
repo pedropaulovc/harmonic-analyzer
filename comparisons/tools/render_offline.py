@@ -34,8 +34,21 @@ import composite  # noqa: E402
 REPO = composite.REPO
 CAD_OUT = REPO / "cad" / "out"
 WORKER = TOOLS / "blender_worker.py"
-# Resolved once in main(); blender_worker's render needs the >= 5.2 gpu API.
+# Resolved LAZILY on first worker launch (blender_worker's render needs the >= 5.2
+# gpu API), cached here. Deferred so the no-op path (nothing stale to render) never
+# needs Blender, and so module consumers that import this without calling main()
+# (comparisons/bench/render_server.py) still get a working path.
 BLENDER: str | None = None
+_BLENDER_OVERRIDE: str | None = None  # set by main() from --blender
+
+
+def blender_exe() -> str:
+    """Blender path, resolved on first call and cached in ``BLENDER``."""
+    global BLENDER
+    if BLENDER is None:
+        BLENDER = resolve_blender(_BLENDER_OVERRIDE)
+        print(f"blender: {BLENDER}", file=sys.stderr)
+    return BLENDER
 
 
 def resolve_blender(override: str | None = None) -> str:
@@ -139,7 +152,7 @@ def _run_worker(geom: dict, jobpairs: list[dict], tmpdir: Path, model: str,
     payload = geom | ({"probe": True} if probe else {}) | {"pairs": jobpairs}
     job_file.write_text(json.dumps(payload), encoding="utf-8")
     proc = subprocess.run(
-        [str(BLENDER), "-b", "--factory-startup", "-P", str(WORKER), "--", str(job_file)],
+        [blender_exe(), "-b", "--factory-startup", "-P", str(WORKER), "--", str(job_file)],
         capture_output=True, text=True)
     ok = proc.returncode == 0 and (probe or "RENDERED" in proc.stdout)
     if not ok:
@@ -175,9 +188,11 @@ def main() -> int:
     ap.add_argument("--blender", help="Blender >= 5.2 exe (default: $HARMONIC_BLENDER or the "
                                       "highest installed)")
     args = ap.parse_args()
-    global BLENDER
-    BLENDER = resolve_blender(args.blender)
-    print(f"blender: {BLENDER}", file=sys.stderr)
+    # Stash the override only; resolve lazily on first worker launch (blender_exe),
+    # so the no-op path (nothing stale) certifies a current gallery without needing
+    # Blender installed on the seat.
+    global _BLENDER_OVERRIDE
+    _BLENDER_OVERRIDE = args.blender
     only = set(args.only.split(",")) if args.only else None
     out_root = Path(args.out_root) if args.out_root else None
     canvas = None
