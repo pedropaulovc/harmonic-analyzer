@@ -53,10 +53,17 @@ async def build(adapter: Any) -> dict[str, str]:
     missing = sum(1 for s in states if s in _MISSING_STATES)
     loaded = len(comps) - missing
     log(f"{src.name}: {len(comps)} components ({loaded} loaded, {missing} suppressed/mismatched)")
-    if loaded < 100:
+    # No-partial-glb guarantee: ANY unresolved component would be silently omitted
+    # from the export, so abort on the first one (a large partial can still clear a
+    # component floor). An empty/near-empty enumeration means open never resolved.
+    if len(comps) < 100:
         raise SystemExit(
-            f"only {loaded} of {len(comps)} components loaded -- references did not "
-            f"resolve (expected ~400); aborting so no partial glb is written")
+            f"only {len(comps)} components enumerated -- references did not resolve "
+            f"(expected ~400); aborting so no partial glb is written")
+    if missing:
+        raise SystemExit(
+            f"{missing} of {len(comps)} components unresolved (suppressed/id-mismatch) -- "
+            f"they would be omitted from the glb; aborting so no partial glb is written")
 
     glb = OUT_GLTF / f"{src.stem}.glb"
     _save_as(doc, glb)

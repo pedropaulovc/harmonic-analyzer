@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import shlex
 import subprocess
 import sys
@@ -55,8 +56,6 @@ CAD_OUT = REPO / "cad" / "out"
 DX_SENSOR_LONG_MM = 23.6
 DX_SENSOR_SHORT_MM = 15.8
 DEFAULT_OBJECT_SIZES_AWAY = 4.0
-
-BLENDER_DEFAULT = "C:/Program Files/Blender Foundation/Blender 5.2/blender.exe"
 
 
 # --------------------------------------------------------------------------- #
@@ -104,7 +103,6 @@ def camera_axes(az_deg, el_deg, roll_deg=0.0):
 
 
 def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
-    import re
     focus = cam.get("frame_components") or []
     target = None
     zoom = float(cam.get("zoom") or 1.0)
@@ -278,6 +276,14 @@ def projection_json(lens, w: int, h: int) -> dict:
 def convert(pair: dict, bbox, w: int, h: int) -> dict:
     mesh_lo, mesh_hi, ext, boxes = bbox
     cam = normalize_camera(pair["camera"])
+    # frame_components framing zooms/centres on the union of named part boxes; a
+    # GLB-derived bbox has none, so it would silently fall through to whole-scene
+    # framing and emit a pose that no longer matches render_offline. Fail loud.
+    if cam.get("frame_components") and not boxes:
+        raise SystemExit(
+            f"{pair['id']}: camera uses frame_components {cam['frame_components']} but the "
+            f"bbox came from a GLB (no per-part boxes); pass --boxes <scene.json> "
+            f"(cad/out/boxes/<model>.json) for focused framing")
     f = compute_framing(cam, boxes, mesh_lo, mesh_hi, ext, w, h)
 
     target_world = model_to_world(f["target"])
@@ -399,9 +405,10 @@ def _gh(args: list[str]) -> str:
 # --------------------------------------------------------------------------- #
 # -- shared per-op command lines (session-scoped) --------------------------- #
 def _open_line(mp: list[str], session: str, glb: str, unit_scale: float,
-               blender: str, aspect: float) -> str:
-    cmd = [*mp, "-s", session, "open", glb, "--blender", blender,
-           "--aspect-ratio", f"{aspect:.5f}"]
+               blender: str | None, aspect: float) -> str:
+    cmd = [*mp, "-s", session, "open", glb, "--aspect-ratio", f"{aspect:.5f}"]
+    if blender:  # omit so meshprobe discovers Blender (Linux/macOS) when unknown
+        cmd += ["--blender", blender]
     if unit_scale != 1.0:
         cmd += ["--unit-scale", str(unit_scale)]
     return _fmt(cmd)
@@ -503,7 +510,9 @@ def main() -> int:
     ap.add_argument("--release-tag", help="release tag for --fetch-glb (default: latest)")
     ap.add_argument("--unit-scale", type=float, default=1.0,
                     help="meshprobe open --unit-scale (default 1.0; see units note in the header)")
-    ap.add_argument("--blender", default=BLENDER_DEFAULT, help="Blender >= 5.2 for meshprobe open")
+    ap.add_argument("--blender", default=None,
+                    help="Blender >= 5.2 path to pass to meshprobe open; omitted by default "
+                         "so meshprobe locates Blender itself (pass this only to override)")
     ap.add_argument("--out-dir", default="comparisons/render/meshprobe",
                     help="render-image --output directory")
     ap.add_argument("--format", choices=["sh", "json"], default="sh",
@@ -522,6 +531,7 @@ def main() -> int:
     batch = args.batch or bool(args.session)
     session = args.session or "poses"
     mp = shlex.split(args.meshprobe)
+    blender = args.blender  # meshprobe locates Blender itself when this is None
 
     override = None
     if args.canvas:
@@ -552,13 +562,13 @@ def main() -> int:
         if args.format == "sh" and not batch:
             glb, glb_src = glb_cache[model]
             blocks += emit_commands(mp, cvt, glb, glb_src, args.unit_scale,
-                                    args.blender, args.out_dir)
+                                    blender, args.out_dir)
 
     if args.format == "json":
         print(json.dumps(results, indent=2))
         return 0
     if batch:
-        blocks = emit_batch(mp, results, glb_cache, args.unit_scale, args.blender,
+        blocks = emit_batch(mp, results, glb_cache, args.unit_scale, blender,
                             args.out_dir, session)
     print("\n".join(blocks))
     return 0

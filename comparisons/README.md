@@ -141,7 +141,9 @@ without a global install; override with `--meshprobe`). Renders land in
 canvas — **distance depends on its portrait/landscape aspect**, so pass it when
 no reference image is available or the run warns about the landscape default),
 `--glb <path>` / `--fetch-glb` (GLB source; the scene-bbox source tracks it),
-`--boxes <path>` (explicit per-part boxes), `--blender <path>` (Blender ≥ 5.2).
+`--boxes <path>` (explicit per-part boxes; required for `frame_components`
+poses), `--blender <path>` (override; by default the emitted `open` omits it so
+meshprobe locates Blender itself).
 
 Mapping (verified against the `open` receipt): pose_studio model coords
 `(x, y, z)` → meshprobe world `(x, −z, y)`; `azimuth = az − 90`,
