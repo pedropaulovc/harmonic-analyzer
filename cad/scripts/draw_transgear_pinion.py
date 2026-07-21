@@ -22,6 +22,8 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -59,6 +61,15 @@ FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1] - 0.035),
 }
+DIMENSION_CALLOUTS = {
+    # Reamed slip fit on the knob shaft's turned Ø5 seat (nominal-or-under, like
+    # the arbor journals): min 0.03 diametral clearance, inside the project's
+    # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
+    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
+    # callout's own limits do).
+    "BoreDia": "THRU - REAM\n+0.05/+0.03",
+}
+DIMENSION_PRECISION = {"BoreDia": 2}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -108,7 +119,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)

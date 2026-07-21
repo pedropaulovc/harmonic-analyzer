@@ -116,22 +116,11 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to drum bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
-    # Overall face length across the drum ends in the profile view. Pick the
-    # two VERTICAL end edges at mid-height (above the bore, inside the tooth
-    # root) -- a pick at the bottom corner lands on the long horizontal tooth
-    # silhouette, and both corners then select the SAME edge (AddDimension2
-    # returns None on that pair). Inset 0.2 mm INSIDE the body: a pick exactly
-    # on the end-edge x can snap to a horizontal tooth line instead, and a
-    # vertical+horizontal pair yields a stray 90-degree ANGLE dimension.
-    end_pick_y = RIGHT_CENTER[1] + HALF_OD * 0.55
-    add_edge_dimension(
-        adapter,
-        right,
-        p0=(LEFT_END_X + 0.0002, end_pick_y),
-        p1=(RIGHT_END_X - 0.0002, end_pick_y),
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_OD - 0.028),
-        label="drum face length",
-    )
+    # No coordinate-picked face-length dimension on the drum profile: every
+    # pick pair tried snaps to the long horizontal tooth silhouettes (exact
+    # end-edge x picks select the same edge; 0.2 mm inset picks pair a
+    # vertical with a horizontal line and emit a stray 90-degree ANGLE dim).
+    # FACE WIDTH 143.2 is owned by the GEAR DATA block and the drum note.
 
     bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
