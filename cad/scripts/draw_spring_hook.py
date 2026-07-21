@@ -79,7 +79,7 @@ def _shank_silhouette(adapter: Any, view: Any) -> Any:
     if not drawing_doc.ActivateView(name):
         raise RuntimeError(f"failed to activate spring-hook drawing view {name!r}")
     components = adapter._attempt(lambda: view.GetVisibleComponents()) or ()
-    candidates: list[tuple[float, Any]] = []
+    candidates: list[tuple[float, float, Any]] = []
     silhouette_count = 0
     endpoint_count = 0
     for component in components:
@@ -101,14 +101,15 @@ def _shank_silhouette(adapter: Any, view: Any) -> Any:
             length = sum(
                 (float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz)
             ) ** 0.5
-            candidates.append((length, silhouette))
+            midpoint_x = (float(start_xyz[0]) + float(end_xyz[0])) / 2.0
+            candidates.append((length, midpoint_x, silhouette))
     if not candidates:
         raise RuntimeError(
             "front view exposes no usable spring-hook silhouette edges: "
             f"components={len(components)} silhouettes={silhouette_count} "
             f"endpoint pairs={endpoint_count}"
         )
-    length, silhouette = max(candidates, key=lambda item: item[0])
+    length, _midpoint_x, silhouette = max(candidates, key=lambda item: item[:2])
     if length < SHANK_RISE / 2000.0:
         raise RuntimeError(
             "could not identify the straight shank silhouette: "
@@ -185,7 +186,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_entity=shank_edge,
-        symbol_xy=(0.060, 0.165),
+        symbol_xy=(0.140, 0.120),
         roughness_ra="1.6",
         label="shank seating finish",
     )

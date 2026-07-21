@@ -47,10 +47,8 @@ from rocker_arm_spec import (
     ROD_HOLE_Y,
     TOP_END_Y,
 )
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -88,37 +86,15 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
-# The two curvature radii jog above the strap; the pivot diameter sits below
-# the fulcrum bore.
+# The large concentric radii are carried in the manufacturing note: imported
+# radius dimensions retain off-sheet centre witnesses even in shortened-radius
+# mode.  Keeping them as notes avoids clipped geometry without losing values.
 FRONT_KEEP = {
-    "TopRadius": (0.140, 0.215),
-    "BottomRadius": (0.235, 0.215),
     "PivotDia": (0.180, 0.120),
 }
+NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
-
-
-def _shorten_radius_dimensions(
-    adapter: Any, annotations: list[Any], names: set[str]
-) -> None:
-    """Stop large-radius leaders before their off-sheet arc centres."""
-    remaining = set(names)
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        if name not in remaining:
-            continue
-        display = annotation.GetSpecificAnnotation()
-        if display is None:
-            raise RuntimeError(f"radius dimension {name!r} has no display annotation")
-        display = _sw_type_info.early_bound(display, "IDisplayDimension")
-        display.ShortenedRadius = True
-        if not bool(display.ShortenedRadius):
-            raise RuntimeError(f"radius dimension {name!r} was not shortened")
-        remaining.remove(name)
-    if remaining:
-        raise RuntimeError(f"radius dimensions not shortened: {sorted(remaining)}")
-    adapter.currentModel.GraphicsRedraw2()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -168,12 +144,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_visible(adapter, front)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    _shorten_radius_dimensions(
-        adapter, front_annotations, {"TopRadius", "BottomRadius"}
-    )
+    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

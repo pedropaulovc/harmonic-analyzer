@@ -204,7 +204,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="summation anchor position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.045)
     add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.150)
 
     return await finalize_drawing(

@@ -23,7 +23,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert arm.DRAWING_DIMENSIONS is rocker_arm_spec.DRAWING_DIMENSIONS
     marked = set().union(*rocker_arm_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
-    assert kept == marked
+    assert kept | drawing.NOTE_ONLY_DIMENSIONS == marked
 
 
 def test_draw_view_math_matches_the_spec() -> None:
@@ -71,40 +71,10 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count("edge_xy=rod_rim") == 2
 
 
-def test_large_radius_dimensions_are_shortened_before_export(monkeypatch) -> None:
-    class Display:
-        ShortenedRadius = False
-
-    class Annotation:
-        def __init__(self, name: str) -> None:
-            self.name = name
-            self.display = Display()
-
-        def GetSpecificAnnotation(self):
-            return self.display
-
-    class Model:
-        redraws = 0
-
-        def GraphicsRedraw2(self) -> None:
-            self.redraws += 1
-
-    class Adapter:
-        currentModel = Model()
-
-    annotations = [Annotation("TopRadius"), Annotation("BottomRadius")]
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
-    monkeypatch.setattr(
-        drawing._sw_type_info, "early_bound", lambda item, *_args: item
-    )
-
-    adapter = Adapter()
-    drawing._shorten_radius_dimensions(
-        adapter, annotations, {"TopRadius", "BottomRadius"}
-    )
-
-    assert all(item.display.ShortenedRadius for item in annotations)
-    assert adapter.currentModel.redraws == 1
+def test_large_radius_values_are_note_only() -> None:
+    assert drawing.NOTE_ONLY_DIMENSIONS == {"TopRadius", "BottomRadius"}
+    assert "R800" in rocker_arm_spec.DRAWING_NOTES
+    assert "R816" in rocker_arm_spec.DRAWING_NOTES
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
