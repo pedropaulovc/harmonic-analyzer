@@ -68,6 +68,7 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
+    assert source.count("edge_xy=rod_rim") == 2
 
 
 def test_large_radius_dimensions_are_shortened_before_export(monkeypatch) -> None:

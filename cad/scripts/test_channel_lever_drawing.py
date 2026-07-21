@@ -22,6 +22,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     marked = set().union(*channel_lever_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
+    assert "TipCentreX" in marked
 
 
 def test_draw_view_math_matches_the_spec() -> None:

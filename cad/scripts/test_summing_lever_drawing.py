@@ -74,6 +74,8 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert source.count("add_native_hole_callout(") == 1
+    assert "knife_edge = _top_xy" in source
+    assert 'label="knife-edge ridge finish"' in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

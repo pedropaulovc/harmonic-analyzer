@@ -11,8 +11,12 @@ length distinctly.  Values MUST match ``_spring`` / build_channel_spring_install
 
 from __future__ import annotations
 
+import _config
+
 # --- Nominal geometry (DIMENSIONS.md ch. 17; matches ``_spring``). ---
-FREE_BODY_LENGTH = 32.0  # relaxed body (the ch.17 p.41 inset callout)
+FREE_BODY_LENGTH = float(
+    _config.parts("channel-spring-installed")["free_length_mm"]
+)  # relaxed body (the ch.17 p.41 inset callout)
 COIL_OD = 6.5
 WIRE_DIA = 1.0
 COIL_COUNT = 28
@@ -34,20 +38,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 DRAWING_NOTES = "\n".join(
     (
         "EXTENSION SPRING DATA (1 OF 20)",
-        "  WIRE DIA .......... 1.0",
-        "  COIL OD ........... 6.5",
-        "  COIL ID ........... 4.5",
-        "  MEAN DIA .......... 5.5",
-        "  FREE BODY LENGTH .. 32 (RELAXED)",
-        "  INSTALLED BODY .... 62 (STRETCHED)",
-        "  TOTAL COILS ....... 28 (CLOSE-WOUND)",
+        f"  WIRE DIA .......... {WIRE_DIA:.2f}",
+        f"  COIL OD ........... {COIL_OD:.2f}",
+        f"  COIL ID ........... {COIL_ID:.2f}",
+        f"  MEAN DIA .......... {MEAN_DIA:.2f}",
+        f"  FREE BODY LENGTH .. {FREE_BODY_LENGTH:.2f} (RELAXED)",
+        f"  INSTALLED BODY .... {INSTALLED_BODY_LENGTH:.2f} (STRETCHED)",
+        f"  TOTAL COILS ....... {COIL_COUNT} (CLOSE-WOUND)",
         "  WIND .............. RIGHT HAND",
-        "  HOOK LEADS ......... 2.0 EACH END",
-        "  ENDS .............. 270 DEG LOOP, R2.75 CL",
-        "  FREE EYE C-C ...... 36.0",
-        "  INSTALLED EYE C-C . 65.98",
+        f"  HOOK LEADS ......... {HOOK_LEAD:.2f} EACH END",
+        f"  ENDS .............. 270 DEG LOOP, R{HOOK_CL_RADIUS:.2f} CL",
+        f"  FREE EYE C-C ...... {FREE_EYE_C2C:.2f}",
+        f"  INSTALLED EYE C-C . {INSTALLED_EYE_C2C:.2f}",
         "NOTE: DRAWN AT THE INSTALLED LENGTH;",
-        "SPRING SHIPS RELAXED AT 32 BODY.",
+        f"SPRING SHIPS RELAXED AT {FREE_BODY_LENGTH:.2f} BODY.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

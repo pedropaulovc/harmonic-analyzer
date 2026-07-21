@@ -179,11 +179,11 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # Rod-pin hole native callout (the #47 wizard hole near the +X tip).
-    rod_edge = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y)
+    rod_rim = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0)
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=rod_edge,
+        edge_xy=rod_rim,
         callout_xy=(0.300, 0.128),
         label="rod-pin hole",
     )
@@ -191,7 +191,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Locate the rod-pin hole from the pivot bore (basic centre distance): pivot
     # bore edge to rod-pin bore edge, dimensioned below the strap.
     pivot_rim = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
-    rod_rim = _sheet_xy(ROD_HOLE_X, ROD_HOLE_Y - _ROD_HOLE_DIA / 2.0)
     rod_location = add_edge_dimension(
         adapter,
         front,
@@ -226,7 +225,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=rod_edge,
+        edge_xy=rod_rim,
         frame_xy=(0.300, 0.195),
         characteristic="position",
         tolerance="0.20",

@@ -44,6 +44,8 @@ from summing_lever_spec import (
     ANCHOR_BORE_R,
     ANCHOR_R,
     CYL_R,
+    HEX_DEPTH,
+    PLATE_L,
     PLATE_W,
     TIP_X,
 )
@@ -165,8 +167,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Datum A on the pivot cylinder axis (front circle, 9 o'clock), Ra on the
-    # pivot OD (6 o'clock) where the knife-edge trunnions carry the load, and a
-    # position FCF locating the summation anchor eye to A in the top plan.
+    # actual top ridge of the +Z knife-edge trunnion, and a position FCF locating
+    # the summation anchor eye to A in the top plan.
     pivot_left = _front_xy(-CYL_R, 0.0)
     add_datum_feature(
         adapter,
@@ -176,14 +178,14 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="pivot cylinder axis",
     )
-    pivot_bottom = _front_xy(0.0, -CYL_R)
+    knife_edge = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=pivot_bottom,
-        symbol_xy=(pivot_bottom[0] + 0.008, pivot_bottom[1] - 0.018),
+        top,
+        edge_xy=knife_edge,
+        symbol_xy=(knife_edge[0] + 0.015, knife_edge[1] + 0.015),
         roughness_ra="1.6",
-        label="pivot OD finish",
+        label="knife-edge ridge finish",
     )
     anchor_outer_edge = _top_xy(TIP_X, ANCHOR_R)
     add_feature_control_frame(

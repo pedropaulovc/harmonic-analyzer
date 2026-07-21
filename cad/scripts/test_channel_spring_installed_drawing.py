@@ -24,6 +24,12 @@ def test_spec_sheet_has_no_graphical_marked_dimensions() -> None:
 
 
 def test_spring_data_matches_the_build() -> None:
+    import _config
+
+    assert spec.FREE_BODY_LENGTH == float(
+        _config.parts("channel-spring-installed")["free_length_mm"]
+    )
+    assert spec.FREE_BODY_LENGTH == spring.COIL_BODY_LENGTH
     # The installed body length in the spec matches the build's derived value.
     assert spec.INSTALLED_BODY_LENGTH == round(spring.INSTALLED_BODY_LENGTH, 2)
     assert spec.COIL_ID == spec.COIL_OD - 2 * spec.WIRE_DIA
@@ -38,8 +44,8 @@ def test_data_table_distinguishes_free_and_installed_length() -> None:
     notes = spec.DRAWING_NOTES
     assert "FREE BODY LENGTH" in notes
     assert "INSTALLED BODY" in notes
-    assert "32" in notes  # free
-    assert "62" in notes  # installed
+    assert f"{spec.FREE_BODY_LENGTH:.2f}" in notes
+    assert f"{spec.INSTALLED_BODY_LENGTH:.2f}" in notes
     assert "RELAXED" in notes
     assert "STRETCHED" in notes
     assert "HOOK LEADS" in notes

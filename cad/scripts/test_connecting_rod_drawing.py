@@ -69,6 +69,7 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
+    assert source.count("edge_xy=pin_rim") == 2
 
 
 def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:

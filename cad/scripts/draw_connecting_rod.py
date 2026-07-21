@@ -163,11 +163,10 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(adapter, centre_distance, label="rod centre distance")
 
     # Rocker pin hole native callout (the #47 wizard hole in the head).
-    pin_edge = _sheet_xy(0.0, CENTER_DISTANCE)
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=pin_edge,
+        edge_xy=pin_rim,
         callout_xy=(0.235, 0.208),
         label="rocker pin hole",
     )
@@ -195,7 +194,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=pin_edge,
+        edge_xy=pin_rim,
         frame_xy=(0.220, 0.218),
         characteristic="position",
         tolerance="0.20",

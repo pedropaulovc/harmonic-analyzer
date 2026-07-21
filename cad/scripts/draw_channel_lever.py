@@ -88,6 +88,7 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 
 FRONT_KEEP = {
     "BarLength": (FRONT_CENTER[0] - 0.010, 0.138),
+    "TipCentreX": (FRONT_CENTER[0] + 0.040, 0.125),
     "NoseRadius": (0.070, 0.172),
     "TipRadius": (0.240, 0.172),
     "FulcrumDia": (0.075, 0.180),

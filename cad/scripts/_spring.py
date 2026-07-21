@@ -23,7 +23,6 @@ from __future__ import annotations
 
 from typing import Iterable
 
-import _config
 from _common import (
     SPRING_BLACK,
     SketchDims,
@@ -47,14 +46,14 @@ from _features import (
     add_spring_end_hooks,
     insert_helix,
 )
+from channel_spring_installed_spec import (
+    COIL_COUNT,
+    COIL_OD,
+    FREE_BODY_LENGTH as COIL_BODY_LENGTH,
+    WIRE_DIA,
+)
 
 MATERIAL = "Alloy Steel"  # see _common.apply_material docstring
-
-# Relaxed body length: registry is the source of truth (see module docstring).
-COIL_BODY_LENGTH = float(_config.parts("channel-spring-installed")["free_length_mm"])
-COIL_OD = 6.5  # DIMENSIONS.md ch17: scaled from p.41 inset (low)
-WIRE_DIA = 1.0  # DIMENSIONS.md ch17: scaled from p.41 inset (low)
-COIL_COUNT = 28  # close-wound: body length / ~1.14 mm pitch (derived, low)
 
 MEAN_RADIUS = (COIL_OD - WIRE_DIA) / 2.0
 HOOK_LEAD = 2.0 * WIRE_DIA  # _features.add_spring_end_hooks default

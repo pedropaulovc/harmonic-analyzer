@@ -28,7 +28,7 @@ TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 185.8 overall length
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_channel_lever marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "LeverOutline": {"BarLength", "NoseRadius", "TipRadius"},
+    "LeverOutline": {"BarLength", "TipCentreX", "NoseRadius", "TipRadius"},
     "FulcrumProfile": {"FulcrumDia"},
 }
 
