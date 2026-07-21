@@ -31,7 +31,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cylinder_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
+from cylinder_gear_spec import BORE_DIA, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -101,6 +101,24 @@ def _visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     return edge
 
 
+def _largest_visible_planar_face(adapter: Any, view: Any) -> Any:
+    """Return the largest visible planar face in ``view``."""
+    candidates: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        faces = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 3), default=()
+        ) or ()
+        for face in faces:
+            face = _early_bound(face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if surface.IsPlane():
+                candidates.append((float(face.GetArea()), face))
+    if not candidates:
+        raise RuntimeError("front view has no visible planar model face")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -156,6 +174,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
     bore_edge = _visible_circle_edge(adapter, front, BORE_DIA)
+    gear_face = _largest_visible_planar_face(adapter, front)
 
     # Datum A: the bore axis (front view, 12 o'clock pick with the symbol above,
     # the draw_pivot_bushing spelling so the standoff is honoured).
@@ -169,23 +188,19 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cylinder gear bore axis",
         entity=bore_edge,
     )
-    # Gear face perpendicular to the bore axis (datum A), attached to the front
-    # face (z=0) silhouette in the profile view. The gear disc runs +z from the
-    # front face; the cam boss is on the far face, so the near (left) face edge
-    # is a clean full-height silhouette.
+    # Gear face perpendicular to the bore axis (datum A), attached directly to
+    # the largest visible planar gear face instead of a tooth-tip silhouette.
     half_od = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-    # z=0 front face: the profile is bbox-centred, so it sits half the full
-    # stack (gear 3 + cam 3.5) left of RIGHT_CENTER.
-    front_face_x = RIGHT_CENTER[0] - (FACE_WIDTH + 3.5) * VIEW_SCALE[0] / 2000.0
     add_feature_control_frame(
         adapter,
-        right,
-        edge_xy=(front_face_x, RIGHT_CENTER[1] + half_od * 0.55),
-        frame_xy=(front_face_x - 0.034, RIGHT_CENTER[1] + half_od + 0.010),
+        front,
+        frame_xy=(FRONT_CENTER[0] + 0.040, RIGHT_CENTER[1] + half_od + 0.010),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
         label="gear face squareness to bore",
+        entity_type="FACE",
+        entity=gear_face,
     )
     # Bore finish: pick at 6 o'clock, symbol below (always-clean routing).
     bore_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - BORE_R)

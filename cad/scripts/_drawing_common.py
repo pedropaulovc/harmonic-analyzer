@@ -361,7 +361,7 @@ def add_feature_control_frame(
     adapter: Any,
     view: Any,
     *,
-    edge_xy: tuple[float, float],
+    edge_xy: tuple[float, float] | None = None,
     frame_xy: tuple[float, float],
     characteristic: str,
     tolerance: str,
@@ -371,13 +371,16 @@ def add_feature_control_frame(
     all_around: bool = False,
     label: str,
     entity_type: str = "EDGE",
+    entity: Any | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
-    edge = _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
+    edge = _select_view_entity(
+        adapter, view, entity_type, edge_xy, label=label, entity=entity
+    )
     draw = adapter.currentModel
     gtol = draw.InsertGtol()
     if gtol is None:
