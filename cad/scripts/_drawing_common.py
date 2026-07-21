@@ -384,7 +384,15 @@ def add_feature_control_frame(
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
     gtol = _sw_type_info.early_bound_or_flag(
-        gtol, "IGtol", "GetFrameCount", "AddFrame", "GetFrame", "GetAnnotation"
+        gtol,
+        "IGtol",
+        "GetFrameCount",
+        "AddFrame",
+        "GetFrame",
+        "GetAnnotation",
+        "SetLeader",
+        "IsAttached",
+        "GetLeaderCount",
     )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
@@ -480,13 +488,19 @@ def add_feature_control_frame(
             f"failed to set a bent leader on the feature-control frame ({label}): "
             f"SetLeader3 status {leader_status}"
         )
+    if not leader:
+        # SetLeader3(swNO_LEADER) updates the annotation's style but leaves the
+        # leader created by InsertGtol in place.  IGtol::SetLeader is the API
+        # that actually disables that displayed leader while preserving the
+        # selected dimension as the annotation's attached entity.
+        gtol.SetLeader(False, _LEADER_SIDE_SMART, False, False)
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     draw.EditRebuild3()
     expected_leaders = 1 if leader else 0
     if (
         int(annotation.GetAttachedEntityCount3()) != 1
-        or not bool(gtol.IsAttached())
+        or bool(gtol.IsAttached()) != leader
         or int(gtol.GetLeaderCount()) != expected_leaders
     ):
         raise RuntimeError(
