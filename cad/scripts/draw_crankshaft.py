@@ -124,6 +124,32 @@ def _visible_shaft_face(adapter: Any, view: Any) -> Any:
     return max(candidates, key=lambda candidate: candidate[0])[1]
 
 
+def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
+    """Return the modeled #9 circular rim visible in the side view."""
+    expected_radius_m = PIN_HOLE_DIA / 2000.0
+    candidates: list[Any] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1),  # swViewEntityType_Edge
+            default=(),
+        ) or ()
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            parameters = curve.CircleParams
+            if abs(float(parameters[6]) - expected_radius_m) <= 1e-6:
+                candidates.append(edge)
+    if len(candidates) != 1:
+        raise RuntimeError(
+            f"crankshaft side view has {len(candidates)} visible circular edges at "
+            f"radius {expected_radius_m:g} m; expected exactly one #9 hole rim"
+        )
+    return candidates[0]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -206,9 +232,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         right,
-        edge_xy=(_PIN_CENTER[0] + PIN_HOLE_DIA / 2000.0, _PIN_CENTER[1]),
         callout_xy=(0.205, 0.104),
         label="tapered-pin cross-hole",
+        edge=_visible_cross_hole_edge(adapter, right),
     )
     add_property_linked_note(adapter, "Crank End Note", 0.172, 0.078)
 

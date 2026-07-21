@@ -46,6 +46,9 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     # Ø/THRU comes from the associative wizard callout; the model-owned nested
     # sketch dimension supplies the station without a coordinate pick.
     assert source.count("add_native_hole_callout(") == 1
+    assert "GetVisibleEntities2(c, 1)" in source
+    assert "edge=_visible_cross_hole_edge(adapter, right)" in source
+    assert "edge_xy=" not in source
     assert source.count("add_edge_dimension(") == 0
     assert source.count("set_basic_dimensions(") == 0
     assert crankshaft_spec.DRAWING_DIMENSIONS["3DSketch1"] == {"PinHeight"}

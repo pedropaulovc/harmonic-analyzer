@@ -670,9 +670,10 @@ def add_native_hole_callout(
     adapter: Any,
     view: Any,
     *,
-    edge_xy: tuple[float, float],
+    edge_xy: tuple[float, float] | None = None,
     callout_xy: tuple[float, float],
     label: str,
+    edge: Any | None = None,
 ) -> Any:
     """Insert an associative Hole Wizard callout on a selected drawing edge.
 
@@ -684,7 +685,9 @@ def add_native_hole_callout(
     True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
     callout still prints the bare nominal.
     """
-    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    _select_view_entity(
+        adapter, view, "EDGE", edge_xy, label=label, entity=edge
+    )
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     display = ddoc.AddHoleCallout2(callout_xy[0], callout_xy[1], 0.0)
