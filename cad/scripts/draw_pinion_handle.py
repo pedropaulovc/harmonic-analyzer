@@ -254,19 +254,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        front,
+        top,
         edge_xy=(
-            _front_x(ROD_DIA / 2.0),
-            _front_y(ROD_UP - 8.0),
+            TOP_CENTER[0] + ROD_DIA * SHEET_SCALE[0] / 2000.0,
+            TOP_CENTER[1],
         ),
-        frame_xy=(0.145, 0.263),
+        frame_xy=(0.315, 0.155),
         characteristic="position",
         tolerance="0.05",
         datums=("A", "B"),
         diameter=True,
         quantity="CROSS-HOLE / PRESSED-ROD AXIS",
         label="handle transverse-axis position",
-        entity_type="SILHOUETTE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
