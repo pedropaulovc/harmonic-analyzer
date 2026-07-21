@@ -320,6 +320,7 @@ def add_datum_feature(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    annotation: Any | None = None,
     shoulder: bool = False,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
@@ -327,10 +328,20 @@ def add_datum_feature(
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
-    _select_view_entity(
-        adapter, view, entity_type, edge_xy, label=label, entity=entity
-    )
     draw = adapter.currentModel
+    if annotation is None:
+        if edge_xy is None:
+            raise ValueError(f"{label}: edge_xy is required without an annotation")
+        _select_view_entity(
+            adapter, view, entity_type, edge_xy, label=label, entity=entity
+        )
+    else:
+        draw.ClearSelection2(True)
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "Select3"
+        )
+        if not annotation.Select3(False, null_callout()):
+            raise RuntimeError(f"failed to select {label} annotation")
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
@@ -341,10 +352,10 @@ def add_datum_feature(
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
     if shoulder:
         tag.Shoulder = True
-    annotation = _sw_type_info.early_bound_or_flag(
+    tag_annotation = _sw_type_info.early_bound_or_flag(
         tag.GetAnnotation(), "IAnnotation", "SetPosition2"
     )
-    if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")

@@ -562,9 +562,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=far_face_entity,
     )
 
-    # Ten lines occupy almost the full lower-left band. Keep the note above the
-    # 12.7 mm zone margin; y=57 mm put its final line 0.8 mm through the border.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    # The coating-mask instruction adds another wrapped line to this block.
+    # Keep its rendered bottom edge above the 12.7 mm zone margin.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.078)
 
     return await finalize_drawing(
         adapter,
