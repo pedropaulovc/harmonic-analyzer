@@ -166,3 +166,10 @@ def test_long_reference_note_is_split_for_readable_rendering(spec_name: str) -> 
     spec = importlib.import_module(spec_name)
     assert "THREAD GEOMETRY OMITTED IN VIEWS;\n" in spec.DRAWING_NOTES
     assert "\nCYLINDRICAL SHANK OUTLINE IS REFERENCE ONLY." in spec.DRAWING_NOTES
+
+
+def test_thumb_note_uses_short_lines_in_a_raised_lane() -> None:
+    drawing = importlib.import_module("draw_thumb_screw")
+    spec = importlib.import_module("thumb_screw_spec")
+    assert drawing.RECIPE.note_xy == (0.020, 0.110)
+    assert max(map(len, spec.DRAWING_NOTES.splitlines())) < 80

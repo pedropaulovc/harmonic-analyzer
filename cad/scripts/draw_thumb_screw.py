@@ -33,6 +33,7 @@ RECIPE = FastenerSheet(
     iso_center=(0.310, 0.170),
     end_keep=END_KEEP,
     dimension_callouts=DIMENSION_CALLOUTS,
+    note_xy=(0.020, 0.110),
 )
 
 
