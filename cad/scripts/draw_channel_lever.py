@@ -29,7 +29,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -50,6 +49,7 @@ from channel_lever_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -145,7 +145,18 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    profile_dimensions = {"BarLength", "TipCentreX", "NoseRadius", "TipRadius"}
+    for annotation in front_annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in profile_dimensions:
+            continue
+        display = annotation.GetSpecificAnnotation()
+        if display is None:
+            raise RuntimeError(f"profile dimension {name!r} has no display annotation")
+        set_basic_dimension(adapter, display, label=f"profile {name}")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
@@ -176,7 +187,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(adapter, spring_c2c, label="fulcrum-to-spring c2c")
 
     # Section thickness (3.0) + bar height (9.5) on the right end view.
-    add_edge_dimension(
+    bar_height = add_edge_dimension(
         adapter,
         right,
         p0=(RIGHT_CENTER[0] - LEVER_THICKNESS / 2000.0, RIGHT_CENTER[1]),
@@ -192,6 +203,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(RIGHT_CENTER[0] + 0.024, RIGHT_CENTER[1]),
         label="bar height",
     )
+    set_basic_dimension(adapter, bar_height, label="bar height from datum C")
 
     # Hole callouts (bar-pin #47, spring-eye #21).  Pick a point ON each hole's
     # rim, not its centre: SolidWorks edge selection only catches the circular
@@ -254,14 +266,17 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="top clocking face",
     )
-    fulcrum_bottom = _sheet_xy(0.0, -PIVOT_HOLE_DIA / 2.0)
-    add_surface_finish(
+    outer_profile = _sheet_xy(80.0, BAR_TALL / 2.0)
+    add_feature_control_frame(
         adapter,
         front,
-        edge_xy=fulcrum_bottom,
-        symbol_xy=(fulcrum_bottom[0] + 0.008, fulcrum_bottom[1] - 0.018),
-        roughness_ra="1.6",
-        label="fulcrum bore finish",
+        edge_xy=outer_profile,
+        frame_xy=(0.105, 0.210),
+        characteristic="profile_surface",
+        tolerance="0.50",
+        datums=("A", "B", "C"),
+        all_around=True,
+        label="outer perimeter profile",
     )
     add_feature_control_frame(
         adapter,

@@ -46,7 +46,8 @@ def test_sheet_runs_at_1_to_1_with_1_to_4_isometric() -> None:
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = channel_lever_spec.DRAWING_NOTES
     assert "6.50 +0.03/0" in notes
-    assert "0.50 | A | B | C" in notes
+    assert "BASIC 4.75 FROM DATUM C" in notes
+    assert "NOT CONCENTRIC" in notes
     assert "#47 DRILL" not in notes
     assert "#21 DRILL" not in notes
     assert "LINEAR +/-" not in notes
@@ -59,16 +60,18 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
+    assert source.count("add_feature_control_frame(") == 3
     assert source.count('characteristic="position"') == 2
-    assert source.count('datums=("A", "B", "C")') == 2
+    assert source.count('datums=("A", "B", "C")') == 3
+    assert 'characteristic="profile_surface"' in source
+    assert "all_around=True" in source
     assert 'edge_xy=bar_pin_edge' in source
     assert 'label="bar-pin hole position"' in source
     assert 'edge_xy=spring_fcf_edge' in source
     assert 'label="spring-eye hole position"' in source
     assert "bar_pin_edge[0] - 0.045, 0.174" in source
     assert "spring_fcf_edge[0] + 0.020, 0.174" in source
-    assert "add_surface_finish(" in source
+    assert "add_surface_finish(" not in source
     assert source.count("add_native_hole_callout(") == 2
 
 
@@ -82,6 +85,6 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"] == "ASTM A48 Class 30 gray cast iron"
     assert spec["material"] == "ASTM A48 Class 30 gray cast iron"
     assert spec["finish"] == (
-        "RAL 6005 alkyd enamel, 40-60 um DFT; machined features masked"
+        "RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores"
     )
     assert int(spec["quantity"]) == 20

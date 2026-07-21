@@ -206,6 +206,7 @@ _GTOL_SYMBOLS = {
     "flatness": "GTOL-FLAT",
     "parallelism": "GTOL-PARA",
     "position": "GTOL-POSI",
+    "profile_surface": "GTOL-SPROF",
     "perpendicularity": "GTOL-PERP",
 }
 
@@ -343,6 +344,7 @@ def add_feature_control_frame(
     datums: Sequence[str] = (),
     diameter: bool = False,
     quantity: str = "",
+    all_around: bool = False,
     label: str,
     entity_type: str = "EDGE",
 ) -> Any:
@@ -442,7 +444,7 @@ def add_feature_control_frame(
             _LEADER_SIDE_SMART,
             True,  # smart arrowhead
             False,  # perpendicular (GTol-only; not wanted here)
-            False,  # all-around
+            all_around,
             False,  # dashed
         )
     )
