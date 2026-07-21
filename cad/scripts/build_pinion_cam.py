@@ -136,7 +136,7 @@ V_TAP_DRILL = _tap_drill_removed()
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -216,8 +216,22 @@ async def build(adapter) -> dict[str, str]:
     # M2.5 x 0.45 tap drill, cut from the boss tip into the existing rod bore.
     # The drawing releases the final 6H thread and minimum full-thread length;
     # this pilot geometry makes the machining operation part of the model too.
+    check(
+        "create_plane tap drill at boss tip",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Top Plane",
+                offset=_BOSS_TIP_Y,
+            )
+        ),
+    )
+    tap_plane_name = name_last_feature(adapter, "TapDrillPlane")
     tap = SketchDims()
-    check("create_sketch tap drill", await adapter.create_sketch("Top"))
+    check(
+        "create_sketch tap drill",
+        await adapter.create_sketch(tap_plane_name),
+    )
     await define_circle(
         adapter, 0.0, -BOSS_Z, TAP_DRILL_DIA / 2.0, "tap drill", dims=tap,
         names=("TapCx", "TapCz", "TapDrillDia"),
@@ -232,7 +246,6 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_cut_extrude(
             ExtrusionParameters(
                 depth=-_BOSS_TIP_Y,
-                start_offset=_BOSS_TIP_Y,
             )
         ),
     )
