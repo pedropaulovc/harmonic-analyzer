@@ -21,7 +21,7 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.END_KEEP) == marked
+    assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
 
 
 def test_catalog_is_the_single_source_of_the_thread() -> None:
@@ -34,11 +34,8 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert drawing.DIMENSION_CALLOUTS["ShankDia"] == spec.THREAD_DESIGNATION
 
 
-def test_lengths_are_drawing_native_linear_callouts() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_edge_dimension(") >= 2
-    assert 'label="head height"' in source
-    assert 'label="under-head length"' in source
+def test_lengths_are_inserted_from_named_model_dimensions() -> None:
+    assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg"}
 
 
 def test_commercial_note_states_standards_conformance() -> None:

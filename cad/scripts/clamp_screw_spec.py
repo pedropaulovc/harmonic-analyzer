@@ -24,6 +24,8 @@ THREAD_DESIGNATION = f"{THREAD} UNC-2A"
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia"},
     "ShankProfile": {"ShankDia"},
+    "Head": {"HeadHt"},
+    "Shank": {"ShankLg"},
 }
 
 DRAWING_NOTES = "\n".join(

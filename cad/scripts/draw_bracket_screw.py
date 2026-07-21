@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the transgear-bracket screw.
 
 Uniform fastener slice (see draw_fillister_screw.py): a profile side view with
-the head-height and under-head length as drawing-native linears, a head-end view
+the head-height and under-head length as inserted model dimensions, a head-end view
 carrying the two marked model diameters (head OD and the shank/thread minor Ø
 with its UNC-2A designation), plus an isometric.  Built on the Front plane (axis
 +Z), so the profile lies HORIZONTAL with the head at the right end.
@@ -17,7 +17,6 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -29,13 +28,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from bracket_screw_spec import (
-    HEAD_DIA,
-    HEAD_H,
-    SHANK_DIA,
-    SHANK_LEN,
-    THREAD_DESIGNATION,
-)
+from bracket_screw_spec import THREAD_DESIGNATION
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -54,31 +47,23 @@ PNG = OUTPUTS.png
 # #8-32 x 12 mm: 6:1 draws the ~14.5 mm length as ~87 mm and the head OD (8)
 # as ~48 mm.
 SHEET_SCALE = (6.0, 1.0)
-_S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
-
 # Built on the Front plane, axis +Z: head at z in [-HEAD_H, 0], shank at
 # z in [0, SHANK_LEN].  Head-end circle in the *Front view; profile (axis
 # HORIZONTAL) in the *Right view, which MIRRORS z (head at HIGH-x, shank tip
-# at LOW-x).  IView::Position locates the model origin -- the head/shank
-# junction here -- rather than the projected outline centre.
+# at LOW-x).
 END_CENTER = (0.070, 0.150)
 SIDE_CENTER = (0.185, 0.150)
 ISO_CENTER = (0.300, 0.175)
-
-def _side_x(model_z: float) -> float:
-    return SIDE_CENTER[0] - model_z * _S
-
-
-_HEAD_END_X = _side_x(-HEAD_H)  # head outer face (right)
-_JUNCTION_X = _side_x(0.0)  # head/shank step
-_SHANK_END_X = _side_x(SHANK_LEN)  # shank tip (left)
-_STEP_Y = SIDE_CENTER[1] + (SHANK_DIA / 2.0 + HEAD_DIA / 2.0) / 2.0 * _S
 
 END_KEEP = {
     "HeadDia": (0.028, END_CENTER[1] + 0.026),
     "ShankDia": (0.028, END_CENTER[1] - 0.026),
 }
 DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+SIDE_KEEP = {
+    "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.038),
+    "ShankLg": (SIDE_CENTER[0] - 0.036, SIDE_CENTER[1] - 0.038),
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -134,22 +119,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
 
-    add_edge_dimension(
-        adapter,
-        side,
-        p0=(_HEAD_END_X, _STEP_Y),
-        p1=(_JUNCTION_X, _STEP_Y),
-        text_xy=(0.5 * (_HEAD_END_X + _JUNCTION_X), SIDE_CENTER[1] + 0.038),
-        label="head height",
-    )
-    add_edge_dimension(
-        adapter,
-        side,
-        p0=(_JUNCTION_X, _STEP_Y),
-        p1=(_SHANK_END_X, SIDE_CENTER[1]),
-        text_xy=(0.5 * (_JUNCTION_X + _SHANK_END_X), SIDE_CENTER[1] - 0.038),
-        label="under-head length",
-    )
+    curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.095)
     add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.205)

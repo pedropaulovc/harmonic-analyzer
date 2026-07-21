@@ -23,6 +23,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     save_part_and_images,
@@ -76,6 +77,7 @@ async def build_flat_screw(
     drive_jobs += head_dims.apply(adapter, "HeadProfile")
     extrude_at_offset(adapter, head_h, -head_h)
     name_last_feature(adapter, "Head")
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v_head = math.pi * (head_dia / 2.0) ** 2 * head_h
     expected = v_head
     await volume_check(adapter, "head", expected, 0.005 * v_head)
@@ -94,6 +96,7 @@ async def build_flat_screw(
     drive_jobs += shank_dims.apply(adapter, "ShankProfile")
     extrude_at_offset(adapter, shank_len, 0.0)
     name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
     v_shank = math.pi * (shank_dia / 2.0) ** 2 * shank_len
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)

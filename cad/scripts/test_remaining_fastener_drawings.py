@@ -90,7 +90,8 @@ def test_registry_paths_and_marked_dimensions(case: Case) -> None:
     assert drawing.PDF.as_posix().endswith(f"/pdf/{case.part_name}.pdf")
     assert drawing.PNG.as_posix().endswith(f"/png/{case.part_name}_drawing.png")
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    assert set(drawing.END_KEEP) == set().union(*spec.DRAWING_DIMENSIONS.values())
+    kept = set(drawing.END_KEEP) | set(getattr(drawing, "SIDE_KEEP", {}))
+    assert kept == set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.part_name)
@@ -151,15 +152,3 @@ def test_cone_pivot_does_not_hide_the_missing_threaded_tail_definition() -> None
     assert "THREADED-END LENGTH IS NOT DEFINED" in spec.DRAWING_NOTES
     assert "DO NOT RELEASE AS A MADE-PART DRAWING" in spec.DRAWING_NOTES
     assert "USE THE COMMERCIAL SHOULDER SCREW" in spec.DRAWING_NOTES
-
-
-@pytest.mark.parametrize(
-    "module_name",
-    ("draw_bracket_screw", "draw_clamp_screw", "draw_fillister_screw"),
-)
-def test_profile_edge_picks_are_anchored_to_the_drawing_view_origin(
-    module_name: str,
-) -> None:
-    drawing = importlib.import_module(module_name)
-    assert drawing._JUNCTION_X == drawing.SIDE_CENTER[0]
-    assert drawing._HEAD_END_X > drawing._JUNCTION_X > drawing._SHANK_END_X

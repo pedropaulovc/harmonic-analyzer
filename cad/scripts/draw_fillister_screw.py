@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the fillister-head machine screw.
 
 Uniform fastener slice: a side (profile) view carrying the head-height and
-under-head length as drawing-native linear dimensions, a head-end view carrying
+under-head length as inserted model dimensions, a head-end view carrying
 the two marked model diameters (the head OD and the shank/thread minor Ø with
 its UNC-2A designation), plus an isometric.  The thread designation and shank
 nominals come from the fastener catalog via ``fillister_screw_spec``.
@@ -17,7 +17,6 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -29,13 +28,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from fillister_screw_spec import (
-    HEAD_DIA,
-    HEAD_H,
-    SHANK_DIA,
-    SHANK_LEN,
-    THREAD_DESIGNATION,
-)
+from fillister_screw_spec import THREAD_DESIGNATION
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -54,8 +47,6 @@ PNG = OUTPUTS.png
 # A #4-40 x 4 mm screw is tiny; 8:1 draws the head OD (5.5) as ~44 mm and the
 # whole length (~6.2) as ~50 mm -- big enough to pick edges and read text.
 SHEET_SCALE = (8.0, 1.0)
-_S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
-
 # The screw is authored on the Front plane, axis along +Z: head at z in
 # [-HEAD_H, 0], shank at z in [0, SHANK_LEN].  The head-end circle projects in
 # the *Front view; the profile (axis horizontal) projects in the *Right view.
@@ -63,28 +54,16 @@ END_CENTER = (0.070, 0.150)
 SIDE_CENTER = (0.185, 0.150)
 ISO_CENTER = (0.300, 0.170)
 
-# Side view (*Right): the screw lies horizontal and the projection MIRRORS the
-# model z axis -- the head (z in [-HEAD_H, 0]) renders at the HIGH-x (right) end,
-# the shank tip (z=+SHANK_LEN) at the LOW-x (left) end.  IView::Position locates
-# the model origin -- the head/shank junction -- not the outline centre.
-def _side_x(model_z: float) -> float:
-    return SIDE_CENTER[0] - model_z * _S
-
-
-_HEAD_END_X = _side_x(-HEAD_H)  # head outer face (right)
-_JUNCTION_X = _side_x(0.0)  # head/shank step
-_SHANK_END_X = _side_x(SHANK_LEN)  # shank tip (left)
-# The head/shank step edge only exists OFF the axis (mid-height is continuous
-# shank), so pick the junction on the step annulus (between the shank and head
-# radii); the two end faces are full disks, pickable across their diameter.
-_STEP_Y = SIDE_CENTER[1] + (SHANK_DIA / 2.0 + HEAD_DIA / 2.0) / 2.0 * _S
-
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
 END_KEEP = {
     "HeadDia": (0.028, END_CENTER[1] + 0.024),
     "ShankDia": (0.028, END_CENTER[1] - 0.024),
 }
 DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+SIDE_KEEP = {
+    "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.034),
+    "ShankLg": (SIDE_CENTER[0] - 0.024, SIDE_CENTER[1] - 0.034),
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -142,24 +121,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
 
-    # Side-view lengths as drawing-native linears (the extrude depths carry no
-    # named display dim), picked on the profile's vertical silhouette faces.
-    add_edge_dimension(
-        adapter,
-        side,
-        p0=(_HEAD_END_X, _STEP_Y),
-        p1=(_JUNCTION_X, _STEP_Y),
-        text_xy=(0.5 * (_HEAD_END_X + _JUNCTION_X), SIDE_CENTER[1] + 0.034),
-        label="head height",
-    )
-    add_edge_dimension(
-        adapter,
-        side,
-        p0=(_JUNCTION_X, _STEP_Y),
-        p1=(_SHANK_END_X, SIDE_CENTER[1]),
-        text_xy=(0.5 * (_JUNCTION_X + _SHANK_END_X), SIDE_CENTER[1] - 0.034),
-        label="under-head length",
-    )
+    curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
 
     # 0.020: the note is left-aligned on its anchor, clearing the 12.7 mm zone
     # margin / re-centred frame rule (~0.0126), which the layout audit enforces.

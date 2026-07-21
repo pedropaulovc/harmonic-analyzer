@@ -37,6 +37,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -94,6 +95,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += head_dims.apply(adapter, "HeadProfile")
     extrude_at_offset(adapter, HEAD_H, -HEAD_H)
     name_last_feature(adapter, "Head")
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v_head = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_H
     expected = v_head
     await volume_check(adapter, "head", expected, 0.005 * v_head)
@@ -112,6 +114,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += shank_dims.apply(adapter, "ShankProfile")
     extrude_at_offset(adapter, SHANK_LEN, 0.0)
     name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
     v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
