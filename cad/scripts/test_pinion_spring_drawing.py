@@ -58,9 +58,13 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "INSIDE-SURFACE PATH" in notes
     assert "MID-THICKNESS" not in notes
     assert "FROM EITHER" not in notes
-    assert "7.62+/-1.00" in notes
-    assert "LEFT OF VERTICAL" in notes
-    assert "NOT THE FREE-FLAT LENGTH" in notes
+    assert "FROM R1.50 KINK EXIT TO FREE TIP" in notes
+    assert "0.80 STRIP END FACE" in notes
+    assert "97.62+/-1 DEG CCW FROM FOOT INSIDE PATH" in drawing.DIMENSION_CALLOUTS[
+        "FlatLen"
+    ]
+    assert "NEAR-VERTICAL" not in drawing.DIMENSION_CALLOUTS["FlatLen"]
+    assert "2.00+/-0.10" not in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -76,7 +80,8 @@ def test_feature_requirements_use_inspectable_datum_controls() -> None:
     assert "parallelism" not in source
     assert "add_surface_finish(" not in source
     assert source.count('entity_type="FACE"') == 1
-    assert "TOP VIEW SCALE 2:1" in source
+    assert "FORMED PROFILE - FRONT VIEW SCALE 2:1" in source
+    assert "TOP VIEW - LOOKING AT SCREW-DOWN FOOT BROAD FACE - SCALE 2:1" in source
     assert "SIZE PER NATIVE CALLOUT" in pinion_spring_spec.DRAWING_NOTES
     assert source.count("add_native_hole_callout(") == 1
     assert "NO TWIST" not in pinion_spring_spec.DRAWING_NOTES

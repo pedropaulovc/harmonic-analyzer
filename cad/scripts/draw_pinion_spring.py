@@ -91,15 +91,18 @@ _FOOT_MID_X = (FOOT_END[0] + FOOT_TAN[0]) / 2.0
 FRONT_KEEP = {
     "FootLen": (_front_x(_FOOT_MID_X), 0.088),
     "BendR": (0.036, 0.120),
-    "KinkR": (0.135, 0.220),
-    "FlatLen": (0.180, 0.205),
+    "KinkR": (0.125, 0.225),
+    "FlatLen": (0.205, 0.220),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {
     "FootLen": "+/-0.10 TRUE LENGTH\nFREE END TO BEND TANGENCY",
     "BendR": "+/-0.10 INSIDE RADIUS",
     "KinkR": "+/-0.10 INSIDE RADIUS",
-    "FlatLen": "+/-0.10 TRUE LENGTH\nNEAR-VERTICAL INSIDE EDGE",
+    "FlatLen": (
+        "+/-0.10 TRUE LENGTH - SHORT TERMINAL INSIDE EDGE\n"
+        "97.62+/-1 DEG CCW FROM FOOT INSIDE PATH"
+    ),
 }
 
 
@@ -187,7 +190,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring screw-down foot flatness",
         entity_type="FACE",
     )
-    if add_note(adapter, "TOP VIEW SCALE 2:1", 0.270, 0.078) is None:
+    if add_note(adapter, "FORMED PROFILE - FRONT VIEW SCALE 2:1", 0.085, 0.078) is None:
+        raise RuntimeError("failed to label spring front view")
+    if add_note(
+        adapter,
+        "TOP VIEW - LOOKING AT SCREW-DOWN FOOT BROAD FACE - SCALE 2:1",
+        0.245,
+        0.078,
+    ) is None:
         raise RuntimeError("failed to label spring top view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
