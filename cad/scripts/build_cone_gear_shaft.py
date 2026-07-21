@@ -68,20 +68,33 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _gear import volume_check
+from cone_gear_shaft_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    FRONT_STUB,
+    SECTIONS,
+)
 
 PART_NAME = "cone-gear-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 PIVOT_JOURNAL = 25.0  # mm, large-end journal into the pivot block (low)
 
-FRONT_STUB = 12.3  # the 3/8" big end runs ON past the old pivot-end origin,
+# FRONT_STUB = 12.3: the 3/8" big end runs ON past the old pivot-end origin,
 # through the pivot post's journal (post plan flank at station -10.85), ending
 # ~1.5 proud of the post's south flank. NOTE the GT cone_front point (world
 # (-127, 101, -123)) is a DOCUMENTED DEVIATION now: the old nested-pedestal
@@ -92,23 +105,18 @@ FRONT_STUB = 12.3  # the 3/8" big end runs ON past the old pivot-end origin,
 # all shifted by FRONT_STUB, and the assembly places the shaft at
 # cone_station(-12.3) (build_drive_train_assembly SHAFT_FRONT_STATION).
 
-# (diameter in inches, section end station in mm from the FRONT STUB end;
-# comments quote the legacy pivot-end stations). M6.7 exact-tracking seat
-# pitch 6.8889 (= 7.0565 drum z-pitch x cos 12.5188 deg, the shallower
-# incline at DP 49.82): seat j spans 28.25 + 6.8889 j +- 3.25 from the pivot
-# end; each step station sits in the ~0.39 air gap between faces (T024 north
-# 141.72 | 141.9 | T018 south 142.11, and so on). Diameters mirror
-# build_cone_gear.bore_dia_in (snug perpendicular seats), stepping much finer
-# than the old DP 30 shaft because the tip gears shrank: T006 OD is now
+# SECTIONS (diameter in inches, section end station in mm from the FRONT STUB
+# end) now lives in cone_gear_shaft_spec.py -- the pure-data contract the
+# drawing shares -- and is imported above; the derivation stays here. M6.7
+# exact-tracking seat pitch 6.8889 (= 7.0565 drum z-pitch x cos 12.5188 deg,
+# the shallower incline at DP 49.82): seat j spans 28.25 + 6.8889 j +- 3.25
+# from the pivot end; each step station sits in the ~0.39 air gap between
+# faces (T024 north 141.72 | 141.9 | T018 south 142.11, and so on). Diameters
+# mirror build_cone_gear.bore_dia_in (snug perpendicular seats), stepping much
+# finer than the old DP 30 shaft because the tip gears shrank: T006 OD is now
 # 4.08 mm. WARNING the 1/32" (0.79 mm) tip journal is mechanically marginal --
 # it follows from the 62.2 OD anchor (ch13, low confidence) and is flagged
 # for Phase 3 rebuild validation.
-SECTIONS = [
-    (0.375, FRONT_STUB + 141.9),  # front stub + pivot journal + 64T + T120..T024
-    (0.25, FRONT_STUB + 148.8),  # T018 seat
-    (0.125, FRONT_STUB + 155.7),  # T012 seat
-    (0.03125, FRONT_STUB + 190.0),  # T006 seat + thin-tip journal
-]
 
 
 async def build(adapter) -> dict[str, str]:
@@ -121,8 +129,9 @@ async def build(adapter) -> dict[str, str]:
     # equation manager reads BARE numbers in document units. The section diameters
     # come from SECTIONS in inches (converted to mm here so a single global drives
     # the on-axis circle's diameter dim). The end stations are extrude DEPTHS
-    # (feature parameters, not sketch dims), so nothing drives them; they stay
-    # editable knobs matching the exemplars.
+    # (feature parameters); each is named Sec{i}End and driven by its SecEnd{i}
+    # global below, so the knobs really reshape the shaft AND the stations are
+    # markable manufacturing dimensions for the drawing.
     for i, (dia_in, end_z) in enumerate(SECTIONS):
         await set_global(adapter, f"SecDia{i}", f"{dia_in * IN}mm")
         await set_global(adapter, f"SecEnd{i}", f"{end_z}mm")
@@ -151,6 +160,8 @@ async def build(adapter) -> dict[str, str]:
             await adapter.create_extrusion(ExtrusionParameters(depth=end_z)),
         )
         name_last_feature(adapter, f"Sec{i}")
+        depth_dim = name_dimensions(adapter, f"Sec{i}", [f"Sec{i}End"])
+        drive_jobs += [(depth_dim[0], f'"SecEnd{i}"')]
         volume += math.pi * (dia_in * IN / 2.0) ** 2 * (end_z - prev_end)
         await volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
@@ -169,6 +180,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

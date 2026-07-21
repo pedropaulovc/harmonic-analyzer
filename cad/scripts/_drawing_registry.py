@@ -392,6 +392,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="transgear_pinion",
         artifact_stem="transgear-pinion",
         script_name="draw_transgear_pinion.py",
+        name="cone_gear_shaft",
+        part="cone_gear_shaft",
+        artifact_stem="cone-gear-shaft",
+        script_name="draw_cone_gear_shaft.py",
     ),
 )
 
