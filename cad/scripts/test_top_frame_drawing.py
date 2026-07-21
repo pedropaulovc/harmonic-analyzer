@@ -30,9 +30,11 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "ASTM A48" not in notes
     assert "GREEN ENAMEL" not in notes
     assert "UOS" not in notes
-    assert "SOLID-STOCK" in notes
-    assert "394 X 224 PITCH" in notes
+    assert "MACHINE FROM SOLID STOCK" in notes
+    assert "394.00 X 224.00" in notes
+    assert "25.50 +0.05/-0.00" in notes
     assert "GOOSENECK BORE" in notes
+    assert "LEFT RAIL IN PLAN" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -56,4 +58,5 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == config["material_specification"]
     assert "gray cast iron" in str(config["material_specification"]).lower()
     assert config["finish"]
+    assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
