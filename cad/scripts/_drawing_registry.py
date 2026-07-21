@@ -303,6 +303,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="boss-hook",
         script_name="draw_boss_hook.py",
     ),
+    DrawingSpec(
+        name="output_fixture",
+        part="output_fixture",
+        artifact_stem="output-fixture",
+        script_name="draw_output_fixture.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

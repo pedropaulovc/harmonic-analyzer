@@ -1,5 +1,8 @@
 output-fixture:
   number: MHA-047
   material: Brass
+  material_specification: CDA 360 free-cutting brass
+  finish: polished; bore reamed
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (brass)"
