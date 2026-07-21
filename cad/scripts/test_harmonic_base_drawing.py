@@ -45,17 +45,23 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "DEBURR" not in notes
     assert "UOS" not in notes
     assert "REVEAL" in notes
-    assert "TAPPED AT THE MODELLED" in notes
+    assert "BLIND FROM THE TOP FACE" in notes
+    assert "LOCATION TOLERANCE +/-0.25" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "insert_hole_table(" in source
 
 
-def test_hole_table_covers_the_four_mounting_holes() -> None:
-    # The mounting-hole table reads the four counterbored lag-screw holes from
-    # the model; the drawing supplies one rim pick per hole.
+def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     assert len(part.HOLE_XZ) == 4
+    assert len(drawing.ALL_HOLES) == 13
+    assert drawing.ALL_HOLES[:4] == tuple(
+        (x, z, part.HOLE_DIA) for x, z in part.HOLE_XZ
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "basic_locations=False" in source
+    assert '"*Front"' in source
     assert len(drawing.TOP_KEEP) == 2
 
 

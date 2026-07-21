@@ -56,7 +56,7 @@ from harmonic_base_spec import (
     BOTTOM_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    ISOMETRIC_VIEW_NOTE,
+    SIDE_VIEW_NOTE,
     TOP_LENGTH,
     TOP_THICKNESS,
     TOP_WIDTH,
@@ -355,7 +355,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Side View Note": SIDE_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

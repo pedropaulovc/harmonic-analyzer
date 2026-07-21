@@ -35,7 +35,18 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_harmonic_base import HOLE_DIA, HOLE_XZ
+from build_harmonic_base import (
+    BLOCK_SCREW_HOLE_DIA,
+    BLOCK_SCREW_XZ,
+    FOOT_SCREW_HOLE_DIA,
+    FOOT_SCREW_XZ,
+    HOLE_DIA,
+    HOLE_XZ,
+    PIVOT_SCREW_HOLE_DIA,
+    PIVOT_SCREW_XZ,
+    STOP_SCREW_HOLE_DIA,
+    STOP_SCREW_XZ,
+)
 from harmonic_base_spec import BOTTOM_LENGTH, BOTTOM_WIDTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -64,7 +75,7 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-
 # table sits upper-right and the notes fill the lower-left.  The plan runs at the
 # sheet's 1:2; only the 1:4 isometric carries a scale note.
 TOP_CENTER = (0.130, 0.170)
-ISO_CENTER = (0.345, 0.160)
+SIDE_CENTER = (0.345, 0.075)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).  Only the bottom plate's overall footprint is marked.
@@ -91,9 +102,18 @@ def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
     )
 
 
-def _hole_rim(x_mm: float, z_mm: float) -> tuple[float, float]:
-    """Sheet pick ON a mounting-hole rim (offset by the Ø13 radius in +X)."""
-    return _plan_xy(x_mm + HOLE_DIA / 2.0, z_mm)
+def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, float]:
+    """Sheet pick on a plan-view hole rim, offset in machine +X."""
+    return _plan_xy(x_mm + diameter_mm / 2.0, z_mm)
+
+
+ALL_HOLES = (
+    *((x, z, HOLE_DIA) for x, z in HOLE_XZ),
+    (*PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA),
+    (*STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
+    *((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ),
+    *((x, z, FOOT_SCREW_HOLE_DIA) for x, z in FOOT_SCREW_XZ),
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -111,7 +131,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Isometric View Note",
+            "Side View Note",
         ),
         required=(
             "Number",
@@ -119,7 +139,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Isometric View Note",
+            "Side View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -139,30 +159,29 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently auto-scale,
     # which shifts every coordinate-based pick on it.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (top, iso):
+    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
+    for view in (top, side):
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
-    # Mounting-hole table: the datum is the plate's lower-left plan corner; each
-    # of the four counterbored lag-screw holes contributes its real Ø13 THRU /
-    # counterbore callout and X/Y station.  (The nine assembly-drilled hardware
-    # seats are covered by note 4 -- they are reamed/tapped through the mating
-    # parts, so they carry reference center marks, not a machined-here callout.)
+    # One complete hole table: four underside counterbores followed by every
+    # top-side blind swing/pinion seat. Non-basic X/Y headers let the title-block
+    # tolerance govern A1-A4; note 4 supplies the tighter seat-only tolerance.
     insert_hole_table(
         adapter,
         top,
         datum_xy=_DATUM_XY,
-        hole_points=tuple(_hole_rim(x, z) for x, z in HOLE_XZ),
+        hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in ALL_HOLES),
         anchor_xy=HOLE_TABLE_ANCHOR,
+        basic_locations=False,
         label="harmonic-base mounting",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.078)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.098)
+    add_property_linked_note(adapter, "Side View Note", 0.300, 0.058)
 
     return await finalize_drawing(
         adapter,

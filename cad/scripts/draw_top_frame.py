@@ -130,7 +130,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Bore Ø25.5 clamps the Ø25.4 column (0.1 slip); gooseneck Ø17. Two decimals
     # on the clamp bore, one on the round gooseneck.
-    set_dimension_precision(adapter, top_annotations, {"C0Dia": 1, "Dia": 0})
+    set_dimension_precision(adapter, top_annotations, {"C0Dia": 2, "Dia": 0})
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the ring bores")
 

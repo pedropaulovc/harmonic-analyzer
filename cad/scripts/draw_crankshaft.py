@@ -83,7 +83,10 @@ _PIN_CENTER = (
 
 FRONT_KEEP = {
     "ShaftDiaDim": (
-        FRONT_CENTER[0] - SHAFT_DIA * END_VIEW_SCALE / 1000.0 - 0.022,
+        max(
+            0.030,
+            FRONT_CENTER[0] - SHAFT_DIA * END_VIEW_SCALE / 1000.0 - 0.022,
+        ),
         FRONT_CENTER[1] + 0.008,
     ),
 }
