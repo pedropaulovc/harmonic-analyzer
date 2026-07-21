@@ -2,7 +2,7 @@ arbor-pedestal:
   number: MHA-004
   material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
-  finish: SSPC-SP 3; black japan varnish, 2 coats, 25-50 um total DFT; mask arbor bore/foot seat; apply after dimensional inspection
+  finish: SSPC-SP3;BLACK JAPAN VARNISH,2 COATS,25-50um DFT;MASK BORE/FOOT SEAT;AFTER INSPECTION
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
