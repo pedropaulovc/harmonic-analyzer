@@ -1,0 +1,136 @@
+r"""Create the curated machinist drawing for the ruled measuring stick.
+
+The SLDPRT remains authoritative.  This recipe supplies only the bar's ruled-face
+view, the overall envelope dimensions, and the graduation notes; every shared
+sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
+
+The stick is a half-hard brass bar (200 x 8 x 3) with a 0-10 scale engraved 0.5
+deep across an 80 mm span (8 mm pitch) and one longer 0.5 tick.  The bar lies
+along +X on the Front plane, so ``*Front`` shows the ruled face; the sheet runs
+1:1 and the isometric drops to 1:2.
+
+Run with SolidWorks open::
+
+    uv run python cad\scripts\draw_measuring_stick.py measuring-stick
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from typing import Any
+
+import _telemetry
+from _common import CAD_ROOT, check, run_build
+from _drawing_common import (
+    DrawingOutputs,
+    add_property_linked_note,
+    curate_view_dimensions,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    set_hidden_lines_removed,
+    stamp_drawing_summary,
+)
+from _drawing_registry import DRAWINGS_BY_NAME
+from solidworks_mcp.adapters.solidworks.drawing import place_view
+
+
+SPEC = DRAWINGS_BY_NAME["measuring_stick"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+SLDDRW = OUTPUTS.slddrw
+PDF = OUTPUTS.pdf
+PNG = OUTPUTS.png
+
+SHEET_SCALE = (1.0, 1.0)   # 1:1 whole sheet (200 mm bar)
+
+# Sheet layout (meters).  The ruled face (front) runs full width across the top;
+# the isometric (1:2) sits mid-right; the notes fill the lower-left.
+FRONT_CENTER = (0.122, 0.215)
+ISO_CENTER = (0.300, 0.130)
+
+# Per-view survivors of the marked-dimension import: the bar envelope only.  The
+# length reads 200 (above the bar), the width 8 (right of the right end).
+FRONT_KEEP = {
+    "BodyLength": (0.122, 0.234),
+    "BodyWidth": (0.250, 0.215),
+}
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+
+    check("open measuring-stick source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Front View Note",
+            "Isometric View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Front View Note",
+            "Isometric View Note",
+        ),
+    )
+    drawing_model, _sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Measuring Stick Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "measuring stick; ruled brass bar; 0-10 scale",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    for view in (front, iso):
+        set_hidden_lines_removed(adapter, view)
+
+    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
+    add_property_linked_note(adapter, "Front View Note", 0.040, 0.188)
+    add_property_linked_note(adapter, "Isometric View Note", 0.250, 0.092)
+
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title="Measuring Stick Manufacturing Drawing",
+        scale=SHEET_SCALE,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))
