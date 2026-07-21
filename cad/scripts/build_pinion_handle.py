@@ -96,7 +96,29 @@ V_WALL = math.pi * (TUBE_OD / 2.0) ** 2 * WALL_T
 V_TUBE = math.pi * ((TUBE_OD / 2.0) ** 2 - (TUBE_ID / 2.0) ** 2) * TUBE_LEN
 V_ROD = math.pi * ROD_R**2 * (ROD_DOWN + ROD_UP)
 
-V_ROD_HOLE = math.pi * ROD_HOLE_R**2 * GRIP_DIA
+
+def _grip_intersection(radius: float) -> float:
+    """Volume where a Y-axis cylinder of ``radius`` crosses the grip."""
+    n = 2000
+    y0, y1 = -GRIP_R, GRIP_R
+    h = (y1 - y0) / n
+
+    def area(y: float) -> float:
+        chord_half = math.sqrt(max(GRIP_R**2 - y * y, 0.0))
+        if chord_half >= radius:
+            return math.pi * radius**2
+        return 2.0 * (
+            chord_half * math.sqrt(radius**2 - chord_half**2)
+            + radius**2 * math.asin(chord_half / radius)
+        )
+
+    total = area(y0) + area(y1)
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * area(y0 + i * h)
+    return total * h / 3.0
+
+
+V_ROD_HOLE = _grip_intersection(ROD_HOLE_R)
 V_TOTAL = V_GRIP + V_CAP + V_WALL + V_TUBE - V_ROD_HOLE + V_ROD
 
 
