@@ -110,32 +110,6 @@ def _circular_edge(
     return edge
 
 
-def _thread_cylindrical_face(adapter: Any, view: Any) -> Any:
-    """Return the visible modeled cylinder carrying the cosmetic thread."""
-    drawing_view = _early_bound(view, "IView")
-    candidates: list[tuple[float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_face in drawing_view.GetVisibleEntities2(component, 3) or []:
-            face = _early_bound(raw_face, "IFace2")
-            surface = face.GetSurface()
-            if surface is None:
-                continue
-            surface = _early_bound(surface, "ISurface")
-            if not surface.IsCylinder():
-                continue
-            candidates.append((float(surface.CylinderParams[6]) * 1000.0, face))
-    if not candidates:
-        raise RuntimeError("front view has no visible cylindrical thread face")
-    target_radius = BODY_DIA / 2.0
-    radius, face = min(candidates, key=lambda item: abs(item[0] - target_radius))
-    if abs(radius - target_radius) > 0.01:
-        raise RuntimeError(
-            f"no cylindrical thread face matches radius {target_radius:.4f} mm; "
-            f"nearest is {radius:.4f} mm"
-        )
-    return face
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -211,19 +185,18 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
-    thread_face = _thread_cylindrical_face(adapter, front)
+    # Attach datum A directly to the external-thread size/callout.  A datum
+    # tag on the modeled major-diameter silhouette could be read as the end
+    # face or as an axis derived from the wrong cylindrical element; the thread
+    # dimension unambiguously establishes the pitch-cylinder datum axis.
     add_datum_feature(
         adapter,
-        front,
-        edge_xy=(
-            FRONT_CENTER[0] + BODY_DIA / 2.0 * SHEET_SCALE[0] / 1000.0,
-            FRONT_CENTER[1],
-        ),
-        symbol_xy=(FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.025),
+        end,
+        edge_xy=END_KEEP["BodyDiaDim"],
+        symbol_xy=(0.175, 0.116),
         datum="A",
         label="thread pitch-cylinder axis",
-        entity_type="FACE",
-        entity=thread_face,
+        entity_type="DIMENSION",
     )
     cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
     add_feature_control_frame(

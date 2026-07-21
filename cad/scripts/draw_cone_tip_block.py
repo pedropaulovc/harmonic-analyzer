@@ -11,6 +11,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -18,14 +19,23 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
+    set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_tip_block_spec import BLOCK_HEIGHT
+from cone_tip_block_spec import (
+    ADJUSTER_AXIS_HEIGHT,
+    BLOCK_HEIGHT,
+    BLOCK_Z,
+    PINCH_CLEARANCE_DIA,
+    PINCH_HEIGHT,
+    SHAFT_PASSAGE_DIA,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -49,6 +59,7 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # block height and clamp slit); the isometric is off to the right.
 FRONT_CENTER = (0.100, 0.160)
 TOP_CENTER = (0.100, 0.245)
+RIGHT_CENTER = (0.205, 0.160)
 ISO_CENTER = (0.330, 0.160)
 
 
@@ -62,7 +73,8 @@ def _front_y(model_y: float) -> float:
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.014),
     "BlockHt": (FRONT_CENTER[0] - 0.028, FRONT_CENTER[1]),
-    "PassageDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(47.65)),
+    "PassageDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(ADJUSTER_AXIS_HEIGHT)),
+    "PassageZ": (FRONT_CENTER[0] - 0.050, _front_y(ADJUSTER_AXIS_HEIGHT / 2.0)),
     # Keep the slit width directly above the slot; the native 5/16-18 thread
     # callout routes rightward below it.
     "SlitW": (FRONT_CENTER[0], 0.232),
@@ -70,8 +82,51 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.036, TOP_CENTER[1]),
 }
-DIMENSION_CALLOUTS = {"PassageDiaDim": "THRU - CLEARANCE PASSAGE"}
-DIMENSION_PRECISION: dict[str, int] = {}
+RIGHT_KEEP = {
+    "PinchZ": (RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0)),
+}
+DIMENSION_CALLOUTS = {
+    "BlockHt": "+0.05/-0.00",
+    "PassageDiaDim": "THRU - CLEARANCE PASSAGE",
+}
+DIMENSION_PRECISION = {"PassageZ": 2, "PinchZ": 2}
+
+
+def _circle_entity(
+    adapter: Any,
+    view: Any,
+    *,
+    radius_mm: float,
+    center_y_mm: float,
+    label: str,
+) -> Any:
+    """Return a real circular model edge by size and vertical station."""
+    drawing_view = _early_bound(view, "IView")
+    candidates: list[tuple[float, float, Any]] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = edge.GetCurve()
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+            candidates.append((params[6], params[1], edge))
+    if not candidates:
+        raise RuntimeError(f"{label} view has no visible circular model edges")
+    radius, center_y, edge = min(
+        candidates,
+        key=lambda item: abs(item[0] - radius_mm)
+        + abs(item[1] - center_y_mm),
+    )
+    if abs(radius - radius_mm) > 0.01 or abs(center_y - center_y_mm) > 0.01:
+        raise RuntimeError(
+            f"no {label} circle matches radius {radius_mm:.3f} mm at "
+            f"height {center_y_mm:.3f} mm"
+        )
+    return edge
 
 
 def _foot_edge(adapter: Any, view: Any) -> Any:
@@ -142,8 +197,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    set_hidden_lines_removed(adapter, iso)
+    for view in (right, iso):
+        set_hidden_lines_removed(adapter, view)
     # The elevation carries the journal as a hidden circle and the adjuster/slit
     # detail; the plan shows the footprint with the bore and holes crossing it.
     for view in (front, top):
@@ -155,12 +212,32 @@ async def build(adapter: Any) -> dict[str, str]:
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the plan view")
+    set_dimension_callouts(
+        adapter,
+        [*front_annotations, *top_annotations, *right_annotations],
+        DIMENSION_CALLOUTS,
+    )
+    set_dimension_precision(
+        adapter, [*front_annotations, *right_annotations], DIMENSION_PRECISION
+    )
+    by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in [*front_annotations, *right_annotations]
+    }
+    for name, label in (
+        ("PassageZ", "adjuster common-axis height"),
+        ("PinchZ", "pinch-axis height"),
+    ):
+        display = adapter._attempt(lambda n=name: by_name[n].GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"{name} has no display dimension to box")
+        set_basic_dimension(adapter, display, label=label)
+    for label, view in (("front", front), ("plan", top), ("right", right)):
+        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+            raise RuntimeError(f"failed to add ASME center mark to the {label} view")
 
     # Datum A = the foot seat face (the platform-seat datum the adjuster and
     # pinch-axis heights measure from).
@@ -176,6 +253,78 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="foot seat face",
         entity=foot_entity,
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=FRONT_KEEP["Width"],
+        symbol_xy=(0.065, _front_y(0.0) - 0.014),
+        datum="B",
+        label="block-width median plane",
+        entity_type="DIMENSION",
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] + BLOCK_Z / 2.0 * _S),
+        symbol_xy=(0.065, TOP_CENTER[1] + BLOCK_Z / 2.0 * _S),
+        datum="C",
+        label="adjuster entry face",
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=TOP_KEEP["Depth"],
+        symbol_xy=(0.155, TOP_CENTER[1]),
+        datum="D",
+        label="block-depth median plane",
+        entity_type="DIMENSION",
+    )
+    passage_entity = _circle_entity(
+        adapter,
+        front,
+        radius_mm=SHAFT_PASSAGE_DIA / 2.0,
+        center_y_mm=ADJUSTER_AXIS_HEIGHT,
+        label="adjuster passage",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(
+            FRONT_CENTER[0] + SHAFT_PASSAGE_DIA / 2.0 * _S,
+            _front_y(ADJUSTER_AXIS_HEIGHT),
+        ),
+        frame_xy=(0.150, _front_y(ADJUSTER_AXIS_HEIGHT) - 0.022),
+        characteristic="position",
+        tolerance="0.05",
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="THREAD + PASSAGE COMMON AXIS",
+        label="adjuster common-axis true position",
+        entity=passage_entity,
+    )
+    pinch_entity = _circle_entity(
+        adapter,
+        right,
+        radius_mm=PINCH_CLEARANCE_DIA / 2.0,
+        center_y_mm=PINCH_HEIGHT,
+        label="pinch clearance",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=(
+            RIGHT_CENTER[0] + PINCH_CLEARANCE_DIA / 2.0 * _S,
+            _front_y(PINCH_HEIGHT),
+        ),
+        frame_xy=(0.245, _front_y(PINCH_HEIGHT) - 0.018),
+        characteristic="position",
+        tolerance="0.05",
+        datums=("A", "D"),
+        diameter=True,
+        quantity="CLEARANCE + THREAD COMMON AXIS",
+        label="pinch common-axis true position",
+        entity=pinch_entity,
     )
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.020, 0.075, char_height=0.0025

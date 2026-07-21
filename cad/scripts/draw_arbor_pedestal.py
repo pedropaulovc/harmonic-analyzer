@@ -404,7 +404,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=foot_edge,
-        frame_xy=(0.165, 0.105),
+        frame_xy=(0.105, 0.070),
         characteristic="flatness",
         tolerance="0.05",
         label="datum-A seat flatness",

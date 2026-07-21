@@ -56,10 +56,10 @@ from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    PINCH_CLEARANCE_DIA,
     SHAFT_PASSAGE_DIA,
 )
 from _holes import (
-    CLEARANCE_MM,
     DRILL_POINT_H,
     HoleSpec,
     blind_cut_dia_mm,
@@ -97,7 +97,6 @@ PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)  # 1.994 tap drill
 PINCH_CLEARANCE_SPEC = HoleSpec(
     "clearance", "#3", end="blind", depth_mm=(BLOCK_X - SLIT_W) / 2.0
 )
-PINCH_CLEARANCE_DIA = CLEARANCE_MM[("#3", "normal")]  # 2.946 near jaw only
 PINCH_BORE_Y = 53.2  # between the counterbore top and the block top
 
 # The pinch cross-bore must land wholly in the material band between the

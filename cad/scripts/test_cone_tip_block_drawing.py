@@ -23,9 +23,17 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is cone_tip_block_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_tip_block_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
-    assert marked == {"Width", "Depth", "BlockHt", "PassageDiaDim", "SlitW"}
+    assert marked == {
+        "Width",
+        "Depth",
+        "BlockHt",
+        "PassageDiaDim",
+        "PassageZ",
+        "PinchZ",
+        "SlitW",
+    }
     assert part.ADJUSTER_AXIS_HEIGHT == cone_tip_block_spec.ADJUSTER_AXIS_HEIGHT
 
 
@@ -35,10 +43,11 @@ def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
     assert "BoreDiaDim" not in source
     assert 'name_last_feature(adapter, "ShaftPassage")' in source
     assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA == 2.0
-    assert drawing.DIMENSION_CALLOUTS == {
-        "PassageDiaDim": "THRU - CLEARANCE PASSAGE"
-    }
-    assert "NOT A SHAFT-BEARING SURFACE" in cone_tip_block_spec.DRAWING_NOTES
+    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == (
+        "THRU - CLEARANCE PASSAGE"
+    )
+    assert drawing.DIMENSION_CALLOUTS["BlockHt"] == "+0.05/-0.00"
+    assert "A SHAFT-BEARING SURFACE" in cone_tip_block_spec.DRAWING_NOTES
 
 
 def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
@@ -47,7 +56,7 @@ def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     assert "#3-48" in notes  # the pinch tapped hole
     assert "SLOT" in notes
     assert "CLEARANCE" in notes
-    assert "LEFT-HAND JAW" in notes
+    assert "OPPOSITE JAW" in notes
     assert "DIA 2.946 +0.10/-0.00" in notes
     assert "MATERIAL" not in notes
     assert "OXIDE" not in notes
@@ -62,20 +71,23 @@ def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     assert "depth_mm=(BLOCK_X - SLIT_W) / 2.0" in part_source
 
 
-def test_datum_and_parallelism_control_are_present() -> None:
+def test_datum_and_position_controls_are_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'datum="A"' in source
-    assert 'datum="B"' not in source
-    assert "add_feature_control_frame(" not in source
-    assert "CYLINDRICAL ZONE DIA 0.05" in cone_tip_block_spec.DRAWING_NOTES
-    assert "PARALLEL TO DATUM A" in cone_tip_block_spec.DRAWING_NOTES
-    assert "DATUM B" not in cone_tip_block_spec.DRAWING_NOTES
+    assert 'datum="B"' in source
+    assert 'datum="C"' in source
+    assert 'datum="D"' in source
+    assert source.count('characteristic="position"') == 2
+    assert source.count("set_basic_dimension(") == 1
+    assert "CYLINDRICAL ZONE" not in cone_tip_block_spec.DRAWING_NOTES
+    assert "CONCENTRIC" not in cone_tip_block_spec.DRAWING_NOTES
+    assert "COMMON AXIS" in cone_tip_block_spec.DRAWING_NOTES
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(2, 1)") == 3  # elevation + plan + pictorial
+    assert source.count("scale=(2, 1)") == 4  # elevation + plan + side + pictorial
 
 
 def test_part_stamps_make_critical_properties() -> None:
