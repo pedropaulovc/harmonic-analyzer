@@ -404,7 +404,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         side,
-        frame_xy=(0.310, 0.093),
+        frame_xy=(0.295, 0.093),
         characteristic="flatness",
         tolerance="0.10",
         label="datum A flatness",
@@ -413,7 +413,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         side,
-        frame_xy=(0.380, 0.093),
+        frame_xy=(0.365, 0.093),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
