@@ -11,6 +11,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
+    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
@@ -82,14 +83,12 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.036, TOP_CENTER[1]),
 }
-RIGHT_KEEP = {
-    "PinchZ": (RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0)),
-}
+RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "BlockHt": "+0.05/-0.00",
     "PassageDiaDim": "THRU - CLEARANCE PASSAGE",
 }
-DIMENSION_PRECISION = {"PassageZ": 2, "PinchZ": 2}
+DIMENSION_PRECISION = {"PassageZ": 2}
 
 
 def _circle_entity(
@@ -225,12 +224,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     by_name = {
         dimension_name(adapter, annotation): annotation
-        for annotation in [*front_annotations, *right_annotations]
+        for annotation in front_annotations
     }
-    for name, label in (
-        ("PassageZ", "adjuster common-axis height"),
-        ("PinchZ", "pinch-axis height"),
-    ):
+    for name, label in (("PassageZ", "adjuster common-axis height"),):
         display = adapter._attempt(lambda n=name: by_name[n].GetSpecificAnnotation())
         if display is None:
             raise RuntimeError(f"{name} has no display dimension to box")
@@ -310,6 +306,18 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=PINCH_HEIGHT,
         label="pinch clearance",
     )
+    pinch_height = add_edge_dimension(
+        adapter,
+        right,
+        p0=(RIGHT_CENTER[0], _front_y(0.0)),
+        p1=(
+            RIGHT_CENTER[0] - PINCH_CLEARANCE_DIA / 2.0 * _S,
+            _front_y(PINCH_HEIGHT),
+        ),
+        text_xy=(RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0)),
+        label="pinch-axis height",
+    )
+    set_basic_dimension(adapter, pinch_height, label="pinch-axis height")
     add_feature_control_frame(
         adapter,
         right,

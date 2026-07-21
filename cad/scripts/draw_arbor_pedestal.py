@@ -63,7 +63,7 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # elevation on that midpoint. Third-angle: the 24x16 foot plan sits ABOVE the
 # elevation, the isometric off to the right.
 _PART_MID_Y = (BORE_HEIGHT + 10.0) / 2.0  # foot 0 .. dome top (bore + dome radius)
-FRONT_CENTER = (0.100, 0.160)
+FRONT_CENTER = (0.100, 0.150)
 TOP_CENTER = (0.100, 0.245)
 ISO_CENTER = (0.335, 0.150)
 
@@ -76,7 +76,7 @@ def _front_y(model_y: float) -> float:
 # Front elevation carries the foot width + flange height, the arbor-bore station
 # and diameter, and the dome diameter; the plan carries the 16 foot depth.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.014),
+    "Width": (FRONT_CENTER[0], _front_y(0.0) + 0.018),
     "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
     "BoreDia": (FRONT_CENTER[0] + 0.068, _front_y(BORE_HEIGHT) - 0.004),
     "DomeDia": (FRONT_CENTER[0] + 0.066, _front_y(BORE_HEIGHT + 9.0)),
@@ -387,7 +387,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=foot_edge,
-        symbol_xy=(FRONT_CENTER[0] + 0.034, _front_y(0.0) - 0.006),
+        symbol_xy=(FRONT_CENTER[0] + 0.034, _front_y(0.0) + 0.014),
         datum="A",
         label="foot seat face",
         entity=foot_entity,
@@ -396,7 +396,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(2.5)),
-        symbol_xy=(0.040, _front_y(2.5)),
+        symbol_xy=(0.040, _front_y(2.5) + 0.010),
         datum="B",
         label="left foot side",
         entity=side_entity,
@@ -405,7 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=foot_edge,
-        frame_xy=(0.105, 0.084),
+        frame_xy=(0.105, 0.105),
         characteristic="flatness",
         tolerance="0.05",
         label="datum-A seat flatness",
@@ -415,7 +415,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(20.0)),
-        frame_xy=(0.020, 0.090),
+        frame_xy=(0.020, 0.105),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),

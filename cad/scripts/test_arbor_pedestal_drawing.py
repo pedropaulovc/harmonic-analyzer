@@ -108,11 +108,11 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.FRONT_CENTER == (0.100, 0.160)
+    assert drawing.FRONT_CENTER == (0.100, 0.150)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(2, 1)") == 3  # elevation + plan + pictorial
-    assert "frame_xy=(0.105, 0.084)" in source
-    assert "frame_xy=(0.020, 0.090)" in source
+    assert "frame_xy=(0.105, 0.105)" in source
+    assert "frame_xy=(0.020, 0.105)" in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

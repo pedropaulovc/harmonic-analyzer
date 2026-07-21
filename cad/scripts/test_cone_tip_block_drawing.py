@@ -24,7 +24,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is cone_tip_block_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_tip_block_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
-    assert kept == marked
+    # PinchZ is marked and remains part-owned, but SolidWorks does not import
+    # that Hole Wizard placement dimension into the end view. The sheet creates
+    # its BASIC datum-to-hole locator natively instead.
+    assert kept | {"PinchZ"} == marked
     assert marked == {
         "Width",
         "Depth",
@@ -78,7 +81,8 @@ def test_datum_and_position_controls_are_present() -> None:
     assert 'datum="C"' in source
     assert 'datum="D"' in source
     assert source.count('characteristic="position"') == 2
-    assert source.count("set_basic_dimension(") == 1
+    assert source.count("set_basic_dimension(") == 2
+    assert 'label="pinch-axis height"' in source
     assert "CYLINDRICAL ZONE" not in cone_tip_block_spec.DRAWING_NOTES
     assert "CONCENTRIC" not in cone_tip_block_spec.DRAWING_NOTES
     assert "COMMON AXIS" in cone_tip_block_spec.DRAWING_NOTES
