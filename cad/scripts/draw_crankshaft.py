@@ -161,6 +161,32 @@ def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
     return candidates[0]
 
 
+def _visible_shaft_end_edges(adapter: Any, view: Any) -> list[tuple[float, Any]]:
+    """Return shaft end edges ordered from crank end to far end."""
+    expected_radius_m = SHAFT_DIA / 2000.0
+    candidates: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1),
+            default=(),
+        ) or ()
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            parameters = curve.CircleParams
+            if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
+                continue
+            candidates.append((float(parameters[1]), edge))
+    if not candidates:
+        raise RuntimeError(
+            f"drawing view has no shaft end edge at radius {expected_radius_m:g} m"
+        )
+    return sorted(candidates, key=lambda candidate: candidate[0])
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -241,36 +267,36 @@ async def build(adapter: Any) -> dict[str, str]:
         face=shaft_face,
     )
 
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-    )
+    front_end_edge = _visible_shaft_end_edges(adapter, front)[0][1]
+    right_end_edges = _visible_shaft_end_edges(adapter, right)
+    crank_end_edge = right_end_edges[0][1]
+    far_end_edge = right_end_edges[-1][1]
     add_datum_feature(
         adapter,
         front,
-        edge_xy=end_top,
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.027),
         datum="A",
         label="shaft OD datum axis",
+        entity=front_end_edge,
     )
     add_datum_feature(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] - SHAFT_DIA / 4000.0, _SIDE_BOTTOM),
         symbol_xy=(RIGHT_CENTER[0] - SHAFT_DIA / 4000.0, 0.060),
         datum="B",
         label="crank-end datum face",
+        entity=crank_end_edge,
     )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + SHAFT_LENGTH / 2000.0),
         frame_xy=(0.185, 0.235),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
         quantity="2X END FACES",
         label="end-face perpendicularity",
+        entity=far_end_edge,
     )
 
     # The #9 tapered-pin cross-hole: the associative wizard callout carries the
