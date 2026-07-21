@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the cone pivot post."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -32,6 +33,8 @@ from cone_pivot_post_spec import (
     BORE_HEIGHT,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
+    CRANK_BORE_OFFSET,
+    INCLINE_DEG,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -252,11 +255,17 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="journal-bore clocking axis",
     )
-    crank_r = CRANK_BORE_DIA / 2.0 * _S
+    # In this elevation the oblique bore projects as an ellipse whose axis is
+    # offset west by DX*cos(I), and whose horizontal semiaxis is r*cos(I).
+    # Pick its modeled right-hand rim, not the untilted-circle approximation.
+    crank_cos = math.cos(math.radians(INCLINE_DEG))
+    crank_rim_x = FRONT_CENTER[0] + (
+        -CRANK_BORE_OFFSET + CRANK_BORE_DIA / 2.0
+    ) * crank_cos * _S
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + crank_r, _front_y(CRANK_BORE_HEIGHT)),
+        edge_xy=(crank_rim_x, _front_y(CRANK_BORE_HEIGHT)),
         frame_xy=(0.170, _front_y(CRANK_BORE_HEIGHT) + 0.010),
         characteristic="position",
         tolerance="0.10",

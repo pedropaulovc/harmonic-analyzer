@@ -245,7 +245,7 @@ async def build(adapter: Any) -> dict[str, str]:
             END_CENTER[0],
             END_CENTER[1] + SLOT_W / 2.0 * SHEET_SCALE[0] / 1000.0,
         ),
-        frame_xy=(END_CENTER[0] + 0.065, END_CENTER[1] - 0.040),
+        frame_xy=(END_CENTER[0] + 0.065, END_CENTER[1] - 0.025),
         characteristic="position",
         tolerance="0.10",
         datums=("A",),

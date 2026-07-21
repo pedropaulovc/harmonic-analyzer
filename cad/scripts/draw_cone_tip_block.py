@@ -63,9 +63,9 @@ FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.014),
     "BlockHt": (FRONT_CENTER[0] - 0.028, FRONT_CENTER[1]),
     "PassageDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(47.65)),
-    # Keep the slit width above/right of the native 5/16-18 thread callout.
-    # At the old x=0.144 position their text occupied the same line.
-    "SlitW": (0.220, 0.220),
+    # Keep the slit width directly above the slot; the native 5/16-18 thread
+    # callout routes rightward below it.
+    "SlitW": (FRONT_CENTER[0], 0.232),
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.036, TOP_CENTER[1]),
