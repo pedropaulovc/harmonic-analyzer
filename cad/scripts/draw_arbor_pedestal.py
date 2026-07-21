@@ -562,9 +562,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=far_face_entity,
     )
 
-    # The coating-mask instruction adds another wrapped line to this block.
+    # The coating acceptance + mask instructions add wrapped lines to this block.
     # Keep its rendered bottom edge above the 12.7 mm zone margin.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.078)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.083)
 
     return await finalize_drawing(
         adapter,

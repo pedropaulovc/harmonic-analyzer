@@ -72,7 +72,7 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "ALL PROFILE-CONTROLLED SURFACES" in notes
     assert "25-50 um TOTAL DFT OVER TWO COATS" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.083)' in source
     assert "add_native_hole_callout(" in source
     assert 'label="flange-hole location from datum D"' in source
 
