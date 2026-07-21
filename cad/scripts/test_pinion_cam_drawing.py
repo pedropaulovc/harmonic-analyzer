@@ -45,7 +45,7 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
     # The whole point of the cam: bore and OD are NOT concentric, so the offset
     # must be an explicit dimension, not implied by graphical alignment.
     assert "CollarCy" in drawing.FRONT_KEEP
-    assert "ECCENTRICITY" in drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert "BOTH END FACES" in drawing.DIMENSION_CALLOUTS["CollarCy"]
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "NOT" in notes and "CONCENTRIC" in notes
     assert "OFFSET 1.0" not in notes

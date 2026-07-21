@@ -79,21 +79,20 @@ CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 FRONT_KEEP = {
     "BoreDia": (0.050, 0.150),
     "CollarOd": (0.030, 0.120),
-    "CollarCy": (0.140, 0.150),
+    "CollarCy": (0.145, 0.135),
 }
 TOP_KEEP = {
-    "Depth": (0.085, 0.205),
-    "BossDia": (0.150, 0.232),
-    "BossCz": (0.150, 0.208),
+    "Depth": (0.085, 0.195),
+    "BossDia": (0.145, 0.225),
+    "BossCz": (0.145, 0.200),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU\nRa 1.6",
     "CollarOd": "+/-0.05",
-    "CollarCy": "ECCENTRICITY +/-0.05 AT BOTH END FACES",
+    "CollarCy": "+/-0.05 BOTH END FACES",
     "Depth": "+/-0.05",
     "BossDia": (
-        "INTEGRAL BOSS\n+/-0.05; PROJECTION 0.50+/-0.05\n"
-        "RADIALLY BEYOND DIA 9.20 OD"
+        "+/-0.05\nPROJECTION 0.50+/-0.05\nBEYOND DIA 9.20 OD"
     ),
 }
 
@@ -207,7 +206,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=boss_top,
-        frame_xy=(0.190, 0.255),
+        frame_xy=(0.150, 0.265),
         characteristic="position",
         tolerance="0.05",
         datums=("A", "B", "C"),
@@ -218,7 +217,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.205, 0.150)
+    add_property_linked_note(adapter, "Isometric View Note", 0.250, 0.145)
 
     return await finalize_drawing(
         adapter,
