@@ -409,6 +409,24 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="cone-tip-adjuster",
         script_name="draw_cone_tip_adjuster.py",
     ),
+    DrawingSpec(
+        name="cone_tip_block",
+        part="cone_tip_block",
+        artifact_stem="cone-tip-block",
+        script_name="draw_cone_tip_block.py",
+    ),
+    DrawingSpec(
+        name="arbor_pedestal",
+        part="arbor_pedestal",
+        artifact_stem="arbor-pedestal",
+        script_name="draw_arbor_pedestal.py",
+    ),
+    DrawingSpec(
+        name="pivot_ball_mount",
+        part="pivot_ball_mount",
+        artifact_stem="pivot-ball-mount",
+        script_name="draw_pivot_ball_mount.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

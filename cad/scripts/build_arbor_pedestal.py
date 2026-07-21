@@ -46,6 +46,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -54,6 +55,12 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from arbor_pedestal_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "arbor-pedestal"
@@ -119,6 +126,9 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=FOOT_HEIGHT)),
     )
     name_last_feature(adapter, "Foot")
+    # Name the extrude DEPTH so the foot flange height is a markable drawing dim.
+    foot_ht_dim = name_dimensions(adapter, "Foot", ["FootHt"])
+    drive_jobs += [(foot_ht_dim[0], '"FootHeight"')]
     v_foot = FOOT_WIDTH * FOOT_DEPTH * FOOT_HEIGHT
     volume = await volume_check(adapter, "foot", v_foot, 0.005 * v_foot)
 
@@ -269,6 +279,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

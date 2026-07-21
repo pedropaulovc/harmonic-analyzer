@@ -41,6 +41,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -48,6 +49,12 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from cone_tip_block_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
 from _holes import (
     DRILL_POINT_H,
     HoleSpec,
@@ -181,6 +188,9 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
     name_last_feature(adapter, "Block")
+    # Name the extrude DEPTH so the block height is a markable drawing dimension.
+    block_depth_dim = name_dimensions(adapter, "Block", ["BlockHt"])
+    drive_jobs += [(block_depth_dim[0], '"BlockHeight"')]
     v_block = BLOCK_X * BLOCK_Z * BLOCK_HEIGHT
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
@@ -293,6 +303,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
