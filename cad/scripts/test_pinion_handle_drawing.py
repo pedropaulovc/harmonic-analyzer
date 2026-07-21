@@ -71,11 +71,9 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()
     )
     assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["TubeId"]
-    assert "CYLINDRICAL LENGTH" in drawing.DIMENSION_CALLOUTS["GripLen"]
-    assert "HUB PROJECTION 12.00 +0.10/-0.00" in drawing.DIMENSION_CALLOUTS[
-        "TubeLen"
-    ]
-    assert "DATUM A TO LOWER END 42.00 +/-0.10" in drawing.DIMENSION_CALLOUTS[
+    assert "CYL. LENGTH" in drawing.DIMENSION_CALLOUTS["GripLen"]
+    assert "12.00 +0.10/-0.00 HUB PROJ." in drawing.DIMENSION_CALLOUTS["TubeLen"]
+    assert "42.00 +/-0.10 A TO LOWER END" in drawing.DIMENSION_CALLOUTS[
         "RodSpan"
     ]
 

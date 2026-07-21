@@ -93,25 +93,25 @@ FRONT_KEEP = {
     "GripDia": (0.024, 0.196),
     "TubeOd": (0.024, 0.116),
     "TubeId": (0.035, 0.096),
-    "RodSpan": (0.044, 0.232),
+    "RodSpan": (0.040, 0.252),
 }
 RIGHT_KEEP = {
-    "GripLen": (0.148, 0.086),
-    "TubeLen": (0.180, 0.105),
+    "GripLen": (0.195, 0.085),
+    "TubeLen": (0.122, 0.108),
 }
 TOP_KEEP = {
     "RodDia": (0.300, 0.078),
 }
 DIMENSION_CALLOUTS = {
     "TubeId": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n8.025 MAX / 8.010 MIN\nRa 1.6",
-    "GripLen": "+/-0.10\nCYLINDRICAL LENGTH",
+    "GripLen": "+/-0.10 CYL. LENGTH",
     "TubeLen": (
-        "+0.10/-0.00 BLIND-BORE DEPTH\n"
-        "HUB PROJECTION 12.00 +0.10/-0.00"
+        "+0.10/-0.00 BORE DEPTH\n"
+        "12.00 +0.10/-0.00 HUB PROJ."
     ),
     "RodSpan": (
-        "+/-0.10 OVERALL\n"
-        "DATUM A TO LOWER END 42.00 +/-0.10"
+        "+/-0.10 OAL\n"
+        "42.00 +/-0.10 A TO LOWER END"
     ),
     "RodDia": (
         "PRESS ROD 6.020 MAX / 6.015 MIN\n"
@@ -218,7 +218,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=flat_end_face,
-        symbol_xy=(flat_end_x, bore_center[1] + 0.026),
+        symbol_xy=(flat_end_x - 0.018, flat_end_face[1]),
         datum="B",
         label="handle flat hub end",
     )
@@ -259,7 +259,7 @@ async def build(adapter: Any) -> dict[str, str]:
             _front_x(ROD_DIA / 2.0),
             _front_y(ROD_UP - 8.0),
         ),
-        frame_xy=(0.108, 0.232),
+        frame_xy=(0.112, 0.263),
         characteristic="position",
         tolerance="0.05",
         datums=("A", "B"),
