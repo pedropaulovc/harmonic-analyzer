@@ -15,7 +15,11 @@ captures (same sidecars), then composites/scores are refreshed.
 """
 
 import argparse
+import glob
 import json
+import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,8 +33,78 @@ import composite  # noqa: E402
 
 REPO = composite.REPO
 CAD_OUT = REPO / "cad" / "out"
-BLENDER = Path(r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe")
 WORKER = TOOLS / "blender_worker.py"
+# Resolved LAZILY on first worker launch (blender_worker's render needs the >= 5.2
+# gpu API), cached here. Deferred so the no-op path (nothing stale to render) never
+# needs Blender, and so module consumers that import this without calling main()
+# (comparisons/bench/render_server.py) still get a working path.
+BLENDER: str | None = None
+_BLENDER_OVERRIDE: str | None = None  # set by main() from --blender
+
+
+def blender_exe() -> str:
+    """Blender path, resolved on first call and cached in ``BLENDER``."""
+    global BLENDER
+    if BLENDER is None:
+        BLENDER = resolve_blender(_BLENDER_OVERRIDE)
+        print(f"blender: {BLENDER}", file=sys.stderr)
+    return BLENDER
+
+
+def _blender_version(exe: str) -> tuple[int, int] | None:
+    """(major, minor) reported by ``<exe> --version``, or None if undeterminable."""
+    try:
+        out = subprocess.run([exe, "--version"], capture_output=True, text=True,
+                             timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"Blender (\d+)\.(\d+)", out)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _require_52(exe: str, hint: str) -> str:
+    """Return ``exe`` iff ``<exe> --version`` reports >= 5.2, else raise loud.
+
+    The worker calls the 5.2 gpu API, so a <5.2 (or unverifiable) binary would crash
+    deep inside _run_worker -- reject it here with a clear message instead."""
+    ver = _blender_version(exe)
+    if ver and ver >= (5, 2):
+        return exe
+    shown = ".".join(map(str, ver)) if ver else "an undeterminable version"
+    raise SystemExit(f"Blender at {exe} is {shown} (< 5.2 required, worker needs the "
+                     f"5.2 gpu API); {hint}")
+
+
+def resolve_blender(override: str | None = None) -> str:
+    """Path to a Blender >= 5.2 for the headless worker.
+
+    --blender / $HARMONIC_BLENDER win (still version-checked -- a <5.2 override can
+    only crash the worker); else the highest >= 5.2 under the standard Windows install
+    dir; else `blender` on PATH (Linux/macOS), version-queried since its name carries
+    no version. Discovery (not a hard-coded version) is what lets the release's export
+    stage refresh the gallery on whichever Blender the seat has -- a pinned "Blender
+    5.1" path silently broke it when that version was uninstalled."""
+    cand = override or os.environ.get("HARMONIC_BLENDER")
+    if cand:
+        if not Path(cand).exists():
+            raise SystemExit(f"Blender not found at {cand} (--blender / $HARMONIC_BLENDER)")
+        return _require_52(cand, "point --blender / $HARMONIC_BLENDER at a >= 5.2 install")
+    found = []
+    for exe in glob.glob(r"C:/Program Files/Blender Foundation/Blender */blender.exe"):
+        m = re.search(r"Blender (\d+)\.(\d+)", exe)
+        if m and (int(m.group(1)), int(m.group(2))) >= (5, 2):
+            found.append(((int(m.group(1)), int(m.group(2))), exe))
+    if found:
+        return max(found)[1]
+    # PATH fallback (Linux/macOS): the name carries no version, so query the binary --
+    # an older `blender` (4.5/5.1) here would cache an unsupported renderer and fail
+    # _run_worker deep in the gpu API, not with a clear "no 5.2" message.
+    which = shutil.which("blender")
+    if which:
+        return _require_52(which, "install a newer Blender or set $HARMONIC_BLENDER / "
+                                  "pass --blender")
+    raise SystemExit(
+        "no Blender >= 5.2 found; install it or set $HARMONIC_BLENDER / pass --blender")
 
 
 STL_DIR = CAD_OUT / "stl"
@@ -107,7 +181,7 @@ def _run_worker(geom: dict, jobpairs: list[dict], tmpdir: Path, model: str,
     payload = geom | ({"probe": True} if probe else {}) | {"pairs": jobpairs}
     job_file.write_text(json.dumps(payload), encoding="utf-8")
     proc = subprocess.run(
-        [str(BLENDER), "-b", "--factory-startup", "-P", str(WORKER), "--", str(job_file)],
+        [blender_exe(), "-b", "--factory-startup", "-P", str(WORKER), "--", str(job_file)],
         capture_output=True, text=True)
     ok = proc.returncode == 0 and (probe or "RENDERED" in proc.stdout)
     if not ok:
@@ -140,7 +214,14 @@ def main() -> int:
     ap.add_argument("--skip-composites", action="store_true",
                     help="do not regenerate the gallery composites/scores")
     ap.add_argument("--probe-out", help="compute base framing per pair, write json, render nothing")
+    ap.add_argument("--blender", help="Blender >= 5.2 exe (default: $HARMONIC_BLENDER or the "
+                                      "highest installed)")
     args = ap.parse_args()
+    # Stash the override only; resolve lazily on first worker launch (blender_exe),
+    # so the no-op path (nothing stale) certifies a current gallery without needing
+    # Blender installed on the seat.
+    global _BLENDER_OVERRIDE
+    _BLENDER_OVERRIDE = args.blender
     only = set(args.only.split(",")) if args.only else None
     out_root = Path(args.out_root) if args.out_root else None
     canvas = None

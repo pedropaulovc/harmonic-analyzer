@@ -31,7 +31,7 @@ from PIL import Image
 BENCH = Path(__file__).resolve().parent
 TOOLS = BENCH.parent / "tools"
 sys.path.insert(0, str(TOOLS))
-import render_offline as ro  # noqa: E402  (BLENDER, WORKER, model_paths)
+import render_offline as ro  # noqa: E402  (blender_exe, WORKER, model_paths)
 
 JPEG = {"quality": 90, "optimize": True}
 DEFAULT_TIMEOUT = 60.0    # normal render is 1-2s; this only trips on a genuine stall
@@ -67,7 +67,7 @@ class RenderServer:
         jobf = self.tmp / "serve_job.json"
         jobf.write_text(json.dumps(geom | {"serve": True, "pairs": []}), encoding="utf-8")
         self.proc = subprocess.Popen(
-            [str(ro.BLENDER), "-b", "--factory-startup", "-P", str(ro.WORKER), "--", str(jobf)],
+            [ro.blender_exe(), "-b", "--factory-startup", "-P", str(ro.WORKER), "--", str(jobf)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, bufsize=1)
         self._q: queue.Queue = queue.Queue()
