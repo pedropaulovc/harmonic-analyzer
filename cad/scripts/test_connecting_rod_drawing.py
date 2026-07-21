@@ -53,7 +53,7 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "#47 DRILL" in notes
     assert "RING 3.00 THICK" in notes
     assert "SHANK AND HEAD\n   2.50 THICK" in notes
-    assert "HEAD 10.0 W x 10.5 HIGH, R5.0" in notes
+    assert "HEAD 10.00 W x 10.50 HIGH, R5.00" in notes
     assert "PIN C/L 2.40 BELOW CROWN" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
