@@ -342,9 +342,31 @@ def add_datum_feature(
             raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
         draw.ClearSelection2(True)
         annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "Select3"
+            annotation, "IAnnotation", "Select3", "GetSpecificAnnotation"
         )
-        if not annotation.Select3(False, null_callout()):
+        selected = bool(annotation.Select3(False, null_callout()))
+        if not selected:
+            display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+            if display is not None:
+                display = _sw_type_info.early_bound_or_flag(
+                    display, "IDisplayDimension", "GetNameForSelection"
+                )
+                selection_name = str(display.GetNameForSelection() or "")
+                selected = bool(
+                    selection_name
+                    and draw.Extension.SelectByID2(
+                        selection_name,
+                        "DIMENSION",
+                        0.0,
+                        0.0,
+                        0.0,
+                        False,
+                        0,
+                        null_callout(),
+                        0,
+                    )
+                )
+        if not selected:
             raise RuntimeError(f"failed to select {label} annotation")
     tag = draw.InsertDatumTag2()
     if tag is None:
