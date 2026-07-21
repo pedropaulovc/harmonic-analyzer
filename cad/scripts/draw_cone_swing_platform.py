@@ -24,6 +24,8 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -39,8 +41,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
-from solidworks_mcp.adapters.com_variant import double_array
-from build_cone_swing_platform import NORTH_OVERHANG, PLATE_LEN
+from build_cone_swing_platform import NORTH_OVERHANG, PLATE_LEN, PLATE_T
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -57,45 +58,70 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 3.0)   # 1:3 keeps the 214 mm plan plus dimensions in-zone
 
-# Sheet layout (meters).  The plan (top) is the main view (the wedge, ~28 x 107
-# at 1:3); the isometric uses the same scale in the open right-hand field.
-TOP_CENTER = (0.105, 0.178)
+# Sheet layout (meters).  The 1:2 plan is the main definition view; the
+# isometric and an end view occupy the open right-hand field.
+TOP_CENTER = (0.115, 0.195)
 ISO_CENTER = (0.330, 0.175)
+END_CENTER = (0.330, 0.083)
 
 # Per-view survivor: overall axis length only. Axis-relative end offsets in the
 # notes define both asymmetric end widths without redundant chained dimensions.
 TOP_KEEP = {
-    "PlateLenDim": (0.048, 0.178),
+    "PlateLenDim": (0.048, TOP_CENTER[1]),
 }
 
 
 def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
     """Draw the model X=0 cone axis through the plan view."""
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
-
-    def _sheet_xy(z_mm: float) -> tuple[float, float]:
-        point = _early_bound(
-            math_utility.CreatePoint(double_array([0.0, 0.0, z_mm / 1000.0])),
-            "IMathPoint",
-        )
-        mapped = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        values = tuple(float(value) for value in mapped.ArrayData)
-        return values[0], values[1]
-
-    north = _sheet_xy(NORTH_OVERHANG)
-    south = _sheet_xy(NORTH_OVERHANG - PLATE_LEN)
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not drawing.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate cone-platform plan for axis centerline")
     sketch_manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    # An active drawing-view sketch accepts model-space coordinates and maps
+    # them through that view.  Feeding ModelToViewTransform output here applies
+    # the view transform twice and strands the line outside the part.
     centerline = sketch_manager.CreateCenterLine(
-        north[0], north[1], 0.0, south[0], south[1], 0.0
+        0.0,
+        0.0,
+        NORTH_OVERHANG / 1000.0,
+        0.0,
+        0.0,
+        (NORTH_OVERHANG - PLATE_LEN) / 1000.0,
     )
     if centerline is None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
+
+
+def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """Return bottom datum-A and top broad-face edges in the end view."""
+    bottom: list[tuple[float, Any]] = []
+    top: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+        ) or ()
+        for raw_edge in edges:
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsLine():
+                continue
+            values = tuple(float(value) for value in curve.LineParams)
+            if abs(values[3]) < 0.99:
+                continue
+            if abs(values[1]) <= 2e-6:
+                bottom.append((values[2], edge))
+            if abs(values[1] - PLATE_T / 1000.0) <= 2e-6:
+                top.append((values[2], edge))
+    if not bottom or not top:
+        raise RuntimeError(
+            "cone-platform end view is missing the broad-face datum edges"
+        )
+    # Prefer the south-end width edges; they are the longest unbroken
+    # representatives of each broad planar face.
+    return min(bottom, key=lambda item: item[0])[1], min(top, key=lambda item: item[0])[1]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -115,6 +141,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Plan View Note",
             "Isometric View Note",
+            "End View Note",
         ),
         required=(
             "Number",
@@ -124,6 +151,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Plan View Note",
             "Isometric View Note",
+            "End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -140,9 +168,10 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 3))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
-    for view in (top, iso):
+    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(1, 2))
+    for view in (top, iso, end):
         set_hidden_lines_removed(adapter, view)
 
     top_annotations = curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
@@ -151,9 +180,42 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the pivot hole")
     _add_cone_axis_centerline(adapter, top)
 
+    datum_a_edge, opposite_face_edge = _visible_broad_face_edges(adapter, end)
+    add_datum_feature(
+        adapter,
+        end,
+        symbol_xy=(0.305, 0.066),
+        datum="A",
+        label="lower broad face",
+        entity=datum_a_edge,
+        shoulder=True,
+    )
+    add_feature_control_frame(
+        adapter,
+        end,
+        frame_xy=(0.270, 0.078),
+        characteristic="flatness",
+        tolerance="0.10",
+        quantity="DATUM A BROAD FACE",
+        label="datum-A broad-face flatness",
+        entity=datum_a_edge,
+    )
+    add_feature_control_frame(
+        adapter,
+        end,
+        frame_xy=(0.355, 0.095),
+        characteristic="parallelism",
+        tolerance="0.10",
+        datums=("A",),
+        quantity="OPPOSITE BROAD FACE",
+        label="opposite broad-face parallelism",
+        entity=opposite_face_edge,
+    )
+
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
     add_property_linked_note(adapter, "Plan View Note", 0.040, 0.036)
     add_property_linked_note(adapter, "Isometric View Note", 0.290, 0.108)
+    add_property_linked_note(adapter, "End View Note", 0.298, 0.055)
 
     return await finalize_drawing(
         adapter,

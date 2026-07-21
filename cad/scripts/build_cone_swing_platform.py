@@ -70,6 +70,7 @@ from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PLAN_VIEW_NOTE,
 )
@@ -441,6 +442,7 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Plan View Note": PLAN_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "End View Note": END_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)
