@@ -57,6 +57,7 @@ VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.225, 0.175)
 RIGHT_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.375, 0.205)
+GEAR_DATA_POS = (0.040, 0.262)
 
 BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0  # bore radius on the sheet (m)
 
@@ -156,7 +157,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cylinder gear bore finish",
     )
 
-    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
+    add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)
     return await finalize_drawing(
         adapter,

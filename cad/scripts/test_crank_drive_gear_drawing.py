@@ -43,6 +43,11 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
+def test_gear_data_block_is_inset_from_the_zone_border() -> None:
+    assert drawing.GEAR_DATA_POS == (0.040, 0.262)
+    assert drawing.GEAR_DATA_POS[0] < drawing.FRONT_CENTER[0]
+
+
 def test_manufacturing_notes_present() -> None:
     notes = spec.DRAWING_NOTES
     assert "CUT TEETH PER GEAR DATA" in notes
