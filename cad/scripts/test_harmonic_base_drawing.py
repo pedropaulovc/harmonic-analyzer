@@ -60,6 +60,11 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert 'add_property_linked_note(adapter, "Side View Note", 0.300, 0.090)' in source
     assert "insert_hole_table(" in source
+    assert "_visible_hole_table_entities(adapter, top)" in source
+    assert "datum_entity=datum_entity" in source
+    assert "hole_entities=hole_entities" in source
+    assert "GetVisibleEntities2(c, 2)" in source
+    assert "GetVisibleEntities2(c, 1)" in source
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:

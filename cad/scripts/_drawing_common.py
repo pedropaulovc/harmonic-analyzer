@@ -1472,6 +1472,8 @@ def insert_hole_table(
     *,
     datum_xy: tuple[float, float],
     hole_points: Sequence[tuple[float, float]],
+    datum_entity: Any | None = None,
+    hole_entities: Sequence[Any] | None = None,
     anchor_xy: tuple[float, float],
     basic_locations: bool = True,
     label: str,
@@ -1479,8 +1481,12 @@ def insert_hole_table(
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
 
     ``datum_xy`` picks the origin VERTEX and each ``hole_points`` entry picks a
-    hole EDGE, all in sheet meters.  The table lands with its top-left corner at
-    ``anchor_xy`` and is validated (row/column count + header) before returning.
+    hole EDGE, all in sheet meters.  Callers that can identify drawing-context
+    entities topologically may additionally supply ``datum_entity`` and
+    ``hole_entities``; those are selected directly with the same hole-table
+    marks and the coordinates remain the count/diagnostic contract.  The table
+    lands with its top-left corner at ``anchor_xy`` and is validated before
+    returning.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -1488,15 +1494,40 @@ def insert_hole_table(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate hole-table view {name!r}")
     draw.ClearSelection2(True)
-    datum = draw.Extension.SelectByID2(
-        "", "VERTEX", datum_xy[0], datum_xy[1], 0.0, False, 1, null_callout(), 0
-    )
+    if hole_entities is not None and len(hole_entities) != len(hole_points):
+        raise ValueError(
+            f"{label} supplied {len(hole_entities)} hole entities for "
+            f"{len(hole_points)} hole points"
+        )
+
+    def _select_entity(entity: Any, *, append: bool, mark: int) -> bool:
+        selection_data = _early_bound(
+            draw.SelectionManager.CreateSelectData(), "ISelectData"
+        )
+        selection_data.Mark = mark
+        selectable = _early_bound(entity, "IEntity")
+        return bool(selectable.Select4(append, selection_data))
+
+    if datum_entity is not None:
+        datum = _select_entity(datum_entity, append=False, mark=1)
+    else:
+        datum = draw.Extension.SelectByID2(
+            "", "VERTEX", datum_xy[0], datum_xy[1], 0.0, False, 1, null_callout(), 0
+        )
     if not datum:
         raise RuntimeError(f"failed to select {label} hole-table datum vertex")
-    for x, y in hole_points:
-        selected = draw.Extension.SelectByID2(
-            "", "EDGE", x, y, 0.0, True, 2, null_callout(), 0
-        )
+    selections = (
+        zip(hole_points, hole_entities, strict=True)
+        if hole_entities is not None
+        else ((point, None) for point in hole_points)
+    )
+    for (x, y), entity in selections:
+        if entity is not None:
+            selected = _select_entity(entity, append=True, mark=2)
+        else:
+            selected = draw.Extension.SelectByID2(
+                "", "EDGE", x, y, 0.0, True, 2, null_callout(), 0
+            )
         if not selected:
             raise RuntimeError(
                 f"failed to select {label} hole-table edge at sheet ({x:g}, {y:g})"

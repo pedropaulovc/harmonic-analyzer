@@ -22,7 +22,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -116,6 +116,77 @@ ALL_HOLES = (
 )
 
 
+def _visible_hole_table_entities(
+    adapter: Any, view: Any
+) -> tuple[Any, tuple[Any, ...]]:
+    """Return the plan datum vertex and hole rims by model geometry."""
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    vertices: list[tuple[float, Any]] = []
+    circles: list[tuple[float, float, float, Any]] = []
+    datum_x_m = -BOTTOM_LENGTH / 2000.0
+    datum_z_m = -BOTTOM_WIDTH / 2000.0
+
+    for component in components:
+        visible_vertices = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 2),  # swViewEntityType_Vertex
+            default=(),
+        ) or ()
+        for vertex in visible_vertices:
+            vertex = _early_bound(vertex, "IVertex")
+            point = tuple(float(value) for value in vertex.GetPoint())
+            error = abs(point[0] - datum_x_m) + abs(point[2] - datum_z_m)
+            if error <= 2e-6:
+                # Prefer the upper visible copy when a vertical edge exposes
+                # both plate vertices at the same plan station.
+                vertices.append((point[1], vertex))
+
+        visible_edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1),  # swViewEntityType_Edge
+            default=(),
+        ) or ()
+        for edge in visible_edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            parameters = tuple(float(value) for value in curve.CircleParams)
+            circles.append((parameters[0], parameters[2], parameters[6], edge))
+
+    if not vertices:
+        raise RuntimeError(
+            "harmonic-base plan has no visible lower-left footprint vertex at "
+            f"({datum_x_m:g}, {datum_z_m:g}) m"
+        )
+
+    selected_edges: list[Any] = []
+    used: set[int] = set()
+    for x_mm, z_mm, diameter_mm in ALL_HOLES:
+        expected = (x_mm / 1000.0, z_mm / 1000.0, diameter_mm / 2000.0)
+        candidates = sorted(
+            (
+                abs(x - expected[0])
+                + abs(z - expected[1])
+                + abs(radius - expected[2]),
+                index,
+                edge,
+            )
+            for index, (x, z, radius, edge) in enumerate(circles)
+            if index not in used
+        )
+        if not candidates or candidates[0][0] > 5e-5:
+            nearest = candidates[0][0] if candidates else None
+            raise RuntimeError(
+                "harmonic-base plan has no visible circular rim for hole "
+                f"({x_mm:g}, {z_mm:g}) diameter {diameter_mm:g} mm; "
+                f"nearest error={nearest!r} m"
+            )
+        _, index, edge = candidates[0]
+        used.add(index)
+        selected_edges.append(edge)
+
+    return max(vertices, key=lambda candidate: candidate[0])[1], tuple(selected_edges)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -167,6 +238,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
+    datum_entity, hole_entities = _visible_hole_table_entities(adapter, top)
+
     # One complete hole table: four underside counterbores followed by every
     # top-side blind swing/pinion seat. Non-basic X/Y headers let the title-block
     # tolerance govern A1-A4; note 4 supplies the tighter seat-only tolerance.
@@ -175,6 +248,8 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         datum_xy=_DATUM_XY,
         hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in ALL_HOLES),
+        datum_entity=datum_entity,
+        hole_entities=hole_entities,
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=False,
         label="harmonic-base mounting",
