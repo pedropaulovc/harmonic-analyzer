@@ -16,6 +16,7 @@ MM_PER_IN = 25.4
 FOOT_WIDTH = 24.0  # X plan width of the foot flange
 FOOT_DEPTH = 16.0  # Z plan depth of the foot flange
 FOOT_HEIGHT = 5.0  # low flange height under the strap
+STRAP_T = 10.0  # strap depth; far face is coplanar with the foot far face
 TOP_RADIUS = 10.0  # dome radius = strap half-width at the top
 DOME_DIA = 2.0 * TOP_RADIUS  # 20.0: the round head around the clamp bore
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525: the 3/8 in cylinder-arbor journal
@@ -40,8 +41,11 @@ DRAWING_NOTES = "\n".join(
         "MATING ARBOR LIMITS DIA 9.505-9.525.",
         "2X STRAIGHT FLANKS RUN FROM TOP CORNERS OF BOXED 24.00 X 5.00 FOOT",
         "TO DIA 20.00 CROWN AT ITS HORIZONTAL CENTERLINE; NO TANGENCY.",
+        "PROFILE 0.10 A-B APPLIES TO CROWN, 2X FLANKS, FOOT TOP + RIGHT SIDE;",
+        "DO NOT BREAK THE CROWN/FLANK OR FLANK/FOOT PROFILE JUNCTIONS.",
         "BOXED 12.00 LOCATES BOTH BORE AND FLANGE-HOLE AXES FROM DATUM B.",
-        "STRAP NEAR FACE 6.00 +/-0.10 FROM DATUM D.",
-        "STRAP FAR FACE FLUSH WITH FOOT FAR FACE (10.00 REF THICK).",
+        "BOXED 6.00 LOCATES STRAP NEAR FACE FROM D; PROFILE 0.10 TO D.",
+        "BOXED 16.00 LOCATES COPLANAR FOOT/STRAP FAR FACES FROM D;",
+        "PROFILE 0.10 TO D; RESULTING STRAP THICKNESS 10.00 REF.",
     )
 )

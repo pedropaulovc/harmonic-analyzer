@@ -34,6 +34,7 @@ from arbor_pedestal_spec import (
     FOOT_HEIGHT,
     FOOT_WIDTH,
     SCREW_CLEARANCE_DIA,
+    STRAP_T,
     TOP_RADIUS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -86,7 +87,6 @@ TOP_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "+0.055/+0.025 THRU",
-    "Depth": "+/-0.10",
 }
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
 # 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).
@@ -166,11 +166,10 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
     return foot_edge, side_edge, flank_edge, bore_edge, dome_edge
 
 
-def _top_exposed_edge(adapter: Any, view: Any) -> Any:
-    """Return the datum-D exposed-flange edge in the plan view."""
+def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
+    """Return a plan-view edge at one modeled depth station."""
     drawing_view = _early_bound(view, "IView")
-    exposed_candidates: list[tuple[float, Any]] = []
-    exposed_z = -FOOT_DEPTH / 2.0
+    candidates: list[tuple[float, Any]] = []
     for component in drawing_view.GetVisibleComponents() or []:
         for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
             edge = _early_bound(raw_edge, "IEdge")
@@ -183,13 +182,13 @@ def _top_exposed_edge(adapter: Any, view: Any) -> Any:
             p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
             p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
             if (
-                abs(p0[2] - exposed_z) <= 0.01
-                and abs(p1[2] - exposed_z) <= 0.01
+                abs(p0[2] - z_mm) <= 0.01
+                and abs(p1[2] - z_mm) <= 0.01
             ):
-                exposed_candidates.append((abs(p1[0] - p0[0]), edge))
-    if not exposed_candidates:
-        raise RuntimeError("plan view has no exposed-flange edge")
-    return max(exposed_candidates, key=lambda item: item[0])[1]
+                candidates.append((abs(p1[0] - p0[0]), edge))
+    if not candidates:
+        raise RuntimeError(f"plan view has no {label} edge at z={z_mm:.3f} mm")
+    return max(candidates, key=lambda item: item[0])[1]
 
 
 def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> Any:
@@ -340,6 +339,15 @@ async def build(adapter: Any) -> dict[str, str]:
         if display is None:
             raise RuntimeError(f"{name} has no display dimension to box")
         set_basic_dimension(adapter, display, label=f"flank {name} coordinate")
+    top_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in top_annotations
+    }
+    depth_annotation = top_by_name["Depth"]
+    depth_display = adapter._attempt(lambda: depth_annotation.GetSpecificAnnotation())
+    if depth_display is None:
+        raise RuntimeError("Depth has no display dimension to box")
+    set_basic_dimension(adapter, depth_display, label="far-face depth coordinate")
     dome_annotation = front_by_name["DomeDia"]
     dome_display = adapter._attempt(lambda: dome_annotation.GetSpecificAnnotation())
     if dome_display is None:
@@ -392,6 +400,27 @@ async def build(adapter: Any) -> dict[str, str]:
         label="left foot side",
         entity=side_entity,
     )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=foot_edge,
+        frame_xy=(0.165, 0.105),
+        characteristic="flatness",
+        tolerance="0.05",
+        label="datum-A seat flatness",
+        entity=foot_entity,
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(2.5)),
+        frame_xy=(0.020, 0.125),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A",),
+        label="datum-B side perpendicularity",
+        entity=side_entity,
+    )
     # The two BASIC coordinates locate the bore axis from datum A and the left
     # foot side B. Position controls both location and axis orientation.
     add_feature_control_frame(
@@ -412,28 +441,13 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(
-            FRONT_CENTER[0] + TOP_RADIUS * _S * 0.70,
-            _front_y(BORE_HEIGHT + TOP_RADIUS * 0.70),
-        ),
+        edge_xy=(FRONT_CENTER[0] + 11.0 * _S, _front_y(BORE_HEIGHT / 2.0)),
         frame_xy=(0.245, _front_y(BORE_HEIGHT) + 0.026),
         characteristic="profile_surface",
         tolerance="0.10",
         datums=("A", "B"),
-        quantity="CROWN ONLY",
-        label="crown surface profile",
-        entity=dome_entity,
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + 11.0 * _S, _front_y(BORE_HEIGHT / 2.0)),
-        frame_xy=(0.220, 0.095),
-        characteristic="profile_surface",
-        tolerance="0.10",
-        datums=("A", "B"),
-        quantity="2X FLANKS ONLY",
-        label="taper-flank surface profile",
+        quantity="EXTERIOR PROFILE EXCEPT A + B",
+        label="controlled exterior surface profile",
         entity=flank_entity,
     )
     add_surface_finish(
@@ -451,7 +465,18 @@ async def build(adapter: Any) -> dict[str, str]:
         SCREW_CLEARANCE_DIA / 2.0,
         label="flange hold-down hole",
     )
-    datum_d_entity = _top_exposed_edge(adapter, top)
+    datum_d_entity = _top_depth_edge(
+        adapter, top, -FOOT_DEPTH / 2.0, label="datum-D near-foot"
+    )
+    strap_near_entity = _top_depth_edge(
+        adapter,
+        top,
+        FOOT_DEPTH / 2.0 - STRAP_T,
+        label="strap near-face",
+    )
+    far_face_entity = _top_depth_edge(
+        adapter, top, FOOT_DEPTH / 2.0, label="coplanar far-face"
+    )
     # The top and front views are projection-aligned, so a second horizontal
     # 12 BASIC dimension would print directly over the bore's 12 BASIC. The
     # property-linked note explicitly assigns that existing datum-B coordinate
@@ -494,6 +519,30 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="flange-hole true position",
         entity=screw_entity,
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=(TOP_CENTER[0], TOP_CENTER[1]),
+        frame_xy=(0.205, 0.275),
+        characteristic="profile_surface",
+        tolerance="0.10",
+        datums=("D",),
+        quantity="STRAP NEAR FACE @ BASIC 6.00",
+        label="strap near-face profile",
+        entity=strap_near_entity,
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] - FOOT_DEPTH / 2.0 * _S),
+        frame_xy=(0.300, 0.220),
+        characteristic="profile_surface",
+        tolerance="0.10",
+        datums=("D",),
+        quantity="FOOT + STRAP FAR FACES @ BASIC 16.00",
+        label="coplanar far-face profile",
+        entity=far_face_entity,
     )
 
     # Ten lines occupy almost the full lower-left band. Keep the note above the

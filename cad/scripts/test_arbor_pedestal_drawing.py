@@ -36,7 +36,7 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     assert round(arbor_pedestal_spec.BORE_DIA, 3) == 9.525
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "+0.055/+0.025 THRU"
     assert "BoreHeight" not in drawing.DIMENSION_CALLOUTS
-    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.10"
+    assert "Depth" not in drawing.DIMENSION_CALLOUTS
     assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
     assert "ARBOR BORE LIMITS" not in arbor_pedestal_spec.DRAWING_NOTES
     shaft_limits = (9.505, 9.525)
@@ -52,7 +52,8 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
 def test_notes_specify_part_requirements_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "MATING ARBOR LIMITS DIA 9.505-9.525" in notes
-    assert "STRAP FAR FACE FLUSH WITH FOOT FAR FACE (10.00 REF THICK)" in notes
+    assert "COPLANAR FOOT/STRAP FAR FACES" in notes
+    assert "RESULTING STRAP THICKNESS 10.00 REF" in notes
     assert "MATERIAL" not in notes
     assert "JAPANNED" not in notes
     assert "DATUM A" in notes
@@ -64,7 +65,7 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "BOXED 24.00 X 5.00 FOOT" in notes
     assert "NO TANGENCY" in notes
     assert "BOXED 12.00 LOCATES BOTH BORE AND FLANGE-HOLE AXES" in notes
-    assert "STRAP NEAR FACE 6.00 +/-0.10 FROM DATUM D" in notes
+    assert "BOXED 6.00 LOCATES STRAP NEAR FACE FROM D" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_native_hole_callout(" in source
@@ -78,9 +79,9 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'datum="D"' in source
     assert 'characteristic="position"' in source
     assert 'characteristic="profile_surface"' in source
-    assert 'quantity="CROWN ONLY"' in source
-    assert 'quantity="2X FLANKS ONLY"' in source
-    assert 'characteristic="perpendicularity"' not in source
+    assert 'quantity="EXTERIOR PROFILE EXCEPT A + B"' in source
+    assert 'characteristic="flatness"' in source
+    assert 'characteristic="perpendicularity"' in source
     assert source.count("_add_circle_basic(") == 4  # helper plus three calls
     assert 'orientation="horizontal"' in source
     assert 'orientation="vertical"' in source
@@ -89,6 +90,9 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'label="flange-hole true position"' in source
     assert 'roughness_ra="1.6"' in source
     assert 'for name in ("Width", "FootHt"):' in source
+    assert 'label="far-face depth coordinate"' in source
+    assert 'label="strap near-face profile"' in source
+    assert 'label="coplanar far-face profile"' in source
     common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
         encoding="utf-8"
     )
