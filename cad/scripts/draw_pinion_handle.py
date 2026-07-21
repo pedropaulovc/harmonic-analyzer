@@ -60,7 +60,9 @@ SHEET_SCALE = (2.0, 1.0)
 FRONT_BBOX_CY = (ROD_UP - ROD_DOWN) / 2.0
 FRONT_CENTER = (0.072, 0.155)
 RIGHT_CENTER = (0.158, 0.155)
-TOP_CENTER = (0.270, 0.078)
+# Keep the top view above the ASME-B title block (its rod span makes the view
+# taller than its circular grip silhouette suggests).
+TOP_CENTER = (0.270, 0.120)
 ISO_CENTER = (0.320, 0.210)
 
 

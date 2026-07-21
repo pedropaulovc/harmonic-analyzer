@@ -34,6 +34,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
+    assert drawing.TOP_CENTER[1] >= 0.110
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source  # the isometric override
     assert pinion_handle_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
