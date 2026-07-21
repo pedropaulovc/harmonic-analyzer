@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the knife-mount bearing block.
 
-A cast gray-iron block (34 wide x ~43.8 tall x 14 deep) with a single Ø25.4 bore.
+A machined brass block (34 wide x ~43.8 tall x 14 deep) with a single Ø25.4 bore.
 The bore is the knife-edge bearing: the summing-lever trunnion's top vertex rides
 its upper inner wall in line contact.  Every face and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the

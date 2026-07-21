@@ -3,13 +3,14 @@ part build (``build_lever_wire.py``) and its manufacturing drawing
 (``draw_lever_wire.py``).
 
 PURE DATA, no SolidWorks/COM imports.  ``build_lever_wire`` imports this contract
-to stamp the print notes, and the magnifier assembly imports the wire's COMPUTED
-endpoints (``WIRE_START``/``WIRE_END``/``WIRE_LEN``) from ``build_lever_wire`` --
-so, unlike the four nominal-coupled magnifier parts, the wire keeps NO ``_geom``
-split (its assembly coupling is an endpoint SOLVER living in the build, not a raw
-nominal).  The only residual cost is that editing THESE print notes refreshes the
-magnifier assembly -- rare and cheap; a geom split would have to relocate the
-whole endpoint solver, which is not worth the churn.  Flagged, accepted.
+to stamp the print notes; the wire's COMPUTED endpoints/yoke
+(``WIRE_START``/``WIRE_END``/``WIRE_LEN``/``YOKE_POINT``) live in the
+drawing-free ``lever_wire_geom`` module, which the magnifier assembly and the
+magnifying wheel import DIRECTLY -- so editing THESE print notes rebuilds only
+the lever-wire part + sheet, never the wheel or the assembly.  (The wire
+originally kept no geom split; codex #360 showed the note text leaking into
+both closures through the ``build_lever_wire`` import chain, so the solver
+moved wholesale into ``lever_wire_geom``.)
 
 The wire is a Ø0.8 drawn-steel cylinder ~363 long -- a thin silhouette with no
 flat face, no end-face big enough to pick and no selectable silhouette edge, so
@@ -21,10 +22,7 @@ terminations and the hub wrap, so their development allowance is unknown.
 
 from __future__ import annotations
 
-# mirror of build_lever_wire.WIRE_DIA (the offline test asserts equality); a bare
-# constant keeps this module import-pure (no COM), while the build stays the sole
-# source of the endpoint solver + the derived cut length.
-WIRE_DIA = 0.8
+from lever_wire_geom import WIRE_DIA  # noqa: F401 (re-export, import-pure)
 
 # Note-based: the un-pickable Ø0.8 wire carries no marked model dimension, so the
 # marked set is empty and the drawing keeps nothing (the lockstep test asserts

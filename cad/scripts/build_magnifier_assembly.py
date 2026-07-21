@@ -187,7 +187,7 @@ WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
 # Endpoints + length live in build_lever_wire.py (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
 # layout move can never leave a floating wire.
-from build_lever_wire import (  # noqa: E402
+from lever_wire_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
     WIRE_DIA as HUB_WIRE_DIA,
     WIRE_END as HUB_WIRE_END,

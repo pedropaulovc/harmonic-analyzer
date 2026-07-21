@@ -40,6 +40,7 @@ from magnifying_clamp_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_WIDTH,
+    LEVER_BORE_DIA,
     LEVER_BORE_Y,
     ROD_BORE_X,
 )
@@ -215,7 +216,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + 6.2 * SHEET_SCALE[0] / 2000.0, _front_y(LEVER_BORE_Y)),
+        edge_xy=(
+            FRONT_CENTER[0] + LEVER_BORE_DIA * SHEET_SCALE[0] / 2000.0,
+            _front_y(LEVER_BORE_Y),
+        ),
         symbol_xy=(FRONT_CENTER[0] + 0.030, _front_y(LEVER_BORE_Y) + 0.008),
         roughness_ra="1.6",
         label="lever bore finish",

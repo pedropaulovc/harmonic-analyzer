@@ -60,15 +60,16 @@ def test_notes_do_not_misrepresent_the_rest_run_as_a_cut_length() -> None:
     assert "NOT A CUT LENGTH" in part_source
 
 
-def test_wire_keeps_no_geom_split_but_stays_assembly_coupled() -> None:
-    # Unlike the four nominal-coupled magnifier parts, the wire's assembly
-    # coupling is an endpoint SOLVER living in the build, so it keeps no _geom
-    # split; the assembly still imports the computed endpoints from the build.
-    assert not Path(part.__file__).with_name("lever_wire_geom.py").exists()
-    assembly = Path(part.__file__).with_name("build_magnifier_assembly.py").read_text(
-        encoding="utf-8"
-    )
-    assert "from build_lever_wire import" in assembly
+def test_wire_geom_split_keeps_notes_out_of_consumer_recipes() -> None:
+    # The endpoint/yoke solver lives in the drawing-free lever_wire_geom module
+    # (codex #360): the assembly and the wheel import the anchors from THERE --
+    # never from build_lever_wire, whose lever_wire_spec import would drag the
+    # sheet notes into their recipe closures and cache keys.
+    assert Path(part.__file__).with_name("lever_wire_geom.py").exists()
+    for consumer in ("build_magnifier_assembly.py", "build_magnifying_wheel.py"):
+        source = Path(part.__file__).with_name(consumer).read_text(encoding="utf-8")
+        assert "from lever_wire_geom import" in source
+        assert "from build_lever_wire import" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

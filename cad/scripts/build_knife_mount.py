@@ -42,7 +42,6 @@ import sys
 from _common import (
     SketchDims,
     add_line_chain,
-    apply_color,
     apply_material,
     check,
     define_circle,
@@ -52,7 +51,6 @@ from _common import (
     force_rebuild,
     name_bore_axis,
     name_last_feature,
-    PANEL_BLACK,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -228,7 +226,6 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
