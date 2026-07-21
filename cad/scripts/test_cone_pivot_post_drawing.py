@@ -53,6 +53,7 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     assert "CLOCKWISE" in notes
     assert "0.927 +/-0.05 EAST" in notes
     assert "0.206 +/-0.05 SOUTH" in notes
+    assert "EAST IS SHEET RIGHT; SOUTH IS SHEET DOWN" in notes
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")

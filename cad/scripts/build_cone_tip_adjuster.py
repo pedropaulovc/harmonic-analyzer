@@ -6,14 +6,11 @@ turning it takes up the shaft's axial end play (the 20 gears must stay
 registered against the cylinder set). The block's top slit + pinch screw
 lock the setting (see build_cone_tip_block).
 
-Body O6.2 x 14 authored along +Y from the SOUTH head face (origin):
+Body O7.9375 x 14 nominal thread-major envelope authored along +Y from the SOUTH head face (origin):
 blind bore O2 x 6 from the NORTH (far) end, driver slot across the head.
 
-The Ø6.2 threaded shank is the repo's screw-in-tap convention -- tap-drill
-6.528 (5/16-18, the mating cone-tip-block AdjusterBore) minus 0.3, matching the
-lag-screw Ø12.0-in-Ø12.304 precedent (memory/fastener-policy-us-customary).
-(Was Ø7.9 line-to-line into a plain Ø7.9 bore, before that bore became a native
-5/16-18 Hole Wizard tapped hole.)
+The physical cylinder is the 5/16 nominal major envelope; the cosmetic thread
+and UNC-2A drawing callout carry the standard thread form and limits.
 
 Run (SolidWorks already open)::
 
@@ -50,11 +47,11 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from cone_tip_adjuster_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
+from cone_tip_adjuster_spec import CHAMFER, DRAWING_DIMENSIONS, DRAWING_NOTES
 
 PART_NAME = "cone-tip-adjuster"
 SPEC = fastener(PART_NAME)
-MATERIAL = SPEC.material  # blued/black screw (t00471)
+MATERIAL = SPEC.material  # black-oxide screw (t00471)
 
 BODY_DIA = SPEC.model_diameter_mm  # 5/16-18 nominal major envelope
 BODY_LEN = SPEC.length_mm
@@ -201,6 +198,32 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven adjuster (equations neutral)", volume,
                        0.02 * v_slot)
+
+    # Break both external thread starts after the cup and driver slot exist.
+    # The slotted south rim is two disjoint arcs, so both surviving arcs must be
+    # selected; the north rim remains one complete circle.
+    radius = BODY_DIA / 2.0
+    check(
+        "chamfer both thread starts",
+        await adapter.add_chamfer(
+            CHAMFER,
+            [
+                [0.0, 0.0, radius],
+                [0.0, 0.0, -radius],
+                [0.0, BODY_LEN, radius],
+            ],
+        ),
+    )
+    name_last_feature(adapter, "ThreadStartChamfers")
+    # Full circular 45-degree chamfer removal by Pappus. The south slot already
+    # removes ~6% of that rim, so allow only that explicit overlap.
+    v_one_chamfer = math.pi * CHAMFER**2 * (radius - CHAMFER / 3.0)
+    volume = await volume_check(
+        adapter,
+        "thread-start chamfers",
+        volume - 2.0 * v_one_chamfer,
+        0.15 * v_one_chamfer,
+    )
 
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "screw axis")
     await apply_material(adapter, MATERIAL)

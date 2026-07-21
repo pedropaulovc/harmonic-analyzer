@@ -37,6 +37,9 @@ def test_thread_callout_is_the_catalog_thread() -> None:
     assert "IEntity" in part_source
     assert "import_cosmetic_threads" in drawing_source
     assert cone_tip_adjuster_spec.BODY_DIA == 7.9375
+    assert part.CHAMFER == drawing.CHAMFER == 0.4
+    assert 'name_last_feature(adapter, "ThreadStartChamfers")' in part_source
+    assert "await adapter.add_chamfer(" in part_source
 
 
 def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> None:

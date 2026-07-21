@@ -24,7 +24,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_tip_adjuster_spec import BODY_DIA, BODY_LEN, CUP_DIA, THREAD
+from cone_tip_adjuster_spec import BODY_DIA, BODY_LEN, CHAMFER, CUP_DIA, THREAD
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -176,7 +176,9 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
     thread_edge = _circular_edge(
-        front, radius_mm=BODY_DIA / 2.0, center_y_mm=BODY_LEN
+        front,
+        radius_mm=BODY_DIA / 2.0,
+        center_y_mm=BODY_LEN - CHAMFER,
     )
     add_datum_feature(
         adapter,

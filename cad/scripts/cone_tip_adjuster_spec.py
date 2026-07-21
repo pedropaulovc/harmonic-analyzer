@@ -19,6 +19,7 @@ CUP_DIA = 2.0  # blind bore the cone-shaft tip rests in (axial end-play takeup)
 CUP_DEPTH = 6.0  # from the far (north) end
 SLOT_W = 1.5  # driver slot width
 SLOT_D = 1.5  # driver slot depth
+CHAMFER = 0.4  # both thread starts, 45 degrees
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BodyProfile": {"BodyDiaDim"},
@@ -32,7 +33,7 @@ DRAWING_NOTES = "\n".join(
         f"THREAD {THREAD} UNC-2A; 11.00 MIN USABLE FULL-FORM LENGTH",
         "BETWEEN RUNOUTS. CLASS 2A LIMITS APPLY AFTER FINISH.",
         "DATUM A IS THE AXIS DERIVED FROM THE 5/16-18 PITCH CYLINDER.",
-        "CHAMFER BOTH THREAD STARTS 0.40 +/-0.10 X 45 DEG +/-1 DEG.",
+        f"CHAMFER BOTH THREAD STARTS {CHAMFER:.2f} +/-0.10 X 45 DEG +/-1 DEG.",
         "BLIND CUP DIA 2.00 +0.05/-0.00 X 6.00 +/-0.10 DEEP FROM",
         "THE END OPPOSITE THE SLOT; FLAT FLOOR, BOTTOM R0.20 MAX.",
         "CUP AXIS POSITION WITHIN DIA 0.05 OF DATUM A.",

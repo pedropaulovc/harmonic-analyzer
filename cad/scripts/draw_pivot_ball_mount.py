@@ -222,25 +222,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="stem axis",
         entity_type="SILHOUETTE",
     )
-    # Position to B controls cross-bore intersection with the pillar axis;
-    # parallelism to A controls the bore-axis attitude.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BALL_CENTER_H) + _bore_r),
-        frame_xy=(0.180, _front_y(BALL_CENTER_H) + 0.060),
-        characteristic="position",
-        tolerance="0.05",
-        datums=("B",),
-        diameter=True,
-        label="cross-bore intersection",
-        entity=bore_entity,
-    )
+    # The +/-0.05 center height controls axial location from A; the explicit
+    # note controls intersection with B. Parallelism controls bore attitude.
+    # A position FCF is deliberately not used: without a BASIC center height it
+    # would double-tolerance this location and leave its zone undefined.
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(BALL_CENTER_H) + _bore_r),  # bore top
-        frame_xy=(0.180, _front_y(BALL_CENTER_H) + 0.036),
+        frame_xy=(0.180, _front_y(BALL_CENTER_H) + 0.048),
         characteristic="parallelism",
         tolerance="0.05",
         datums=("A",),
