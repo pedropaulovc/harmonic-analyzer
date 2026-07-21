@@ -105,6 +105,10 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         "cone-gear-shaft",
         "crank-drive-gear",
     }
+    assert "RootDrawingComponent2(False)" in source
+    assert 'name.split("@", 1)[0].casefold()' in source
+    assert 'identity.startswith(f"{stem}-")' in source
+    assert "enumerated drawing components" in source
     assert "T006-T120" in drawing.ASSEMBLY_NOTES
     assert "CONE PLATFORM ENGAGED" in drawing.ASSEMBLY_NOTES
     assert all(

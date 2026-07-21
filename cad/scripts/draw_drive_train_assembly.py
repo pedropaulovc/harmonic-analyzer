@@ -135,35 +135,57 @@ BOM_ANCHOR = (0.248, 0.265)
 @_telemetry.traced("drawing.show_bottom_balloon_components")
 def _show_bottom_balloon_components(adapter: Any, view: Any) -> None:
     """Expose the enclosed component families in the auxiliary bottom view."""
-    root = adapter._attempt(lambda: view.RootDrawingComponent, default=None)
+    root = adapter._attempt(
+        lambda: view.RootDrawingComponent2(False), default=None
+    )
     if root is None:
         raise RuntimeError("drive-train bottom view has no root drawing component")
 
-    pending = list(adapter._attempt(lambda: root.GetChildren(), default=()) or ())
+    pending = list(root.GetChildren() or ())
     found: set[str] = set()
+    enumerated: list[str] = []
     while pending:
         drawing_component = pending.pop()
-        children = adapter._attempt(
-            lambda dc=drawing_component: dc.GetChildren(), default=()
-        ) or ()
+        children = drawing_component.GetChildren() or ()
         pending.extend(children)
+
+        name = str(drawing_component.Name or "")
+        enumerated.append(name)
         component = adapter._attempt(
             lambda dc=drawing_component: dc.Component, default=None
         )
-        if component is None:
-            continue
-        path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
-        stem = Path(str(path)).stem.casefold()
-        if stem not in BOTTOM_VISIBILITY_STEMS:
+        path = ""
+        if component is not None:
+            path = adapter._attempt(
+                lambda c=component: c.GetPathName(), default=""
+            ) or ""
+
+        identities = {Path(str(path)).stem.casefold()}
+        identities.add(name.split("@", 1)[0].casefold())
+        matched = {
+            stem
+            for stem in BOTTOM_VISIBILITY_STEMS
+            if any(
+                identity == stem
+                or (
+                    identity.startswith(f"{stem}-")
+                    and identity.removeprefix(f"{stem}-").isdigit()
+                )
+                for identity in identities
+            )
+        }
+        if not matched:
             continue
         drawing_component.Visible = True
-        found.add(stem)
-        _telemetry.event("drawing.component_visible", component=stem)
+        found.update(matched)
+        for stem in matched:
+            _telemetry.event("drawing.component_visible", component=stem)
 
     missing = sorted(BOTTOM_VISIBILITY_STEMS - found)
     if missing:
         raise RuntimeError(
-            f"drive-train bottom view is missing enclosed components: {missing}"
+            "drive-train bottom view is missing enclosed components: "
+            f"{missing}; enumerated drawing components: {sorted(enumerated)}"
         )
     adapter.currentModel.EditRebuild3()
 
