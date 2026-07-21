@@ -62,11 +62,11 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
     notes = pinion_bracket_spec.DRAWING_NOTES
-    assert "3.00 MIN" in notes
+    assert "3.00 MIN" not in notes
     assert "25 MM LONG GO PIN" in notes
-    assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
-    assert "8.010/8.025" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
-    assert "4.000/4.012" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
+    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
+    assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
+    assert "4.012 MAX / 4.000 MIN" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
     assert "1/4 IN" not in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "5/16" not in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
     assert drawing.DIMENSION_CALLOUTS["PinSeatCy"].count("\n") == 2

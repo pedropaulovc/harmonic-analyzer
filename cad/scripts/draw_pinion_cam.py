@@ -83,7 +83,7 @@ TOP_KEEP = {
     "BossCz": (0.150, 0.208),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "BASIC SIZE REF\nFINAL REAM LIMITS\n6.360/6.375 THRU\nRa 1.6",
+    "BoreDia": "BASIC SIZE REF\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU\nRa 1.6",
     "CollarOd": "+/-0.05",
     "CollarCy": "ECCENTRICITY +/-0.05",
     "Depth": "+/-0.05",

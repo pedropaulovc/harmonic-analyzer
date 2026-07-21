@@ -61,8 +61,8 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
-    assert "SLIDING FIT" in notes
-    assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "SLIDING FIT" not in notes
+    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -83,7 +83,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "add_datum_feature(" not in source
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
-    assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 3
     assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["CollarCy"]
 
