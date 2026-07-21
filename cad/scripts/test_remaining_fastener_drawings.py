@@ -153,3 +153,8 @@ def test_cone_pivot_does_not_hide_the_missing_threaded_tail_definition() -> None
     assert "THREADED-END LENGTH IS NOT DEFINED" in spec.DRAWING_NOTES
     assert "DO NOT RELEASE AS A MADE-PART DRAWING" in spec.DRAWING_NOTES
     assert "USE THE COMMERCIAL SHOULDER SCREW" in spec.DRAWING_NOTES
+
+
+def test_hex_bolt_long_notes_stay_below_the_side_view() -> None:
+    drawing = importlib.import_module("draw_hex_bolt")
+    assert drawing.RECIPE.note_xy == (0.020, 0.070)
