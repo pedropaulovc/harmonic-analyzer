@@ -37,7 +37,7 @@ def test_thread_callout_is_the_catalog_thread() -> None:
     assert "InsertCosmeticThread3" in part_source
     assert "IEntity" in part_source
     assert "import_cosmetic_threads" in drawing_source
-    assert "set_reference_dimensions(adapter, end_annotations" in drawing_source
+    assert "set_reference_dimensions(adapter, front_annotations" in drawing_source
     assert cone_tip_adjuster_spec.BODY_DIA == 6.2
     assert part.CHAMFER == drawing.CHAMFER == 0.4
     assert 'name_last_feature(adapter, "ThreadStartChamfers")' in part_source
@@ -74,7 +74,7 @@ def test_thread_axis_datum_and_slot_position_are_native_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'label="thread pitch-cylinder axis"' in source
     assert 'entity_type="DIMENSION"' in source
-    assert 'edge_xy=END_KEEP["BodyDiaDim"]' in source
+    assert 'edge_xy=FRONT_KEEP["BodyDiaDim"]' in source
     assert 'label="driver-slot median-plane position"' in source
     assert 'quantity="SLOT MEDIAN PLANE"' in source
     assert 'characteristic="position"' in source

@@ -26,9 +26,8 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_adjuster_spec import (
-    BODY_DIA,
     BODY_LEN,
-    CHAMFER,
+    CHAMFER as CHAMFER,
     CUP_DIA,
     SLOT_W,
     THREAD,
@@ -63,9 +62,9 @@ ISO_CENTER = (0.300, 0.160)
 
 FRONT_KEEP = {
     "BodyLenDim": (FRONT_CENTER[0] - 0.045, FRONT_CENTER[1]),
+    "BodyDiaDim": (FRONT_CENTER[0] + 0.060, FRONT_CENTER[1] + 0.010),
 }
 END_KEEP = {
-    "BodyDiaDim": (END_CENTER[0] + 0.055, END_CENTER[1] + 0.015),
     "SlotWDim": (END_CENTER[0] + 0.055, END_CENTER[1] - 0.015),
 }
 CUP_KEEP = {
@@ -179,7 +178,7 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *end_annotations, *cup_annotations],
         DIMENSION_CALLOUTS,
     )
-    set_reference_dimensions(adapter, end_annotations, ("BodyDiaDim",))
+    set_reference_dimensions(adapter, front_annotations, ("BodyDiaDim",))
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the head end view")
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
@@ -191,9 +190,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # dimension unambiguously establishes the pitch-cylinder datum axis.
     add_datum_feature(
         adapter,
-        end,
-        edge_xy=END_KEEP["BodyDiaDim"],
-        symbol_xy=(0.175, 0.116),
+        front,
+        edge_xy=FRONT_KEEP["BodyDiaDim"],
+        symbol_xy=(0.205, FRONT_CENTER[1] + 0.010),
         datum="A",
         label="thread pitch-cylinder axis",
         entity_type="DIMENSION",
