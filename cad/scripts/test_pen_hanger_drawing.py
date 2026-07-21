@@ -31,7 +31,9 @@ def test_notes_describe_the_strap_channel_and_screw() -> None:
     assert "WALL-THICKNESS DIFFERENCE 0.10 MAX" in notes
     assert "HOLE CENTER 4.00 +/-0.05 FROM FRONT DEPTH FACE" in notes
     assert "AWS A5.8 BAg-7" in notes
-    assert "COPLANAR BACK SEAM" in notes
+    assert "FLUSH WITH BLOCK BACK DEPTH FACE WITHIN 0.10" in notes
+    assert "FULL 3.00 JOINT PENETRATION" in notes
+    assert "CUMULATIVE VOID LENGTH 0.50 MAX" in notes
     assert "HORIZONTALLY RIGHT OF FRONT-VIEW TOP-LEFT CORNER" in notes
     assert "#6-32" in notes
     assert "AISI" not in notes
