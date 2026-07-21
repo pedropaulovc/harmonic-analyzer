@@ -68,7 +68,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from lever_wire_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
+from lever_wire_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FRONT_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "lever-wire"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -249,13 +254,15 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     notes = (
         DRAWING_NOTES
-        + f"\nSTRAIGHT REST-RUN LENGTH {WIRE_LEN:.1f}; NOT A CUT LENGTH."
+        + f"\nSTRAIGHT REST-RUN LENGTH {WIRE_LEN:.1f} END FACE TO END FACE;"
+        + " NOT A CUT LENGTH."
     )
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
             "Manufacturing Notes": notes,
+            "Front View Note": FRONT_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

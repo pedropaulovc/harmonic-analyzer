@@ -74,6 +74,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Front View Note",
             "Isometric View Note",
         ),
         required=(
@@ -82,6 +83,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Front View Note",
             "Isometric View Note",
         ),
     )
@@ -108,6 +110,7 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Front View Note", 0.100, 0.100)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.100)
 
     return await finalize_drawing(

@@ -72,11 +72,11 @@ FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
     "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
-    "BoreCz": (FRONT_CENTER[0] + 0.050, _front_y(BORE_CY / 2.0)),
+    "BoreCz": (FRONT_CENTER[0] + 0.058, _front_y(BORE_CY / 2.0) + 0.006),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU - KNIFE-EDGE BEARING",
+    "BoreDia": "THRU",
 }
 
 RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -128,9 +128,12 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (right, top, iso):
-        set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, front)
+    # The bore only reads in the front view; show it dashed in the projected
+    # right/top views so the orthographic set carries the thru-hole the
+    # isometric implies (blind-review finding: HLR left them empty rectangles).
+    set_hidden_lines_removed(adapter, iso)
+    for view in (front, right, top):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -175,7 +178,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] + R_BORE * SHEET_SCALE[0] / 1000.0, _front_y(BORE_CY)),
-        symbol_xy=(FRONT_CENTER[0] + 0.036, _front_y(BORE_CY) - 0.008),
+        symbol_xy=(FRONT_CENTER[0] + 0.052, _front_y(BORE_CY) - 0.020),
         roughness_ra="0.8",
         label="knife bore finish",
     )
