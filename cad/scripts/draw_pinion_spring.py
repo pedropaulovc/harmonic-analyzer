@@ -22,10 +22,8 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -36,7 +34,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_spring_spec import WIDTH
 from build_pinion_spring import (
     BEND_EXIT,
     FLAT_TIP,
@@ -88,15 +85,11 @@ def _front_y(model_y_mm: float) -> float:
 
 
 _FOOT_MID_X = (FOOT_END[0] + FOOT_TAN[0]) / 2.0
-_BLADE_MID = (
-    (BEND_EXIT[0] + KINK_START[0]) / 2.0,
-    (BEND_EXIT[1] + KINK_START[1]) / 2.0,
-)
 FRONT_KEEP = {
     "FootLen": (_front_x(_FOOT_MID_X), 0.088),
     "BendR": (0.036, 0.120),
-    "KinkR": (0.120, 0.255),
-    "FlatLen": (0.205, 0.240),
+    "KinkR": (0.135, 0.220),
+    "FlatLen": (0.185, 0.205),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {
@@ -165,65 +158,20 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
 
-    # Datum A is the broad foot face visible in the removed top view. Datum B
-    # is one designated long edge, giving the formed-profile angles and hole
-    # offset a unique, inspectable direction/reference instead of the former
-    # prose-only "foot axis" / "either long edge" wording.
-    top_face = TOP_CENTER
-    top_long_edge = (
-        TOP_CENTER[0],
-        TOP_CENTER[1] + WIDTH * SHEET_SCALE[0] / 2000.0,
-    )
-    # The thin-feature centreline is a real projected model edge in the front
-    # view.  SOLIDWORKS does not expose the ribbon interior as a selectable
-    # drawing FACE, so attach the broad-face controls to this boundary edge and
-    # name the controlled surface explicitly in the FCF quantity compartment.
-    blade_face_edge = (_front_x(_BLADE_MID[0]), _front_y(_BLADE_MID[1]))
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=top_face,
-        symbol_xy=(0.250, 0.118),
-        datum="A",
-        label="spring broad foot face",
-        entity_type="FACE",
-    )
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=top_long_edge,
-        symbol_xy=(0.350, 0.118),
-        datum="B",
-        label="spring designated long edge",
-    )
+    # Pick the rectangular screw-down foot face away from its hole so the
+    # leader cannot attach to the cylindrical hole wall. Flatness needs no
+    # datum reference and remains valid after the in-plane forming bends.
+    top_face = (TOP_CENTER[0] + 0.020, TOP_CENTER[1])
     add_feature_control_frame(
         adapter,
         top,
         edge_xy=top_face,
-        frame_xy=(0.350, 0.092),
+        frame_xy=(0.350, 0.118),
         characteristic="flatness",
         tolerance="0.10",
-        label="spring datum-A face flatness",
+        quantity="SCREW-DOWN FOOT BROAD FACE",
+        label="spring screw-down foot flatness",
         entity_type="FACE",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=blade_face_edge,
-        frame_xy=(0.260, 0.150),
-        characteristic="parallelism",
-        tolerance="0.20",
-        datums=("A",),
-        quantity="BLADE-SIDE BROAD FACE",
-        label="spring formed broad-face coplanarity",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=blade_face_edge,
-        symbol_xy=(0.205, 0.123),
-        roughness_ra="0.8",
-        label="spring concave blade broad face",
     )
     if add_note(adapter, "TOP VIEW SCALE 2:1", 0.270, 0.078) is None:
         raise RuntimeError("failed to label spring top view")

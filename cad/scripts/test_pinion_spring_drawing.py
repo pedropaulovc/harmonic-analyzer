@@ -55,7 +55,7 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_spring_spec.DRAWING_NOTES
     assert "TANGENT LENGTH 39.64" in notes
-    assert "DATUM EDGE B" in notes
+    assert "STRIP MID-THICKNESS PATH" in notes
     assert "FROM EITHER" not in notes
     assert "97.62+/-1.00 DEG" in notes
     assert "LINEAR +/-" not in notes
@@ -67,16 +67,16 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 
 def test_feature_requirements_use_inspectable_datum_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 2
+    assert "add_datum_feature(" not in source
+    assert source.count("add_feature_control_frame(") == 1
     assert "characteristic=\"flatness\"" in source
-    assert "characteristic=\"parallelism\"" in source
-    assert "add_surface_finish(" in source
-    assert source.count('entity_type="FACE"') == 2
+    assert "parallelism" not in source
+    assert "add_surface_finish(" not in source
+    assert source.count('entity_type="FACE"') == 1
     assert "TOP VIEW SCALE 2:1" in source
     assert "THRU" in pinion_spring_spec.DRAWING_NOTES
     assert "NO TWIST" not in pinion_spring_spec.DRAWING_NOTES
-    assert 'quantity="BLADE-SIDE BROAD FACE"' in source
+    assert 'quantity="SCREW-DOWN FOOT BROAD FACE"' in source
     assert abs(spring._BLADE_LEN - pinion_spring_spec.BLADE_STRAIGHT_LEN) < 1e-9
     assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["BendR"]
     assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["KinkR"]
