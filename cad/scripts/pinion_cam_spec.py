@@ -11,13 +11,15 @@ in lockstep (``test_pinion_cam_drawing.py``).
 
 from __future__ import annotations
 
-CAM_OD = 9.2  # collar OD
-CAM_LEN = 9.0  # collar length along the rod
-ECC = 1.0  # bore offset from the collar OD axis -> 2.0 full lift
-BORE = 6.35  # rides the Ø6.35 lift rod
-BOSS_DIA = 3.2  # set-pin dome, proud of the OD on the heavy (thick) side
-BOSS_PROUD = 0.5  # boss height proud of the OD
-BOSS_Z = 1.7  # boss axis station from the front face
+from pinion_cam_geometry import (
+    BORE as BORE,
+    BOSS_DIA as BOSS_DIA,
+    BOSS_PROUD as BOSS_PROUD,
+    BOSS_Z as BOSS_Z,
+    CAM_LEN as CAM_LEN,
+    CAM_OD as CAM_OD,
+    ECC as ECC,
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},

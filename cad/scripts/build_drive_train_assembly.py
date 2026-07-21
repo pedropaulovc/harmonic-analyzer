@@ -589,7 +589,7 @@ from build_pinion_pivot_block import (  # noqa: E402
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
     SCREW_HOLE_DIA as BLOCK_SCREW_HOLE_DIA,
 )
-from build_pinion_cam import (  # noqa: E402
+from pinion_cam_geometry import (  # noqa: E402
     BORE as CAM_BORE_DIA,
     BOSS_DIA as CAM_BOSS_DIA,
     BOSS_PROUD as CAM_BOSS_PROUD,

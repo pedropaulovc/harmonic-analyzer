@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pinion_cam_geometry
 import pinion_cam_spec
 import draw_pinion_cam as drawing
 import build_pinion_cam as cam
+from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -28,6 +30,15 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         pinion_cam_spec.BORE,
         pinion_cam_spec.ECC,
     )
+    assert pinion_cam_spec.ECC == pinion_cam_geometry.ECC
+
+
+def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
+    drive_train = Path(__file__).with_name("build_drive_train_assembly.py")
+    dependency_names = {Path(path).name for path in module_deps_of(drive_train)}
+    assert "pinion_cam_geometry.py" in dependency_names
+    assert "build_pinion_cam.py" not in dependency_names
+    assert "pinion_cam_spec.py" not in dependency_names
 
 
 def test_eccentricity_is_dimensioned_and_called_out() -> None:

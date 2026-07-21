@@ -55,16 +55,18 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
-from pinion_cam_spec import (
+from pinion_cam_geometry import (
     BORE,
     BOSS_DIA,
     BOSS_PROUD,
     BOSS_Z,
     CAM_LEN,
     CAM_OD,
+    ECC,
+)
+from pinion_cam_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    ECC,
     ISOMETRIC_VIEW_NOTE,
 )
 
