@@ -202,6 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A", "B"),
         diameter=True,
         label="cam boss axis position",
+        entity_type="SILHOUETTE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
