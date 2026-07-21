@@ -1,5 +1,8 @@
 chain-sprocket:
   number: MHA-008
   material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finished steel
+  finish: machined, deburred, oiled
+  quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"

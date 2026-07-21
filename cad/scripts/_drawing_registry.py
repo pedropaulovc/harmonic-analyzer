@@ -351,6 +351,54 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="cylinder-gear",
         script_name="draw_cylinder_gear.py",
     ),
+    DrawingSpec(
+        name="cone_gear",
+        part="cone_gear",
+        artifact_stem="cone-gear",
+        script_name="draw_cone_gear.py",
+    ),
+    DrawingSpec(
+        name="crank_drive_gear",
+        part="crank_drive_gear",
+        artifact_stem="crank-drive-gear",
+        script_name="draw_crank_drive_gear.py",
+    ),
+    DrawingSpec(
+        name="crank_pinion",
+        part="crank_pinion",
+        artifact_stem="crank-pinion",
+        script_name="draw_crank_pinion.py",
+    ),
+    DrawingSpec(
+        name="alignment_pinion",
+        part="alignment_pinion",
+        artifact_stem="alignment-pinion",
+        script_name="draw_alignment_pinion.py",
+    ),
+    DrawingSpec(
+        name="rack_pinion",
+        part="rack_pinion",
+        artifact_stem="rack-pinion",
+        script_name="draw_rack_pinion.py",
+    ),
+    DrawingSpec(
+        name="transgear_feed_pinion",
+        part="transgear_feed_pinion",
+        artifact_stem="transgear-feed-pinion",
+        script_name="draw_transgear_feed_pinion.py",
+    ),
+    DrawingSpec(
+        name="transgear_pinion",
+        part="transgear_pinion",
+        artifact_stem="transgear-pinion",
+        script_name="draw_transgear_pinion.py",
+    ),
+    DrawingSpec(
+        name="chain_sprocket",
+        part="chain_sprocket",
+        artifact_stem="chain-sprocket",
+        script_name="draw_chain_sprocket.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

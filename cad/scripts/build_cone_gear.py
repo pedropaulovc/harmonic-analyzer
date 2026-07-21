@@ -72,6 +72,12 @@ import sys
 from typing import Any
 
 import _config
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from cone_gear_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, GEAR_DATA
 from _common import (
     OUT_PNG,
     SketchDims,
@@ -802,6 +808,18 @@ async def build(adapter) -> dict[str, str]:
 
     check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
     await report_mass_properties(adapter)
+
+    # Mark the bore as the single manufacturing model dimension (on the drawn
+    # T120 config) and stamp the title-block + gear-data properties the curated
+    # drawing reads.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+    )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
 
     if findings:

@@ -1,6 +1,9 @@
 crank-pinion:
   number: MHA-025
   material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finished steel
+  finish: gear teeth cut, deburred, oiled
+  quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
   process: "gear cutting (hob/shaper)"
