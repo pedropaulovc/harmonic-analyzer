@@ -53,7 +53,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("output-fixture")
-    assert config["material"] == "CDA 360 free-cutting brass"
+    assert config["material"] == "C36000 free-cutting brass"
     assert config["material"] == config["material_specification"]
     assert "brass" in str(config["material_specification"]).lower()
     assert config["finish"]

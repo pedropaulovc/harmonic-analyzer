@@ -1,7 +1,7 @@
 measuring-stick:
   number: MHA-046
-  material: CDA 260 cartridge brass, half-hard
-  material_specification: CDA 260 cartridge brass, half-hard
+  material: C26000 brass, half-hard
+  material_specification: C26000 brass, half-hard
   finish: polished; graduations engraved and black-filled
   quantity: 1
   tolerance_class: plate_profile

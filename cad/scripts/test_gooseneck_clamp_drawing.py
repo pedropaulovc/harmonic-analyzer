@@ -52,7 +52,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("gooseneck-clamp")
-    assert config["material"] == "ASTM A48 Class 30 gray cast iron"
+    assert config["material"] == "ASTM A48 Class 30 gray iron"
     assert config["material"] == config["material_specification"]
     assert "iron" in str(config["material_specification"]).lower()
     assert config["finish"]

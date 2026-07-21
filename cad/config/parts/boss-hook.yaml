@@ -1,7 +1,7 @@
 boss-hook:
   number: MHA-005
-  material: AISI 1018 cold-drawn low-carbon steel wire
-  material_specification: "AISI 1018 cold-drawn low-carbon steel wire"
+  material: AISI 1018 cold-drawn wire
+  material_specification: "AISI 1018 cold-drawn wire"
   finish: "black oxide"
   quantity: 1
   tolerance_class: machined_block

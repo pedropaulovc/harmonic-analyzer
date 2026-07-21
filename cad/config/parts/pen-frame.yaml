@@ -1,8 +1,8 @@
 pen-frame:
   number: MHA-048
-  material: CDA 360 free-machining brass
+  material: C36000 free-machining brass
   tolerance_class: machined_block
   process: "machined (brass)"
-  material_specification: "CDA 360 free-machining brass"
+  material_specification: "C36000 free-machining brass"
   finish: "deburred; draw-filed; light satin"
   quantity: 1

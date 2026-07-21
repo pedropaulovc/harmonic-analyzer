@@ -49,7 +49,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("gooseneck")
-    assert config["material"] == "Chrome-plated AISI 1010 steel tube"
+    assert config["material"] == "Chrome-plated AISI 1010 tube"
     assert config["material"] == config["material_specification"]
     assert "chrome" in str(config["material_specification"]).lower()
     assert config["finish"]

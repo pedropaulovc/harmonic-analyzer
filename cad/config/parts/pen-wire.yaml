@@ -1,7 +1,7 @@
 pen-wire:
   number: MHA-100
-  material: ASTM A228 music-wire spring steel
-  material_specification: ASTM A228 music-wire spring steel
+  material: ASTM A228 music wire
+  material_specification: ASTM A228 music wire
   finish: bright drawn; lightly oiled
   quantity: 1
   tolerance_class: machined_block

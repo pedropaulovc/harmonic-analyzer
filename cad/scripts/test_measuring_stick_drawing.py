@@ -53,7 +53,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("measuring-stick")
-    assert config["material"] == "CDA 260 cartridge brass, half-hard"
+    assert config["material"] == "C26000 brass, half-hard"
     assert config["material"] == config["material_specification"]
     assert "brass" in str(config["material_specification"]).lower()
     assert config["finish"]

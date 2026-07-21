@@ -1,8 +1,8 @@
 gooseneck-clamp:
   number: MHA-033
-  material: ASTM A48 Class 30 gray cast iron
+  material: ASTM A48 Class 30 gray iron
   tolerance_class: machined_block
   process: "cast + machined"
-  material_specification: "ASTM A48 Class 30 gray cast iron"
+  material_specification: "ASTM A48 Class 30 gray iron"
   finish: "green enamel; bore reamed, mating faces machined"
   quantity: 1

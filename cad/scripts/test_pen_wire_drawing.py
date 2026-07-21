@@ -48,7 +48,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("pen-wire")
-    assert config["material"] == "ASTM A228 music-wire spring steel"
+    assert config["material"] == "ASTM A228 music wire"
     assert config["material"] == config["material_specification"]
     assert "wire" in str(config["material_specification"]).lower()
     assert config["finish"]
