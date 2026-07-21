@@ -1053,6 +1053,12 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "build_platen_guide.py",
         "test_pen_summing_drawing_batch_contract.py",
     } <= deps
+    pytest_command = recipe["actions"][0][1][0]
+    assert {
+        "test_drawing_marks.py",
+        "test_cone_drawing_batch_contract.py",
+        "test_fastener_catalog.py",
+    } <= {Path(argument).name for argument in pytest_command}
 
     command = recipe["actions"][0][1][0]
     assert any(
