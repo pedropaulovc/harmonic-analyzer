@@ -74,7 +74,7 @@ TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "+/-0.010 THRU",
+    "BoreDia": "+0.055/+0.025 THRU",
     "BoreHeight": "+/-0.05",
     "DomeDia": "+/-0.10",
 }

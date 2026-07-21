@@ -44,7 +44,8 @@ def test_thread_callout_is_the_catalog_thread() -> None:
 
 def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> None:
     notes = cone_tip_adjuster_spec.DRAWING_NOTES
-    assert "5/16-18" in notes
+    assert "5/16-18" not in notes
+    assert "11.00 MIN USABLE FULL-FORM THREAD" in notes
     assert "CUP" in notes  # the shaft-tip seating cup
     assert "SLOT" in notes  # the driver slot
     assert "MATERIAL" not in notes
@@ -73,4 +74,5 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "12L14" in str(config["material_specification"])
     assert "12L14" in str(config["material"])
     assert config["finish"]
+    assert "fit_class" not in config
     assert int(config["quantity"]) == 1

@@ -56,6 +56,7 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     assert "EAST IS SHEET RIGHT; SOUTH IS SHEET DOWN" in notes
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
+    assert "MACHINE FROM CONTINUOUS-CAST ROUND STOCK" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 

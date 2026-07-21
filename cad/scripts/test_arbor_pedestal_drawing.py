@@ -30,16 +30,27 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     }
 
 
-def test_arbor_bore_is_a_clamp_fit_at_matching_precision() -> None:
+def test_arbor_bore_closes_the_configured_running_fit() -> None:
+    import _config
+
     assert round(arbor_pedestal_spec.BORE_DIA, 3) == 9.525
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "+/-0.010 THRU"
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "+0.055/+0.025 THRU"
     assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
-    assert "9.525" not in arbor_pedestal_spec.DRAWING_NOTES
+    assert "ARBOR BORE LIMITS" not in arbor_pedestal_spec.DRAWING_NOTES
+    shaft_limits = (9.505, 9.525)
+    bore_limits = (9.550, 9.580)
+    clearances = (
+        bore_limits[0] - shaft_limits[1],
+        bore_limits[1] - shaft_limits[0],
+    )
+    expected = tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
+    assert tuple(round(value, 3) for value in clearances) == expected
 
 
 def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "ARBOR BORE" in notes
+    assert "MATING ARBOR LIMITS DIA 9.505-9.525" in notes
     assert "#4" in notes  # the flange hold-down clearance hole
     assert "DIA 3.264 +0.10/-0.00" in notes
     assert "STRAP 10.00 +/-0.10 THICK" in notes
@@ -48,6 +59,7 @@ def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
     assert "DATUM A" in notes
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
+    assert "MACHINE FROM CONTINUOUS-CAST STOCK" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
@@ -57,6 +69,9 @@ def test_datum_and_parallelism_frame_are_present() -> None:
     assert 'datum="A"' in source
     assert 'characteristic="parallelism"' in source
     assert 'roughness_ra="1.6"' in source
+    notes = arbor_pedestal_spec.DRAWING_NOTES
+    assert "CYLINDRICAL ZONE" not in notes
+    assert "FINISH RA" not in notes
 
 
 def test_view_scales_are_explicit() -> None:

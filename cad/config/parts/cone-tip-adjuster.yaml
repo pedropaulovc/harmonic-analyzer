@@ -5,5 +5,4 @@ cone-tip-adjuster:
   finish: black oxide
   quantity: 1
   tolerance_class: machined_block
-  fit_class: fastener_clearance
   process: "machined (steel), black oxide"
