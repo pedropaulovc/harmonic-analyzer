@@ -309,12 +309,6 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    if removed_tap_notes != 3:
-        raise RuntimeError(
-            "harmonic-base expected three redundant automatic tapped-hole "
-            f"notes, removed {removed_tap_notes}"
-        )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
@@ -337,6 +331,12 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=True,
         label="harmonic-base mounting",
     )
+    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
+    if removed_tap_notes != 3:
+        raise RuntimeError(
+            "harmonic-base expected three redundant automatic tapped-hole "
+            f"notes, removed {removed_tap_notes}"
+        )
 
     add_datum_feature(
         adapter,
