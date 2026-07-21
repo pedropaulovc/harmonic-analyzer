@@ -78,10 +78,10 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "2.00 MIN FULL THREAD" in notes
 
 
-def test_direct_limits_replace_ambiguous_gdt() -> None:
+def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_feature_control_frame(") == 2
     assert "add_surface_finish(" not in source
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 3

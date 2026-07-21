@@ -130,6 +130,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArborBore", f"{ARBOR_BORE}mm")
     await set_global(adapter, "PinBore", f"{PIN_BORE}mm")
     await set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
+    await set_global(adapter, "PinSeatDepth", f"{PIN_SEAT}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -288,6 +289,8 @@ async def build(adapter) -> dict[str, str]:
         f"{removed:.1f} mm^3 (analytic {v_bore:.1f}), COM x {com_x:+.3f}"
     )
     name_last_feature(adapter, "PinSeat")
+    seat_depth_dim = name_dimensions(adapter, "PinSeat", ["Depth"])
+    drive_jobs += [(seat_depth_dim[0], '"PinSeatDepth"')]
     expected -= v_bore
     await volume_check(adapter, "strap with pin seat", expected, 0.005 * expected)
 

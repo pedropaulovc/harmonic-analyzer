@@ -102,17 +102,19 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (0.200, 0.082),
     "PinSeatDia": (0.262, 0.128),
+    "PinSeatDepth": (0.285, 0.105),
     # Locates the pin seat through the thickness (mid-plane) in the section view.
     "PinSeatCz": (0.225, 0.180),
 }
 DIMENSION_CALLOUTS = {
     "ArborBoreCz": "+/-0.10",
-    "PivotBoreDia": "BASIC SIZE REF\nTHRU - REAM\n6.375 MAX / 6.360 MIN\nRa 1.6",
-    "ArborBoreDia": "BASIC SIZE REF\nTHRU - REAM\n8.025 MAX / 8.010 MIN\nRa 1.6",
+    "PivotBoreDia": "PIVOT BORE; NOMINAL REF\nTHRU - REAM\n6.375 MAX / 6.360 MIN\nRa 1.6",
+    "ArborBoreDia": "ARBOR BORE; NOMINAL REF\nTHRU - REAM\n8.025 MAX / 8.010 MIN\nRa 1.6",
     "PinSeatCy": "PIN-SEAT AXIS\n+/-0.05 BELOW\nPIVOT-BORE AXIS",
-    "Depth": "ONE STRAP THICKNESS",
-    "PinSeatDia": "BASIC SIZE REF\nH7: 4.012 MAX / 4.000 MIN\n3.00 MIN FULL-DIA DEEP\nDRILL FROM LEFT EDGE",
-    "PinSeatCz": "+/-0.05 FROM BROAD FACE",
+    "Depth": "+/-0.05 ONE STRAP THICKNESS",
+    "PinSeatDia": "NOMINAL REF\nH7: 4.012 MAX / 4.000 MIN\nBLIND; FLAT BOTTOM",
+    "PinSeatDepth": "+0.10/-0.00 TOTAL DEPTH\nDRILL FROM LEFT EDGE SHOWN",
+    "PinSeatCz": "+/-0.05 FROM EITHER BROAD FACE",
 }
 
 

@@ -50,6 +50,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # PinSeatCz locates the blind pin seat THROUGH the 5 mm thickness (mid-
     # thickness), so the seat is fully located, not just drawn centred.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
+    "PinSeat": {"PinSeatDepth"},
 }
 
 # True free-text instructions only. Geometry, datum structure, form/orientation
@@ -58,13 +59,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # $PRPSHEET links, so the print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "ONE STRAP SHOWN. EACH R9.00 OUTER ARC SHALL RUN WITHIN 0.05 TIR",
-        "  TO A CLOSE-FIT GAGE PIN IN ITS CORRESPONDING BORE; SIDES TANGENT TO ARCS.",
-        "PIN-SEAT BOTTOM PLANE 5.00+/-0.05 LEFT OF PIVOT-BORE AXIS.",
-        "  FLAT-BOTTOM OR RELIEVE DRILL POINT.",
-        "MAKE TWO CLAMPED FACE-TO-FACE AND REAM BOTH SETS OF BORES IN ONE SETUP.",
-        "  A SINGLE 25 MM LONG GO PIN SHALL PASS THROUGH BOTH STRAPS AT EACH BORE",
-        "  WITHOUT FORCE. STAMP MATCHING LETTER A ON OUTER FACE AT PIVOT END.",
+        "EACH R9.00 OUTER ARC CONCENTRIC WITH ITS ASSOCIATED FINAL REAMED",
+        "  BORE WITHIN 0.05 TIR; STRAIGHT SIDES TANGENT TO ARCS.",
+        "MACHINE TWO PARTS CLAMPED FACE-TO-FACE IN ONE SETUP; REAM BOTH",
+        "  PIVOT BORES TOGETHER AND BOTH ARBOR BORES TOGETHER.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

@@ -63,7 +63,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
     notes = pinion_bracket_spec.DRAWING_NOTES
     assert "3.00 MIN" not in notes
-    assert "25 MM LONG GO PIN" in notes
+    assert "GO PIN" not in notes
+    assert "CLAMPED FACE-TO-FACE" in notes
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
     assert "4.012 MAX / 4.000 MIN" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
@@ -88,7 +89,8 @@ def test_hole_states_are_annotated() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert "THRU - REAM" in callouts["PivotBoreDia"]
     assert "THRU" in callouts["ArborBoreDia"]
-    assert "DEEP" in callouts["PinSeatDia"]
+    assert "FLAT BOTTOM" in callouts["PinSeatDia"]
+    assert "TOTAL DEPTH" in callouts["PinSeatDepth"]
 
 
 def test_direct_limits_replace_ambiguous_datum_scheme() -> None:

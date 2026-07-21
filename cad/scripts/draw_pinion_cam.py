@@ -21,6 +21,8 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -32,7 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_cam_spec import BORE, CAM_OD, ECC
+from pinion_cam_spec import BORE, BOSS_DIA, BOSS_Z, CAM_LEN, CAM_OD, ECC
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -83,7 +85,7 @@ TOP_KEEP = {
     "BossCz": (0.150, 0.208),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "BASIC SIZE REF\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU\nRa 1.6",
+    "BoreDia": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU\nRa 1.6",
     "CollarOd": "+/-0.05",
     "CollarCy": "ECCENTRICITY +/-0.05",
     "Depth": "+/-0.05",
@@ -150,6 +152,56 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
+
+    bore_center = (FRONT_CENTER[0], _front_y(0.0))
+    bore_top = (bore_center[0], bore_center[1] + BORE_R_SHEET)
+    front_face_x = TOP_CENTER[0] - CAM_LEN * SHEET_SCALE[0] / 2000.0
+    front_face = (front_face_x, TOP_CENTER[1])
+    boss_center_x = front_face_x + BOSS_Z * SHEET_SCALE[0] / 1000.0
+    boss_top = (
+        boss_center_x,
+        TOP_CENTER[1] + BOSS_DIA * SHEET_SCALE[0] / 2000.0,
+    )
+    od_center = (FRONT_CENTER[0], _front_y(-ECC))
+    od_right = (od_center[0] + CAM_R_SHEET, od_center[1])
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=front_face,
+        symbol_xy=(front_face_x - 0.018, TOP_CENTER[1] + 0.018),
+        datum="A",
+        label="cam front end face",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=bore_top,
+        symbol_xy=(bore_center[0], bore_center[1] + 0.038),
+        datum="B",
+        label="cam final bore axis",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=od_right,
+        frame_xy=(0.160, 0.118),
+        characteristic="parallelism",
+        tolerance="0.03",
+        datums=("B",),
+        diameter=True,
+        label="cam OD axis parallelism",
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=boss_top,
+        frame_xy=(0.190, 0.255),
+        characteristic="position",
+        tolerance="0.05",
+        datums=("A", "B"),
+        diameter=True,
+        label="cam boss axis position",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.205, 0.150)
