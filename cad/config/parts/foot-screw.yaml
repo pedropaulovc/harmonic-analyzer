@@ -1,5 +1,9 @@
 foot-screw:
   number: MHA-103
   material: Plain Carbon Steel
+  material_specification: AISI 12L14 free-machining steel bar
+  finish: machined, black oxide all over
+  quantity: 2
   tolerance_class: machined_block
+  fit_class: fastener_clearance
   process: "machined (steel, black finish)"
