@@ -1717,6 +1717,9 @@ def task_check():
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
+        # Cross-sheet ownership checks whose filename intentionally does not match
+        # the one-file-per-drawing discovery pattern above.
+        SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
     ]
     recipe_test_deps = sorted({
         *(str(path.resolve()) for path in recipe_tests),
