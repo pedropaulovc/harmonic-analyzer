@@ -1,5 +1,8 @@
 tube-frame:
   number: MHA-083
   material: Plain Carbon Steel
+  material_specification: standard 1 in OD x 0.12 in wall steel tube (DOM/CDS)
+  finish: polished OD, oiled
+  quantity: 4
   tolerance_class: plate_profile
   process: "machined (steel)"

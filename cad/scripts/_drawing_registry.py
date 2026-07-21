@@ -411,6 +411,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="top-frame",
         script_name="draw_top_frame.py",
     ),
+    DrawingSpec(
+        name="tube_frame",
+        part="tube_frame",
+        artifact_stem="tube-frame",
+        script_name="draw_tube_frame.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

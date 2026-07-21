@@ -45,7 +45,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     apply_material,
     apply_color,
@@ -56,6 +55,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -64,15 +64,29 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from tube_frame_spec import (
+    COLUMN_LENGTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    INNER_DIA,
+    LENGTH_VIEW_NOTE,
+    OUTER_DIA,
+    WALL_THICKNESS,
+)
 
 PART_NAME = "tube-frame"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-OUTER_DIA = 1.0 * IN  # Ø25.4: rederived from the ch30 8-views (Ø23.8±1.0 -> 1in stock)
-WALL_THICKNESS = 0.12 * IN  # legacy: 3.048 wall -> Ø19.304 bore
-COLUMN_LENGTH = 989.9  # top flush with the top-frame top face (see docstring)
-
-INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS
+# Tube nominals (OUTER_DIA / WALL_THICKNESS / INNER_DIA / COLUMN_LENGTH) live in
+# tube_frame_spec -- the COM-free contract the drawing shares. Ø25.4 OD rederived
+# from the ch30 8-views (Ø23.8±1.0 -> 1 in stock); 0.12 in wall -> Ø19.304 bore;
+# length photo-locked to the top-frame stack (see build docstring).
 
 
 async def build(adapter) -> dict[str, str]:
@@ -118,6 +132,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=COLUMN_LENGTH)),
     )
     name_last_feature(adapter, "Column")
+    depth_dim = name_dimensions(adapter, "Column", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"ColumnLength"')]
     v_annulus = (
         math.pi * ((OUTER_DIA / 2.0) ** 2 - (INNER_DIA / 2.0) ** 2) * COLUMN_LENGTH
     )
@@ -157,6 +173,18 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+            "Length View Note": LENGTH_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
