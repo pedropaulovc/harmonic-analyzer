@@ -26,11 +26,14 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -41,7 +44,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
-from tube_frame_spec import OUTER_DIA
+from tube_frame_spec import COLUMN_LENGTH, OUTER_DIA
 
 
 SPEC = DRAWINGS_BY_NAME["tube_frame"]
@@ -71,10 +74,6 @@ END_KEEP = {
     "OuterDia": (
         END_CENTER[0] - OUTER_DIA * END_VIEW_SCALE / 1000.0 - 0.024,
         END_CENTER[1] + 0.010,
-    ),
-    "BoreDia": (
-        END_CENTER[0] + OUTER_DIA * END_VIEW_SCALE / 1000.0 + 0.020,
-        END_CENTER[1] - 0.010,
     ),
 }
 LENGTH_KEEP = {
@@ -133,12 +132,54 @@ async def build(adapter: Any) -> dict[str, str]:
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"
     )
-    curate_view_dimensions(adapter, length, keep=LENGTH_KEEP, view_label="length")
-    # Both annulus diameters are exact 1 in / bore conversions; keep two decimals
-    # for the bore (Ø19.30) and one for the OD (Ø25.4 is a round stock size).
-    set_dimension_precision(adapter, end_annotations, {"BoreDia": 2, "OuterDia": 1})
+    length_annotations = curate_view_dimensions(
+        adapter, length, keep=LENGTH_KEEP, view_label="length"
+    )
+    set_dimension_precision(adapter, end_annotations, {"OuterDia": 2})
+    set_dimension_callouts(adapter, end_annotations, {"OuterDia": "+0/-0.05"})
+    set_dimension_callouts(adapter, length_annotations, {"Depth": "+/-0.25"})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
+
+    end_top = (
+        END_CENTER[0],
+        END_CENTER[1] + OUTER_DIA * END_VIEW_SCALE / 2000.0,
+    )
+    add_datum_feature(
+        adapter,
+        end,
+        edge_xy=end_top,
+        symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.038),
+        datum="A",
+        label="finished OD derived axis",
+    )
+    flank_x = LENGTH_CENTER[0] + OUTER_DIA / 10000.0
+    add_feature_control_frame(
+        adapter,
+        length,
+        edge_xy=(flank_x, LENGTH_CENTER[1]),
+        frame_xy=(0.115, 0.205),
+        characteristic="cylindricity",
+        tolerance="0.10",
+        quantity="FULL OD LENGTH",
+        label="full-length OD cylindricity",
+        entity_type="SILHOUETTE",
+    )
+    half_length_on_sheet = COLUMN_LENGTH / 10000.0
+    for edge_y, frame_y, label in (
+        (LENGTH_CENTER[1] - half_length_on_sheet, 0.045, "bottom end perpendicularity"),
+        (LENGTH_CENTER[1] + half_length_on_sheet, 0.255, "top end perpendicularity"),
+    ):
+        add_feature_control_frame(
+            adapter,
+            length,
+            edge_xy=(LENGTH_CENTER[0], edge_y),
+            frame_xy=(0.090, frame_y),
+            characteristic="perpendicularity",
+            tolerance="0.10",
+            datums=("A",),
+            label=label,
+        )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.125)
     add_property_linked_note(adapter, "End View Note", 0.275, 0.162)

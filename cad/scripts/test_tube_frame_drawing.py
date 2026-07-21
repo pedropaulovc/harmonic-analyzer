@@ -39,12 +39,18 @@ def test_notes_and_native_gdt() -> None:
     assert "POLISH" not in notes
     assert "DEBURR" not in notes
     assert "UOS" not in notes
-    assert "FACED SQUARE TO THE TUBE AXIS" in notes
+    assert "AS-PROCURED STOCK RESULT" in notes
+    assert "NOT AN ACCEPTANCE DIMENSION" in notes
+    assert "BORE" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert source.count("add_datum_feature(") == 0
-    assert source.count("add_feature_control_frame(") == 0
+    assert source.count("add_datum_feature(") == 1
+    assert source.count("add_feature_control_frame(") == 2
+    assert 'characteristic="cylindricity"' in source
+    assert source.count('characteristic="perpendicularity"') == 1
+    assert '{"OuterDia": "+0/-0.05"}' in source
+    assert '{"Depth": "+/-0.25"}' in source
     assert source.count("add_surface_finish(") == 0
 
 
@@ -67,5 +73,7 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == config["material_specification"]
     assert "ASTM A513 Type 5" in str(config["material"])
     assert "SAE 1020 DOM" in str(config["material"])
-    assert config["finish"]
+    finish = str(config["finish"]).lower()
+    assert "od polished ra 1.6" in finish
+    assert "corrosion-preventive oil after inspection" in finish
     assert int(config["quantity"]) == 4

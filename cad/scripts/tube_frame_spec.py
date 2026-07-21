@@ -21,11 +21,11 @@ COLUMN_LENGTH = 989.9  # top flush with the top-frame ring top face
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_tube_frame`` marks exactly these; ``draw_tube_frame`` keeps
-# exactly their union across its per-view keep maps. The two annulus diameters
-# are on-axis sketch dimensions; the column LENGTH is the extrude depth, named
-# and marked in the build so it imports into the length view. ---
+# exactly their union across its per-view keep maps. The finished OD and column
+# length are acceptance dimensions. The stock-result ID is deliberately not
+# dimensioned; the title-block material specification owns the tube wall. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "AnnulusProfile": {"OuterDia", "BoreDia"},
+    "AnnulusProfile": {"OuterDia"},
     "Column": {"Depth"},
 }
 
@@ -33,9 +33,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # title block; it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
-        "NO FLUTES, FLATS OR STEPS ON THE OD.",
-        "BOTH ENDS FACED SQUARE TO THE TUBE AXIS WITHIN 0.10.",
-        "TOP END SEATS FLUSH IN THE TOP-FRAME CORNER BOSS (Ø25.5 BORE).",
+        "1. ID IS THE AS-PROCURED STOCK RESULT; NOT AN ACCEPTANCE DIMENSION.",
+        "2. NO FLUTES, FLATS OR STEPS ON THE OD.",
+        "3. TOP END SEATS FLUSH IN THE TOP-FRAME CORNER BOSS.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
