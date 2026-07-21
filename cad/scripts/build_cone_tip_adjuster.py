@@ -36,6 +36,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -43,6 +44,12 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from cone_tip_adjuster_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
 
 PART_NAME = "cone-tip-adjuster"
 SPEC = fastener(PART_NAME)
@@ -84,6 +91,9 @@ async def build(adapter) -> dict[str, str]:
     check("extrude body", await adapter.create_extrusion(
         ExtrusionParameters(depth=BODY_LEN)))
     name_last_feature(adapter, "Body")
+    # Name the extrude DEPTH so the body length is a markable drawing dimension.
+    body_len_dim = name_dimensions(adapter, "Body", ["BodyLenDim"])
+    drive_jobs += [(body_len_dim[0], '"BodyLen"')]
     v = math.pi * (BODY_DIA / 2.0) ** 2 * BODY_LEN
     volume = await volume_check(adapter, "body", v, 0.005 * v)
 
@@ -139,6 +149,14 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "screw axis")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

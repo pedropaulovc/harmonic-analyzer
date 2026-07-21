@@ -1318,6 +1318,63 @@ def set_dimension_precision(
     adapter.currentModel.EditRebuild3()
 
 
+def set_reference_dimensions(
+    adapter: Any, annotations: Iterable[Any], names: Iterable[str]
+) -> None:
+    """Parenthesize NAMED dimensions so they read as REFERENCE, not controlling.
+
+    A fastener modeled at its thread MINOR diameter carries the real spec in a
+    thread callout; the modeled OD is reference geometry, not a controlling
+    dimension.  Showing that OD as a hard value contradicts the thread callout
+    (a 5/16-18 thread's Ø6.20 minor cannot grow crests — codex machinist
+    review), so the OD dim is boxed in parentheses: ASME reference-dimension
+    notation.  Keyed on the parametric name so a value collision can never
+    parenthesize the wrong dimension.  Fails loud if any name is unmatched.
+
+    ``IDisplayDimension.ShowParenthesis`` only affects "text above the dimension
+    line", which a leadered diameter callout does not have (it sets the flag but
+    renders nothing), so instead bracket the value with a "(" prefix and ")"
+    suffix via ``SetText`` — the same proven channel ``set_dimension_callouts``
+    uses for the below-text — which renders on any dimension form.
+    """
+    text_prefix = 1  # swDimensionTextParts_e.swDimensionTextPrefix
+    text_suffix = 2  # swDimensionTextParts_e.swDimensionTextSuffix
+    # A custom prefix REPLACES the auto diameter glyph, so carry SolidWorks'
+    # own "<MOD-DIAM>" token to keep the Ø on a diameter dim: "(Ø6.20)".
+    open_paren = "(<MOD-DIAM>"
+    wanted = set(names)
+    marked: set[str] = set()
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        if name not in wanted:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        adapter._attempt(lambda d=display: d.SetText(text_prefix, open_paren))
+        adapter._attempt(lambda d=display: d.SetText(text_suffix, ")"))
+        # SetText reports nothing, so verify the SIDE EFFECT: read the parts back
+        # (a silent no-op would ship the OD as a controlling dim vs the thread).
+        got_prefix = adapter._attempt(lambda d=display: d.GetText(text_prefix))
+        got_suffix = adapter._attempt(lambda d=display: d.GetText(text_suffix))
+        if str(got_prefix) != open_paren or str(got_suffix) != ")":
+            raise RuntimeError(
+                f"reference (parenthesis) mark on dimension {name!r} did not take: "
+                f"prefix={got_prefix!r} suffix={got_suffix!r}"
+            )
+        marked.add(name)
+    missing = wanted - marked
+    if missing:
+        raise RuntimeError(f"reference dimensions not applied: {sorted(missing)}")
+    adapter.currentModel.EditRebuild3()
+
+
 def add_edge_dimension(
     adapter: Any,
     view: Any,
