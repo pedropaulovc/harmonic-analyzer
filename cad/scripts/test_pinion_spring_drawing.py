@@ -49,6 +49,7 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert "scale=(1, 1)" in source  # the isometric override
     assert pinion_spring_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert drawing.FRONT_BBOX_CX < 0.0
 
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:

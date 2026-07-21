@@ -69,6 +69,9 @@ SHEET_SCALE = (2.0, 1.0)
 
 # Front view (XY): the checkmark profile -- the foot runs along the bottom, the
 # blade rises to the upper right.  Centre it on the profile's y midspan.
+FRONT_BBOX_CX = (
+    FOOT_END[0] + max(BEND_EXIT[0], KINK_START[0], FLAT_TIP[0])
+) / 2.0
 FRONT_BBOX_CY = (FOOT_Y + FLAT_TIP[1]) / 2.0
 FRONT_CENTER = (0.130, 0.150)
 # Put the narrow top view in the open right-hand field, above the title block
@@ -78,7 +81,7 @@ ISO_CENTER = (0.320, 0.190)
 
 
 def _front_x(model_x_mm: float) -> float:
-    return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
+    return FRONT_CENTER[0] + (model_x_mm - FRONT_BBOX_CX) * SHEET_SCALE[0] / 1000.0
 
 
 def _front_y(model_y_mm: float) -> float:
