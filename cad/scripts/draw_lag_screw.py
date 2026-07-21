@@ -62,7 +62,7 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # The side view sits high so the ~126 mm profile clears the wide manufacturing
 # note that anchors just above the title block.
 END_CENTER = (0.085, 0.180)
-SIDE_CENTER = (0.190, 0.168)
+SIDE_CENTER = (0.190, 0.195)
 ISO_CENTER = (0.320, 0.175)
 
 _Y_MID = (SHANK_LEN - HEAD_H) / 2.0

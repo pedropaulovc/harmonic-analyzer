@@ -51,7 +51,7 @@ SHEET_SCALE = (4.0, 1.0)
 # HORIZONTAL) in the *Right view, which MIRRORS z (head at HIGH-x, shank tip
 # at LOW-x).
 END_CENTER = (0.065, 0.150)
-SIDE_CENTER = (0.190, 0.150)
+SIDE_CENTER = (0.190, 0.190)
 ISO_CENTER = (0.320, 0.180)
 
 END_KEEP = {

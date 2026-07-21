@@ -50,7 +50,7 @@ SHEET_SCALE = (8.0, 1.0)
 # [-HEAD_H, 0], shank at z in [0, SHANK_LEN].  The head-end circle projects in
 # the *Front view; the profile (axis horizontal) projects in the *Right view.
 END_CENTER = (0.070, 0.150)
-SIDE_CENTER = (0.185, 0.150)
+SIDE_CENTER = (0.185, 0.190)
 ISO_CENTER = (0.300, 0.170)
 
 # Head-end view: the two concentric marked diameters, leadered clear to the left.

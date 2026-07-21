@@ -62,7 +62,7 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # as the head/shank extrude-DEPTH model dimensions (HeadHt/ShankLg), not as
 # drawing-native edge dimensions.
 END_CENTER = (0.085, 0.180)
-SIDE_CENTER = (0.190, 0.150)
+SIDE_CENTER = (0.190, 0.190)
 ISO_CENTER = (0.300, 0.175)
 
 # Side view (*Front): model y -> sheet y (head up), centred on the profile bbox.
