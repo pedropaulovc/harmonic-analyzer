@@ -206,6 +206,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="thread pitch-cylinder axis",
         entity_type="DIMENSION",
+        shoulder=True,
     )
     cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
     add_feature_control_frame(
