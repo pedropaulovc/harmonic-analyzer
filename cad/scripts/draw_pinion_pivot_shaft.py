@@ -66,7 +66,7 @@ ISO_CENTER = (0.355, 0.205)
 ISO_SCALE = (1, 2)
 
 FRONT_KEEP = {
-    "ShaftDia": (0.030, FRONT_CENTER[1]),
+    "ShaftDia": (0.115, 0.180),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
@@ -166,7 +166,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
-    add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
+    add_property_linked_note(adapter, "End View Note", 0.020, 0.155)
     add_property_linked_note(adapter, "Iso View Note", 0.325, 0.157)
 
     return await finalize_drawing(

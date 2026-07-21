@@ -103,6 +103,9 @@ def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     assert 'quantity="TURNED GRIP PROFILE - SEE NOTE"' in source
     assert "set_basic_dimension(" in source
     assert "add_surface_finish(" not in source
+    assert drawing.RIGHT_KEEP["PivotBoreDia"] == (0.365, 0.205)
+    assert "frame_xy=(0.350, 0.263)" in source
+    assert "frame_xy=(0.180, 0.263)" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

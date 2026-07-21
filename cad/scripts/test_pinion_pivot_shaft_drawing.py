@@ -65,6 +65,7 @@ def test_direct_limits_and_native_cylindricity_control_the_body() -> None:
     assert "CYLINDRICITY" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     assert "Ra 1.6" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     assert "CROWN ROOT CIRCLES" in drawing.DIMENSION_CALLOUTS["Depth"]
+    assert drawing.FRONT_KEEP["ShaftDia"] == (0.115, 0.180)
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

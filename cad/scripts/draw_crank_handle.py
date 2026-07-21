@@ -93,7 +93,7 @@ FRONT_KEEP = {
     "PeakStation": (0.150, 0.242),
 }
 RIGHT_KEEP = {
-    "PivotBoreDia": (0.245, 0.178),
+    "PivotBoreDia": (0.365, 0.205),
 }
 DIMENSION_CALLOUTS = {
     "HandleLength": "+/-0.25 OVERALL",
@@ -206,7 +206,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=bore_top,
-        frame_xy=(0.240, 0.252),
+        frame_xy=(0.350, 0.263),
         characteristic="total_runout",
         tolerance="0.10",
         datums=("A",),
@@ -217,7 +217,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=profile_peak,
-        frame_xy=(0.205, 0.263),
+        frame_xy=(0.180, 0.263),
         characteristic="profile_surface",
         tolerance="0.50",
         datums=("A", "B"),
