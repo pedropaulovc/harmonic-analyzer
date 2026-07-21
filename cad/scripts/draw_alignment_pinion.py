@@ -120,13 +120,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # two VERTICAL end edges at mid-height (above the bore, inside the tooth
     # root) -- a pick at the bottom corner lands on the long horizontal tooth
     # silhouette, and both corners then select the SAME edge (AddDimension2
-    # returns None on that pair).
+    # returns None on that pair). Inset 0.2 mm INSIDE the body: a pick exactly
+    # on the end-edge x can snap to a horizontal tooth line instead, and a
+    # vertical+horizontal pair yields a stray 90-degree ANGLE dimension.
     end_pick_y = RIGHT_CENTER[1] + HALF_OD * 0.55
     add_edge_dimension(
         adapter,
         right,
-        p0=(LEFT_END_X, end_pick_y),
-        p1=(RIGHT_END_X, end_pick_y),
+        p0=(LEFT_END_X + 0.0002, end_pick_y),
+        p1=(RIGHT_END_X - 0.0002, end_pick_y),
         text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_OD - 0.028),
         label="drum face length",
     )

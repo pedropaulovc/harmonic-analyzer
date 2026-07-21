@@ -169,11 +169,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        # Frame BELOW-LEFT of the front view: with the frame up top the leader
-        # shoulder ran right over the bore's lower-left, crossing the bore
-        # finish leader (both attach points are SolidWorks-chosen canonical
-        # vertices in that quadrant; layout audit leader-crossing).
-        frame_xy=(0.168, FRONT_CENTER[1] - 0.052),
+        frame_xy=(0.175, RIGHT_CENTER[1] + half_od + 0.010),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
@@ -181,15 +177,20 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="FACE",
         entity=gear_face,
     )
-    # Bore finish: symbol directly below the bore; attaches by model identity
-    # (the batch contract) at the circle's canonical vertex in the lower-left
-    # quadrant -- the FCF frame above routes clear of it.
+    # Bore finish: attaches by model identity (the batch contract) at the
+    # circle edge's canonical vertex, which lands at (FRONT_CENTER-0.0038,
+    # FRONT_CENTER+... ) -- the bore's lower-left, invariant across runs. Two
+    # other invariant leader corridors converge there (the datum's 45-degree
+    # run y = x - 0.05 just below the attach, and the face-FCF's vertical run
+    # at x 0.201..0.208), so route the SF leader STRAIGHT DOWN from a symbol
+    # directly above the attach: x = 0.2212 clears the FCF corridor on the
+    # right, and the vertical span stops 0.9 mm above the 45-degree segment.
     bore_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - BORE_R)
     add_surface_finish(
         adapter,
         front,
         edge_xy=bore_bottom,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.052),
+        symbol_xy=(FRONT_CENTER[0] - 0.0038, FRONT_CENTER[1] + 0.035),
         roughness_ra="1.6",
         label="cylinder gear bore finish",
         entity=bore_edge,
