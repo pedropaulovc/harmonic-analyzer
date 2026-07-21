@@ -380,12 +380,24 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.190, 0.098),
         characteristic="position",
-        tolerance="0.50",
+        tolerance="0.20",
         datums=("A", "B", "C"),
         diameter=True,
         quantity="4X DIA 13 THRU HOLES",
         label="through-hole true position",
         entity=hole_entities[2],
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.110, 0.085),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="4X DIA 23 UNDERSIDE C'BORES",
+        label="underside counterbore true position",
+        entity=hole_entities[0],
     )
     add_feature_control_frame(
         adapter,

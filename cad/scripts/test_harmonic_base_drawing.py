@@ -54,7 +54,9 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "NEAR LONG SIDE 6.35 +/-0.10 FROM B" in notes
     assert "NEAR LEFT END 6.35 +/-0.10 FROM C" in notes
     assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
-    assert "C'BORE AXES WITHIN DIA 0.10 OF ASSOCIATED HOLE AXES" in notes
+    assert "PLAN RIMS AT E1-E4 ARE THE DIA 13.00 THRU FEATURES" in notes
+    assert "DIAMETERS/DEPTHS ARE PROCESS DATA" in notes
+    assert "THREAD CLASS/DEPTH GOVERN" in notes
     assert "B1 IS UNTHREADED" in notes
     assert "A1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
     assert "A1-A4" not in notes
@@ -72,8 +74,9 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GetVisibleEntities2(c, 2)" in source
     assert "GetVisibleEntities2(c, 1)" in source
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 7
+    assert source.count("add_feature_control_frame(") == 8
     assert 'quantity="4X DIA 13 THRU HOLES"' in source
+    assert 'quantity="4X DIA 23 UNDERSIDE C\'BORES"' in source
     assert 'quantity="8X BLIND TAPPED HOLES"' in source
     assert 'quantity="1X DIA 6.53 BLIND HOLE"' in source
     assert "underside-only counterbore rims are visible" in source
@@ -113,7 +116,8 @@ def test_part_stamps_make_critical_properties() -> None:
     finish = str(config["finish"]).lower()
     assert "shade noncritical" in finish
     assert "mask a/b/c" in finish
-    assert "all holes/counterbores" in finish
+    assert "top pad face" in finish
+    assert "all bores/threads/counterbores" in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
 
