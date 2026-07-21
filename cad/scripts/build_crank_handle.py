@@ -169,13 +169,13 @@ async def build(adapter) -> dict[str, str]:
             PEAK_X, REAR_CY, HANDLE_LENGTH, CAP_R, PEAK_X, PEAK_R
         ),
     )
-    # Construction-only radial at the visible swell.  Its on-axis lower point
-    # carries the drawing's axial peak-station dimension; unlike the front arc
-    # centre (hundreds of millimetres below the profile), both witness points
-    # remain on the physical handle and import onto the sheet.
+    # Construction-only witness line inside the visible swell.  Keep both ends
+    # clear of the profile and axis: a line that touches the already-constrained
+    # arc join or axis inherits coincident relations and makes its peak-station
+    # dimension redundant/over-defining in SolidWorks.
     peak_station = check(
         "peak station construction line",
-        await adapter.add_centerline(PEAK_X, 0.0, PEAK_X, PEAK_R),
+        await adapter.add_centerline(PEAK_X, 2.0, PEAK_X, 3.0),
     )
     cap_face = check(
         "butt cap face",
@@ -236,16 +236,17 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_constraint(peak_station, None, "vertical"),
     )
     await anchor_point_to_origin(
-        adapter, f"{peak_station}.start", PEAK_X, 0.0, "peak station"
+        adapter, f"{peak_station}.start", PEAK_X, 2.0, "peak station"
     )
     profile.record("PeakStation", '"PeakX"')
+    profile.record(None, None)
     check(
-        "peak radius construction dimension",
+        "peak witness construction length",
         await adapter.add_sketch_dimension(
-            peak_station, None, "linear", PEAK_R
+            peak_station, None, "linear", 1.0
         ),
     )
-    profile.record("PeakRadius", '"HandleMaxDia" / 2')
+    profile.record(None, None)
     # Each arc centre is off-axis (PEAK_X != 0, *_CY < 0): anchor_point_to_origin
     # emits a horizontal then a vertical distance dim. The horizontal span is
     # PEAK_X (clean knob -> "PeakX"); the vertical span is the arc-centre depth
