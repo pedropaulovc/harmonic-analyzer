@@ -243,7 +243,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="tapered-pin cross-hole",
         edge=_visible_cross_hole_edge(adapter, right),
     )
-    add_property_linked_note(adapter, "Crank End Note", 0.172, 0.078)
+    add_property_linked_note(adapter, "Crank End Note", 0.250, 0.090)
 
     add_surface_finish(
         adapter,

@@ -89,6 +89,7 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=(2, 1)" in source
     assert crankshaft_spec.END_VIEW_NOTE == "CRANK-END VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
+    assert 'add_property_linked_note(adapter, "Crank End Note", 0.250, 0.090)' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
