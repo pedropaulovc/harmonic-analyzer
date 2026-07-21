@@ -78,14 +78,12 @@ def set_dimension_symmetric_tolerance(
     tolerance = _early_bound(matches[0].Tolerance, "IDimensionTolerance")
     tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
     tolerance_m = tolerance_mm / 1000.0
-    if not tolerance.SetValues2(
-        -tolerance_m,
-        tolerance_m,
-        1,  # swSetValueInConfiguration_e.swSetValue_InThisConfiguration
-        "",
-    ):
+    # SOLIDWORKS 2026 rejects SetValues2 for this extrusion-depth dimension in
+    # both all-configuration and active-configuration forms.  SetValues is the
+    # source-model path already exercised by _holes._tolerance_hole_diameter.
+    if not tolerance.SetValues(-tolerance_m, tolerance_m):
         raise RuntimeError(
-            f"{dimension_name}@{feature_name}: SetValues2 rejected +/-{tolerance_mm} mm"
+            f"{dimension_name}@{feature_name}: SetValues rejected +/-{tolerance_mm} mm"
         )
     if int(tolerance.Type) != 4:
         raise RuntimeError(
