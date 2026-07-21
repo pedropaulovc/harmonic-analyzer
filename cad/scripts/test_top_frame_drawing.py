@@ -36,7 +36,9 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "394.00 X 224.00" in notes
     assert "25.50 +0.05/0" in notes
     assert "POSITION <MOD-DIAM>0.20 A|B|C" in notes
-    assert "COAXIAL WITH RESPECTIVE BORES WITHIN 0.10 TIR" in notes
+    assert "MAX-MIN RADIAL WALL THICKNESS" in notes
+    assert "SHALL NOT EXCEED 0.10" in notes
+    assert "TIR" not in notes
     assert "GOOSENECK BORE" in notes
     assert "LEFT COLUMN-BORE CENTRELINE" in notes
     assert "MIDWAY BETWEEN LEFT BORE AXES" in notes
@@ -76,5 +78,6 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "alkyd primer/green enamel" in finish
     assert "75-125 um total dft" in finish
     assert "mask a/b/c" in finish
+    assert "4x top annuli(od48/id25.5)" in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
