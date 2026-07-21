@@ -20,7 +20,9 @@ catch.
 **How to apply:**
 - DRAWING_NOTES carry ONLY part-specific facts (process steps, functional fits,
   gear/spring/wire data tables, commercial-equivalent designations).
-- Never restate units, UOS clauses, or general tolerances in a note.
+- Never restate units, UOS clauses, general tolerances, or generic
+  "BREAK ALL SHARP EDGES / REMOVE BURRS" (the title block carries the
+  edge-break row) in a note.
 - A dimension needing a TIGHTER tolerance than the block gets it ON that
   dimension (`IDimensionTolerance` on the PART model dim — see
   [[hole-tolerance-sldprt-not-drawing]]), never as a blanket note.
