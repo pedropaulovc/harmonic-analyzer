@@ -2448,6 +2448,15 @@ def insert_bom_table(
             applied = str(
                 table.DisplayedText2(row, description_column, False) or ""
             )
+            if applied != text and configuration_grouping == "same-part":
+                # A same-part row is a visible aggregate over hidden per-config
+                # rows. SetText2(False) addresses only the aggregate and 2026
+                # silently discards it; IncludeHidden=True writes the grouped
+                # backing cells that drive the displayed aggregate.
+                table.SetText2(row, description_column, True, text)
+                applied = str(
+                    table.DisplayedText2(row, description_column, False) or ""
+                )
             if applied != text:
                 raise RuntimeError(
                     f"{label} BOM description did not persist: {applied!r} != {text!r}"
@@ -2754,10 +2763,14 @@ def _create_auto_balloons(
             return []
         raise RuntimeError(f"AutoBalloon5 produced no balloons ({label})")
     balloons = list(notes)
-    _telemetry.info(
-        f"{label}: AutoBalloon5 item order "
-        f"{[_balloon_item_number(adapter, note, label=label) for note in balloons]}"
-    )
+    identities: list[str] = []
+    for note in balloons:
+        item = _balloon_item_number(adapter, note, label=label)
+        annotation = _sw_type_info.early_bound_or_flag(
+            note.GetAnnotation(), "IAnnotation", "GetName"
+        )
+        identities.append(f"{annotation.GetName()}=item {item}")
+    _telemetry.info(f"{label}: AutoBalloon5 identities {identities}")
     return balloons
 
 
