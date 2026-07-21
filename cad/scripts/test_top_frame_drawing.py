@@ -33,6 +33,9 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "MACHINE FROM SOLID STOCK" in notes
     assert "442.00 +/-0.25 X 272.00 +/-0.25" in notes
     assert "416.00 X 246.00" in notes
+    assert "372.00 X 202.00 CLEAR OPENING" in notes
+    assert "NO BLENDS OR" in notes
+    assert "CHAMFERS AT BOSS/RAIL INTERSECTIONS" in notes
     assert "394.00 X 224.00" in notes
     assert "25.50 +0.05/0" in notes
     assert "POSITION <MOD-DIAM>0.20 A|B|C" in notes
@@ -50,10 +53,12 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
+    assert source.count("add_feature_control_frame(") == 3
     assert 'symbol_xy=(0.245, 0.105), datum="C"' in source
     assert 'quantity="4X COLUMN BORES"' in source
+    assert 'quantity="4X BOSS ODS"' in source
     assert 'quantity="GOOSENECK BORE"' in source
+    assert '{"Width": "+/-0.25", "Depth": "+/-0.25"}' in source
 
 
 def test_view_scales_are_explicit() -> None:
@@ -80,6 +85,8 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "sspc-sp3" in finish
     assert "alkyd primer/green enamel" in finish
     assert "75-125um dft" in finish
+    assert "total" in finish
+    assert "color noncritical" in finish
     assert "mask" not in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1

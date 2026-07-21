@@ -28,6 +28,7 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
+    set_dimension_callouts,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -37,6 +38,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_top_frame import (
     BORE_DIA,
+    BOSS_DIA,
     COLUMN_X,
     COLUMN_Z,
     GOOSENECK_BORE_DIA,
@@ -81,8 +83,8 @@ TOP_KEEP = {
 }
 
 
-def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
-    """Return one column bore, the gooseneck bore, and datum B/C rail edges."""
+def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
+    """Return one column bore/OD pair, gooseneck bore, and B/C rail edges."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     circles: list[tuple[float, float, float, Any]] = []
     lines: list[tuple[tuple[float, ...], Any]] = []
@@ -127,6 +129,7 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]
         raise RuntimeError("top-frame plan is missing the B/C outer rail datum edges")
     return (
         _circle(-COLUMN_X, COLUMN_Z, BORE_DIA, "column bore"),
+        _circle(-COLUMN_X, COLUMN_Z, BOSS_DIA, "column boss OD"),
         _circle(GOOSENECK_X, GOOSENECK_Z, GOOSENECK_BORE_DIA, "gooseneck bore"),
         datum_b[0],
         datum_c[0],
@@ -201,13 +204,24 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, front):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
+    )
+    set_dimension_callouts(
+        adapter,
+        top_annotations,
+        {"Width": "+/-0.25", "Depth": "+/-0.25"},
+    )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the ring bores")
 
-    column_bore, gooseneck_bore, datum_b_edge, datum_c_edge = _visible_plan_controls(
-        adapter, top
-    )
+    (
+        column_bore,
+        column_boss,
+        gooseneck_bore,
+        datum_b_edge,
+        datum_c_edge,
+    ) = _visible_plan_controls(adapter, top)
     datum_a_edge = _visible_front_datum_a(adapter, front)
     add_datum_feature(
         adapter, front, symbol_xy=(0.285, 0.125), datum="A",
@@ -226,6 +240,12 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.20", datums=("A", "B", "C"), diameter=True,
         quantity="4X COLUMN BORES", label="column-bore true position",
         entity=column_bore,
+    )
+    add_feature_control_frame(
+        adapter, top, frame_xy=(0.130, 0.220), characteristic="position",
+        tolerance="0.20", datums=("A", "B", "C"), diameter=True,
+        quantity="4X BOSS ODS", label="column-boss true position",
+        entity=column_boss,
     )
     add_feature_control_frame(
         adapter, top, frame_xy=(0.080, 0.165), characteristic="position",
