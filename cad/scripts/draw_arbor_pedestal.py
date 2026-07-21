@@ -153,10 +153,9 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
     return foot_edge, side_edge, bore_edge, dome_edge
 
 
-def _top_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return datum-B and exposed-flange edges in the plan view."""
+def _top_exposed_edge(adapter: Any, view: Any) -> Any:
+    """Return the datum-D exposed-flange edge in the plan view."""
     drawing_view = _early_bound(view, "IView")
-    side_candidates: list[tuple[float, Any]] = []
     exposed_candidates: list[tuple[float, Any]] = []
     exposed_z = -FOOT_DEPTH / 2.0
     for component in drawing_view.GetVisibleComponents() or []:
@@ -171,23 +170,13 @@ def _top_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
             p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
             p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
             if (
-                abs(p0[0] + FOOT_WIDTH / 2.0) <= 0.01
-                and abs(p1[0] + FOOT_WIDTH / 2.0) <= 0.01
-            ):
-                side_candidates.append((abs(p1[2] - p0[2]), edge))
-            if (
                 abs(p0[2] - exposed_z) <= 0.01
                 and abs(p1[2] - exposed_z) <= 0.01
             ):
                 exposed_candidates.append((abs(p1[0] - p0[0]), edge))
-    if not side_candidates:
-        raise RuntimeError("plan view has no datum-B foot-side edge")
     if not exposed_candidates:
         raise RuntimeError("plan view has no exposed-flange edge")
-    return (
-        max(side_candidates, key=lambda item: item[0])[1],
-        max(exposed_candidates, key=lambda item: item[0])[1],
-    )
+    return max(exposed_candidates, key=lambda item: item[0])[1]
 
 
 def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> Any:
@@ -377,8 +366,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),
-        frame_xy=(0.165, _front_y(BORE_HEIGHT) - 0.025),
+        edge_xy=(
+            FRONT_CENTER[0] - _bore_r * 0.7,
+            _front_y(BORE_HEIGHT) - _bore_r * 0.7,
+        ),
+        frame_xy=(0.020, _front_y(BORE_HEIGHT) + 0.006),
         characteristic="position",
         tolerance="0.10",
         datums=("A", "B"),
@@ -401,16 +393,12 @@ async def build(adapter: Any) -> dict[str, str]:
         SCREW_CLEARANCE_DIA / 2.0,
         label="flange hold-down hole",
     )
-    datum_b_top_entity, datum_d_entity = _top_datum_edges(adapter, top)
-    _add_circle_basic(
-        adapter,
-        top,
-        datum_b_top_entity,
-        screw_entity,
-        orientation="horizontal",
-        position=(TOP_CENTER[0], 0.220),
-        label="flange-hole location from datum B",
-    )
+    datum_d_entity = _top_exposed_edge(adapter, top)
+    # The top and front views are projection-aligned, so a second horizontal
+    # 12 BASIC dimension would print directly over the bore's 12 BASIC. The
+    # property-linked note explicitly assigns that existing datum-B coordinate
+    # to the flange-hole axis; only the independent datum-D coordinate belongs
+    # on this view.
     _add_circle_basic(
         adapter,
         top,

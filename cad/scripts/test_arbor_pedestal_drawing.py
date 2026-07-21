@@ -63,12 +63,12 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "2X STRAIGHT FLANKS RUN FROM THE DATUM-A FOOT CORNERS" in notes
     assert "NO TANGENCY" in notes
     assert "CROWN CENTER SHALL LIE WITHIN 0.05 OF THE BORE AXIS" in notes
+    assert "FLANGE-HOLE AXIS IS BASIC 12.00 FROM DATUM B" in notes
     assert "6.00 EXPOSED FLANGE IS REFERENCE ONLY" in notes
     assert "FLUSH WITH THE 16.00-DEEP" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_native_hole_callout(" in source
-    assert 'label="flange-hole location from datum B"' in source
     assert 'label="flange-hole location from datum D"' in source
 
 
@@ -80,7 +80,7 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'characteristic="position"' in source
     assert 'characteristic="profile_surface"' not in source
     assert 'characteristic="perpendicularity"' not in source
-    assert source.count("_add_circle_basic(") == 5  # helper plus four calls
+    assert source.count("_add_circle_basic(") == 4  # helper plus three calls
     assert 'orientation="horizontal"' in source
     assert 'orientation="vertical"' in source
     assert "for index in (1, 2):" in source
