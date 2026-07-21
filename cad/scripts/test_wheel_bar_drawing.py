@@ -45,8 +45,15 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
 def test_linked_notes_specify_the_bores_and_stock() -> None:
     notes = wheel_bar_spec.DRAWING_NOTES
-    assert "#8 CLEARANCE" in notes
-    assert "#6 CLEARANCE" in notes
+    assert "#8 NORMAL CLEARANCE Ø4.978" in notes
+    assert "#6 CLOSE CLEARANCE Ø3.912" in notes
+    assert wheel_bar_spec.CLAMP_HOLE_DIA == 4.978
+    assert wheel_bar_spec.PEN_HANGER_HOLE_DIA == 3.912
+    assert part.blind_cut_dia_mm(part.CLAMP_HOLE_SPEC) == wheel_bar_spec.CLAMP_HOLE_DIA
+    assert (
+        part.blind_cut_dia_mm(part.SCREW_HOLE_SPEC)
+        == wheel_bar_spec.PEN_HANGER_HOLE_DIA
+    )
     assert "STEEL" not in notes and "AISI 1018" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes

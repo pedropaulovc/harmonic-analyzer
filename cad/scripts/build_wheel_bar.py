@@ -65,7 +65,13 @@ from wheel_bar_geom import (
     BAR_DEPTH,
     BAR_LENGTH,
     BAR_SIDE,
+    CLAMP_HOLE_DIA,
+    CLAMP_HOLE_FIT,
+    CLAMP_HOLE_SIZE,
     CLAMP_HOLE_X,
+    PEN_HANGER_HOLE_DIA,
+    PEN_HANGER_HOLE_FIT,
+    PEN_HANGER_HOLE_SIZE,
     SCREW_HOLE_X,
 )
 from wheel_bar_spec import (
@@ -80,9 +86,11 @@ MATERIAL = "Plain Carbon Steel"
 # Bar section + hole stations live in wheel_bar_geom (imported above).
 # Pen-hanger screw passes through: #6 clearance, CLOSE fit (Ø3.912, the wizard
 # twin of the old Ø3.8 artefact dim; nearest UNC to the screw).
-SCREW_HOLE_SPEC = HoleSpec("clearance", "#6", fit="close")
+SCREW_HOLE_SPEC = HoleSpec(
+    "clearance", PEN_HANGER_HOLE_SIZE, fit=PEN_HANGER_HOLE_FIT
+)
 # The Ø3.9 clamp-screw shanks pass through: #8 clearance (support-bar idiom).
-CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
+CLAMP_HOLE_SPEC = HoleSpec("clearance", CLAMP_HOLE_SIZE, fit=CLAMP_HOLE_FIT)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -145,6 +153,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, SCREW_HOLE_SPEC,
         [[SCREW_HOLE_X, 0.0, front_z]],
         (0.0, 0.0, -1.0), "pen-hanger screw hole (#6 clearance)", name="ScrewHole",
+        expect_dia_mm=PEN_HANGER_HOLE_DIA,
         placement_dims=[(("ScrewHoleCx", '-"ScrewHoleX"'), (None, None))],
     )
     drive_jobs += screw_cut.placement_drive_jobs
@@ -155,6 +164,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, CLAMP_HOLE_SPEC,
         [[x, 0.0, front_z] for x in CLAMP_HOLE_X],
         (0.0, 0.0, -1.0), "clamp-screw clearance holes (#8)", name="ClampHoles",
+        expect_dia_mm=CLAMP_HOLE_DIA,
     )
     expected -= 2.0 * math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
     await volume_check(adapter, "bar with clamp holes", expected, 1.0)
