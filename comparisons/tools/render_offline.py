@@ -62,19 +62,33 @@ def _blender_version(exe: str) -> tuple[int, int] | None:
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
+def _require_52(exe: str, hint: str) -> str:
+    """Return ``exe`` iff ``<exe> --version`` reports >= 5.2, else raise loud.
+
+    The worker calls the 5.2 gpu API, so a <5.2 (or unverifiable) binary would crash
+    deep inside _run_worker -- reject it here with a clear message instead."""
+    ver = _blender_version(exe)
+    if ver and ver >= (5, 2):
+        return exe
+    shown = ".".join(map(str, ver)) if ver else "an undeterminable version"
+    raise SystemExit(f"Blender at {exe} is {shown} (< 5.2 required, worker needs the "
+                     f"5.2 gpu API); {hint}")
+
+
 def resolve_blender(override: str | None = None) -> str:
     """Path to a Blender >= 5.2 for the headless worker.
 
-    --blender / $HARMONIC_BLENDER win; else the highest >= 5.2 under the standard
-    Windows install dir; else `blender` on PATH (Linux/macOS). Discovery (not a
-    hard-coded version) is what lets the release's export stage refresh the gallery
-    on whichever Blender the seat has -- a pinned "Blender 5.1" path silently broke
-    it when that version was uninstalled."""
+    --blender / $HARMONIC_BLENDER win (still version-checked -- a <5.2 override can
+    only crash the worker); else the highest >= 5.2 under the standard Windows install
+    dir; else `blender` on PATH (Linux/macOS), version-queried since its name carries
+    no version. Discovery (not a hard-coded version) is what lets the release's export
+    stage refresh the gallery on whichever Blender the seat has -- a pinned "Blender
+    5.1" path silently broke it when that version was uninstalled."""
     cand = override or os.environ.get("HARMONIC_BLENDER")
     if cand:
         if not Path(cand).exists():
             raise SystemExit(f"Blender not found at {cand} (--blender / $HARMONIC_BLENDER)")
-        return cand
+        return _require_52(cand, "point --blender / $HARMONIC_BLENDER at a >= 5.2 install")
     found = []
     for exe in glob.glob(r"C:/Program Files/Blender Foundation/Blender */blender.exe"):
         m = re.search(r"Blender (\d+)\.(\d+)", exe)
@@ -87,13 +101,8 @@ def resolve_blender(override: str | None = None) -> str:
     # _run_worker deep in the gpu API, not with a clear "no 5.2" message.
     which = shutil.which("blender")
     if which:
-        ver = _blender_version(which)
-        if ver and ver >= (5, 2):
-            return which
-        shown = ".".join(map(str, ver)) if ver else "an undeterminable version"
-        raise SystemExit(
-            f"`blender` on PATH is {shown} (< 5.2 required); install a newer Blender "
-            f"or set $HARMONIC_BLENDER / pass --blender")
+        return _require_52(which, "install a newer Blender or set $HARMONIC_BLENDER / "
+                                  "pass --blender")
     raise SystemExit(
         "no Blender >= 5.2 found; install it or set $HARMONIC_BLENDER / pass --blender")
 
