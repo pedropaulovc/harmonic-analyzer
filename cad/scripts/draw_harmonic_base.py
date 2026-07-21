@@ -351,7 +351,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         side,
-        symbol_xy=(0.285, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
+        symbol_xy=(0.255, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0 - 0.004),
         datum="A",
         label="machined underside datum",
         entity=datum_a_edge,
@@ -414,7 +414,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.060, 0.125),
+        frame_xy=(0.025, 0.145),
         characteristic="position",
         tolerance="0.50",
         datums=("A", "B", "C"),
