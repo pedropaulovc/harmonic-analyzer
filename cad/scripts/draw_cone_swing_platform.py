@@ -6,8 +6,8 @@ sheet/template, import, curation, and export behavior lives in ``_drawing_common
 
 The platform is a black-oxide 1/4 in steel plate: an asymmetric wedge (214 long,
 21.5 -> 57 wide) with a Ø6.76 pivot hole at the narrow tip, an open lock notch
-through the west edge, and rounded plan corners.  The sheet runs 1:2; the
-isometric drops to 1:4.
+through the west edge, and rounded plan corners. The sheet and both views run
+1:3 so the plan dimensions remain inside the zone border.
 
 Run with SolidWorks open::
 
@@ -55,10 +55,10 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 2.0)   # 1:2 whole sheet (214 mm plate)
+SHEET_SCALE = (1.0, 3.0)   # 1:3 keeps the 214 mm plan plus dimensions in-zone
 
 # Sheet layout (meters).  The plan (top) is the main view (the wedge, ~28 x 107
-# at 1:2); the isometric also runs 1:2 in the open right-hand field.
+# at 1:3); the isometric uses the same scale in the open right-hand field.
 TOP_CENTER = (0.105, 0.178)
 ISO_CENTER = (0.330, 0.175)
 
@@ -140,8 +140,8 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 3))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
     for view in (top, iso):
         set_hidden_lines_removed(adapter, view)
 

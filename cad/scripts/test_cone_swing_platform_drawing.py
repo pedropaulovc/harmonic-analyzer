@@ -52,14 +52,14 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
 
 
 def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 2.0)
+    assert drawing.SHEET_SCALE == (1.0, 3.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 2)" in source
-    assert source.count("scale=(1, 2)") == 2
-    assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
+    assert "scale=(1, 3)" in source
+    assert source.count("scale=(1, 3)") == 2
+    assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:3"
     assert (
         cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE
-        == "ISOMETRIC VIEW SCALE 1:2"
+        == "ISOMETRIC VIEW SCALE 1:3"
     )
 
 
