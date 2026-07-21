@@ -45,6 +45,9 @@ def test_linked_notes_specify_the_ratio_and_spokes() -> None:
     assert "5X" in notes
     assert "6 STRAIGHT SPOKES" in notes
     assert "5 WIDE x 4 THICK" in notes
+    assert "GROOVED BRASS HUB DRUM" in notes
+    assert "CURRENT ONE-PIECE SOURCE MODEL" in notes
+    assert "DO NOT" in notes and "RELEASE" in notes
     assert "GRAY-IRON" not in notes and "BLACK-PAINTED" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes

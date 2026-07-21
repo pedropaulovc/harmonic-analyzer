@@ -108,7 +108,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Magnifying Bracket Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "magnifying bracket; collar + arm + flange; black steel fitting",
+            3: "magnifying bracket; collar + arm + flange; steel fitting",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

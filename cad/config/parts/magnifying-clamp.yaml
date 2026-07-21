@@ -1,7 +1,7 @@
 magnifying-clamp:
   number: MHA-042
-  material: C36000 free-machining brass
-  material_specification: C36000 free-machining brass
+  material: Brass
+  material_specification: Brass
   finish: machined
   quantity: 1
   tolerance_class: machined_block

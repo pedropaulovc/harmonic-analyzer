@@ -119,7 +119,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Knife-Mount Bearing Block Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "knife mount; cast iron bearing block; knife-edge bore",
+            3: "knife mount; brass bearing block; knife-edge bore",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

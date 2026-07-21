@@ -9,7 +9,7 @@ assembly layout; the fixed values are mirrored here for the drawing's view math,
 and the offline lockstep test asserts the part marks and the drawing keeps
 EXACTLY ``DRAWING_DIMENSIONS``.
 
-NOTE on the "knife edge": this cast BEARING BLOCK carries a circular bore MUCH
+NOTE on the "knife edge": this brass BEARING BLOCK carries a circular bore MUCH
 larger than the mating hex trunnion, so only the trunnion's TOP VERTEX LINE nears
 the bore's upper inner wall -- the true knife-edge line contact.  The sharp ridge
 is on the LEVER trunnion (``build_summing_lever``), NOT on this part; this part's
@@ -37,10 +37,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "BORE Ø25.4 THRU: THIS IS THE KNIFE-EDGE BEARING - THE LEVER TRUNNION'S",
-        "TOP VERTEX RIDES THE BORE'S UPPER INNER WALL IN LINE CONTACT.",
-        "BORE ROUND AND SMOOTH, Ra 0.8, NO BELL-MOUTH; THE UPPER WALL IS THE",
-        "WORKING SEAT. TWO USED (ONE PER TRUNNION), FRONT AND BACK.",
+        "BORE Ø25.4 THRU; TWO BLOCKS USED, ONE PER TRUNNION.",
+        "THE CURRENT MODEL HAS NO HARDENED KNIFE SEAT OR MOUNT-TO-CROSSBAR",
+        "HOLES. SEAT MATERIAL, GEOMETRY, RETENTION, AND MOUNTING PATTERN ARE",
+        "NOT DEFINED. DO NOT RELEASE UNTIL THOSE DETAILS ARE SPECIFIED.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

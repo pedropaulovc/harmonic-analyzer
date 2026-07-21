@@ -1,8 +1,8 @@
 magnifying-wheel:
   number: MHA-045
-  material: ASTM A48 Class 30 gray cast iron
-  material_specification: ASTM A48 Class 30 gray cast iron
-  finish: black paint; rim edge + hub drum machined bright
+  material: Gray Cast Iron
+  material_specification: Gray Cast Iron
+  finish: black paint; rim edge machined bright
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing

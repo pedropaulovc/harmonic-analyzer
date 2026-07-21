@@ -74,7 +74,7 @@ from knife_mount_spec import (
 import _telemetry
 
 PART_NAME = "knife-mount"
-MATERIAL = "Gray Cast Iron"  # cast bearing bracket, painted dark (ch18 p.43)
+MATERIAL = "Brass"  # registry + DFM assessment; the old cast-iron constant was stale
 
 # --- knife-edge geometry (kept in sync with the lever's hex trunnion) -------
 RIDGE_Y = HEX_H / 2.0  # hex top vertex above the pivot/cylinder centreline (5.134)

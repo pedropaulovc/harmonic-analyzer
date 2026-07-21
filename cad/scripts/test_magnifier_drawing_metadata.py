@@ -32,13 +32,6 @@ def test_title_block_owns_material_finish_units_and_general_requirements() -> No
         " MM",
         "MATERIAL:",
         "FINISH:",
-        "AISI",
-        "ASTM",
-        "C36000",
-        "GRAY IRON",
-        "CAST IRON",
-        "BRASS",
-        "STEEL",
         "DEBUR",
         "BURR",
         "REMOVE BURR",
@@ -59,6 +52,9 @@ def test_title_block_owns_material_finish_units_and_general_requirements() -> No
         config = _config.parts(part_name)
         material = config["material_specification"].strip().upper()
         finish = config["finish"].strip().upper()
+        # Exact title-block values must not be repeated.  Other material words
+        # remain legal when they identify a feature-specific exception or an
+        # explicit release hold (for example the wheel's unresolved brass hub).
         assert material and material not in notes, part_name
         assert finish and finish not in notes, part_name
         for duplicate in template_owned:

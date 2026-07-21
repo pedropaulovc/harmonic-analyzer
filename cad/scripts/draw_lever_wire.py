@@ -95,7 +95,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Lever Wire (WIRE 1) Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "lever wire; drawn spring steel; amplification chain",
+            3: "lever wire; drawn steel wire; amplification chain",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

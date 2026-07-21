@@ -36,10 +36,13 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert abs(knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
 
 
-def test_linked_notes_call_out_the_knife_edge_bearing_bore() -> None:
+def test_linked_notes_expose_the_unresolved_knife_seat_and_mounting_pattern() -> None:
     notes = knife_mount_spec.DRAWING_NOTES
-    assert "KNIFE-EDGE BEARING" in notes
-    assert "Ra 0.8" in notes
+    assert "BORE Ø25.4 THRU" in notes
+    assert "NO HARDENED KNIFE SEAT" in notes
+    assert "MOUNT-TO-CROSSBAR" in notes
+    assert "DO NOT RELEASE" in notes
+    assert "Ra 0.8" not in notes
     assert "GRAY IRON" not in notes and "PAINT BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes
@@ -48,12 +51,11 @@ def test_linked_notes_call_out_the_knife_edge_bearing_bore() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_native_gdt_and_bore_finish() -> None:
+def test_native_gdt_and_bore_geometry() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert 'characteristic="position"' in source
-    assert source.count("add_surface_finish(") == 1
     assert source.count("add_edge_dimension(") == 1
 
 
