@@ -1,0 +1,271 @@
+r"""Create the curated machinist drawing for the channel (top) lever.
+
+The SLDPRT remains authoritative.  This recipe supplies only the channel-lever
+views, dimension layout, hole callouts, and manufacturing notes; every shared
+sheet/template, import, curation, and export behavior lives in
+``_drawing_common``.
+
+The lever is a long thin third-class lever (~186 mm nose-to-tip, 9.5 mm tall,
+3.0 mm thick).  The sheet runs at 1:1 with a small 1:4 isometric; the 3.0 x 9.5
+section is dimensioned on a right end view.
+
+Run with SolidWorks open::
+
+    uv run python cad\scripts\draw_channel_lever.py channel-lever
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from typing import Any
+
+import _telemetry
+from _common import CAD_ROOT, check, run_build
+from _drawing_common import (
+    DrawingOutputs,
+    add_datum_feature,
+    add_edge_dimension,
+    add_feature_control_frame,
+    add_native_hole_callout,
+    add_property_linked_note,
+    add_surface_finish,
+    curate_view_dimensions,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    set_basic_dimension,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
+    stamp_drawing_summary,
+)
+from _drawing_registry import DRAWINGS_BY_NAME
+from channel_lever_spec import (
+    BAR_PIN_X,
+    BAR_TALL,
+    LEVER_SPRING_X,
+    LEVER_THICKNESS,
+    PIVOT_HOLE_DIA,
+    TIP_END_X,
+)
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    place_view,
+)
+
+
+SPEC = DRAWINGS_BY_NAME["channel_lever"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+SLDDRW = OUTPUTS.slddrw
+PDF = OUTPUTS.pdf
+PNG = OUTPUTS.png
+
+SHEET_SCALE = (1.0, 1.0)  # 1:1
+
+_NOSE_R = BAR_TALL / 2.0  # 4.75
+_BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
+_SPRING_HOLE_DIA = 4.039  # #21 drill
+_BAR_PIN_DIA = 1.994  # #47 drill
+
+FRONT_CENTER = (0.150, 0.155)
+RIGHT_CENTER = (0.295, 0.155)
+ISO_CENTER = (0.360, 0.210)
+
+
+def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
+    """Sheet (x, y) of a model point in the bbox-centred front view (1:1)."""
+    return (
+        FRONT_CENTER[0] + (mx - _BBOX_CX) / 1000.0,
+        FRONT_CENTER[1] + my / 1000.0,
+    )
+
+
+FRONT_KEEP = {
+    "BarLength": (FRONT_CENTER[0] - 0.010, 0.138),
+    "NoseRadius": (0.070, 0.172),
+    "TipRadius": (0.240, 0.172),
+    "FulcrumDia": (0.075, 0.180),
+}
+RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+TOP_KEEP: dict[str, tuple[float, float]] = {}
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+
+    check("open channel-lever source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
+        ),
+    )
+    drawing_model, _sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Channel Lever Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "channel lever; cast iron; third-class lever",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
+    for view in (right, iso):
+        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_visible(adapter, front)
+
+    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to front view")
+
+    # Fulcrum -> bar-pin (127) and fulcrum -> spring-eye (177.8) centre distances
+    # (bore edge to bore edge; SolidWorks dimensions circle edges centre-to-centre).
+    fulcrum_rim = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
+    bar_pin_rim = _sheet_xy(BAR_PIN_X - _BAR_PIN_DIA / 2.0, 0.0)
+    spring_rim = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
+    bar_pin_c2c = add_edge_dimension(
+        adapter,
+        front,
+        p0=fulcrum_rim,
+        p1=bar_pin_rim,
+        text_xy=(FRONT_CENTER[0] - 0.020, 0.128),
+        label="fulcrum-to-bar-pin c2c",
+    )
+    set_basic_dimension(adapter, bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
+    spring_c2c = add_edge_dimension(
+        adapter,
+        front,
+        p0=fulcrum_rim,
+        p1=spring_rim,
+        text_xy=(FRONT_CENTER[0], 0.118),
+        label="fulcrum-to-spring c2c",
+    )
+    set_basic_dimension(adapter, spring_c2c, label="fulcrum-to-spring c2c")
+
+    # Section thickness (3.0) + bar height (9.5) on the right end view.
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=(RIGHT_CENTER[0] - LEVER_THICKNESS / 2000.0, RIGHT_CENTER[1]),
+        p1=(RIGHT_CENTER[0] + LEVER_THICKNESS / 2000.0, RIGHT_CENTER[1]),
+        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.028),
+        label="lever thickness",
+    )
+    add_edge_dimension(
+        adapter,
+        right,
+        p0=(RIGHT_CENTER[0], RIGHT_CENTER[1] - BAR_TALL / 2000.0),
+        p1=(RIGHT_CENTER[0], RIGHT_CENTER[1] + BAR_TALL / 2000.0),
+        text_xy=(RIGHT_CENTER[0] + 0.024, RIGHT_CENTER[1]),
+        label="bar height",
+    )
+
+    # Hole callouts (bar-pin #47, spring-eye #21).  Pick a point ON each hole's
+    # rim, not its centre: SolidWorks edge selection only catches the circular
+    # edge within tolerance of the rim.  The bar-pin sits in the tall 9.5 mm bar,
+    # so its 12-o'clock rim is clear.  The spring eye rides a narrow 6.0 mm tab
+    # (rim ~1 mm from the tab's top edge), so a 12-o'clock pick grabs the tab
+    # edge and AddHoleCallout2 fails -- pick it at 9 o'clock (toward the lever
+    # body, on the Y=0 centreline), ~3 mm from the tab edges and clear of the tip.
+    bar_pin_edge = _sheet_xy(BAR_PIN_X, _BAR_PIN_DIA / 2.0)
+    spring_edge = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
+    add_native_hole_callout(
+        adapter,
+        front,
+        edge_xy=bar_pin_edge,
+        callout_xy=(bar_pin_edge[0] - 0.010, 0.185),
+        label="bar-pin hole",
+    )
+    add_native_hole_callout(
+        adapter,
+        front,
+        edge_xy=spring_edge,
+        callout_xy=(spring_edge[0] + 0.005, 0.185),
+        label="spring-eye hole",
+    )
+
+    # Datum A on the fulcrum bore axis (9 o'clock), Ra on the bore (6 o'clock),
+    # position FCF tying the spring-eye hole to A.
+    fulcrum_left = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=fulcrum_left,
+        symbol_xy=(fulcrum_left[0] - 0.018, fulcrum_left[1]),
+        datum="A",
+        label="fulcrum bore axis",
+    )
+    fulcrum_bottom = _sheet_xy(0.0, -PIVOT_HOLE_DIA / 2.0)
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=fulcrum_bottom,
+        symbol_xy=(fulcrum_bottom[0] + 0.008, fulcrum_bottom[1] - 0.018),
+        roughness_ra="1.6",
+        label="fulcrum bore finish",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=spring_edge,
+        frame_xy=(spring_edge[0] - 0.010, 0.200),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A",),
+        diameter=True,
+        label="spring-eye hole position",
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
+
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title="Channel Lever Manufacturing Drawing",
+        scale=SHEET_SCALE,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))

@@ -62,10 +62,10 @@ DRAWING_NOTES = "\n".join(
         "2. STRAP 16 DEEP x 2.5 THICK.",
         "3. TOP EDGE R800, BOTTOM EDGE R816,",
         "   CONCENTRIC; CENTRE 808 ABOVE PIVOT.",
-        "4. ARC LENGTHS 11.5 IN TOP / 10.5 IN",
-        "   BOTTOM TAPER THE ENDS.",
-        "5. EACH TIP: 0.22 IN FACE PERP TO TOP EDGE.",
-        "6. PIVOT HOLE: REAM TO SUIT 6.35 SHAFT.",
+        "4. ARC LENGTHS 292.1 TOP / 266.7 BOTTOM",
+        "   TAPER THE ENDS.",
+        "5. EACH TIP: 5.59 FACE PERP TO TOP EDGE.",
+        "6. PIVOT HOLE: REAM 6.50 THRU.",
         "7. ROD-PIN HOLE: #47 DRILL THRU.",
     )
 )

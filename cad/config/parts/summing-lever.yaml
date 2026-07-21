@@ -1,5 +1,8 @@
 summing-lever:
   number: MHA-073
   material: Gray Cast Iron
+  material_specification: ASTM A48 Class 30 gray cast iron
+  finish: green enamel; knife edges + anchor bore machined
+  quantity: 20
   tolerance_class: machined_block
   process: "cast + machined"

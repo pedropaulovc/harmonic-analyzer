@@ -56,6 +56,17 @@ from _features import (
     add_spring_end_hooks,
     insert_helix,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from counter_spring_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 import _telemetry
 
@@ -169,7 +180,30 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, SPRING_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+
+    # Manufacturing drawing support: a coil spring carries no graphical marked
+    # dimensions (the data table governs), so the mark loop is a no-op; stamp the
+    # make-critical title-block properties + the spring data table.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "Isometric View Note",
+        ),
+    )
+    return artefacts
 
 
 if __name__ == "__main__":

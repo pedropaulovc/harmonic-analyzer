@@ -43,8 +43,17 @@ from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _common import run_build, save_part_and_images
 from _spring import COIL_BODY_LENGTH, HOOK_LEAD, build_spring
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from channel_spring_installed_spec import (
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "channel-spring-installed"
 
@@ -66,10 +75,33 @@ assert INSTALLED_BODY_LENGTH > COIL_BODY_LENGTH, "installed spring must be stret
 
 
 async def build(adapter) -> dict[str, str]:
-    return await build_spring(
+    result = await build_spring(
         adapter, PART_NAME, INSTALLED_BODY_LENGTH, leads=(BOTTOM_LEAD, TOP_LEAD),
         eye_axes=True,
     )
+    # Manufacturing spec-sheet support: a coil spring carries no graphical marked
+    # dimensions (the data table governs), so no mark loop; stamp the
+    # make-critical title-block properties + the spring data table, then re-save.
+    # (build_spring already saved once; this re-stamps the canonical installed
+    # part only -- the mass-produced stretch variants never take this path.)
+    clear_dimensions_for_drawing(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "Isometric View Note",
+        ),
+    )
+    return {**result, **artefacts}
 
 
 if __name__ == "__main__":

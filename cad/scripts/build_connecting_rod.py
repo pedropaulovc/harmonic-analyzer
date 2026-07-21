@@ -58,6 +58,17 @@ from _common import (
     volume_check,
 )
 from _holes import HoleSpec, wizard_holes
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from connecting_rod_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 import _telemetry
 
@@ -380,7 +391,29 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "Isometric View Note",
+        ),
+    )
+    return artefacts
 
 
 if __name__ == "__main__":

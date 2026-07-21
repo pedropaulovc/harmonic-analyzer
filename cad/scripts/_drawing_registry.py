@@ -285,6 +285,18 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="channel-spring-installed",
         script_name="draw_channel_spring_installed.py",
     ),
+    DrawingSpec(
+        name="spring_hook",
+        part="spring_hook",
+        artifact_stem="spring-hook",
+        script_name="draw_spring_hook.py",
+    ),
+    DrawingSpec(
+        name="summing_lever",
+        part="summing_lever",
+        artifact_stem="summing-lever",
+        script_name="draw_summing_lever.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

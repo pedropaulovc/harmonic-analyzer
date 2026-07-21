@@ -47,11 +47,13 @@ def test_sheet_runs_at_1_to_2() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_are_functional_and_us_customary() -> None:
+def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = rocker_arm_spec.DRAWING_NOTES
     assert "R800" in notes
     assert "R816" in notes
     assert "#47 DRILL" in notes
+    assert "11.5 IN" not in notes
+    assert "0.22 IN" not in notes
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
@@ -75,6 +77,6 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("rocker-arm")
-    assert spec["material_specification"]
-    assert spec["finish"]
+    assert spec["material_specification"] == "AISI 1018 cold-rolled steel strap"
+    assert spec["finish"] == "matte black oxide"
     assert int(spec["quantity"]) == 20
