@@ -210,7 +210,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=blade_face_edge,
-        frame_xy=(0.230, 0.145),
+        frame_xy=(0.260, 0.150),
         characteristic="parallelism",
         tolerance="0.20",
         datums=("A",),
@@ -221,7 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=blade_face_edge,
-        symbol_xy=(0.230, 0.118),
+        symbol_xy=(0.205, 0.123),
         roughness_ra="0.8",
         label="spring concave blade broad face",
     )
