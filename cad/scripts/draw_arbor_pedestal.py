@@ -340,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
         foot_entity,
         bore_entity,
         orientation="vertical",
-        position=(0.040, FRONT_CENTER[1]),
+        position=(0.060, FRONT_CENTER[1]),
         label="bore vertical location",
     )
     add_datum_feature(
@@ -356,7 +356,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(2.5)),
-        symbol_xy=(0.055, _front_y(2.5)),
+        symbol_xy=(0.040, _front_y(2.5)),
         datum="B",
         label="left foot side",
         entity=side_entity,
