@@ -28,7 +28,9 @@ def test_notes_describe_the_wire_hook() -> None:
     notes = boss_hook_spec.DRAWING_NOTES
     assert "WIRE" in notes
     assert "R3 +/-0.20" in notes
-    assert "OVALITY" in notes
+    assert "(MAX DIA - MIN DIA)/3.00 <= 0.05" in notes
+    assert "FLAT SURFACE PLATE; 0.25 MAX GAP" in notes
+    assert "5X MAGNIFICATION" in notes
     assert "AISI" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")

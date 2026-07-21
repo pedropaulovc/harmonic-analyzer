@@ -2,7 +2,7 @@ boss-hook:
   number: MHA-005
   material: AISI 1018 cold-drawn steel wire
   material_specification: "AISI 1018 cold-drawn steel wire"
-  finish: "black oxide"
+  finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"
