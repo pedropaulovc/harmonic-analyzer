@@ -218,15 +218,15 @@ def _visible_hole_table_entities(
     return (
         max(datum_candidates, key=lambda candidate: candidate[0])[1],
         tuple(selected_edges),
-        max(datum_b_candidates, key=lambda edge: float(edge.GetLength())),
-        max(datum_c_candidates, key=lambda edge: float(edge.GetLength())),
+        datum_b_candidates[0],
+        datum_c_candidates[0],
     )
 
 
 def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
     """Return the finished underside A and top-pad face edges in the side view."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    candidates: list[tuple[float, float, Any]] = []
+    candidates: list[tuple[float, Any]] = []
     for component in components:
         edges = adapter._attempt(
             lambda c=component: view.GetVisibleEntities2(c, 1),
@@ -240,12 +240,12 @@ def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
             parameters = tuple(float(value) for value in curve.LineParams)
             if abs(parameters[3]) < 0.99:
                 continue
-            candidates.append((parameters[1], float(edge.GetLength()), edge))
+            candidates.append((parameters[1], edge))
 
     def _at_height(height_m: float, label: str) -> Any:
         matching = [
-            (length, edge)
-            for y, length, edge in candidates
+            edge
+            for y, edge in candidates
             if abs(y - height_m) <= 2e-6
         ]
         if not matching:
@@ -253,7 +253,7 @@ def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
                 f"harmonic-base side view has no visible {label} edge at "
                 f"model Y={height_m:g} m"
             )
-        return max(matching, key=lambda candidate: candidate[0])[1]
+        return matching[0]
 
     return _at_height(0.0, "underside datum A"), _at_height(
         STACK_HEIGHT / 1000.0, "top pad"
