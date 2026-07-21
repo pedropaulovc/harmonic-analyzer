@@ -15,7 +15,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -37,7 +36,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_spring_spec import BLADE_TILT_DEG, THICK, WIDTH
+from pinion_spring_spec import WIDTH
 from build_pinion_spring import (
     BEND_EXIT,
     FLAT_TIP,
@@ -88,24 +87,11 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
 
 
-# East normal of the strap axis (the blade's outward contact face direction).
-_TH = math.radians(BLADE_TILT_DEG)
-_N = (math.cos(_TH), -math.sin(_TH))
 _FOOT_MID_X = (FOOT_END[0] + FOOT_TAN[0]) / 2.0
 _BLADE_MID = (
     (BEND_EXIT[0] + KINK_START[0]) / 2.0,
     (BEND_EXIT[1] + KINK_START[1]) / 2.0,
 )
-# The spring is created as a one-sided thin feature from its open centreline.
-# In the front projection that centreline is the concave outline, not an
-# interior point of the visible broad face.  The live one-sided thin extrusion
-# lands opposite the outward contact normal, so move half a strip thickness in
-# that direction and pick unambiguously inside the projected ribbon.
-_BLADE_FACE_MID = (
-    _BLADE_MID[0] - THICK * _N[0] / 2.0,
-    _BLADE_MID[1] - THICK * _N[1] / 2.0,
-)
-
 FRONT_KEEP = {
     "FootLen": (_front_x(_FOOT_MID_X), 0.088),
     "BendR": (0.036, 0.120),
@@ -188,7 +174,11 @@ async def build(adapter: Any) -> dict[str, str]:
         TOP_CENTER[0],
         TOP_CENTER[1] + WIDTH * SHEET_SCALE[0] / 2000.0,
     )
-    blade_face = (_front_x(_BLADE_FACE_MID[0]), _front_y(_BLADE_FACE_MID[1]))
+    # The thin-feature centreline is a real projected model edge in the front
+    # view.  SOLIDWORKS does not expose the ribbon interior as a selectable
+    # drawing FACE, so attach the broad-face controls to this boundary edge and
+    # name the controlled surface explicitly in the FCF quantity compartment.
+    blade_face_edge = (_front_x(_BLADE_MID[0]), _front_y(_BLADE_MID[1]))
     add_datum_feature(
         adapter,
         top,
@@ -219,22 +209,21 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=blade_face,
+        edge_xy=blade_face_edge,
         frame_xy=(0.230, 0.145),
         characteristic="parallelism",
         tolerance="0.20",
         datums=("A",),
+        quantity="FORMED BROAD FACE",
         label="spring formed broad-face coplanarity",
-        entity_type="FACE",
     )
     add_surface_finish(
         adapter,
         front,
-        edge_xy=blade_face,
+        edge_xy=blade_face_edge,
         symbol_xy=(0.230, 0.118),
         roughness_ra="0.8",
         label="spring concave blade broad face",
-        entity_type="FACE",
     )
     if add_note(adapter, "TOP VIEW (REMOVED) SCALE 2:1", 0.270, 0.078) is None:
         raise RuntimeError("failed to label removed spring top view")
