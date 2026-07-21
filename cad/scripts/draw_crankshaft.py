@@ -51,6 +51,7 @@ from crankshaft_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -267,7 +268,16 @@ async def build(adapter: Any) -> dict[str, str]:
         face=shaft_face,
     )
 
-    front_end_edge = _visible_shaft_end_edges(adapter, front)[0][1]
+    shaft_dia_annotation = next(
+        (
+            annotation
+            for annotation in front_annotations
+            if dimension_name(adapter, annotation) == "ShaftDiaDim"
+        ),
+        None,
+    )
+    if shaft_dia_annotation is None:
+        raise RuntimeError("crankshaft end view is missing ShaftDiaDim annotation")
     right_end_edges = _visible_shaft_end_edges(adapter, right)
     crank_end_edge = right_end_edges[0][1]
     far_end_edge = right_end_edges[-1][1]
@@ -277,7 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.027, FRONT_CENTER[1]),
         datum="A",
         label="shaft OD datum axis",
-        entity=front_end_edge,
+        annotation=shaft_dia_annotation,
         shoulder=True,
     )
     add_datum_feature(
@@ -327,7 +337,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         right,
-        symbol_xy=(0.205, 0.055),
+        symbol_xy=(0.205, 0.145),
         roughness_ra="1.6",
         label="crankshaft bearing finish",
         entity_type="FACE",

@@ -82,6 +82,9 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert 'entity_type="FACE"' in source
     assert "edge_entity=shaft_face" in source
     assert 'production_method="SHAFT OD"' in source
+    assert 'dimension_name(adapter, annotation) == "ShaftDiaDim"' in source
+    assert "annotation=shaft_dia_annotation" in source
+    assert "symbol_xy=(0.205, 0.145)" in source
     assert 'characteristic="position"' in source
     assert 'characteristic="perpendicularity"' in source
     assert "face_xy=" not in source
