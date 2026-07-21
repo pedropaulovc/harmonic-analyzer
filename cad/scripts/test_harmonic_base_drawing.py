@@ -49,16 +49,15 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "DEBURR" not in notes
     assert "UOS" not in notes
     assert "JOINED" not in notes
-    assert "ALL WALLS 2 DEG DRAFT" in notes
-    assert "ALL FILLETS/CORNERS R3.00" in notes
-    assert "MACHINING DATUM FACES A/B/C" in notes
-    assert "MACHINE A (UNDERSIDE) FLAT 0.10" in notes
-    assert "B=LONG-SIDE EDGE; C=LEFT END" in notes
-    assert "TOP PAD FLAT 0.10, PARALLEL 0.10 TO A" in notes
+    assert "MACHINE FROM SOLID STOCK" in notes
+    assert "NO DRAFT" in notes
+    assert "PAD AND FLANGE CENTRELINES" in notes
+    assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
+    assert "C'BORE AXES WITHIN DIA 0.10 OF ASSOCIATED HOLE AXES" in notes
     assert "BLIND FROM TOP" in notes
     assert "A1-A4" not in notes
     assert "FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES" in notes
-    assert "LOCATIONS BASIC" in notes
+    assert "LOCATIONS ARE BASIC" in notes
     assert re.search(r"\d+\.\d(?!\d)", notes) is None
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -71,8 +70,9 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GetVisibleEntities2(c, 2)" in source
     assert "GetVisibleEntities2(c, 1)" in source
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'quantity="13X TABLED HOLES"' in source
+    assert source.count("add_feature_control_frame(") == 7
+    assert 'quantity="4X DIA 13 THRU HOLES"' in source
+    assert 'quantity="9X BLIND TAPPED HOLES"' in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
     assert "expected_redundant_notes=3" in source
 
@@ -108,8 +108,8 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "gray cast iron" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "shade noncritical" in finish
-    assert "as-cast only" in finish
-    assert "ra 3.2" in finish
+    assert "mask a/b/c" in finish
+    assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
 
 

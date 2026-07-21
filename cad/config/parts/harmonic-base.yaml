@@ -2,7 +2,7 @@ harmonic-base:
   number: MHA-035
   material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
-  finish: green enamel, shade noncritical, as-cast only; Ra 3.2 A/B/C, top pad + hole seats
+  finish: green enamel, shade noncritical; mask A/B/C, top pad + hole seats
   quantity: 1
   tolerance_class: machined_block
-  process: "cast + machined"
+  process: "machined from solid stock"

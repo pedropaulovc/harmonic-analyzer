@@ -314,7 +314,7 @@ async def build(adapter: Any) -> dict[str, str]:
     datum_entity, hole_entities, datum_b_edge, datum_c_edge = (
         _visible_hole_table_entities(adapter, top)
     )
-    datum_a_edge, _top_pad_edge = _visible_side_datum_edges(adapter, side)
+    datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
 
     # One complete hole table: four underside counterbores followed by every
     # top-side blind swing/pinion seat. Non-basic X/Y headers let the title-block
@@ -360,17 +360,77 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.170, 0.094),
+        frame_xy=(0.170, 0.098),
         characteristic="position",
         tolerance="0.50",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="13X TABLED HOLES",
-        label="hole-pattern true position",
+        quantity="4X DIA 13 THRU HOLES",
+        label="through-hole true position",
         entity=hole_entities[2],
     )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.170, 0.085),
+        characteristic="position",
+        tolerance="0.50",
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="9X BLIND TAPPED HOLES",
+        label="tapped-hole true position",
+        entity=hole_entities[4],
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.060, 0.090),
+        characteristic="perpendicularity",
+        tolerance="0.10",
+        datums=("A",),
+        label="datum B perpendicularity to A",
+        entity=datum_b_edge,
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.115, 0.090),
+        characteristic="perpendicularity",
+        tolerance="0.10",
+        datums=("A", "B"),
+        label="datum C perpendicularity to A and B",
+        entity=datum_c_edge,
+    )
+    add_feature_control_frame(
+        adapter,
+        side,
+        frame_xy=(0.285, 0.110),
+        characteristic="flatness",
+        tolerance="0.10",
+        label="datum A flatness",
+        entity=datum_a_edge,
+    )
+    add_feature_control_frame(
+        adapter,
+        side,
+        frame_xy=(0.345, 0.110),
+        characteristic="flatness",
+        tolerance="0.10",
+        label="top-pad flatness",
+        entity=top_pad_edge,
+    )
+    add_feature_control_frame(
+        adapter,
+        side,
+        frame_xy=(0.405, 0.110),
+        characteristic="parallelism",
+        tolerance="0.10",
+        datums=("A",),
+        label="top-pad parallelism to A",
+        entity=top_pad_edge,
+    )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.078)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.062)
     add_property_linked_note(adapter, "Side View Note", 0.300, 0.090)
 
     return await finalize_drawing(
