@@ -241,7 +241,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=bar_pin_edge,
-        frame_xy=(bar_pin_edge[0] - 0.010, 0.200),
+        # Keep this frame below the hole-callout elbow (y ~= 0.182) and in a
+        # separate horizontal lane from the spring-eye frame.  Routing it from
+        # the old above-left position crossed the bar-pin callout leader.
+        frame_xy=(bar_pin_edge[0] - 0.045, 0.174),
         characteristic="position",
         tolerance="0.20",
         datums=("A",),
@@ -252,7 +255,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=spring_edge,
-        frame_xy=(spring_edge[0] - 0.010, 0.200),
+        frame_xy=(spring_edge[0] - 0.040, 0.174),
         characteristic="position",
         tolerance="0.20",
         datums=("A",),
