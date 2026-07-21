@@ -88,7 +88,7 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 
 FRONT_KEEP = {
     "BarLength": (FRONT_CENTER[0] - 0.010, 0.138),
-    "TipCentreX": (FRONT_CENTER[0] + 0.040, 0.125),
+    "TipCentreX": (FRONT_CENTER[0] + 0.070, 0.125),
     "NoseRadius": (0.070, 0.172),
     "TipRadius": (0.240, 0.172),
     "FulcrumDia": (0.075, 0.180),
@@ -277,6 +277,31 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A", "B", "C"),
         all_around=True,
         label="outer perimeter profile",
+    )
+    fulcrum_bottom = _sheet_xy(0.0, -PIVOT_HOLE_DIA / 2.0)
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=fulcrum_bottom,
+        frame_xy=(0.065, 0.200),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A",),
+        label="fulcrum bore perpendicularity",
+    )
+    opposite_broad_face = (
+        RIGHT_CENTER[0] + LEVER_THICKNESS / 2000.0,
+        RIGHT_CENTER[1],
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=opposite_broad_face,
+        frame_xy=(0.225, 0.205),
+        characteristic="parallelism",
+        tolerance="0.05",
+        datums=("A",),
+        label="opposite broad face parallelism",
     )
     add_feature_control_frame(
         adapter,

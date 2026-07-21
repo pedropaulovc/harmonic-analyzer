@@ -60,10 +60,13 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 3
+    assert source.count("add_feature_control_frame(") == 5
     assert source.count('characteristic="position"') == 2
     assert source.count('datums=("A", "B", "C")') == 3
     assert 'characteristic="profile_surface"' in source
+    assert 'characteristic="perpendicularity"' in source
+    assert 'characteristic="parallelism"' in source
+    assert source.count('datums=("A",)') == 2
     assert "all_around=True" in source
     assert 'edge_xy=bar_pin_edge' in source
     assert 'label="bar-pin hole position"' in source
