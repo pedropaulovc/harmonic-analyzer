@@ -51,6 +51,7 @@ from crankshaft_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -252,16 +253,18 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter, right_annotations, {"PinHeight": (0.132, 0.105)}
     )
+    shaft_diameter_annotation = next(
+        annotation
+        for annotation in front_annotations
+        if dimension_name(adapter, annotation) == "ShaftDiaDim"
+    )
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(
-            FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-            FRONT_CENTER[1],
-        ),
-        symbol_xy=(FRONT_CENTER[0] + 0.027, FRONT_CENTER[1]),
+        symbol_xy=(0.034, 0.135),
         datum="A",
         label="shaft OD datum axis",
+        annotation=shaft_diameter_annotation,
     )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the

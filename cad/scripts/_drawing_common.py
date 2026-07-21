@@ -311,16 +311,29 @@ def add_datum_feature(
     entity_type: str = "EDGE",
     entity: Any | None = None,
     shoulder: bool = False,
+    annotation: Any | None = None,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
-    _select_view_entity(
-        adapter, view, entity_type, edge_xy, label=label, entity=entity
-    )
     draw = adapter.currentModel
+    if annotation is None:
+        _select_view_entity(
+            adapter, view, entity_type, edge_xy, label=label, entity=entity
+        )
+    else:
+        ddoc = _early_bound(draw, "IDrawingDoc")
+        name = view_name(adapter, view)
+        if not ddoc.ActivateView(name):
+            raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+        draw.ClearSelection2(True)
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "Select2"
+        )
+        if not annotation.Select2(False, 0):
+            raise RuntimeError(f"failed to select {label} dimension annotation")
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
