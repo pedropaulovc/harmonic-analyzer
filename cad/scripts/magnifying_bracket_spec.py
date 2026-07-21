@@ -37,7 +37,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "COLLAR Ø12 OD, BORE Ø6.2 THRU x 10 LONG - SLIP GUIDE ON THE Ø6 LEVER ROD.",
+        "COLLAR Ø12 OD x 10 LONG (X), BORE Ø6.2 THRU - SLIP GUIDE ON THE",
+        "Ø6 LEVER ROD.",
         "ARM 10 WIDE x 7.5 THICK (Y); FLANGE 5 THICK (Y), BUTTS THE SUMMING-",
         "PLATE FRONT FACE. CURRENT PART IS AN UNDRILLED BLANK: MOUNTING-HOLE",
         "AXIS AND PATTERN ARE NOT DEFINED. DO NOT RELEASE UNTIL SPECIFIED.",

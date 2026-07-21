@@ -30,6 +30,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -70,6 +71,14 @@ TOP_KEEP = {
 }
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+# Blind-review round 1: the four plan values read unattached at a glance --
+# label each with the feature it controls.
+DIMENSION_CALLOUTS = {
+    "ArmWidth": "ARM WIDTH",
+    "ArmDepth": "ARM LENGTH",
+    "FlangeWidth": "FLANGE WIDTH",
+    "FlangeDepth": "FLANGE DEPTH",
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -123,9 +132,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, front):
         set_hidden_lines_visible(adapter, view)
 
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
+    )
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    set_dimension_callouts(adapter, top_annotations, DIMENSION_CALLOUTS)
 
     # ASME centre mark on the collar bore (a real circular edge in the end view).
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
