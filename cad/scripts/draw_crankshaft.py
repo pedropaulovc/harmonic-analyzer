@@ -154,7 +154,7 @@ def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
             f"crankshaft side view has no visible edge adjacent to the "
             f"#9 cylindrical face at radius {expected_radius_m:g} m"
         )
-    return max(candidates, key=lambda edge: float(edge.GetLength()))
+    return candidates[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
