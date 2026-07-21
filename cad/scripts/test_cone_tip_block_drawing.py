@@ -80,6 +80,7 @@ def test_datum_and_position_controls_are_present() -> None:
     assert 'datum="B"' in source
     assert 'datum="C"' in source
     assert 'datum="D"' in source
+    assert "shoulder=True" in source
     assert source.count('characteristic="position"') == 2
     assert source.count("set_basic_dimension(") == 2
     assert 'label="pinch-axis height"' in source

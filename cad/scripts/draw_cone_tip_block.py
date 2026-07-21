@@ -275,6 +275,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="D",
         label="block-depth median plane",
         entity_type="DIMENSION",
+        shoulder=True,
     )
     passage_entity = _circle_entity(
         adapter,
