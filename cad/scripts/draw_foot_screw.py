@@ -62,7 +62,7 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # that SolidWorks will not point-select -- the two LENGTHS are therefore inserted
 # as the head/shank extrude-DEPTH model dimensions (HeadHt/ShankLg), not as
 # drawing-native edge dimensions.
-END_CENTER = (0.075, 0.180)
+END_CENTER = (0.085, 0.180)
 SIDE_CENTER = (0.190, 0.150)
 ISO_CENTER = (0.300, 0.175)
 
@@ -79,9 +79,10 @@ _JUNCTION_Y = _side_y(0.0)  # head/shank step
 _SHANK_END_Y = _side_y(-SHANK_LEN)  # shank tip (bottom)
 
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
+END_DIM_X = 0.040
 END_KEEP = {
-    "HeadDia": (0.030, END_CENTER[1] + 0.024),
-    "ShankDia": (0.030, END_CENTER[1] - 0.024),
+    "HeadDia": (END_DIM_X, END_CENTER[1] + 0.024),
+    "ShankDia": (END_DIM_X, END_CENTER[1] - 0.024),
 }
 DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
 

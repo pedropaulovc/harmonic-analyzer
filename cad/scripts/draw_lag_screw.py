@@ -62,7 +62,7 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # the *Bottom view; the profile (axis VERTICAL, head at bottom) in *Front.
 # The side view sits high so the ~126 mm profile clears the wide manufacturing
 # note that anchors just above the title block.
-END_CENTER = (0.070, 0.180)
+END_CENTER = (0.085, 0.180)
 SIDE_CENTER = (0.190, 0.168)
 ISO_CENTER = (0.320, 0.175)
 
@@ -78,9 +78,10 @@ _JUNCTION_Y = _side_y(0.0)  # head/shank step
 _SHANK_END_Y = _side_y(SHANK_LEN)  # shank tip (top)
 
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
+END_DIM_X = 0.043
 END_KEEP = {
-    "HeadDia": (0.028, END_CENTER[1] + 0.030),
-    "ShankDia": (0.028, END_CENTER[1] - 0.030),
+    "HeadDia": (END_DIM_X, END_CENTER[1] + 0.030),
+    "ShankDia": (END_DIM_X, END_CENTER[1] - 0.030),
 }
 DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
 
