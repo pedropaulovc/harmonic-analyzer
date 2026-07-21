@@ -24,6 +24,7 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -60,9 +61,9 @@ SHEET_SCALE = (3.0, 1.0)
 # Front view (XY): the collar circle is centred ECC BELOW the origin, the bore
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
 FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + 0.5))) / 2.0
-FRONT_CENTER = (0.085, 0.150)
-TOP_CENTER = (0.085, 0.232)
-ISO_CENTER = (0.215, 0.185)
+FRONT_CENTER = (0.105, 0.150)
+TOP_CENTER = (0.100, 0.232)
+ISO_CENTER = (0.230, 0.185)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -77,23 +78,24 @@ BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "BoreDia": (0.050, 0.150),
-    "CollarOd": (0.030, 0.120),
-    "CollarCy": (0.145, 0.135),
+    "BoreDia": (0.045, 0.165),
+    "CollarOd": (0.025, 0.120),
+    "CollarCy": (0.170, 0.135),
 }
 TOP_KEEP = {
-    "Depth": (0.085, 0.195),
-    "BossDia": (0.145, 0.225),
-    "BossCz": (0.145, 0.200),
+    "Depth": (0.100, 0.195),
+    "BossDia": (0.180, 0.225),
+    "BossCz": (0.155, 0.200),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU\nRa 1.6",
+    "BoreDia": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU",
     "CollarOd": "+/-0.05",
     "CollarCy": "+/-0.05 BOTH END FACES",
     "Depth": "+/-0.05",
     "BossDia": (
         "+/-0.05\nPROJECTION 0.50+/-0.05\nBEYOND DIA 9.20 OD"
     ),
+    "BossCz": "A TO BOSS / TAP AXIS",
 }
 
 
@@ -139,7 +141,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    iso = place_view(adapter, str(SOURCE), "*Trimetric", *ISO_CENTER, scale=(2, 1))
     set_hidden_lines_removed(adapter, iso)
     for view in (front, top):
         set_hidden_lines_visible(adapter, view)
@@ -168,12 +170,17 @@ async def build(adapter: Any) -> dict[str, str]:
 
     bore_center = (FRONT_CENTER[0], _front_y(0.0))
     bore_bottom = (bore_center[0], bore_center[1] - BORE_R_SHEET)
+    bore_right = (bore_center[0] + BORE_R_SHEET, bore_center[1])
     front_face_x = TOP_CENTER[0] - CAM_LEN * SHEET_SCALE[0] / 2000.0
     front_face = (front_face_x, TOP_CENTER[1])
     boss_center_x = front_face_x + BOSS_Z * SHEET_SCALE[0] / 1000.0
     boss_top = (
         boss_center_x,
         TOP_CENTER[1] + BOSS_DIA * SHEET_SCALE[0] / 2000.0,
+    )
+    tap_bottom = (
+        boss_center_x,
+        TOP_CENTER[1] - 2.5 * SHEET_SCALE[0] / 2000.0,
     )
     od_center = (FRONT_CENTER[0], _front_y(-ECC))
     od_bottom = (od_center[0], od_center[1] - CAM_R_SHEET)
@@ -190,7 +197,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=bore_bottom,
-        symbol_xy=(0.065, 0.112),
+        symbol_xy=(0.085, 0.105),
         datum="B",
         label="cam final bore axis",
     )
@@ -198,7 +205,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=od_bottom,
-        symbol_xy=(0.125, 0.112),
+        symbol_xy=(0.155, 0.105),
         datum="C",
         label="cam OD datum axis",
     )
@@ -208,12 +215,32 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=boss_top,
         frame_xy=(0.150, 0.265),
         characteristic="position",
-        tolerance="0.05",
+        tolerance="0.03",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="2X COAXIAL AXES",
+        quantity="BOSS OD AXIS",
         label="cam boss axis position",
         entity_type="SILHOUETTE",
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=tap_bottom,
+        frame_xy=(0.270, 0.250),
+        characteristic="position",
+        tolerance="0.03",
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="M2.5 TAP PITCH AXIS",
+        label="cam tap pitch axis position",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=bore_right,
+        symbol_xy=(0.155, 0.175),
+        roughness_ra="1.6",
+        label="cam bore finish",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)

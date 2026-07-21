@@ -54,8 +54,9 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
 def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(2, 1)" in source  # the isometric override
-    assert pinion_cam_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
+    assert '"*Trimetric"' in source
+    assert "scale=(2, 1)" in source  # the trimetric override
+    assert pinion_cam_spec.ISOMETRIC_VIEW_NOTE == "TRIMETRIC VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
@@ -81,13 +82,17 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
 def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 1
+    assert source.count("add_feature_control_frame(") == 2
     assert "set_basic_dimension(" in source
     assert 'datums=("A", "B", "C")' in source
-    assert 'quantity="2X COAXIAL AXES"' in source
-    assert "add_surface_finish(" not in source
+    assert 'quantity="BOSS OD AXIS"' in source
+    assert 'quantity="M2.5 TAP PITCH AXIS"' in source
+    assert "COMMON ZONE" not in pinion_cam_spec.DRAWING_NOTES
+    assert "SEPARATE POSITION FRAMES" in pinion_cam_spec.DRAWING_NOTES
+    assert "add_surface_finish(" in source
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 3
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 2
+    assert "A TO BOSS / TAP AXIS" in drawing.DIMENSION_CALLOUTS["BossCz"]
     assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["CollarCy"]
 
 
