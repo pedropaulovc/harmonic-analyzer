@@ -161,7 +161,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=anchor_bore_edge,
-        callout_xy=(anchor_bore_edge[0] - 0.020, anchor_bore_edge[1] - 0.022),
+        callout_xy=(0.060, 0.125),
         label="anchor bore",
     )
 
