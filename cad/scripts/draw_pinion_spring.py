@@ -94,7 +94,7 @@ _FOOT_MID_X = (FOOT_END[0] + FOOT_TAN[0]) / 2.0
 FRONT_KEEP = {
     "FootLen": (_front_x(_FOOT_MID_X), 0.088),
     "BendR": (0.036, 0.120),
-    "KinkR": (0.125, 0.225),
+    "KinkR": (0.085, 0.235),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {
@@ -168,7 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         text=TERMINAL_CALLOUT,
         entity_xy=(_front_x(terminal_mid[0]), _front_y(terminal_mid[1])),
-        note_xy=(0.185, 0.225),
+        note_xy=(0.215, 0.235),
         label="spring short terminal inside edge",
         entity_type="SILHOUETTE",
     )

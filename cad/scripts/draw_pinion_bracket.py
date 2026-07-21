@@ -100,10 +100,10 @@ FRONT_KEEP = {
     "PinSeatCy": (0.058, 0.128),
 }
 RIGHT_KEEP = {
-    "Depth": (0.200, 0.082),
-    "PinSeatDia": (0.262, 0.128),
+    "Depth": (0.190, 0.068),
+    "PinSeatDia": (0.282, 0.132),
     # Locates the pin seat through the thickness (mid-plane) in the section view.
-    "PinSeatCz": (0.225, 0.180),
+    "PinSeatCz": (0.245, 0.190),
 }
 DIMENSION_CALLOUTS = {
     "ArborBoreCz": "+/-0.10",
