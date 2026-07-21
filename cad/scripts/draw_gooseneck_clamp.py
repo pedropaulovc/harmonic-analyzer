@@ -36,7 +36,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_gooseneck_clamp import BLOCK_HALF_X, BLOCK_HALF_Z, BLOCK_HEIGHT
+from build_gooseneck_clamp import BLOCK_HALF_X, BLOCK_HEIGHT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,

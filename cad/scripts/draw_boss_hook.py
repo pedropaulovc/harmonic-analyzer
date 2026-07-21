@@ -33,7 +33,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_boss_hook import ARM_RUN, ROD_DIA, SHANK_RISE
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
