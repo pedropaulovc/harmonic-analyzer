@@ -73,7 +73,7 @@ BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "BoreDia": (0.030, 0.150),
+    "BoreDia": (0.050, 0.150),
     "CollarOd": (0.030, 0.120),
     "CollarCy": (0.140, 0.150),
 }
@@ -83,7 +83,7 @@ TOP_KEEP = {
     "BossCz": (0.150, 0.208),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM 6.360/6.375 THRU\nRa 1.6",
+    "BoreDia": "REAM\n6.360/6.375 THRU\nRa 1.6",
     "CollarOd": "+/-0.05",
     "CollarCy": "ECCENTRICITY +/-0.05",
     "Depth": "+/-0.05",

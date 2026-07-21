@@ -84,6 +84,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
     assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 2
     assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["CollarCy"]
 
 

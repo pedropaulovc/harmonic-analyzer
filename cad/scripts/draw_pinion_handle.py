@@ -79,7 +79,7 @@ BORE_R_SHEET = TUBE_ID * SHEET_SCALE[0] / 2000.0
 FRONT_KEEP = {
     "GripDia": (0.024, 0.196),
     "TubeOd": (0.024, 0.116),
-    "TubeId": (0.024, 0.096),
+    "TubeId": (0.035, 0.096),
     "RodSpan": (0.044, 0.232),
 }
 RIGHT_KEEP = {
@@ -90,7 +90,7 @@ TOP_KEEP = {
     "RodDia": (0.300, 0.078),
 }
 DIMENSION_CALLOUTS = {
-    "TubeId": "8.010/8.025\n10.00 DEEP FROM FLAT END\nRa 1.6",
+    "TubeId": "8.010/8.025\n10.00 DEEP\nFROM FLAT END\nRa 1.6",
     "GripLen": "+/-0.10",
     "TubeLen": "+/-0.10",
     "RodSpan": "42.00/43.00 FROM GRIP AXIS",

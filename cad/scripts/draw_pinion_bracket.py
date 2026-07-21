@@ -109,7 +109,7 @@ DIMENSION_CALLOUTS = {
     "ArborBoreCz": "+/-0.10",
     "PivotBoreDia": "THRU - REAM\n6.360/6.375\nRa 1.6",
     "ArborBoreDia": "THRU - REAM\n8.010/8.025\nRa 1.6",
-    "PinSeatCy": "PIN AXIS 2.00 BELOW PIVOT AXIS",
+    "PinSeatCy": "PIN AXIS\n2.00 BELOW\nPIVOT AXIS",
     "Depth": "ONE STRAP THICKNESS",
     "PinSeatDia": "4.000/4.012 H7\n4.00 DEEP - FLAT BOTTOM\nDRILL FROM LEFT EDGE",
     "PinSeatCz": "PIN AXIS AT MID-THICKNESS",

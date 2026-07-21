@@ -45,6 +45,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "6.330-6.350" in notes
     assert "194.40 OVERALL" in notes
     assert "6.330/6.350" in drawing.DIMENSION_CALLOUTS["ShaftDia"]
+    assert drawing.DIMENSION_CALLOUTS["ShaftDia"].count("\n") == 3
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes

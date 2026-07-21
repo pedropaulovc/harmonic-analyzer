@@ -69,6 +69,7 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()
     )
     assert "8.010/8.025" in drawing.DIMENSION_CALLOUTS["TubeId"]
+    assert drawing.DIMENSION_CALLOUTS["TubeId"].count("\n") == 3
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

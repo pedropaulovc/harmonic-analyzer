@@ -66,6 +66,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
     assert "6.360-6.375" in drawing.DIMENSION_CALLOUTS["HubBore"]
+    assert drawing.DIMENSION_CALLOUTS["HubBore"].count("\n") == 3
     assert "RADIUS" in drawing.DIMENSION_CALLOUTS["RodRootR"]
     assert "RADIUS" in drawing.DIMENSION_CALLOUTS["RodTipR"]
 

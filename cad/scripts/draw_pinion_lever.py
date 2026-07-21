@@ -76,14 +76,14 @@ BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
     "HubOd": (0.028, 0.086),
-    "HubBore": (0.028, 0.066),
+    "HubBore": (0.112, 0.083),
     "RodTipY": (0.044, 0.170),
     "RodRootR": (0.120, 0.108),
     "RodTipR": (0.120, 0.232),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "HubBore": "8.0 DEEP FROM FLAT FACE\nREAM 6.360-6.375\nRa 1.6",
+    "HubBore": "8.0 DEEP\nFROM FLAT FACE\nREAM 6.360-6.375\nRa 1.6",
     "RodRootR": "RADIUS - Ø4.00 AT HUB",
     "RodTipR": "RADIUS - Ø6.00 AT TIP",
 }

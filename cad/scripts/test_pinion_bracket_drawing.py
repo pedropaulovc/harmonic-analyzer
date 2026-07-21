@@ -68,6 +68,7 @@ def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
     assert "4.000/4.012" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
     assert "1/4 IN" not in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "5/16" not in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
+    assert drawing.DIMENSION_CALLOUTS["PinSeatCy"].count("\n") == 2
     assert "THRU - REAM" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
