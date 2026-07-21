@@ -25,6 +25,8 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -33,6 +35,7 @@ from _drawing_common import (
     new_project_drawing,
     offset_dimension_text,
     read_required_properties,
+    set_basic_dimensions,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
@@ -219,6 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter, [*front_annotations, *right_annotations], {"ShaftDiaDim": 3}
     )
+    set_basic_dimensions(adapter, right_annotations, ("PinHeight",))
     offset_dimension_text(
         adapter, right_annotations, {"PinHeight": (0.132, 0.105)}
     )
@@ -237,22 +241,66 @@ async def build(adapter: Any) -> dict[str, str]:
         face=shaft_face,
     )
 
+    end_top = (
+        FRONT_CENTER[0],
+        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=end_top,
+        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.027),
+        datum="A",
+        label="shaft OD datum axis",
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=(RIGHT_CENTER[0] - SHAFT_DIA / 4000.0, _SIDE_BOTTOM),
+        symbol_xy=(RIGHT_CENTER[0] - SHAFT_DIA / 4000.0, 0.060),
+        datum="B",
+        label="crank-end datum face",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + SHAFT_LENGTH / 2000.0),
+        frame_xy=(0.185, 0.235),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A",),
+        quantity="2X END FACES",
+        label="end-face perpendicularity",
+    )
+
     # The #9 tapered-pin cross-hole: the associative wizard callout carries the
     # Ø/THRU specification. The axial station is the imported model-owned
     # PinHeight dimension above and takes the title-block linear tolerance.
+    cross_hole_edge = _visible_cross_hole_edge(adapter, right)
     add_native_hole_callout(
         adapter,
         right,
         callout_xy=(0.205, 0.104),
         label="tapered-pin cross-hole",
-        edge=_visible_cross_hole_edge(adapter, right),
+        edge=cross_hole_edge,
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        frame_xy=(0.205, 0.128),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A", "B"),
+        diameter=True,
+        label="cross-hole true position",
+        entity=cross_hole_edge,
     )
     add_property_linked_note(adapter, "Crank End Note", 0.250, 0.090)
 
     add_surface_finish(
         adapter,
         right,
-        symbol_xy=(0.185, 0.065),
+        symbol_xy=(0.210, 0.195),
         roughness_ra="1.6",
         label="crankshaft bearing finish",
         entity_type="FACE",

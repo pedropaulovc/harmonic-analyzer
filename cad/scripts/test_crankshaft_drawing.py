@@ -38,10 +38,10 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     notes = crankshaft_spec.DRAWING_NOTES
     assert "#9" not in notes
     assert "TAPER PIN" in notes
-    assert "FINISHED PILOT-HOLE CONDITION" in notes
+    assert "FINISHED SIZE FOR THIS PART" in notes
     assert "<MOD-DIAM>4.98" not in notes
     assert "+0.10/0" not in notes
-    assert "INTERSECTS THE SHAFT AXIS" in notes
+    assert "INTERSECTS THE SHAFT AXIS" not in notes
     assert "PART ACCEPTANCE:" not in notes
     assert "CUSTOM TAPER PIN" in notes and "MHA-024" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -49,10 +49,10 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     # sketch dimension supplies the station without a coordinate pick.
     assert source.count("add_native_hole_callout(") == 1
     assert "GetVisibleEntities2(c, 1)" in source
-    assert "edge=_visible_cross_hole_edge(adapter, right)" in source
-    assert "edge_xy=" not in source
+    assert "cross_hole_edge = _visible_cross_hole_edge(adapter, right)" in source
+    assert "edge=cross_hole_edge" in source
     assert source.count("add_edge_dimension(") == 0
-    assert source.count("set_basic_dimensions(") == 0
+    assert source.count("set_basic_dimensions(") == 1
     assert crankshaft_spec.DRAWING_DIMENSIONS["3DSketch1"] == {"PinHeight"}
 
 
@@ -71,19 +71,21 @@ def test_linked_notes_define_remaining_operations() -> None:
 
 def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 0
-    assert source.count("add_feature_control_frame(") == 0
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_feature_control_frame(") == 2
     assert source.count("add_surface_finish(") == 1
     assert "add_view_centerline(" in source
     assert 'offset_dimension_text(' in source
     assert '{"PinHeight": (0.132, 0.105)}' in source
     assert "GetVisibleEntities2(c, 3)" in source
     assert "face=shaft_face" in source
-    assert 'symbol_xy=(0.185, 0.065)' in source
+    assert 'symbol_xy=(0.210, 0.195)' in source
     assert 'entity_type="FACE"' in source
     assert "edge_entity=shaft_face" in source
+    assert 'characteristic="position"' in source
+    assert 'characteristic="perpendicularity"' in source
     assert "face_xy=" not in source
-    assert "BOTH END FACES SQUARE" in crankshaft_spec.DRAWING_NOTES
+    assert "BOTH END FACES SQUARE" not in crankshaft_spec.DRAWING_NOTES
 
 
 def test_view_scales_are_explicit() -> None:

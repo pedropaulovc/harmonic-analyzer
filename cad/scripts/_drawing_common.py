@@ -1406,6 +1406,27 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
     return dimension
 
 
+def set_basic_dimensions(
+    adapter: Any, annotations: Iterable[Any], names: Iterable[str]
+) -> None:
+    """Box named imported model dimensions as BASIC location dimensions."""
+    remaining = set(names)
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        set_basic_dimension(adapter, display, label=name)
+        remaining.remove(name)
+    if remaining:
+        raise RuntimeError(f"dimensions not made BASIC: {sorted(remaining)}")
+
+
 def hole_table_template(adapter: Any) -> Path:
     executable = adapter._attempt(
         lambda: adapter.swApp.GetExecutablePath(), default=None
