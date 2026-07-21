@@ -252,6 +252,17 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter, right_annotations, {"PinHeight": (0.132, 0.105)}
     )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=(
+            FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+            FRONT_CENTER[1],
+        ),
+        symbol_xy=(FRONT_CENTER[0] + 0.027, FRONT_CENTER[1]),
+        datum="A",
+        label="shaft OD datum axis",
+    )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
     # ASME centre mark, the side view marks the #9 cross-hole circle.
@@ -267,18 +278,9 @@ async def build(adapter: Any) -> dict[str, str]:
         face=shaft_face,
     )
 
-    front_end_edge = _visible_shaft_end_edges(adapter, front)[0][1]
     right_end_edges = _visible_shaft_end_edges(adapter, right)
     crank_end_edge = right_end_edges[0][1]
     far_end_edge = right_end_edges[-1][1]
-    add_datum_feature(
-        adapter,
-        front,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.027),
-        datum="A",
-        label="shaft OD datum axis",
-        entity=front_end_edge,
-    )
     add_datum_feature(
         adapter,
         right,
