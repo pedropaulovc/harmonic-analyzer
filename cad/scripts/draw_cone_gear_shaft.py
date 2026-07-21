@@ -230,12 +230,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_datum_feature(
         adapter,
-        end,
-        edge_xy=pivot_circle,
-        symbol_xy=(0.082, 0.132),
+        side,
+        edge_xy=pivot_top,
+        symbol_xy=(0.215, 0.252),
         datum="A",
-        label="cone gear shaft axis",
-        entity=pivot_edge,
+        label="pivot journal datum feature",
+        entity_type="FACE",
+        entity=pivot_face,
     )
     add_feature_control_frame(
         adapter,

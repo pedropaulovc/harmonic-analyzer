@@ -23,9 +23,9 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is cone_tip_adjuster_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_tip_adjuster_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.END_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.END_KEEP) | set(drawing.CUP_KEEP)
     assert kept == marked
-    assert marked == {"BodyDiaDim", "BodyLenDim", "SlotWDim"}
+    assert marked == {"BodyDiaDim", "BodyLenDim", "CupDiaDim", "SlotWDim"}
 
 
 def test_thread_callout_is_the_catalog_thread() -> None:
@@ -33,8 +33,10 @@ def test_thread_callout_is_the_catalog_thread() -> None:
     assert drawing.DIMENSION_CALLOUTS["BodyDiaDim"] == "5/16-18 UNC-2A"
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "AddThreadParameters" in part_source
+    assert "InsertCosmeticThread3" in part_source
+    assert "IEntity" in part_source
     assert "import_cosmetic_threads" in drawing_source
+    assert cone_tip_adjuster_spec.BODY_DIA == 7.9375
 
 
 def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> None:
@@ -46,7 +48,7 @@ def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> N
     assert "OXIDE" not in notes
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
-    assert notes.endswith("OVERALL LENGTH 14.00 +/-0.10.")
+    assert "OVERALL LENGTH" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
@@ -54,7 +56,7 @@ def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> N
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (4.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(4, 1)") == 2  # elevation + head-end view
+    assert source.count("scale=(4, 1)") == 3  # elevation + both end views
     assert source.count("scale=(2, 1)") == 1  # enlarged pictorial
 
 

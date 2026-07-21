@@ -7,13 +7,11 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -26,6 +24,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_pivot_post_spec import (
+    BLOCK_DIA,
     BLOCK_HEIGHT,
     BORE_DIA,
     BORE_HEIGHT,
@@ -73,10 +72,57 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "BlockDia": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
 }
-DIMENSION_CALLOUTS = {"BoreDia": "+0.005/-0.005 THRU"}
+DIMENSION_CALLOUTS = {
+    "BoreDia": "+0.005/-0.005 THRU",
+    "BoreZ": "+/-0.05",
+}
 # 3/8 in = 9.525 exactly; the sheet default of 2 decimals prints 9.53, a false
 # contradiction of the DIA 9.525 the note and the mating cone shaft are built on.
 DIMENSION_PRECISION = {"BoreDia": 3}
+
+
+def _circular_edge(
+    adapter: Any,
+    view: Any,
+    *,
+    radius_mm: float,
+    center_y_mm: float,
+) -> Any:
+    """Return the visible circular edge matching radius and model height."""
+    drawing_view = _early_bound(view, "IView")
+    components = drawing_view.GetVisibleComponents() or []
+    candidates: list[tuple[float, float, Any]] = []
+    for component in components:
+        edges = drawing_view.GetVisibleEntities2(component, 1) or []
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = edge.GetCurve()
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = tuple(float(value) for value in curve.CircleParams)
+            candidates.append((params[6] * 1000.0, params[1] * 1000.0, edge))
+    if not candidates:
+        raise RuntimeError("front view has no visible circular model edges")
+    _telemetry.info(
+        "front-view circular edges (radius,height mm): "
+        + ", ".join(
+            f"({radius:.3f},{center_y:.3f})"
+            for radius, center_y, _edge in candidates
+        )
+    )
+    radius, center_y, edge = min(
+        candidates,
+        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - center_y_mm),
+    )
+    if abs(radius - radius_mm) > 0.01 or abs(center_y - center_y_mm) > 0.01:
+        raise RuntimeError(
+            f"no circular edge matches radius {radius_mm:.3f} mm at "
+            f"height {center_y_mm:.3f} mm"
+        )
+    return edge
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -145,6 +191,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # carries the running-fit finish.
     _bore_r = BORE_DIA / 2.0 * _S
     foot_edge = (FRONT_CENTER[0] + 0.005, _front_y(0.0))
+    foot_entity = _circular_edge(
+        adapter, front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
+    )
     add_datum_feature(
         adapter,
         front,
@@ -152,37 +201,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(foot_edge[0], _front_y(0.0) - 0.010),
         datum="A",
         label="foot seat face",
+        entity=foot_entity,
     )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) + _bore_r),
-        symbol_xy=(FRONT_CENTER[0] - 0.035, _front_y(BORE_HEIGHT) + 0.024),
-        datum="B",
-        label="journal bore axis",
-    )
-    # Journal bore is seen end-on (a circle); its axis runs horizontal (along Z),
-    # so it is PARALLEL to the horizontal foot seat (datum A) -- parallelism, not
-    # perpendicularity, keeps the shaft axis at a constant height off the seat.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) + _bore_r),  # bore top
-        frame_xy=(0.145, _front_y(BORE_HEIGHT) + 0.028),
-        characteristic="parallelism",
-        tolerance="0.05",
-        datums=("A",),
-        label="journal bore parallelism",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),  # bore right
-        symbol_xy=(0.150, _front_y(BORE_HEIGHT) - 0.024),
-        roughness_ra="1.6",
-        label="journal bore finish",
-    )
-
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
     return await finalize_drawing(

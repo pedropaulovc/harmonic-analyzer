@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -52,7 +52,7 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # elevation, the isometric off to the right.
 _PART_MID_Y = (BORE_HEIGHT + 10.0) / 2.0  # foot 0 .. dome top (bore + dome radius)
 FRONT_CENTER = (0.100, 0.145)
-TOP_CENTER = (0.100, 0.250)
+TOP_CENTER = (0.100, 0.245)
 ISO_CENTER = (0.335, 0.150)
 
 
@@ -67,17 +67,63 @@ FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.014),
     "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
     "BoreHeight": (FRONT_CENTER[0] - 0.048, _front_y(BORE_HEIGHT / 2.0)),
-    "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT)),
-    "DomeDia": (FRONT_CENTER[0] + 0.048, _front_y(BORE_HEIGHT + 6.0)),
+    "BoreDia": (FRONT_CENTER[0] + 0.068, _front_y(BORE_HEIGHT) - 0.004),
+    "DomeDia": (FRONT_CENTER[0] + 0.066, _front_y(BORE_HEIGHT + 9.0)),
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
-    "ScrewZ": (TOP_CENTER[0] - 0.030, TOP_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"BoreDia": "+/-0.010 THRU"}
+DIMENSION_CALLOUTS = {
+    "BoreDia": "+/-0.010 THRU",
+    "BoreHeight": "+/-0.05",
+    "DomeDia": "+/-0.10",
+}
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
 # 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).
 DIMENSION_PRECISION = {"BoreDia": 3}
+
+
+def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """Return real foot-seat and arbor-bore edges from the front view."""
+    drawing_view = _early_bound(view, "IView")
+    foot_candidates: list[tuple[float, Any]] = []
+    bore_candidates: list[tuple[float, float, Any]] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = edge.GetCurve()
+            if curve is not None:
+                curve = _early_bound(curve, "ICurve")
+                if curve.IsCircle():
+                    params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+                    bore_candidates.append((params[6], params[1], edge))
+            start = edge.GetStartVertex()
+            end = edge.GetEndVertex()
+            if start is None or end is None:
+                continue
+            start = _early_bound(start, "IVertex", "GetPoint")
+            end = _early_bound(end, "IVertex", "GetPoint")
+            p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+            p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+            if abs(p0[1]) <= 0.01 and abs(p1[1]) <= 0.01:
+                foot_candidates.append((abs(p1[0] - p0[0]), edge))
+    if not foot_candidates:
+        raise RuntimeError("front view has no model edge on the foot-seat plane")
+    foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
+    if foot_span < 23.9:
+        raise RuntimeError(f"foot-seat edge span is only {foot_span:.3f} mm")
+    if not bore_candidates:
+        raise RuntimeError("front view has no circular model edges")
+    radius, height, bore_edge = min(
+        bore_candidates,
+        key=lambda item: abs(item[0] - BORE_DIA / 2.0)
+        + abs(item[1] - BORE_HEIGHT),
+    )
+    if abs(radius - BORE_DIA / 2.0) > 0.01 or abs(height - BORE_HEIGHT) > 0.01:
+        raise RuntimeError(
+            f"no circular edge matches arbor bore at {BORE_HEIGHT:.3f} mm"
+        )
+    return foot_edge, bore_edge
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -146,13 +192,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # clamp-fit finish.
     _bore_r = BORE_DIA / 2.0 * _S
     foot_edge = (FRONT_CENTER[0] + 0.006, _front_y(0.0))
+    foot_entity, bore_entity = _front_entities(adapter, front)
     add_datum_feature(
         adapter,
         front,
         edge_xy=foot_edge,
-        symbol_xy=(foot_edge[0], _front_y(0.0) - 0.012),
+        symbol_xy=(FRONT_CENTER[0] + 0.034, _front_y(0.0) - 0.006),
         datum="A",
         label="foot seat face",
+        entity=foot_entity,
     )
     # The arbor bore is seen end-on (a circle); its axis runs horizontal (along
     # Z), so it is PARALLEL to the horizontal foot seat (datum A) -- parallelism
@@ -161,22 +209,25 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) + _bore_r),  # bore top
-        frame_xy=(0.155, _front_y(BORE_HEIGHT) + 0.030),
+        frame_xy=(0.190, _front_y(BORE_HEIGHT) + 0.040),
         characteristic="parallelism",
         tolerance="0.05",
         datums=("A",),
+        diameter=True,
         label="arbor bore parallelism",
+        entity=bore_entity,
     )
     add_surface_finish(
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),  # bore right
-        symbol_xy=(0.157, _front_y(BORE_HEIGHT) - 0.026),
+        symbol_xy=(0.190, _front_y(BORE_HEIGHT) - 0.035),
         roughness_ra="1.6",
         label="arbor bore finish",
+        entity=bore_entity,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.057)
 
     return await finalize_drawing(
         adapter,

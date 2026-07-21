@@ -28,6 +28,7 @@ import sys
 from _fastener_catalog import fastener
 from _common import (
     SketchDims,
+    _early_bound,
     apply_material,
     check,
     define_centered_rectangle,
@@ -55,7 +56,7 @@ PART_NAME = "cone-tip-adjuster"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # blued/black screw (t00471)
 
-BODY_DIA = SPEC.model_diameter_mm  # 5/16-18 modeled thread minor diameter
+BODY_DIA = SPEC.model_diameter_mm  # 5/16-18 nominal major envelope
 BODY_LEN = SPEC.length_mm
 CUP_DIA = 2.0  # blind bore the shaft tip rests in
 CUP_DEPTH = 6.0
@@ -68,9 +69,52 @@ def _slot_strip_area(r: float, w: float) -> float:
     return 2.0 * (h * math.sqrt(r * r - h * h) + r * r * math.asin(h / r))
 
 
+def _insert_cosmetic_thread(adapter) -> bool:
+    """Attach the 5/16-18 cosmetic thread to the exact north-end outer edge."""
+    part = _early_bound(adapter.currentModel, "IPartDoc", "GetBodies2")
+    bodies = part.GetBodies2(0, False) or []  # swSolidBody
+    candidates = []
+    for body in bodies:
+        body = _early_bound(body, "IBody2", "GetEdges")
+        for edge in body.GetEdges() or []:
+            edge = _early_bound(edge, "IEdge", "GetCurve")
+            curve = edge.GetCurve()
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve", "IsCircle", "CircleParams")
+            if not curve.IsCircle():
+                continue
+            params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+            candidates.append((params[6], params[1], edge))
+    radius, centre_y, edge = min(
+        candidates,
+        key=lambda item: abs(item[0] - BODY_DIA / 2.0)
+        + abs(item[1] - BODY_LEN),
+    )
+    if abs(radius - BODY_DIA / 2.0) > 0.01 or abs(centre_y - BODY_LEN) > 0.01:
+        return False
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    selection_manager = _early_bound(
+        model.SelectionManager, "ISelectionMgr", "CreateSelectData"
+    )
+    selection_data = selection_manager.CreateSelectData()
+    selectable = _early_bound(edge, "IEntity", "Select4")
+    if not selectable.Select4(False, selection_data):
+        return False
+    manager = _early_bound(
+        model.FeatureManager, "IFeatureManager", "InsertCosmeticThread3"
+    )
+    feature = manager.InsertCosmeticThread3(
+        0, "", "5/16-18", 0.0, 0, BODY_LEN / 1000.0, ""
+    )
+    model.ClearSelection2(True)
+    return feature is not None
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
-        AddThreadParameters,
         CreatePlaneParameters,
         ExtrusionParameters,
     )
@@ -143,21 +187,13 @@ async def build(adapter) -> dict[str, str]:
     v_slot = _slot_strip_area(BODY_DIA / 2.0, SLOT_W) * SLOT_D
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.02 * v_slot)
 
-    # The physical solid remains the thread-root envelope used by the assembly,
-    # while this annotation feature gives drawings the standard external-thread
-    # representation and designation.
-    check(
-        "cosmetic thread 5/16-18",
-        await adapter.add_thread(
-            AddThreadParameters(
-                edge_point=[BODY_DIA / 2.0, BODY_LEN, 0.0],
-                standard="ansi_inch",
-                size="5/16-18",
-                end_type="blind",
-                depth=BODY_LEN,
-            )
-        ),
-    )
+    # The physical solid is the nominal major envelope; this annotation feature
+    # gives drawings the standard external-thread
+    # representation and designation. Select the exact circular edge by its
+    # measured radius/axis station: coordinate picking is view-dependent and
+    # failed even in a square-on view, while IEntity.Select4 is deterministic.
+    if not _insert_cosmetic_thread(adapter):
+        raise RuntimeError("failed to insert cosmetic thread 5/16-18")
 
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:

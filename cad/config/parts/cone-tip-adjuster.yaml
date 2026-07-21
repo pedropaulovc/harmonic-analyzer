@@ -2,8 +2,8 @@ cone-tip-adjuster:
   number: MHA-097
   material: AISI 12L14 free-machining steel
   material_specification: AISI 12L14 free-machining steel
-  finish: blued (black oxide)
+  finish: black oxide
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel, blued)"
+  process: "machined (steel), black oxide"

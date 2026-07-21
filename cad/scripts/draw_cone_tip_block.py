@@ -7,13 +7,11 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -25,11 +23,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_tip_block_spec import (
-    BLOCK_HEIGHT,
-    BORE_DIA,
-    BORE_HEIGHT,
-)
+from cone_tip_block_spec import BLOCK_HEIGHT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -53,8 +47,7 @@ SHEET_SCALE = (2.0, 1.0)  # small 14x55 block -- 2:1 keeps the tall elevation le
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
 # Third-angle: the 14x12 plan sits ABOVE the front elevation (which carries the
-# block height, the tip-journal station + diameter, and the clamp slit); the
-# isometric is off to the right.
+# block height and clamp slit); the isometric is off to the right.
 FRONT_CENTER = (0.100, 0.160)
 TOP_CENTER = (0.100, 0.245)
 ISO_CENTER = (0.330, 0.160)
@@ -65,22 +58,45 @@ def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - BLOCK_HEIGHT / 2.0) * _S
 
 
-# Front elevation carries the standing block: width, height, the tip-journal
-# station + diameter, and the top clamp slit. The plan carries the 12 depth.
+# Front elevation carries the standing block width, height, and top clamp slit.
+# The plan carries the 12 depth; the hole contract is explicit in the notes.
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.014),
     "BlockHt": (FRONT_CENTER[0] - 0.028, FRONT_CENTER[1]),
-    "BoreZ": (FRONT_CENTER[0] - 0.014, _front_y(BORE_HEIGHT / 2.0)),
-    "BoreDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(BORE_HEIGHT)),
     "SlitW": (FRONT_CENTER[0] + 0.044, _front_y(BLOCK_HEIGHT)),
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.036, TOP_CENTER[1]),
 }
-DIMENSION_CALLOUTS = {"BoreDiaDim": "+0.005/-0.005 THRU"}
-# 1/32 in = 0.79375 exactly; the sheet default of 2 decimals prints 0.79, and
-# the note cites 0.794 (1/32 in) -- show 3 places so the view matches the note.
-DIMENSION_PRECISION = {"BoreDiaDim": 3}
+DIMENSION_CALLOUTS: dict[str, str] = {}
+DIMENSION_PRECISION: dict[str, int] = {}
+
+
+def _foot_edge(adapter: Any, view: Any) -> Any:
+    """Return the real front-view bottom edge of the block's foot seat."""
+    drawing_view = _early_bound(view, "IView")
+    candidates: list[tuple[float, float, Any]] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        for edge in drawing_view.GetVisibleEntities2(component, 1) or []:
+            edge = _early_bound(edge, "IEdge", "GetStartVertex", "GetEndVertex")
+            start = edge.GetStartVertex()
+            end = edge.GetEndVertex()
+            if start is None or end is None:
+                continue
+            start = _early_bound(start, "IVertex", "GetPoint")
+            end = _early_bound(end, "IVertex", "GetPoint")
+            p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+            p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+            if abs(p0[1]) > 0.01 or abs(p1[1]) > 0.01:
+                continue
+            span_x = abs(p1[0] - p0[0])
+            candidates.append((span_x, min(p0[2], p1[2]), edge))
+    if not candidates:
+        raise RuntimeError("front view has no model edge on the foot-seat plane")
+    span_x, _z, edge = max(candidates, key=lambda item: item[0])
+    if span_x < 13.9:
+        raise RuntimeError(f"foot-seat edge span is only {span_x:.3f} mm")
+    return edge
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -117,7 +133,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Tip Block Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone tip block; steel clamp block; tip journal + adjuster",
+            3: "cone tip block; steel adjuster carrier; end-play thread lock",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -144,13 +160,12 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the plan view")
 
-    # Datum A = the foot seat face (the platform-seat datum the bore heights
-    # measure from). The tip journal is toleranced parallel to it and carries
-    # the running-fit finish.
-    _bore_r = BORE_DIA / 2.0 * _S
+    # Datum A = the foot seat face (the platform-seat datum the adjuster and
+    # pinch-axis heights measure from).
     # Attach datum A to the RIGHT of the foot-bottom edge so its symbol clears
     # the centred 14.00 Width dimension (which sits at x=FRONT_CENTER[0]).
-    foot_edge = (FRONT_CENTER[0] + 0.011, _front_y(0.0))
+    foot_edge = (FRONT_CENTER[0] + 0.005, _front_y(0.0))
+    foot_entity = _foot_edge(adapter, front)
     add_datum_feature(
         adapter,
         front,
@@ -158,51 +173,14 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.024, _front_y(0.0) - 0.010),
         datum="A",
         label="foot seat face",
+        entity=foot_entity,
     )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) + _bore_r),
-        symbol_xy=(FRONT_CENTER[0] - 0.034, _front_y(BORE_HEIGHT) + 0.024),
-        datum="B",
-        label="tip journal axis",
+    add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.075, char_height=0.0025
     )
-    # The journal bore is seen end-on (a circle); its axis runs horizontal (along
-    # Z), so it is PARALLEL to the horizontal foot seat (datum A) -- parallelism
-    # holds the shaft tip at a constant height off the seat.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) + _bore_r),  # bore top
-        frame_xy=(0.150, _front_y(BORE_HEIGHT) + 0.030),
-        characteristic="parallelism",
-        tolerance="0.05",
-        datums=("A",),
-        diameter=True,  # cylindrical zone -- the control is on the bore AXIS
-        label="journal bore parallelism",
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),  # bore right
-        symbol_xy=(0.152, _front_y(BORE_HEIGHT) - 0.026),
-        roughness_ra="1.6",
-        label="journal bore finish",
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-
-    # The 5/16-18 adjuster and #3-48 pinch are native Hole Wizard features, so
-    # importing the marked dims + hole center marks also brings SolidWorks'
-    # descriptive "... Tapped Hole" note for each; both stack at the bore and
-    # duplicate the prose notes. Drop them once every model item is in -- the
-    # tapped holes are fully specified in the Manufacturing Notes (which read
-    # "TAPPED" but never "TAPPED HOLE", so the linked note survives).
     removed = remove_notes_matching(adapter, "Tapped Hole")
-    if removed < 2:
-        raise RuntimeError(
-            f"expected to remove at least 2 auto tapped-hole notes, removed {removed}"
-        )
+    if removed != 2:
+        raise RuntimeError(f"expected 2 auto tapped-hole notes, removed {removed}")
 
     return await finalize_drawing(
         adapter,

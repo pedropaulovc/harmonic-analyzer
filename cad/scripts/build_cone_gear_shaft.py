@@ -1,9 +1,10 @@
 r"""Reproduction script: cone gear shaft (book ch. 12, pp. 16-21) -- stepped.
 
 Steel shaft carrying the 20-gear cone set (all gears fixed to and
-rotating with the shaft), with bearing journals into the green pivot
-post (large end) and the tip clamp block (thin end) -- both standing on
-the swing platform, so the whole set pivots out of engagement as one
+rotating with the shaft), with its large-end bearing journal in the green
+pivot post and its thin end located by the external spacer and cup-ended
+adjuster -- the post and adjuster carrier both stand on the swing platform,
+so the whole set pivots out of engagement as one
 unit (ch. 25; p. 18 "pivot"). At the finer module DP 49.82 (ch13 OD 62.2) the
 tip gears are tiny -- T006 OD is 4.08 mm -- so the shaft steps down far
 more at the thin end to match the configured gear bores AND stay inside
@@ -26,15 +27,15 @@ gear faces (stations below quoted from the legacy pivot end):
   seats T120..T024
 * 1/4 in x 148.8 -- T018 seat
 * 1/8 in x 155.7 -- T012 seat
-* 1/32 in x 190.0 -- T006 seat + thin-tip journal into the tip block.
+* 1/32 in x 190.0 -- T006 seat + thin tip reaching the adjuster cup.
   WARNING: a 0.79 mm x ~34 mm steel tip journal is mechanically
   marginal (it follows from the 62.2 OD anchor, low confidence) --
   flagged for Phase 3 rebuild validation; a real builder would more
   likely keep the tip gears larger (i.e. the 62.2 reading may be low).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- base dia legacy (med),
-length 190 = pivot journal + stack + thin-tip journal through the tip
-block at station 185 (derived, low), step diameters = gear bores
+length 190 = pivot journal + stack + thin tip reaching the external spacer
+and adjuster cup at station 185 (derived, low), step diameters = gear bores
 (Appendix C #7).
 
 Build: four coaxial Front-plane circles extruded +Z to each section's end

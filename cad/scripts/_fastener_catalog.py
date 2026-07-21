@@ -103,7 +103,7 @@ FASTENERS: dict[str, FastenerSpec] = {
         HeadStyle.SHOULDER, DriveStyle.SLOT,
     ),
     "cone-tip-adjuster": _steel(
-        "cone-tip-adjuster", "5/16-18", 14.0, 6.2,
+        "cone-tip-adjuster", "5/16-18", 14.0, 7.9375,
         HeadStyle.SET_SCREW, DriveStyle.SLOT, Finish.BLACK,
     ),
     "cone-tip-pinch-screw": _steel(

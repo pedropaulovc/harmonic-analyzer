@@ -26,20 +26,23 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert marked == {
-        "Width", "Depth", "FootHt", "BoreHeight", "BoreDia", "DomeDia", "ScrewZ"
+        "Width", "Depth", "FootHt", "BoreHeight", "BoreDia", "DomeDia"
     }
 
 
 def test_arbor_bore_is_a_clamp_fit_at_matching_precision() -> None:
+    assert round(arbor_pedestal_spec.BORE_DIA, 3) == 9.525
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "+/-0.010 THRU"
     assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
-    assert "9.525" in arbor_pedestal_spec.DRAWING_NOTES
+    assert "9.525" not in arbor_pedestal_spec.DRAWING_NOTES
 
 
 def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "ARBOR BORE" in notes
     assert "#4" in notes  # the flange hold-down clearance hole
+    assert "DIA 3.264 +0.10/-0.00" in notes
+    assert "STRAP 10.00 +/-0.10 THICK" in notes
     assert "MATERIAL" not in notes
     assert "JAPANNED" not in notes
     assert "DATUM A" in notes

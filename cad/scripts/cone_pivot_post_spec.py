@@ -18,6 +18,8 @@ CRANK_BORE_DIA = BORE_DIA + 0.5  # 10.025: running clearance over the crankshaft
 CRANK_BORE_HEIGHT = 85.835  # crank-bore axis above the foot
 CRANK_BORE_OFFSET = 0.95  # crank-bore axis east of the column axis
 INCLINE_DEG = 12.5182  # crank bore tips this far off the column's vertical axis
+CRANK_AXIS_EAST = 0.927  # closest point on axis, east of post axis in plan
+CRANK_AXIS_SOUTH = 0.206  # closest point on axis, south of post axis in plan
 
 # The oblique, offset crank bore is a running-clearance feature on a cast column
 # and is fully specified by the general note (dia, height, tip, offset) rather
@@ -32,13 +34,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "MACHINE ALL SURFACES SHOWN FROM CONTINUOUS-CAST ROUND STOCK.",
-        "DATUM A IS THE FINISHED FOOT SEAT; DATUM B IS THE JOURNAL AXIS.",
-        "JOURNAL BORE LIMITS DIA 9.545-9.555; AXIS HEIGHT 47.65 +/-0.05",
-        "ABOVE A. MATING SHAFT LIMITS DIA 9.505-9.525.",
-        "CRANK BORE DIA 10.025 +/-0.025 THRU; AXIS PARALLEL TO A",
-        "WITHIN 0.10 AND 85.835 +/-0.05 ABOVE A.",
-        "IN THE UPPER PLAN VIEW, CRANK AXIS IS 12.52 +/-0.10 DEG",
-        "CLOCKWISE FROM B; SHORTEST PLAN DISTANCE BETWEEN AXES IS",
-        "0.95 +/-0.05, WITH THE CRANK AXIS ON THE SIDE SHOWN.",
+        "DATUM A IS THE FINISHED FOOT SEAT.",
+        "JOURNAL BORE LIMITS DIA 9.545-9.555; FINISH RA 1.6;",
+        "AXIS INTERSECTS POST AXIS IN PLAN AND LIES IN A CYLINDRICAL",
+        "ZONE DIA 0.05 PARALLEL TO DATUM A.",
+        "MATING SHAFT LIMITS DIA 9.505-9.525.",
+        "CRANK BORE DIA 10.025 +/-0.025 THRU; AXIS 85.835 +/-0.05 ABOVE A",
+        "AND IN A CYLINDRICAL ZONE DIA 0.10 PARALLEL TO DATUM A.",
+        "IN UPPER PLAN VIEW, CRANK AXIS IS 12.52 +/-0.10 DEG CLOCKWISE",
+        "FROM JOURNAL AXIS. ITS CLOSEST POINT TO POST AXIS IS",
+        "0.927 +/-0.05 EAST AND 0.206 +/-0.05 SOUTH OF POST AXIS.",
+        "PLAN CENTER MARKS DEFINE POST AXIS; AXIS DIRECTIONS ARE CENTERLINES.",
     )
 )

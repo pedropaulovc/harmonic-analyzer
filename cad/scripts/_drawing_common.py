@@ -22,7 +22,6 @@ from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
     LayoutElement,
-    LeaderCrossing,
     LeaderSegment,
     audit_layout,
     format_findings,
@@ -38,7 +37,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     iter_views,
     new_drawing,
-    remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
@@ -354,29 +352,6 @@ def add_datum_feature(
     return tag
 
 
-@_telemetry.traced("drawing.centerline", label_param="label")
-def add_view_centerline(
-    adapter: Any,
-    view: Any,
-    *,
-    face_xy: tuple[float, float],
-    label: str,
-    entity: Any | None = None,
-) -> Any:
-    """Insert the axis centerline of a cylindrical face seen side-on in a view."""
-    _select_view_entity(
-        adapter, view, "FACE", face_xy, label=label, entity=entity
-    )
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    centerline = ddoc.InsertCenterLine2()
-    if centerline is None:
-        raise RuntimeError(f"failed to insert centerline ({label})")
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    return centerline
-
-
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
 def add_feature_control_frame(
     adapter: Any,
@@ -646,12 +621,37 @@ def add_view_centerline(
 
 @_telemetry.traced("drawing.linked_note", label_param="property_name")
 def add_property_linked_note(
-    adapter: Any, property_name: str, x: float, y: float
+    adapter: Any,
+    property_name: str,
+    x: float,
+    y: float,
+    *,
+    char_height: float | None = None,
 ) -> Any:
     """Place one note whose displayed text resolves from the source SLDPRT."""
     note = add_note(adapter, property_link(property_name), x, y)
     if note is None:
         raise RuntimeError(f"failed to add linked drawing note {property_name!r}")
+    if char_height is None:
+        return note
+
+    note = _early_bound(note, "INote", "GetAnnotation")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"linked drawing note {property_name!r} has no annotation")
+    annotation = _early_bound(
+        annotation, "IAnnotation", "GetTextFormat", "SetTextFormat"
+    )
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(
+            f"linked drawing note {property_name!r} has no text format"
+        )
+    text_format.CharHeight = float(char_height)
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(
+            f"failed to set linked drawing note {property_name!r} text height"
+        )
     return note
 
 
@@ -704,6 +704,62 @@ def add_property_linked_callout(
         or int(annotation.GetLeaderCount()) != 1
     ):
         raise RuntimeError(f"linked callout {property_name!r} lacks one arrow")
+    draw.ClearSelection2(True)
+    return note
+
+
+@_telemetry.traced("drawing.attached_note", label_param="label")
+def add_attached_note(
+    adapter: Any,
+    view: Any,
+    *,
+    text: str,
+    edge_xy: tuple[float, float],
+    note_xy: tuple[float, float],
+    label: str,
+    entity_type: str = "EDGE",
+    entity: Any | None = None,
+) -> Any:
+    """Attach one literal, arrowed manufacturing callout to a model entity."""
+    draw = adapter.currentModel
+    edge = _select_view_entity(
+        adapter,
+        view,
+        entity_type,
+        edge_xy,
+        label=label,
+        entity=entity,
+    )
+    note = draw.InsertNote(text)
+    if note is None:
+        raise RuntimeError(f"failed to insert attached note ({label})")
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"attached note has no annotation ({label})")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation,
+        "IAnnotation",
+        "GetAttachedEntityCount3",
+        "SetAttachedEntities",
+        "SetLeader3",
+        "SetPosition2",
+        "GetLeaderCount",
+    )
+    if int(annotation.GetAttachedEntityCount3()) != 1:
+        if not annotation.SetAttachedEntities(dispatch_array([edge])):
+            raise RuntimeError(f"failed to attach note ({label})")
+    status = int(annotation.SetLeader3(1, 0, True, False, False, False))
+    if status != 0:
+        raise RuntimeError(f"failed to create attached-note leader ({label}): {status}")
+    if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
+        raise RuntimeError(f"failed to position attached note ({label})")
+    draw.EditRebuild3()
+    if (
+        int(annotation.GetAttachedEntityCount3()) != 1
+        or int(annotation.GetLeaderCount()) != 1
+    ):
+        raise RuntimeError(f"attached note lacks one attached arrow ({label})")
     draw.ClearSelection2(True)
     return note
 
@@ -2284,6 +2340,7 @@ def _measured_gdt_box(
             points.extend((v[ix], v[iy]) for ix, iy in offsets if iy < len(v))
     if not points:
         return None
+
     xs = [p[0] for p in points]
     ys = [p[1] for p in points]
     return min(xs), min(ys), max(xs), max(ys)
@@ -2795,7 +2852,7 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     the balloon's rendered radius, which INote::GetBalloonInfo had all along (see
     :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
-    with _telemetry.span("drawing.layout_audit") as span:
+    with _telemetry.span("drawing.layout_audit"):
         elements, leaders, region = collect_layout_elements(adapter)
         overlaps, overflows, crossings = audit_layout(
             elements, region, leaders=leaders

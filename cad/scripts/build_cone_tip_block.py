@@ -1,22 +1,21 @@
 r"""Reproduction script: cone tip block (book ch. 12, p. 18; video 4/4 stills).
 
-The small clamp block at the thin end of the cone shaft. It stands on the
-swing platform right beside the pivot and journals the shaft's 1/32" tip
-stub, so the shaft is carried at BOTH ends -- big-end journal in the
-pivot post, tip in this block -- and the whole set swings as one unit
-about the platform's pivot axis (the block sits so close to the pivot
-that its throw is millimetres).
+The small adjuster-support block at the thin end of the cone shaft. It stands
+on the swing platform beside the pivot and carries the threaded, cup-ended
+end-play adjuster; the external brass spacer supports the shaft at the south
+face and the adjuster cup supports its tip. The block and whole cone set swing
+as one unit about the platform's pivot axis.
 
 Dimensions estimated from the p.18 top-down and the v4_t00393 still
-(low). The bore height above the block base is BORE_HEIGHT; the platform
-adds PLATE_T under the foot, and BORE_HEIGHT + PLATE_T must equal the
+(low). The adjuster axis above the block base is ADJUSTER_AXIS_HEIGHT; the platform
+adds PLATE_T under the foot, and ADJUSTER_AXIS_HEIGHT + PLATE_T must equal the
 drive height above the base top (54) -- asserted module-level in
 build_drive_train_assembly.
 
 Layout: block standing on the Top plane, plan centred on the origin,
-tip journal bore along Z at y = BORE_HEIGHT (the assembly rotates the
-block about Y to align the bore with the cone axis). Named "journal
-axis" for the view-independent coaxial mate to the shaft tip.
+adjuster axis along Z at y = ADJUSTER_AXIS_HEIGHT (the assembly rotates the
+block about Y to align it with the cone axis). Named "adjuster axis" for the
+view-independent coaxial mate to the cup-ended screw.
 
 Run (SolidWorks already open)::
 
@@ -35,7 +34,6 @@ from _common import (
     apply_material,
     check,
     define_centered_rectangle,
-    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -53,7 +51,11 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from cone_tip_block_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
+from cone_tip_block_spec import (
+    ADJUSTER_AXIS_HEIGHT,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+)
 from _holes import (
     CLEARANCE_MM,
     DRILL_POINT_H,
@@ -69,11 +71,6 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it ri
 BLOCK_X = 14.0  # plan width across the shaft (low)
 BLOCK_Z = 12.0  # plan depth along the shaft (low)
 BLOCK_HEIGHT = 55.0  # bore at 47.65 + headroom for the pinch cross-bore (low)
-BORE_DIA = 0.819  # finished 0.814..0.824 over shaft max 0.794
-BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
-
-BORE_RADIUS = BORE_DIA / 2.0
-
 # --- adjuster + pinch lock (item 5, v4_t00471 / 7:49) ------------------------
 # Adjuster interface: native 5/16-18 blind TAPPED hole from the NORTH face --
 # the Ø6.2 cone-tip-adjuster threads in. NOTE: the old bore was Ø7.9
@@ -81,7 +78,7 @@ BORE_RADIUS = BORE_DIA / 2.0
 # 6.528 (per fastener policy we take the true tap-drill, NOT an override to the
 # artefact Ø). ADJUSTER_BORE_DIA is the tap-drill, used by the slit + interlock
 # geometry below (NOT imported by the assembly, so the shrink is self-contained).
-ADJUSTER_BORE_DEPTH = 8.0  # from the NORTH face; 1/32" journal lip stays south
+ADJUSTER_BORE_DEPTH = 8.0  # from the NORTH face
 ADJUSTER_BORE_SPEC = HoleSpec(
     "tapped", "5/16-18", end="blind", depth_mm=ADJUSTER_BORE_DEPTH)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)  # 6.528 tap drill
@@ -94,13 +91,15 @@ SLIT_DEPTH = 8.0  # top face down past the bore line (55.0 -> 47.0)
 # imported by the assembly as TIP_PINCH_BORE_DIA.
 PINCH_BORE_SPEC = HoleSpec("tapped", "#3-48")
 PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)  # 1.994 tap drill
-PINCH_CLEARANCE_SPEC = HoleSpec("clearance", "#3", end="through_next")
+PINCH_CLEARANCE_SPEC = HoleSpec(
+    "clearance", "#3", end="blind", depth_mm=(BLOCK_X - SLIT_W) / 2.0
+)
 PINCH_CLEARANCE_DIA = CLEARANCE_MM[("#3", "normal")]  # 2.946 near jaw only
 PINCH_BORE_Y = 53.2  # between the counterbore top and the block top
 
 # The pinch cross-bore must land wholly in the material band between the
 # adjuster counterbore's top and the block top, and the slit must cross it.
-if PINCH_BORE_Y - PINCH_BORE_DIA / 2.0 < BORE_HEIGHT + ADJUSTER_BORE_DIA / 2.0 + 0.25:
+if PINCH_BORE_Y - PINCH_BORE_DIA / 2.0 < ADJUSTER_AXIS_HEIGHT + ADJUSTER_BORE_DIA / 2.0 + 0.25:
     raise AssertionError("pinch bore clips the adjuster counterbore")
 if PINCH_BORE_Y + PINCH_BORE_DIA / 2.0 > BLOCK_HEIGHT - 0.25:
     raise AssertionError("pinch bore breaches the block top")
@@ -110,11 +109,11 @@ if BLOCK_HEIGHT - SLIT_DEPTH > PINCH_BORE_Y - PINCH_BORE_DIA / 2.0:
 
 def _slit_removed() -> float:
     """Slit volume net of the already-void bores it crosses: the adjuster
-    counterbore band, its blind-tap 118-degree DRILL-POINT cone past the
+    counterbore band and its blind-tap 118-degree DRILL-POINT cone past the
     shoulder (the term whose omission failed the first wizard build by
-    +4.1 mm^3), and the 1/32" journal -- the cone and journal are concentric,
-    so each z-slice subtracts the UNION circle (max radius), never both."""
-    r_cb, y_cb, y_bot = ADJUSTER_BORE_DIA / 2.0, BORE_HEIGHT, BLOCK_HEIGHT - SLIT_DEPTH
+    +4.1 mm^3)."""
+    r_cb = ADJUSTER_BORE_DIA / 2.0
+    y_cb, y_bot = ADJUSTER_AXIS_HEIGHT, BLOCK_HEIGHT - SLIT_DEPTH
     x_half = SLIT_W / 2.0
 
     def a_void(r: float) -> float:
@@ -138,14 +137,14 @@ def _slit_removed() -> float:
     point_h = r_cb * DRILL_POINT_H  # 118-degree point height past the shoulder
     v = SLIT_W * BLOCK_Z * SLIT_DEPTH
     v -= a_void(r_cb) * ADJUSTER_BORE_DEPTH  # counterbore band already void
-    # Past the shoulder the void slice is max(cone, journal) -- trapezoid in z.
+    # Past the shoulder the tapered drill-point void shrinks to zero.
     n_z = 400
     dz = (BLOCK_Z - ADJUSTER_BORE_DEPTH) / n_z
     acc = 0.0
     for k in range(n_z + 1):
         z = k * dz  # 0 at the shoulder
         r_cone = r_cb * max(1.0 - z / point_h, 0.0)
-        a = a_void(max(r_cone, BORE_RADIUS))
+        a = a_void(r_cone)
         acc += a * (0.5 if k in (0, n_z) else 1.0)
     v -= acc * dz
     return v
@@ -163,8 +162,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BlockX", f"{BLOCK_X}mm")
     await set_global(adapter, "BlockZ", f"{BLOCK_Z}mm")
     await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
+    await set_global(adapter, "AdjusterAxisHeight", f"{ADJUSTER_AXIS_HEIGHT}mm")
     # (The old AdjusterBoreDia/PinchBoreDia knobs are gone: both are now native
     # Hole Wizard TAPPED features whose diameters come from the ANSI-inch tap
     # tables, not driven dims.)
@@ -196,47 +194,21 @@ async def build(adapter) -> dict[str, str]:
     v_block = BLOCK_X * BLOCK_Z * BLOCK_HEIGHT
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
-    # Tip journal bore along Z at the drive height. On-axis in X (centre x 0,
-    # a relation), so define_circle records only the centre-Z + diameter dims.
-    bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, 0.0, BORE_HEIGHT, BORE_RADIUS, "bore", dims=bore,
-        names=("BoreX", "BoreZ", "BoreDiaDim"),
-        drives=(None, '"BoreHeight"', '"BoreDia"'),
-    )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreProfile")
-    drive_jobs += bore.apply(adapter, "BoreProfile")
-    check(
-        "cut bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=BLOCK_Z + 4.0, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "JournalBore")
-    v_bore = math.pi * BORE_RADIUS**2 * BLOCK_Z
-    volume = await volume_check(adapter, "bore", volume - v_bore, 0.5 * v_bore)
-
     # Adjuster interface (v4_t00471 / 7:49): ONE native Hole Wizard blind
     # 5/16-18 TAPPED hole from the NORTH face (z = +BLOCK_Z/2), concentric with
-    # the journal, ADJUSTER_BORE_DEPTH deep -- the partially hollow Ø6.2 slotted
+    # the cone shaft, ADJUSTER_BORE_DEPTH deep -- the partially hollow slotted
     # adjuster screw threads in here and the shaft tip rests in its (own) cup
     # (axial end-play takeup). Drilled while the body is still simple (block +
-    # journal). Removed = the blind tap-drill cylinder + drill point MINUS the
-    # journal already void within that envelope (the journal runs straight
-    # through it). The 1/32" journal survives at the south.
+    # cup-ended screw supports the shaft tip. Removed volume is the blind
+    # tap-drill cylinder plus its standard drill point.
     adjuster_cut = wizard_holes(
         adapter, ADJUSTER_BORE_SPEC,
-        [[0.0, BORE_HEIGHT, BLOCK_Z / 2.0]],
+        [[0.0, ADJUSTER_AXIS_HEIGHT, BLOCK_Z / 2.0]],
         (0.0, 0.0, 1.0), "adjuster tapped hole (5/16-18 blind)", name="AdjusterBore",
-        placement_dims=[((None, None), ("CbZ", '"BoreHeight"'))],
+        placement_dims=[((None, None), ("CbZ", '"AdjusterAxisHeight"'))],
     )
     drive_jobs += adjuster_cut.placement_drive_jobs
-    _adj_point = (ADJUSTER_BORE_DIA / 2.0) * DRILL_POINT_H
-    v_cb = blind_hole_volume_mm3(ADJUSTER_BORE_DIA, ADJUSTER_BORE_DEPTH) \
-        - math.pi * BORE_RADIUS**2 * (ADJUSTER_BORE_DEPTH + _adj_point)
+    v_cb = blind_hole_volume_mm3(ADJUSTER_BORE_DIA, ADJUSTER_BORE_DEPTH)
     volume = await volume_check(adapter, "adjuster bore", volume - v_cb, 0.03 * v_cb)
 
     # Top slit + perpendicular pinch screw (the McMaster 61815K41 pattern,
@@ -302,11 +274,11 @@ async def build(adapter) -> dict[str, str]:
     # Named bore axis for the view-independent coaxial mate: the shaft tip
     # positions this block (coaxial + axial distance), no face picks.
     await name_bore_axis(
-        adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "journal axis",
-        drive_a='"BoreHeight"', drive_jobs=drive_jobs,
+        adapter, "Top Plane", ADJUSTER_AXIS_HEIGHT, "Right Plane", 0.0,
+        "adjuster axis", drive_a='"AdjusterAxisHeight"', drive_jobs=drive_jobs,
     )
     # Second named axis (Axis2): the pinch-screw cross-bore, along local X at
-    # the slit -- the assembly journals the pinch screw on it.
+    # the slit -- the assembly locates the pinch screw on it.
     await name_bore_axis(
         adapter, "Top Plane", PINCH_BORE_Y, "Front Plane", 0.0, "pinch axis",
         drive_a='"PinchBoreY"', drive_jobs=drive_jobs,
@@ -319,7 +291,7 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven block (equations neutral)", volume, 0.5 * v_bore)
+    await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)

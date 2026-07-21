@@ -2,7 +2,7 @@ cone-tip-block:
   number: MHA-092
   material: AISI 1018 cold-finished steel
   material_specification: AISI 1018 cold-finished steel
-  finish: black oxide; mask journal and threads
+  finish: black oxide; mask threads
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"

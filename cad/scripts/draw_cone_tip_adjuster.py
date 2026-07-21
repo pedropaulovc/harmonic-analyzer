@@ -7,9 +7,11 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -17,13 +19,12 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_reference_dimensions,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_tip_adjuster_spec import THREAD
+from cone_tip_adjuster_spec import BODY_DIA, BODY_LEN, CUP_DIA, THREAD
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -44,11 +45,11 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
 
-# The screw is 14 mm long x Ø6.2: at 4:1 the elevation is 56 x 25 mm. Third
-# angle: the head-end view (with the driver slot) sits BELOW the elevation; the
-# notes block sits clear at the bottom.
+# The screw is 14 mm long x nominal Ø7.9375: at 4:1 the elevation is compact.
+# Third angle: the slotted head and cup-end views sit below the elevation.
 FRONT_CENTER = (0.095, 0.180)
 END_CENTER = (0.095, 0.100)
+CUP_CENTER = (0.190, 0.100)
 ISO_CENTER = (0.300, 0.160)
 
 FRONT_KEEP = {
@@ -58,11 +59,46 @@ END_KEEP = {
     "BodyDiaDim": (END_CENTER[0] + 0.055, END_CENTER[1] + 0.015),
     "SlotWDim": (END_CENTER[0] + 0.055, END_CENTER[1] - 0.015),
 }
+CUP_KEEP = {
+    "CupDiaDim": (CUP_CENTER[0] + 0.050, CUP_CENTER[1]),
+}
 DIMENSION_CALLOUTS = {
     "BodyDiaDim": f"{THREAD} UNC-2A",
     "BodyLenDim": "+/-0.10",
     "SlotWDim": "+/-0.10",
+    "CupDiaDim": "+0.05/-0.00 X 6.00 +/-0.10 DEEP",
 }
+
+
+def _circular_edge(
+    view: Any, *, radius_mm: float, center_y_mm: float
+) -> Any:
+    """Return the visible circular model edge at the requested axis station."""
+    drawing_view = _early_bound(view, "IView")
+    candidates: list[tuple[float, float, Any]] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = edge.GetCurve()
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+            candidates.append((params[6], params[1], edge))
+    if not candidates:
+        raise RuntimeError("drawing view has no circular model edges")
+    radius, center_y, edge = min(
+        candidates,
+        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - center_y_mm),
+    )
+    if abs(radius - radius_mm) > 0.01 or abs(center_y - center_y_mm) > 0.01:
+        raise RuntimeError(
+            f"no circular edge matches radius {radius_mm:.4f} mm at "
+            f"axis station {center_y_mm:.3f} mm"
+        )
+    return edge
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -99,18 +135,19 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Tip Adjuster Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone tip adjuster; 5/16-18 slotted set screw; blued",
+            3: "cone tip adjuster; 5/16-18 slotted set screw; black oxide",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
     end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=(4, 1))
+    cup = place_view(adapter, str(SOURCE), "*Top", *CUP_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     set_hidden_lines_removed(adapter, iso)
     # The elevation shows the blind cup as hidden lines; the head end view
     # exposes the driver slot across the OD.
-    for view in (front, end):
+    for view in (front, end, cup):
         set_hidden_lines_visible(adapter, view)
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
     if (thread_seeds, thread_instances) != (1, 1):
@@ -125,14 +162,44 @@ async def build(adapter: Any) -> dict[str, str]:
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *end_annotations], DIMENSION_CALLOUTS
+    cup_annotations = curate_view_dimensions(
+        adapter, cup, keep=CUP_KEEP, view_label="cup end"
     )
-    # The OD is the modeled thread MINOR diameter; the 5/16-18 callout governs.
-    # Box it in parentheses so it reads as reference, not a controlling dim.
-    set_reference_dimensions(adapter, end_annotations, {"BodyDiaDim"})
+    set_dimension_callouts(
+        adapter,
+        [*front_annotations, *end_annotations, *cup_annotations],
+        DIMENSION_CALLOUTS,
+    )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the head end view")
+    if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to the cup-end view")
+
+    thread_edge = _circular_edge(
+        front, radius_mm=BODY_DIA / 2.0, center_y_mm=BODY_LEN
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + 0.028, FRONT_CENTER[1]),
+        symbol_xy=(FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.025),
+        datum="A",
+        label="thread pitch-cylinder axis",
+        entity=thread_edge,
+    )
+    cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
+    add_feature_control_frame(
+        adapter,
+        cup,
+        edge_xy=(CUP_CENTER[0] + 0.004, CUP_CENTER[1]),
+        frame_xy=(CUP_CENTER[0] + 0.050, CUP_CENTER[1] + 0.032),
+        characteristic="position",
+        tolerance="0.05",
+        datums=("A",),
+        diameter=True,
+        label="cup axis position",
+        entity=cup_edge,
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
 

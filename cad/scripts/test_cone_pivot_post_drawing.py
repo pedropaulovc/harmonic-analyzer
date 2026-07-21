@@ -37,27 +37,31 @@ def test_marked_dimensions_cover_the_column_and_journal() -> None:
 def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     notes = cone_pivot_post_spec.DRAWING_NOTES
     assert "9.545-9.555" in notes
+    assert "FINISH RA 1.6" in notes
     # The oblique, offset crank bore is fully called out by note (dia, height,
     # tip, offset direction) since it projects as an ellipse in every square view.
     assert "CRANK BORE" in notes
     assert "10.025" in notes
     assert "85.835" in notes
     assert "12.52 +/-0.10 DEG" in notes
-    assert "CLOCKWISE FROM B" in notes
+    assert "CLOCKWISE" in notes
+    assert "0.927 +/-0.05 EAST" in notes
+    assert "0.206 +/-0.05 SOUTH" in notes
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_native_gdt_controls_the_journal_bore() -> None:
+def test_datum_and_notes_control_the_journal_bore() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 1
-    # The horizontal bore axis is PARALLEL to the horizontal foot seat (datum A).
-    assert source.count('characteristic="parallelism"') == 1
-    assert source.count("add_surface_finish(") == 1
-    assert 'datum="B"' in source
+    assert source.count("add_datum_feature(") == 1
+    assert "add_datum_feature_to_annotation(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "CYLINDRICAL\nZONE DIA 0.05 PARALLEL TO DATUM A" in cone_pivot_post_spec.DRAWING_NOTES
+    assert "add_surface_finish(" not in source
+    assert "DATUM B" not in cone_pivot_post_spec.DRAWING_NOTES
+    assert "JOURNAL AXIS" in cone_pivot_post_spec.DRAWING_NOTES
 
 
 def test_view_scales_are_explicit() -> None:

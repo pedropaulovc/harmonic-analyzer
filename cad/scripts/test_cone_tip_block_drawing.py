@@ -25,43 +25,46 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*cone_tip_block_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
-    assert marked == {"Width", "Depth", "BlockHt", "BoreZ", "BoreDiaDim", "SlitW"}
-    assert part.BORE_DIA == cone_tip_block_spec.BORE_DIA == 0.819
+    assert marked == {"Width", "Depth", "BlockHt", "SlitW"}
+    assert part.ADJUSTER_AXIS_HEIGHT == cone_tip_block_spec.ADJUSTER_AXIS_HEIGHT
 
 
-def test_journal_bore_is_a_running_fit_at_matching_precision() -> None:
-    # The reamed 1/32 in journal is dimensioned at 3 places (0.794) so the view
-    # matches the note, and carries the running-fit callout.
-    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == "+0.005/-0.005 THRU"
-    assert drawing.DIMENSION_PRECISION["BoreDiaDim"] == 3
-    assert "0.814-0.824" in cone_tip_block_spec.DRAWING_NOTES
+def test_fictional_tip_journal_is_absent() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "JournalBore" not in source
+    assert "BoreDiaDim" not in source
+    assert drawing.DIMENSION_CALLOUTS == {}
 
 
-def test_notes_specify_journal_adjuster_and_functional_pinch_joint() -> None:
+def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     notes = cone_tip_block_spec.DRAWING_NOTES
-    assert "JOURNAL" in notes
     assert "5/16-18" in notes  # the adjuster tapped hole
     assert "#3-48" in notes  # the pinch tapped hole
-    assert "SLIT" in notes
+    assert "SLOT" in notes
     assert "CLEARANCE" in notes
-    assert "FAR JAW" in notes
+    assert "LEFT-HAND JAW" in notes
+    assert "DIA 2.946 +0.10/-0.00" in notes
     assert "MATERIAL" not in notes
     assert "OXIDE" not in notes
     assert "DATUM A" in notes
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'adapter, "Manufacturing Notes", 0.020, 0.075, char_height=0.0025' in source
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PinchClearance"' in part_source
-    assert 'HoleSpec("clearance", "#3", end="through_next")' in part_source
+    assert '"clearance", "#3", end="blind"' in part_source
+    assert "depth_mm=(BLOCK_X - SLIT_W) / 2.0" in part_source
 
 
-def test_datum_and_parallelism_frame_are_present() -> None:
+def test_datum_and_parallelism_control_are_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'datum="A"' in source
-    assert 'characteristic="parallelism"' in source
-    assert 'roughness_ra="1.6"' in source
+    assert 'datum="B"' not in source
+    assert "add_feature_control_frame(" not in source
+    assert "CYLINDRICAL ZONE DIA 0.05" in cone_tip_block_spec.DRAWING_NOTES
+    assert "PARALLEL TO DATUM A" in cone_tip_block_spec.DRAWING_NOTES
+    assert "DATUM B" not in cone_tip_block_spec.DRAWING_NOTES
 
 
 def test_view_scales_are_explicit() -> None:

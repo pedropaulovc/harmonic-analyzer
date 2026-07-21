@@ -7,7 +7,7 @@ SLDDRW recipes from one source (see build_pivot_ball_mount.py for the geometry).
 from __future__ import annotations
 
 
-# Chrome-look ball-end pillar carrying each pivot shaft end: a seat pad, a stem,
+# Nickel-plated ball-end pillar carrying each pivot shaft end: a seat pad, a stem,
 # and a Ø13 ball cross-bored for the Ø6.35 pivot shaft. Four are used (two on
 # the rocker-support apexes, two on the top-frame west rail).
 BALL_DIA = 13.0  # the pivot ball (spherical)
@@ -19,18 +19,16 @@ BORE_DIA = 6.5  # shaft cross-bore
 SHAFT_DIA = 6.35  # the mating Ø6.35 pivot shaft
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BallMountProfile": {"BallRise", "BallRadius", "BaseRadius", "BaseHeight"},
+    "BallMountProfile": {"BallRise"},
     "ShaftBoreProfile": {"ShaftBoreDia"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
-        "DATUM A IS SEAT FACE; HEIGHTS ARE AXIS-TO-A.",
-        "SPHERICAL BALL DIA 13.00 +/-0.05; DIA 13.00 +/-0.05 X",
-        "4.00 +/-0.05 SEAT PAD; DIA 8.00 +/-0.05 STEM.",
-        "BALL AND CROSS-BORE AXES CENTERED ON PILLAR AXIS WITHIN 0.05.",
-        "SHAFT CROSS-BORE LIMITS DIA 6.45-6.50 THRU BALL CENTRE;",
-        "AXIS 25.20 +/-0.05 ABOVE A AND PARALLEL TO A WITHIN DIA 0.05.",
-        "MATING SHAFT MAX DIA 6.35. 4 REQUIRED.",
+        "DATUM A IS SEAT FACE. DATUM B IS DIA 8 STEM AXIS.",
+        "25.20 +/-0.05 LOCATES SPHERE CENTER AND CROSS-BORE AXIS FROM A.",
+        "CROSS-BORE AXIS SHALL INTERSECT DATUM B WITHIN DIA 0.05.",
+        "MATING SHAFT MAX DIA 6.35.",
+        "POLISH EXPOSED BALL, STEM, AND PAD OD TO Ra 0.8 BEFORE PLATE.",
     )
 )
