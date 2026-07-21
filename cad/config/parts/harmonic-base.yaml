@@ -2,7 +2,7 @@ harmonic-base:
   number: MHA-035
   material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
-  finish: SSPC-SP 3; alkyd primer + green enamel, 75-125 um DFT; mask A/B/C, pad, bores/threads/c'bores
+  finish: SSPC-SP 3; ALKYD PRIMER/GREEN ENAMEL, 75-125 um DFT; MASK A/B/C, PAD, ALL BORES/THREADS
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock"

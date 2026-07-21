@@ -73,6 +73,7 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "gray cast iron" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "sspc-sp 3" in finish
+    assert "alkyd primer/green enamel" in finish
     assert "75-125 um total dft" in finish
     assert "mask a/b/c" in finish
     assert config["process"] == "machined from solid stock"
