@@ -25,6 +25,12 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert part.BORE_DIA == cone_pivot_post_spec.BORE_DIA == 9.550
+    assert part.CRANK_BORE_DIA == cone_pivot_post_spec.CRANK_BORE_DIA == 10.025
+    assert round(
+        cone_pivot_post_spec.CRANK_BORE_DIA
+        - cone_pivot_post_spec.CRANK_SHAFT_MAX_DIA,
+        3,
+    ) == 0.500
 
 
 def test_marked_dimensions_cover_the_column_and_journal() -> None:

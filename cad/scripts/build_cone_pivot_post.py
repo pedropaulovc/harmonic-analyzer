@@ -68,7 +68,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from cone_pivot_post_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
+from cone_pivot_post_spec import CRANK_BORE_DIA, DRAWING_DIMENSIONS, DRAWING_NOTES
 
 PART_NAME = "cone-pivot-post"
 MATERIAL = "Gray Cast Iron"  # ONE green casting: big-end journal + crank pedestal
@@ -101,7 +101,6 @@ BORE_RADIUS = BORE_DIA / 2.0
 # mm^3 measured; the M6.8 sliver class -- design 0.25 margins, see memory).
 # The cone journal bore carries 0.02..0.05 diametral running clearance over
 # the shaft's 9.505..9.525 limits; its named axis still defines the mate.
-CRANK_BORE_DIA = BORE_DIA + 0.5
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
