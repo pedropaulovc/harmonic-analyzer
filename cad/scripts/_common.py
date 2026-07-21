@@ -1130,8 +1130,9 @@ def part_properties(part_name: str) -> dict[str, str]:
 
     Pulls Number/Revision/Material/Tolerance Class/Fit Class/Process/Confidence
     from ``cad/config/parts.yaml`` (merged over its defaults) and stamps a
-    reproducible Generator (git sha). Title is the part name. Parts absent from
-    the registry get the minimal set (Title + Generator) and are flagged by the
+    reproducible Generator (git sha). ``title`` may override the internal
+    artifact name for a clearer manufacturing identity; parts absent from the
+    registry get the minimal set (Title + Generator) and are flagged by the
     verify.py tolerance audit.
     """
     import _config
@@ -1158,6 +1159,7 @@ def part_properties(part_name: str) -> dict[str, str]:
         reg = _config.parts(registry_name)
     except KeyError:
         return props
+    props["Title"] = str(reg.get("title") or part_name)
     field_map = {
         "Number": "number", "Revision": "revision", "Material": "material",
         "Tolerance Class": "tolerance_class", "Fit Class": "fit_class",
