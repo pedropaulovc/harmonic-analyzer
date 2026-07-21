@@ -31,12 +31,15 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
         "GEAR DATA", "NUMBER OF TEETH", "DIAMETRAL PITCH", "MODULE (mm",
         "PRESSURE ANGLE", "PITCH DIAMETER (mm", "OUTSIDE DIAMETER (mm)",
         "WHOLE DEPTH (mm)", "FACE WIDTH (mm)", "TOOTH FORM", "HELIX ANGLE",
-        "HELIX TWIST",
+        "HELIX TWIST", "ROOT DIAMETER (mm)",
     ):
         assert field in data, field
     assert "64" in data
     assert spec.HELIX_ANGLE_DEG == pytest.approx(part.HELIX_DEG, abs=0.01)
     assert spec.TOTAL_TWIST_DEG == pytest.approx(4.16, abs=0.01)
+    assert spec.ROOT_DIA == pytest.approx(
+        (part.TEETH / part.DP - 2.0 * 1.157 / part.DP) * spec.MM_PER_IN
+    )
     assert "X.XX" not in data
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Gear Data"' in source
@@ -52,6 +55,7 @@ def test_manufacturing_notes_present() -> None:
     notes = spec.DRAWING_NOTES
     assert "CUT TEETH PER GEAR DATA" in notes
     assert "POSITIVE HELIX" in notes
+    assert "ROOT DIAMETER" in notes
     assert "DEBUR" not in notes
     assert "X.XX" not in notes
 

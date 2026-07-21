@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_crank_pinion as part
 import crank_pinion_spec as spec
 import draw_crank_pinion as drawing
@@ -29,9 +31,13 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
         "GEAR DATA", "NUMBER OF TEETH", "DIAMETRAL PITCH", "MODULE (mm",
         "PRESSURE ANGLE", "PITCH DIAMETER (mm", "OUTSIDE DIAMETER (mm)",
         "WHOLE DEPTH (mm)", "FACE WIDTH (mm)", "TOOTH FORM",
+        "ROOT DIAMETER (mm)",
     ):
         assert field in data, field
     assert "16" in data
+    assert spec.ROOT_DIA == pytest.approx((
+        part.TEETH / part.DP - 2.0 * 1.157 / part.DP
+    ) * spec.MM_PER_IN)
     assert "X.XX" not in data
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Gear Data"' in source
@@ -40,6 +46,7 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
 
 def test_manufacturing_notes_present() -> None:
     assert "CUT TEETH PER GEAR DATA" in spec.DRAWING_NOTES
+    assert "ROOT DIAMETER" in spec.DRAWING_NOTES
     assert "DEBUR" not in spec.DRAWING_NOTES
     assert "X.XX" not in spec.DRAWING_NOTES
 

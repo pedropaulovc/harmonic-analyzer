@@ -56,6 +56,10 @@ def test_manufacturing_notes_cover_teeth_and_family() -> None:
     notes = spec.DRAWING_NOTES
     assert "CUT TEETH PER GEAR DATA" in notes
     assert "CONE SET" in notes
+    assert "1 OF EACH CONFIGURATION" in notes
+    assert "20 GEARS TOTAL" in notes
+    assert "NO KEYWAY" in notes
+    assert "SOLDER TO MATCHING SHAFT SEATS" in notes
     assert "X.XX" not in notes
     assert "SET TABLE" not in notes
     assert "CONE-SHAFT DRAWING" not in notes

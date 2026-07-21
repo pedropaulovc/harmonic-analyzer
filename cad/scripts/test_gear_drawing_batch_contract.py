@@ -28,12 +28,16 @@ SHEETS = (
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "ALL DIMENSIONS",
+    "BREAK EDGES",
     "BREAK SHARP",
     "DEBUR",
+    "EDGE BREAK",
     "FINISH:",
     "GENERAL TOLERANCE",
     "MATERIAL:",
     "REMOVE BURR",
+    "SHARP EDGES",
+    "U.O.S.",
     "UNLESS OTHERWISE SPECIFIED",
     " UOS",
 )

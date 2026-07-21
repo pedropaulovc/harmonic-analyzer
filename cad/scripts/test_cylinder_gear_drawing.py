@@ -58,6 +58,7 @@ def test_manufacturing_notes_cover_cam_and_teeth() -> None:
     assert "CUT TEETH PER GEAR DATA" in notes
     assert "ECCENTRIC CAM" in notes
     assert "NOTCH" in notes
+    assert "RADIAL PLANE THROUGH BORE AXIS + NOTCH CENTERLINE" in notes
     assert "X.XX" not in notes
     assert "DEBUR" not in notes
 
