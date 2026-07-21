@@ -1,5 +1,8 @@
 harmonic-base:
   number: MHA-035
   material: Gray Cast Iron
+  material_specification: ASTM A48 Class 30 gray cast iron
+  finish: green enamel; machined seats + mounting faces masked
+  quantity: 1
   tolerance_class: machined_block
   process: "cast + machined"

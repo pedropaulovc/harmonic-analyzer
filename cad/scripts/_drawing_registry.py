@@ -399,6 +399,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="crankshaft",
         script_name="draw_crankshaft.py",
     ),
+    DrawingSpec(
+        name="harmonic_base",
+        part="harmonic_base",
+        artifact_stem="harmonic-base",
+        script_name="draw_harmonic_base.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

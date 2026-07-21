@@ -44,20 +44,34 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
+from harmonic_base_spec import (
+    BOTTOM_LENGTH,
+    BOTTOM_THICKNESS,
+    BOTTOM_WIDTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+    TOP_LENGTH,
+    TOP_THICKNESS,
+    TOP_WIDTH,
+)
 
 import _telemetry
 
 PART_NAME = "harmonic-base"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
+# Plate nominal geometry (BOTTOM_*/TOP_*) lives in harmonic_base_spec -- the
+# COM-free contract the drawing shares. DIMENSIONS.md ch6: 46 cm / 28 cm callouts
+# = 18.1 x 11.0 in (annotated); legacy 18.0 x 11.0 kept, top plate 0.25 in reveal
+# per side, thicknesses from the legacy HarmonicBase.cs (photo-verify M2 note).
 IN = 25.4
-BOTTOM_LENGTH = 18.0 * IN  # DIMENSIONS.md ch6: 46 cm callout = 18.1" (annotated)
-BOTTOM_WIDTH = 11.0 * IN  # DIMENSIONS.md ch6: 28 cm callout = 11.0" (annotated)
-BOTTOM_THICKNESS = 0.5 * IN  # legacy HarmonicBase.cs (photo-verify M2 note)
-TOP_LENGTH = 17.5 * IN  # legacy: 0.25" reveal per side
-TOP_WIDTH = 10.5 * IN
-TOP_THICKNESS = 1.5 * IN
 
 # Rocker-support hold-down holes (machine = part-local: frame.SLDASM places the
 # base unrotated at the origin). Four through-drilled O13 clearance holes laid out
@@ -333,6 +347,17 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
