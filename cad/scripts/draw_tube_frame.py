@@ -160,15 +160,25 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(flank_x, LENGTH_CENTER[1]),
         frame_xy=(0.115, 0.205),
         characteristic="cylindricity",
-        tolerance="0.10",
+        tolerance="0.03",
         quantity="FULL OD LENGTH",
         label="full-length OD cylindricity",
         entity_type="SILHOUETTE",
     )
     half_length_on_sheet = COLUMN_LENGTH / 10000.0
-    for edge_y, frame_y, label in (
-        (LENGTH_CENTER[1] - half_length_on_sheet, 0.045, "bottom end perpendicularity"),
-        (LENGTH_CENTER[1] + half_length_on_sheet, 0.255, "top end perpendicularity"),
+    for edge_y, frame_y, label, quantity in (
+        (
+            LENGTH_CENTER[1] - half_length_on_sheet,
+            0.045,
+            "bottom end perpendicularity",
+            "BOTTOM END FACE",
+        ),
+        (
+            LENGTH_CENTER[1] + half_length_on_sheet,
+            0.255,
+            "top end perpendicularity",
+            "TOP END FACE",
+        ),
     ):
         add_feature_control_frame(
             adapter,
@@ -178,6 +188,7 @@ async def build(adapter: Any) -> dict[str, str]:
             characteristic="perpendicularity",
             tolerance="0.10",
             datums=("A",),
+            quantity=quantity,
             label=label,
         )
 

@@ -41,6 +41,9 @@ def test_notes_and_native_gdt() -> None:
     assert "UOS" not in notes
     assert "AS-PROCURED STOCK RESULT" in notes
     assert "NOT AN ACCEPTANCE DIMENSION" in notes
+    assert "DO NOT MACHINE THE ID" in notes
+    assert "FULL-LENGTH CYLINDRICITY CONTROL" in notes
+    assert "TOP/BOTTOM ORIENTATION IS NONFUNCTIONAL" in notes
     assert "BORE" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -48,6 +51,9 @@ def test_notes_and_native_gdt() -> None:
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert 'characteristic="cylindricity"' in source
+    assert 'tolerance="0.03"' in source
+    assert '"BOTTOM END FACE"' in source
+    assert '"TOP END FACE"' in source
     assert source.count('characteristic="perpendicularity"') == 1
     assert '{"OuterDia": "+0/-0.05"}' in source
     assert '{"Depth": "+/-0.25"}' in source
@@ -76,4 +82,6 @@ def test_part_stamps_make_critical_properties() -> None:
     finish = str(config["finish"]).lower()
     assert "od polished ra 1.6" in finish
     assert "corrosion-preventive oil after inspection" in finish
+    assert "ends faced" in finish
+    assert "id as-procured" in finish
     assert int(config["quantity"]) == 4
