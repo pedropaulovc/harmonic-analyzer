@@ -25,7 +25,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # renders as the diameter symbol.
 DRAWING_NOTES = "\n".join(
     (
-        "1. FINISHED WIRE <MOD-DIAM>3.00 +0.00/-0.05; ENDS SQUARE + DEBURRED.",
+        "1. FINISHED WIRE <MOD-DIAM>3.00 +0.00/-0.05; ENDS SQUARE.",
         "2. FORM: 12 STRAIGHT RISE, 90 DEG ELBOW (R3 AT WIRE",
         "   CENTERLINE), THEN 3.5 ARM RUN; DIMS ARE STRAIGHT TANGENTS.",
         "3. R3 +/-0.20; RISE + ARM LENGTHS +/-0.20. FORM IN ONE PLANE",
