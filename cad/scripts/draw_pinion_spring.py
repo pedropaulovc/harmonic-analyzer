@@ -213,6 +213,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.20",
         datums=("A",),
         label="spring formed broad-face coplanarity",
+        entity_type="FACE",
     )
     add_surface_finish(
         adapter,
@@ -221,6 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.230, 0.118),
         roughness_ra="0.8",
         label="spring concave blade broad face",
+        entity_type="FACE",
     )
     if add_note(adapter, "TOP VIEW (REMOVED) SCALE 2:1", 0.270, 0.078) is None:
         raise RuntimeError("failed to label removed spring top view")
