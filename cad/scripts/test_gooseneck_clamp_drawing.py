@@ -31,6 +31,10 @@ def test_notes_describe_the_post_bore_and_pinch_screw() -> None:
     notes = gooseneck_clamp_spec.DRAWING_NOTES
     assert "1/4-20 UNC-2B" in notes
     assert "BORE" in notes
+    assert "MACHINE ALL SIX OUTER FACES" in notes
+    assert "FRONT FACE SHOWN IS SCREW-ENTRY FACE" in notes
+    assert "3.0 MIN FULL THREAD" in notes
+    assert "UNDER-HEAD-LENGTH" in notes
     assert "GRAY" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
