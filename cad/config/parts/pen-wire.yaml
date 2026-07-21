@@ -1,5 +1,8 @@
 pen-wire:
   number: MHA-100
   material: Plain Carbon Steel
+  material_specification: ASTM A228 music (spring) steel wire
+  finish: bright drawn; lightly oiled
+  quantity: 1
   tolerance_class: machined_block
   process: "drawn steel wire"

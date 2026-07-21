@@ -39,12 +39,24 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
     volume_check,
+)
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from pen_wire_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ELEVATION_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
 )
 
 PART_NAME = "pen-wire"
@@ -99,7 +111,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=WIRE_LEN)),
     )
     name_last_feature(adapter, "Wire")
-    drive_jobs.append(("D1@Wire", '"WireLength"'))
+    # Name the extrude depth "Depth" so the drawing can mark the run length
+    # (mirrors build_crankshaft's Shaft/Depth); the drive now targets that name.
+    length_dim = name_dimensions(adapter, "Wire", ["Depth"])
+    drive_jobs.append((length_dim[0], '"WireLength"'))
     v_wire = math.pi * (WIRE_DIA / 2.0) ** 2 * WIRE_LEN
     await volume_check(adapter, "wire", v_wire, 0.005 * v_wire)
 
@@ -114,6 +129,18 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Elevation View Note": ELEVATION_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
