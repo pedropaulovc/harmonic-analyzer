@@ -122,7 +122,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.070)
     # The end view runs 16x the sheet scale -- label it or "do not scale
     # drawing" leaves its size unreadable.
-    add_property_linked_note(adapter, "End View Note", 0.200, 0.180)
+    # Below the 4:1 end view -- the manufacturing-notes block above descends
+    # to ~y=0.175 and owns the old 0.180 spot (layout audit).
+    add_property_linked_note(adapter, "End View Note", 0.205, 0.120)
 
     return await finalize_drawing(
         adapter,
