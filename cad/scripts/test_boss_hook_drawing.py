@@ -28,6 +28,8 @@ def test_notes_describe_the_wire_hook() -> None:
     notes = boss_hook_spec.DRAWING_NOTES
     assert "WIRE" in notes
     assert "R3 +/-0.20" in notes
+    assert "END-FACE AXIAL" in notes
+    assert "WIRE CENTERLINE, FROM END FACE" in notes
     assert "(MAX DIA - MIN DIA)/3.00 <= 0.05" in notes
     assert "FLAT SURFACE PLATE; 0.25 MAX GAP" in notes
     assert "5X MAGNIFICATION" in notes
@@ -52,7 +54,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("boss-hook")
-    assert config["material"] == "AISI 1018 cold-drawn steel wire"
+    assert config["material"] == "ASTM A108 Grade 1018 cold-finished steel round"
     assert config["material"] == config["material_specification"]
     assert "steel" in str(config["material_specification"]).lower()
     assert config["finish"]
