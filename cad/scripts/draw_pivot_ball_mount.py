@@ -312,10 +312,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=STEM_DIM_TEXT,
-        symbol_xy=(0.020, _front_y(12.0)),
+        symbol_xy=STEM_DIM_TEXT,
         datum="B",
         label="stem diameter feature of size",
         entity_type="DIMENSION",
+        position_tolerance_m=0.0005,
     )
     add_feature_control_frame(
         adapter,
