@@ -48,7 +48,7 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
     assert "ECCENTRICITY" in drawing.DIMENSION_CALLOUTS["CollarCy"]
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "NOT" in notes and "CONCENTRIC" in notes
-    assert "OFFSET 1.0" in notes
+    assert "OFFSET 1.0" not in notes
 
 
 def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:

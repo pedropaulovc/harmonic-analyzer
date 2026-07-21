@@ -86,7 +86,7 @@ def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
 
 def test_hole_states_are_annotated() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
-    assert callouts["PivotBoreDia"].startswith("THRU")
+    assert "THRU - REAM" in callouts["PivotBoreDia"]
     assert "THRU" in callouts["ArborBoreDia"]
     assert "DEEP" in callouts["PinSeatDia"]
 
