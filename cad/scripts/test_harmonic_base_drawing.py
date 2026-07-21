@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import build_harmonic_base as part
 import draw_harmonic_base as drawing
@@ -47,14 +48,17 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GREEN ENAMEL" not in notes
     assert "DEBURR" not in notes
     assert "UOS" not in notes
-    assert "ONE-PIECE CASTING" in notes
-    assert "INTEGRAL;" in notes
     assert "JOINED" not in notes
-    assert "REVEAL" in notes
-    assert "BLIND FROM THE TOP FACE" in notes
+    assert "ALL WALLS 2 DEG DRAFT" in notes
+    assert "ALL FILLETS/CORNERS R3.00" in notes
+    assert "MACHINING DATUM FACES A/B/C" in notes
+    assert "MACHINE A (UNDERSIDE), B (LONG-SIDE EDGE), C (LEFT END)" in notes
+    assert "TOP PAD FLAT 0.10, PARALLEL 0.10 TO A" in notes
+    assert "BLIND FROM TOP" in notes
     assert "A1-A4" not in notes
-    assert "FOUR DIA 13 THRU / DIA 23 X 6.5 DEEP COUNTERBORES" in notes
-    assert "LOCATION TOLERANCE +/-0.25" in notes
+    assert "FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES" in notes
+    assert "LOCATIONS BASIC" in notes
+    assert re.search(r"\d+\.\d(?!\d)", notes) is None
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -65,6 +69,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "hole_entities=hole_entities" in source
     assert "GetVisibleEntities2(c, 2)" in source
     assert "GetVisibleEntities2(c, 1)" in source
+    assert source.count("add_datum_feature(") == 3
+    assert source.count("add_feature_control_frame(") == 2
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
@@ -74,11 +80,17 @@ def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
         (x, z, part.HOLE_DIA) for x, z in part.HOLE_XZ
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "basic_locations=False" in source
+    assert "basic_locations=True" in source
     assert '"*Front"' in source
     assert len(drawing.TOP_KEEP) == 2
     assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
     assert drawing.HOLE_TABLE_ANCHOR[0] >= 0.274
+
+
+def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:
+    for spec in (part.STOP_SEAT_SPEC, part.BLOCK_SEAT_SPEC, part.FOOT_SEAT_SPEC):
+        thread_depth = spec.overrides_mm["ThreadDepth"]
+        assert spec.depth_mm - thread_depth >= 3.0
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -90,7 +102,10 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("harmonic-base")
     assert config["material"] == config["material_specification"]
     assert "gray cast iron" in str(config["material_specification"]).lower()
-    assert config["finish"]
+    finish = str(config["finish"]).lower()
+    assert "shade noncritical" in finish
+    assert "as-cast only" in finish
+    assert "ra 3.2" in finish
     assert int(config["quantity"]) == 1
 
 

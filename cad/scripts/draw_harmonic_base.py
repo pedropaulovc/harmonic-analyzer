@@ -25,6 +25,8 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -47,7 +49,7 @@ from build_harmonic_base import (
     STOP_SCREW_HOLE_DIA,
     STOP_SCREW_XZ,
 )
-from harmonic_base_spec import BOTTOM_LENGTH, BOTTOM_WIDTH
+from harmonic_base_spec import BOTTOM_LENGTH, BOTTOM_WIDTH, STACK_HEIGHT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -118,11 +120,12 @@ ALL_HOLES = (
 
 def _visible_hole_table_entities(
     adapter: Any, view: Any
-) -> tuple[Any, tuple[Any, ...]]:
-    """Return the plan datum vertex and hole rims by model geometry."""
+) -> tuple[Any, tuple[Any, ...], Any, Any]:
+    """Return plan origin, hole rims, and the B/C datum edges."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     vertices: list[tuple[tuple[float, float, float], Any]] = []
     circles: list[tuple[float, float, float, Any]] = []
+    lines: list[tuple[tuple[float, ...], Any]] = []
 
     for component in components:
         visible_vertices = adapter._attempt(
@@ -141,10 +144,13 @@ def _visible_hole_table_entities(
         for edge in visible_edges:
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
+            if curve.IsCircle():
+                parameters = tuple(float(value) for value in curve.CircleParams)
+                circles.append((parameters[0], parameters[2], parameters[6], edge))
                 continue
-            parameters = tuple(float(value) for value in curve.CircleParams)
-            circles.append((parameters[0], parameters[2], parameters[6], edge))
+            if curve.IsLine():
+                parameters = tuple(float(value) for value in curve.LineParams)
+                lines.append((parameters, edge))
 
     if not vertices:
         raise RuntimeError("harmonic-base plan has no visible footprint vertices")
@@ -192,8 +198,65 @@ def _visible_hole_table_entities(
         used.add(index)
         selected_edges.append(edge)
 
-    return max(datum_candidates, key=lambda candidate: candidate[0])[1], tuple(
-        selected_edges
+    datum_b_candidates = [
+        edge
+        for parameters, edge in lines
+        if abs(parameters[2] - BOTTOM_WIDTH / 2000.0) <= 2e-6
+        and abs(parameters[3]) >= 0.99
+    ]
+    datum_c_candidates = [
+        edge
+        for parameters, edge in lines
+        if abs(parameters[0] + BOTTOM_LENGTH / 2000.0) <= 2e-6
+        and abs(parameters[5]) >= 0.99
+    ]
+    if not datum_b_candidates or not datum_c_candidates:
+        raise RuntimeError(
+            "harmonic-base plan is missing a visible outer B/C datum edge"
+        )
+
+    return (
+        max(datum_candidates, key=lambda candidate: candidate[0])[1],
+        tuple(selected_edges),
+        max(datum_b_candidates, key=lambda edge: float(edge.GetLength())),
+        max(datum_c_candidates, key=lambda edge: float(edge.GetLength())),
+    )
+
+
+def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """Return the finished underside A and top-pad face edges in the side view."""
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    candidates: list[tuple[float, float, Any]] = []
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1),
+            default=(),
+        ) or ()
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsLine():
+                continue
+            parameters = tuple(float(value) for value in curve.LineParams)
+            if abs(parameters[3]) < 0.99:
+                continue
+            candidates.append((parameters[1], float(edge.GetLength()), edge))
+
+    def _at_height(height_m: float, label: str) -> Any:
+        matching = [
+            (length, edge)
+            for y, length, edge in candidates
+            if abs(y - height_m) <= 2e-6
+        ]
+        if not matching:
+            raise RuntimeError(
+                f"harmonic-base side view has no visible {label} edge at "
+                f"model Y={height_m:g} m"
+            )
+        return max(matching, key=lambda candidate: candidate[0])[1]
+
+    return _at_height(0.0, "underside datum A"), _at_height(
+        STACK_HEIGHT / 1000.0, "top pad"
     )
 
 
@@ -248,7 +311,10 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
-    datum_entity, hole_entities = _visible_hole_table_entities(adapter, top)
+    datum_entity, hole_entities, datum_b_edge, datum_c_edge = (
+        _visible_hole_table_entities(adapter, top)
+    )
+    datum_a_edge, _top_pad_edge = _visible_side_datum_edges(adapter, side)
 
     # One complete hole table: four underside counterbores followed by every
     # top-side blind swing/pinion seat. Non-basic X/Y headers let the title-block
@@ -261,8 +327,60 @@ async def build(adapter: Any) -> dict[str, str]:
         datum_entity=datum_entity,
         hole_entities=hole_entities,
         anchor_xy=HOLE_TABLE_ANCHOR,
-        basic_locations=False,
+        basic_locations=True,
         label="harmonic-base mounting",
+    )
+
+    add_datum_feature(
+        adapter,
+        side,
+        symbol_xy=(0.285, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
+        datum="A",
+        label="machined underside datum",
+        entity=datum_a_edge,
+        shoulder=True,
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        symbol_xy=(0.060, _DATUM_XY[1] - 0.010),
+        datum="B",
+        label="machined long-side datum",
+        entity=datum_b_edge,
+        shoulder=True,
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        symbol_xy=(_DATUM_XY[0] + 0.013, 0.190),
+        datum="C",
+        label="machined left-end datum",
+        entity=datum_c_edge,
+        shoulder=True,
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.055, 0.135),
+        characteristic="position",
+        tolerance="1.00",
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="4X E1-E4",
+        label="mounting-hole true position",
+        entity=hole_entities[0],
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.055, 0.205),
+        characteristic="position",
+        tolerance="0.50",
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="9X A1-D4",
+        label="top-seat true position",
+        entity=hole_entities[4],
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.078)
