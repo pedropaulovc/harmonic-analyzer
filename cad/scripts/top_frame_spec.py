@@ -10,27 +10,30 @@ from __future__ import annotations
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The overall ring footprint (OuterProfile Width/Depth), one column
-# clamp bore (Ø25.5) and the gooseneck bore (Ø17) are marked; the rail width, ring
-# height, boss OD and column pitch are carried in the notes (they are relations or
-# repeated features that would collide as duplicate-named imported dims). ---
+# print shows. The rail outside profile (OuterProfile Width/Depth) is marked;
+# limits and the datum-controlled bore pattern stay together in the notes rather
+# than being duplicated by isolated native diameter dimensions. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OuterProfile": {"Width", "Depth"},
-    "BoreProfile": {"C0Dia"},
-    "GooseneckProfile": {"Dia"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
         "1. MACHINE FROM SOLID STOCK TO THE FINISHED PROFILE SHOWN; NO DRAFT",
         "   OR CAST FILLETS.",
-        "2. RECTANGULAR RING: RAILS 22.00 WIDE X 41.00 TALL; CORNER BOSSES",
-        "   <MOD-DIAM>48.00.",
-        "3. COLUMN BORES 4X <MOD-DIAM>25.50 +0.05/-0.00 THRU ON 394.00 X 224.00",
-        "   PITCH (+/-0.10); CENTRE PATTERN ON OUTER ENVELOPE WITHIN 0.20.",
-        "4. GOOSENECK BORE <MOD-DIAM>17.00 +0.20/-0.00 THRU LEFT RAIL IN PLAN",
-        "   VIEW; CENTRE AT RAIL MID-SPAN WITHIN 0.10.",
+        "2. OVERALL FINISHED ENVELOPE 442.00 +/-0.25 X 272.00 +/-0.25 X",
+        "   41.00 +/-0.10. RAIL OUTSIDE PROFILE 416.00 X 246.00; RAILS",
+        "   22.00 +/-0.10 WIDE. ALL RAILS AND BOSSES FULL 41.00 THICKNESS.",
+        "3. DATUM A = BOTTOM FACE; B = LEFT OUTER RAIL FACE; C = LOWER",
+        "   OUTER RAIL FACE. FOUR COLUMN-BORE AXES ARE BASIC 11.00 FROM",
+        "   B/C WITH 394.00 X 224.00 BASIC PITCH.",
+        "4. COLUMN BORES 4X <MOD-DIAM>25.50 +0.05/0 THRU; POSITION",
+        "   <MOD-DIAM>0.20 A|B|C. BOSSES 4X <MOD-DIAM>48.00 +/-0.10,",
+        "   COAXIAL WITH RESPECTIVE BORES WITHIN 0.10 TIR.",
+        "5. GOOSENECK BORE <MOD-DIAM>17.00 +0.20/0 THRU; AXIS BASIC ON",
+        "   LEFT COLUMN-BORE CENTRELINE AND MIDWAY BETWEEN LEFT BORE AXES;",
+        "   POSITION <MOD-DIAM>0.20 A|B|C. ALL BORES Ra 1.6.",
     )
 )
 TOP_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:4 - THIRD ANGLE"

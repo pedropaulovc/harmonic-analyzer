@@ -64,7 +64,7 @@ from _drawing_marks import (
 from top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    ISOMETRIC_VIEW_NOTE,
+    FRONT_VIEW_NOTE,
     TOP_VIEW_NOTE,
 )
 
@@ -337,7 +337,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Top View Note": TOP_VIEW_NOTE,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Front View Note": FRONT_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

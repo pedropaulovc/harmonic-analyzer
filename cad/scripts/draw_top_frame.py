@@ -1,12 +1,12 @@
-r"""Create the curated machinist drawing for the cast-iron top-frame ring.
+r"""Create the curated machinist drawing for the gray-iron top-frame ring.
 
 The SLDPRT remains authoritative.  This recipe supplies only the ring's views,
-overall + bore dimensions, and casting notes; every shared sheet/template,
+profile dimensions, datum-controlled bores, and manufacturing notes; every shared sheet/template,
 import, curation, and export behavior lives in ``_drawing_common``.
 
-The ring is a green gray-iron casting: a 416 x 246 rectangular ring (22 wide
-rails, 41 tall) with four Ø48 corner bosses bored Ø25.5 to clamp the columns,
-plus a Ø17 gooseneck bore through one rail.  The sheet runs 1:2; the isometric
+The finished envelope is 442 x 272 x 41 with a 416 x 246 rectangular rail
+outside profile, four Ø48 corner bosses bored Ø25.5 to clamp the columns, and
+a Ø17 gooseneck bore through one rail. The sheet runs 1:2; the front elevation
 drops to 1:4.
 
 Run with SolidWorks open::
@@ -21,20 +21,31 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_top_frame import OUTER_X, OUTER_Z
+from build_top_frame import (
+    BORE_DIA,
+    COLUMN_X,
+    COLUMN_Z,
+    GOOSENECK_BORE_DIA,
+    GOOSENECK_X,
+    GOOSENECK_Z,
+    OUTER_X,
+    OUTER_Z,
+    RING_HEIGHT,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -53,29 +64,94 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 2.0)   # 1:2 whole sheet (416 mm ring)
+SHEET_SCALE = (1.0, 2.0)   # 1:2 whole sheet (442 mm finished envelope)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5
 
-# Sheet layout (meters).  The plan (top) is the sole ortho view: the ring is a
-# flat 41-tall band, so a front view adds only its thin edge (the two-plate step
-# it would show on a solid part is absent here) while crowding the sheet -- the
-# thicknesses live in note 2 and the isometric (1:4) shows the depth in 3D.
+# Sheet layout (meters). The plan defines the profile and bore pattern; the
+# front elevation makes the full 41 mm rail/boss thickness and datum A visible.
 TOP_CENTER = (0.135, 0.175)
-ISO_CENTER = (0.345, 0.150)
+FRONT_CENTER = (0.345, 0.150)
 
 
-# Per-view survivors of the marked-dimension import.  The overall footprint, one
-# corner clamp bore (Ø25.5) and the gooseneck bore (Ø17) are kept; the pitch,
-# rail width and boss OD are in the notes.  Width sits above the plan, Depth to
-# its right (both keyed off the real outer envelope so they clear the sheet
-# border); the two bore callouts stay tight to their west-side bores, above the
-# lower-left note block.
+# Per-view survivors of the marked-dimension import. Width/Depth are the straight
+# rail outside profile, not the boss envelope; note 2 states both explicitly.
 TOP_KEEP = {
     "Width": (TOP_CENTER[0], TOP_CENTER[1] + OUTER_Z * VIEW_SCALE / 1000.0 + 0.012),
     "Depth": (TOP_CENTER[0] + OUTER_X * VIEW_SCALE / 1000.0 + 0.016, TOP_CENTER[1]),
-    "C0Dia": (0.052, 0.135),
-    "Dia": (0.052, 0.190),
 }
+
+
+def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
+    """Return one column bore, the gooseneck bore, and datum B/C rail edges."""
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    circles: list[tuple[float, float, float, Any]] = []
+    lines: list[tuple[tuple[float, ...], Any]] = []
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+        ) or ()
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if curve.IsCircle():
+                values = tuple(float(value) for value in curve.CircleParams)
+                circles.append((values[0], values[2], values[6], edge))
+                continue
+            if curve.IsLine():
+                lines.append((tuple(float(value) for value in curve.LineParams), edge))
+
+    def _circle(x_mm: float, z_mm: float, diameter_mm: float, label: str) -> Any:
+        matches = [
+            edge
+            for x, z, radius, edge in circles
+            if abs(x - x_mm / 1000.0)
+            + abs(z - z_mm / 1000.0)
+            + abs(radius - diameter_mm / 2000.0)
+            <= 5e-5
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"top-frame plan expected one visible {label}, got {len(matches)}")
+        return matches[0]
+
+    datum_b = [
+        edge
+        for values, edge in lines
+        if abs(values[0] + OUTER_X / 1000.0) <= 2e-6 and abs(values[5]) >= 0.99
+    ]
+    datum_c = [
+        edge
+        for values, edge in lines
+        if abs(values[2] - OUTER_Z / 1000.0) <= 2e-6 and abs(values[3]) >= 0.99
+    ]
+    if not datum_b or not datum_c:
+        raise RuntimeError("top-frame plan is missing the B/C outer rail datum edges")
+    return (
+        _circle(-COLUMN_X, COLUMN_Z, BORE_DIA, "column bore"),
+        _circle(GOOSENECK_X, GOOSENECK_Z, GOOSENECK_BORE_DIA, "gooseneck bore"),
+        datum_b[0],
+        datum_c[0],
+    )
+
+
+def _visible_front_datum_a(adapter: Any, view: Any) -> Any:
+    """Return the finished bottom-face edge in the front elevation."""
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    matches: list[Any] = []
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+        ) or ()
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsLine():
+                continue
+            values = tuple(float(value) for value in curve.LineParams)
+            if abs(values[1] + RING_HEIGHT / 2000.0) <= 2e-6 and abs(values[3]) >= 0.99:
+                matches.append(edge)
+    if not matches:
+        raise RuntimeError("top-frame front view has no visible bottom datum-A edge")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -94,7 +170,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Top View Note",
-            "Isometric View Note",
+            "Front View Note",
         ),
         required=(
             "Number",
@@ -103,7 +179,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Top View Note",
-            "Isometric View Note",
+            "Front View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -116,27 +192,51 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Top Frame Ring Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "top frame; ring; gray iron casting; column bores",
+            3: "top frame; machined gray iron ring; column bores",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (top, iso):
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 4))
+    for view in (top, front):
         set_hidden_lines_removed(adapter, view)
 
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
-    )
-    # Bore Ø25.5 clamps the Ø25.4 column (0.1 slip); gooseneck Ø17. Two decimals
-    # on the clamp bore, one on the round gooseneck.
-    set_dimension_precision(adapter, top_annotations, {"C0Dia": 2, "Dia": 0})
+    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the ring bores")
 
+    column_bore, gooseneck_bore, datum_b_edge, datum_c_edge = _visible_plan_controls(
+        adapter, top
+    )
+    datum_a_edge = _visible_front_datum_a(adapter, front)
+    add_datum_feature(
+        adapter, front, symbol_xy=(0.285, 0.125), datum="A",
+        label="finished bottom-face datum", entity=datum_a_edge, shoulder=True,
+    )
+    add_datum_feature(
+        adapter, top, symbol_xy=(0.020, 0.175), datum="B",
+        label="left outer rail-face datum", entity=datum_b_edge, shoulder=True,
+    )
+    add_datum_feature(
+        adapter, top, symbol_xy=(0.135, 0.100), datum="C",
+        label="lower outer rail-face datum", entity=datum_c_edge, shoulder=True,
+    )
+    add_feature_control_frame(
+        adapter, top, frame_xy=(0.175, 0.135), characteristic="position",
+        tolerance="0.20", datums=("A", "B", "C"), diameter=True,
+        quantity="4X COLUMN BORES", label="column-bore true position",
+        entity=column_bore,
+    )
+    add_feature_control_frame(
+        adapter, top, frame_xy=(0.080, 0.165), characteristic="position",
+        tolerance="0.20", datums=("A", "B", "C"), diameter=True,
+        quantity="GOOSENECK BORE", label="gooseneck-bore true position",
+        entity=gooseneck_bore,
+    )
+
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
     add_property_linked_note(adapter, "Top View Note", 0.040, 0.034)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.095)
+    add_property_linked_note(adapter, "Front View Note", 0.300, 0.095)
 
     return await finalize_drawing(
         adapter,
