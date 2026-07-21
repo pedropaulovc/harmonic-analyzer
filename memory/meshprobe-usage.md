@@ -1,16 +1,18 @@
 ---
 name: meshprobe-usage
-description: "meshprobe (Playwright-for-3D CLI) driving notes: needs Blender >= 5.2 via --blender, glTF must be metres, view-orbit needs --projection-json, high_key illumination for CAD inspection"
+description: "meshprobe (Playwright-for-3D CLI) driving notes: needs Blender >= 5.2 (auto-discovered incl. Windows as of 1.2.0), glTF must be metres, view-orbit needs --projection-json, high_key illumination for CAD inspection"
 metadata:
   type: reference
 ---
 
-meshprobe (`uv run meshprobe`, pedropaulovc/meshprobe, 0.3.0) inspects/renders release
+meshprobe (`uv run meshprobe`, pedropaulovc/meshprobe, 1.2.0) inspects/renders release
 GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93–#102):
 
 - **Blender ≥ 5.2 required** (worker calls `gpu.init()`, new in 5.2; 4.5/5.1 crash with
-  AttributeError). Not auto-discovered on Windows — pass
-  `--blender "C:/Program Files/Blender Foundation/Blender 5.2/blender.exe"` to `open`.
+  AttributeError). As of 1.2.0 `open` **auto-discovers Blender on Windows too** — verified
+  2026-07-20 by opening a GLB with no `--blender` (EXIT 0). The old "pass
+  `--blender C:/Program Files/Blender Foundation/Blender 5.2/blender.exe`" was a 0.3.0
+  limitation; `--blender` now only needed to OVERRIDE the discovered install.
 - **glTF units are METRES** (spec). A mm-authored GLB reads as a 457 m machine with no
   warning — author GLBs in metres.
 - Coordinate mapping (in the `open` receipt): glTF +X→world +X, +Y→+Z, +Z→−Y. Machine
