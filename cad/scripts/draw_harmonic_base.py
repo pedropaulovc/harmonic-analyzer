@@ -377,7 +377,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.190, 0.098),
+        frame_xy=(0.165, 0.125),
         characteristic="position",
         tolerance="0.20",
         datums=("A", "B", "C"),
@@ -389,7 +389,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.110, 0.085),
+        frame_xy=(0.105, 0.125),
         characteristic="position",
         tolerance="0.50",
         datums=("A", "B", "C"),
@@ -401,7 +401,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.025, 0.145),
+        frame_xy=(0.025, 0.150),
         characteristic="position",
         tolerance="0.50",
         datums=("A", "B", "C"),
@@ -413,7 +413,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.060, 0.090),
+        frame_xy=(0.075, 0.115),
         characteristic="perpendicularity",
         tolerance="0.10",
         datums=("A",),
@@ -423,7 +423,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.025, 0.085),
+        frame_xy=(0.025, 0.120),
         characteristic="perpendicularity",
         tolerance="0.10",
         datums=("A", "B"),
@@ -442,7 +442,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.062)
-    add_property_linked_note(adapter, "Side View Note", 0.250, 0.090)
+    add_property_linked_note(adapter, "Side View Note", 0.250, 0.088)
 
     return await finalize_drawing(
         adapter,

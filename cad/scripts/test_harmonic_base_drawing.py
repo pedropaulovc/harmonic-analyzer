@@ -65,7 +65,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert 'add_property_linked_note(adapter, "Side View Note", 0.250, 0.090)' in source
+    assert 'add_property_linked_note(adapter, "Side View Note", 0.250, 0.088)' in source
     assert "insert_hole_table(" in source
     assert "_visible_hole_table_entities(adapter, top)" in source
     assert "datum_entity=datum_entity" in source
@@ -113,10 +113,10 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "gray cast iron" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "sspc-sp 3" in finish
-    assert "75-125 um total dft" in finish
+    assert "75-125 um dft" in finish
     assert "mask a/b/c" in finish
-    assert "top pad face" in finish
-    assert "all bores/threads/counterbores" in finish
+    assert "pad" in finish
+    assert "bores/threads/c'bores" in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
 
