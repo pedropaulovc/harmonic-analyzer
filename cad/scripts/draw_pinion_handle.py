@@ -49,6 +49,7 @@ from pinion_handle_spec import (
     WALL_T,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -94,11 +95,11 @@ FRONT_KEEP = {
     "GripDia": (0.045, 0.196),
     "TubeOd": (0.045, 0.116),
     "TubeId": (0.075, 0.096),
-    "RodSpan": (0.100, 0.235),
+    "RodSpan": (0.115, 0.245),
 }
 RIGHT_KEEP = {
-    "GripLen": (0.195, 0.085),
-    "TubeLen": (0.170, 0.108),
+    "GripLen": (0.205, 0.078),
+    "TubeLen": (0.165, 0.118),
 }
 TOP_KEEP = {
     "RodDia": (0.300, 0.078),
@@ -107,13 +108,9 @@ DIMENSION_CALLOUTS = {
     "TubeId": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n8.025 MAX / 8.010 MIN\nRa 1.6",
     "GripLen": "+/-0.10 CYL. LENGTH",
     "TubeLen": (
-        "+0.10/-0.00 BORE DEPTH\n"
-        "12.00 +0.10/-0.00 HUB PROJ."
+        "+0.10/-0.00 BORE DEPTH"
     ),
-    "RodSpan": (
-        "+/-0.10 OAL\n"
-        f"{ROD_DOWN:.2f} +/-0.10 A TO LOWER END"
-    ),
+    "RodSpan": "+/-0.10 OAL",
     "RodDia": (
         f"PRESS ROD {ROD_DIA + 0.0025:.3f} MAX / {ROD_DIA - 0.0025:.3f} MIN\n"
         f"REAM BODY HOLE {ROD_HOLE_DIA + 0.005:.3f} MAX / "
@@ -269,9 +266,16 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.05",
         datums=("A", "B"),
         diameter=True,
-        quantity="CROSS-HOLE / PRESSED-ROD AXIS",
+        quantity="BODY CROSS-HOLE AXIS BEFORE PRESSING",
         label="handle transverse-axis position",
     )
+    if add_note(
+        adapter,
+        "BODY CROSS-HOLE VIEW - LOOKING ALONG HOLE AXIS - SCALE 2:1",
+        0.235,
+        0.070,
+    ) is None:
+        raise RuntimeError("failed to label handle body cross-hole view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.184)

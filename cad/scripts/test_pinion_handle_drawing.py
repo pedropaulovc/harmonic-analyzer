@@ -92,10 +92,12 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     )
     assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["TubeId"]
     assert "CYL. LENGTH" in drawing.DIMENSION_CALLOUTS["GripLen"]
-    assert "12.00 +0.10/-0.00 HUB PROJ." in drawing.DIMENSION_CALLOUTS["TubeLen"]
-    assert "42.00 +/-0.10 A TO LOWER END" in drawing.DIMENSION_CALLOUTS[
-        "RodSpan"
-    ]
+    assert drawing.DIMENSION_CALLOUTS["TubeLen"] == "+0.10/-0.00 BORE DEPTH"
+    assert drawing.DIMENSION_CALLOUTS["RodSpan"] == "+/-0.10 OAL"
+    assert "HUB PROJECTION: DATUM B TO GRIP FACE 12.00 +0.10/-0.00" in (
+        pinion_handle_spec.DRAWING_NOTES
+    )
+    assert "DATUM A TO LOWER END 42.00+/-0.10" in pinion_handle_spec.DRAWING_NOTES
 
 
 def test_transverse_axis_uses_basic_location_and_position_control() -> None:
@@ -108,9 +110,11 @@ def test_transverse_axis_uses_basic_location_and_position_control() -> None:
     assert 'characteristic="position"' in source
     assert 'datums=("A", "B")' in source
     assert "diameter=True" in source
-    assert drawing.FRONT_KEEP["RodSpan"][0] >= 0.100
+    assert drawing.FRONT_KEEP["RodSpan"] == (0.115, 0.245)
     assert drawing.FRONT_KEEP["TubeId"][0] >= 0.075
     assert "frame_xy=(0.315, 0.155)" in source
+    assert 'quantity="BODY CROSS-HOLE AXIS BEFORE PRESSING"' in source
+    assert "BODY CROSS-HOLE VIEW - LOOKING ALONG HOLE AXIS - SCALE 2:1" in source
 
 
 def test_crown_has_one_toleranced_form_control() -> None:
