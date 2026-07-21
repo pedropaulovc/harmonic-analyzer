@@ -178,9 +178,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        # mid-width on the rim OD line (round 1: the corner pick read as
-        # controlling either the OD or the side face)
-        edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + _RIM_R),
+        # on the rim OD line, off the corner (round 1: the corner pick read as
+        # controlling either the OD or the side face; the exact mid-width pick
+        # finds no edge -- build 4 -- so aim 60% of the way out, still clearly
+        # on the OD face)
+        edge_xy=(RIGHT_CENTER[0] + RIGHT_HALF_RIM * 0.6, RIGHT_CENTER[1] + _RIM_R),
         frame_xy=(RIGHT_CENTER[0] + 0.024, RIGHT_CENTER[1] + _RIM_R + 0.020),
         characteristic="circular_runout",
         tolerance="0.10",
