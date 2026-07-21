@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 import _config
 import _telemetry
@@ -34,7 +34,7 @@ def insert_identified_bom_table(
     anchor_xy: tuple[float, float],
     descriptions: Mapping[str, str],
     part_numbers: Mapping[str, str],
-    display_as_one_item: bool = False,
+    configuration_grouping: Literal["separate", "same-part"] = "separate",
     label: str,
 ) -> Any:
     """Insert a validated BOM, then replace filename stems with MHA identifiers."""
@@ -58,7 +58,7 @@ def insert_identified_bom_table(
         anchor_xy=anchor_xy,
         expected_components=components,
         descriptions=dict(descriptions),
-        display_as_one_item=display_as_one_item,
+        configuration_grouping=configuration_grouping,
         label=label,
     )
 

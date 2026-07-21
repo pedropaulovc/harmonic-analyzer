@@ -166,7 +166,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
         label="channel assembly balloons",
     )
-    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
+    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add channel assembly notes")
 
     return await finalize_drawing(

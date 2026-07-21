@@ -2314,7 +2314,7 @@ def insert_bom_table(
     anchor_xy: tuple[float, float],
     expected_components: Sequence[str],
     descriptions: dict[str, str] | None = None,
-    display_as_one_item: bool = False,
+    configuration_grouping: Literal["separate", "same-part"] = "separate",
     label: str,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
@@ -2346,7 +2346,7 @@ def insert_bom_table(
         0,  # swNumberingType_e.swNumberingType_None (non-indented BOM)
         False,  # DetailedCutList
         False,  # DissolvePartLevelRows
-        display_as_one_item,
+        configuration_grouping == "same-part",
     )
     draw.ClearSelection2(True)
     if bom is None:
@@ -2360,13 +2360,33 @@ def insert_bom_table(
     if feature is None:
         raise RuntimeError(f"{label} BOM table has no BOM feature")
     feature = _sw_type_info.early_bound_or_flag(
-        feature, "IBomFeature", "SetConfigurations"
+        feature,
+        "IBomFeature",
+        "SetConfigurations",
+        "PartConfigurationGrouping",
+        "DisplayAsOneItem",
     )
     if not feature.SetConfigurations(
         True, bool_array([True]), bstr_array([configuration])
     ):
         raise RuntimeError(
             f"failed to bind {label} BOM table to configuration {configuration!r}"
+        )
+    grouping_value = 2 if configuration_grouping == "same-part" else 1
+    setattr(feature, "PartConfigurationGrouping", grouping_value)
+    setattr(feature, "DisplayAsOneItem", configuration_grouping == "same-part")
+    actual_grouping = int(
+        adapter._get_attr_or_call(feature, "PartConfigurationGrouping") or 0
+    )
+    actual_one_item = bool(
+        adapter._get_attr_or_call(feature, "DisplayAsOneItem")
+    )
+    if actual_grouping != grouping_value or actual_one_item != (
+        configuration_grouping == "same-part"
+    ):
+        raise RuntimeError(
+            f"{label} BOM configuration grouping did not persist: "
+            f"grouping={actual_grouping}, one_item={actual_one_item}"
         )
     draw.ForceRebuild3(False)
     adapter.currentModel.EditRebuild3()
@@ -2733,7 +2753,12 @@ def _create_auto_balloons(
         if allow_empty:
             return []
         raise RuntimeError(f"AutoBalloon5 produced no balloons ({label})")
-    return list(notes)
+    balloons = list(notes)
+    _telemetry.info(
+        f"{label}: AutoBalloon5 item order "
+        f"{[_balloon_item_number(adapter, note, label=label) for note in balloons]}"
+    )
+    return balloons
 
 
 def _balloon_item_number(adapter: Any, note: Any, *, label: str) -> str:

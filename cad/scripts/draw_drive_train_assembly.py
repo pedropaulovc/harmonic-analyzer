@@ -181,7 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=BOM_ANCHOR,
         descriptions=BOM_COMPONENTS,
         part_numbers=BOM_PART_NUMBERS,
-        display_as_one_item=True,
+        configuration_grouping="same-part",
         label="drive-train assembly",
     )
     # Balloon the ISOMETRIC view: the pictorial keeps the cone/pinion/crank
