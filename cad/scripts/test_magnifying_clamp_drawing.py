@@ -43,7 +43,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 def test_linked_notes_specify_slip_bores_and_thumb_screw() -> None:
     notes = magnifying_clamp_spec.DRAWING_NOTES
     assert "SLIP FIT" in notes
-    assert "#4-40 TAPPED" in notes
+    assert "#4-40 UNC-2B, TAPPED" in notes
     assert "BRASS" not in notes and "C36000" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes
