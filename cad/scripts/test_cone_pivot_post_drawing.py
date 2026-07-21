@@ -44,16 +44,15 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     notes = cone_pivot_post_spec.DRAWING_NOTES
     assert "9.545-9.555" in notes
     assert "FINISH RA 1.6" in notes
-    # The oblique, offset crank bore is fully called out by note (dia, height,
-    # tip, offset direction) since it projects as an ellipse in every square view.
+    # The oblique bore's size and basic geometry supplement its native position
+    # frame because the feature projects as an ellipse in every square view.
     assert "CRANK BORE" in notes
     assert "10.025" in notes
     assert "85.835" in notes
-    assert "12.52 +/-0.10 DEG" in notes
-    assert "CLOCKWISE" in notes
-    assert "0.927 +/-0.05 EAST" in notes
-    assert "0.206 +/-0.05 SOUTH" in notes
-    assert "EAST IS SHEET RIGHT; SOUTH IS SHEET DOWN" in notes
+    assert "BASIC ACUTE ANGLE TO DATUM AXIS C IS 12.52 DEG" in notes
+    assert "BASIC 85.835 ABOVE A" in notes
+    assert "SHORTEST DISTANCE FROM B IS 0.950" in notes
+    assert "SHEET RIGHT/DOWN" in notes
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     assert "MACHINE FROM CONTINUOUS-CAST ROUND STOCK" in notes
@@ -63,13 +62,16 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
 
 def test_datum_and_notes_control_the_journal_bore() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
+    assert source.count("add_datum_feature(") == 3
     assert "add_datum_feature_to_annotation(" not in source
-    assert "add_feature_control_frame(" not in source
-    assert "CYLINDRICAL\nZONE DIA 0.05 PARALLEL TO DATUM A" in cone_pivot_post_spec.DRAWING_NOTES
+    assert source.count("add_feature_control_frame(") == 2
+    assert 'datums=("A", "B")' in source
+    assert 'datums=("A", "B", "C")' in source
+    assert 'diameter=True' in source
+    assert "AXIS BASICALLY INTERSECTS DATUM AXIS B" in cone_pivot_post_spec.DRAWING_NOTES
     assert "add_surface_finish(" not in source
-    assert "DATUM B" not in cone_pivot_post_spec.DRAWING_NOTES
-    assert "JOURNAL AXIS" in cone_pivot_post_spec.DRAWING_NOTES
+    assert "B IS COLUMN OD" in cone_pivot_post_spec.DRAWING_NOTES
+    assert "C IS JOURNAL-BORE AXIS" in cone_pivot_post_spec.DRAWING_NOTES
 
 
 def test_view_scales_are_explicit() -> None:

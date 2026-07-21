@@ -19,13 +19,12 @@ CRANK_BORE_DIA = CRANK_SHAFT_MAX_DIA + 0.5  # 10.025: 0.25 radial clearance
 CRANK_BORE_HEIGHT = 85.835  # crank-bore axis above the foot
 CRANK_BORE_OFFSET = 0.95  # crank-bore axis east of the column axis
 INCLINE_DEG = 12.5182  # crank bore tips this far off the column's vertical axis
-CRANK_AXIS_EAST = 0.927  # closest point on axis, east of post axis in plan
-CRANK_AXIS_SOUTH = 0.206  # closest point on axis, south of post axis in plan
 
 # The oblique, offset crank bore is a running-clearance feature on a cast column
-# and is fully specified by the general note (dia, height, tip, offset) rather
-# than an orthographic dimension -- an angled bore projects as an ellipse in
-# every square view, so a note is the honest, unambiguous callout.
+# and is fully specified by basic height, angle, and normal offset plus a native
+# position control.  The angled bore projects as an ellipse in every square
+# view, so the basic geometry is stated next to the view instead of pretending
+# an ellipse edge is a linear dimension endpoint.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"BlockDia"},
     "Block": {"BlockHt"},
@@ -35,17 +34,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "MACHINE FROM CONTINUOUS-CAST ROUND STOCK; REMOVE AS-CAST SKIN.",
-        "DATUM A IS THE FINISHED FOOT SEAT.",
+        "DATUM A IS FOOT SEAT; B IS COLUMN OD; C IS JOURNAL-BORE AXIS.",
         "JOURNAL BORE LIMITS DIA 9.545-9.555; FINISH RA 1.6;",
-        "AXIS INTERSECTS POST AXIS IN PLAN AND LIES IN A CYLINDRICAL",
-        "ZONE DIA 0.05 PARALLEL TO DATUM A.",
+        "AXIS BASICALLY INTERSECTS DATUM AXIS B AT BOXED 47.65 ABOVE A.",
         "MATING SHAFT LIMITS DIA 9.505-9.525.",
-        "CRANK BORE DIA 10.025 +/-0.025 THRU; AXIS 85.835 +/-0.05 ABOVE A",
-        "AND IN A CYLINDRICAL ZONE DIA 0.10 PARALLEL TO DATUM A.",
-        "IN UPPER PLAN VIEW, CRANK AXIS IS 12.52 +/-0.10 DEG CLOCKWISE",
-        "FROM JOURNAL AXIS. ITS CLOSEST POINT TO POST AXIS IS",
-        "0.927 +/-0.05 EAST AND 0.206 +/-0.05 SOUTH OF POST AXIS.",
-        "UPPER PLAN VIEW: EAST IS SHEET RIGHT; SOUTH IS SHEET DOWN.",
-        "PLAN CENTER MARKS DEFINE POST AXIS; AXIS DIRECTIONS ARE CENTERLINES.",
+        "CRANK BORE DIA 10.025 +/-0.025 THRU; AXIS BASIC 85.835 ABOVE A.",
+        "BASIC ACUTE ANGLE TO DATUM AXIS C IS 12.52 DEG.",
+        "IN UPPER PLAN VIEW CRANK AXIS SLOPES DOWN-LEFT; ITS BASIC",
+        "SHORTEST DISTANCE FROM B IS 0.950 TOWARD SHEET RIGHT/DOWN.",
+        "JOURNAL IS LOWER CIRCLE; CRANK BORE IS UPPER ELLIPSE IN FRONT VIEW.",
+        "PLAN CENTER MARKS DEFINE B; BORE CENTERLINES DEFINE AXIS DIRECTIONS.",
     )
 )

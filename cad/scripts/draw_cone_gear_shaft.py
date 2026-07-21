@@ -257,8 +257,10 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.05",
         datums=("A",),
         label="tip journal runout",
-        entity_type="FACE",
-        entity=tip_face,
+        # Attach to the cylindrical outline itself.  A face attachment lets
+        # SolidWorks terminate the leader at the nearest end corner, which is
+        # visually ambiguous between radial runout and end-face runout.
+        entity_type="SILHOUETTE",
     )
     add_surface_finish(
         adapter,

@@ -11,6 +11,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -18,6 +19,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
+    set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -28,9 +30,12 @@ from cone_pivot_post_spec import (
     BLOCK_HEIGHT,
     BORE_DIA,
     BORE_HEIGHT,
+    CRANK_BORE_DIA,
+    CRANK_BORE_HEIGHT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -74,7 +79,6 @@ TOP_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "+0.005/-0.005 THRU",
-    "BoreZ": "+/-0.05",
 }
 # 3/8 in = 9.525 exactly; the sheet default of 2 decimals prints 9.53, a false
 # contradiction of the DIA 9.525 the note and the mating cone shaft are built on.
@@ -183,12 +187,26 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
+    front_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in front_annotations
+    }
+    bore_height_annotation = front_by_name["BoreZ"]
+    bore_height_display = adapter._attempt(
+        lambda: bore_height_annotation.GetSpecificAnnotation()
+    )
+    if bore_height_display is None:
+        raise RuntimeError("BoreZ has no display dimension to box")
+    set_basic_dimension(
+        adapter, bore_height_display, label="journal-bore basic height"
+    )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the plan view")
 
-    # Datum A = the foot seat face (the platform-seat datum the bore heights
-    # measure from). The journal bore is toleranced perpendicular to it and
-    # carries the running-fit finish.
+    # Datum A establishes height, datum B is the turned column axis, and the
+    # controlled journal bore becomes clocking datum C for the oblique crank
+    # bore.  Native position frames give both axes finite, inspectable zones;
+    # the property-linked notes carry their basic angle/offset geometry.
     _bore_r = BORE_DIA / 2.0 * _S
     foot_edge = (FRONT_CENTER[0] + 0.005, _front_y(0.0))
     foot_entity = _circular_edge(
@@ -202,6 +220,54 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="foot seat face",
         entity=foot_entity,
+    )
+    post_od_entity = _circular_edge(
+        adapter, top, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] - BLOCK_DIA / 2.0 * _S),
+        symbol_xy=(TOP_CENTER[0] + 0.026, TOP_CENTER[1] - 0.020),
+        datum="B",
+        label="column outside diameter",
+        entity=post_od_entity,
+    )
+    journal_entity = _circular_edge(
+        adapter, front, radius_mm=BORE_DIA / 2.0, center_y_mm=BORE_HEIGHT
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),
+        frame_xy=(0.170, _front_y(BORE_HEIGHT) - 0.010),
+        characteristic="position",
+        tolerance="0.05",
+        datums=("A", "B"),
+        diameter=True,
+        label="journal-bore true position",
+        entity=journal_entity,
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] - _bore_r, _front_y(BORE_HEIGHT)),
+        symbol_xy=(0.145, _front_y(BORE_HEIGHT) + 0.012),
+        datum="C",
+        label="journal-bore clocking axis",
+        entity=journal_entity,
+    )
+    crank_r = CRANK_BORE_DIA / 2.0 * _S
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + crank_r, _front_y(CRANK_BORE_HEIGHT)),
+        frame_xy=(0.170, _front_y(CRANK_BORE_HEIGHT) + 0.010),
+        characteristic="position",
+        tolerance="0.10",
+        datums=("A", "B", "C"),
+        diameter=True,
+        label="crank-bore true position",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
