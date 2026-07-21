@@ -60,7 +60,6 @@ from pinion_cam_pin_spec import (
     END_VIEW_NOTE,
     PIN_DIA,
     PIN_LEN,
-    SEAT_LEN,
 )
 
 PART_NAME = "pinion-cam-pin"

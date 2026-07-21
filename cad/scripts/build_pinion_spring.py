@@ -66,35 +66,18 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
-
-PART_NAME = "pinion-spring"
-MATERIAL = "Brass"  # p.68: the leaf reads brass against the steel strap
-
-# Primitive nominals come from the drawing spec (single source of truth shared
-# with the manufacturing print).  Design rationale, unchanged:
-#   FOOT_LEN  -- the flat screw-down foot points WEST and crosses UNDER the lift
-#                rod and parked cam pin so its screw lands west of the moving rig.
-#   KINK_DEG  -- the crest at the kink start is the parked contact edge; the flat
-#                above it is the engaged contact face.
-#   FLAT_LEN  -- short on purpose: the flat angles 20 deg WEST of the flank it
-#                faces, so a longer flat dives INSIDE the parked strap flank (an
-#                interference-gate hit); 2.0 leaves the tip 0.32 east of it.
-#   BLADE_TILT_DEG -- must match build_drive_train STRAP_LEAN_DEG magnitude.
 from pinion_spring_spec import (
-    BLADE_TILT_DEG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FLAT_LEN,
     FOOT_LEN,
     ISOMETRIC_VIEW_NOTE,
-    KINK_DEG,
     R_BEND,
     R_KINK,
     THICK,
     WIDTH,
 )
 from pinion_spring_geometry import (
-    AXIS_OFFSET,
     BEND_CX,
     BEND_CY,
     BEND_EXIT,
@@ -102,19 +85,24 @@ from pinion_spring_geometry import (
     FOOT_END,
     FOOT_TAN,
     FOOT_Y,
-    HOLE_DIA,
+    HOLE_DIA as HOLE_DIA,
     HOLE_FROM_END,
     HOLE_SPEC,
     KINK_C,
     KINK_EXIT,
     KINK_START,
-    PIVOT_LX,
-    PIVOT_LY,
     VOLUME,
-    _A1,
-    _A2,
-    _BLADE_LEN,
+    _BLADE_LEN as _BLADE_LEN,
 )
+
+PART_NAME = "pinion-spring"
+MATERIAL = "Brass"  # p.68: the leaf reads brass against the steel strap
+
+# Primitive nominals come from the drawing spec (single source of truth shared
+# with the manufacturing print). Design rationale, unchanged:
+#   FOOT_LEN -- the flat screw-down foot points WEST and crosses UNDER the lift
+#               rod and parked cam pin so its screw lands west of the moving rig.
+#   FLAT_LEN -- short on purpose: the free flat remains clear of the parked strap.
 
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
