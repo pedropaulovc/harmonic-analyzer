@@ -24,7 +24,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -110,9 +109,9 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(8, 1))
     set_hidden_lines_removed(adapter, side)
     set_hidden_lines_removed(adapter, iso)
-    # The driver slot and the head OD both read in the head-end view; keep the
-    # hidden edges so the slot and the head-behind-shank circle both show.
-    set_hidden_lines_visible(adapter, end)
+    # The open driver slot and head OD remain visible in HLR.  Suppress the
+    # shank-behind-head circle so the end view cannot be misread as a hole.
+    set_hidden_lines_removed(adapter, end)
 
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="head-end"

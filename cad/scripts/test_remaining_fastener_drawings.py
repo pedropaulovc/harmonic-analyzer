@@ -174,3 +174,24 @@ def test_thumb_note_uses_short_lines_in_a_raised_lane() -> None:
     spec = importlib.import_module("thumb_screw_spec")
     assert drawing.RECIPE.note_xy == (0.020, 0.110)
     assert max(map(len, spec.DRAWING_NOTES.splitlines())) < 80
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    (
+        "draw_bracket_screw",
+        "draw_clamp_screw",
+        "draw_fillister_screw",
+        "draw_foot_screw",
+        "draw_lag_screw",
+        "draw_slotted_screw",
+    ),
+)
+def test_custom_head_end_view_does_not_show_hidden_shank_circle(
+    module_name: str,
+) -> None:
+    source = Path(importlib.import_module(module_name).__file__).read_text(
+        encoding="utf-8"
+    )
+    assert "set_hidden_lines_removed(adapter, end)" in source
+    assert "set_hidden_lines_visible(adapter, end)" not in source
