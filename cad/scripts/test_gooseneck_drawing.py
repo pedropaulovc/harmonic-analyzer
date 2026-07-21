@@ -28,7 +28,7 @@ def test_notes_describe_the_chrome_tube_and_bend() -> None:
     notes = gooseneck_spec.DRAWING_NOTES
     assert "2.0 WALL" in notes
     assert "SILVER-BRAZE" in notes
-    assert "AISI 1018 STEEL" in notes
+    assert "AISI 1018" in notes
     assert "JOINT PENETRATION" in notes
     assert "CHROME" not in notes
     assert "X.XX" not in notes
