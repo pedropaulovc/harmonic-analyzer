@@ -286,7 +286,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(12.0)),
-        frame_xy=(0.155, 0.140),
+        frame_xy=(0.155, 0.115),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
