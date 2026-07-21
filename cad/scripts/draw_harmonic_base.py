@@ -91,7 +91,7 @@ _DATUM_XY = (
     TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
     TOP_CENTER[1] - BOTTOM_WIDTH * VIEW_SCALE / 2000.0,
 )
-HOLE_TABLE_ANCHOR = (0.266, 0.256)
+HOLE_TABLE_ANCHOR = (0.274, 0.256)
 
 
 def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
