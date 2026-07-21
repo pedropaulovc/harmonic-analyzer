@@ -113,6 +113,7 @@ def test_catalog_thread_and_dimension_callout_are_not_invented(case: Case) -> No
         return
     assert "REFERENCE ONLY" in spec.DRAWING_NOTES
     assert "FULL THREAD" in spec.DRAWING_NOTES
+    assert "END FACE SQUARE TO THREAD AXIS" in spec.DRAWING_NOTES
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.part_name)
