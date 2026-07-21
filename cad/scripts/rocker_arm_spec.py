@@ -61,13 +61,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # REF: it is fixed by the concentric R800/R816 edges.
 DRAWING_NOTES = "\n".join(
     (
-        "1. PROFILE SYMMETRIC ABOUT THE PIVOT;",
-        "   ROD-PIN HOLE ON +X ARM ONLY (1X).",
+        "1. PROFILE MIRROR-SYMMETRIC ABOUT THE",
+        "   PIVOT-BORE AXIS; ROD-PIN HOLE AT ONE",
+        "   END ONLY (1X), THE END SHOWN.",
         "2. STRAP 2.50 THICK; ALL HOLES THRU",
         "   THE THICKNESS.",
         "3. TOP EDGE R800.00, BOTTOM EDGE R816.00,",
-        "   CONCENTRIC; CENTRE 808.00 ABOVE PIVOT",
-        "   (STRAP DEPTH 16.00 REF).",
+        "   CONCENTRIC; COMMON CENTRE ON THE",
+        "   MIRROR AXIS, 808.00 FROM THE PIVOT",
+        "   AXIS (STRAP DEPTH 16.00 REF).",
         "4. ARC LENGTHS 292.10 TOP / 266.70 BOTTOM",
         "   TAPER THE ENDS.",
         "5. EACH TIP: 5.59 FACE PERP TO TOP EDGE.",
