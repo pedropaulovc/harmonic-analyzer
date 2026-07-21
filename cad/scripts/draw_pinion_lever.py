@@ -33,7 +33,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_lever_spec import BORE, HUB_LEN, HUB_OD, ROD_LEN, ROD_ROOT_DIA
+from pinion_lever_spec import BORE, CAP_SAG, HUB_LEN, HUB_OD, ROD_LEN, ROD_ROOT_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -152,7 +152,13 @@ async def build(adapter: Any) -> dict[str, str]:
     hub_center = (FRONT_CENTER[0], _front_y(0.0))
     bore_top = (hub_center[0], hub_center[1] + BORE_R_SHEET)
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
-    flat_face_x = RIGHT_CENTER[0] - HUB_LEN * SHEET_SCALE[0] / 2000.0
+    # The south crown makes the right-view bounds asymmetric about z=0.  View
+    # placement centres that full -6.5..+5.0 mm silhouette, so locate the flat
+    # +Z face from the true bounding-box centre rather than half the hub length.
+    z_min = -HUB_LEN / 2.0 - CAP_SAG
+    z_max = HUB_LEN / 2.0
+    z_center = (z_min + z_max) / 2.0
+    flat_face_x = RIGHT_CENTER[0] - (z_max - z_center) * SHEET_SCALE[0] / 1000.0
     flat_face = (flat_face_x, hub_center[1])
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
     add_datum_feature(
