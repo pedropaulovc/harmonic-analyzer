@@ -64,8 +64,9 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "NO TANGENCY" in notes
     assert "CROWN CENTER SHALL LIE WITHIN 0.05 OF THE BORE AXIS" in notes
     assert "FLANGE-HOLE AXIS IS BASIC 12.00 FROM DATUM B" in notes
-    assert "6.00 EXPOSED FLANGE IS REFERENCE ONLY" in notes
-    assert "FLUSH WITH THE 16.00-DEEP" in notes
+    assert "FACE OPPOSITE DATUM D" in notes
+    assert "COPLANAR WITH OPPOSITE FOOT FACE WITHIN 0.10" in notes
+    assert "6.00 FROM DATUM D TO STRAP NEAR FACE IS REFERENCE ONLY" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_native_hole_callout(" in source
