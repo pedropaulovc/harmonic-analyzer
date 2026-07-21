@@ -93,7 +93,7 @@ FRONT_KEEP = {
     "GripDia": (0.045, 0.196),
     "TubeOd": (0.045, 0.116),
     "TubeId": (0.075, 0.096),
-    "RodSpan": (0.100, 0.245),
+    "RodSpan": (0.100, 0.235),
 }
 RIGHT_KEEP = {
     "GripLen": (0.195, 0.085),
@@ -259,7 +259,7 @@ async def build(adapter: Any) -> dict[str, str]:
             _front_x(ROD_DIA / 2.0),
             _front_y(ROD_UP - 8.0),
         ),
-        frame_xy=(0.190, 0.255),
+        frame_xy=(0.145, 0.263),
         characteristic="position",
         tolerance="0.05",
         datums=("A", "B"),

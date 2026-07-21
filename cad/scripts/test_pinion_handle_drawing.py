@@ -90,7 +90,7 @@ def test_transverse_axis_uses_basic_location_and_position_control() -> None:
     assert "diameter=True" in source
     assert drawing.FRONT_KEEP["RodSpan"][0] >= 0.100
     assert drawing.FRONT_KEEP["TubeId"][0] >= 0.075
-    assert "frame_xy=(0.190, 0.255)" in source
+    assert "frame_xy=(0.145, 0.263)" in source
 
 
 def test_crown_has_one_toleranced_form_control() -> None:
