@@ -126,9 +126,12 @@ def test_finalize_exports_pdf_before_reopen_and_skips_clean_save():
     first_reopen = source.index("reopen_drawing")
     pdf_export = source.index("pdf_path=str(outputs.pdf)")
     assert pdf_export < first_reopen
-    assert source.count("save_drawing(") == 1
+    # The dirty-scale branch saves a NEWER SLDDRW after that first export, so
+    # it must re-export the PDF to match the persisted drawing (codex review
+    # #361); the clean path keeps the single early export.
+    assert source.count("save_drawing(") == 2
+    assert source.rindex("save_drawing(") > source.index("if sheet_scale_dirty:")
     assert '"GetSaveFlag"' in source
-    assert "if sheet_scale_dirty:" in source
     assert "save skipped" in source
 
 

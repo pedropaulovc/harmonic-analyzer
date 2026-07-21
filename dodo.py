@@ -1775,8 +1775,14 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_nameplate_geometry.py")],
         },
         "recipe": {
+            # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via
+            # _config.parts(), and module_deps_of tracks _config.py but not the
+            # YAML documents it loads -- without these deps a finish/material
+            # edit would leave the stamp valid and the guard silently stale
+            # (codex review #361).
             "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
                          *recipe_test_deps,
+                         *_CONFIG_YAMLS,
                          str(PROJECT_DRWDOT.resolve())],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },

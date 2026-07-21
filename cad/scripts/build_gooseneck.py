@@ -27,8 +27,10 @@ loop to encircle (simplification).
 Layout: part origin at the vertical leg's MID-height of the OLD 180 lay
 (machine (197, 1210, 0), placement preserved): leg y -330..+125, bend
 arc centre (-51, +125), arm centreline y +176 from x -51 to -112, lug
-x -109..-103.5 rising y 159..172 into the arm underside (min 168), pin
-along X at (y 163, z 0). Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
+x -109..-103.5 rising y 159..169.5 into the arm's 2 mm wall (underside
+min 168), pin along X at (y 163, z 0). The tube is HOLLOW -- O16 x 2.0
+wall, matching the drawing's tube stock -- so every profile is an
+annulus. Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
 Run (SolidWorks already open)::
 
@@ -79,6 +81,8 @@ PART_NAME = "gooseneck"
 MATERIAL = "Plain Carbon Steel"
 
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
+WALL_T = 2.0  # tube wall: the drawing ships O16 x 2.0 WALL tube stock, so the
+# native CAD is the same hollow tube, not solid bar (codex review #361)
 LEG_TOP = 125.0  # bend start = machine 1335 (derived: arm y - bend R)
 LEG_BOTTOM = -330.0  # leg bottom = machine 880: the post passes through a
 # clearance bore in the east rail (build_top_frame gooseneck bore) and drops
@@ -96,9 +100,10 @@ ARM_END_X = -112.0  # arm end face = machine 85: covers the lug with margin
 ARM_RUN = -ARM_END_X - BEND_R  # 61: straight run after the bend exit
 LUG_X = (-109.0, -103.5)  # lug plate, machine x 88..93.5 (derived: clear
 # of the spring loop's wire band x 94.1..95.9)
-LUG_Y = (159.0, 172.0)  # rises 4 past the arm underside so the prism
-# merges into the round tube (the old design met the down-tip's FLAT end
-# face, where exact touch unions; a curved face needs real overlap)
+LUG_Y = (159.0, 169.5)  # rises 1.5 past the arm underside (168) so the prism
+# merges into the round tube (a curved face needs real overlap) while staying
+# inside the 2 mm wall band (outer 168.0..168.14 over the lug's z, inner
+# 170.0..170.19) -- a taller lug would poke through into the hollow bore
 LUG_HALF_Z = 1.5
 PIN_DIA = 4.0  # spring-loop pin (low)
 PIN_Y = 163.0  # machine 1373: loop centre 1370.6 + (loop mean r 5.35
@@ -106,6 +111,8 @@ PIN_Y = 163.0  # machine 1373: loop centre 1370.6 + (loop mean r 5.35
 PIN_X = (-109.0, -98.0)  # cantilevers past the loop band to machine x 99
 
 TUBE_R = TUBE_DIA / 2.0
+TUBE_IR = TUBE_R - WALL_T  # hollow bore radius (6.0)
+_RING_AREA = math.pi * (TUBE_R**2 - TUBE_IR**2)  # annular wall cross-section
 
 
 async def _volume(adapter) -> float:
@@ -133,6 +140,7 @@ async def build(adapter) -> dict[str, str]:
     # LegBottom and the LugY/extrude depths are feature parameters (start-offset
     # extrudes), NOT sketch dims, so they are editable knobs that nothing drives.
     await set_global(adapter, "TubeDia", f"{TUBE_DIA}mm")
+    await set_global(adapter, "WallT", f"{WALL_T}mm")
     await set_global(adapter, "LegTop", f"{LEG_TOP}mm")
     await set_global(adapter, "LegBottom", f"{LEG_BOTTOM}mm")
     await set_global(adapter, "BendR", f"{BEND_R}mm")
@@ -156,8 +164,9 @@ async def build(adapter) -> dict[str, str]:
 
     # 1. Vertical leg (start-offset extrude from the Top plane: the leg is
     # asymmetric -- bottom at LEG_BOTTOM, top at +LEG_TOP into the bend).
-    # On-axis (origin) circle: only the diameter is a dim; the two centre slots
-    # are ignored.
+    # TWO concentric on-axis (origin) circles -- the OD and the tube bore --
+    # extrude as the annular wall. Only the diameters are dims; the centre
+    # slots are ignored.
     leg = SketchDims()
     check("create_sketch leg", await adapter.create_sketch("Top"))
     await define_circle(
@@ -165,13 +174,18 @@ async def build(adapter) -> dict[str, str]:
         names=("LegCx", "LegCz", "TubeDia"),
         drives=(None, None, '"TubeDia"'),
     )
+    await define_circle(
+        adapter, 0.0, 0.0, TUBE_IR, "leg bore", dims=leg,
+        names=("LegBoreCx", "LegBoreCz", "TubeBoreDia"),
+        drives=(None, None, '"TubeDia" - 2 * "WallT"'),
+    )
     await ensure_fully_defined(adapter, "leg sketch")
     check("exit_sketch leg", await adapter.exit_sketch())
     name_last_feature(adapter, "LegProfile")
     drive_jobs += leg.apply(adapter, "LegProfile")
     extrude_at_offset(adapter, LEG_TOP - LEG_BOTTOM, LEG_BOTTOM)
     name_last_feature(adapter, "Leg")
-    expected = math.pi * TUBE_R**2 * (LEG_TOP - LEG_BOTTOM)
+    expected = _RING_AREA * (LEG_TOP - LEG_BOTTOM)
     vol = await _volume(adapter)
     _telemetry.info(f"volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.005 * expected:
@@ -245,10 +259,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
     )
     # The sweep profile rides a custom reference plane and is pierced onto the
-    # path; its dim structure isn't a plain origin circle, and its diameter is
-    # already the TubeDia-driven knob (shared with the Leg profile). So name it
-    # but record no dims -- nothing extra to drive.
+    # path; its dim structure isn't a plain origin circle, and its diameters
+    # are already the TubeDia/WallT-driven knobs (shared with the Leg profile).
+    # So name it but record no dims -- nothing extra to drive. Annular (OD +
+    # bore) like the leg, so the swept bend + arm stay hollow tube.
     await define_circle(adapter, 0.0, 0.0, TUBE_R, "bend profile")
+    await define_circle(adapter, 0.0, 0.0, TUBE_IR, "bend profile bore")
     await ensure_fully_defined(adapter, "bend profile sketch")
     check("exit_sketch bend profile", await adapter.exit_sketch())
     name_last_feature(adapter, "BendProfile")
@@ -268,6 +284,9 @@ async def build(adapter) -> dict[str, str]:
             await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
         )
         await define_circle(adapter, 0.0, 0.0, TUBE_R, "bend profile (flipped)")
+        await define_circle(
+            adapter, 0.0, 0.0, TUBE_IR, "bend profile bore (flipped)"
+        )
         await ensure_fully_defined(adapter, "bend profile sketch (flipped)")
         check("exit_sketch bend profile (flipped)", await adapter.exit_sketch())
         # Distinct name: if the primary sweep failed, the original "BendProfile"
@@ -276,12 +295,16 @@ async def build(adapter) -> dict[str, str]:
         res = await adapter.create_sweep(SweepParameters(path=path_name))
     check("sweep bend + arm", res)
     name_last_feature(adapter, "BendArmSweep")
-    v_bend = math.pi**2 * TUBE_R**2 * BEND_R / 2.0  # quarter torus
-    v_arm = math.pi * TUBE_R**2 * ARM_RUN
+    # Quarter torus with an annular cross-section: V = (arc/2pi) * 2pi*Rc*A
+    # = (pi/2) * BendR * ring area; the straight arm is the same ring extruded.
+    v_bend = math.pi / 2.0 * BEND_R * _RING_AREA
+    v_arm = _RING_AREA * ARM_RUN
     expected = expected + v_bend + v_arm
     vol = await _volume(adapter)
     _telemetry.info(f"volume after bend + arm: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.01 * expected:
+    # 0.02 (was 0.01 solid): the annular wall is ~44% of the solid section, so
+    # the same absolute B-rep slack is ~2.3x larger relative to the expectation.
+    if abs(vol - expected) > 0.02 * expected:
         raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
     expected = vol  # rebase: keep the sweep's B-rep slack out of the lug delta
 
@@ -313,7 +336,9 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Lug")
     # Added material = the prism OUTSIDE the tube: height to the tube
     # underside (~168 + z^2/16 over z +-1.5) ~ 9.05 mean, vs the 9-high
-    # solid reference -> ratio 1.005, inside the (0.95, 1.01) window.
+    # solid reference -> ratio 1.005, inside the (0.95, 1.01) window. The
+    # prism's top (169.5) is buried in the 2 mm wall band, so nothing lands
+    # inside the hollow bore and the overlap adds no volume.
     v_lug = (LUG_X[1] - LUG_X[0]) * 2.0 * LUG_HALF_Z * 9.0
     before = expected
     vol = await _volume(adapter)

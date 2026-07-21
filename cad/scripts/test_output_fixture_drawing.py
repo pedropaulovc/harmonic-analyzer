@@ -27,6 +27,18 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
 
 
+def test_spec_is_the_single_source_of_collar_nominals() -> None:
+    # The build consumes the spec nominals directly (codex review #361), and
+    # the pure-data spec's tap-drill literal stays locked to the producer table.
+    from _holes import TAP_DRILL_MM
+
+    assert part.COLLAR_DIA is output_fixture_spec.COLLAR_DIA
+    assert part.COLLAR_HEIGHT is output_fixture_spec.COLLAR_HEIGHT
+    assert part.ROD_BORE_DIA is output_fixture_spec.ROD_BORE_DIA
+    assert part.CROSS_HOLE_DIA is output_fixture_spec.CROSS_HOLE_DIA
+    assert output_fixture_spec.CROSS_HOLE_DIA == TAP_DRILL_MM["#4-40"]
+
+
 def test_notes_describe_bore_and_cross_hole() -> None:
     notes = output_fixture_spec.DRAWING_NOTES
     assert "FINISHED COLLAR" in notes

@@ -10,9 +10,11 @@ keeps cannot silently drift.
 from __future__ import annotations
 
 
-# Collar nominals (mirror build_output_fixture; a small brass collar that slides
-# the trace's vertical placement on the Ø5 output rod).  Kept here so the drawing
-# stays COM-free.
+# Collar nominals -- the SINGLE source: ``build_output_fixture`` imports these
+# to cut the part and ``draw_output_fixture`` reads them for its view math, so
+# the print and the part cannot drift (codex review #361).  Kept literal here
+# so the module stays pure data; the build pins CROSS_HOLE_DIA against
+# ``_holes.TAP_DRILL_MM["#4-40"]`` and the offline drawing test re-asserts it.
 COLLAR_DIA = 10.0
 COLLAR_HEIGHT = 8.0
 ROD_BORE_DIA = 5.2
