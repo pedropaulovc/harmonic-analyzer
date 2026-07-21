@@ -123,7 +123,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # 0.020: the note is left-aligned on its anchor, clearing the 12.7 mm zone
     # margin / re-centred frame rule (~0.0126), which the layout audit enforces.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.115)
     add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.210)
 
     return await finalize_drawing(

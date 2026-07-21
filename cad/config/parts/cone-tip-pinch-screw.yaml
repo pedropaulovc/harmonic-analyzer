@@ -1,8 +1,8 @@
 cone-tip-pinch-screw:
   number: MHA-098
-  material: AISI 12L14 free-machining steel bar
-  material_specification: AISI 12L14 free-machining steel bar
-  finish: turned and polished, bright
+  material: 12L14 (UNS G12144) per ASTM A108-24
+  material_specification: 12L14 (UNS G12144) per ASTM A108-24
+  finish: uncoated, bright
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance

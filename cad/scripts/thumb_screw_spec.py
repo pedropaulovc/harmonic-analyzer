@@ -10,6 +10,7 @@ ONE hardware source.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
+from _fastener_notes import reeded_head_notes, thread_control_notes
 
 
 _SPEC = fastener("thumb-screw")
@@ -29,15 +30,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        f"{THREAD_DESIGNATION} FULL THREAD OVER {SHANK_LEN:.2f} LENGTH BELOW HEAD;",
-        "THREAD FORM, RUNOUT, AND LIMITS PER ASME B1.1.",
-        "THREAD GEOMETRY OMITTED IN VIEWS;",
-        "CYLINDRICAL SHANK OUTLINE IS REFERENCE ONLY.",
-        "END FACE SQUARE TO THREAD AXIS;",
-        "END EDGES PER TITLE BLOCK.",
-        f"HEAD Ø{HEAD_DIA:.2f} X {HEAD_LENGTH:.2f} LONG; {GROOVE_COUNT} EQUALLY "
-        "SPACED AXIAL Ø1.00 GROOVES.",
-        "GROOVE CUTTER Ø1.00; AXIS ON HEAD OD; FULL HEAD LENGTH.",
+        *thread_control_notes(
+            thread=THREAD,
+            thread_designation=THREAD_DESIGNATION,
+            underhead_length_mm=SHANK_LEN,
+        ),
+        *reeded_head_notes(
+            head_name="HEAD",
+            head_dia_mm=HEAD_DIA,
+            head_length_mm=HEAD_LENGTH,
+            groove_count=GROOVE_COUNT,
+        ),
     )
 )
 END_VIEW_NOTE = "KNOB-END VIEW"

@@ -119,7 +119,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.095)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.115)
     add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.018, 0.200)
 
     return await finalize_drawing(

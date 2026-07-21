@@ -9,6 +9,7 @@ source; the drawing never invents a thread the part does not build.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
+from _fastener_notes import slotted_round_head_notes, thread_control_notes
 
 
 _SPEC = fastener("lag-screw")
@@ -43,13 +44,17 @@ SIDE_VIEW_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        f"{THREAD_DESIGNATION} FULL THREAD OVER {SHANK_LEN:.2f} UNDER-HEAD LENGTH; "
-        "THREAD FORM, RUNOUT, AND LIMITS PER ASME B1.1.",
-        "THREAD GEOMETRY OMITTED IN VIEWS; CYLINDRICAL SHANK OUTLINE IS "
-        "REFERENCE ONLY.",
-        "END FACE SQUARE TO THREAD AXIS; END EDGES PER TITLE BLOCK.",
-        f"STRAIGHT DRIVER SLOT {SLOT_W:.2f} +/-0.10 WIDE X {SLOT_D:.2f} "
-        "+/-0.10 DEEP, CENTERED, THROUGH HEAD DIAMETER.",
+        *thread_control_notes(
+            thread=THREAD,
+            thread_designation=THREAD_DESIGNATION,
+            underhead_length_mm=SHANK_LEN,
+        ),
+        *slotted_round_head_notes(
+            head_dia_mm=HEAD_DIA,
+            head_height_mm=HEAD_H,
+            slot_width_mm=SLOT_W,
+            slot_depth_mm=SLOT_D,
+        ),
     )
 )
 END_VIEW_NOTE = "DRIVER-FACE VIEW"

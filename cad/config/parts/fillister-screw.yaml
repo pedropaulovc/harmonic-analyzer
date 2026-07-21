@@ -1,8 +1,8 @@
 fillister-screw:
   number: MHA-030
-  material: free-machining brass bar, ASTM B16 (C36000)
-  material_specification: free-machining brass bar, ASTM B16 (C36000)
-  finish: turned and polished, bright
+  material: UNS C36000 per ASTM B16/B16M-24
+  material_specification: UNS C36000 per ASTM B16/B16M-24
+  finish: uncoated, bright
   quantity: 6
   tolerance_class: machined_block
   fit_class: fastener_clearance

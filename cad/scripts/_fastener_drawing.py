@@ -16,7 +16,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -34,7 +33,7 @@ class FastenerSheet:
     iso_center: tuple[float, float]
     end_keep: Mapping[str, tuple[float, float]]
     dimension_callouts: Mapping[str, str]
-    note_xy: tuple[float, float] = (0.020, 0.095)
+    note_xy: tuple[float, float] = (0.020, 0.115)
     end_note_xy: tuple[float, float] = (0.050, 0.220)
 
 
@@ -110,7 +109,10 @@ async def build_fastener_sheet(
     )
     set_hidden_lines_removed(adapter, side)
     set_hidden_lines_removed(adapter, iso)
-    set_hidden_lines_visible(adapter, end)
+    # The shank is fully occluded in the driver/knob-face view.  Showing its
+    # hidden circle reads like a counterbore or boss on these tiny sheets and
+    # adds no manufacturing information; the thread callout owns that feature.
+    set_hidden_lines_removed(adapter, end)
 
     end_annotations = curate_view_dimensions(
         adapter, end, keep=recipe.end_keep, view_label="head-end"

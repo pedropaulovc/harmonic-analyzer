@@ -145,7 +145,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # inserted and positioned to the right of the vertical profile.
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.090)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.115)
     add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.250)
 
     return await finalize_drawing(
