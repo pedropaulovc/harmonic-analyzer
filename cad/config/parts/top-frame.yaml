@@ -2,7 +2,7 @@ top-frame:
   number: MHA-077
   material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
-  finish: SSPC-SP3;ALKYD PRIMER/GREEN ENAMEL;75-125um DFT;MASK A/B/C,BORES,4X OD48/ID25.5 FACES
+  finish: SSPC-SP3;ALKYD PRIMER/GREEN ENAMEL;75-125um DFT
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock"

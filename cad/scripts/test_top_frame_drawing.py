@@ -43,6 +43,8 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "LEFT COLUMN-BORE CENTRELINE" in notes
     assert "MIDWAY BETWEEN LEFT BORE AXES" in notes
     assert "ALL BORES Ra 1.6" in notes
+    assert "MASK DATUM A/B/C FACES, ALL BORES" in notes
+    assert "4X BOSS ANNULI" in notes
     assert "-0.00" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -78,7 +80,6 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "sspc-sp3" in finish
     assert "alkyd primer/green enamel" in finish
     assert "75-125um dft" in finish
-    assert "mask a/b/c" in finish
-    assert "4x od48/id25.5 faces" in finish
+    assert "mask" not in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
