@@ -36,12 +36,22 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from magnifying_vertical_rod_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    ISO_VIEW_NOTE,
+    ROD_DIA,
+    ROD_LENGTH,
+)
 
 PART_NAME = "magnifying-vertical-rod"
 MATERIAL = "Brass"  # see _common.apply_material docstring
-
-ROD_LENGTH = 150.0  # DIMENSIONS.md ch20: ~half the lever rod, p.46/48 (low)
-ROD_DIA = 5.0  # DIMENSIONS.md ch20: thinner than the Ø6 lever (low)
 
 R = ROD_DIA / 2.0
 
@@ -104,11 +114,11 @@ async def build(adapter) -> dict[str, str]:
     await anchor_point_to_origin(
         adapter, f"{cap_left}.center", R, 0.0, "left dome centre"
     )
-    profile.record("LeftDomeX", '"RodDia" / 2')
+    profile.record("LeftDomeCentre", '"RodDia" / 2')
     await anchor_point_to_origin(
         adapter, f"{cap_right}.center", ROD_LENGTH - R, 0.0, "right dome centre"
     )
-    profile.record("RightDomeX", '"RodLength" - "RodDia" / 2')
+    profile.record("RightDomeCentre", '"RodLength" - "RodDia" / 2')
     check(
         "right dome radius",
         await adapter.add_sketch_dimension(cap_right, None, "radial", R),
@@ -151,6 +161,21 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+            "Iso View Note": ISO_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -49,23 +49,35 @@ from _common import (
 )
 
 import _telemetry
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from magnifying_wheel_geom import (
+    BORE_DIA,
+    HUB_AXIAL,
+    HUB_DIA,
+    RIM_AXIAL,
+    RIM_INNER_DIA,
+    RIM_OUTER_DIA,
+    RIM_RING_RADIAL,
+    SPOKE_AXIAL,
+    SPOKE_COUNT,
+    SPOKE_OVERLAP,
+    SPOKE_WIDTH,
+)
+from magnifying_wheel_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+    SECTION_VIEW_NOTE,
+)
 
 PART_NAME = "magnifying-wheel"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-RIM_OUTER_DIA = 100.0  # DIMENSIONS.md ch21: annotated (high)
-HUB_DIA = 20.0  # DIMENSIONS.md ch21: annotated (high)
-SPOKE_COUNT = 6  # DIMENSIONS.md ch21: counted on p.51 (high)
-
-RIM_RING_RADIAL = 6.0  # rim ring radial thickness, photo-scaled (low)
-RIM_AXIAL = 8.0  # rim axial width, photo-scaled (low)
-HUB_AXIAL = 10.0  # brass drum axial length, photo-scaled (low)
-SPOKE_WIDTH = 5.0  # photo-scaled (low)
-SPOKE_AXIAL = 4.0  # photo-scaled (low)
-BORE_DIA = 5.0  # axle bore, photo-scaled (low)
-
-RIM_INNER_DIA = RIM_OUTER_DIA - 2 * RIM_RING_RADIAL
-SPOKE_OVERLAP = 1.0  # spokes bite into hub and rim so the bodies merge
+# Wheel nominals live in magnifying_wheel_geom (imported above).
 
 # --- WIRE-1 yoke point (the coupling mate's wheel-side geometry) --------------
 # ``WireYokePoint``: a reference point on the hub PITCH circle (groove radius +
@@ -311,6 +323,21 @@ async def build(adapter) -> dict[str, str]:
 
     _assert_yoke_point(adapter)
     await report_mass_properties(adapter)
+
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Section View Note": SECTION_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

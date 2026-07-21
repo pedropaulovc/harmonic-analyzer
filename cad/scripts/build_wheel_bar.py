@@ -56,19 +56,32 @@ from _common import (
     volume_check,
 )
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from wheel_bar_geom import (
+    BAR_DEPTH,
+    BAR_LENGTH,
+    BAR_SIDE,
+    CLAMP_HOLE_X,
+    SCREW_HOLE_X,
+)
+from wheel_bar_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "wheel-bar"
 MATERIAL = "Plain Carbon Steel"
 
-BAR_SIDE = 10.0  # tall (Y) (low)
-BAR_DEPTH = 9.0  # deep (Z) -- support-bar stock; back face seats on the clamp arc
-BAR_LENGTH = 234.0  # clamped end 29 past the west column + free end (photo, med)
-SCREW_HOLE_X = -114.5
+# Bar section + hole stations live in wheel_bar_geom (imported above).
 # Pen-hanger screw passes through: #6 clearance, CLOSE fit (Ø3.912, the wizard
 # twin of the old Ø3.8 artefact dim; nearest UNC to the screw).
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#6", fit="close")
-CLAMP_HOLE_X = (70.5, 105.5)  # local stations flanking the column line at +88
-# The O3.9 clamp-screw shanks pass through: #8 clearance (support-bar idiom).
+# The Ø3.9 clamp-screw shanks pass through: #8 clearance (support-bar idiom).
 CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
 
 
@@ -156,6 +169,20 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

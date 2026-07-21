@@ -40,6 +40,8 @@ def test_linked_notes_call_out_the_knife_edge_bearing_bore() -> None:
     notes = knife_mount_spec.DRAWING_NOTES
     assert "KNIFE-EDGE BEARING" in notes
     assert "Ra 0.8" in notes
+    assert "GRAY IRON" not in notes and "PAINT BLACK" not in notes
+    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes
     assert "LINEAR +/-" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -62,6 +64,6 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("knife-mount")
-    assert config["material_specification"]
+    assert config["material"] == config["material_specification"]
     assert config["finish"]
     assert int(config["quantity"]) == 2

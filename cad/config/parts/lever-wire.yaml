@@ -1,5 +1,8 @@
 lever-wire:
   number: MHA-099
-  material: Plain Carbon Steel
+  material: ASTM A228 high-carbon spring-steel wire
+  material_specification: ASTM A228 high-carbon spring-steel wire
+  finish: bright drawn
+  quantity: 1
   tolerance_class: machined_block
   process: "drawn steel wire"

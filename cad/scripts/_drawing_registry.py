@@ -237,6 +237,18 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="magnifying-wheel",
         script_name="draw_magnifying_wheel.py",
     ),
+    DrawingSpec(
+        name="magnifying_bracket",
+        part="magnifying_bracket",
+        artifact_stem="magnifying-bracket",
+        script_name="draw_magnifying_bracket.py",
+    ),
+    DrawingSpec(
+        name="lever_wire",
+        part="lever_wire",
+        artifact_stem="lever-wire",
+        script_name="draw_lever_wire.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

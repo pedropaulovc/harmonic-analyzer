@@ -63,6 +63,12 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from lever_wire_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 
 PART_NAME = "lever-wire"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -231,6 +237,28 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+
+    # Manufacturing drawing support: the Ø0.8 wire carries NO marked model
+    # dimension (nothing on it is a dependable pick), so the mark loop is a no-op
+    # over an empty contract; only the make-critical properties are stamped.  The
+    # developed cut length is COMPUTED here and APPENDED to the notes, so the
+    # derived value is never duplicated in the (import-pure) spec.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    notes = (
+        DRAWING_NOTES
+        + f"\nCUT LENGTH {WIRE_LEN:.1f} (STRAIGHT-RUN DEVELOPED LENGTH; "
+        "ADD WRAP + HOOK ALLOWANCE)."
+    )
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": notes,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -51,6 +51,16 @@ from _common import (
 )
 
 import _telemetry
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from magnifying_bracket_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"  # black hardware
@@ -96,7 +106,7 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -212,7 +222,7 @@ async def build(adapter) -> dict[str, str]:
     # the anchor z lands at the magnitude Z1 (unsigned distance).
     await define_rectilinear_chain(
         adapter, arm, arm_rect, label="arm", dims=arm_dims,
-        names=["Width", "Depth", "CornerX", "CornerZ"],
+        names=["ArmWidth", "ArmDepth", "ArmCornerX", "ArmCornerZ"],
         drives=[
             '2 * "ArmHalfX"',
             '"ArmZ1" - "ArmZ0"',
@@ -251,7 +261,7 @@ async def build(adapter) -> dict[str, str]:
     # drive POSITIVE -- negate the signed FlangeX0 global ('-"FlangeX0"').
     await define_rectilinear_chain(
         adapter, flange, flange_rect, label="flange", dims=flange_dims,
-        names=["Width", "Depth", "CornerX", "CornerZ"],
+        names=["FlangeWidth", "FlangeDepth", "FlangeCornerX", "FlangeCornerZ"],
         drives=[
             '"FlangeX1" - "FlangeX0"',
             '"FlangeZ1" - "FlangeZ0"',
@@ -309,6 +319,21 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+
+    # Manufacturing drawing support: mark exactly the print's plan dimensions
+    # (the two extruded rectangles -- the collar Ø/bore + Y through-thicknesses
+    # ride the notes) and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

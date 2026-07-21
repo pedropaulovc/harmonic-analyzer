@@ -1,5 +1,9 @@
 magnifying-bracket:
   number: MHA-041
-  material: Plain Carbon Steel
+  material: AISI 1018 cold-rolled steel bar
+  material_specification: AISI 1018 cold-rolled steel bar
+  finish: black oxide; collar bore + flange butt-face machined bright
+  quantity: 1
   tolerance_class: machined_block
+  fit_class: shaft_in_bushing
   process: "machined (steel)"

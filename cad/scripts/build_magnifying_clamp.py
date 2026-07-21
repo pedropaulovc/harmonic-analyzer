@@ -43,24 +43,34 @@ from _common import (
     volume_check,
 )
 from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from magnifying_clamp_geom import (
+    BLOCK_DEPTH,
+    BLOCK_HEIGHT,
+    BLOCK_WIDTH,
+    LEVER_BORE_DIA,
+    LEVER_BORE_Y,
+    ROD_BORE_DIA,
+    ROD_BORE_X,
+)
+from magnifying_clamp_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "magnifying-clamp"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-BLOCK_WIDTH = 20.0  # X  DIMENSIONS.md ch20: clamp block, p.48 (low)
-BLOCK_HEIGHT = 26.0  # Y
-BLOCK_DEPTH = 12.0  # Z
-# The two rod bores are engineered running/slip fits (0.2 mm clearance over
-# their rods), NOT drilled fastener holes, so they stay plain dimensioned cuts
-# -- the Hole Wizard's standard drills are for drilled holes/pins/seats, and a
-# nearest-drill fit would slop the magnifier train (same machined-fit exception
-# as the crank-arm reamed journal / rocker fulcrum bearings).
-LEVER_BORE_DIA = 6.2  # Ø6 lever + clearance
-LEVER_BORE_Y = 19.0  # bore centre height
-ROD_BORE_DIA = 5.2  # Ø5 vertical rod + clearance
-ROD_BORE_X = 6.5  # skew offset from the lever bore axis plane
-# The thumb-screw hole threads IN, so it IS a native #4-40 tapped Hole Wizard
-# hole (tap drill Ø2.261; the mating thumb screw's Ø2.0 shank fits it).
+# Nominal geometry lives in magnifying_clamp_geom (imported above): the two rod
+# bores are engineered running/slip fits (0.2 mm clearance over their rods), NOT
+# drilled fastener holes, so they stay plain dimensioned cuts.  The thumb-screw
+# hole threads IN, so it IS a native #4-40 tapped Hole Wizard hole (tap drill
+# Ø2.261; the mating thumb screw's Ø2.0 shank fits it).
 
 THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
 
@@ -205,6 +215,20 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
