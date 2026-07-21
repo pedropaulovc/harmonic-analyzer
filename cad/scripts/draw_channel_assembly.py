@@ -1,9 +1,9 @@
-r"""Create the curated assembly drawing for the summing subassembly.
+r"""Create the curated assembly drawing for the channel subassembly.
 
-Front / right / isometric views of ``cad/out/sldasm/summing.SLDASM`` plus a
+Front / right / isometric views of ``cad/out/sldasm/channel.SLDASM`` plus a
 top-level parts BOM and auto-inserted item-number balloons, on the same
 hand-made ASME B template every part print uses. The title block resolves from
-the custom properties ``build_summing_assembly.py`` stamps on the assembly
+the custom properties ``build_channel_assembly.py`` stamps on the assembly
 (Number, Revision, SEE PARTS LIST material/finish, and the TOL_* cells
 ``finalize_drawing`` requires).
 """
@@ -30,7 +30,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
-SPEC = DRAWINGS_BY_NAME["summing_assembly"]
+SPEC = DRAWINGS_BY_NAME["channel_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(
@@ -42,45 +42,54 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The summing head is tall: the knife-mount / lever / crossbar cluster sits at
-# machine y ~990-1050, and the counter-spring chain (boss-hook -> spring ->
-# gooseneck) hangs from the east column up to ~1225, with the gooseneck leg
-# reaching down toward the top frame -- a ~470 mm span. 1:5 shrinks that to a
-# ~94 mm on-sheet view (pen's size), so three views + the BOM + the balloon
-# cloud all clear the borders and the title block (1:3 overflowed the balloons
-# past the bottom border and across the right view).
-SHEET_SCALE = (1.0, 5.0)
-VIEW_SCALE = (1, 5)
+# The channel bank is the machine's tallest subassembly: the rocker bank sits at
+# machine y ~254 and the whole motion chain runs UP the 812.8 mm amplitude bars
+# to the lever fulcrum at y ~1066, a ~840 mm span in Y that governs BOTH ortho
+# views (Front = XY, Right = ZY). The pitch-station Z spread (~220 mm, ball
+# mounts at |z| ~111) and the X spread (ring centre -55 to fulcrum 200, ~255 mm)
+# are both far smaller, so Y drives the on-sheet size. 1:7 shrinks the 840 mm
+# tower to a ~120 mm on-sheet view -- in the 100-130 mm target band -- so three
+# views + the BOM + the balloon cloud all clear the borders and the title block.
+# (summing's 1:5 fits its shorter ~470 mm head; the taller channel tower needs
+# the extra reduction. 1:4/1:5 would render ~170-210 mm and overflow the sheet.)
+SHEET_SCALE = (1.0, 7.0)
+VIEW_SCALE = (1, 7)
 
-# One BOM row per UNIQUE top-level component of build_summing_assembly.py. The
-# two knife-mount bearing supports collapse to one row (QTY 2) under the
-# standard BOM's IgnoreMultiple; the other six are placed once. Descriptions
-# fill the template's DESCRIPTION column (the parts carry no Description custom
-# property, and a blank column reads as an unreleased sheet).
+# One BOM row per UNIQUE top-level component of build_channel_assembly.py. Most
+# components repeat down the 20-channel spine (rocker/rod/bar/lever/spring/hook
+# x20, the two bushings x19, ball mount x4); the standard BOM collapses each
+# family to one row (QTY N) under IgnoreMultiple, so the UNIQUE placed set -- not
+# the raw call count -- fills the list. Descriptions fill the template's
+# DESCRIPTION column (the parts carry no Description custom property, and a blank
+# column reads as an unreleased sheet).
 BOM_COMPONENTS = {
-    "knife-mount": "KNIFE-EDGE BEARING SUPPORT",
-    "top-crossbar": "LEVER HANGER CROSSBAR",
-    "summing-lever": "SUMMING LEVER",
-    "boss-hook": "COUNTER-SPRING LEVER HOOK",
-    "counter-spring": "COUNTER-BALANCE SPRING",
-    "gooseneck": "COUNTER-SPRING SUPPORT POST",
-    "gooseneck-clamp": "GOOSENECK COLUMN CLAMP",
+    "pivot-shaft": "ROCKER PIVOT SHAFT",
+    "fulcrum-shaft": "LEVER FULCRUM SHAFT",
+    "pivot-ball-mount": "BALL PIVOT MOUNT",
+    "pivot-bushing": "ROCKER SHAFT SPACER BUSHING",
+    "lever-bushing": "FULCRUM SHAFT SPACER BUSHING",
+    "rocker-arm": "ROCKER SEESAW ARM",
+    "connecting-rod": "CAM CONNECTING ROD",
+    "amplitude-bar": "AMPLITUDE BAR",
+    "channel-lever": "CHANNEL OUTPUT LEVER",
+    "channel-spring-installed": "CHANNEL RETURN SPRING",
+    "spring-hook": "SPRING-HOOK FASTENER",
 }
 
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",
-        "1. SEAT SUMMING LEVER ON BOTH KNIFE-MOUNT EDGES.",
-        "2. HOOK COUNTER-SPRING BETWEEN BOSS HOOK AND GOOSENECK.",
-        "3. VERIFY LEVER ROCKS FREELY AFTER ASSEMBLY.",
+        "1. INSTALL 20 CHANNEL CHAINS AT 7.06 PITCH AS SHOWN.",
+        "2. SEAT EACH SPRING HOOK IN THE SUMMING-LEVER PLATE AT FINAL ASSEMBLY.",
+        "3. VERIFY EACH ROCKER / ROD / BAR / LEVER CHAIN MOVES FREELY.",
     )
 )
 
-# Three views left-shifted from pen's centers to open the right-view/iso gap:
-# the iso balloons spread ~0.05 left of the iso outline, so the right view is
-# pulled left to 0.130 to clear them (at pen's 0.150 they overlapped by 2-5 mm),
-# while the iso stays at 0.225 -- right balloons clear of the title-block
-# keep-out (x >= 0.264) and above the bottom border.
+# Three views on the validated summing layout (left-shifted centers open the
+# right-view/iso gap; the iso balloons spread ~0.05 left of the iso outline, so
+# the right view is pulled left to 0.130 to clear them, while the iso stays at
+# 0.225 -- right balloons clear of the title-block keep-out (x >= 0.264) and
+# above the bottom border).
 FRONT_CENTER = (0.060, 0.150)
 RIGHT_CENTER = (0.130, 0.150)
 ISO_CENTER = (0.225, 0.140)
@@ -93,7 +102,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
-    check("open summing assembly source", await adapter.open_model(str(SOURCE)))
+    check("open channel assembly source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -119,10 +128,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Summing Assembly Drawing",
+            0: "Channel Assembly Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "summing head; knife-edge lever; counter-spring; parts list",
+            3: "channel motion chain; rocker/rod/bar/lever bank; parts list",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -145,22 +154,22 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=BOM_ANCHOR,
         expected_components=tuple(BOM_COMPONENTS),
         descriptions=BOM_COMPONENTS,
-        label="summing assembly",
+        label="channel assembly",
     )
-    # Balloon the ISOMETRIC view: the pictorial keeps every component visible,
-    # while the orthographic projections stack the counter-spring chain over the
-    # lever under hidden-lines-removed.
+    # Balloon the ISOMETRIC view: the pictorial keeps every component family
+    # visible, while the orthographic projections stack the 20-channel spine so
+    # densely that the balloons would pile up under hidden-lines-removed.
     add_auto_balloons(
         adapter, iso, expected=len(BOM_COMPONENTS),
-        label="summing assembly balloons",
+        label="channel assembly balloons",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
-        raise RuntimeError("failed to add summing assembly notes")
+        raise RuntimeError("failed to add channel assembly notes")
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Summing Assembly Drawing",
+        pdf_title="Channel Assembly Drawing",
         scale=SHEET_SCALE,
     )
 

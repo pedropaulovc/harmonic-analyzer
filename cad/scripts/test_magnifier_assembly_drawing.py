@@ -1,12 +1,11 @@
-"""Offline contracts for the summing ASSEMBLY drawing."""
+"""Offline contracts for the magnifier ASSEMBLY drawing."""
 
 from __future__ import annotations
 
 import importlib.util
-import re
 from pathlib import Path
 
-import draw_summing_assembly as drawing
+import draw_magnifier_assembly as drawing
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,22 +20,21 @@ def _load_dodo():
 
 
 def test_registry_row_resolves_the_assembly_source() -> None:
-    spec = DRAWINGS_BY_NAME["summing_assembly"]
+    spec = DRAWINGS_BY_NAME["magnifier_assembly"]
     assert spec.source_kind == "assembly"
-    assert spec.part == "summing"
-    assert spec.source.as_posix().endswith("/out/sldasm/summing.SLDASM")
+    assert spec.part == "magnifier"
+    assert spec.source.as_posix().endswith("/out/sldasm/magnifier.SLDASM")
     assert spec.script == Path(drawing.__file__).resolve()
 
 
 def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/summing-assembly.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/summing-assembly.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/summing-assembly_drawing.png")
-    assert drawing.SOURCE == DRAWINGS_BY_NAME["summing_assembly"].source
+    assert drawing.SLDDRW.as_posix().endswith("/slddrw/magnifier-assembly.SLDDRW")
+    assert drawing.PDF.as_posix().endswith("/pdf/magnifier-assembly.pdf")
+    assert drawing.PNG.as_posix().endswith("/png/magnifier-assembly_drawing.png")
+    assert drawing.SOURCE == DRAWINGS_BY_NAME["magnifier_assembly"].source
 
 
 def test_part_rows_keep_their_part_source() -> None:
-    """The assembly rows must not disturb the part-drawing rows."""
     for spec in DRAWINGS:
         if spec.source_kind == "assembly":
             continue
@@ -47,54 +45,52 @@ def test_part_rows_keep_their_part_source() -> None:
 
 def test_dodo_deps_use_the_sldasm_recipe_and_exact_assembly_token() -> None:
     dodo = _load_dodo()
-    deps = dodo._drawing_file_deps("summing_assembly")
+    deps = dodo._drawing_file_deps("magnifier_assembly")
     assert any(
-        dep.replace("\\", "/").endswith("/out/sldasm/summing.SLDASM") for dep in deps
+        dep.replace("\\", "/").endswith("/out/sldasm/magnifier.SLDASM") for dep in deps
     )
-    assert dodo._assembly_execution_token("summing") in deps
-    assert dodo._part_execution_token("summing") not in deps
+    assert dodo._assembly_execution_token("magnifier") in deps
+    assert dodo._part_execution_token("magnifier") not in deps
     assert any(dep.endswith("harmonic-analyzer.DRWDOT") for dep in deps)
 
 
 def test_dodo_yields_the_assembly_drawing_task() -> None:
     dodo = _load_dodo()
-    assert "summing_assembly" in dodo._drawing_order()
+    assert "magnifier_assembly" in dodo._drawing_order()
     task = next(
-        task for task in dodo.task_drawing() if task["name"] == "summing_assembly"
+        task for task in dodo.task_drawing() if task["name"] == "magnifier_assembly"
     )
     targets = {Path(target).name for target in task["targets"]}
     assert targets == {
-        "summing-assembly.SLDDRW",
-        "summing-assembly.pdf",
-        "summing-assembly_drawing.png",
+        "magnifier-assembly.SLDDRW",
+        "magnifier-assembly.pdf",
+        "magnifier-assembly_drawing.png",
     }
 
 
 def test_bom_covers_every_placed_component() -> None:
-    """Every UNIQUE placed component appears once in the BOM list.
+    """Every BOM row corresponds to a component the magnifier build places.
 
-    knife-mount is placed twice (front + back bearing support); the standard
-    BOM collapses it to one QTY-2 row, so the UNIQUE placed set -- not the raw
-    call count -- must match the BOM keys.
+    The magnifier mixes single ``place_component`` calls, a two-arc placement
+    loop and a native clamp-screw pattern, so the check is a string presence
+    test -- the runtime ``insert_bom_table`` validates one BOM row per expected
+    component.
     """
-    source = (Path(__file__).parent / "build_summing_assembly.py").read_text(
+    source = (Path(__file__).parent / "build_magnifier_assembly.py").read_text(
         encoding="utf-8"
     )
     for component in drawing.BOM_COMPONENTS:
         assert f'"{component}"' in source, f"{component} not placed by the build"
-    placed = re.findall(r'place_component\(\s*adapter,\s*"([a-z0-9-]+)"', source)
-    assert set(placed) == set(drawing.BOM_COMPONENTS)
-    assert len(placed) == 8  # knife-mount placed twice (front + back support)
 
 
 def test_assembly_stamps_title_block_properties() -> None:
-    source = (Path(__file__).parent / "build_summing_assembly.py").read_text(
+    source = (Path(__file__).parent / "build_magnifier_assembly.py").read_text(
         encoding="utf-8"
     )
     assert "apply_custom_properties" in source
     assert "SEE PARTS LIST" in source
-    assert "part_properties(ASM_NAME)" in source  # carries the required TOL_* cells
-    assert '"MHA-A07"' in source
+    assert "part_properties(ASM_NAME)" in source
+    assert '"MHA-A05"' in source
     assert source.count('"Material": "SEE PARTS LIST"') == 1
     assert source.count('"Material Specification": "SEE PARTS LIST"') == 1
     assert source.count('"Finish": "SEE PARTS LIST"') == 1
@@ -104,9 +100,10 @@ def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_bom_table(") == 1
     assert source.count("add_auto_balloons(") == 1
-    assert drawing.SHEET_SCALE == (1.0, 5.0)
-    assert source.count("scale=VIEW_SCALE") == 3  # every view pins its scale
+    assert drawing.SHEET_SCALE == (1.0, 4.0)
+    assert source.count("scale=VIEW_SCALE") == 3
     assert source.count("add_note(") == 1
+    assert "ROUTE LEVER WIRE" in drawing.ASSEMBLY_NOTES
     assert all(
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")

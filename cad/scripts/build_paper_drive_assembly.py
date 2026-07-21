@@ -77,10 +77,14 @@ from _chain import (
 )
 from _common import (
     IN,
+    apply_custom_properties,
+    apply_summary_info,
     check,
     log,
+    part_properties,
     run_build,
 )
+from _drawing_marks import DRAWN_BY
 from _assembly import (
     angle_driver,
     assert_component_placed,
@@ -1122,6 +1126,29 @@ async def build(adapter) -> dict[str, str]:
     # standard views (same as the top assembly) so the saved doc and the _front
     # render show the true machine front. Geometry untouched.
     remap_front_to_machine_front(adapter)
+    # Title-block identity for the assembly drawing (draw_paper_drive_assembly.py):
+    # part_properties supplies Title/Generator plus the TOL_* general-tolerance
+    # cells finalize_drawing hard-requires; material/finish defer to the parts
+    # list (standard assembly-drawing practice).
+    apply_custom_properties(
+        adapter,
+        {
+            **part_properties(ASM_NAME),
+            # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
+            # (a longer number overflows the DWG. NO. title-block cell).
+            "Number": "MHA-A06",
+            "Revision": "A",
+            "Revision Description": "Initial release",
+            "Material": "SEE PARTS LIST",
+            "Material Specification": "SEE PARTS LIST",
+            "Finish": "SEE PARTS LIST",
+            "Quantity": "1",
+            "Drawn By": DRAWN_BY,
+        },
+    )
+    # The PART cell resolves the document summary Title; "paper-drive assembly"
+    # (not the bare stem) so the sheet identifies itself as an assembly drawing.
+    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

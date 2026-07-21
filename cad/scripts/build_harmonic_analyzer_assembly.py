@@ -42,9 +42,13 @@ import sys
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
+    apply_custom_properties,
+    apply_summary_info,
     check,
+    part_properties,
     run_build,
 )
+from _drawing_marks import DRAWN_BY
 from _assembly import (
     _discard_copy_source,
     assert_component_placed,
@@ -124,6 +128,27 @@ async def build(adapter) -> dict[str, str]:
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)
+
+    # Title-block identity for the top assembly drawing
+    # (draw_harmonic_analyzer_assembly.py): part_properties supplies
+    # Title/Generator plus the TOL_* general-tolerance cells finalize_drawing
+    # hard-requires; material/finish defer to the parts list.
+    apply_custom_properties(
+        adapter,
+        {
+            **part_properties(ASM_NAME),
+            # MHA-A## = assembly-drawing ids (A08 = the top machine assembly).
+            "Number": "MHA-A08",
+            "Revision": "A",
+            "Revision Description": "Initial release",
+            "Material": "SEE PARTS LIST",
+            "Material Specification": "SEE PARTS LIST",
+            "Finish": "SEE PARTS LIST",
+            "Quantity": "1",
+            "Drawn By": DRAWN_BY,
+        },
+    )
+    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
 
     # The machine is authored output-side -Z, so SolidWorks' native Front view
     # shows the BACK. Redefine the document's standard views so Front (and the

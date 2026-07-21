@@ -1,11 +1,9 @@
-r"""Create the curated assembly drawing for the summing subassembly.
+r"""Create the curated assembly drawing for the frame subassembly.
 
-Front / right / isometric views of ``cad/out/sldasm/summing.SLDASM`` plus a
+Front / right / isometric views of ``cad/out/sldasm/frame.SLDASM`` plus a
 top-level parts BOM and auto-inserted item-number balloons, on the same
 hand-made ASME B template every part print uses. The title block resolves from
-the custom properties ``build_summing_assembly.py`` stamps on the assembly
-(Number, Revision, SEE PARTS LIST material/finish, and the TOL_* cells
-``finalize_drawing`` requires).
+the custom properties ``build_frame_assembly.py`` stamps on the assembly.
 """
 
 from __future__ import annotations
@@ -30,7 +28,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
-SPEC = DRAWINGS_BY_NAME["summing_assembly"]
+SPEC = DRAWINGS_BY_NAME["frame_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(
@@ -42,58 +40,49 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The summing head is tall: the knife-mount / lever / crossbar cluster sits at
-# machine y ~990-1050, and the counter-spring chain (boss-hook -> spring ->
-# gooseneck) hangs from the east column up to ~1225, with the gooseneck leg
-# reaching down toward the top frame -- a ~470 mm span. 1:5 shrinks that to a
-# ~94 mm on-sheet view (pen's size), so three views + the BOM + the balloon
-# cloud all clear the borders and the title block (1:3 overflowed the balloons
-# past the bottom border and across the right view).
+# The frame is the whole structural tower: cast base at machine y ~0-51, four
+# smooth columns rising to the top-frame ring at y ~1000-1041 -- a ~1040 mm
+# span, ~460 wide x ~280 deep. 1:5 keeps the tall front + right + iso views and
+# the BOM on ASME B; refined against the first render.
 SHEET_SCALE = (1.0, 5.0)
 VIEW_SCALE = (1, 5)
 
-# One BOM row per UNIQUE top-level component of build_summing_assembly.py. The
-# two knife-mount bearing supports collapse to one row (QTY 2) under the
-# standard BOM's IgnoreMultiple; the other six are placed once. Descriptions
-# fill the template's DESCRIPTION column (the parts carry no Description custom
-# property, and a blank column reads as an unreleased sheet).
+# One BOM row per UNIQUE top-level component of build_frame_assembly.py. The
+# four corner columns (tube-frame) and four hold-down lag-screws are native
+# component patterns, so each collapses to one QTY-4 BOM row; the base, support,
+# ring and nameplate are placed once. Descriptions fill the template's
+# DESCRIPTION column.
 BOM_COMPONENTS = {
-    "knife-mount": "KNIFE-EDGE BEARING SUPPORT",
-    "top-crossbar": "LEVER HANGER CROSSBAR",
-    "summing-lever": "SUMMING LEVER",
-    "boss-hook": "COUNTER-SPRING LEVER HOOK",
-    "counter-spring": "COUNTER-BALANCE SPRING",
-    "gooseneck": "COUNTER-SPRING SUPPORT POST",
-    "gooseneck-clamp": "GOOSENECK COLUMN CLAMP",
+    "harmonic-base": "TWO-PLATE CAST BASE",
+    "tube-frame": "CORNER COLUMN",
+    "rocker-arm-support": "ROCKER-PIVOT SUPPORT",
+    "lag-screw": "SUPPORT HOLD-DOWN LAG SCREW",
+    "top-frame": "TOP-FRAME RING",
+    "nameplate": "MAKER'S NAMEPLATE",
 }
 
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",
-        "1. SEAT SUMMING LEVER ON BOTH KNIFE-MOUNT EDGES.",
-        "2. HOOK COUNTER-SPRING BETWEEN BOSS HOOK AND GOOSENECK.",
-        "3. VERIFY LEVER ROCKS FREELY AFTER ASSEMBLY.",
+        "1. INSTALL FOUR LAG SCREWS FROM THE BASE UNDERSIDE INTO THE SUPPORT.",
+        "2. SEAT TOP-FRAME RING ON ALL FOUR COLUMNS AS SHOWN.",
+        "3. VERIFY FRAME IS SQUARE BEFORE FINAL TIGHTENING.",
     )
 )
 
-# Three views left-shifted from pen's centers to open the right-view/iso gap:
-# the iso balloons spread ~0.05 left of the iso outline, so the right view is
-# pulled left to 0.130 to clear them (at pen's 0.150 they overlapped by 2-5 mm),
-# while the iso stays at 0.225 -- right balloons clear of the title-block
-# keep-out (x >= 0.264) and above the bottom border.
-FRONT_CENTER = (0.060, 0.150)
-RIGHT_CENTER = (0.130, 0.150)
-ISO_CENTER = (0.225, 0.140)
-# Top-left BOM anchor, top-right of the sheet above the title block, bounded by
-# the sheet ZONE band (0.2667); refined against the render.
-BOM_ANCHOR = (0.248, 0.265)
+FRONT_CENTER = (0.075, 0.140)
+RIGHT_CENTER = (0.165, 0.140)
+ISO_CENTER = (0.250, 0.130)
+# Top-left BOM anchor, bounded above by the sheet ZONE band (0.2667) and kept
+# left of the title-block keep-out; refined against the first render.
+BOM_ANCHOR = (0.250, 0.265)
 
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
-    check("open summing assembly source", await adapter.open_model(str(SOURCE)))
+    check("open frame assembly source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -119,10 +108,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Summing Assembly Drawing",
+            0: "Frame Assembly Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "summing head; knife-edge lever; counter-spring; parts list",
+            3: "structural frame; base, columns, top ring; parts list",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -145,22 +134,21 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=BOM_ANCHOR,
         expected_components=tuple(BOM_COMPONENTS),
         descriptions=BOM_COMPONENTS,
-        label="summing assembly",
+        label="frame assembly",
     )
     # Balloon the ISOMETRIC view: the pictorial keeps every component visible,
-    # while the orthographic projections stack the counter-spring chain over the
-    # lever under hidden-lines-removed.
+    # while the tall orthographic views stack the base/columns/ring vertically.
     add_auto_balloons(
         adapter, iso, expected=len(BOM_COMPONENTS),
-        label="summing assembly balloons",
+        label="frame assembly balloons",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
-        raise RuntimeError("failed to add summing assembly notes")
+        raise RuntimeError("failed to add frame assembly notes")
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Summing Assembly Drawing",
+        pdf_title="Frame Assembly Drawing",
         scale=SHEET_SCALE,
     )
 
