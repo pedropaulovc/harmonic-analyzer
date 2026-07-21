@@ -26,6 +26,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert marked == {"Width", "Depth", "BlockHt", "BoreZ", "BoreDiaDim", "SlitW"}
+    assert part.BORE_DIA == cone_tip_block_spec.BORE_DIA == 0.819
 
 
 def test_journal_bore_is_a_running_fit_at_matching_precision() -> None:
@@ -50,6 +51,9 @@ def test_notes_specify_journal_adjuster_and_functional_pinch_joint() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name="PinchClearance"' in part_source
+    assert 'HoleSpec("clearance", "#3", end="through_next")' in part_source
 
 
 def test_datum_and_parallelism_frame_are_present() -> None:

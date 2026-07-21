@@ -31,6 +31,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_thread_callout_is_the_catalog_thread() -> None:
     assert cone_tip_adjuster_spec.THREAD == "5/16-18"
     assert drawing.DIMENSION_CALLOUTS["BodyDiaDim"] == "5/16-18 UNC-2A"
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "AddThreadParameters" in part_source
+    assert "import_cosmetic_threads" in drawing_source
 
 
 def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> None:

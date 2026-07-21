@@ -24,6 +24,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*cone_pivot_post_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
+    assert part.BORE_DIA == cone_pivot_post_spec.BORE_DIA == 9.550
 
 
 def test_marked_dimensions_cover_the_column_and_journal() -> None:
@@ -55,6 +56,7 @@ def test_native_gdt_controls_the_journal_bore() -> None:
     # The horizontal bore axis is PARALLEL to the horizontal foot seat (datum A).
     assert source.count('characteristic="parallelism"') == 1
     assert source.count("add_surface_finish(") == 1
+    assert 'datum="B"' in source
 
 
 def test_view_scales_are_explicit() -> None:
