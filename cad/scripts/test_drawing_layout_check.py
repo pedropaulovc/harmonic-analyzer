@@ -12,6 +12,7 @@ print.
 
 from __future__ import annotations
 
+from inspect import getsource
 from types import SimpleNamespace
 
 import pytest
@@ -118,6 +119,17 @@ def test_metric_edge_break_fails_loud_when_template_note_is_missing():
     with pytest.raises(RuntimeError, match="exactly one recognized"):
         drawing_common._normalize_metric_edge_break_note(_FakeAdapter(None), ddoc)
     assert note.text == "SOME OTHER TEMPLATE NOTE"
+
+
+def test_finalize_exports_pdf_before_reopen_and_skips_clean_save():
+    source = getsource(drawing_common.finalize_drawing)
+    first_reopen = source.index("reopen_drawing")
+    pdf_export = source.index("pdf_path=str(outputs.pdf)")
+    assert pdf_export < first_reopen
+    assert source.count("save_drawing(") == 1
+    assert '"GetSaveFlag"' in source
+    assert "if sheet_scale_dirty:" in source
+    assert "save skipped" in source
 
 
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):

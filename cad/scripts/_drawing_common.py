@@ -2761,17 +2761,30 @@ async def finalize_drawing(
     # the saved SLDDRW / PDF / PNG.
     check_drawing_layout(adapter, stem=outputs.slddrw.stem)
 
-    artifacts = save_drawing(adapter, str(outputs.slddrw))
+    # Export the PDF while the just-authored drawing is still fully loaded.
+    # A large drawing can reopen view-only even when its referenced views report
+    # loaded; SolidWorks then rejects PDF SaveAs3 with 0x1001. The SLDDRW is
+    # still reopened below twice and validated as the persisted source artifact.
+    artifacts = save_drawing(
+        adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
+    )
+    if set(artifacts) != {"drawing", "pdf"}:
+        raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
     drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
         raise RuntimeError("failed to persist reopened drawing sheet scale")
-    check(
-        "save final drawing sheet scale",
-        await adapter.save_file(str(outputs.slddrw)),
+    sheet_scale_dirty = bool(
+        adapter._get_attr_or_call(drawing_model, "GetSaveFlag")
     )
+    if sheet_scale_dirty:
+        check(
+            "save final drawing sheet scale",
+            await adapter.save_file(str(outputs.slddrw)),
+        )
+    if not sheet_scale_dirty:
+        _telemetry.info("final drawing sheet scale already persisted; save skipped")
     drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
     assert_asme_b_sheet(adapter, sheet, phase="post-save reopen", scale=scale)
-    artifacts.update(save_drawing(adapter, "", pdf_path=str(outputs.pdf)))
     sanitize_pdf_metadata(outputs.pdf, title=pdf_title)
     render_pdf_png(outputs.pdf, outputs.png)
     artifacts["png"] = str(outputs.png.resolve())
