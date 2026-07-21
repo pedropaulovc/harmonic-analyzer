@@ -98,7 +98,7 @@ RIGHT_KEEP = {
 DIMENSION_CALLOUTS: dict[str, str] = {}
 DIMENSION_CALLOUTS = {
     "HandleLength": "+/-0.25 OVERALL",
-    "PivotBoreDia": "FINAL LIMITS 6.10/6.15 THRU",
+    "PivotBoreDia": "FINAL LIMITS 6.15 MAX / 6.10 MIN THRU",
 }
 
 
