@@ -79,7 +79,7 @@ def _slotted_rim_chamfer_volume(r: float, chamfer: float, slot_w: float) -> floa
 
 
 def _insert_cosmetic_thread(adapter) -> bool:
-    """Attach the 5/16-18 cosmetic thread to the exact north-end outer edge."""
+    """Attach the catalog cosmetic thread to the exact north-end outer edge."""
     part = _early_bound(adapter.currentModel, "IPartDoc", "GetBodies2")
     bodies = part.GetBodies2(0, False) or []  # swSolidBody
     candidates = []
@@ -116,7 +116,7 @@ def _insert_cosmetic_thread(adapter) -> bool:
         model.FeatureManager, "IFeatureManager", "InsertCosmeticThread3"
     )
     feature = manager.InsertCosmeticThread3(
-        0, "", "5/16-18", 0.0, 0, BODY_LEN / 1000.0, ""
+        0, "", SPEC.thread, 0.0, 0, BODY_LEN / 1000.0, ""
     )
     model.ClearSelection2(True)
     return feature is not None
@@ -202,7 +202,7 @@ async def build(adapter) -> dict[str, str]:
     # measured radius/axis station: coordinate picking is view-dependent and
     # failed even in a square-on view, while IEntity.Select4 is deterministic.
     if not _insert_cosmetic_thread(adapter):
-        raise RuntimeError("failed to insert cosmetic thread 5/16-18")
+        raise RuntimeError(f"failed to insert cosmetic thread {SPEC.thread}")
 
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:

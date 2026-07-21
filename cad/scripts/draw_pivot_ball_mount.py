@@ -281,6 +281,7 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(12.0)),
         text_xy=STEM_DIM_TEXT,
         label="stem diameter",
+        entity_type="SILHOUETTE",
     )
     _set_stem_dimension_format(adapter, stem_dimension)
     add_attached_note(

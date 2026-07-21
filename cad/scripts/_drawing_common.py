@@ -1598,14 +1598,17 @@ def add_edge_dimension(
     text_xy: tuple[float, float],
     label: str,
     orientation: str = "smart",
+    entity_type: Literal["EDGE", "SILHOUETTE"] = "EDGE",
 ) -> Any:
-    """Dimension across two edges picked at explicit sheet points (meters).
+    """Dimension across two view entities picked at explicit sheet points.
 
     The adapter's ``add_overall_dimension`` derives its picks from
     ``IView.GetOutline``, which pads the geometry with a whitespace margin, so
     its coordinate picks can miss.  Recipes know their layout exactly — the
-    explicit points make the pick deterministic.  Fails loud on either pick or
-    on dimension creation.
+    explicit sheet-meter points make the pick deterministic. Revolved outlines
+    are drawing silhouettes rather than model edges, so callers must request
+    ``SILHOUETTE`` for those flanks. Fails loud on either pick or dimension
+    creation.
 
     ``orientation`` pins the measured direction: ``"smart"`` (default) lets
     SolidWorks infer from the picks and text position, while ``"horizontal"`` /
@@ -1621,11 +1624,12 @@ def add_edge_dimension(
     draw.ClearSelection2(True)
     for index, (x, y) in enumerate((p0, p1)):
         selected = draw.Extension.SelectByID2(
-            "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
+            "", entity_type, x, y, 0.0, index > 0, 0, null_callout(), 0
         )
         if not selected:
             raise RuntimeError(
-                f"failed to select {label} edge {index} at sheet ({x:g}, {y:g})"
+                f"failed to select {label} {entity_type.lower()} {index} "
+                f"at sheet ({x:g}, {y:g})"
             )
     if orientation == "horizontal":
         dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)

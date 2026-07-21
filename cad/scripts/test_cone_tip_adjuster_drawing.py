@@ -35,6 +35,8 @@ def test_thread_callout_is_the_catalog_thread() -> None:
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "InsertCosmeticThread3" in part_source
+    assert "SPEC.thread" in part_source
+    assert '"5/16-18"' not in part_source
     assert "IEntity" in part_source
     assert "import_cosmetic_threads" in drawing_source
     assert "set_reference_dimensions(adapter, front_annotations" in drawing_source

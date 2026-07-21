@@ -31,6 +31,20 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     }
 
 
+def test_part_uses_shared_geometry_constants() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    for name in (
+        "BALL_DIA",
+        "BALL_CENTER_H",
+        "BASE_DIA",
+        "BASE_H",
+        "STEM_DIA",
+        "BORE_DIA",
+    ):
+        assert getattr(part, name) == getattr(pivot_ball_mount_spec, name)
+        assert f"{name} =" not in source
+
+
 def test_callouts_clarify_bore_and_center_height() -> None:
     assert drawing.DIMENSION_CALLOUTS["ShaftBoreDia"] == "+0.00/-0.05 THRU"
     assert "BallRise" not in drawing.DIMENSION_CALLOUTS
@@ -62,6 +76,7 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert 'characteristic="profile_surface"' in source
     assert 'quantity="STEM AXIS"' in source
     assert 'label="stem diameter"' in source
+    assert 'entity_type="SILHOUETTE"' in source
     assert source.count('entity_type="DIMENSION"') == 2
     assert "set_basic_dimension(" in source
     assert "add_view_centerline(" in source
