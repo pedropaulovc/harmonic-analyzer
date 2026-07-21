@@ -97,5 +97,8 @@ def test_bore_annotations_use_exact_model_edge_identity() -> None:
 def test_tooth_runout_is_stated_against_the_bore_axis_datum() -> None:
     for part_name, spec in SHEETS:
         notes = spec.DRAWING_NOTES.upper()
-        assert "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX TO DATUM A" in notes, part_name
+        assert (
+            "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, "
+            "MEASURED AT THE TOOTH TIPS" in notes
+        ), part_name
         assert "WITHIN 0.05 TIR" not in notes, part_name

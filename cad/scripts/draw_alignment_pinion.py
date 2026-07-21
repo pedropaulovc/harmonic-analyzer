@@ -116,12 +116,17 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to drum bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
-    # Overall face length across the drum ends in the profile view.
+    # Overall face length across the drum ends in the profile view. Pick the
+    # two VERTICAL end edges at mid-height (above the bore, inside the tooth
+    # root) -- a pick at the bottom corner lands on the long horizontal tooth
+    # silhouette, and both corners then select the SAME edge (AddDimension2
+    # returns None on that pair).
+    end_pick_y = RIGHT_CENTER[1] + HALF_OD * 0.55
     add_edge_dimension(
         adapter,
         right,
-        p0=(LEFT_END_X, RIGHT_CENTER[1] - HALF_OD),
-        p1=(RIGHT_END_X, RIGHT_CENTER[1] - HALF_OD),
+        p0=(LEFT_END_X, end_pick_y),
+        p1=(RIGHT_END_X, end_pick_y),
         text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_OD - 0.028),
         label="drum face length",
     )

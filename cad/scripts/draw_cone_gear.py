@@ -24,6 +24,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -110,7 +111,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    # 3 decimals so the displayed bore matches the family rows' 9.525 (a
+    # 2-decimal 9.53 reads as a conflicting definition).
+    set_dimension_precision(adapter, front_annotations, {"BoreCutDia": 3})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)

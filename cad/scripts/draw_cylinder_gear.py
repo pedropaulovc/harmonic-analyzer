@@ -169,7 +169,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        frame_xy=(0.175, RIGHT_CENTER[1] + half_od + 0.010),
+        # Frame BELOW-LEFT of the front view: with the frame up top the leader
+        # shoulder ran right over the bore's lower-left, crossing the bore
+        # finish leader (both attach points are SolidWorks-chosen canonical
+        # vertices in that quadrant; layout audit leader-crossing).
+        frame_xy=(0.168, FRONT_CENTER[1] - 0.052),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
@@ -177,13 +181,15 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="FACE",
         entity=gear_face,
     )
-    # Bore finish: pick at 6 o'clock, symbol below (always-clean routing).
+    # Bore finish: symbol directly below the bore; attaches by model identity
+    # (the batch contract) at the circle's canonical vertex in the lower-left
+    # quadrant -- the FCF frame above routes clear of it.
     bore_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - BORE_R)
     add_surface_finish(
         adapter,
         front,
         edge_xy=bore_bottom,
-        symbol_xy=(FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] - 0.052),
+        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.052),
         roughness_ra="1.6",
         label="cylinder gear bore finish",
         entity=bore_edge,

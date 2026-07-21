@@ -39,7 +39,7 @@ GEAR_DATA = gear_data_note(
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
         ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f}"),
+        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
         ("FACE WIDTH (mm)", f"{FACE_WIDTH:.2f}"),
         ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
     ]
@@ -48,7 +48,7 @@ GEAR_DATA = gear_data_note(
 DRAWING_NOTES = "\n".join(
     (
         "CUT TEETH PER GEAR DATA.",
-        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX TO DATUM A.",
+        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
         "MESHES THE 120T REDUCTION DISC (MHA-070) FOR THE 1:10 PAPER FEED.",
     )
 )

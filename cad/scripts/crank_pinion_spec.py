@@ -40,8 +40,8 @@ GEAR_DATA = gear_data_note(
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
         ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f}"),
-        ("ROOT DIAMETER (mm)", f"{ROOT_DIA:.2f}"),
+        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
+        ("ROOT DIAMETER (mm)", f"{ROOT_DIA:.2f} +0/-0.10"),
         ("FACE WIDTH (mm)", f"{FACE_WIDTH:.2f}"),
         ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
         ("MATING GEAR", "64T (MHA-021)"),
@@ -51,7 +51,7 @@ GEAR_DATA = gear_data_note(
 DRAWING_NOTES = "\n".join(
     (
         "CUT TEETH PER GEAR DATA.",
-        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX TO DATUM A.",
+        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
         "ROOT FLOOR IS A CONCENTRIC ARC AT THE ROOT DIAMETER ABOVE.",
         "REMOVABLE ON THE CRANKSHAFT.",
     )
