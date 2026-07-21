@@ -13,6 +13,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
     add_datum_feature,
+    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
@@ -83,6 +84,40 @@ TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "+0.00/-0.05 THRU",
 }
+STEM_DIM_TEXT = (0.050, _front_y(12.0))
+
+
+def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
+    """Render the drawing-native stem width as a toleranced diameter."""
+    display = _early_bound(
+        dimension,
+        "IDisplayDimension",
+        "SetText",
+        "GetText",
+        "GetDimension",
+    )
+    prefix = "<MOD-DIAM>"
+    display.SetText(1, prefix)  # swDimensionTextPrefix
+    if str(display.GetText(1) or "") != prefix:
+        raise RuntimeError("stem diameter glyph did not persist")
+    model_dimension = _early_bound(display.GetDimension(), "IDimension")
+    tolerance = _early_bound(
+        model_dimension.Tolerance,
+        "IDimensionTolerance",
+        "SetValues",
+        "GetMinValue",
+        "GetMaxValue",
+    )
+    tolerance.Type = 2  # swTolType_e.swTolBILAT
+    limit_m = 0.05 / 1000.0
+    if not tolerance.SetValues(-limit_m, limit_m):
+        raise RuntimeError("stem diameter bilateral tolerance was rejected")
+    if (
+        abs(float(tolerance.GetMinValue()) + limit_m) > 1e-9
+        or abs(float(tolerance.GetMaxValue()) - limit_m) > 1e-9
+    ):
+        raise RuntimeError("stem diameter bilateral tolerance did not persist")
+    adapter.currentModel.EditRebuild3()
 
 
 def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -239,15 +274,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spherical ball size",
         entity_type="SILHOUETTE",
     )
-    add_attached_note(
+    stem_dimension = add_edge_dimension(
         adapter,
         front,
-        text="<MOD-DIAM>8.00 +/-0.05 STEM",
-        edge_xy=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(12.0)),
-        note_xy=(0.038, 0.128),
+        p0=(FRONT_CENTER[0] - STEM_DIA / 2.0 * _S, _front_y(12.0)),
+        p1=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(12.0)),
+        text_xy=STEM_DIM_TEXT,
         label="stem diameter",
-        entity_type="SILHOUETTE",
     )
+    _set_stem_dimension_format(adapter, stem_dimension)
     add_attached_note(
         adapter,
         front,
@@ -275,17 +310,16 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(10.0)),
-        symbol_xy=(FRONT_CENTER[0] + 0.026, _front_y(10.0)),
+        edge_xy=STEM_DIM_TEXT,
+        symbol_xy=(0.073, _front_y(12.0) - 0.012),
         datum="B",
-        label="stem axis",
-        entity_type="FACE",
-        entity=stem_face,
+        label="stem diameter feature of size",
+        entity_type="DIMENSION",
     )
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(12.0)),
+        edge_xy=STEM_DIM_TEXT,
         frame_xy=(0.155, 0.115),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -293,8 +327,7 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         quantity="STEM AXIS",
         label="datum-B axis perpendicularity",
-        entity_type="FACE",
-        entity=stem_face,
+        entity_type="DIMENSION",
     )
     # The BASIC height and position zone locate the cross-bore axis from the
     # seat plane and through the stem axis without a prose-only acceptance rule.
