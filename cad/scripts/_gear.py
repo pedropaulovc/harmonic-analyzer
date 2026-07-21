@@ -32,8 +32,6 @@ from _common import (
 )
 from build_cone_gear import gear_facts
 
-import _telemetry
-
 __all__ = [
     "build_fixed_gear",
     "cut_tooth_gap",
@@ -188,36 +186,30 @@ async def pattern_about_z(
 ) -> Any:
     """Circular-pattern seed feature(s) about the Z axis through the origin.
 
-    Creates a Top x Right reference axis, then walks candidate selection
-    points (axis selection by view-projected point is flaky -- live-caught
-    on the cone gear): the origin axis point first, then OD-face points at
-    angles away from the seed gap near angle 0.
+    Creates a Top x Right reference axis and selects that reference feature by
+    its returned name. Point selection projects through the graphics view and
+    is not a reliable way to select a buried reference axis.
     """
     from solidworks_mcp.adapters.base import CircularPatternParameters, CreateAxisParameters
 
-    check(
+    axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     )
-    adapter._zoom_to_fit(adapter.currentModel)
-    candidates = [[0.0, 0.0, z_mm]]
-    for angle_deg in (-45.0, -90.0, -135.0, 135.0, 45.0):
-        a = math.radians(angle_deg)
-        candidates.append([radius_mm * math.cos(a), radius_mm * math.sin(a), z_mm])
     features = [seed_feature] if isinstance(seed_feature, str) else list(seed_feature)
-    for point in candidates:
-        res = await adapter.circular_pattern_feature(
+    return check(
+        f"circular pattern about {axis.name}",
+        await adapter.circular_pattern_feature(
             CircularPatternParameters(
-                axis_point=point, features=features, count=count
+                axis_name=axis.name,
+                features=features,
+                count=count,
+                geometry_pattern=True,
             )
-        )
-        if res.is_success:
-            _telemetry.success(f"circular pattern axis via point {point}")
-            return res
-        _telemetry.debug(f"axis candidate {point} failed: {res.error}")
-    raise RuntimeError("circular pattern: no axis candidate selectable")
+        ),
+    )
 
 
 def gap_area_in_disc_ext(
