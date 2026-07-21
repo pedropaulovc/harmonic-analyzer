@@ -45,6 +45,7 @@ DRAWING_NOTES = "\n".join(
         "   CENTRED; STRADDLES THE LEVER.",
         "5. TOP PIN HOLE: #47 DRILL THRU,",
         "   6.35 BELOW THE BAR TOP.",
+        "6. BOTTOM NOTCH FOOT: Ra 0.8.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:8"

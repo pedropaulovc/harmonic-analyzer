@@ -24,11 +24,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_edge_dimension,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -37,15 +33,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from amplitude_bar_spec import (
-    BAR_DEPTH,
-    BAR_LENGTH,
-    BAR_WIDTH,
-)
-from solidworks_mcp.adapters.solidworks.drawing import (
-    place_view,
-    view_outline,
-)
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["amplitude_bar"]
@@ -61,40 +49,9 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 4.0)  # 1:4
-_S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.25)
-
-# Front-view model bbox: X symmetric about half-width, Y 0..BAR_LENGTH.
-_BBOX_CX = BAR_WIDTH / 2.0
-_BBOX_CY = BAR_LENGTH / 2.0
-
 FRONT_CENTER = (0.110, 0.140)
 TOP_CENTER = (0.220, 0.150)  # square-section end view (4:1)
 ISO_CENTER = (0.330, 0.140)
-_TOP_SCALE = 4.0
-
-
-def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model point in the bbox-centred front view (1:4)."""
-    return (
-        FRONT_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
-        FRONT_CENTER[1] + (my - _BBOX_CY) * _S / 1000.0,
-    )
-
-
-def _view_center_delta(
-    adapter: Any, view: Any, intended: tuple[float, float], label: str
-) -> tuple[float, float]:
-    """Return the actual geometry-center offset from the authored view center."""
-    outline = view_outline(adapter, view)
-    if outline is None:
-        raise RuntimeError(f"{label} drawing view has no outline")
-    cx = (outline[0] + outline[2]) / 2.0
-    cy = (outline[1] + outline[3]) / 2.0
-    _telemetry.debug(
-        f"{label} view geometry center ({cx:.4f}, {cy:.4f}) vs intended "
-        f"({intended[0]:.4f}, {intended[1]:.4f})"
-    )
-    return cx - intended[0], cy - intended[1]
 
 
 FRONT_KEEP = {
@@ -154,63 +111,10 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    top_dx, top_dy = _view_center_delta(adapter, top, TOP_CENTER, "top")
-
-    def top_pt(x: float, y: float) -> tuple[float, float]:
-        return x + top_dx, y + top_dy
-
-    # Square section on the top end view (4:1): width (X) horizontal, depth (Z)
-    # vertical.
-    half_w = BAR_WIDTH * _TOP_SCALE / 2000.0
-    half_d = BAR_DEPTH * _TOP_SCALE / 2000.0
-    add_edge_dimension(
-        adapter,
-        top,
-        p0=top_pt(TOP_CENTER[0] - half_w, TOP_CENTER[1]),
-        p1=top_pt(TOP_CENTER[0] + half_w, TOP_CENTER[1]),
-        text_xy=top_pt(TOP_CENTER[0], TOP_CENTER[1] + 0.024),
-        label="section width",
-    )
-    add_edge_dimension(
-        adapter,
-        top,
-        p0=top_pt(TOP_CENTER[0], TOP_CENTER[1] - half_d),
-        p1=top_pt(TOP_CENTER[0], TOP_CENTER[1] + half_d),
-        text_xy=top_pt(TOP_CENTER[0] + 0.024, TOP_CENTER[1]),
-        label="section depth",
-    )
-
-    # Datum A on a long side face (front view left edge), Ra on the sliding face,
-    # and a flatness callout on the reference face (the form control the sliding
-    # bar needs; the shared FCF helper carries no straightness symbol).
-    left_edge = (FRONT_CENTER[0] - BAR_WIDTH * _S / 2000.0, FRONT_CENTER[1])
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=left_edge,
-        symbol_xy=(left_edge[0] - 0.016, FRONT_CENTER[1]),
-        datum="A",
-        label="bar reference face",
-    )
-    right_edge = (FRONT_CENTER[0] + BAR_WIDTH * _S / 2000.0, FRONT_CENTER[1] + 0.030)
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=right_edge,
-        symbol_xy=(right_edge[0] + 0.012, right_edge[1] + 0.006),
-        roughness_ra="0.8",
-        label="sliding face finish",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=left_edge,
-        frame_xy=(0.045, 0.090),
-        characteristic="flatness",
-        tolerance="0.20",
-        datums=(),
-        label="bar flatness",
-    )
+    # The projected end outline is not a selectable topological EDGE after the
+    # end notches are overlaid. The manufacturing note owns the explicit 6.35
+    # square section; this enlarged end view confirms its shape without a
+    # duplicate, topology-fragile dimension.
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.150, 0.230)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.070)

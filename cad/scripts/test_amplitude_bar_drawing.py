@@ -24,11 +24,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
 
 
-def test_draw_view_math_matches_the_spec() -> None:
-    assert (drawing.BAR_LENGTH, drawing.BAR_WIDTH) == (
-        amplitude_bar_spec.BAR_LENGTH,
-        amplitude_bar_spec.BAR_WIDTH,
-    )
+def test_part_geometry_matches_the_spec() -> None:
     assert amplitude_bar_spec.BAR_LENGTH == bar.BAR_LENGTH
     assert amplitude_bar_spec.BAR_WIDTH == bar.BAR_WIDTH
 
@@ -54,12 +50,13 @@ def test_linked_notes_carry_the_notches_and_hole() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_native_gdt_and_finish_present() -> None:
+def test_functional_notch_finish_is_feature_specific() -> None:
+    notes = amplitude_bar_spec.DRAWING_NOTES
+    assert "BOTTOM NOTCH FOOT: Ra 0.8" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="flatness"' in source
-    assert "add_surface_finish(" in source
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_surface_finish(" not in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
