@@ -393,12 +393,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="transgear-pinion",
         script_name="draw_transgear_pinion.py",
     ),
-    DrawingSpec(
-        name="chain_sprocket",
-        part="chain_sprocket",
-        artifact_stem="chain-sprocket",
-        script_name="draw_chain_sprocket.py",
-    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

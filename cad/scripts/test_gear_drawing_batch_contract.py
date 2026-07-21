@@ -1,10 +1,9 @@
-"""Cross-sheet offline contracts for the nine batch gear drawings."""
+"""Cross-sheet offline contracts for the eight current gear drawings."""
 
 from __future__ import annotations
 
 import _config
 import alignment_pinion_spec
-import chain_sprocket_spec
 import cone_gear_spec
 import crank_drive_gear_spec
 import crank_pinion_spec
@@ -16,7 +15,6 @@ import transgear_pinion_spec
 
 SHEETS = (
     ("alignment-pinion", alignment_pinion_spec),
-    ("chain-sprocket", chain_sprocket_spec),
     ("cone-gear", cone_gear_spec),
     ("crank-drive-gear", crank_drive_gear_spec),
     ("crank-pinion", crank_pinion_spec),
