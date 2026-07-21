@@ -222,7 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=foot_entity,
     )
     post_od_entity = _circular_edge(
-        adapter, top, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
+        adapter, top, radius_mm=BLOCK_DIA / 2.0, center_y_mm=BLOCK_HEIGHT
     )
     add_datum_feature(
         adapter,

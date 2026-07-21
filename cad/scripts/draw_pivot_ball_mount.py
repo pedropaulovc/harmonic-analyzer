@@ -242,7 +242,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(BALL_CENTER_H) + _bore_r),  # bore top
-        frame_xy=(0.180, _front_y(BALL_CENTER_H) + 0.048),
+        # Route the bore-axis control into the open left field.  The ball-size,
+        # runout and finish leaders all fan rightward from the sphere outline.
+        frame_xy=(0.030, 0.205),
         characteristic="parallelism",
         tolerance="0.05",
         datums=("A",),
