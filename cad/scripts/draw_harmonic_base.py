@@ -121,13 +121,8 @@ def _visible_hole_table_entities(
 ) -> tuple[Any, tuple[Any, ...]]:
     """Return the plan datum vertex and hole rims by model geometry."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    vertices: list[tuple[float, Any]] = []
-    visible_points: list[tuple[float, float, float]] = []
+    vertices: list[tuple[tuple[float, float, float], Any]] = []
     circles: list[tuple[float, float, float, Any]] = []
-    datum_x_m = -BOTTOM_LENGTH / 2000.0
-    # A SolidWorks Top-plane sketch maps sketch +Y to model -Z.  Therefore the
-    # lower-left corner in the *Top drawing view is model +Z.
-    datum_z_m = BOTTOM_WIDTH / 2000.0
 
     for component in components:
         visible_vertices = adapter._attempt(
@@ -137,12 +132,7 @@ def _visible_hole_table_entities(
         for vertex in visible_vertices:
             vertex = _early_bound(vertex, "IVertex")
             point = tuple(float(value) for value in vertex.GetPoint())
-            visible_points.append(point)
-            error = abs(point[0] - datum_x_m) + abs(point[2] - datum_z_m)
-            if error <= 2e-6:
-                # Prefer the upper visible copy when a vertical edge exposes
-                # both plate vertices at the same plan station.
-                vertices.append((point[1], vertex))
+            vertices.append((point, vertex))
 
         visible_edges = adapter._attempt(
             lambda c=component: view.GetVisibleEntities2(c, 1),  # swViewEntityType_Edge
@@ -157,16 +147,33 @@ def _visible_hole_table_entities(
             circles.append((parameters[0], parameters[2], parameters[6], edge))
 
     if not vertices:
+        raise RuntimeError("harmonic-base plan has no visible footprint vertices")
+
+    x_min = min(point[0] for point, _entity in vertices)
+    x_max = max(point[0] for point, _entity in vertices)
+    z_min = min(point[2] for point, _entity in vertices)
+    z_max = max(point[2] for point, _entity in vertices)
+    x_offset_m = (x_min + x_max) / 2.0
+    z_offset_m = (z_min + z_max) / 2.0
+    datum_candidates = [
+        (point[1], entity)
+        for point, entity in vertices
+        if abs(point[0] - x_min) <= 2e-6 and abs(point[2] - z_max) <= 2e-6
+    ]
+    if not datum_candidates:
         raise RuntimeError(
-            "harmonic-base plan has no visible lower-left footprint vertex at "
-            f"({datum_x_m:g}, {datum_z_m:g}) m; visible model points="
-            f"{sorted(set(visible_points))!r}"
+            "harmonic-base plan has no visible lower-left outer vertex at "
+            f"drawing-context X={x_min:g}, Z={z_max:g} m"
         )
 
     selected_edges: list[Any] = []
     used: set[int] = set()
     for x_mm, z_mm, diameter_mm in ALL_HOLES:
-        expected = (x_mm / 1000.0, z_mm / 1000.0, diameter_mm / 2000.0)
+        expected = (
+            x_offset_m + x_mm / 1000.0,
+            z_offset_m + z_mm / 1000.0,
+            diameter_mm / 2000.0,
+        )
         candidates = sorted(
             (
                 abs(x - expected[0])
@@ -189,7 +196,9 @@ def _visible_hole_table_entities(
         used.add(index)
         selected_edges.append(edge)
 
-    return max(vertices, key=lambda candidate: candidate[0])[1], tuple(selected_edges)
+    return max(datum_candidates, key=lambda candidate: candidate[0])[1], tuple(
+        selected_edges
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
