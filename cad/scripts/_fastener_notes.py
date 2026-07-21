@@ -10,6 +10,7 @@ recipes can share the exact same product definition.
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 
 _TPI_RE = re.compile(r"-(?P<tpi>[1-9][0-9]*)$")
@@ -38,26 +39,36 @@ def thread_control_notes(
     return (
         f"{thread_designation} PER ASME B1.1-2024.",
         "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
-        f"{underhead_length_mm:.2f} +/-0.20 UNDER-HEAD LENGTH.",
         "THREAD EXTENT FROM UNDERHEAD FILLET TO DISTAL START CHAMFER.",
         f"{min_full_form:.2f} MIN FULL THREAD FORM; INCOMPLETE THREAD 2P MAX "
         "AT EACH END.",
         f"DISTAL START CHAMFER C{lead_chamfer:.2f} +/-0.05 X 45 DEG +/-1 DEG.",
-        f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX; THREAD LIMITS APPLY "
-        "AFTER FINISH.",
-        "DISTAL END FACE SQUARE TO THREAD AXIS WITHIN 1 DEG.",
+        f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX, TANGENT TO SHANK AND "
+        "BEARING FACE.",
+        "THREAD LIMITS APPLY AFTER FINISH.",
+        "DISTAL END FACE SQUARE TO THREAD AXIS; CONTROL PER FCF.",
         "THREAD GEOMETRY OMITTED IN VIEWS; SHANK OUTLINE REFERENCE ONLY.",
     )
 
 
 def slotted_round_head_notes(
-    *, head_dia_mm: float, head_height_mm: float, slot_width_mm: float, slot_depth_mm: float
+    *,
+    head_dia_mm: float,
+    head_height_mm: float,
+    slot_width_mm: float,
+    slot_depth_mm: float,
+    axis_control_style: Literal["notes", "native"] = "notes",
 ) -> tuple[str, ...]:
     """Return controls for a cylindrical head with a straight driver slot."""
+    controls = ()
+    if axis_control_style == "notes":
+        controls = (
+            "HEAD OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS.",
+            "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
+        )
     return (
         f"HEAD DIA {head_dia_mm:.2f} +/-0.10 X {head_height_mm:.2f} +/-0.10 HIGH.",
-        "HEAD OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS.",
-        "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
+        *controls,
         f"DRIVER SLOT {slot_width_mm:.2f} +/-0.10 WIDE X "
         f"{slot_depth_mm:.2f} +/-0.10 DEEP.",
         "SLOT FLAT BOTTOM; DEPTH FROM TOP; MIDPLANE OFFSET FROM HEAD OD AXIS "

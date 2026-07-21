@@ -51,6 +51,7 @@ DRAWING_NOTES = "\n".join(
             head_height_mm=HEAD_H,
             slot_width_mm=SLOT_W,
             slot_depth_mm=SLOT_D,
+            axis_control_style="native",
         ),
         "CUSTOM FILLISTER-STYLE HEAD; ASME B18.6.3 HEAD DIMENSIONS DO NOT APPLY.",
     )

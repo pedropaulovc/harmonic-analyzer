@@ -34,10 +34,16 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS == {}
     assert "FULL THREAD" in spec.DRAWING_NOTES
+    assert "HEAD OD TOTAL RUNOUT" not in spec.DRAWING_NOTES
+    assert "BEARING FACE PERPENDICULAR" not in spec.DRAWING_NOTES
 
 
 def test_lengths_are_inserted_from_named_model_dimensions() -> None:
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg"}
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_symmetric_tolerances" in source
+    assert "add_datum_feature" in source
+    assert source.count("add_feature_control_frame(") == 3
 
 
 def test_made_part_note_states_standards_conformance() -> None:

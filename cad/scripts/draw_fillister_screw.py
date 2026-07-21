@@ -17,12 +17,15 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_dimension_symmetric_tolerances,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -54,7 +57,7 @@ ISO_CENTER = (0.300, 0.170)
 
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
 END_KEEP = {
-    "HeadDia": (0.028, END_CENTER[1] + 0.024),
+    "HeadDia": (END_CENTER[0], END_CENTER[1] + 0.050),
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
 SIDE_KEEP = {
@@ -118,12 +121,63 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
 
-    curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
+    side_annotations = curate_view_dimensions(
+        adapter, side, keep=SIDE_KEEP, view_label="side"
+    )
+    set_dimension_symmetric_tolerances(
+        adapter, side_annotations, {"ShankLg": 0.20}
+    )
+
+    # The threaded shank establishes datum axis A. Native feature-control
+    # frames make the head relationship directly inspectable; the linked notes
+    # retain only size/process requirements and point the distal squareness to
+    # its FCF.
+    shank_top = (SIDE_CENTER[0] - 0.009, SIDE_CENTER[1] + 0.008)
+    add_datum_feature(
+        adapter,
+        side,
+        edge_xy=shank_top,
+        symbol_xy=(shank_top[0], SIDE_CENTER[1] + 0.045),
+        datum="A",
+        label="thread pitch-diameter datum axis",
+        entity_type="SILHOUETTE",
+    )
+    add_feature_control_frame(
+        adapter,
+        side,
+        edge_xy=(SIDE_CENTER[0] + 0.016, SIDE_CENTER[1] + 0.022),
+        frame_xy=(SIDE_CENTER[0] + 0.040, SIDE_CENTER[1] + 0.050),
+        characteristic="circular_runout",
+        tolerance="0.10",
+        datums=("A",),
+        label="head OD circular runout",
+        entity_type="SILHOUETTE",
+    )
+    add_feature_control_frame(
+        adapter,
+        side,
+        edge_xy=(SIDE_CENTER[0] + 0.007, SIDE_CENTER[1] + 0.015),
+        frame_xy=(SIDE_CENTER[0] + 0.040, SIDE_CENTER[1] + 0.023),
+        characteristic="perpendicularity",
+        tolerance="0.10",
+        datums=("A",),
+        label="bearing-face perpendicularity",
+    )
+    add_feature_control_frame(
+        adapter,
+        side,
+        edge_xy=(SIDE_CENTER[0] - 0.025, SIDE_CENTER[1]),
+        frame_xy=(SIDE_CENTER[0] - 0.080, SIDE_CENTER[1] - 0.012),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A",),
+        label="distal-end perpendicularity",
+    )
 
     # 0.020: the note is left-aligned on its anchor, clearing the 12.7 mm zone
     # margin / re-centred frame rule (~0.0126), which the layout audit enforces.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.115)
-    add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.210)
+    add_property_linked_note(adapter, "End View Note", 0.020, 0.205)
 
     return await finalize_drawing(
         adapter,
