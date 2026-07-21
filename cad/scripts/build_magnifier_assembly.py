@@ -513,8 +513,8 @@ async def build(adapter) -> dict[str, str]:
     check_no_interference(adapter)
     # Title-block identity for the assembly drawing (draw_magnifier_assembly.py):
     # part_properties supplies Title/Generator plus the TOL_* general-tolerance
-    # cells finalize_drawing hard-requires; material/finish defer to the parts
-    # list (standard assembly-drawing practice).
+    # cells finalize_drawing hard-requires; material/finish defer to each
+    # released component drawing (the BOM has no material/finish columns).
     apply_custom_properties(
         adapter,
         {
@@ -524,9 +524,9 @@ async def build(adapter) -> dict[str, str]:
             "Number": "MHA-A05",
             "Revision": "A",
             "Revision Description": "Initial release",
-            "Material": "SEE PARTS LIST",
-            "Material Specification": "SEE PARTS LIST",
-            "Finish": "SEE PARTS LIST",
+            "Material": "SEE COMPONENT DRAWINGS",
+            "Material Specification": "SEE COMPONENT DRAWINGS",
+            "Finish": "SEE COMPONENT DRAWINGS",
             "Quantity": "1",
             "Drawn By": DRAWN_BY,
         },

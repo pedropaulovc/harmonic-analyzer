@@ -93,17 +93,17 @@ def test_assembly_stamps_title_block_properties() -> None:
         Path(__file__).parent / "build_harmonic_analyzer_assembly.py"
     ).read_text(encoding="utf-8")
     assert "apply_custom_properties" in source
-    assert "SEE PARTS LIST" in source
+    assert "SEE COMPONENT DRAWINGS" in source
     assert "part_properties(ASM_NAME)" in source
     assert '"MHA-A08"' in source
-    assert source.count('"Material": "SEE PARTS LIST"') == 1
-    assert source.count('"Material Specification": "SEE PARTS LIST"') == 1
-    assert source.count('"Finish": "SEE PARTS LIST"') == 1
+    assert source.count('"Material": "SEE COMPONENT DRAWINGS"') == 1
+    assert source.count('"Material Specification": "SEE COMPONENT DRAWINGS"') == 1
+    assert source.count('"Finish": "SEE COMPONENT DRAWINGS"') == 1
 
 
 def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("insert_bom_table(") == 1
+    assert source.count("insert_identified_bom_table(") == 1
     assert source.count("add_auto_balloons(") == 1
     assert drawing.SHEET_SCALE == (1.0, 8.0)
     assert source.count("scale=VIEW_SCALE") == 3

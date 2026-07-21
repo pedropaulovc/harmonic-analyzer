@@ -4,7 +4,7 @@ Front / right / isometric views of ``cad/out/sldasm/paper-drive.SLDASM`` plus a
 top-level parts BOM and auto-inserted item-number balloons, on the same
 hand-made ASME B template every part print uses. The title block resolves from
 the custom properties ``build_paper_drive_assembly.py`` stamps on the assembly
-(Number, Revision, SEE PARTS LIST material/finish, and the TOL_* cells
+(Number, Revision, component-drawing material/finish, and the TOL_* cells
 ``finalize_drawing`` requires).
 """
 
@@ -15,12 +15,15 @@ import sys
 from typing import Any
 
 import _telemetry
+from _assembly_drawing_bom import (
+    configured_part_numbers,
+    insert_identified_bom_table,
+)
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons,
     finalize_drawing,
-    insert_bom_table,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -85,6 +88,7 @@ BOM_COMPONENTS = {
     "chain-inner-link": "ROLLER CHAIN INNER LINK",
     "chain-outer-link": "ROLLER CHAIN OUTER LINK",
 }
+BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 
 ASSEMBLY_NOTES = "\n".join(
     (
@@ -158,12 +162,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    insert_bom_table(
+    insert_identified_bom_table(
         adapter,
         front,
         anchor_xy=BOM_ANCHOR,
-        expected_components=tuple(BOM_COMPONENTS),
         descriptions=BOM_COMPONENTS,
+        part_numbers=BOM_PART_NUMBERS,
         label="paper-drive assembly",
     )
     # Balloon the ISOMETRIC view: the pictorial keeps every component visible,

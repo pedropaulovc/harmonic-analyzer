@@ -13,12 +13,15 @@ import sys
 from typing import Any
 
 import _telemetry
+from _assembly_drawing_bom import (
+    configured_part_numbers,
+    insert_identified_bom_table,
+)
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons,
     finalize_drawing,
-    insert_bom_table,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -67,6 +70,7 @@ BOM_COMPONENTS = {
     "magnifying-wheel": "MAGNIFYING WHEEL",
     "lever-wire": "AMPLIFICATION WIRE 1",
 }
+BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 
 ASSEMBLY_NOTES = "\n".join(
     (
@@ -134,12 +138,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    insert_bom_table(
+    insert_identified_bom_table(
         adapter,
         front,
         anchor_xy=BOM_ANCHOR,
-        expected_components=tuple(BOM_COMPONENTS),
         descriptions=BOM_COMPONENTS,
+        part_numbers=BOM_PART_NUMBERS,
         label="magnifier assembly",
     )
     # Balloon the ISOMETRIC view: the pictorial keeps every component visible,

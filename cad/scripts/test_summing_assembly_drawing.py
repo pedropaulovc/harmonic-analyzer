@@ -92,17 +92,17 @@ def test_assembly_stamps_title_block_properties() -> None:
         encoding="utf-8"
     )
     assert "apply_custom_properties" in source
-    assert "SEE PARTS LIST" in source
+    assert "SEE COMPONENT DRAWINGS" in source
     assert "part_properties(ASM_NAME)" in source  # carries the required TOL_* cells
     assert '"MHA-A07"' in source
-    assert source.count('"Material": "SEE PARTS LIST"') == 1
-    assert source.count('"Material Specification": "SEE PARTS LIST"') == 1
-    assert source.count('"Finish": "SEE PARTS LIST"') == 1
+    assert source.count('"Material": "SEE COMPONENT DRAWINGS"') == 1
+    assert source.count('"Material Specification": "SEE COMPONENT DRAWINGS"') == 1
+    assert source.count('"Finish": "SEE COMPONENT DRAWINGS"') == 1
 
 
 def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("insert_bom_table(") == 1
+    assert source.count("insert_identified_bom_table(") == 1
     assert source.count("add_auto_balloons(") == 1
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert source.count("scale=VIEW_SCALE") == 3  # every view pins its scale

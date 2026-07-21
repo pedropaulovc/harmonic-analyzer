@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
+import _config
 import draw_channel_assembly
 import draw_drive_train_assembly
 import draw_frame_assembly
@@ -64,6 +66,39 @@ def test_each_sheet_has_a_complete_bom_contract() -> None:
         assert len(drawing.BOM_COMPONENTS) == len(set(drawing.BOM_COMPONENTS.values())), (
             drawing.ARTIFACT_STEM
         )
+        assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS), (
+            drawing.ARTIFACT_STEM
+        )
+        assert len(drawing.BOM_PART_NUMBERS) == len(
+            set(drawing.BOM_PART_NUMBERS.values())
+        ), drawing.ARTIFACT_STEM
+        assert all(
+            re.fullmatch(r"MHA-(?:\d{3}|A\d{2})", number)
+            for number in drawing.BOM_PART_NUMBERS.values()
+        ), drawing.ARTIFACT_STEM
+
+
+def test_part_bom_numbers_come_from_the_part_registry() -> None:
+    for drawing in SHEETS:
+        if drawing is draw_harmonic_analyzer_assembly:
+            continue
+        assert drawing.BOM_PART_NUMBERS == {
+            stem: _config.parts(stem)["number"]
+            for stem in drawing.BOM_COMPONENTS
+        }, drawing.ARTIFACT_STEM
+
+
+def test_top_level_bom_uses_released_subassembly_numbers() -> None:
+    assert draw_harmonic_analyzer_assembly.BOM_PART_NUMBERS == {
+        "frame": "MHA-A04",
+        "drive-train": "MHA-A03",
+        "channel": "MHA-A02",
+        "summing": "MHA-A07",
+        "magnifier": "MHA-A05",
+        "pen": "MHA-A01",
+        "paper-drive": "MHA-A06",
+        "measuring-stick": "MHA-046",
+    }
 
 
 def test_each_sheet_uses_three_hlr_views_bom_and_balloons() -> None:
@@ -74,5 +109,8 @@ def test_each_sheet_uses_three_hlr_views_bom_and_balloons() -> None:
         assert "set_hidden_lines_removed(adapter, view)" in source, (
             drawing.ARTIFACT_STEM
         )
-        assert source.count("insert_bom_table(") == 1, drawing.ARTIFACT_STEM
+        assert source.count("insert_identified_bom_table(") == 1, (
+            drawing.ARTIFACT_STEM
+        )
+        assert "part_numbers=BOM_PART_NUMBERS" in source, drawing.ARTIFACT_STEM
         assert source.count("add_auto_balloons(") == 1, drawing.ARTIFACT_STEM

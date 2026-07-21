@@ -15,12 +15,15 @@ import sys
 from typing import Any
 
 import _telemetry
+from _assembly_drawing_bom import (
+    configured_part_numbers,
+    insert_identified_bom_table,
+)
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons,
     finalize_drawing,
-    insert_bom_table,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -62,6 +65,16 @@ BOM_COMPONENTS = {
     "pen": "PEN / OUTPUT SUBASSEMBLY",
     "paper-drive": "PAPER-DRIVE SUBASSEMBLY",
     "measuring-stick": "LOOSE MEASURING STICK",
+}
+BOM_PART_NUMBERS = {
+    "frame": "MHA-A04",
+    "drive-train": "MHA-A03",
+    "channel": "MHA-A02",
+    "summing": "MHA-A07",
+    "magnifier": "MHA-A05",
+    "pen": "MHA-A01",
+    "paper-drive": "MHA-A06",
+    **configured_part_numbers(("measuring-stick",)),
 }
 
 ASSEMBLY_NOTES = "\n".join(
@@ -131,12 +144,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    insert_bom_table(
+    insert_identified_bom_table(
         adapter,
         front,
         anchor_xy=BOM_ANCHOR,
-        expected_components=tuple(BOM_COMPONENTS),
         descriptions=BOM_COMPONENTS,
+        part_numbers=BOM_PART_NUMBERS,
         label="harmonic-analyzer assembly",
     )
     add_auto_balloons(
