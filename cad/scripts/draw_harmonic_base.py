@@ -404,7 +404,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         side,
-        frame_xy=(0.285, 0.110),
+        frame_xy=(0.310, 0.093),
         characteristic="flatness",
         tolerance="0.10",
         label="datum A flatness",
@@ -413,16 +413,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         side,
-        frame_xy=(0.345, 0.110),
-        characteristic="flatness",
-        tolerance="0.10",
-        label="top-pad flatness",
-        entity=top_pad_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        frame_xy=(0.365, 0.110),
+        frame_xy=(0.380, 0.093),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
@@ -431,7 +422,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.062)
-    add_property_linked_note(adapter, "Side View Note", 0.300, 0.090)
+    add_property_linked_note(adapter, "Side View Note", 0.250, 0.090)
 
     return await finalize_drawing(
         adapter,
