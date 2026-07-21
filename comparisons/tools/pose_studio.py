@@ -266,9 +266,20 @@ def _view3d_space(context):
     return None
 
 
+def _tag_redraw(context):
+    """Force the 3D viewport(s) to repaint — modal alpha tweaks don't auto-refresh."""
+    for area in context.screen.areas:
+        if area.type == "VIEW_3D":
+            area.tag_redraw()
+
+
 # Last-seen viewport projection, so the watcher fires only on the CAMERA->free EDGE
 # (not continuously — that would yank the user back while they orbit).
 _LAST_PERSP: dict = {"v": None}
+
+# Guards the hold-Q peek modal against keyboard auto-repeat re-invoking it (which
+# would stack modal handlers). True for the lifetime of one press->release peek.
+_PEEKING: dict = {"on": False}
 
 
 def _camera_exit_watcher():
@@ -672,6 +683,45 @@ class HAC_OT_frame_model(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class HAC_OT_peek_ref(bpy.types.Operator):
+    bl_idname = "hac.peek_ref"
+    bl_label = "Peek Reference (hold Q)"
+    bl_description = ("Hold Q to flash the reference photo to full opacity for a "
+                      "clean look at the alignment; release to restore the overlay")
+
+    def invoke(self, context, event):
+        if _PEEKING["on"] or getattr(event, "is_repeat", False):
+            return {"CANCELLED"}  # auto-repeat PRESS while already peeking
+        cam_data = _STATE.get("cam_data")
+        if not _STATE.get("built") or not cam_data or not cam_data.background_images:
+            self.report({"INFO"}, "no reference overlay to peek")
+            return {"CANCELLED"}
+        bg = cam_data.background_images[0]
+        # Snapshot exactly what to put back on release: the overlay opacity and
+        # whether it was showing at all (peeking force-shows it if hidden).
+        self._prev = (bg.alpha, cam_data.show_background_images)
+        cam_data.show_background_images = True
+        bg.alpha = 1.0
+        _PEEKING["on"] = True
+        _tag_redraw(context)
+        context.window_manager.modal_handler_add(self)
+        return {"RUNNING_MODAL"}
+
+    def modal(self, context, event):
+        # Restore on Q release, on Esc, or if the scene was torn down mid-hold.
+        done = ((event.type == "Q" and event.value == "RELEASE")
+                or event.type == "ESC" or not _STATE.get("built"))
+        if not done:
+            return {"PASS_THROUGH"}  # let orbit/pan keep working while held
+        cam_data = _STATE.get("cam_data")
+        if cam_data and cam_data.background_images:
+            bg = cam_data.background_images[0]
+            bg.alpha, cam_data.show_background_images = self._prev
+        _PEEKING["on"] = False
+        _tag_redraw(context)
+        return {"FINISHED"}
+
+
 class HAC_OT_save_manifest(bpy.types.Operator):
     bl_idname = "hac.save_manifest"
     bl_label = "Save Pose To Manifest"
@@ -864,6 +914,7 @@ class HAC_PT_panel(bpy.types.Panel):
 
         box = layout.box()
         box.label(text="Reference")
+        box.label(text="Hold Q to flash the photo to full opacity", icon="HIDE_OFF")
         box.prop(props, "show_ref")
         box.prop(props, "ref_alpha", slider=True)
         box.prop(props, "ref_scale", slider=True)
@@ -894,6 +945,7 @@ _CLASSES = (
     HAC_OT_look_camera,
     HAC_OT_toggle_camera,
     HAC_OT_frame_model,
+    HAC_OT_peek_ref,
     HAC_OT_save_manifest,
     HAC_OT_export_deltas,
     HAC_OT_new_pair,
@@ -927,6 +979,9 @@ def register():
     if kc:
         km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
         kmi = km.keymap_items.new("hac.toggle_camera", "NUMPAD_0", "PRESS")
+        _KEYMAPS.append((km, kmi))
+        # Hold Q to flash the reference overlay to full opacity (release restores).
+        kmi = km.keymap_items.new("hac.peek_ref", "Q", "PRESS")
         _KEYMAPS.append((km, kmi))
     # Safety net: correctness for camera-exit doesn't hinge on the keymap winning.
     if not bpy.app.timers.is_registered(_camera_exit_watcher):
