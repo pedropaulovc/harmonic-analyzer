@@ -59,6 +59,7 @@ END_KEEP = {
     "HeadDia": (END_CENTER[0], END_CENTER[1] + 0.050),
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
+SIDE_DIMENSION_CALLOUTS = {"ShankLg": "UNDERHEAD LENGTH"}
 SIDE_KEEP = {
     "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.034),
     "ShankLg": (SIDE_CENTER[0] - 0.024, SIDE_CENTER[1] - 0.034),
@@ -120,7 +121,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
 
-    curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
+    side_annotations = curate_view_dimensions(
+        adapter, side, keep=SIDE_KEEP, view_label="side"
+    )
+    set_dimension_callouts(adapter, side_annotations, SIDE_DIMENSION_CALLOUTS)
 
     # The threaded shank establishes datum axis A. Native feature-control
     # frames make the head relationship directly inspectable; the linked notes

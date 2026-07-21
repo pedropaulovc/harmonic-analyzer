@@ -143,6 +143,8 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_symmetric_tolerance(adapter, "HeadProfile", "HeadDia", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "Head", "HeadHt", 0.10)
     set_dimension_symmetric_tolerance(adapter, "Shank", "ShankLg", 0.20)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

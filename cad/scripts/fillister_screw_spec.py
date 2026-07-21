@@ -52,8 +52,12 @@ DRAWING_NOTES = "\n".join(
             slot_width_mm=SLOT_W,
             slot_depth_mm=SLOT_D,
             axis_control_style="native",
+            size_control_style="dimensions",
         ),
-        "CUSTOM FILLISTER-STYLE HEAD; ASME B18.6.3 HEAD DIMENSIONS DO NOT APPLY.",
+        "DATUM FEATURE A IS THE #4-40 UNC-2A THREAD; DATUM AXIS IS THE "
+        "PITCH-CYLINDER AXIS.",
+        "CUSTOM CYLINDRICAL SLOTTED HEAD; ASME B18.6.3 HEAD DIMENSIONS DO NOT "
+        "APPLY. ALL UNSPECIFIED HEAD EDGES PER TITLE BLOCK.",
     )
 )
 END_VIEW_NOTE = "DRIVER-FACE VIEW"

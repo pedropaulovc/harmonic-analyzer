@@ -40,8 +40,9 @@ def thread_control_notes(
         f"{thread_designation} PER ASME B1.1-2024.",
         "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
         "THREAD EXTENT FROM UNDERHEAD FILLET TO DISTAL START CHAMFER.",
-        f"{min_full_form:.2f} MIN FULL THREAD FORM; INCOMPLETE THREAD 2P MAX "
-        "AT EACH END.",
+        f"{min_full_form:.2f} MIN FULL THREAD FORM BETWEEN RUNOUT ZONES.",
+        "UNDERHEAD INCOMPLETE THREAD 2P MAX FROM FILLET TANGENCY.",
+        "DISTAL INCOMPLETE THREAD 2P MAX FROM CHAMFER END.",
         f"DISTAL START CHAMFER C{lead_chamfer:.2f} +/-0.05 X 45 DEG +/-1 DEG.",
         f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX, TANGENT TO SHANK AND "
         "BEARING FACE.",
@@ -58,8 +59,15 @@ def slotted_round_head_notes(
     slot_width_mm: float,
     slot_depth_mm: float,
     axis_control_style: Literal["notes", "native"] = "notes",
+    size_control_style: Literal["notes", "dimensions"] = "notes",
 ) -> tuple[str, ...]:
     """Return controls for a cylindrical head with a straight driver slot."""
+    sizes = ()
+    if size_control_style == "notes":
+        sizes = (
+            f"HEAD DIA {head_dia_mm:.2f} +/-0.10 X "
+            f"{head_height_mm:.2f} +/-0.10 HIGH.",
+        )
     controls = ()
     if axis_control_style == "notes":
         controls = (
@@ -67,10 +75,11 @@ def slotted_round_head_notes(
             "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
         )
     return (
-        f"HEAD DIA {head_dia_mm:.2f} +/-0.10 X {head_height_mm:.2f} +/-0.10 HIGH.",
+        *sizes,
         *controls,
         f"DRIVER SLOT {slot_width_mm:.2f} +/-0.10 WIDE X "
         f"{slot_depth_mm:.2f} +/-0.10 DEEP.",
+        "SLOT EXTENDS ACROSS FULL HEAD DIAMETER; OPEN AT BOTH SIDES.",
         "SLOT FLAT BOTTOM; DEPTH FROM TOP; MIDPLANE OFFSET FROM HEAD OD AXIS "
         "0.00 +/-0.05.",
     )

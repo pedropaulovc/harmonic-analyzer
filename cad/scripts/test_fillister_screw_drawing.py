@@ -33,6 +33,7 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC-2A"
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS == {}
+    assert drawing.SIDE_DIMENSION_CALLOUTS == {"ShankLg": "UNDERHEAD LENGTH"}
     assert "FULL THREAD" in spec.DRAWING_NOTES
     assert "HEAD OD TOTAL RUNOUT" not in spec.DRAWING_NOTES
     assert "BEARING FACE PERPENDICULAR" not in spec.DRAWING_NOTES
@@ -42,7 +43,7 @@ def test_lengths_are_inserted_from_named_model_dimensions() -> None:
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg"}
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_symmetric_tolerance" in part_source
+    assert part_source.count("set_dimension_symmetric_tolerance(") == 3
     assert "add_datum_feature" in drawing_source
     assert drawing_source.count("add_feature_control_frame(") == 3
 
