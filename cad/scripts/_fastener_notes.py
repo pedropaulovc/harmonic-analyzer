@@ -69,8 +69,6 @@ def hex_head_notes(*, across_flats_mm: float, head_height_mm: float) -> tuple[st
         f"CUSTOM REGULAR HEX HEAD {across_flats_mm:.2f} +/-0.10 ACROSS FLATS X "
         f"{head_height_mm:.2f} +/-0.10 HIGH.",
         "B18 HEAD DIMENSIONS DO NOT APPLY.",
-        "DATUM A = THREAD PITCH-DIAMETER AXIS.",
-        "HEX CENTER WITHIN DIA 0.10 OF A; BEARING FACE PERP 0.10 TO A.",
     )
 
 
