@@ -43,6 +43,8 @@ def test_sheet_runs_at_1_to_1_with_2_to_1_end_view_and_1_to_2_iso() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_pivot_shaft_spec.DRAWING_NOTES
     assert "SPHERICAL CROWN" in notes
+    assert "COAXIAL WITH CYLINDRICAL BODY" in notes
+    assert "EXEMPT FROM TITLE-BLOCK EDGE-BREAK" in notes
     assert "1.20 REF AXIAL HEIGHT" in notes
     assert "1.20+/-0.05" not in notes
     assert "194.40 OVERALL" not in notes
@@ -59,8 +61,9 @@ def test_direct_limits_and_native_cylindricity_control_the_body() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source
     assert "add_feature_control_frame(" in source
-    assert "add_surface_finish(" not in source
+    assert "add_surface_finish(" in source
     assert "CYLINDRICITY" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
+    assert "Ra 1.6" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     assert "CROWN ROOT CIRCLES" in drawing.DIMENSION_CALLOUTS["Depth"]
 
 

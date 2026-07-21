@@ -23,6 +23,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -65,13 +66,13 @@ ISO_CENTER = (0.355, 0.205)
 ISO_SCALE = (1, 2)
 
 FRONT_KEEP = {
-    "ShaftDia": (0.112, FRONT_CENTER[1]),
+    "ShaftDia": (0.030, FRONT_CENTER[1]),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
 DIMENSION_CALLOUTS = {
-    "ShaftDia": "NOMINAL REF ONLY\nFINAL LIMITS\n6.350 MAX / 6.330 MIN\nRa 1.6",
+    "ShaftDia": "NOMINAL REF ONLY\nFINAL LIMITS\n6.350 MAX / 6.330 MIN",
     "Depth": "+/-0.25 CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
 }
 
@@ -141,18 +142,27 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
     end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
+    end_circle = (FRONT_CENTER[0] + end_radius, FRONT_CENTER[1])
     end_upper = (
-        FRONT_CENTER[0] + end_radius * math.cos(math.radians(45.0)),
-        FRONT_CENTER[1] + end_radius * math.sin(math.radians(45.0)),
+        FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
+        FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
     )
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=end_upper,
-        frame_xy=(0.075, 0.245),
+        frame_xy=(0.065, 0.250),
         characteristic="cylindricity",
         tolerance="0.01",
         label="pinion pivot cylindrical body",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=end_circle,
+        symbol_xy=(0.075, 0.222),
+        roughness_ra="1.6",
+        label="pinion pivot bearing finish",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
