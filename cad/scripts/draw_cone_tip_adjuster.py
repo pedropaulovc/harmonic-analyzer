@@ -26,6 +26,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_adjuster_spec import (
+    BODY_DIA,
     BODY_LEN,
     CHAMFER as CHAMFER,
     CUP_DIA,
@@ -35,7 +36,6 @@ from cone_tip_adjuster_spec import (
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -195,25 +195,21 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
-    front_by_name = {
-        dimension_name(adapter, annotation): annotation
-        for annotation in front_annotations
-    }
-    body_diameter_annotation = front_by_name.get("BodyDiaDim")
-    if body_diameter_annotation is None:
-        raise RuntimeError("thread diameter dimension has no display annotation")
-    # Attach A to the threaded feature-of-size dimension.  That is the
-    # conventional datum-axis indication for a thread and agrees with the note
-    # establishing A from the pitch cylinder; a tag on one silhouette instead
-    # reads as a tangent-plane datum.
+    # Identify the complete threaded cylindrical datum feature on its visible
+    # outline.  The manufacturing note defines A as the axis derived from the
+    # thread pitch cylinder; the symbol therefore names the feature of size,
+    # not a tangent plane on this one silhouette.
     add_datum_feature(
         adapter,
         front,
-        symbol_xy=(0.180, 0.210),
+        edge_xy=(
+            FRONT_CENTER[0] + BODY_DIA / 2.0 * SHEET_SCALE[0] / 1000.0,
+            FRONT_CENTER[1],
+        ),
+        symbol_xy=(0.145, 0.230),
         datum="A",
         label="thread pitch-cylinder axis",
-        annotation=body_diameter_annotation,
-        shoulder=True,
+        entity_type="SILHOUETTE",
     )
     cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
     add_feature_control_frame(

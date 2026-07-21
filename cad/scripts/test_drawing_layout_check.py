@@ -800,6 +800,12 @@ def test_dimension_attached_datum_uses_its_sheet_position_not_local_primitives()
     assert element.xmin == x - drawing_common._NOMINAL_GDT_HALF_M
     assert element.ymin == y - drawing_common._NOMINAL_GDT_HALF_M
 
+    leaders = drawing_common._datum_leader_segments(
+        _FakeAdapter(None), annotation, label="datum A", owner="front"
+    )
+
+    assert leaders == []
+
 
 def test_control_frame_is_measured_from_its_rendered_lines():
     """An FCF's box is its real geometry, NOT a square around its anchor.

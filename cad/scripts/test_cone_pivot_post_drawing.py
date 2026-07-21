@@ -65,10 +65,9 @@ def test_datum_and_notes_control_the_journal_bore() -> None:
     assert source.count("add_datum_feature(") == 3
     assert "add_datum_feature_to_annotation(" not in source
     assert source.count("add_feature_control_frame(") == 2
-    assert 'annotation=column_diameter_annotation' in source
-    assert 'column_diameter_annotation = top_by_name.get("BlockDia")' in source
-    assert 'label="column outside diameter",\n        annotation=' in source
-    assert "post_od_entity" not in source
+    assert "post_od_entity = _circular_edge(" in source
+    assert 'label="column outside diameter",\n        entity=post_od_entity' in source
+    assert "position_tolerance_m=0.016" in source
     assert 'datums=("A", "B")' in source
     assert 'datums=("A", "B", "C")' in source
     assert 'diameter=True' in source

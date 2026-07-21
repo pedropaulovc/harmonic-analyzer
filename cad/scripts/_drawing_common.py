@@ -323,6 +323,7 @@ def add_datum_feature(
     entity: Any | None = None,
     annotation: Any | None = None,
     shoulder: bool = False,
+    position_tolerance_m: float = 1e-6,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
@@ -385,14 +386,20 @@ def add_datum_feature(
     if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
     actual_position = tag_annotation.GetPosition()
-    if (
-        not actual_position
-        or abs(float(actual_position[0]) - symbol_xy[0]) > 1e-6
-        or abs(float(actual_position[1]) - symbol_xy[1]) > 1e-6
-    ):
+    position_error = (
+        math.inf
+        if not actual_position
+        else math.hypot(
+            float(actual_position[0]) - symbol_xy[0],
+            float(actual_position[1]) - symbol_xy[1],
+        )
+    )
+    if position_error > position_tolerance_m:
         raise RuntimeError(
             f"datum {datum} position did not persist ({label}): "
-            f"{tuple(actual_position[:2]) if actual_position else None}"
+            f"{tuple(actual_position[:2]) if actual_position else None}; "
+            f"requested={symbol_xy}, error={position_error:.6g} m, "
+            f"limit={position_tolerance_m:.6g} m"
         )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
@@ -2487,6 +2494,19 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     return LayoutElement(name, "table", x, y - height, x + width, y)
 
 
+def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
+    """Whether a datum tag is attached to a display dimension.
+
+    SolidWorks reports ``IDatumTag`` primitive coordinates for this attachment
+    type in the dimension's local frame.  They must not be mixed with the
+    sheet-space annotation position used by the layout audit.
+    """
+    attachment_types = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetAttachedEntityTypes")
+    ) or ()
+    return _SEL_DIMENSION in (int(value) for value in attachment_types)
+
+
 def _measured_gdt_box(
     adapter: Any, annotation: Any, kind: int
 ) -> tuple[float, float, float, float] | None:
@@ -2505,10 +2525,7 @@ def _measured_gdt_box(
     working ``INote.GetExtent()`` in the same probe run.)
     """
     if kind == _ANNOT_DATUM:
-        attachment_types = adapter._attempt(
-            lambda: adapter._get_attr_or_call(annotation, "GetAttachedEntityTypes")
-        ) or ()
-        if _SEL_DIMENSION in (int(value) for value in attachment_types):
+        if _datum_is_dimension_attached(adapter, annotation):
             # A datum attached to a display dimension reports IDatumTag primitive
             # coordinates in that dimension's local frame, unlike the sheet-space
             # primitives of an edge-attached tag. Its IAnnotation.GetPosition is
@@ -2771,6 +2788,9 @@ def _datum_leader_segments(
     leader driven 41.8 mm down through the whole end view) and crank-arm (datum A
     across a 16 mm section), both passing every gate.
     """
+    if _datum_is_dimension_attached(adapter, annotation):
+        return []
+
     spec = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
     )

@@ -66,8 +66,11 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "NO TANGENCY" in notes
     assert "BOXED 12.00 LOCATES BOTH BORE AND FLANGE-HOLE AXES" in notes
     assert "BOXED 6.00 LOCATES STRAP NEAR FACE FROM D" in notes
-    assert "MASK ARBOR BORE AND FOOT SEAT DURING COATING" in notes
-    assert "DIMENSIONAL INSPECTION" in notes
+    assert "DIMENSIONS AND GD&T APPLY BEFORE COATING" in notes
+    assert "MASK ARBOR BORE, DIA 3.26 HOLE" in notes
+    assert "DATUM A/B/D FEATURES" in notes
+    assert "ALL PROFILE-CONTROLLED SURFACES" in notes
+    assert "25-50 um TOTAL DFT OVER TWO COATS" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_native_hole_callout(" in source

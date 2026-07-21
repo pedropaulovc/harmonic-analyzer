@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _fastener_catalog import fastener
 from _common import (
     SketchDims,
@@ -78,6 +79,7 @@ def _slotted_rim_chamfer_volume(r: float, chamfer: float, slot_w: float) -> floa
     return full_volume * (1.0 - missing_fraction)
 
 
+@_telemetry.traced("feature.cosmetic_thread")
 def _insert_cosmetic_thread(adapter) -> bool:
     """Attach the catalog cosmetic thread to the exact north-end outer edge."""
     part = _early_bound(adapter.currentModel, "IPartDoc", "GetBodies2")
