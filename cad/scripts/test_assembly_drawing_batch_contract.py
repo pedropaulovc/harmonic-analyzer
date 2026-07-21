@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import draw_channel_assembly
 import draw_drive_train_assembly
 import draw_frame_assembly
@@ -25,11 +27,14 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "ALL DIMENSIONS",
     "BREAK SHARP",
     "DEBUR",
+    "DRAWING UNITS",
+    "EDGE BREAK",
     "FINISH:",
     "GENERAL TOLERANCE",
     "MATERIAL:",
     "REMOVE BURR",
     "UNLESS OTHERWISE SPECIFIED",
+    "UNITS:",
     " UOS",
 )
 
@@ -59,3 +64,15 @@ def test_each_sheet_has_a_complete_bom_contract() -> None:
         assert len(drawing.BOM_COMPONENTS) == len(set(drawing.BOM_COMPONENTS.values())), (
             drawing.ARTIFACT_STEM
         )
+
+
+def test_each_sheet_uses_three_hlr_views_bom_and_balloons() -> None:
+    for drawing in SHEETS:
+        source = Path(drawing.__file__).read_text(encoding="utf-8")
+        assert source.count("place_view(") == 3, drawing.ARTIFACT_STEM
+        assert "for view in (front, right, iso):" in source, drawing.ARTIFACT_STEM
+        assert "set_hidden_lines_removed(adapter, view)" in source, (
+            drawing.ARTIFACT_STEM
+        )
+        assert source.count("insert_bom_table(") == 1, drawing.ARTIFACT_STEM
+        assert source.count("add_auto_balloons(") == 1, drawing.ARTIFACT_STEM
