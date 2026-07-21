@@ -2867,7 +2867,7 @@ def position_bom_balloon(
     if annotation is None:
         raise RuntimeError(f"{label}: item {item_number} has no annotation")
     annotation = _sw_type_info.early_bound_or_flag(
-        annotation, "IAnnotation", "GetPosition", "SetPosition"
+        annotation, "IAnnotation", "GetPosition", "SetPosition", "SetPosition2"
     )
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = ddoc.GetCurrentSheet()
@@ -2893,7 +2893,14 @@ def position_bom_balloon(
     # stale circle data, and redraw before judging each rendered-circle readback.
     for _attempt in range(3):
         note.LockPosition = False
-        if not annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0):
+        moved = bool(
+            annotation.SetPosition2(target_anchor[0], target_anchor[1], 0.0)
+        )
+        if not moved:
+            moved = bool(
+                annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0)
+            )
+        if not moved:
             raise RuntimeError(f"{label}: failed to position item {item_number}")
         note.LockPosition = True
         adapter.currentModel.EditRebuild3()
