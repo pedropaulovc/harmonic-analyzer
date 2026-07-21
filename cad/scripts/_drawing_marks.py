@@ -81,7 +81,7 @@ def set_dimension_symmetric_tolerance(
     if not tolerance.SetValues2(
         -tolerance_m,
         tolerance_m,
-        2,  # swSetValueInConfiguration_e.swSetValue_InAllConfigurations
+        1,  # swSetValueInConfiguration_e.swSetValue_InThisConfiguration
         "",
     ):
         raise RuntimeError(
