@@ -54,7 +54,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("boss-hook")
-    assert config["material"] == "ASTM A108 Grade 1018 cold-finished steel round"
+    assert config["material"] == "ASTM A108 Grade 1018 round"
     assert config["material"] == config["material_specification"]
     assert "steel" in str(config["material_specification"]).lower()
     assert config["finish"]

@@ -1,7 +1,7 @@
 boss-hook:
   number: MHA-005
-  material: ASTM A108 Grade 1018 cold-finished steel round
-  material_specification: "ASTM A108 Grade 1018 cold-finished steel round"
+  material: ASTM A108 Grade 1018 round
+  material_specification: "ASTM A108 Grade 1018 round"
   finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
   quantity: 1
   tolerance_class: machined_block

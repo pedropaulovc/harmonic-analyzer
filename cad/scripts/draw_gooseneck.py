@@ -57,8 +57,16 @@ SHEET_SCALE = (1.0, 3.0)   # 1:3 whole sheet (~506 mm tall post)
 FRONT_CENTER = (0.180, 0.150)
 ISO_CENTER = (0.350, 0.150)
 # An activated drawing-view sketch uses projected MODEL coordinates (meters),
-# not sheet coordinates.  The lug/pin centre is model (-105, +165) mm.
-LUG_DETAIL_SOURCE = (-0.105, 0.165)
+# not sheet coordinates -- BUT the two transforms are anchored differently:
+# CreateDrawViewFromModelView3 places the geometry-bbox CENTER at FRONT_CENTER,
+# while the activated-view sketch maps the model ORIGIN there.  Shift model
+# coords by the bbox centre or the fence lands (bbox_c * scale) off target
+# (seen live: the fence rendered ~(17, 24) mm sheet off the lug, exactly
+# bbox_c/3).  Model bbox: x [-112 (arm end), +8 (leg OD)], y [-330 (leg
+# bottom), +184 (arm top)] -> centre (-52, -73).
+_BBOX_CENTER = (-0.052, -0.073)
+# The lug/pin centre is model (-105, +165) mm.
+LUG_DETAIL_SOURCE = (-0.105 - _BBOX_CENTER[0], 0.165 - _BBOX_CENTER[1])
 LUG_DETAIL_CENTER = (0.275, 0.190)
 LUG_DETAIL_RADIUS = 0.010
 
