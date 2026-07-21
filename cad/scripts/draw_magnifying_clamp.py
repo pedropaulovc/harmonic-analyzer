@@ -80,7 +80,10 @@ def _front_y(model_y_mm: float) -> float:
 
 
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.016),
+    # x pushed right of the notes paragraph (x <= ~0.16): at the old centred
+    # position the 20.00 text landed inside the notes text (eye pass; display
+    # dims are overlap-exempt in the audit, so only the eye catches it).
+    "Width": (FRONT_CENTER[0] + 0.052, _front_y(0.0) - 0.016),
     "Height": (FRONT_CENTER[0] - BLOCK_WIDTH * 2.0 / 1000.0 - 0.022, FRONT_CENTER[1]),
     "LeverBoreYDim": (FRONT_CENTER[0] + BLOCK_WIDTH * 2.0 / 1000.0 + 0.020, _front_y(LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (FRONT_CENTER[0] - 0.045, _front_y(LEVER_BORE_Y) + 0.030),
@@ -188,7 +191,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(0.0)),
-        symbol_xy=(FRONT_CENTER[0], _front_y(0.0) - 0.020),
+        # off-centre and lower so the flag stays clear of the bottom-face
+        # extension lines (round 1: read as obscured)
+        symbol_xy=(FRONT_CENTER[0] - 0.012, _front_y(0.0) - 0.026),
         datum="A",
         label="block bottom seat",
     )

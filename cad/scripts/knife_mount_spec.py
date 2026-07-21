@@ -32,13 +32,18 @@ BORE_CY = -12.45  # bore centre below the ridge origin (TopClear - R_BORE)
 # section. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"BlockWidth", "BlockHeight"},
-    "BoreProfile": {"BoreDia", "BoreCz"},
+    # BoreCz was dropped from the print: the sketch dim measures the centre
+    # from the invisible part origin, which sits 0.25 above the bore top -- on
+    # the sheet it read as a (wrong) 12.45 bore radius (blind review round 2).
+    # The centre height rides the notes, stated from the datum-A top seat.
+    "BoreProfile": {"BoreDia"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
         "BORE Ø25.4 THRU, CENTRED IN THE 34.00 WIDTH (ON THE BLOCK VERTICAL",
-        "CENTRELINE). THE BORE IS THE KNIFE-EDGE BEARING: THE LEVER TRUNNION",
+        f"CENTRELINE), CENTRE {BLK_TOP - BORE_CY:.2f} BELOW THE TOP SEAT",
+        "(DATUM A). THE BORE IS THE KNIFE-EDGE BEARING: THE LEVER TRUNNION",
         "RIDES ITS UPPER INNER WALL. TWO BLOCKS USED, ONE PER TRUNNION.",
         "THE CURRENT MODEL HAS NO HARDENED KNIFE SEAT OR MOUNT-TO-CROSSBAR",
         "HOLES. SEAT MATERIAL, GEOMETRY, RETENTION, AND MOUNTING PATTERN ARE",

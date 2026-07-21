@@ -72,7 +72,6 @@ FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
     "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
-    "BoreCz": (FRONT_CENTER[0] + 0.058, _front_y(BORE_CY / 2.0) + 0.006),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {

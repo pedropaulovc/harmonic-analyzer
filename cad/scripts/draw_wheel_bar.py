@@ -156,7 +156,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.125)
-    add_property_linked_note(adapter, "Isometric View Note", 0.230, 0.055)
+    # x <= 0.235 keeps the ~55 mm label fully left of the title-block keep-out
+    # (x >= 0.264) -- the first run landed it 25.6 x 4.5 mm into the block.
+    add_property_linked_note(adapter, "Isometric View Note", 0.180, 0.070)
 
     return await finalize_drawing(
         adapter,

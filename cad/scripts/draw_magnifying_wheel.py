@@ -38,6 +38,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from magnifying_wheel_spec import (
+    BORE_DIA,
     HUB_AXIAL,
     HUB_DIA,
     RIM_AXIAL,
@@ -151,7 +152,8 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         p0=(RIGHT_CENTER[0] - RIGHT_HALF_HUB, RIGHT_CENTER[1]),
         p1=(RIGHT_CENTER[0] + RIGHT_HALF_HUB, RIGHT_CENTER[1]),
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.016),
+        # text clear right of the section (round 1: it sat on the hub band)
+        text_xy=(RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.024),
         label="hub-drum axial length",
     )
     add_edge_dimension(
@@ -163,19 +165,22 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rim axial width",
     )
 
-    # Datum A = the axle bore (front); Ra 1.6 on the bore, position of the bore.
+    # Datum A = the axle BORE rim (round 1: the old pick landed on the hub OD,
+    # so the rotational datum read as the drum, not the functional bore).
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + _HUB_R),
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + _HUB_R + 0.010),
+        edge_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0),
+        symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),
         datum="A",
         label="axle bore axis",
     )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] + RIGHT_HALF_RIM, RIGHT_CENTER[1] + _RIM_R),
+        # mid-width on the rim OD line (round 1: the corner pick read as
+        # controlling either the OD or the side face)
+        edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + _RIM_R),
         frame_xy=(RIGHT_CENTER[0] + 0.024, RIGHT_CENTER[1] + _RIM_R + 0.020),
         characteristic="circular_runout",
         tolerance="0.10",
@@ -186,7 +191,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] + HUB_DIA * SHEET_SCALE[0] / 2000.0, FRONT_CENTER[1]),
-        symbol_xy=(FRONT_CENTER[0] + _HUB_R + 0.006, FRONT_CENTER[1] - 0.028),
+        # up-right of the hub, clear of the Ø20 leader (round 1: crossed it)
+        symbol_xy=(FRONT_CENTER[0] + _HUB_R + 0.024, FRONT_CENTER[1] + 0.024),
         roughness_ra="1.6",
         label="hub drum finish",
     )
