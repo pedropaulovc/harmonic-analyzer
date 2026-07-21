@@ -35,6 +35,9 @@ def test_sheet_runs_at_1_to_4_with_1_to_8_isometric() -> None:
     assert "scale=(1, 8)" in source  # the isometric override
     assert "scale=(4, 1)" in source  # the top end-view section override
     assert amplitude_bar_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:8"
+    assert amplitude_bar_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "End View Note"' in source
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 

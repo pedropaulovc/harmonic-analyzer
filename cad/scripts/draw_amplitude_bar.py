@@ -77,6 +77,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "End View Note",
         ),
         required=(
             "Number",
@@ -85,6 +86,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -118,6 +120,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.150, 0.230)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.070)
+    # The end view runs 16x the sheet scale -- label it or "do not scale
+    # drawing" leaves its size unreadable.
+    add_property_linked_note(adapter, "End View Note", 0.200, 0.180)
 
     return await finalize_drawing(
         adapter,

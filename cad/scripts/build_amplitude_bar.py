@@ -59,6 +59,7 @@ from _saved_part_guard import require_saved_drawing_properties
 from amplitude_bar_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
 )
 
@@ -324,6 +325,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "End View Note": END_VIEW_NOTE,
         },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
@@ -331,7 +333,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         (
             "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
+            "Manufacturing Notes", "Isometric View Note", "End View Note",
         ),
     )
     return artefacts
