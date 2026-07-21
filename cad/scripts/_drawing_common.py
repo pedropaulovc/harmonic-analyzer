@@ -13,7 +13,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Literal, Sequence
 from xml.etree import ElementTree
 
 import _telemetry
@@ -1432,15 +1432,27 @@ def curate_view_dimensions(
 
 
 def set_dimension_callouts(
-    adapter: Any, annotations: Iterable[Any], below_text: dict[str, str]
+    adapter: Any,
+    annotations: Iterable[Any],
+    callout_text: dict[str, str],
+    *,
+    location: Literal["above", "below"] = "below",
 ) -> None:
-    """Append callout text below named dimensions (e.g. THRU / depth notes).
+    """Append native callout text above or below named dimensions.
 
     A bare Ø does not tell the machinist whether a hole is through or blind;
     ASME hole callouts carry that below the value.  Keyed on the parametric
     dimension name, so a value collision can never stamp the wrong hole.
+
+    ``above`` is required when a datum feature symbol is attached to the same
+    size dimension: SOLIDWORKS places that symbol between the primary value and
+    the below-callout lane, while the above-callout lane remains unobstructed.
     """
-    remaining = dict(below_text)
+    text_part = {
+        "above": 3,  # swDimensionTextCalloutAbove
+        "below": _DIMENSION_TEXT_CALLOUT_BELOW,
+    }[location]
+    remaining = dict(callout_text)
     for annotation in annotations:
         annotation = _sw_type_info.early_bound_or_flag(
             annotation, "IAnnotation", "GetSpecificAnnotation"
@@ -1456,7 +1468,7 @@ def set_dimension_callouts(
             display, "IDisplayDimension", "SetText"
         )
         adapter._attempt(
-            lambda d=display, s=text: d.SetText(_DIMENSION_TEXT_CALLOUT_BELOW, s)
+            lambda d=display, s=text: d.SetText(text_part, s)
         )
     if remaining:
         raise RuntimeError(

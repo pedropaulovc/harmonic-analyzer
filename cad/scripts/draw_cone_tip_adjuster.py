@@ -176,7 +176,17 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         [*front_annotations, *end_annotations, *cup_annotations],
-        DIMENSION_CALLOUTS,
+        {
+            name: text
+            for name, text in DIMENSION_CALLOUTS.items()
+            if name != "BodyDiaDim"
+        },
+    )
+    set_dimension_callouts(
+        adapter,
+        front_annotations,
+        {"BodyDiaDim": DIMENSION_CALLOUTS["BodyDiaDim"]},
+        location="above",
     )
     set_reference_dimensions(adapter, front_annotations, ("BodyDiaDim",))
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
