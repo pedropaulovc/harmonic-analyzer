@@ -2,7 +2,7 @@ pinion-handle:
   number: MHA-058
   material: AISI 1018 cold-finished steel
   material_specification: AISI 1018 cold-finished steel
-  finish: bright machined, oiled
+  finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"

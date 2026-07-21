@@ -22,6 +22,8 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -33,7 +35,17 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_handle_spec import ROD_DOWN, ROD_UP, TUBE_ID
+from pinion_handle_spec import (
+    CAP_SAG,
+    GRIP_DIA,
+    GRIP_LEN,
+    ROD_DOWN,
+    ROD_UP,
+    TUBE_ID,
+    TUBE_LEN,
+    TUBE_OD,
+    WALL_T,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -90,7 +102,7 @@ TOP_KEEP = {
     "RodDia": (0.300, 0.078),
 }
 DIMENSION_CALLOUTS = {
-    "TubeId": "FINAL REAM LIMITS\n8.025 MAX / 8.010 MIN\nRa 1.6",
+    "TubeId": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n8.025 MAX / 8.010 MIN\nRa 1.6",
     "GripLen": "+/-0.10\nGRIP CYLINDRICAL LENGTH",
     "TubeLen": "+0.10/-0.00 FULL-DIA\nBLIND-BORE DEPTH\n12.00 REF HUB PROJECTION",
     "RodSpan": "42.00 DOWN / 43.00 UP\nFROM GRIP AXIS",
@@ -164,6 +176,68 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
+
+    bore_center = (FRONT_CENTER[0], _front_y(0.0))
+    bore_top = (bore_center[0], bore_center[1] + BORE_R_SHEET)
+    grip_right = (
+        bore_center[0] + GRIP_DIA * SHEET_SCALE[0] / 2000.0,
+        bore_center[1],
+    )
+    hub_right = (
+        bore_center[0] + TUBE_OD * SHEET_SCALE[0] / 2000.0,
+        bore_center[1],
+    )
+    z_min = -GRIP_LEN / 2.0 - CAP_SAG
+    z_max = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
+    z_center = (z_min + z_max) / 2.0
+    flat_end_x = RIGHT_CENTER[0] - (z_max - z_center) * SHEET_SCALE[0] / 1000.0
+    flat_end = (flat_end_x, bore_center[1])
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=bore_top,
+        symbol_xy=(bore_center[0], bore_center[1] + 0.032),
+        datum="A",
+        label="handle final bore axis",
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=flat_end,
+        symbol_xy=(flat_end_x - 0.020, bore_center[1]),
+        datum="B",
+        label="handle flat hub end",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=grip_right,
+        frame_xy=(0.145, 0.205),
+        characteristic="circular_runout",
+        tolerance="0.05",
+        datums=("A",),
+        label="handle grip OD runout",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=hub_right,
+        frame_xy=(0.145, 0.180),
+        characteristic="circular_runout",
+        tolerance="0.05",
+        datums=("A",),
+        label="handle hub OD runout",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=flat_end,
+        frame_xy=(0.205, 0.135),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A",),
+        label="handle flat-end perpendicularity",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.184)
