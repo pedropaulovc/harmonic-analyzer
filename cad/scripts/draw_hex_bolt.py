@@ -28,12 +28,11 @@ RECIPE = FastenerSheet(
     scale=SHEET_SCALE,
     side_view="*Front",
     end_view="*Top",
-    side_center=(0.200, 0.150),
+    side_center=(0.200, 0.180),
     end_center=(0.070, 0.150),
     iso_center=(0.340, 0.175),
     end_keep=END_KEEP,
     dimension_callouts=DIMENSION_CALLOUTS,
-    note_xy=(0.020, 0.070),
 )
 
 

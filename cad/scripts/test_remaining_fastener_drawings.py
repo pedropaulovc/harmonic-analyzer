@@ -155,6 +155,7 @@ def test_cone_pivot_does_not_hide_the_missing_threaded_tail_definition() -> None
     assert "USE THE COMMERCIAL SHOULDER SCREW" in spec.DRAWING_NOTES
 
 
-def test_hex_bolt_long_notes_stay_below_the_side_view() -> None:
+def test_hex_bolt_long_notes_stay_below_the_raised_side_view() -> None:
     drawing = importlib.import_module("draw_hex_bolt")
-    assert drawing.RECIPE.note_xy == (0.020, 0.070)
+    assert drawing.RECIPE.side_center == (0.200, 0.180)
+    assert drawing.RECIPE.note_xy == (0.020, 0.095)
