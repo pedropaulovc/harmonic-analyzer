@@ -405,6 +405,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="harmonic-base",
         script_name="draw_harmonic_base.py",
     ),
+    DrawingSpec(
+        name="top_frame",
+        part="top_frame",
+        artifact_stem="top-frame",
+        script_name="draw_top_frame.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
