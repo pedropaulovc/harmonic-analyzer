@@ -27,14 +27,18 @@ SHEETS = (
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "ALL DIMENSIONS",
+    "BREAK ALL",
     "BREAK SHARP",
+    "BURR",
     "DEBUR",
+    "DIMENSIONS IN",
     "DRAWING UNITS",
     "EDGE BREAK",
     "FINISH:",
-    "GENERAL TOLERANCE",
+    "GENERAL TOLER",
     "MATERIAL:",
     "REMOVE BURR",
+    "SHARP EDGE",
     "UNLESS OTHERWISE SPECIFIED",
     "UNITS:",
     " UOS",
@@ -99,6 +103,25 @@ def test_top_level_bom_uses_released_subassembly_numbers() -> None:
         "paper-drive": "MHA-A06",
         "measuring-stick": "MHA-046",
     }
+
+
+def test_configured_variants_remain_visible_after_bom_row_collapse() -> None:
+    assert draw_drive_train_assembly.BOM_COMPONENTS["cone-gear"] == (
+        "CONE GEAR, T006-T120 BY 6; 1 EACH"
+    )
+    assert draw_paper_drive_assembly.BOM_COMPONENTS["transgear-removable"] == (
+        "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+    )
+
+
+def test_unresolved_assembly_inputs_are_release_holds_not_guessed_details() -> None:
+    assert "HARDENED KNIFE SEATS" in draw_summing_assembly.ASSEMBLY_NOTES
+    assert "MOUNT-TO-CROSSBAR FASTENERS" in draw_summing_assembly.ASSEMBLY_NOTES
+    assert "LEVER-WIRE TERMINATIONS" in draw_magnifier_assembly.ASSEMBLY_NOTES
+    assert "WHEEL HUB/RIM" in draw_magnifier_assembly.ASSEMBLY_NOTES
+    top_notes = draw_harmonic_analyzer_assembly.ASSEMBLY_NOTES
+    assert "GENERAL-ARRANGEMENT REFERENCE ONLY" in top_notes
+    assert "LOCATING FEATURES AND FASTENERS" in top_notes
 
 
 def test_each_sheet_uses_three_hlr_views_bom_and_balloons() -> None:

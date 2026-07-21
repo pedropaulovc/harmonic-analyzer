@@ -84,7 +84,7 @@ BOM_COMPONENTS = {
     "transgear-feed-pinion": "12T FEED PINION",
     "transgear-knob-shaft": "KNOB SHAFT",
     "transgear-pinion": "12T THIRD GEAR",
-    "transgear-removable": "REMOVABLE CHAIN SPROCKET",
+    "transgear-removable": "CHAIN SPROCKET, T12/T18/T24; 1 EACH",
     "chain-inner-link": "ROLLER CHAIN INNER LINK",
     "chain-outer-link": "ROLLER CHAIN OUTER LINK",
 }

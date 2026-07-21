@@ -107,6 +107,8 @@ def test_drawing_places_bom_and_balloons() -> None:
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert source.count("scale=VIEW_SCALE") == 3  # every view pins its scale
     assert source.count("add_note(") == 1
+    assert "KNIFE-MOUNT EDGES" not in drawing.ASSEMBLY_NOTES
+    assert "HARDENED KNIFE SEATS" in drawing.ASSEMBLY_NOTES
     assert all(
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")

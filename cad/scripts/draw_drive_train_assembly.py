@@ -95,7 +95,7 @@ BOM_COMPONENTS = {
     "foot-screw": "FOOT MOUNT SCREW",
     "cone-gear-shaft": "CONE GEAR SHAFT",
     "crank-drive-gear": "64T CRANK DRIVE GEAR",
-    "cone-gear": "CONE INTEGRATOR GEAR",
+    "cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
     "cylinder-gear": "CYLINDER DRUM GEAR",
     "crankshaft": "CRANKSHAFT",
     "crank-pinion": "16T CRANK PINION",

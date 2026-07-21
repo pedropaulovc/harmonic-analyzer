@@ -103,7 +103,8 @@ def test_drawing_places_bom_and_balloons() -> None:
     assert drawing.SHEET_SCALE == (1.0, 4.0)
     assert source.count("scale=VIEW_SCALE") == 3
     assert source.count("add_note(") == 1
-    assert "ROUTE LEVER WIRE" in drawing.ASSEMBLY_NOTES
+    assert "LEVER-WIRE TERMINATIONS" in drawing.ASSEMBLY_NOTES
+    assert "WHEEL HUB/RIM" in drawing.ASSEMBLY_NOTES
     assert all(
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")

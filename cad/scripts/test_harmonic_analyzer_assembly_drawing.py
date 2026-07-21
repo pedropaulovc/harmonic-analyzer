@@ -109,6 +109,8 @@ def test_drawing_places_bom_and_balloons() -> None:
     assert source.count("scale=VIEW_SCALE") == 3
     assert source.count("add_note(") == 1
     assert "MHA-A01 THROUGH MHA-A07" in drawing.ASSEMBLY_NOTES
+    assert "GENERAL-ARRANGEMENT REFERENCE ONLY" in drawing.ASSEMBLY_NOTES
+    assert drawing.ASSEMBLY_NOTES.count("RELEASE HOLD") == 2
     assert all(
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
