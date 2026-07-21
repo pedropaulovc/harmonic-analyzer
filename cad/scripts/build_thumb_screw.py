@@ -2,7 +2,7 @@ r"""Reproduction script: reeded thumb screw (book ch. 20, p. 48).
 
 The knurled ("reeded") thumb screw that locks the magnifying-lever clamp
 block (a second identical one locks the output fixture). M4 finishing
-pass: head reeded with 24 axial Ø1 mm grooves (tube-frame fluting recipe,
+pass: head reeded with the spec-defined axial Ø1 mm grooves (tube-frame fluting recipe,
 ``_features.add_reeded_head_and_thread``) and a cosmetic #4-40 UNC thread on
 the shank (annotation only -- keeps M6 interference checks clean).
 
@@ -53,6 +53,7 @@ from thumb_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
+    GROOVE_COUNT,
     HEAD_DIA,
     HEAD_LENGTH,
     SHANK_DIA,
@@ -120,7 +121,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven stepped blank (equations neutral)", v_blank, 0.005 * v_blank)
 
     await add_reeded_head_and_thread(
-        adapter, HEAD_DIA, HEAD_LENGTH, SHANK_DIA, SHANK_LEN, groove_count=24
+        adapter,
+        HEAD_DIA,
+        HEAD_LENGTH,
+        SHANK_DIA,
+        SHANK_LEN,
+        groove_count=GROOVE_COUNT,
     )
 
     await apply_material(adapter, MATERIAL)

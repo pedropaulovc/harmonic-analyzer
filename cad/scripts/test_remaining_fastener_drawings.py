@@ -195,3 +195,20 @@ def test_custom_head_end_view_does_not_show_hidden_shank_circle(
     )
     assert "set_hidden_lines_removed(adapter, end)" in source
     assert "set_hidden_lines_visible(adapter, end)" not in source
+
+
+@pytest.mark.parametrize(
+    ("build_name", "spec_name"),
+    (
+        ("build_pen_set_screw", "pen_set_screw_spec"),
+        ("build_thumb_screw", "thumb_screw_spec"),
+    ),
+)
+def test_reeded_builder_uses_spec_groove_count(
+    build_name: str, spec_name: str
+) -> None:
+    build = importlib.import_module(build_name)
+    spec = importlib.import_module(spec_name)
+    source = Path(build.__file__).read_text(encoding="utf-8")
+    assert build.GROOVE_COUNT == spec.GROOVE_COUNT
+    assert "groove_count=GROOVE_COUNT" in source

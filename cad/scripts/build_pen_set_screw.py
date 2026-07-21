@@ -2,7 +2,7 @@ r"""Reproduction script: pen set screw (book ch. 24, pp. 64-65).
 
 The small screw with the black knurled knob that threads up through the
 pen frame's bottom rail to set the pen-to-paper angle. M4 finishing pass:
-knob reeded with 22 axial Ø1 mm grooves (tube-frame fluting recipe,
+knob reeded with the spec-defined axial Ø1 mm grooves (tube-frame fluting recipe,
 ``_features.add_reeded_head_and_thread``) and a cosmetic #4-40 UNC thread on
 the shank (annotation only -- keeps M6 interference checks clean).
 
@@ -51,6 +51,7 @@ from pen_set_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
+    GROOVE_COUNT,
     KNOB_DIA,
     KNOB_LENGTH,
     SHANK_DIA,
@@ -118,7 +119,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven stepped blank (equations neutral)", v_blank, 0.005 * v_blank)
 
     await add_reeded_head_and_thread(
-        adapter, KNOB_DIA, KNOB_LENGTH, SHANK_DIA, SHANK_LEN, groove_count=22
+        adapter,
+        KNOB_DIA,
+        KNOB_LENGTH,
+        SHANK_DIA,
+        SHANK_LEN,
+        groove_count=GROOVE_COUNT,
     )
 
     from solidworks_mcp.adapters.base import CreateAxisParameters
