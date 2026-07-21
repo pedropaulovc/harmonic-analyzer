@@ -1,28 +1,27 @@
-"""Offline contracts for the foot-screw drawing."""
+"""Offline contracts for the lag-screw drawing."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import build_foot_screw as part
-import draw_foot_screw as drawing
-import foot_screw_spec as spec
+import build_lag_screw as part
+import draw_lag_screw as drawing
+import lag_screw_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
 
 
 def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/foot-screw.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/foot-screw.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/foot-screw_drawing.png")
-    assert DRAWINGS_BY_NAME["foot_screw"].script == Path(drawing.__file__).resolve()
+    assert drawing.SLDDRW.as_posix().endswith("/slddrw/lag-screw.SLDDRW")
+    assert drawing.PDF.as_posix().endswith("/pdf/lag-screw.pdf")
+    assert drawing.PNG.as_posix().endswith("/png/lag-screw_drawing.png")
+    assert DRAWINGS_BY_NAME["lag_screw"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    # The head-end view carries the diameters, the side view the two lengths;
-    # together they cover exactly the marked set (nothing dropped, nothing extra).
+    # Head-end view carries the diameters, side view the two lengths.
     assert set(drawing.END_KEEP) == set().union(*spec.END_VIEW_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) == set().union(*spec.SIDE_VIEW_DIMENSIONS.values())
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
@@ -32,7 +31,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 
 def test_catalog_is_the_single_source_of_the_thread() -> None:
-    catalog = fastener("foot-screw")
+    catalog = fastener("lag-screw")
     assert spec.THREAD == catalog.thread
     assert spec.SHANK_DIA == catalog.model_diameter_mm
     assert spec.SHANK_LEN == catalog.length_mm
@@ -42,9 +41,6 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
 
 
 def test_lengths_are_marked_extrude_depth_model_dims() -> None:
-    # The vertical (axis +Y) profile cannot point-select the edge-on shoulder/tip
-    # silhouettes, so the two lengths ship as the head/shank extrude-DEPTH model
-    # dimensions: the build names them, the drawing inserts them in the side view.
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name_dimensions(adapter, "Head", ["HeadHt"])' in part_source
     assert 'name_dimensions(adapter, "Shank", ["ShankLg"])' in part_source
@@ -53,10 +49,11 @@ def test_lengths_are_marked_extrude_depth_model_dims() -> None:
     assert 'keep=SIDE_KEEP, view_label="side"' in draw_source
 
 
-def test_commercial_note_states_standards_conformance() -> None:
+def test_custom_hold_down_note_completely_defines_the_unmodeled_features() -> None:
     notes = spec.DRAWING_NOTES
-    assert "COMMERCIAL" in notes
-    assert "ACCEPTABLE" in notes
+    assert "FULL-LENGTH THREAD" in notes
+    assert "DRIVER SLOT 2 WIDE x 2 DEEP" in notes
+    assert "COMMERCIAL" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
 
 
@@ -66,8 +63,8 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "clear_dimensions_for_drawing" in source
     import _config
 
-    config = _config.parts("foot-screw")
-    assert config["number"] == "MHA-103"
+    config = _config.parts("lag-screw")
+    assert config["number"] == "MHA-039"
     assert config["material"] == config["material_specification"]
     assert config["finish"]
-    assert int(config["quantity"]) == 2
+    assert int(config["quantity"]) == 4

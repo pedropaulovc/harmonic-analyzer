@@ -1,5 +1,9 @@
 slotted-screw:
   number: MHA-101
-  material: Plain Carbon Steel
+  material: AISI 12L14 free-machining steel bar
+  material_specification: AISI 12L14 free-machining steel bar
+  finish: turned and polished, bright
+  quantity: 4
   tolerance_class: machined_block
+  fit_class: fastener_clearance
   process: "machined (steel)"

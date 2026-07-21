@@ -1,6 +1,9 @@
 thumb-screw:
   number: MHA-075
-  material: Brass
+  material: free-machining brass bar, ASTM B16 (C36000)
+  material_specification: free-machining brass bar, ASTM B16 (C36000)
+  finish: turned and polished, bright; head straight-knurled
+  quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (brass)"

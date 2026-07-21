@@ -44,6 +44,12 @@ from _common import (
     volume_check,
 )
 from _features import add_reeded_head_and_thread
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from thumb_screw_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, END_VIEW_NOTE
 
 PART_NAME = "thumb-screw"
 SPEC = fastener(PART_NAME)
@@ -118,6 +124,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

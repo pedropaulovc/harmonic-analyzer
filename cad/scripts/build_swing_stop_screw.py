@@ -39,16 +39,27 @@ from _common import (
     volume_check,
 )
 
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from swing_stop_screw_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    HEAD_DIA,
+    HEAD_T,
+    SHANK_DIA,
+)
+
 PART_NAME = "swing-stop-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-SHANK_DIA = SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 EMBED_LEN = 6.0  # into the base's stop hole
 PROUD_LEN = 8.0  # above the base top: covers the 6.35 plate band + margin
 assert EMBED_LEN + PROUD_LEN == SPEC.length_mm
-HEAD_DIA = 8.0
-HEAD_T = 2.5
 SLOT_W = 1.2
 SLOT_D = 1.0
 
@@ -152,6 +163,17 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "stop axis")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

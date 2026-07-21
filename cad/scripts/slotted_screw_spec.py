@@ -1,0 +1,53 @@
+r"""Pure-data dimensional contract shared by the slotted screw and drawing.
+
+PURE DATA: modeled nominals + the marked-dimension map, so one edit rebuilds
+both the SLDPRT and SLDDRW recipe.  Thread designation and the catalog-owned
+shank nominals are re-derived from the fastener catalog row -- ONE hardware
+source; the drawing never invents a thread the part does not build.
+"""
+
+from __future__ import annotations
+
+from _fastener_catalog import fastener
+
+
+_SPEC = fastener("slotted-screw")
+
+HEAD_DIA = 8.0  # slotted cylindrical head (p.69, low)
+HEAD_H = 2.5
+
+SHANK_DIA = _SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
+SHANK_LEN = _SPEC.length_mm  # nominal under-head length
+THREAD = _SPEC.thread  # "#8-32"
+THREAD_DESIGNATION = f"{THREAD} UNC-2A"
+
+# The head-end view carries the two diameters; the side view carries the two
+# lengths.  The lengths are the head/shank extrude DEPTH dimensions (named
+# HeadHt/ShankLg in the build) inserted as model dims -- an axis-along-Y screw
+# projects edge-on circle silhouettes for the shoulder and tip that SolidWorks
+# will not point-select, so a drawing-native edge dimension cannot pick them.
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "HeadProfile": {"HeadDia"},
+    "ShankProfile": {"ShankDia"},
+    "Head": {"HeadHt"},
+    "Shank": {"ShankLg"},
+}
+END_VIEW_DIMENSIONS: dict[str, set[str]] = {
+    "HeadProfile": {"HeadDia"},
+    "ShankProfile": {"ShankDia"},
+}
+SIDE_VIEW_DIMENSIONS: dict[str, set[str]] = {
+    "Head": {"HeadHt"},
+    "Shank": {"ShankLg"},
+}
+
+DRAWING_NOTES = "\n".join(
+    (
+        f"COMMERCIAL {THREAD_DESIGNATION} SLOTTED FILLISTER-HEAD MACHINE SCREW, "
+        f"{SHANK_LEN:g} MM LONG, PER ASME B18.6.3, ACCEPTABLE IN PLACE OF A "
+        "MADE PART.",
+        "SHANK MODELED AT THREAD MINOR DIA; THREADS OMITTED FOR CLARITY.",
+        "HEAD CARRIES A STRAIGHT DRIVER SLOT PER THE HEAD-END VIEW.",
+    )
+)
+END_VIEW_NOTE = "HEAD-END VIEW"

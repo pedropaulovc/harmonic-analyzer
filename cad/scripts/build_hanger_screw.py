@@ -47,15 +47,24 @@ from _common import (
     volume_check,
 )
 
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from hanger_screw_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    HEAD_AF,
+    HEAD_H,
+    SHANK_DIA,
+    SHANK_LEN,
+)
+
 PART_NAME = "hanger-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # black hardware
-
-HEAD_AF = 7.0  # hex across-flats (low)
-HEAD_H = 2.5
-SHANK_DIA = SPEC.model_diameter_mm  # #6-32 modeled thread minor diameter
-# (threads #6-32 into the strap; rides the bar's O3.8 / strap's O3.6 clearance)
-SHANK_LEN = SPEC.length_mm  # bar 9 + 2.5 into the 3-thick strap
 
 # Every hex offset dim is linear in the across-flats (radius = AF/sqrt 3), so a
 # single HeadAF global drives them all via dimensionless coefficients -- unit-safe
@@ -154,6 +163,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

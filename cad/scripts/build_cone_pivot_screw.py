@@ -39,18 +39,27 @@ from _common import (
     volume_check,
 )
 
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from cone_pivot_screw_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    HEAD_DIA,
+    HEAD_T,
+    SHANK_DIA,
+    SHANK_LEN,
+)
+
 PART_NAME = "cone-pivot-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # bright steel screw (v4 stills)
 
-HEAD_DIA = 9.5  # covers the plate's O6.5 hole; r 4.75 clears the tip block's
-# north face 0.25 (pivot station 196 - block north 191 -- assembly-asserted;
-# the first O12 cut clipped the block corner 13.5 mm^3)
-HEAD_T = 3.0
 SLOT_W = 1.6  # driver slot width
 SLOT_D = 1.2  # driver slot depth into the head top
-SHANK_DIA = SPEC.model_diameter_mm  # shoulder: the plate's O6.5 hole rides it
-SHANK_LEN = SPEC.length_mm  # plate 6.35 + 6.0 engaged into the base's pivot hole
 
 
 def _slot_strip_area(r: float, w: float) -> float:
@@ -133,6 +142,17 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

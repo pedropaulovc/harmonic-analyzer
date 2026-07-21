@@ -435,6 +435,30 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="foot-screw",
         script_name="draw_foot_screw.py",
     ),
+    DrawingSpec(
+        name="bracket_screw",
+        part="bracket_screw",
+        artifact_stem="bracket-screw",
+        script_name="draw_bracket_screw.py",
+    ),
+    DrawingSpec(
+        name="clamp_screw",
+        part="clamp_screw",
+        artifact_stem="clamp-screw",
+        script_name="draw_clamp_screw.py",
+    ),
+    DrawingSpec(
+        name="slotted_screw",
+        part="slotted_screw",
+        artifact_stem="slotted-screw",
+        script_name="draw_slotted_screw.py",
+    ),
+    DrawingSpec(
+        name="lag_screw",
+        part="lag_screw",
+        artifact_stem="lag-screw",
+        script_name="draw_lag_screw.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

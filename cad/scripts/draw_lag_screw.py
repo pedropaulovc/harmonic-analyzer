@@ -1,11 +1,13 @@
-r"""Create the curated machinist drawing for the foot hold-down screw.
+r"""Create the curated machinist drawing for the rocker-support hold-down screw.
 
 Uniform fastener slice (see draw_fillister_screw.py): a profile side view with
 the head-height and under-head length, a head-end view carrying the two marked
-model diameters (head OD and the shank/thread minor Ø with its UNC-2A
-designation), plus an isometric.  The screw is authored on the Top plane
-(axis +Y), so it stands VERTICAL in the profile view -- the edge-on shoulder/tip
-silhouettes cannot be point-selected, so the two lengths ship as the head/shank
+model diameters (round head OD and the shank/thread minor Ø with its UNC-2A
+designation), plus an isometric.  Authored on the Top plane (axis +Y) with the
+head DOWN (head at y in [-HEAD_H, 0], shank rising to +SHANK_LEN), so it stands
+VERTICAL in the profile view with the head at the bottom; the head-end circle is
+seen from below in the *Bottom view.  The vertical profile cannot point-select
+the edge-on shoulder/tip silhouettes, so the two lengths ship as the head/shank
 extrude-DEPTH model dimensions (HeadHt/ShankLg) inserted in the side view.
 """
 
@@ -30,7 +32,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from foot_screw_spec import (
+from lag_screw_spec import (
     HEAD_H,
     SHANK_LEN,
     THREAD_DESIGNATION,
@@ -38,7 +40,7 @@ from foot_screw_spec import (
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
-SPEC = DRAWINGS_BY_NAME["foot_screw"]
+SPEC = DRAWINGS_BY_NAME["lag_screw"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(
@@ -50,43 +52,40 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# #4-40 x 8 mm screw; 8:1 draws the ~10 mm length as ~82 mm and the head OD
-# (5.5) as ~44 mm -- big enough to read the dimensions and text.
-SHEET_SCALE = (8.0, 1.0)
+# 9/16-12 x 63 mm: 2:1 draws the ~69 mm length as ~138 mm and the head OD (22)
+# as ~44 mm.
+SHEET_SCALE = (2.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
-# Authored on the Top plane, axis +Y: head at y in [0, HEAD_H] (top), shank at
-# y in [-SHANK_LEN, 0] (bottom).  The head-end circle projects in the *Top view;
-# the profile (axis VERTICAL, head up) projects in the *Front view.  The screw
-# stands vertical, so the head/shoulder/tip read as edge-on circle silhouettes
-# that SolidWorks will not point-select -- the two LENGTHS are therefore inserted
-# as the head/shank extrude-DEPTH model dimensions (HeadHt/ShankLg), not as
-# drawing-native edge dimensions.
-END_CENTER = (0.075, 0.180)
-SIDE_CENTER = (0.190, 0.150)
-ISO_CENTER = (0.300, 0.175)
+# Authored on the Top plane, axis +Y, HEAD DOWN: head at y in [-HEAD_H, 0]
+# (bottom), shank at y in [0, SHANK_LEN] (top).  The head-end circle is seen in
+# the *Bottom view; the profile (axis VERTICAL, head at bottom) in *Front.
+# The side view sits high so the ~126 mm profile clears the wide manufacturing
+# note that anchors just above the title block.
+END_CENTER = (0.070, 0.180)
+SIDE_CENTER = (0.190, 0.168)
+ISO_CENTER = (0.320, 0.175)
 
-# Side view (*Front): model y -> sheet y (head up), centred on the profile bbox.
-_Y_MID = (HEAD_H - SHANK_LEN) / 2.0
+_Y_MID = (SHANK_LEN - HEAD_H) / 2.0
 
 
 def _side_y(model_y: float) -> float:
     return SIDE_CENTER[1] + (model_y - _Y_MID) * _S
 
 
-_HEAD_END_Y = _side_y(HEAD_H)  # head outer face (top)
+_HEAD_END_Y = _side_y(-HEAD_H)  # head outer face (bottom)
 _JUNCTION_Y = _side_y(0.0)  # head/shank step
-_SHANK_END_Y = _side_y(-SHANK_LEN)  # shank tip (bottom)
+_SHANK_END_Y = _side_y(SHANK_LEN)  # shank tip (top)
 
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
 END_KEEP = {
-    "HeadDia": (0.030, END_CENTER[1] + 0.024),
-    "ShankDia": (0.030, END_CENTER[1] - 0.024),
+    "HeadDia": (0.028, END_CENTER[1] + 0.030),
+    "ShankDia": (0.028, END_CENTER[1] - 0.030),
 }
 DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
 
-# Side view: the head-height and under-head length as model dimensions, stacked
-# to the right of the profile clear of the geometry.
+# Side view: the head-height and under-head length as the extrude-depth model
+# dims (the vertical profile cannot point-select the edge-on shoulder/tip).
 SIDE_KEEP = {
     "HeadHt": (SIDE_CENTER[0] + 0.052, (_HEAD_END_Y + _JUNCTION_Y) / 2.0),
     "ShankLg": (SIDE_CENTER[0] + 0.052, (_JUNCTION_Y + _SHANK_END_Y) / 2.0),
@@ -97,7 +96,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open foot-screw source", await adapter.open_model(str(SOURCE)))
+    check("open lag-screw source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
         adapter.currentModel,
         (
@@ -126,17 +125,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Foot Screw Manufacturing Drawing",
+            0: "Lag Screw Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "foot screw; slotted machine screw; black steel",
+            3: "lag screw; slotted round-head screw; black steel",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
-    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(8, 1))
-    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(8, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(8, 1))
+    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(2, 1))
+    end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=(2, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     set_hidden_lines_removed(adapter, side)
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_visible(adapter, end)
@@ -150,13 +149,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # inserted and positioned to the right of the vertical profile.
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.095)
-    add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.240)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.085)
+    add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.230)
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Foot Screw Manufacturing Drawing",
+        pdf_title="Lag Screw Manufacturing Drawing",
         scale=SHEET_SCALE,
     )
 

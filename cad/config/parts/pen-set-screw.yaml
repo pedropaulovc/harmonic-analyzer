@@ -1,6 +1,9 @@
 pen-set-screw:
   number: MHA-052
-  material: Brass
+  material: free-machining brass bar, ASTM B16 (C36000)
+  material_specification: free-machining brass bar, ASTM B16 (C36000)
+  finish: turned and polished; knob straight-knurled
+  quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (brass)"

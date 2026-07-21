@@ -1,6 +1,9 @@
 hanger-screw:
   number: MHA-034
-  material: Plain Carbon Steel
+  material: AISI 12L14 free-machining steel bar
+  material_specification: AISI 12L14 free-machining steel bar
+  finish: machined, black oxide all over
+  quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (steel)"
