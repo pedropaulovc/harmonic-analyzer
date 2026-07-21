@@ -1753,9 +1753,9 @@ sections:
         - scaled
         - med
       - - Cam-follower pin (per strap)
-        - Ø3 × 17.5 steel, pressed through the strap tail 6.25 below the pivot bore, ~2.75 west working reach over the lift rod
+        - Ø4 × 15 steel stud, seated 4.0 in a blind west-edge bore 2.0 below the pivot axis; 11 proud over the lift cam
         - —
-        - 'p.69 block close-up (page002_img01): a bright pin through each strap tail overhangs the lift rod; the rod''s radial cam pin (Ø3, thinned from 4.0 with the working cam) sweeps up beneath it — curved arrow = rod turn, straight arrow = pin lifted — swinging the drum east into mesh. Contact band + clearances asserted analytically (build_drive_train CAM_*)'
+        - 'PR8 re-derivation of the p.69 block close-up (page002_img01): the bright follower reads as a fatter (~Ø4-5) stud at the pivot-height band, resting on the eccentric collar. A 4.0 blind edge seat is the geometry that clears the Ø6.35 pivot bore; contact reach + clearances are asserted analytically (build_drive_train CAM_*)'
         - scaled
         - med
   - prose: |2

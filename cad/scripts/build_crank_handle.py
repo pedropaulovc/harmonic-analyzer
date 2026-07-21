@@ -2,10 +2,10 @@ r"""Reproduction script: crank handle (book ch. 11, pp. 12-15).
 
 The pear-shaped wooden handle (stained black) that rotates on the crank-arm
 pivot -- the book calls it "a smooth piece of wood ... well-suited for a firm
-grip" (p.12). The brass collar at the crank end is modelled as an integral
-cylindrical section of the revolve profile (it gets its own appearance at
-M3 material assignment); the slotted pivot screw is a separate part
-(grouped with the plain shafts/pins).
+grip" (p.12). The current source part is one oak body: the collar-shaped
+cylindrical section at the crank end is integral with the revolve profile.
+Do not claim a separate brass collar on its manufacturing drawing unless the
+source model is split and assigned accordingly.
 
 The silhouette is now genuinely SMOOTH (the earlier revision approximated it
 with straight, axially-faceted segments). Two internally-tangent circular

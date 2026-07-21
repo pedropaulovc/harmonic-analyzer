@@ -54,3 +54,19 @@ def test_finish_field_does_not_repeat_generic_edge_break_instruction() -> None:
         assert "DEBUR" not in finish, part_name
         assert "REMOVE BURR" not in finish, part_name
         assert "BREAK SHARP" not in finish, part_name
+
+
+def test_part_numbers_are_unique_across_the_complete_registry() -> None:
+    by_number: dict[str, list[str]] = {}
+    for part_name, part in _config.parts().items():
+        by_number.setdefault(str(part["number"]), []).append(part_name)
+
+    duplicates = {
+        number: names for number, names in by_number.items() if len(names) > 1
+    }
+    assert duplicates == {}
+
+
+def test_new_pin_and_spring_numbers_follow_the_existing_registry_tail() -> None:
+    assert _config.parts("pinion-cam-pin")["number"] == "MHA-113"
+    assert _config.parts("pinion-spring")["number"] == "MHA-114"

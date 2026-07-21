@@ -51,6 +51,14 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
+def test_unresolved_handle_interfaces_are_an_explicit_release_hold() -> None:
+    notes = pinion_handle_spec.DRAWING_NOTES
+    assert "RELEASE HOLD - DO NOT MANUFACTURE" in notes
+    assert "CROSS-ROD CONSTRUCTION/BORE FIT" in notes
+    assert "HUB-TO-ARBOR TORQUE DRIVE AND AXIAL RETENTION" in notes
+    assert "PRESSED THROUGH" not in notes
+
+
 def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source

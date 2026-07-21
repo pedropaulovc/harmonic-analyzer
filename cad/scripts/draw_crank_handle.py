@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the crank handle.
 
-A turned stained-oak pear grip (book ch. 11): a brass collar at the crank end,
+A turned stained-oak pear grip (book ch. 11): an integral collar profile at the crank end,
 a waisted neck, a smooth twin-arc swell to the Ø22 max, and a blunt domed butt
 with a flat cap.  The pear silhouette is two internally-tangent arcs, so the
 swell/neck/butt diameters derive from the profile and cannot be marked without
@@ -119,7 +119,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crank Handle Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank handle; turned oak pear grip; brass collar",
+            3: "crank handle; turned oak pear grip; integral collar profile",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

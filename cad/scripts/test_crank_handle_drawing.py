@@ -54,13 +54,21 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = crank_handle_spec.DRAWING_NOTES
     assert "CDA 260" not in notes
-    assert "<MOD-DIAM>9.6 BORE" in notes
+    assert "COLLAR PROFILE INTEGRAL WITH THE OAK HANDLE" in notes
     assert "COIL" not in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+
+
+def test_unresolved_pivot_interface_is_an_explicit_release_hold() -> None:
+    notes = crank_handle_spec.DRAWING_NOTES
+    assert "RELEASE HOLD - DO NOT MANUFACTURE" in notes
+    assert "HANDLE PIVOT BORE/PIN" in notes
+    assert "RUNNING CLEARANCE" in notes
+    assert "AXIAL RETENTION" in notes
 
 
 def test_feature_requirements_do_not_use_ambiguous_unused_datums() -> None:
@@ -77,6 +85,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("crank-handle")
+    assert spec["material"] == handle.MATERIAL == "Oak"
     assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]

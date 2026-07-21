@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the crank handle and its
 manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A turned stained-oak pear grip on the
-crank-arm pivot: a brass collar at the crank end, a waisted neck, a smooth
+crank-arm pivot: an integral collar profile at the crank end, a waisted neck, a smooth
 twin-arc swell to the Ø22 max, and a blunt domed butt with a flat cap.  The
 pear silhouette is two internally-tangent arcs, so the swell/neck/butt
 DIAMETERS derive from the profile geometry and cannot be marked without
@@ -33,8 +33,9 @@ DRAWING_NOTES = "\n".join(
         "TURNING SCHEDULE (DIAMETERS): COLLAR <MOD-DIAM>11, NECK <MOD-DIAM>9.6, "
         "MAX <MOD-DIAM>22 AT STATION 62, BUTT CAP <MOD-DIAM>7.",
         "BLEND NECK-TO-MAX AND MAX-TO-BUTT AS ONE SMOOTH PEAR CURVE.",
-        "MAKE THE COLLAR AS A SEPARATE <MOD-DIAM>11 X 6.00 RING WITH <MOD-DIAM>9.6 BORE;",
-        "  PRESS OR BOND OVER THE WOOD NECK, THEN FINAL-TURN TO THE SHOWN PROFILE.",
+        "TURN THE COLLAR PROFILE INTEGRAL WITH THE OAK HANDLE.",
+        "RELEASE HOLD - DO NOT MANUFACTURE: DEFINE THE HANDLE PIVOT BORE/PIN,",
+        "  RUNNING CLEARANCE, AND AXIAL RETENTION AT THE CRANK ARM.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

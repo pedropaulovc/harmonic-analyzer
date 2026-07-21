@@ -59,6 +59,14 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
+def test_unresolved_cam_attachment_is_an_explicit_release_hold() -> None:
+    notes = pinion_cam_spec.DRAWING_NOTES
+    assert "RELEASE HOLD - DO NOT MANUFACTURE" in notes
+    assert "SET-PIN HOLE" in notes
+    assert "PIN SPECIFICATION" in notes
+    assert "ENGAGEMENT IN THE LIFT ROD" in notes
+
+
 def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source
