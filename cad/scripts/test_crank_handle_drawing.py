@@ -39,8 +39,8 @@ def test_diameters_are_a_turning_schedule_not_marked_dims() -> None:
     marked = set().union(*crank_handle_spec.DRAWING_DIMENSIONS.values())
     assert marked == {"HandleLength", "CollarLength", "PeakStation", "PivotBoreDia"}
     notes = crank_handle_spec.DRAWING_NOTES
-    assert "TURNING SCHEDULE" in notes
-    assert "ARCS TANGENT AT MAX ONLY" in notes
+    assert "THEORETICALLY EXACT TURNING PROFILE" in notes
+    assert "ARCS ARE TANGENT AT MAX ONLY" in notes
 
 
 def test_peak_station_uses_visible_construction_geometry() -> None:
@@ -73,7 +73,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "COLLAR PROFILE INTEGRAL WITH HANDLE BLANK" in notes
     assert "COIL" not in notes
     assert "LINEAR +/-" not in notes
-    assert "BA" not in notes
+    assert "BRASS" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -82,14 +82,18 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     notes = crank_handle_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "BORE AXIS CONCENTRIC" in notes
+    assert "BORE AXIS CONCENTRIC" not in notes
+    assert "NO BLEND, RADIUS, OR CHAMFER" in notes
     assert "6.10/6.15 THRU" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
 
 
-def test_feature_requirements_do_not_use_ambiguous_unused_datums() -> None:
+def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_feature_control_frame(") == 2
+    assert 'characteristic="total_runout"' in source
+    assert 'characteristic="profile_surface"' in source
+    assert "set_basic_dimension(" in source
     assert "add_surface_finish(" not in source
 
 

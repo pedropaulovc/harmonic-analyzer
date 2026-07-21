@@ -24,19 +24,29 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     add_view_centerline,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from crank_handle_spec import COLLAR_DIA, HANDLE_LENGTH
+from crank_handle_spec import (
+    COLLAR_DIA,
+    HANDLE_LENGTH,
+    HANDLE_MAX_DIA,
+    PEAK_X,
+    PIVOT_BORE_DIA,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -88,8 +98,6 @@ RIGHT_KEEP = {
 DIMENSION_CALLOUTS: dict[str, str] = {}
 DIMENSION_CALLOUTS = {
     "HandleLength": "+/-0.25 OVERALL",
-    "CollarLength": "+/-0.10 FROM COLLAR FACE",
-    "PeakStation": "+/-0.25 FROM COLLAR FACE",
     "PivotBoreDia": "FINAL LIMITS 6.10/6.15 THRU",
 }
 
@@ -150,6 +158,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
+    front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
+    for station in ("CollarLength", "PeakStation"):
+        annotation = front_by_name[station]
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"{station} has no display dimension to box")
+        set_basic_dimension(adapter, display, label=f"{station} profile station")
     add_view_centerline(
         adapter,
         front,
@@ -158,6 +173,54 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
+
+    collar_od_top = (RIGHT_CENTER[0], RIGHT_CENTER[1] + COLLAR_R_SHEET)
+    bore_top = (
+        RIGHT_CENTER[0],
+        RIGHT_CENTER[1] + PIVOT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
+    )
+    collar_face = (_front_x(0.0), _front_y(COLLAR_R * 0.55))
+    profile_peak = (
+        _front_x(PEAK_X),
+        _front_y(HANDLE_MAX_DIA / 2.0),
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=collar_od_top,
+        symbol_xy=(0.318, 0.224),
+        datum="A",
+        label="collar OD datum axis",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=collar_face,
+        symbol_xy=(0.040, 0.198),
+        datum="B",
+        label="flat collar face",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=bore_top,
+        frame_xy=(0.275, 0.252),
+        characteristic="total_runout",
+        tolerance="0.10",
+        datums=("A",),
+        label="full-length bore total runout",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=profile_peak,
+        frame_xy=(0.220, 0.257),
+        characteristic="profile_surface",
+        tolerance="0.50",
+        datums=("A", "B"),
+        label="turned handle profile",
+        entity_type="SILHOUETTE",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.116)

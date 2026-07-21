@@ -171,6 +171,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(front_face_x - 0.018, TOP_CENTER[1] + 0.018),
         datum="A",
         label="cam front end face",
+        entity_type="SILHOUETTE",
     )
     add_datum_feature(
         adapter,
