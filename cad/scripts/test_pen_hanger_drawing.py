@@ -26,7 +26,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_the_strap_channel_and_screw() -> None:
     notes = pen_hanger_spec.DRAWING_NOTES
-    assert "SQUARE CHANNEL" in notes
+    assert "SQUARE THROUGH-HOLE" in notes
+    assert "INTERNAL CORNER R0.25 MAX" in notes
+    assert "AWS A5.8 BAg-7" in notes
+    assert "NO VISIBLE VOIDS" in notes
     assert "#6-32" in notes
     assert "AISI" not in notes
     assert "X.XX" not in notes
