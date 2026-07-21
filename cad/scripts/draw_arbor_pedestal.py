@@ -93,7 +93,7 @@ DIMENSION_PRECISION = {"BoreDia": 3}
 
 
 def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
-    """Return foot, side, left flank, bore, and dome front entities."""
+    """Return foot, side, right flank, bore, and dome front entities."""
     drawing_view = _early_bound(view, "IView")
     foot_candidates: list[tuple[float, Any]] = []
     side_candidates: list[tuple[float, Any]] = []
@@ -124,7 +124,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
             ):
                 side_candidates.append((abs(p1[1] - p0[1]), edge))
             if (
-                max(p0[0], p1[0]) < 0.0
+                min(p0[0], p1[0]) > 0.0
                 and abs(p1[1] - p0[1]) > 40.0
                 and abs(p1[0] - p0[0]) > 0.5
             ):
@@ -140,10 +140,10 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
     if side_span < FOOT_HEIGHT - 0.1:
         raise RuntimeError(f"left foot-side edge span is only {side_span:.3f} mm")
     if not flank_candidates:
-        raise RuntimeError("front view has no left taper-flank edge")
+        raise RuntimeError("front view has no right taper-flank edge")
     flank_span, flank_edge = max(flank_candidates, key=lambda item: item[0])
     if flank_span < 40.0:
-        raise RuntimeError(f"left taper-flank span is only {flank_span:.3f} mm")
+        raise RuntimeError(f"right taper-flank span is only {flank_span:.3f} mm")
     if not bore_candidates:
         raise RuntimeError("front view has no circular model edges")
     radius, height, bore_edge = min(
@@ -376,8 +376,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         text="2X 2.12<MOD-DEG> +/-0.10<MOD-DEG>\nFROM VERTICAL",
-        edge_xy=(FRONT_CENTER[0] - 11.0 * _S, _front_y(BORE_HEIGHT / 2.0)),
-        note_xy=(0.020, _front_y(BORE_HEIGHT / 2.0) + 0.015),
+        edge_xy=(FRONT_CENTER[0] + 11.0 * _S, _front_y(BORE_HEIGHT / 2.0)),
+        note_xy=(0.150, 0.125),
         label="taper flank angle",
         entity=flank_entity,
     )
