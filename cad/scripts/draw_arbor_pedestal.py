@@ -197,10 +197,18 @@ def _add_bore_horizontal_basic(
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension(), "IDimension")
     arc_end_set = False
-    for index in (0, 1):
+    for index in (1, 2):
         if int(dimension.GetArcEndCondition(index)) == 0:
             continue
-        dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
+        result = int(
+            dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
+        )
+        if result != 0:
+            raise RuntimeError(
+                f"failed to set bore X-location endpoint {index} to arc center "
+                f"(SolidWorks result {result})"
+            )
+        draw.GraphicsRedraw2()
         if int(dimension.GetArcEndCondition(index)) != 1:
             raise RuntimeError("bore X location did not retain center arc condition")
         arc_end_set = True

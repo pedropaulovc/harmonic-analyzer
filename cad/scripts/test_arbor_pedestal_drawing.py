@@ -75,6 +75,8 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'characteristic="circular_runout"' in source
     assert 'characteristic="perpendicularity"' in source
     assert source.count("set_basic_dimension(") == 2
+    assert "for index in (1, 2):" in source
+    assert "if result != 0:" in source
     assert 'roughness_ra="1.6"' in source
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "CYLINDRICAL ZONE" not in notes
