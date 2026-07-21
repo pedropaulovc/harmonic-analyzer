@@ -396,7 +396,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(2.5)),
-        symbol_xy=(0.040, _front_y(2.5)),
+        symbol_xy=(0.068, _front_y(2.5)),
         datum="B",
         label="left foot side",
         entity=side_entity,
