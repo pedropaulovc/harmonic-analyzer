@@ -1,9 +1,9 @@
 arbor-pedestal:
   number: MHA-004
-  material: Gray Cast Iron
+  material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
   finish: black japanned; clamp bore + foot seat masked
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "cast + machined"
+  process: "machined from continuous-cast stock"

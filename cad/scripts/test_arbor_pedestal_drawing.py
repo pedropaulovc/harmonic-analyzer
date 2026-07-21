@@ -25,20 +25,23 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*arbor_pedestal_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
-    assert marked == {"Width", "Depth", "FootHt", "BoreHeight", "BoreDia", "DomeDia"}
+    assert marked == {
+        "Width", "Depth", "FootHt", "BoreHeight", "BoreDia", "DomeDia", "ScrewZ"
+    }
 
 
 def test_arbor_bore_is_a_clamp_fit_at_matching_precision() -> None:
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "THRU, ARBOR CLAMP FIT"
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "+/-0.010 THRU"
     assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
     assert "9.525" in arbor_pedestal_spec.DRAWING_NOTES
 
 
-def test_notes_specify_bore_screw_and_casting() -> None:
+def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
-    assert "ARBOR CLAMP BORE" in notes
+    assert "ARBOR BORE" in notes
     assert "#4" in notes  # the flange hold-down clearance hole
-    assert "A48 CLASS 30" in notes  # cast-iron grade on the sheet
+    assert "MATERIAL" not in notes
+    assert "JAPANNED" not in notes
     assert "DATUM A" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -66,5 +69,6 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("arbor-pedestal")
     assert "A48" in str(config["material_specification"])
+    assert "A48" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1

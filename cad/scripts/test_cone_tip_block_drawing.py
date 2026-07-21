@@ -31,18 +31,21 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_journal_bore_is_a_running_fit_at_matching_precision() -> None:
     # The reamed 1/32 in journal is dimensioned at 3 places (0.794) so the view
     # matches the note, and carries the running-fit callout.
-    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == "THRU, CLOSE RUNNING FIT"
+    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == "+0.005/-0.005 THRU"
     assert drawing.DIMENSION_PRECISION["BoreDiaDim"] == 3
-    assert "0.794" in cone_tip_block_spec.DRAWING_NOTES
+    assert "0.814-0.824" in cone_tip_block_spec.DRAWING_NOTES
 
 
-def test_notes_specify_journal_adjuster_pinch_and_finish() -> None:
+def test_notes_specify_journal_adjuster_and_functional_pinch_joint() -> None:
     notes = cone_tip_block_spec.DRAWING_NOTES
     assert "JOURNAL" in notes
     assert "5/16-18" in notes  # the adjuster tapped hole
     assert "#3-48" in notes  # the pinch tapped hole
     assert "SLIT" in notes
-    assert "OXIDE" in notes  # black-oxide finish
+    assert "CLEARANCE" in notes
+    assert "FAR JAW" in notes
+    assert "MATERIAL" not in notes
+    assert "OXIDE" not in notes
     assert "DATUM A" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -70,5 +73,6 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-tip-block")
     assert "1018" in str(config["material_specification"])
+    assert "1018" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1

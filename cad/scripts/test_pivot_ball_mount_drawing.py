@@ -35,16 +35,17 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 
 def test_callouts_clarify_ball_bore_and_pad() -> None:
-    assert drawing.DIMENSION_CALLOUTS["ShaftBoreDia"] == "THRU, RUNNING FIT"
+    assert drawing.DIMENSION_CALLOUTS["ShaftBoreDia"] == "+0.00/-0.05 THRU"
     assert drawing.DIMENSION_CALLOUTS["BallRadius"] == "SPHERICAL"
     assert "DIA 13" in drawing.DIMENSION_CALLOUTS["BaseRadius"]
 
 
-def test_notes_specify_ball_bore_shaft_and_finish() -> None:
+def test_notes_specify_ball_bore_and_shaft_without_title_block_duplicates() -> None:
     notes = pivot_ball_mount_spec.DRAWING_NOTES
     assert "SPHERICAL" in notes
     assert "6.35" in notes  # the mating pivot shaft
-    assert "NICKEL PLATED" in notes
+    assert "MATERIAL" not in notes
+    assert "NICKEL" not in notes
     assert "DATUM A" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -72,5 +73,6 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("pivot-ball-mount")
     assert "1018" in str(config["material_specification"])
+    assert "1018" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 4

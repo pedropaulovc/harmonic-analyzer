@@ -33,12 +33,13 @@ def test_thread_callout_is_the_catalog_thread() -> None:
     assert drawing.DIMENSION_CALLOUTS["BodyDiaDim"] == "5/16-18 UNC-2A"
 
 
-def test_notes_specify_thread_cup_slot_and_finish() -> None:
+def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> None:
     notes = cone_tip_adjuster_spec.DRAWING_NOTES
     assert "5/16-18" in notes
     assert "CUP" in notes  # the shaft-tip seating cup
     assert "SLOT" in notes  # the driver slot
-    assert "OXIDE" in notes  # blued finish
+    assert "MATERIAL" not in notes
+    assert "OXIDE" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -59,5 +60,6 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-tip-adjuster")
     assert "12L14" in str(config["material_specification"])
+    assert "12L14" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1

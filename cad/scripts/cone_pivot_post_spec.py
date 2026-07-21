@@ -12,7 +12,7 @@ MM_PER_IN = 25.4
 # single source of the marked dimensions.
 BLOCK_DIA = 24.0  # round column outside diameter
 BLOCK_HEIGHT = 100.5  # column height, foot (platform seat) to top
-BORE_DIA = 0.375 * MM_PER_IN  # 9.525: cone shaft big-end journal
+BORE_DIA = 9.550  # 9.545..9.555 finished bore over shaft max 9.525
 BORE_HEIGHT = 47.65  # journal-bore axis above the foot
 CRANK_BORE_DIA = BORE_DIA + 0.5  # 10.025: running clearance over the crankshaft
 CRANK_BORE_HEIGHT = 85.835  # crank-bore axis above the foot
@@ -31,14 +31,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "CAST, THEN MACHINE THE BORES,",
-        "THE FOOT SEAT AND THE OD.",
-        "BORE HEIGHTS ARE AXIS-TO-FOOT (PLATFORM SEAT FACE = DATUM A).",
-        "JOURNAL BORE DIA 9.525: REAM STRAIGHT TO A CLOSE RUNNING",
-        "FIT ON THE CONE SHAFT, 0.02-0.05 DIAMETRAL CLEARANCE.",
-        "CRANK BORE DIA 10.025 THRU: AXIS 85.835 ABOVE THE FOOT,",
-        "IN THE FRONT-VIEW PLANE, TIPPED 12.52 DEG FROM THE COLUMN",
-        "AXIS AND OFFSET 0.95 TOWARD VIEW-RIGHT -- A CAST RUNNING",
-        "CLEARANCE (0.25/SIDE, INTENTIONAL) OVER THE DIA 9.525 CRANKSHAFT.",
+        "MACHINE ALL SURFACES SHOWN FROM CONTINUOUS-CAST ROUND STOCK.",
+        "DATUM A IS THE FINISHED FOOT SEAT; DATUM B IS THE JOURNAL AXIS.",
+        "JOURNAL BORE LIMITS DIA 9.545-9.555; AXIS HEIGHT 47.65 +/-0.05",
+        "ABOVE A. MATING SHAFT LIMITS DIA 9.505-9.525.",
+        "CRANK BORE DIA 10.025 +/-0.025 THRU; AXIS PARALLEL TO A",
+        "WITHIN 0.10 AND 85.835 +/-0.05 ABOVE A.",
+        "IN THE UPPER PLAN VIEW, CRANK AXIS IS 12.52 +/-0.10 DEG",
+        "CLOCKWISE FROM B; SHORTEST PLAN DISTANCE BETWEEN AXES IS",
+        "0.95 +/-0.05, WITH THE CRANK AXIS ON THE SIDE SHOWN.",
+        "BREAK EDGES 0.25 MAX.",
     )
 )

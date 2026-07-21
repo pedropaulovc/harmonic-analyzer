@@ -69,7 +69,11 @@ def _slot_strip_area(r: float, w: float) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        AddThreadParameters,
+        CreatePlaneParameters,
+        ExtrusionParameters,
+    )
 
     check("create_part", await adapter.create_part())
     await set_global(adapter, "BodyDia", f"{BODY_DIA}mm")
@@ -138,6 +142,22 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "DriverSlot")
     v_slot = _slot_strip_area(BODY_DIA / 2.0, SLOT_W) * SLOT_D
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.02 * v_slot)
+
+    # The physical solid remains the thread-root envelope used by the assembly,
+    # while this annotation feature gives drawings the standard external-thread
+    # representation and designation.
+    check(
+        "cosmetic thread 5/16-18",
+        await adapter.add_thread(
+            AddThreadParameters(
+                edge_point=[BODY_DIA / 2.0, BODY_LEN, 0.0],
+                standard="ansi_inch",
+                size="5/16-18",
+                end_type="blind",
+                depth=BODY_LEN,
+            )
+        ),
+    )
 
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:

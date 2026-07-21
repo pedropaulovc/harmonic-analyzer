@@ -43,7 +43,6 @@ import sys
 
 from _common import (
     CASTING_GREEN,
-    IN,
     SketchDims,
     add_line_chain,
     apply_color,
@@ -78,7 +77,7 @@ BLOCK_DIA = 24.0  # round green column, p.18 top-down
 BLOCK_HEIGHT = 100.5  # crank bore at 86.19 + 14.31 of material above (the old
 # separate pedestal read ~110 above the BASE top = ~103.65 above the plate;
 # this column ends just past the crank bore, video-plausible)
-BORE_DIA = 0.375 * IN  # 9.525: cone shaft big-end diameter (ch. 12, legacy, med)
+BORE_DIA = 9.550  # finished 9.545..9.555 over shaft max 9.525
 BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
 # (asserted in the assembly)
 
@@ -100,8 +99,8 @@ BORE_RADIUS = BORE_DIA / 2.0
 # is mated to the PLATFORM's crank axis (not this bore), so a line-to-line
 # bore turns micron-level chain mismatch into an interference sliver (0.29
 # mm^3 measured; the M6.8 sliver class -- design 0.25 margins, see memory).
-# The cone journal bore stays line-to-line: its shaft is mated EXACTLY
-# coaxial to this part's own named axis.
+# The cone journal bore carries 0.02..0.05 diametral running clearance over
+# the shaft's 9.505..9.525 limits; its named axis still defines the mate.
 CRANK_BORE_DIA = BORE_DIA + 0.5
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
 _SIN_I = math.sin(math.radians(INCLINE_DEG))

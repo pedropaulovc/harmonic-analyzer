@@ -14,6 +14,7 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -129,6 +130,12 @@ async def build(adapter: Any) -> dict[str, str]:
             lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
         )
         _telemetry.info(f"PROBE {label} outline={outline}")
+    add_view_centerline(
+        adapter,
+        side,
+        face_xy=(SIDE_CENTER[0], SIDE_CENTER[1] + SECTION_DIAS[0] / 4000.0),
+        label="shaft longitudinal axis",
+    )
 
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
     end_annotations = curate_view_dimensions(

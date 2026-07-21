@@ -73,7 +73,7 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "BlockDia": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
 }
-DIMENSION_CALLOUTS = {"BoreDia": "THRU, CLOSE RUNNING FIT"}
+DIMENSION_CALLOUTS = {"BoreDia": "+0.005/-0.005 THRU"}
 # 3/8 in = 9.525 exactly; the sheet default of 2 decimals prints 9.53, a false
 # contradiction of the DIA 9.525 the note and the mating cone shaft are built on.
 DIMENSION_PRECISION = {"BoreDia": 3}
@@ -152,6 +152,14 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(foot_edge[0], _front_y(0.0) - 0.010),
         datum="A",
         label="foot seat face",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) + _bore_r),
+        symbol_xy=(FRONT_CENTER[0] - 0.035, _front_y(BORE_HEIGHT) + 0.024),
+        datum="B",
+        label="journal bore axis",
     )
     # Journal bore is seen end-on (a circle); its axis runs horizontal (along Z),
     # so it is PARALLEL to the horizontal foot seat (datum A) -- parallelism, not

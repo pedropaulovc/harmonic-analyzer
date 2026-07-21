@@ -51,7 +51,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
 
 def test_linked_notes_cover_the_remaining_shaft_operations() -> None:
     notes = cone_gear_shaft_spec.DRAWING_NOTES
-    assert "CENTRE MARKS" in notes
+    assert "NO CENTRE HOLE" in notes
     assert "LARGE-END FACE" in notes
     # The 0.79 mm tip journal is a documented, Phase-3-flagged design
     # characteristic -- the print warns the machinist instead of hiding it.
@@ -91,5 +91,6 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-gear-shaft")
     assert "1018" in str(config["material_specification"])
+    assert "1018" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1

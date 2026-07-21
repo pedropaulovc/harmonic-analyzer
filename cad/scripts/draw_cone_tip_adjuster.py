@@ -13,6 +13,7 @@ from _drawing_common import (
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -57,7 +58,11 @@ END_KEEP = {
     "BodyDiaDim": (END_CENTER[0] + 0.055, END_CENTER[1] + 0.015),
     "SlotWDim": (END_CENTER[0] + 0.055, END_CENTER[1] - 0.015),
 }
-DIMENSION_CALLOUTS = {"BodyDiaDim": f"{THREAD} UNC-2A"}
+DIMENSION_CALLOUTS = {
+    "BodyDiaDim": f"{THREAD} UNC-2A",
+    "BodyLenDim": "+/-0.10",
+    "SlotWDim": "+/-0.10",
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -107,6 +112,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # exposes the driver slot across the OD.
     for view in (front, end):
         set_hidden_lines_visible(adapter, view)
+    thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
+    if (thread_seeds, thread_instances) != (1, 1):
+        raise RuntimeError(
+            "expected one cosmetic external thread in front view, got "
+            f"{thread_seeds} seeds / {thread_instances} instances"
+        )
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"

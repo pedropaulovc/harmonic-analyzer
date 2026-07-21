@@ -71,7 +71,7 @@ FRONT_KEEP = {
 # No second orthographic view carries dimensions; keep the test contract honest.
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "THRU, RUNNING FIT",
+    "ShaftBoreDia": "+0.00/-0.05 THRU",
     "BallRadius": "SPHERICAL",
     "BaseRadius": "(DIA 13 PAD)",
 }

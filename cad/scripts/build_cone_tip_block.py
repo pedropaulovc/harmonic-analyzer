@@ -29,7 +29,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     PANEL_BLACK,
     SketchDims,
     apply_color,
@@ -56,6 +55,7 @@ from _drawing_marks import (
 )
 from cone_tip_block_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
 from _holes import (
+    CLEARANCE_MM,
     DRILL_POINT_H,
     HoleSpec,
     blind_cut_dia_mm,
@@ -69,7 +69,7 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it ri
 BLOCK_X = 14.0  # plan width across the shaft (low)
 BLOCK_Z = 12.0  # plan depth along the shaft (low)
 BLOCK_HEIGHT = 55.0  # bore at 47.65 + headroom for the pinch cross-bore (low)
-BORE_DIA = 0.03125 * IN  # 0.79375: the shaft's 1/32" tip stub (ch. 12 SECTIONS)
+BORE_DIA = 0.819  # finished 0.814..0.824 over shaft max 0.794
 BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
 
 BORE_RADIUS = BORE_DIA / 2.0
@@ -94,6 +94,8 @@ SLIT_DEPTH = 8.0  # top face down past the bore line (55.0 -> 47.0)
 # imported by the assembly as TIP_PINCH_BORE_DIA.
 PINCH_BORE_SPEC = HoleSpec("tapped", "#3-48")
 PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)  # 1.994 tap drill
+PINCH_CLEARANCE_SPEC = HoleSpec("clearance", "#3", end="through_next")
+PINCH_CLEARANCE_DIA = CLEARANCE_MM[("#3", "normal")]  # 2.946 near jaw only
 PINCH_BORE_Y = 53.2  # between the counterbore top and the block top
 
 # The pinch cross-bore must land wholly in the material band between the
@@ -263,7 +265,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "top slit", volume - _slit_removed(), 0.02 * _slit_removed()
     )
 
-    # Pinch screw cross-bore: ONE native Hole Wizard #3-48 TAPPED hole through
+    # Pinch screw cross-bore: native #3-48 tap through both jaws, followed by a
+    # #3 NORMAL clearance through the +X near jaw only.  The resulting finished
+    # feature is the conventional pinch joint: screw slips through the head-side
+    # jaw and pulls against threads in the far jaw.
     # along local X at (y = PINCH_BORE_Y, z = 0), drilled from the +X block face
     # (a clean planar rectangle -- the top slit only removes the |x|<SLIT_W/2
     # centre). The top slit splits it into two solid halves, so a through-all
@@ -277,6 +282,22 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += pinch_cut.placement_drive_jobs
     v_pinch = math.pi * (PINCH_BORE_DIA / 2.0) ** 2 * (BLOCK_X - SLIT_W)
     volume = await volume_check(adapter, "pinch bore", volume - v_pinch, 0.05 * v_pinch)
+
+    pinch_clearance = wizard_holes(
+        adapter, PINCH_CLEARANCE_SPEC,
+        [[BLOCK_X / 2.0, PINCH_BORE_Y, 0.0]],
+        (1.0, 0.0, 0.0), "pinch near-jaw clearance (#3 normal)",
+        name="PinchClearance",
+        placement_dims=[((None, None), ("PinchZ", '"PinchBoreY"'))],
+    )
+    drive_jobs += pinch_clearance.placement_drive_jobs
+    near_jaw = (BLOCK_X - SLIT_W) / 2.0
+    v_clearance = math.pi * (
+        (PINCH_CLEARANCE_DIA / 2.0) ** 2 - (PINCH_BORE_DIA / 2.0) ** 2
+    ) * near_jaw
+    volume = await volume_check(
+        adapter, "pinch clearance", volume - v_clearance, 0.08 * v_clearance
+    )
 
     # Named bore axis for the view-independent coaxial mate: the shaft tip
     # positions this block (coaxial + axial distance), no face picks.

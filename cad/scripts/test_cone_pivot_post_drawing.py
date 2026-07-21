@@ -35,14 +35,14 @@ def test_marked_dimensions_cover_the_column_and_journal() -> None:
 
 def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     notes = cone_pivot_post_spec.DRAWING_NOTES
-    assert "RUNNING" in notes
+    assert "9.545-9.555" in notes
     # The oblique, offset crank bore is fully called out by note (dia, height,
     # tip, offset direction) since it projects as an ellipse in every square view.
     assert "CRANK BORE" in notes
     assert "10.025" in notes
     assert "85.835" in notes
-    assert "12.52 DEG" in notes
-    assert "VIEW-RIGHT" in notes  # the offset direction is defined, not "east"
+    assert "12.52 +/-0.10 DEG" in notes
+    assert "CLOCKWISE FROM B" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -50,7 +50,7 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
 
 def test_native_gdt_controls_the_journal_bore() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
+    assert source.count("add_datum_feature(") == 2
     assert source.count("add_feature_control_frame(") == 1
     # The horizontal bore axis is PARALLEL to the horizontal foot seat (datum A).
     assert source.count('characteristic="parallelism"') == 1
@@ -72,5 +72,6 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-pivot-post")
     assert "A48" in str(config["material_specification"])
+    assert "A48" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1

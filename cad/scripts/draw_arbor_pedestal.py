@@ -29,7 +29,6 @@ from arbor_pedestal_spec import BORE_DIA, BORE_HEIGHT, FOOT_HEIGHT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
-    remove_notes_matching,
 )
 
 
@@ -73,8 +72,9 @@ FRONT_KEEP = {
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
+    "ScrewZ": (TOP_CENTER[0] - 0.030, TOP_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"BoreDia": "THRU, ARBOR CLAMP FIT"}
+DIMENSION_CALLOUTS = {"BoreDia": "+/-0.010 THRU"}
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
 # 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).
 DIMENSION_PRECISION = {"BoreDia": 3}
@@ -177,12 +177,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-
-    # The #4 flange hold-down is a native Hole Wizard clearance feature, so the
-    # model-item import may bring SolidWorks' descriptive callout note for it;
-    # it duplicates the prose note, so drop it if present (best-effort -- a
-    # clearance hole does not always carry one).
-    remove_notes_matching(adapter, "Clearance")
 
     return await finalize_drawing(
         adapter,

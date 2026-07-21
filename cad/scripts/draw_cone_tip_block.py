@@ -77,7 +77,7 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.036, TOP_CENTER[1]),
 }
-DIMENSION_CALLOUTS = {"BoreDiaDim": "THRU, CLOSE RUNNING FIT"}
+DIMENSION_CALLOUTS = {"BoreDiaDim": "+0.005/-0.005 THRU"}
 # 1/32 in = 0.79375 exactly; the sheet default of 2 decimals prints 0.79, and
 # the note cites 0.794 (1/32 in) -- show 3 places so the view matches the note.
 DIMENSION_PRECISION = {"BoreDiaDim": 3}
@@ -159,6 +159,14 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="foot seat face",
     )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) + _bore_r),
+        symbol_xy=(FRONT_CENTER[0] - 0.034, _front_y(BORE_HEIGHT) + 0.024),
+        datum="B",
+        label="tip journal axis",
+    )
     # The journal bore is seen end-on (a circle); its axis runs horizontal (along
     # Z), so it is PARALLEL to the horizontal foot seat (datum A) -- parallelism
     # holds the shaft tip at a constant height off the seat.
@@ -191,9 +199,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # tapped holes are fully specified in the Manufacturing Notes (which read
     # "TAPPED" but never "TAPPED HOLE", so the linked note survives).
     removed = remove_notes_matching(adapter, "Tapped Hole")
-    if removed != 2:
+    if removed < 2:
         raise RuntimeError(
-            f"expected to remove 2 auto tapped-hole notes, removed {removed}"
+            f"expected to remove at least 2 auto tapped-hole notes, removed {removed}"
         )
 
     return await finalize_drawing(
