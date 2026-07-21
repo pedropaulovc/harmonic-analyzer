@@ -33,7 +33,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_lever_spec import BORE, HUB_LEN, HUB_OD, ROD_LEN
+from pinion_lever_spec import BORE, HUB_LEN, HUB_OD, ROD_LEN, ROD_ROOT_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -154,6 +154,7 @@ async def build(adapter: Any) -> dict[str, str]:
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
     flat_face_x = RIGHT_CENTER[0] - HUB_LEN * SHEET_SCALE[0] / 2000.0
     flat_face = (flat_face_x, hub_center[1])
+    grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
     add_datum_feature(
         adapter,
         front,
@@ -189,6 +190,19 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.05",
         datums=("A",),
         label="lever flat-face perpendicularity",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=grip_edge,
+        frame_xy=(0.125, 0.245),
+        characteristic="position",
+        tolerance="0.05",
+        datums=("A", "B"),
+        diameter=True,
+        quantity="GRIP AXIS",
+        label="lever grip-axis position",
+        entity_type="SILHOUETTE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.045)
