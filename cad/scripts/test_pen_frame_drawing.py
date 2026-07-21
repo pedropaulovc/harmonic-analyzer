@@ -28,6 +28,8 @@ def test_notes_describe_the_yoke_and_set_screw() -> None:
     notes = pen_frame_spec.DRAWING_NOTES
     assert "#4-40 UNC-2B" in notes
     assert "WINDOW" in notes
+    assert "10.25 +/-0.05 FROM LEFT OUTER FACE" in notes
+    assert "MID-DEPTH CENTER PLANE" in notes
     assert "CDA" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -39,9 +41,8 @@ def test_view_scales_are_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(2, 1)" in source
     assert pen_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 2:1"
-    assert pen_frame_spec.LEFT_VIEW_NOTE == "LEFT-SIDE VIEW SCALE 2:1"
-    assert '"*Left"' in source
-    assert '"*Right"' not in source
+    assert pen_frame_spec.RIGHT_VIEW_NOTE == "RIGHT-SIDE VIEW SCALE 2:1"
+    assert '"*Right"' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

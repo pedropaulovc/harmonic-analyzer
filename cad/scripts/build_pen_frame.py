@@ -52,7 +52,7 @@ from pen_frame_spec import (
     DRAWING_NOTES,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
-    LEFT_VIEW_NOTE,
+    RIGHT_VIEW_NOTE,
 )
 
 PART_NAME = "pen-frame"
@@ -207,7 +207,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
-            "Left View Note": LEFT_VIEW_NOTE,
+            "Right View Note": RIGHT_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
