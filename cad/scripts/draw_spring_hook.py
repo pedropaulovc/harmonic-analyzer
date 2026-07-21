@@ -19,6 +19,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _early_bound,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -74,7 +75,8 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 def _shank_silhouette(adapter: Any, view: Any) -> Any:
     """Return the longest visible straight silhouette of the shank."""
     name = view_name(adapter, view)
-    if not adapter.currentModel.ActivateView(name):
+    drawing_doc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing_doc.ActivateView(name):
         raise RuntimeError(f"failed to activate spring-hook drawing view {name!r}")
     components = adapter._attempt(lambda: view.GetVisibleComponents()) or ()
     candidates: list[tuple[float, Any]] = []
