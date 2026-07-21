@@ -396,7 +396,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(2.5)),
-        symbol_xy=(0.068, _front_y(2.5)),
+        # Keep the tag on the inboard side of the datum edge.  Its short
+        # rightward leader stays clear of the datum-B perpendicularity frame.
+        symbol_xy=(0.086, _front_y(2.5)),
         datum="B",
         label="left foot side",
         entity=side_entity,
