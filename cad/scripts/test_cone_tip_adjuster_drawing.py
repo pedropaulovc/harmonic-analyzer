@@ -66,6 +66,20 @@ def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> N
     assert "OVERALL LENGTH" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "POSITION FCF APPLIES TO THE SLOT MEDIAN PLANE" in notes
+    assert "REFERENCE THREAD ROOT ENVELOPE" in notes
+
+
+def test_thread_axis_datum_and_slot_position_are_native_controls() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_add_axis_datum_to_dimension(" in source
+    assert 'end_by_name["BodyDiaDim"]' in source
+    assert 'label="driver-slot median-plane position"' in source
+    assert 'quantity="SLOT MEDIAN PLANE"' in source
+    assert 'characteristic="position"' in source
+    assert 'datums=("A",)' in source
+    assert 'add_note(adapter, "SLOT END VIEW"' in source
+    assert 'add_note(adapter, "CUP END VIEW"' in source
 
 
 def test_view_scales_are_explicit() -> None:

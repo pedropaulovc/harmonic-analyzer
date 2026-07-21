@@ -10,7 +10,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
@@ -25,9 +24,18 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_tip_adjuster_spec import BODY_DIA, BODY_LEN, CHAMFER, CUP_DIA, THREAD
+from cone_tip_adjuster_spec import (
+    BODY_DIA,
+    BODY_LEN,
+    CHAMFER,
+    CUP_DIA,
+    SLOT_W,
+    THREAD,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -102,6 +110,34 @@ def _circular_edge(
     return edge
 
 
+def _add_axis_datum_to_dimension(
+    adapter: Any,
+    annotation: Any,
+    *,
+    datum: str,
+    symbol_xy: tuple[float, float],
+) -> None:
+    """Attach a datum axis to the cylindrical feature-of-size dimension."""
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    annotation = _early_bound(annotation, "IAnnotation", "Select2")
+    if not annotation.Select2(False, 0):
+        raise RuntimeError("failed to select thread diameter dimension for datum A")
+    tag = draw.InsertDatumTag2()
+    if tag is None:
+        raise RuntimeError("failed to insert datum A on thread diameter dimension")
+    tag = _early_bound(tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel")
+    if not tag.SetLabel(datum):
+        raise RuntimeError(f"failed to label thread-axis datum {datum}")
+    tag_annotation = _early_bound(tag.GetAnnotation(), "IAnnotation", "SetPosition2")
+    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+        raise RuntimeError(f"failed to position thread-axis datum {datum}")
+    if str(tag.GetLabel()) != datum:
+        raise RuntimeError(f"thread-axis datum {datum} did not persist")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -172,24 +208,20 @@ async def build(adapter: Any) -> dict[str, str]:
         DIMENSION_CALLOUTS,
     )
     set_reference_dimensions(adapter, end_annotations, ("BodyDiaDim",))
+    end_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in end_annotations
+    }
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the head end view")
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
-    thread_edge = _circular_edge(
-        front,
-        radius_mm=BODY_DIA / 2.0,
-        center_y_mm=BODY_LEN - CHAMFER,
-    )
-    add_datum_feature(
+    _add_axis_datum_to_dimension(
         adapter,
-        front,
-        edge_xy=(FRONT_CENTER[0] + 0.028, FRONT_CENTER[1]),
-        symbol_xy=(FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.025),
+        end_by_name["BodyDiaDim"],
         datum="A",
-        label="thread pitch-cylinder axis",
-        entity=thread_edge,
+        symbol_xy=(END_CENTER[0] + 0.075, END_CENTER[1] + 0.028),
     )
     cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
     add_feature_control_frame(
@@ -204,6 +236,24 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cup axis position",
         entity=cup_edge,
     )
+    add_feature_control_frame(
+        adapter,
+        end,
+        edge_xy=(
+            END_CENTER[0],
+            END_CENTER[1] + SLOT_W / 2.0 * SHEET_SCALE[0] / 1000.0,
+        ),
+        frame_xy=(END_CENTER[0] + 0.065, END_CENTER[1] - 0.040),
+        characteristic="position",
+        tolerance="0.10",
+        datums=("A",),
+        quantity="SLOT MEDIAN PLANE",
+        label="driver-slot median-plane position",
+    )
+    if add_note(adapter, "SLOT END VIEW", 0.070, 0.132) is None:
+        raise RuntimeError("failed to label slot end view")
+    if add_note(adapter, "CUP END VIEW", 0.165, 0.132) is None:
+        raise RuntimeError("failed to label cup end view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
 
