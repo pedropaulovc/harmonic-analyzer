@@ -44,6 +44,7 @@ from amplitude_bar_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
+    view_outline,
 )
 
 
@@ -78,6 +79,22 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
         FRONT_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
         FRONT_CENTER[1] + (my - _BBOX_CY) * _S / 1000.0,
     )
+
+
+def _view_center_delta(
+    adapter: Any, view: Any, intended: tuple[float, float], label: str
+) -> tuple[float, float]:
+    """Return the actual geometry-center offset from the authored view center."""
+    outline = view_outline(adapter, view)
+    if outline is None:
+        raise RuntimeError(f"{label} drawing view has no outline")
+    cx = (outline[0] + outline[2]) / 2.0
+    cy = (outline[1] + outline[3]) / 2.0
+    _telemetry.debug(
+        f"{label} view geometry center ({cx:.4f}, {cy:.4f}) vs intended "
+        f"({intended[0]:.4f}, {intended[1]:.4f})"
+    )
+    return cx - intended[0], cy - intended[1]
 
 
 FRONT_KEEP = {
@@ -137,6 +154,11 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
+    top_dx, top_dy = _view_center_delta(adapter, top, TOP_CENTER, "top")
+
+    def top_pt(x: float, y: float) -> tuple[float, float]:
+        return x + top_dx, y + top_dy
+
     # Square section on the top end view (4:1): width (X) horizontal, depth (Z)
     # vertical.
     half_w = BAR_WIDTH * _TOP_SCALE / 2000.0
@@ -144,17 +166,17 @@ async def build(adapter: Any) -> dict[str, str]:
     add_edge_dimension(
         adapter,
         top,
-        p0=(TOP_CENTER[0] - half_w, TOP_CENTER[1]),
-        p1=(TOP_CENTER[0] + half_w, TOP_CENTER[1]),
-        text_xy=(TOP_CENTER[0], TOP_CENTER[1] + 0.024),
+        p0=top_pt(TOP_CENTER[0] - half_w, TOP_CENTER[1]),
+        p1=top_pt(TOP_CENTER[0] + half_w, TOP_CENTER[1]),
+        text_xy=top_pt(TOP_CENTER[0], TOP_CENTER[1] + 0.024),
         label="section width",
     )
     add_edge_dimension(
         adapter,
         top,
-        p0=(TOP_CENTER[0], TOP_CENTER[1] - half_d),
-        p1=(TOP_CENTER[0], TOP_CENTER[1] + half_d),
-        text_xy=(TOP_CENTER[0] + 0.024, TOP_CENTER[1]),
+        p0=top_pt(TOP_CENTER[0], TOP_CENTER[1] - half_d),
+        p1=top_pt(TOP_CENTER[0], TOP_CENTER[1] + half_d),
+        text_xy=top_pt(TOP_CENTER[0] + 0.024, TOP_CENTER[1]),
         label="section depth",
     )
 
