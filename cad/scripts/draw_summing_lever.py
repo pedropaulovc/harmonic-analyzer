@@ -105,7 +105,9 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "PlateWidth": (0.230, 0.135),
     "PlateLength": (0.245, TOP_CENTER[1]),
-    "AnchorOuterDia": (0.055, 0.070),
+    # Left of the anchor eye, above the notes block -- the old (0.055, 0.070)
+    # planted the Ø19.05 text inside the Manufacturing Notes paragraph.
+    "AnchorOuterDia": (0.052, 0.132),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
