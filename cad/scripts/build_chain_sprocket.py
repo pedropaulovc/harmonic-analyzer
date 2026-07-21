@@ -242,7 +242,6 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-
     return await save_part_and_images(adapter, PART_NAME)
 
 
