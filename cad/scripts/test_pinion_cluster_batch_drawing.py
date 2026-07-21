@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import _config
 import crank_handle_spec
 import pinion_bracket_spec
@@ -11,6 +14,7 @@ import pinion_handle_spec
 import pinion_lever_spec
 import pinion_pivot_shaft_spec
 import pinion_spring_spec
+from _buildgraph import module_deps_of
 
 
 SHEETS = (
@@ -70,3 +74,31 @@ def test_part_numbers_are_unique_across_the_complete_registry() -> None:
 def test_new_pin_and_spring_numbers_follow_the_existing_registry_tail() -> None:
     assert _config.parts("pinion-cam-pin")["number"] == "MHA-113"
     assert _config.parts("pinion-spring")["number"] == "MHA-114"
+
+
+def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
+    scripts = Path(__file__).resolve().parent
+    deps = {Path(path).name for path in module_deps_of(scripts / "build_drive_train_assembly.py")}
+    drawing_only = {
+        "pinion_cam_spec.py",
+        "pinion_cam_pin_spec.py",
+        "pinion_handle_spec.py",
+        "pinion_lever_spec.py",
+        "pinion_spring_spec.py",
+    }
+    assert deps.isdisjoint(drawing_only)
+    assert {
+        "pinion_cam_geometry.py",
+        "pinion_cam_pin_geometry.py",
+        "pinion_handle_geometry.py",
+        "pinion_lever_geometry.py",
+        "pinion_spring_geometry.py",
+    } <= deps
+
+
+def test_drive_train_does_not_duplicate_bracket_geometry_constants() -> None:
+    source = (Path(__file__).resolve().parent / "build_drive_train_assembly.py").read_text(
+        encoding="utf-8"
+    )
+    for name in ("STRAP_T", "STRAP_R_END", "STRAP_C2C"):
+        assert re.search(rf"^\s*{name}\s*=", source, re.MULTILINE) is None

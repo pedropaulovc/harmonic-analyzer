@@ -16,15 +16,17 @@ one source of truth.
 
 from __future__ import annotations
 
-THICK = 0.8  # strip thickness (photo-scaled vs the 5.0 strap)
-WIDTH = 4.0  # strip width = extrude depth, inside the strap's z band
-FOOT_LEN = 31.0  # flat screw-down foot on the base, pointing WEST
-R_BEND = 2.0  # foot-to-blade bend
-R_KINK = 1.5  # the subtle bend-back near the top
-KINK_DEG = 20.0  # turn back west near the tip
-FLAT_LEN = 2.0  # free flat above the kink
-BLADE_TILT_DEG = 12.38  # blade lean off the foot plane (= strap parked lean)
-BLADE_STRAIGHT_LEN = 39.6410821736783  # tangent length between the two bends
+from pinion_spring_geometry import (
+    BLADE_STRAIGHT_LEN as BLADE_STRAIGHT_LEN,
+    BLADE_TILT_DEG as BLADE_TILT_DEG,
+    FLAT_LEN as FLAT_LEN,
+    FOOT_LEN as FOOT_LEN,
+    KINK_DEG as KINK_DEG,
+    R_BEND as R_BEND,
+    R_KINK as R_KINK,
+    THICK as THICK,
+    WIDTH as WIDTH,
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {"FootLen", "BendR", "KinkR", "FlatLen"},

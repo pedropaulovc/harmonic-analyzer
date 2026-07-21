@@ -10,11 +10,13 @@ marked-dimension map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
-PIN_DIA = 4.0  # press fit in the strap's blind edge bore (pinion_bracket PIN_BORE)
-PIN_LEN = 15.0  # cylindrical shank; the 0.8 crown is additional
-SEAT_LEN = 4.0  # into the blind edge bore (clear of the strap pivot bore)
-CAP_SAG = 0.8  # domed outer end crown height
-CAP_RADIUS = ((PIN_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
+from pinion_cam_pin_geometry import (
+    CAP_RADIUS as CAP_RADIUS,
+    CAP_SAG as CAP_SAG,
+    PIN_DIA as PIN_DIA,
+    PIN_LEN as PIN_LEN,
+    SEAT_LEN as SEAT_LEN,
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia"},

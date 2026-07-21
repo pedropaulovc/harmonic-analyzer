@@ -575,10 +575,13 @@ from build_pinion_arbor import (  # noqa: E402
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
+    C2C as STRAP_C2C,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,
     PIN_SEAT as FPIN_SEAT,
     PIVOT_BORE as STRAP_PIVOT_BORE,
+    R_END as STRAP_R_END,
+    THICKNESS as STRAP_T,
 )
 from build_pinion_pivot_block import (  # noqa: E402
     BLOCK_DEPTH,
@@ -598,12 +601,12 @@ from pinion_cam_geometry import (  # noqa: E402
     CAM_OD,
     ECC as CAM_ECC,
 )
-from build_pinion_cam_pin import (  # noqa: E402
+from pinion_cam_pin_geometry import (  # noqa: E402
     PIN_DIA as FPIN_DIA,
     PIN_LEN as FPIN_LEN,
     SEAT_LEN as FPIN_SEAT_LEN,
 )
-from build_pinion_lever import (  # noqa: E402
+from pinion_lever_geometry import (  # noqa: E402
     CAP_SAG as LEVER_CAP_SAG,
     HUB_LEN as LEVER_HUB_LEN,
     ROD_LEN as LEVER_ROD_LEN,
@@ -611,7 +614,7 @@ from build_pinion_lever import (  # noqa: E402
     ROD_TIP_DIA as LEVER_ROD_TIP_DIA,
     WALL_T as LEVER_WALL_T,
 )
-from build_pinion_handle import (  # noqa: E402
+from pinion_handle_geometry import (  # noqa: E402
     GRIP_DIA as HANDLE_GRIP_DIA,
     GRIP_LEN as HANDLE_GRIP_LEN,
     CAP_SAG as HANDLE_CAP_SAG,
@@ -619,7 +622,7 @@ from build_pinion_handle import (  # noqa: E402
     TUBE_LEN as HANDLE_TUBE_LEN,
     WALL_T as HANDLE_WALL_T,
 )
-from build_pinion_spring import (  # noqa: E402
+from pinion_spring_geometry import (  # noqa: E402
     AXIS_OFFSET as SPRING_AXIS_OFF,
     FLAT_TIP as SPR_FLAT_TIP_L,
     FOOT_END as SPR_FOOT_END_L,
@@ -1009,10 +1012,8 @@ APINION_DRUM_LEN = 143.2  # build_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = -75.0  # drum front end face (station coverage asserted below)
 APINION_Z_BACK = APINION_Z_FRONT + APINION_DRUM_LEN  # +68.2
 PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot block bore height
-STRAP_T = 5.0  # build_pinion_bracket THICKNESS
-STRAP_R_END = 9.0  # build_pinion_bracket WIDTH / 2 (must match): end-cap radius
-STRAP_C2C = 43.0  # build_pinion_bracket C2C (was 31: the drive axis now sits
-# 42.0 above the pivot bore, so the strap grew with the level-pinion layout)
+# Bracket thickness, end radius and pivot-to-arbor spacing come from the
+# geometry-only contract imported above.
 STRAP_AIR = 0.25  # axial air each side of each strap
 PIVOT_X = APINION_X + math.sqrt(
     STRAP_C2C**2 - (APINION_Y - PIVOT_Y) ** 2
@@ -1121,7 +1122,7 @@ if _LEV_STUB_D < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.2
 # gated. The cam engage path (PR5, below) defines the engaged pose; flexed
 # spring geometry for it stays deferred -- issue #158 (the channel springs'
 # stretchNN precedent is the eventual shape of the fix).
-# Geometry is IMPORTED from build_pinion_spring (machine = part local +
+# Geometry is imported from pinion_spring_geometry (machine = part local +
 # (SPRING_X, Y_BASE_TOP)). The thin wall is ONE-sided; the part's 1%-tol
 # volume gate pins the probed side (right-of-travel: under the foot, EAST
 # of the blade/flat centreline), but every clearance that can afford it

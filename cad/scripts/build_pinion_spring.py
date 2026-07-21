@@ -59,7 +59,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _holes import blind_cut_dia_mm, wizard_holes
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -93,6 +93,28 @@ from pinion_spring_spec import (
     THICK,
     WIDTH,
 )
+from pinion_spring_geometry import (
+    AXIS_OFFSET,
+    BEND_CX,
+    BEND_CY,
+    BEND_EXIT,
+    FLAT_TIP,
+    FOOT_END,
+    FOOT_TAN,
+    FOOT_Y,
+    HOLE_DIA,
+    HOLE_FROM_END,
+    HOLE_SPEC,
+    KINK_C,
+    KINK_EXIT,
+    KINK_START,
+    PIVOT_LX,
+    PIVOT_LY,
+    VOLUME,
+    _A1,
+    _A2,
+    _BLADE_LEN,
+)
 
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
@@ -102,78 +124,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Manufacturing Notes",
     "Isometric View Note",
 )
-
-# Machine-frame derivation (build_drive_train_assembly owns placement + the
-# clearance asserts; local frame = machine - (9.04, 50.8)): the blade
-# centreline runs parallel to the strap axis (pivot machine (1.16, 62.8)),
-# offset 10.1 east = 9 strap half-width + 0.25 min air + 0.8 worst-case thin
-# side, ending 36.0 along the axis from the pivot -- below the strap's top
-# cap, clear of the lift rod and 2.0 off the 120T drum tips.
-PIVOT_LX = 1.16 - 9.04  # strap pivot bore, local frame
-PIVOT_LY = 62.8 - 50.8
-AXIS_OFFSET = 10.1  # strap axis -> blade centreline, east
-KINK_T = 32.0  # pivot -> kink start (the contact crest), along the strap axis
-FOOT_Y = 0.8  # foot centreline above the base top (= THICK: flush if the
-# thin side falls down, 0.8 float if up -- either passes the gates)
-# Foot screw hole (PR7 item 11): the black foot screw (build_foot_screw, O2.9
-# shank) bolts the foot down -- 0.4 rims in the 4-wide strip. #4 clearance
-# NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim; same foot
-# screw as build_arbor_pedestal's flange hole).
-HOLE_SPEC = HoleSpec("clearance", "#4")
-HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)  # 3.251; re-exposed for the drive-train
-# assembly's foot-screw clearance assert (build_drive_train_assembly)
-HOLE_FROM_END = 3.1  # hole centre east of the foot's free (west) end: the
-# O5.5 head sits fully on the strip (0.35 rim to the end) yet 0.46 clear
-# of the lift rod's west flank crossing above (build_drive_train asserts)
-
-_TH = math.radians(BLADE_TILT_DEG)
-_U = (math.sin(_TH), math.cos(_TH))  # up the blade, leaning east
-_N = (math.cos(_TH), -math.sin(_TH))  # east normal of the strap axis
-
-# Bend centre: on the blade line pulled R_BEND back WEST (the foot points
-# west, the same side as the top bend-back), at foot height + R_BEND
-# (tangent to the horizontal foot from above).
-BEND_CY = FOOT_Y + R_BEND
-BEND_CX = PIVOT_LX + (AXIS_OFFSET - R_BEND - (BEND_CY - PIVOT_LY) * _N[1]) / _N[0]
-BEND_EXIT = (BEND_CX + R_BEND * _N[0], BEND_CY + R_BEND * _N[1])
-FOOT_TAN = (BEND_CX, FOOT_Y)
-FOOT_END = (BEND_CX - FOOT_LEN, FOOT_Y)
-KINK_START = (
-    PIVOT_LX + KINK_T * _U[0] + AXIS_OFFSET * _N[0],
-    PIVOT_LY + KINK_T * _U[1] + AXIS_OFFSET * _N[1],
-)  # = the parked contact crest (tangent parallel to the strap axis there)
-KINK_C = (KINK_START[0] - R_KINK * _N[0], KINK_START[1] - R_KINK * _N[1])
-# Arcs sweep CCW p1 -> p2: the kink turns WEST (heading angle increases),
-# so p1 = the kink start, p2 = the exit onto the flat.
-_A1 = math.atan2(_N[1], _N[0])  # kink start azimuth on its circle (-12.38)
-_A2 = _A1 + math.radians(KINK_DEG)
-KINK_EXIT = (KINK_C[0] + R_KINK * math.cos(_A2), KINK_C[1] + R_KINK * math.sin(_A2))
-_FLAT_DIR = (
-    math.sin(math.radians(BLADE_TILT_DEG - KINK_DEG)),
-    math.cos(math.radians(BLADE_TILT_DEG - KINK_DEG)),
-)  # 7.62 deg west of vertical
-FLAT_TIP = (
-    KINK_EXIT[0] + FLAT_LEN * _FLAT_DIR[0],
-    KINK_EXIT[1] + FLAT_LEN * _FLAT_DIR[1],
-)
-
-# Centreline path length; the one-sided thin material rides R +/- t/2 on the
-# arcs, so the exact volume depends on the wall side. Probed live (PR4, and
-# re-probed with the PR7 kink): SolidWorks lays the wall on the RIGHT of the
-# foot->tip traversal -- the passing east-foot volume decomposed as bend
-# INSIDE its radius + kink OUTSIDE its own, which is exactly right-of-travel
-# (the earlier "west of centreline" prose mislabelled it). With the foot now
-# pointing WEST the traversal heads east then turns LEFT through both arcs,
-# so right-of-travel puts the wall OUTSIDE both (and flush under the foot).
-# A side flip fails this loud; the assembly asserts stay valid either way
-# (designed worst-case both sides).
-_BEND_SWEEP = math.radians(90.0 - BLADE_TILT_DEG)
-_BLADE_LEN = math.hypot(KINK_START[0] - BEND_EXIT[0], KINK_START[1] - BEND_EXIT[1])
-PATH_LEN = (FOOT_LEN + R_BEND * _BEND_SWEEP + _BLADE_LEN
-            + R_KINK * math.radians(KINK_DEG) + FLAT_LEN)
-_ARC_SIDE = (math.radians(KINK_DEG) + _BEND_SWEEP) * (THICK / 2.0) * THICK
-VOLUME = (PATH_LEN * THICK + _ARC_SIDE) * WIDTH  # ~181.0 (right-of-travel wall)
-
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters

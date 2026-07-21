@@ -10,16 +10,18 @@ map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
-ROD_ROOT_DIA = 4.0  # rod diameter where it leaves the clamp hub (thin end)
-ROD_TIP_DIA = 6.0  # rod diameter at the grip tip (fat end)
-ROD_LEN = 86.0  # hub centre to tip
-ROD_Y0 = 3.5  # rod base above the hub centre (buried under the hub OD)
-HUB_OD = 13.0  # clamp hub cylinder OD
-HUB_LEN = 10.0  # hub length along the lift rod (z -5..+5)
-BORE = 6.35  # clamp bore -- grips the Ø6.35 lift rod
-WALL_T = 2.0  # blind wall behind the bore (south end)
-CAP_SAG = 1.5  # domed south cap crown height
-CAP_RADIUS = ((HUB_OD / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
+from pinion_lever_geometry import (
+    BORE as BORE,
+    CAP_RADIUS as CAP_RADIUS,
+    CAP_SAG as CAP_SAG,
+    HUB_LEN as HUB_LEN,
+    HUB_OD as HUB_OD,
+    ROD_LEN as ROD_LEN,
+    ROD_ROOT_DIA as ROD_ROOT_DIA,
+    ROD_TIP_DIA as ROD_TIP_DIA,
+    ROD_Y0 as ROD_Y0,
+    WALL_T as WALL_T,
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
