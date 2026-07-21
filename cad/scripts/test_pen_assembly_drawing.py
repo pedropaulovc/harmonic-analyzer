@@ -35,9 +35,9 @@ def test_required_drawing_paths() -> None:
 
 
 def test_part_rows_keep_their_part_source() -> None:
-    """The assembly extension must not disturb the six part-drawing rows."""
+    """The assembly rows must not disturb the part-drawing rows."""
     for spec in DRAWINGS:
-        if spec.name == "pen_assembly":
+        if spec.source_kind == "assembly":
             continue
         assert spec.source_kind == "part"
         assert spec.source.as_posix().endswith(f"/out/sldprt/{spec.artifact_stem}.SLDPRT")

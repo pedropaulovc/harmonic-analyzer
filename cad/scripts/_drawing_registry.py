@@ -579,6 +579,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="thumb-screw",
         script_name="draw_thumb_screw.py",
     ),
+    DrawingSpec(
+        name="summing_assembly",
+        part="summing",
+        artifact_stem="summing-assembly",
+        script_name="draw_summing_assembly.py",
+        source_kind="assembly",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

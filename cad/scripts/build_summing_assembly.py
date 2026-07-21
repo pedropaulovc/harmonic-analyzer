@@ -39,10 +39,14 @@ from __future__ import annotations
 import sys
 
 from _common import (
+    apply_custom_properties,
+    apply_summary_info,
     check,
     log,
+    part_properties,
     run_build,
 )
+from _drawing_marks import DRAWN_BY
 from _assembly import (
     angle_driver,
     assert_free_dof_necessity,
@@ -195,6 +199,29 @@ async def build(adapter) -> dict[str, str]:
         adapter, 1, required_stems=("summing-lever", "boss-hook"))
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
+    # Title-block identity for the assembly drawing (draw_summing_assembly.py):
+    # part_properties supplies Title/Generator plus the TOL_* general-tolerance
+    # cells finalize_drawing hard-requires; material/finish defer to the parts
+    # list (standard assembly-drawing practice).
+    apply_custom_properties(
+        adapter,
+        {
+            **part_properties(ASM_NAME),
+            # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
+            # (a longer number overflows the DWG. NO. title-block cell).
+            "Number": "MHA-A07",
+            "Revision": "A",
+            "Revision Description": "Initial release",
+            "Material": "SEE PARTS LIST",
+            "Material Specification": "SEE PARTS LIST",
+            "Finish": "SEE PARTS LIST",
+            "Quantity": "1",
+            "Drawn By": DRAWN_BY,
+        },
+    )
+    # The PART cell resolves the document summary Title; "summing assembly" (not
+    # the bare stem) so the sheet identifies itself as an assembly drawing.
+    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
