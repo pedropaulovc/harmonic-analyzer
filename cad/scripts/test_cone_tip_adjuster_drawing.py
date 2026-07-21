@@ -37,7 +37,7 @@ def test_thread_callout_is_the_catalog_thread() -> None:
     assert "InsertCosmeticThread3" in part_source
     assert "IEntity" in part_source
     assert "import_cosmetic_threads" in drawing_source
-    assert "set_reference_dimensions(adapter, front_annotations" in drawing_source
+    assert "set_reference_dimensions(adapter, end_annotations" in drawing_source
     assert cone_tip_adjuster_spec.BODY_DIA == 6.2
     assert part.CHAMFER == drawing.CHAMFER == 0.4
     assert 'name_last_feature(adapter, "ThreadStartChamfers")' in part_source
