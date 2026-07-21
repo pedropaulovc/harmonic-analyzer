@@ -12,7 +12,7 @@ from _fastener_catalog import fastener
 
 _SCREW = fastener("cone-tip-adjuster")
 
-BODY_DIA = _SCREW.model_diameter_mm  # 7.9375: nominal 5/16 major envelope
+BODY_DIA = _SCREW.model_diameter_mm  # 6.2: interference-safe cosmetic-thread envelope
 BODY_LEN = _SCREW.length_mm  # 14.0
 THREAD = _SCREW.thread  # 5/16-18
 CUP_DIA = 2.0  # blind bore the cone-shaft tip rests in (axial end-play takeup)

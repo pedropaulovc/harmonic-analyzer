@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 from _fastener_catalog import DriveStyle, FASTENERS, Finish, HeadStyle
+from _holes import HoleSpec, blind_cut_dia_mm
 
 
 _THREADED_BUILDERS = {
@@ -65,3 +66,13 @@ def test_period_fasteners_keep_their_visible_drive_style() -> None:
     }
     assert {name for name, spec in FASTENERS.items() if spec.drive is DriveStyle.SLOT} == slotted
     assert FASTENERS["hanger-screw"].head is HeadStyle.HEX
+
+
+def test_cone_tip_adjuster_cosmetic_envelope_clears_its_tap_drill() -> None:
+    adjuster = FASTENERS["cone-tip-adjuster"]
+    tap_drill = blind_cut_dia_mm(
+        HoleSpec("tapped", adjuster.thread, end="blind", depth_mm=8.0)
+    )
+    assert adjuster.model_diameter_mm == 6.2
+    assert tap_drill == 6.528
+    assert tap_drill - adjuster.model_diameter_mm >= 0.25

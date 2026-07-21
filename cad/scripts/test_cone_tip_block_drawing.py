@@ -25,15 +25,20 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*cone_tip_block_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
-    assert marked == {"Width", "Depth", "BlockHt", "SlitW"}
+    assert marked == {"Width", "Depth", "BlockHt", "PassageDiaDim", "SlitW"}
     assert part.ADJUSTER_AXIS_HEIGHT == cone_tip_block_spec.ADJUSTER_AXIS_HEIGHT
 
 
-def test_fictional_tip_journal_is_absent() -> None:
+def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "JournalBore" not in source
     assert "BoreDiaDim" not in source
-    assert drawing.DIMENSION_CALLOUTS == {}
+    assert 'name_last_feature(adapter, "ShaftPassage")' in source
+    assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA == 2.0
+    assert drawing.DIMENSION_CALLOUTS == {
+        "PassageDiaDim": "THRU - CLEARANCE PASSAGE"
+    }
+    assert "NOT A SHAFT-BEARING SURFACE" in cone_tip_block_spec.DRAWING_NOTES
 
 
 def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:

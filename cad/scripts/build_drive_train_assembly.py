@@ -639,18 +639,21 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BORE_Y as POST_CRANK_Y,
 )
 from build_cone_tip_block import (  # noqa: E402
+    ADJUSTER_BORE_DIA as TIP_ADJ_BORE_DIA,
     ADJUSTER_BORE_DEPTH as TIP_ADJ_BORE_DEPTH,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
     PINCH_BORE_DIA as TIP_PINCH_BORE_DIA,
     PINCH_BORE_Y as TIP_PINCH_Y,
+    SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
 )
 from build_cone_tip_bushing import (  # noqa: E402
     BORE_DIA as BUSH_BORE_DIA,
     LENGTH as BUSH_LEN,
 )
 from build_cone_tip_adjuster import (  # noqa: E402
+    BODY_DIA as ADJ_BODY_DIA,
     BODY_LEN as ADJ_LEN,
     CUP_DEPTH as ADJ_CUP_DEPTH,
     CUP_DIA as ADJ_CUP_DIA,
@@ -731,10 +734,14 @@ if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 if ADJ_EMBED > TIP_ADJ_BORE_DEPTH - 0.5:
     raise AssertionError("adjuster bottoms out in the block counterbore")
+if TIP_ADJ_BORE_DIA - ADJ_BODY_DIA < 0.25:
+    raise AssertionError("modeled adjuster envelope interferes with its tap drill")
 if not (_ADJ_MOUTH + 0.5 <= _TIP_END_STATION <= _ADJ_MOUTH + ADJ_CUP_DEPTH - 0.5):
     raise AssertionError("shaft tip end does not rest inside the adjuster cup")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:
     raise AssertionError("adjuster cup too tight around the tip stub")
+if TIP_SHAFT_PASSAGE_DIA < _STUB_DIA + 0.25:
+    raise AssertionError("tip-block passage too tight around the shaft tip")
 # The pinch screw THREADS INTO the block's tapped #3-48 cross-bore: the
 # modeled shank rides at tap-drill - ~0.3 (memory/fastener-policy lag
 # precedent), so the fit is an engagement band, not the old equality.

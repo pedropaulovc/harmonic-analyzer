@@ -6,11 +6,12 @@ turning it takes up the shaft's axial end play (the 20 gears must stay
 registered against the cylinder set). The block's top slit + pinch screw
 lock the setting (see build_cone_tip_block).
 
-Body O7.9375 x 14 nominal thread-major envelope authored along +Y from the SOUTH head face (origin):
+Body O6.2 x 14 cosmetic-thread envelope authored along +Y from the SOUTH head face (origin):
 blind bore O2 x 6 from the NORTH (far) end, driver slot across the head.
 
-The physical cylinder is the 5/16 nominal major envelope; the cosmetic thread
-and UNC-2A drawing callout carry the standard thread form and limits.
+The physical cylinder is the interference-safe thread-minor envelope; the
+cosmetic thread and UNC-2A drawing callout carry the standard major diameter,
+thread form, and limits.
 
 Run (SolidWorks already open)::
 
@@ -53,7 +54,7 @@ PART_NAME = "cone-tip-adjuster"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # black-oxide screw (t00471)
 
-BODY_DIA = SPEC.model_diameter_mm  # 5/16-18 nominal major envelope
+BODY_DIA = SPEC.model_diameter_mm  # interference-safe modeled thread minor envelope
 BODY_LEN = SPEC.length_mm
 CUP_DIA = 2.0  # blind bore the shaft tip rests in
 CUP_DEPTH = 6.0
@@ -184,7 +185,7 @@ async def build(adapter) -> dict[str, str]:
     v_slot = _slot_strip_area(BODY_DIA / 2.0, SLOT_W) * SLOT_D
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.02 * v_slot)
 
-    # The physical solid is the nominal major envelope; this annotation feature
+    # The physical solid is the interference-safe minor envelope; this annotation
     # gives drawings the standard external-thread
     # representation and designation. Select the exact circular edge by its
     # measured radius/axis station: coordinate picking is view-dependent and

@@ -58,17 +58,18 @@ def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - BLOCK_HEIGHT / 2.0) * _S
 
 
-# Front elevation carries the standing block width, height, and top clamp slit.
-# The plan carries the 12 depth; the hole contract is explicit in the notes.
+# Front elevation carries the standing block width, height, shaft passage, and
+# top clamp slit. The plan carries the 12 depth.
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.014),
     "BlockHt": (FRONT_CENTER[0] - 0.028, FRONT_CENTER[1]),
+    "PassageDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(47.65)),
     "SlitW": (FRONT_CENTER[0] + 0.044, _front_y(BLOCK_HEIGHT)),
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.036, TOP_CENTER[1]),
 }
-DIMENSION_CALLOUTS: dict[str, str] = {}
+DIMENSION_CALLOUTS = {"PassageDiaDim": "THRU - CLEARANCE PASSAGE"}
 DIMENSION_PRECISION: dict[str, int] = {}
 
 

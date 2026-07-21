@@ -2,6 +2,8 @@ r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing
 
 from __future__ import annotations
 
+from cone_tip_adjuster_spec import CUP_DIA as SHAFT_PASSAGE_DIA
+
 
 MM_PER_IN = 25.4
 
@@ -14,6 +16,9 @@ BLOCK_HEIGHT = 55.0  # block height, foot to top
 ADJUSTER_AXIS_HEIGHT = 47.65  # adjuster axis above the foot
 ADJUSTER_THREAD = "5/16-18"  # blind tapped hole from the far (north) face
 ADJUSTER_DEPTH = 8.0
+# Non-bearing clearance passage from the south face into the adjuster bore. Its
+# diameter matches the already-defined adjuster cup, so the shaft tip has one
+# continuous envelope without reviving the removed fictional journal fit.
 PINCH_THREAD = "#3-48"  # cross-bore tapped hole that squeezes the top slit
 PINCH_HEIGHT = 53.2
 SLIT_W = 1.2  # top clamp slit width
@@ -21,6 +26,7 @@ SLIT_W = 1.2  # top clamp slit width
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Width", "Depth"},
     "Block": {"BlockHt"},
+    "PassageProfile": {"PassageDiaDim"},
     "SlitProfile": {"SlitW"},
 }
 
@@ -31,6 +37,8 @@ DRAWING_NOTES = "\n".join(
         "TAP-DRILL SHOULDER 8.00 +/-0.10 DEEP, STANDARD 118 DEG POINT.",
         "AXIS 47.65 +/-0.05 ABOVE A AND ON 14.00 WIDTH CENTERLINE +/-0.05;",
         "AXIS LIES IN A CYLINDRICAL ZONE DIA 0.05 PARALLEL TO DATUM A.",
+        f"SHAFT CLEARANCE PASSAGE DIA {SHAFT_PASSAGE_DIA:.2f} THRU, CONCENTRIC",
+        "WITH THE ADJUSTER AXIS; PASSAGE IS NOT A SHAFT-BEARING SURFACE.",
         "REAR FACE IS RIGHT-HAND 14 X 55 FACE IN ISOMETRIC VIEW.",
         "DRILL DIA 2.946 +0.10/-0.00 NORMAL CLEARANCE THRU RIGHT-HAND JAW",
         f"ONLY IN FRONT VIEW; TAP {PINCH_THREAD} UNC-2B THRU LEFT-HAND JAW.",
