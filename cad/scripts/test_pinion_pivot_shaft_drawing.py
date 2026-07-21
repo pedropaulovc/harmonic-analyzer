@@ -43,6 +43,8 @@ def test_sheet_runs_at_1_to_1_with_2_to_1_end_view_and_1_to_2_iso() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_pivot_shaft_spec.DRAWING_NOTES
     assert "SPHERICAL CROWN" in notes
+    assert "1.20 REF AXIAL HEIGHT" in notes
+    assert "1.20+/-0.05" not in notes
     assert "194.40 OVERALL" not in notes
     assert "6.350 MAX / 6.330 MIN" in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     # General tolerances live in the title block ONLY.

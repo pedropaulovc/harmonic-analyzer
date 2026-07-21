@@ -43,6 +43,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
     assert "SPHERICAL CROWN" in notes
+    assert "1.50 REF HIGH" in notes
+    assert "1.50+/-0.05" not in notes
     assert "DATUM A" in notes and "DATUM B" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes

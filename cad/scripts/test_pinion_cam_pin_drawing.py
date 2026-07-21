@@ -41,6 +41,8 @@ def test_sheet_runs_at_4_to_1_with_8_to_1_end_view() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_pin_spec.DRAWING_NOTES
+    assert "0.80 REF AXIAL HEIGHT" in notes
+    assert "0.80+/-0.05" not in notes
     assert "SPHERICAL" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
