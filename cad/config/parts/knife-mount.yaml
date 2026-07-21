@@ -1,5 +1,8 @@
 knife-mount:
   number: MHA-037
-  material: Brass
+  material: Gray Cast Iron
+  material_specification: ASTM A48 Class 30 gray cast iron
+  finish: black enamel; bore masked
+  quantity: 2
   tolerance_class: machined_block
-  process: "machined (brass)"
+  process: "cast + machined"
