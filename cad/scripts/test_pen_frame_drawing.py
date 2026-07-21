@@ -39,8 +39,9 @@ def test_view_scales_are_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(2, 1)" in source
     assert pen_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 2:1"
-    assert pen_frame_spec.RIGHT_VIEW_NOTE == "RIGHT-SIDE VIEW SCALE 2:1"
-    assert '"*Right"' in source
+    assert pen_frame_spec.LEFT_VIEW_NOTE == "LEFT-SIDE VIEW SCALE 2:1"
+    assert '"*Left"' in source
+    assert '"*Right"' not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

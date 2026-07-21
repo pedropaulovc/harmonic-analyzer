@@ -4,5 +4,5 @@ pen-frame:
   tolerance_class: machined_block
   process: "machined (brass)"
   material_specification: "C36000 free-machining brass"
-  finish: "draw-filed; light satin"
+  finish: "draw-filed; lay parallel to 40 mm length"
   quantity: 1
