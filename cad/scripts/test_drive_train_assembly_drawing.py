@@ -12,6 +12,15 @@ from _drawing_registry import DRAWINGS_BY_NAME
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+class _CallableChildren:
+    def GetChildren(self):
+        return ("a", "b")
+
+
+class _MaterializedChildren:
+    GetChildren = ("a", "b")
+
+
 def _load_dodo():
     spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
     assert spec is not None and spec.loader is not None
@@ -115,3 +124,8 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
     )
+
+
+def test_drawing_component_children_accepts_both_pywin32_shapes() -> None:
+    assert drawing._drawing_component_children(_CallableChildren()) == ("a", "b")
+    assert drawing._drawing_component_children(_MaterializedChildren()) == ("a", "b")

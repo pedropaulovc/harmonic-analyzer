@@ -132,6 +132,13 @@ BOTTOM_CENTER = (0.170, 0.078)
 BOM_ANCHOR = (0.248, 0.265)
 
 
+def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
+    """Return children across callable and materialized pywin32 dispatch shapes."""
+    member = drawing_component.GetChildren
+    children = member() if callable(member) else member
+    return tuple(children or ())
+
+
 @_telemetry.traced("drawing.show_bottom_balloon_components")
 def _show_bottom_balloon_components(adapter: Any, view: Any) -> None:
     """Expose the enclosed component families in the auxiliary bottom view."""
@@ -141,12 +148,12 @@ def _show_bottom_balloon_components(adapter: Any, view: Any) -> None:
     if root is None:
         raise RuntimeError("drive-train bottom view has no root drawing component")
 
-    pending = list(root.GetChildren() or ())
+    pending = list(_drawing_component_children(root))
     found: set[str] = set()
     enumerated: list[str] = []
     while pending:
         drawing_component = pending.pop()
-        children = drawing_component.GetChildren() or ()
+        children = _drawing_component_children(drawing_component)
         pending.extend(children)
 
         name = str(drawing_component.Name or "")
