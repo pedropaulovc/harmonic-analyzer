@@ -51,10 +51,12 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "JOINED" not in notes
     assert "MACHINE FROM SOLID STOCK" in notes
     assert "NO DRAFT" in notes
-    assert "PAD AND FLANGE CENTRELINES" in notes
+    assert "NEAR LONG SIDE 6.35 +/-0.10 FROM B" in notes
+    assert "NEAR LEFT END 6.35 +/-0.10 FROM C" in notes
     assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
     assert "C'BORE AXES WITHIN DIA 0.10 OF ASSOCIATED HOLE AXES" in notes
-    assert "BLIND FROM TOP" in notes
+    assert "B1 IS UNTHREADED" in notes
+    assert "A1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
     assert "A1-A4" not in notes
     assert "FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES" in notes
     assert "LOCATIONS ARE BASIC" in notes
@@ -70,9 +72,11 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GetVisibleEntities2(c, 2)" in source
     assert "GetVisibleEntities2(c, 1)" in source
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 6
+    assert source.count("add_feature_control_frame(") == 7
     assert 'quantity="4X DIA 13 THRU HOLES"' in source
-    assert 'quantity="9X BLIND TAPPED HOLES"' in source
+    assert 'quantity="8X BLIND TAPPED HOLES"' in source
+    assert 'quantity="1X DIA 6.53 BLIND HOLE"' in source
+    assert "drawing_doc.HideEdge()" in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
     assert "expected_redundant_notes=3" in source
 
@@ -109,6 +113,7 @@ def test_part_stamps_make_critical_properties() -> None:
     finish = str(config["finish"]).lower()
     assert "shade noncritical" in finish
     assert "mask a/b/c" in finish
+    assert "all holes/counterbores" in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
 
