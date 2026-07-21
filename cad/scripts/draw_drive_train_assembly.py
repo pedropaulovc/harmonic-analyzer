@@ -1,6 +1,6 @@
 r"""Create the curated assembly drawing for the drive-train subassembly.
 
-Front / right / isometric views of ``cad/out/sldasm/drive-train.SLDASM`` plus a
+Front / right / bottom / isometric views of ``cad/out/sldasm/drive-train.SLDASM`` plus a
 top-level parts BOM and auto-inserted item-number balloons, on the same
 hand-made ASME B template every part print uses. The title block resolves from
 the custom properties ``build_drive_train_assembly.py`` stamps on the assembly
@@ -120,6 +120,7 @@ ASSEMBLY_NOTES = "\n".join(
 FRONT_CENTER = (0.060, 0.150)
 RIGHT_CENTER = (0.130, 0.150)
 ISO_CENTER = (0.225, 0.140)
+BOTTOM_CENTER = (0.170, 0.078)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
 BOM_ANCHOR = (0.248, 0.265)
@@ -172,7 +173,10 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
     )
-    for view in (front, right, iso):
+    bottom = place_view(
+        adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=VIEW_SCALE
+    )
+    for view in (front, right, iso, bottom):
         set_hidden_lines_removed(adapter, view)
 
     insert_identified_bom_table(
@@ -184,14 +188,15 @@ async def build(adapter: Any) -> dict[str, str]:
         configuration_grouping="same-part",
         label="drive-train assembly",
     )
-    # Balloon the ISOMETRIC view: the pictorial keeps the cone/pinion/crank
-    # clusters visible, while the orthographic projections stack the ~30
-    # components under hidden-lines-removed.
+    # The lower platform and fastener families are occluded in the front/right
+    # pair and behind the gear ladders in the pictorial.  The bottom projection
+    # exposes those remaining BOM identities rather than accepting an
+    # incomplete balloon set.
     add_auto_balloons_across_views(
-        adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
+        adapter, (front, right, iso, bottom), expected=len(BOM_COMPONENTS),
         label="drive-train assembly balloons",
     )
-    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
+    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add drive-train assembly notes")
 
     return await finalize_drawing(

@@ -94,9 +94,10 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("add_auto_balloons_across_views(") == 1
     assert 'configuration_grouping="same-part"' in source
-    assert "adapter, (front, right, iso)" in source
+    assert "adapter, (front, right, iso, bottom)" in source
     assert source.count("add_note(") == 1
-    assert source.count("scale=VIEW_SCALE") == 3
+    assert source.count("scale=VIEW_SCALE") == 4
+    assert '"*Bottom"' in source
     assert "T006-T120" in drawing.ASSEMBLY_NOTES
     assert "CONE PLATFORM ENGAGED" in drawing.ASSEMBLY_NOTES
     assert all(
