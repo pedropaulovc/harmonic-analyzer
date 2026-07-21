@@ -51,6 +51,17 @@ def blender_exe() -> str:
     return BLENDER
 
 
+def _blender_version(exe: str) -> tuple[int, int] | None:
+    """(major, minor) reported by ``<exe> --version``, or None if undeterminable."""
+    try:
+        out = subprocess.run([exe, "--version"], capture_output=True, text=True,
+                             timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"Blender (\d+)\.(\d+)", out)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
 def resolve_blender(override: str | None = None) -> str:
     """Path to a Blender >= 5.2 for the headless worker.
 
@@ -71,9 +82,18 @@ def resolve_blender(override: str | None = None) -> str:
             found.append(((int(m.group(1)), int(m.group(2))), exe))
     if found:
         return max(found)[1]
+    # PATH fallback (Linux/macOS): the name carries no version, so query the binary --
+    # an older `blender` (4.5/5.1) here would cache an unsupported renderer and fail
+    # _run_worker deep in the gpu API, not with a clear "no 5.2" message.
     which = shutil.which("blender")
     if which:
-        return which
+        ver = _blender_version(which)
+        if ver and ver >= (5, 2):
+            return which
+        shown = ".".join(map(str, ver)) if ver else "an undeterminable version"
+        raise SystemExit(
+            f"`blender` on PATH is {shown} (< 5.2 required); install a newer Blender "
+            f"or set $HARMONIC_BLENDER / pass --blender")
     raise SystemExit(
         "no Blender >= 5.2 found; install it or set $HARMONIC_BLENDER / pass --blender")
 
