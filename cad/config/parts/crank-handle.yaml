@@ -1,5 +1,8 @@
 crank-handle:
   number: MHA-022
   material: Oak
+  material_specification: Oak or close-grained hardwood, turned
+  finish: sanded smooth, stained black, sealed
+  quantity: 1
   tolerance_class: visual_noncritical
   process: "turned (wood)"

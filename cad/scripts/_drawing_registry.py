@@ -310,6 +310,42 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_pinion_lever.py",
     ),
     DrawingSpec(
+        name="pinion_cam",
+        part="pinion_cam",
+        artifact_stem="pinion-cam",
+        script_name="draw_pinion_cam.py",
+    ),
+    DrawingSpec(
+        name="pinion_cam_pin",
+        part="pinion_cam_pin",
+        artifact_stem="pinion-cam-pin",
+        script_name="draw_pinion_cam_pin.py",
+    ),
+    DrawingSpec(
+        name="pinion_pivot_shaft",
+        part="pinion_pivot_shaft",
+        artifact_stem="pinion-pivot-shaft",
+        script_name="draw_pinion_pivot_shaft.py",
+    ),
+    DrawingSpec(
+        name="pinion_handle",
+        part="pinion_handle",
+        artifact_stem="pinion-handle",
+        script_name="draw_pinion_handle.py",
+    ),
+    DrawingSpec(
+        name="pinion_spring",
+        part="pinion_spring",
+        artifact_stem="pinion-spring",
+        script_name="draw_pinion_spring.py",
+    ),
+    DrawingSpec(
+        name="crank_handle",
+        part="crank_handle",
+        artifact_stem="crank-handle",
+        script_name="draw_crank_handle.py",
+    ),
+    DrawingSpec(
         name="boss_hook",
         part="boss_hook",
         artifact_stem="boss-hook",

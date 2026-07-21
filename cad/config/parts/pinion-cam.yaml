@@ -1,5 +1,9 @@
 pinion-cam:
   number: MHA-104
   material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finished steel
+  finish: bright machined, oiled
+  quantity: 2
   tolerance_class: machined_block
+  fit_class: shaft_in_bushing
   process: "machined (steel)"

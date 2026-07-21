@@ -60,27 +60,48 @@ from _common import (
     volume_check,
 )
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
 
 PART_NAME = "pinion-spring"
 MATERIAL = "Brass"  # p.68: the leaf reads brass against the steel strap
 
-THICK = 0.8  # strip thickness (photo-scaled vs the 5.0 strap)
-WIDTH = 4.0  # strip width = extrude depth, inside the strap's z band
-FOOT_LEN = 31.0  # flat screw-down foot on the base, pointing WEST: it
-# crosses UNDER the lift rod (rod bottom 59.6 vs foot top 51.6) and the
-# parked cam pin so its screw lands west of the whole moving rig -- in
-# page002_img01 the dark foot screw sits at frame left, past the block's
-# bright pair (the rig z-bands differ, so only the rod/pin cross above)
-R_BEND = 2.0  # foot-to-blade bend
-R_KINK = 1.5  # the subtle bend-back near the top (PR7)
-KINK_DEG = 20.0  # turn back west; the crest at the kink start is the
-# parked contact edge, the flat above it the engaged contact face
-FLAT_LEN = 2.0  # free flat above the kink. Short on purpose: the flat
-# angles 20 deg WEST of the flank it faces, so every mm of length dives
-# 0.342 toward the parked strap's n=9 flank line -- at 6.0 the last 3 mm
-# sat INSIDE the flank (a 6.28 mm^3 interference-gate hit); 2.0 leaves the
-# tip 0.32 east of it (build_drive_train asserts the tip's n-coordinate)
-BLADE_TILT_DEG = 12.38  # must match build_drive_train STRAP_LEAN_DEG magnitude
+# Primitive nominals come from the drawing spec (single source of truth shared
+# with the manufacturing print).  Design rationale, unchanged:
+#   FOOT_LEN  -- the flat screw-down foot points WEST and crosses UNDER the lift
+#                rod and parked cam pin so its screw lands west of the moving rig.
+#   KINK_DEG  -- the crest at the kink start is the parked contact edge; the flat
+#                above it is the engaged contact face.
+#   FLAT_LEN  -- short on purpose: the flat angles 20 deg WEST of the flank it
+#                faces, so a longer flat dives INSIDE the parked strap flank (an
+#                interference-gate hit); 2.0 leaves the tip 0.32 east of it.
+#   BLADE_TILT_DEG -- must match build_drive_train STRAP_LEAN_DEG magnitude.
+from pinion_spring_spec import (
+    BLADE_TILT_DEG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FLAT_LEN,
+    FOOT_LEN,
+    ISOMETRIC_VIEW_NOTE,
+    KINK_DEG,
+    R_BEND,
+    R_KINK,
+    THICK,
+    WIDTH,
+)
+
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 # Machine-frame derivation (build_drive_train_assembly owns placement + the
 # clearance asserts; local frame = machine - (9.04, 50.8)): the blade
@@ -291,9 +312,25 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven spring (equations neutral)", volume, 0.01 * VOLUME
     )
 
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -41,14 +42,33 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from pinion_pivot_shaft_spec import (
+    CAP_SAG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    ISO_VIEW_NOTE,
+    SHAFT_DIA,
+    SHAFT_LEN,
+)
 
 PART_NAME = "pinion-pivot-shaft"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.67)
-
-SHAFT_DIA = 6.35  # rides the strap and block bores (derived)
-SHAFT_LEN = 192.0  # machine z -104..+88: ends FLUSH with the block outer
-# faces (PR7 review item; was 196 with 2 proud each side)
-CAP_SAG = 1.2  # crown height of each end's spherical cap (p.69, low)
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "End View Note",
+    "Iso View Note",
+)
 
 SHAFT_R = SHAFT_DIA / 2.0
 CAP_R = (SHAFT_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 4.80 sphere radius
@@ -90,6 +110,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LEN)),
     )
     name_last_feature(adapter, "Shaft")
+    depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"ShaftLen"')]
     volume = await volume_check(adapter, "shaft", V_SHAFT, 0.005 * V_SHAFT)
 
     # Crowned end caps (PR7): a shallow spherical cap proud of each flat end
@@ -208,10 +230,27 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven shaft (equations neutral)", volume, 0.005 * V_SHAFT)
 
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+            "Iso View Note": ISO_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

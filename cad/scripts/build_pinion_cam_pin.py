@@ -38,6 +38,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -46,18 +47,32 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from pinion_cam_pin_spec import (
+    CAP_SAG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    PIN_DIA,
+    PIN_LEN,
+    SEAT_LEN,
+)
 
 PART_NAME = "pinion-cam-pin"
 MATERIAL = "Plain Carbon Steel"  # bright steel, like the rods it works with
-
-PIN_DIA = 4.0  # press fit in the strap's blind edge bore -- pinion_bracket
-# PIN_BORE must match (img01 ~9.45 px/mm reads 4-5; 4 keeps 0.5 walls in
-# the 5-thick strap edge)
-PIN_LEN = 15.0  # 4.0 seated + 11 proud west (past the cam centre 15 west
-# of the strap axis at the pin's height; the assembly asserts the reach)
-SEAT_LEN = 4.0  # into the blind edge bore (stops 5 short of the strap
-# centreline -- clear of the Ø6.35 pivot bore)
-CAP_SAG = 0.8  # domed outer end (img01's dome)
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "End View Note",
+)
 
 PIN_R = PIN_DIA / 2.0
 CAP_R = (PIN_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 2.9
@@ -95,6 +110,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=PIN_LEN)),
     )
     name_last_feature(adapter, "Pin")
+    depth_dim = name_dimensions(adapter, "Pin", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"PinLen"')]
     volume = await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
 
     # Domed outer end (the arbor back-cap idiom; apex -> rim is the minor CCW
@@ -167,10 +184,26 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven pin (equations neutral)", volume, 0.005 * V_PIN)
 
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

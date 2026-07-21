@@ -42,6 +42,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -50,20 +51,38 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from pinion_handle_spec import (
+    CAP_SAG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    GRIP_DIA,
+    GRIP_LEN,
+    ISOMETRIC_VIEW_NOTE,
+    ROD_DIA,
+    ROD_DOWN,
+    ROD_UP,
+    TUBE_ID,
+    TUBE_LEN,
+    TUBE_OD,
+    WALL_T,
+)
 
 PART_NAME = "pinion-handle"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.67)
-
-GRIP_DIA = 23.0  # grip cylinder, img07 (was the Ø24 ball) (med)
-GRIP_LEN = 14.0  # along the arbor, z -7..+7 (med)
-CAP_SAG = 2.0  # domed south face (img07's rounded cap)
-ROD_DIA = 6.0  # cross rod, same stock as the lever root (high)
-ROD_DOWN = 42.0  # arm, img07 centre-to-tip (was 35) (med)
-ROD_UP = 43.0  # arm, img07 (the old p002 68 is retired) (med)
-TUBE_OD = 10.5  # blind cap hub over the arbor stub, img07 (med)
-TUBE_ID = 8.0  # = the arbor stub Ø8 (build_alignment_pinion STUB_DIA, must match)
-TUBE_LEN = 10.0  # stub seat depth (z +9..+19)
-WALL_T = 2.0  # blind wall between grip and tube (z +7..+9)
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 GRIP_R = GRIP_DIA / 2.0
 ROD_R = ROD_DIA / 2.0
@@ -135,6 +154,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += grip.apply(adapter, "GripProfile")
     extrude_at_offset(adapter, GRIP_LEN, -GRIP_LEN / 2.0)
     name_last_feature(adapter, "Grip")
+    drive_jobs += [(name_dimensions(adapter, "Grip", ["Depth"])[0], '"GripLen"')]
     expected = V_GRIP
     await volume_check(adapter, "grip", expected, 0.005 * V_GRIP)
 
@@ -235,6 +255,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += tube.apply(adapter, "TubeProfile")
     extrude_at_offset(adapter, TUBE_LEN, GRIP_LEN / 2.0 + WALL_T)
     name_last_feature(adapter, "Tube")
+    drive_jobs += [(name_dimensions(adapter, "Tube", ["Depth"])[0], '"TubeLen"')]
     expected += V_TUBE
     await volume_check(adapter, "tube", expected, 0.01 * V_TUBE)
 
@@ -252,6 +273,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += rod.apply(adapter, "RodProfile")
     extrude_at_offset(adapter, ROD_DOWN + ROD_UP, -ROD_DOWN)
     name_last_feature(adapter, "Rod")
+    drive_jobs += [
+        (name_dimensions(adapter, "Rod", ["Depth"])[0], '"RodDown" + "RodUp"')
+    ]
     await volume_check(adapter, "handle", V_TOTAL, 0.01 * V_ROD)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
@@ -262,10 +286,26 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven handle (equations neutral)", V_TOTAL, 0.01 * V_ROD)
 
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

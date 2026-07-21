@@ -52,20 +52,42 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
 
 PART_NAME = "crank-handle"
 MATERIAL = "Oak"  # see _common.apply_material docstring
 
-HANDLE_LENGTH = 90.0  # DIMENSIONS.md ch11: handle length (low)
-HANDLE_MAX_DIA = 22.0  # DIMENSIONS.md ch11: handle diameter (low)
-COLLAR_LENGTH = 6.0  # DIMENSIONS.md ch11: brass collar, p.12 photo (low)
-COLLAR_DIA = 11.0  # DIMENSIONS.md ch11: brass collar, p.12 photo (low)
+# Primitive nominals come from the drawing spec (single source of truth shared
+# with the manufacturing print).
+from crank_handle_spec import (  # noqa: E402
+    CAP_R,
+    COLLAR_DIA,
+    COLLAR_LENGTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    HANDLE_LENGTH,
+    HANDLE_MAX_DIA,
+    ISOMETRIC_VIEW_NOTE,
+    NECK_R,
+    PEAK_X,
+)
 
 COLLAR_R = COLLAR_DIA / 2.0
 PEAK_R = HANDLE_MAX_DIA / 2.0
-NECK_R = 4.8  # waist just below the collar (p.12 photo); < collar -> shoulder
-PEAK_X = 62.0  # axial station of the maximum diameter (p.15 photo, ~0.69 L)
-CAP_R = 3.5  # flat butt cap (metal disc + slot screw seat), p.15 photo
+
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 # Smooth pear silhouette = two circular arcs that meet at the swell (PEAK_X,
 # PEAK_R) with a common horizontal tangent (both centres sit directly below
@@ -251,10 +273,26 @@ async def build(adapter) -> dict[str, str]:
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
+    # Manufacturing drawing support: mark exactly the print's axial dimensions
+    # and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, STAINED_OAK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":
