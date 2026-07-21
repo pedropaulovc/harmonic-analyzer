@@ -2448,12 +2448,23 @@ def insert_bom_table(
             applied = str(
                 table.DisplayedText2(row, description_column, False) or ""
             )
+            if applied != text:
+                # BOM cells can defer evaluation until the drawing rebuilds,
+                # especially when this row aggregates several configurations.
+                # Rebuild before deciding that the documented Text2 write was
+                # discarded; the immediate DisplayedText2 value is not a
+                # reliable postcondition for a grouped row.
+                adapter.currentModel.EditRebuild3()
+                applied = str(
+                    table.DisplayedText2(row, description_column, False) or ""
+                )
             if applied != text and configuration_grouping == "same-part":
                 # A same-part row is a visible aggregate over hidden per-config
                 # rows. SetText2(False) addresses only the aggregate and 2026
                 # silently discards it; IncludeHidden=True writes the grouped
                 # backing cells that drive the displayed aggregate.
                 table.SetText2(row, description_column, True, text)
+                adapter.currentModel.EditRebuild3()
                 applied = str(
                     table.DisplayedText2(row, description_column, False) or ""
                 )
@@ -2766,10 +2777,8 @@ def _create_auto_balloons(
     identities: list[str] = []
     for note in balloons:
         item = _balloon_item_number(adapter, note, label=label)
-        annotation = _sw_type_info.early_bound_or_flag(
-            note.GetAnnotation(), "IAnnotation", "GetName"
-        )
-        identities.append(f"{annotation.GetName()}=item {item}")
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetName")
+        identities.append(f"{note.GetName()}=item {item}")
     _telemetry.info(f"{label}: AutoBalloon5 identities {identities}")
     return balloons
 
