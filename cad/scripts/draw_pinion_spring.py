@@ -37,7 +37,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_spring_spec import BLADE_TILT_DEG, WIDTH
+from pinion_spring_spec import BLADE_TILT_DEG, THICK, WIDTH
 from build_pinion_spring import (
     BEND_EXIT,
     FLAT_TIP,
@@ -92,6 +92,14 @@ _FOOT_MID_X = (FOOT_END[0] + FOOT_TAN[0]) / 2.0
 _BLADE_MID = (
     (BEND_EXIT[0] + KINK_START[0]) / 2.0,
     (BEND_EXIT[1] + KINK_START[1]) / 2.0,
+)
+# The spring is created as a one-sided thin feature from its open centreline.
+# In the front projection that centreline is the concave outline, not an
+# interior point of the visible broad face.  Move half a strip thickness along
+# the known outward normal so FACE selection lands unambiguously in the ribbon.
+_BLADE_FACE_MID = (
+    _BLADE_MID[0] + THICK * _N[0] / 2.0,
+    _BLADE_MID[1] + THICK * _N[1] / 2.0,
 )
 
 FRONT_KEEP = {
@@ -176,7 +184,7 @@ async def build(adapter: Any) -> dict[str, str]:
         TOP_CENTER[0],
         TOP_CENTER[1] + WIDTH * SHEET_SCALE[0] / 2000.0,
     )
-    blade_edge = (_front_x(_BLADE_MID[0]), _front_y(_BLADE_MID[1]))
+    blade_face = (_front_x(_BLADE_FACE_MID[0]), _front_y(_BLADE_FACE_MID[1]))
     add_datum_feature(
         adapter,
         top,
@@ -207,7 +215,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=blade_edge,
+        edge_xy=blade_face,
         frame_xy=(0.230, 0.145),
         characteristic="parallelism",
         tolerance="0.20",
@@ -218,7 +226,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=blade_edge,
+        edge_xy=blade_face,
         symbol_xy=(0.230, 0.118),
         roughness_ra="0.8",
         label="spring concave blade broad face",
