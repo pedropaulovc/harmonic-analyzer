@@ -283,9 +283,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - _bore_r, _front_y(BORE_HEIGHT)),
-        symbol_xy=(0.075, _front_y(BORE_HEIGHT) + 0.030),
+        symbol_xy=(
+            FRONT_CENTER[0] - _bore_r - 0.022,
+            _front_y(BORE_HEIGHT) + 0.002,
+        ),
         datum="C",
         label="journal-bore clocking axis",
+        position_tolerance_m=0.0005,
     )
     crank_entity, crank_xy = _crank_bore_edge(adapter, front)
     add_feature_control_frame(
