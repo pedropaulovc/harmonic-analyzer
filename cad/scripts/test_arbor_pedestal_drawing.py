@@ -51,7 +51,7 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
 
 def test_notes_specify_part_requirements_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
-    assert "MATING ARBOR LIMITS DIA 9.505-9.525" in notes
+    assert "MATING ARBOR LIMITS DIA 9.505-9.525 (REF)" in notes
     assert "COPLANAR FOOT/STRAP FAR FACES" in notes
     assert "RESULTING STRAP THICKNESS 10.00 REF" in notes
     assert "MATERIAL" not in notes
@@ -79,7 +79,10 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'datum="D"' in source
     assert 'characteristic="position"' in source
     assert 'characteristic="profile_surface"' in source
-    assert 'quantity="EXTERIOR PROFILE EXCEPT A + B"' in source
+    assert 'quantity="CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE"' in source
+    assert 'quantity="DATUM D FACE"' in source
+    assert 'datums=("A", "B", "D")' in source
+    assert "leader_attach_xy=" in source
     assert 'characteristic="flatness"' in source
     assert 'characteristic="perpendicularity"' in source
     assert source.count("_add_circle_basic(") == 4  # helper plus three calls

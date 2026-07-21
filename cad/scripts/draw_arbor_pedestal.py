@@ -22,7 +22,6 @@ from _drawing_common import (
     set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
-    set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
@@ -310,7 +309,9 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    set_hidden_lines_removed(adapter, iso)
+    # The hold-down hole sits behind the upright in this pictorial direction;
+    # HLV keeps that manufactured feature visible instead of contradicting plan.
+    set_hidden_lines_visible(adapter, iso)
     # The elevation carries the arbor bore as a hidden circle and the flange
     # hold-down hole; the plan shows the foot with the bore + screw crossing it.
     for view in (front, top):
@@ -418,6 +419,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
+        quantity="DATUM B SIDE",
         label="datum-B side perpendicularity",
         entity=side_entity,
     )
@@ -446,7 +448,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="profile_surface",
         tolerance="0.10",
         datums=("A", "B"),
-        quantity="EXTERIOR PROFILE EXCEPT A + B",
+        quantity="CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE",
         label="controlled exterior surface profile",
         entity=flank_entity,
     )
@@ -458,6 +460,7 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="arbor bore finish",
         entity=bore_entity,
+        leader_attach_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),
     )
     screw_entity = _circle_entity(
         adapter,
@@ -500,6 +503,18 @@ async def build(adapter: Any) -> dict[str, str]:
         label="exposed flange edge",
         entity=datum_d_entity,
     )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] + FOOT_DEPTH / 2.0 * _S),
+        frame_xy=(0.020, 0.235),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A", "B"),
+        quantity="DATUM D FACE",
+        label="datum-D face perpendicularity",
+        entity=datum_d_entity,
+    )
     _screw_r = SCREW_CLEARANCE_DIA / 2.0 * _S
     add_native_hole_callout(
         adapter,
@@ -527,7 +542,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.245, 0.242),
         characteristic="profile_surface",
         tolerance="0.10",
-        datums=("D",),
+        datums=("A", "B", "D"),
         quantity="STRAP NEAR FACE @ BASIC 6.00",
         label="strap near-face profile",
         entity=strap_near_entity,
@@ -539,7 +554,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.300, 0.220),
         characteristic="profile_surface",
         tolerance="0.10",
-        datums=("D",),
+        datums=("A", "B", "D"),
         quantity="FOOT + STRAP FAR FACES @ BASIC 16.00",
         label="coplanar far-face profile",
         entity=far_face_entity,
