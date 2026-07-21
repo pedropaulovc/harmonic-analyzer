@@ -171,7 +171,7 @@ def _visible_hole_table_entities(
     for x_mm, z_mm, diameter_mm in ALL_HOLES:
         expected = (
             x_offset_m + x_mm / 1000.0,
-            z_offset_m + z_mm / 1000.0,
+            z_offset_m - z_mm / 1000.0,
             diameter_mm / 2000.0,
         )
         candidates = sorted(
