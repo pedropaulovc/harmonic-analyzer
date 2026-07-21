@@ -30,7 +30,7 @@ RECIPE = FastenerSheet(
     # Look from the threaded tail so the controlled ground shoulder is visible
     # inside the larger head outline; the head-end view occludes that shoulder.
     end_view="*Bottom",
-    side_center=(0.190, 0.150),
+    side_center=(0.190, 0.170),
     end_center=(0.070, 0.150),
     iso_center=(0.310, 0.170),
     end_keep=END_KEEP,

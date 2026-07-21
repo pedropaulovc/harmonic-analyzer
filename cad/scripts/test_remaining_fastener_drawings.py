@@ -150,7 +150,10 @@ def test_cone_pivot_does_not_hide_the_missing_threaded_tail_definition() -> None
 
 def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     drawing = importlib.import_module("draw_cone_pivot_screw")
+    spec = importlib.import_module("cone_pivot_screw_spec")
     assert drawing.RECIPE.end_view == "*Bottom"
+    assert drawing.RECIPE.side_center == (0.190, 0.170)
+    assert spec.END_VIEW_NOTE == "SHOULDER-END VIEW"
 
 
 @pytest.mark.parametrize("spec_name", ("hanger_screw_spec", "thumb_screw_spec"))
