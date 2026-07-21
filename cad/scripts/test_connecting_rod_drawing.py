@@ -69,7 +69,10 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
-    assert source.count("edge_xy=pin_rim") == 2
+    # The callout owns the 9-o'clock rim; the position FCF anchors the
+    # opposite 3-o'clock rim so the two leaders cannot cross.
+    assert source.count("edge_xy=pin_rim") == 1
+    assert source.count("edge_xy=pin_fcf_rim") == 1
 
 
 def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
