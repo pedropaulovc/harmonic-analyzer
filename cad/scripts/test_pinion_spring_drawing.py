@@ -36,7 +36,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 def test_it_is_a_formed_leaf_not_a_coil_spring() -> None:
     # The mission's coil-spring spec sheet does NOT apply: this is a bent strip.
     notes = pinion_spring_spec.DRAWING_NOTES
-    assert "0.80 THK X 4.00 WIDE STRIP" in notes
+    assert "0.80+/-0.05 THK X 4.00+/-0.05 WIDE STRIP" in notes
     assert "COIL" not in notes
     assert "FORM FROM" in notes
 
@@ -54,7 +54,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_spring_spec.DRAWING_NOTES
     assert "TANGENT LENGTH 39.64" in notes
-    assert "LOWER BROAD FACE" in notes
+    assert "DATUM EDGE B" in notes
+    assert "FROM EITHER" not in notes
     assert "97.62+/-1.00 DEG" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
@@ -63,14 +64,18 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_feature_requirements_are_unambiguous_without_unused_datums() -> None:
+def test_feature_requirements_use_inspectable_datum_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
-    assert "add_surface_finish(" not in source
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_feature_control_frame(") == 2
+    assert "characteristic=\"flatness\"" in source
+    assert "characteristic=\"parallelism\"" in source
+    assert "add_surface_finish(" in source
+    assert "TOP VIEW (REMOVED) SCALE 2:1" in source
     assert abs(spring._BLADE_LEN - pinion_spring_spec.BLADE_STRAIGHT_LEN) < 1e-9
     assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["BendR"]
     assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["KinkR"]
+    assert "R2.00 AND R1.50" not in pinion_spring_spec.DRAWING_NOTES
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

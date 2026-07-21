@@ -23,7 +23,10 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -34,7 +37,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_spring_spec import BLADE_TILT_DEG
+from pinion_spring_spec import BLADE_TILT_DEG, WIDTH
 from build_pinion_spring import (
     BEND_EXIT,
     FLAT_TIP,
@@ -44,6 +47,7 @@ from build_pinion_spring import (
     KINK_START,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -93,15 +97,15 @@ _BLADE_MID = (
 FRONT_KEEP = {
     "FootLen": (_front_x(_FOOT_MID_X), 0.088),
     "BendR": (0.036, 0.120),
-    "KinkR": (0.170, 0.196),
-    "FlatLen": (0.190, 0.176),
+    "KinkR": (0.150, 0.220),
+    "FlatLen": (0.205, 0.188),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {
     "FootLen": "+/-0.10 TRUE LENGTH\nFREE END TO BEND TANGENCY",
     "BendR": "+/-0.10 INSIDE RADIUS",
     "KinkR": "+/-0.10 INSIDE RADIUS",
-    "FlatLen": "+/-0.10 TRUE LENGTH",
+    "FlatLen": "+/-0.10 FREE-FLAT TANGENT LENGTH",
 }
 
 
@@ -162,6 +166,64 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
+
+    # Datum A is the broad foot face visible in the removed top view. Datum B
+    # is one designated long edge, giving the formed-profile angles and hole
+    # offset a unique, inspectable direction/reference instead of the former
+    # prose-only "foot axis" / "either long edge" wording.
+    top_face = TOP_CENTER
+    top_long_edge = (
+        TOP_CENTER[0],
+        TOP_CENTER[1] + WIDTH * SHEET_SCALE[0] / 2000.0,
+    )
+    blade_edge = (_front_x(_BLADE_MID[0]), _front_y(_BLADE_MID[1]))
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=top_face,
+        symbol_xy=(0.250, 0.118),
+        datum="A",
+        label="spring broad foot face",
+        entity_type="FACE",
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=top_long_edge,
+        symbol_xy=(0.350, 0.118),
+        datum="B",
+        label="spring designated long edge",
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=top_face,
+        frame_xy=(0.350, 0.092),
+        characteristic="flatness",
+        tolerance="0.10",
+        label="spring datum-A face flatness",
+        entity_type="FACE",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=blade_edge,
+        frame_xy=(0.230, 0.145),
+        characteristic="parallelism",
+        tolerance="0.20",
+        datums=("A",),
+        label="spring formed broad-face coplanarity",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=blade_edge,
+        symbol_xy=(0.230, 0.118),
+        roughness_ra="0.8",
+        label="spring concave blade broad face",
+    )
+    if add_note(adapter, "TOP VIEW (REMOVED) SCALE 2:1", 0.270, 0.078) is None:
+        raise RuntimeError("failed to label removed spring top view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.164)
