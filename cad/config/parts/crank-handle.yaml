@@ -1,7 +1,7 @@
 crank-handle:
   number: MHA-022
-  material: White oak, FAS/Select; 6-8% MC; clear straight grain
-  material_specification: White oak, FAS/Select; 6-8% MC; clear straight grain
+  material: FAS white oak; 6-8% MC
+  material_specification: FAS white oak; 6-8% MC
   finish: P220 sand; Minwax 2716 stain; 3x Minwax 35055000 satin poly; P320 between; cure 7 d
   quantity: 1
   tolerance_class: visual_noncritical

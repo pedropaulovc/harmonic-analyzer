@@ -84,8 +84,10 @@ def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "BORE AXIS CONCENTRIC" not in notes
     assert "NO BLEND, RADIUS, OR CHAMFER" in notes
-    assert "BORE TOTAL RUNOUT 0.10 | A APPLIES FULL LENGTH" in notes
-    assert "GRAIN RUNS PARALLEL TO TURNING AXIS" in notes
+    assert "FINAL BORE LIMITS APPLY FULL LENGTH" in notes
+    assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
+    assert "BASIC 90.00" in notes
+    assert "ACTUAL BUTT FACE AT 90.00+/-0.25 TRIMS" in notes
     assert "PROFILE 0.50 | A | B APPLIES" in notes
     assert "NOMINAL REF ONLY" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "6.15 MAX / 6.10 MIN THRU" in drawing.DIMENSION_CALLOUTS[
@@ -103,7 +105,7 @@ def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     assert 'quantity="TURNED GRIP PROFILE - SEE NOTE"' in source
     assert "set_basic_dimension(" in source
     assert "add_surface_finish(" not in source
-    assert drawing.RIGHT_KEEP["PivotBoreDia"] == (0.365, 0.205)
+    assert drawing.RIGHT_KEEP["PivotBoreDia"] == (0.360, 0.220)
     assert "frame_xy=(0.350, 0.263)" in source
     assert "frame_xy=(0.180, 0.263)" in source
 
@@ -116,7 +118,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("crank-handle")
     assert handle.MATERIAL == "Oak"
-    assert "White oak" in spec["material_specification"]
+    assert "white oak" in spec["material_specification"]
     assert "6-8% MC" in spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]

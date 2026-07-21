@@ -93,7 +93,7 @@ FRONT_KEEP = {
     "PeakStation": (0.150, 0.242),
 }
 RIGHT_KEEP = {
-    "PivotBoreDia": (0.365, 0.205),
+    "PivotBoreDia": (0.360, 0.220),
 }
 DIMENSION_CALLOUTS = {
     "HandleLength": "+/-0.25 OVERALL",
