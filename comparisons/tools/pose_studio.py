@@ -109,10 +109,22 @@ import os  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 import bpy  # noqa: E402
-from mathutils import Vector  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import blender_worker as bw  # noqa: E402
+
+# The built scene lives in SolidWorks' Y-up frame (blender_worker imports STL raw
+# and camera_axes treats +Y as world up). Blender's viewport turntable orbits
+# about global +Z, so a Y-up scene tumbles when you free-orbit (MMB). We DISPLAY
+# the scene rotated +90 deg about X (+Y -> +Z) so native orbit feels upright,
+# while every bit of pose math (aim_camera, capture, manifest az/el/roll, part
+# deltas) stays in the original Y-up frame — render_offline is untouched and
+# renders byte-identically (the same rigid rotation on both geometry AND camera
+# leaves the camera view unchanged). _VIEW_R maps a Y-up world matrix/point into
+# the displayed Z-up frame; _VIEW_R_INV converts a viewport reading back to Y-up.
+_VIEW_R = Matrix.Rotation(math.radians(90.0), 4, "X")
+_VIEW_R_INV = _VIEW_R.inverted()
 
 # Built-scene handle: objects/camera/bounds so slider edits re-aim without a
 # full rebuild. Populated by HAC_OT_build_scene.
@@ -194,6 +206,11 @@ def _aim(props) -> None:
         _STATE["boxes"], _STATE["mesh_lo"], _STATE["mesh_hi"],
         _STATE["ext"], _STATE["w"], _STATE["h"],
     )
+    # aim_camera placed the camera in the Y-up pose frame; rotate it into the Z-up
+    # display frame so it stays consistent with the rotated geometry (the rendered
+    # camera view is unchanged — same rigid transform applied to both).
+    cam = _STATE["cam"]
+    cam.matrix_world = _VIEW_R @ cam.matrix_world
     _STATE["target"], _STATE["cam_dist"] = target, cam_dist
 
 
@@ -415,7 +432,9 @@ def _frame_view(context):
     if space is None or not _STATE.get("built"):
         return
     ext = _STATE["ext"]
-    center = _bbox_center()
+    # bbox centre is in the Y-up pose frame; place the free-view pivot + cursor on
+    # its Z-up display position so orbit/pan stay on the model.
+    center = _VIEW_R @ Vector(_bbox_center())
     space.clip_start = ext * 0.001
     space.clip_end = ext * 40
     rv3d = space.region_3d
@@ -513,6 +532,14 @@ class HAC_OT_build_scene(bpy.types.Operator):
                       mesh_lo=mesh_lo, mesh_hi=mesh_hi, ext=ext, w=w, h=h,
                       orig_world=orig_world, part_of=part_of)
 
+        # Display the Y-up scene rotated into Blender's Z-up so native free-orbit
+        # feels upright. Everything the pose math needs was captured pre-rotation:
+        # mesh bounds/boxes (aim_camera's fit basis), orig_world (part-delta base)
+        # and the target sliders all stay Y-up; _aim rotates the camera to match,
+        # and capture/export convert viewport readings back with _VIEW_R_INV.
+        for obj in objs:
+            obj.matrix_world = _VIEW_R @ obj.matrix_world
+
         # Seed sliders from the pair's stored pose (fires _aim via callbacks).
         c = pair.get("camera", {})
         cx, cy, cz = _bbox_center()
@@ -560,9 +587,12 @@ class HAC_OT_capture_view(bpy.types.Operator):
             return {"CANCELLED"}
         props = context.scene.hac_pose
         rv3d = space.region_3d
-        az, el, roll = _invert_pose(rv3d.view_matrix.inverted())
+        # The viewport reads in the Z-up display frame; convert the camera matrix
+        # and the pivot back to the Y-up pose frame before inverting to az/el/roll
+        # and reading the target, so the captured pose matches render_offline.
+        az, el, roll = _invert_pose(_VIEW_R_INV @ rv3d.view_matrix.inverted())
         props.az_deg, props.el_deg, props.roll_deg = az, el, roll
-        loc = rv3d.view_location
+        loc = _VIEW_R_INV @ rv3d.view_location
         props.free_target = True
         props.target_x, props.target_y, props.target_z = loc.x, loc.y, loc.z
         _aim(props)  # re-centre framing on the captured angle + target
@@ -702,7 +732,9 @@ class HAC_OT_export_deltas(bpy.types.Operator):
             if base is None:
                 continue
             ot, orq, osc = base.decompose()
-            ct, crq, csc = obj.matrix_world.decompose()
+            # orig_world was snapshotted in the Y-up pose frame; bring the current
+            # (display-rotated) world back to Y-up so deltas map to SolidWorks mm.
+            ct, crq, csc = (_VIEW_R_INV @ obj.matrix_world).decompose()
             dt = ct - ot                                   # world mm
             sf = [c / o if abs(o) > 1e-9 else 1.0 for c, o in zip(csc, osc)]
             dr = [math.degrees(a) for a in (crq @ orq.inverted()).to_euler()]
