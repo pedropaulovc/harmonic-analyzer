@@ -60,29 +60,32 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "BREAK EDGES" not in notes
     assert "MACHINE FROM CONTINUOUS-CAST STOCK" in notes
     assert "DATUM B IS LEFT FOOT SIDE FACE SHOWN" in notes
-    assert "SYMMETRIC ABOUT THE BORE CENTERLINE" in notes
+    assert "2X STRAIGHT FLANKS RUN FROM THE DATUM-A FOOT CORNERS" in notes
+    assert "NO TANGENCY" in notes
+    assert "CROWN CENTER SHALL LIE WITHIN 0.05 OF THE BORE AXIS" in notes
     assert "6.00 EXPOSED FLANGE IS REFERENCE ONLY" in notes
     assert "FLUSH WITH THE 16.00-DEEP" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_native_hole_callout(" in source
-    assert 'label="flange-hole location"' in source
-    assert "3.00 +/-0.10 FROM" in source
+    assert 'label="flange-hole location from datum B"' in source
+    assert 'label="flange-hole location from datum D"' in source
 
 
 def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'datum="A"' in source
     assert 'datum="B"' in source
+    assert 'datum="D"' in source
     assert 'characteristic="position"' in source
-    assert 'characteristic="profile_surface"' in source
-    assert 'characteristic="perpendicularity"' in source
-    assert source.count("_add_bore_basic(") == 3  # helper plus X and Y calls
+    assert 'characteristic="profile_surface"' not in source
+    assert 'characteristic="perpendicularity"' not in source
+    assert source.count("_add_circle_basic(") == 5  # helper plus four calls
     assert 'orientation="horizontal"' in source
     assert 'orientation="vertical"' in source
     assert "for index in (1, 2):" in source
     assert "if result != 0:" in source
-    assert 'text="2X 2.12<MOD-DEG> +/-0.10<MOD-DEG>\\nFROM VERTICAL"' in source
+    assert 'label="flange-hole true position"' in source
     assert 'roughness_ra="1.6"' in source
     common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
         encoding="utf-8"
