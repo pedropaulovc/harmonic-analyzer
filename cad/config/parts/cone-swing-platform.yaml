@@ -1,5 +1,8 @@
 cone-swing-platform:
   number: MHA-091
   material: Plain Carbon Steel
+  material_specification: AISI 1018 steel plate, 1/4 in
+  finish: black oxide
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (steel plate)"

@@ -417,6 +417,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="tube-frame",
         script_name="draw_tube_frame.py",
     ),
+    DrawingSpec(
+        name="cone_swing_platform",
+        part="cone_swing_platform",
+        artifact_stem="cone-swing-platform",
+        script_name="draw_cone_swing_platform.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
