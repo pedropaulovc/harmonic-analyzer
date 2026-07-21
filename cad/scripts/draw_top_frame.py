@@ -222,7 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lower outer rail-face datum", entity=datum_c_edge, shoulder=True,
     )
     add_feature_control_frame(
-        adapter, top, frame_xy=(0.175, 0.135), characteristic="position",
+        adapter, top, frame_xy=(0.175, 0.150), characteristic="position",
         tolerance="0.20", datums=("A", "B", "C"), diameter=True,
         quantity="4X COLUMN BORES", label="column-bore true position",
         entity=column_bore,
