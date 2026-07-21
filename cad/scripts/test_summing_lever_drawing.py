@@ -52,15 +52,17 @@ def test_sheet_runs_at_1_to_2_with_1_to_4_isometric() -> None:
 def test_linked_notes_describe_the_hung_lever() -> None:
     notes = summing_lever_spec.DRAWING_NOTES
     assert "KNIFE EDGE" in notes
-    assert "#47" in notes
-    assert "7.0565 PITCH" in notes
-    assert "4.60 FROM FREE PLATE EDGE" in notes
-    assert "END OFFSETS 9.90 AND 8.43" in notes
-    assert "76.20 FROM PIVOT AXIS" in notes
-    assert "3.00 BORE" in notes
-    assert "19.05 THICK" in notes
     assert "8.65 W x 10.27 HIGH" in notes
     assert "21.72 LONG EACH END" in notes
+    # The spring-hole pattern and anchor location are dimensioned NATIVELY on
+    # the sheet (basic coordinates + 20X position frame); the notes must not
+    # repeat those numbers as prose that could drift into contradiction.
+    assert "#47" not in notes
+    assert "PITCH" not in notes
+    assert "FROM FREE PLATE EDGE" not in notes
+    assert "END OFFSETS" not in notes
+    assert "FROM PIVOT AXIS" not in notes
+    assert "BORE," not in notes
     assert "LINEAR +/-" not in notes
     assert "GRAY-IRON" not in notes
     assert "GREEN ENAMEL" not in notes
@@ -70,11 +72,11 @@ def test_linked_notes_describe_the_hung_lever() -> None:
 
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_feature_control_frame(") == 2
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
-    assert source.count("add_native_hole_callout(") == 1
+    assert source.count("add_native_hole_callout(") == 2
     assert "knife_edge_datum = _top_xy" in source
     assert 'label="knife-edge pivot axis"' in source
     assert "knife_edge = _top_xy" in source
@@ -82,6 +84,25 @@ def test_native_gdt_and_finish_present() -> None:
     assert "anchor_bore_fcf_edge = _top_xy(TIP_X - ANCHOR_BORE_R, 0.0)" in source
     assert 'edge_xy=anchor_bore_fcf_edge' in source
     assert "anchor_outer_edge" not in source
+
+
+def test_spring_hole_pattern_is_natively_controlled() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'datum="B"' in source
+    assert 'label="plate -Z end face"' in source
+    assert 'quantity="20X"' in source
+    assert 'datums=("A", "B")' in source
+    assert 'label="spring-hole pattern position"' in source
+    # The pattern is located by BASIC coordinate components, not slant chains.
+    assert source.count('orientation="horizontal"') == 2
+    assert source.count('orientation="vertical"') == 2
+    for basic in (
+        "anchor bore X location",
+        "spring-hole row X",
+        "spring-hole start Z",
+        "spring-hole pitch",
+    ):
+        assert f'label="{basic}"' in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

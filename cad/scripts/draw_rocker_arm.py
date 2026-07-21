@@ -159,18 +159,32 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod-pin hole",
     )
 
-    # Locate the rod-pin hole from the pivot bore (basic centre distance): pivot
-    # bore edge to rod-pin bore edge, dimensioned below the strap.
+    # Locate the rod-pin hole from the pivot bore with X and Y BASIC coordinate
+    # components.  The rod-pin centre is NOT collinear with the pivot (7.30 mm
+    # above its mid-height), so a single slant centre distance would leave the
+    # angular component uninspectable; two component dimensions fully define
+    # the true position the FCF below controls.
     pivot_rim = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
-    rod_location = add_edge_dimension(
+    rod_location_x = add_edge_dimension(
         adapter,
         front,
         p0=pivot_rim,
         p1=rod_rim,
         text_xy=(0.180, 0.138),
-        label="rod-pin location",
+        label="rod-pin X location",
+        orientation="horizontal",
     )
-    set_basic_dimension(adapter, rod_location, label="rod-pin location")
+    set_basic_dimension(adapter, rod_location_x, label="rod-pin X location")
+    rod_location_y = add_edge_dimension(
+        adapter,
+        front,
+        p0=pivot_rim,
+        p1=rod_rim,
+        text_xy=(0.267, 0.162),
+        label="rod-pin Y location",
+        orientation="vertical",
+    )
+    set_basic_dimension(adapter, rod_location_y, label="rod-pin Y location")
 
     # Datum A on the pivot bore axis (picked at 9 o'clock so the tag stands off
     # to the LEFT), Ra on the bore at 6 o'clock, and a position FCF tying the

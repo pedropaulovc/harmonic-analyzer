@@ -29,6 +29,7 @@ HEX_DEPTH = 21.717
 
 # 20 channel-spring holes (#47 seed + linear pattern).
 HOLE_X = 39.85
+HOLE_DIA = 1.994  # #47 drill
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
@@ -51,18 +52,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SummationAnchorProfile": {"AnchorOuterDia"},
 }
 
+# The spring-hole pattern (count, size, row X, start offset, pitch) and the
+# anchor-eye size/location are dimensioned NATIVELY on the sheet (basic
+# coordinates + position frames); the notes must not repeat those numbers.
 DRAWING_NOTES = "\n".join(
     (
         f"1. HEX TRUNNIONS {HEX_W:.2f} W x {HEX_H:.2f} HIGH,",
         f"   {HEX_DEPTH:.2f} LONG EACH END; VERTEX UP IS",
         "   THE KNIFE EDGE.",
-        f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK; {HOLE_COUNT} X",
-        f"   #47 HOLES AT {CHANNEL_PITCH:.4f} PITCH.",
-        f"3. HOLE ROW {HOLE_EDGE_OFFSET:.2f} FROM FREE PLATE EDGE;",
-        f"   END OFFSETS {HOLE_END_OFFSET_FIRST:.2f} AND {HOLE_END_OFFSET_LAST:.2f}.",
-        f"4. SUMMATION EYE {2.0 * ANCHOR_R:.2f} THICK,",
-        f"   {2.0 * ANCHOR_BORE_R:.2f} BORE, {SUM_H:.2f} FROM PIVOT AXIS.",
-        f"5. PIVOT CYLINDER {PLATE_L:.2f} LONG; NO BORE.",
+        f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK.",
+        f"3. PIVOT CYLINDER {PLATE_L:.2f} LONG; NO BORE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

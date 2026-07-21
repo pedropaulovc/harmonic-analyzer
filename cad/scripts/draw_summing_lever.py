@@ -28,6 +28,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
+    add_edge_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
@@ -36,6 +37,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_basic_dimension,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -43,7 +45,11 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from summing_lever_spec import (
     ANCHOR_BORE_R,
     ANCHOR_R,
+    CHANNEL_PITCH,
     HEX_DEPTH,
+    HOLE_DIA,
+    HOLE_X,
+    HOLE_Z_FIRST,
     PLATE_L,
     PLATE_W,
     TIP_X,
@@ -202,6 +208,88 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         diameter=True,
         label="summation anchor position",
+    )
+    # BASIC X coordinate backing the anchor position frame: knife-edge pivot
+    # axis (datum A, the -Z trunnion ridge line) to the anchor bore centre.
+    ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
+    anchor_bore_bottom = _top_xy(TIP_X, -ANCHOR_BORE_R)
+    anchor_location = add_edge_dimension(
+        adapter,
+        top,
+        p0=ridge_dim_edge,
+        p1=anchor_bore_bottom,
+        text_xy=(0.146, 0.050),
+        label="anchor bore X location",
+        orientation="horizontal",
+    )
+    set_basic_dimension(adapter, anchor_location, label="anchor bore X location")
+
+    # Spring-hole pattern control: datum B on the -Z plate end, BASIC row-X /
+    # start-Z / pitch coordinates off A|B, a native #47 callout, and a 20X
+    # position frame -- the inspectable pattern definition (the notes no longer
+    # carry these numbers as prose).
+    plate_end_edge = _top_xy(29.0, -PLATE_L / 2.0)
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=plate_end_edge,
+        symbol_xy=(plate_end_edge[0] + 0.013, plate_end_edge[1] - 0.011),
+        datum="B",
+        label="plate -Z end face",
+    )
+    seed_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, HOLE_Z_FIRST)
+    row_x = add_edge_dimension(
+        adapter,
+        top,
+        p0=ridge_dim_edge,
+        p1=seed_rim_right,
+        text_xy=(0.178, 0.042),
+        label="spring-hole row X",
+        orientation="horizontal",
+    )
+    set_basic_dimension(adapter, row_x, label="spring-hole row X")
+    seed_rim_top = _top_xy(HOLE_X, HOLE_Z_FIRST + HOLE_DIA / 2.0)
+    start_z = add_edge_dimension(
+        adapter,
+        top,
+        p0=plate_end_edge,
+        p1=seed_rim_top,
+        text_xy=(0.196, 0.069),
+        label="spring-hole start Z",
+        orientation="vertical",
+    )
+    set_basic_dimension(adapter, start_z, label="spring-hole start Z")
+    second_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST + CHANNEL_PITCH - HOLE_DIA / 2.0)
+    pitch = add_edge_dimension(
+        adapter,
+        top,
+        p0=seed_rim_top,
+        p1=second_rim_bottom,
+        text_xy=(0.205, 0.0765),
+        label="spring-hole pitch",
+        orientation="vertical",
+    )
+    set_basic_dimension(adapter, pitch, label="spring-hole pitch")
+    seed_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST - HOLE_DIA / 2.0)
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=seed_rim_bottom,
+        callout_xy=(0.222, 0.052),
+        label="spring-hole seed",
+    )
+    seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, HOLE_Z_FIRST)
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=seed_rim_left,
+        frame_xy=(0.222, 0.088),
+        characteristic="position",
+        tolerance="0.30",
+        datums=("A", "B"),
+        diameter=True,
+        quantity="20X",
+        label="spring-hole pattern position",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)

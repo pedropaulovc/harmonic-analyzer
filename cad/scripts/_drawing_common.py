@@ -1236,6 +1236,7 @@ def add_edge_dimension(
     p1: tuple[float, float],
     text_xy: tuple[float, float],
     label: str,
+    orientation: str = "smart",
 ) -> Any:
     """Dimension across two edges picked at explicit sheet points (meters).
 
@@ -1244,6 +1245,12 @@ def add_edge_dimension(
     its coordinate picks can miss.  Recipes know their layout exactly — the
     explicit points make the pick deterministic.  Fails loud on either pick or
     on dimension creation.
+
+    ``orientation`` pins the measured direction: ``"smart"`` (default) lets
+    SolidWorks infer from the picks and text position, while ``"horizontal"`` /
+    ``"vertical"`` force the X/Y component — required when a hole is located by
+    coordinate components off a datum rather than a slant centre distance (a
+    slant reads ambiguous for holes not collinear with their datum).
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -1259,11 +1266,18 @@ def add_edge_dimension(
             raise RuntimeError(
                 f"failed to select {label} edge {index} at sheet ({x:g}, {y:g})"
             )
-    dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    if orientation == "horizontal":
+        dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)
+    elif orientation == "vertical":
+        dimension = draw.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
+    elif orientation == "smart":
+        dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    else:
+        raise ValueError(f"unknown dimension orientation {orientation!r}")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     if dimension is None:
-        raise RuntimeError(f"failed to add the {label} dimension")
+        raise RuntimeError(f"failed to add the {label} {orientation} dimension")
     return dimension
 
 
