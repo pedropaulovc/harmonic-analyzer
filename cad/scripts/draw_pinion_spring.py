@@ -67,7 +67,9 @@ SHEET_SCALE = (2.0, 1.0)
 # blade rises to the upper right.  Centre it on the profile's y midspan.
 FRONT_BBOX_CY = (FOOT_Y + FLAT_TIP[1]) / 2.0
 FRONT_CENTER = (0.130, 0.150)
-TOP_CENTER = (0.130, 0.058)
+# Put the narrow top view in the open right-hand field, above the title block
+# and clear of the lower-left manufacturing-note band.
+TOP_CENTER = (0.300, 0.100)
 ISO_CENTER = (0.320, 0.190)
 
 

@@ -43,6 +43,8 @@ def test_it_is_a_formed_leaf_not_a_coil_spring() -> None:
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
+    assert drawing.TOP_CENTER[0] >= 0.250
+    assert drawing.TOP_CENTER[1] >= 0.090
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source  # the isometric override
     assert pinion_spring_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
