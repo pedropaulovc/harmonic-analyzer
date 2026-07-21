@@ -221,6 +221,10 @@ async def build(adapter: Any) -> dict[str, str]:
         dimension_name(adapter, annotation): annotation
         for annotation in front_annotations
     }
+    top_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in top_annotations
+    }
     bore_height_annotation = front_by_name["BoreZ"]
     bore_height_display = adapter._attempt(
         lambda: bore_height_annotation.GetSpecificAnnotation()
@@ -251,17 +255,22 @@ async def build(adapter: Any) -> dict[str, str]:
         label="foot seat face",
         entity=foot_entity,
     )
-    post_od_entity = _circular_edge(
-        adapter, top, radius_mm=BLOCK_DIA / 2.0, center_y_mm=BLOCK_HEIGHT
-    )
+    column_diameter_annotation = top_by_name.get("BlockDia")
+    if column_diameter_annotation is None:
+        raise RuntimeError("column diameter has no display annotation")
+    # A datum tag attached to one circular edge defines that surface locally
+    # and SolidWorks constrains its position to the edge.  Attach B to the
+    # feature-of-size dimension instead: this conventionally establishes the
+    # derived median axis of the complete turned column OD and permits the
+    # square tag's shoulder to sit clear of the plan view.
     add_datum_feature(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] - BLOCK_DIA / 2.0 * _S),
         symbol_xy=(TOP_CENTER[0] + 0.026, TOP_CENTER[1] - 0.020),
         datum="B",
         label="column outside diameter",
-        entity=post_od_entity,
+        annotation=column_diameter_annotation,
+        shoulder=True,
     )
     add_feature_control_frame(
         adapter,
