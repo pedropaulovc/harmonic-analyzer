@@ -313,7 +313,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        frame_xy=(0.105, 0.055),
+        frame_xy=(0.070, 0.055),
         characteristic="position",
         tolerance="0.20",
         datums=("A", "B"),
