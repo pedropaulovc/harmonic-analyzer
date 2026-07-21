@@ -126,16 +126,22 @@ uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002
 uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002 | bash
 uv run meshprobe close --all            # stop the Blender daemon when done
 
+# many poses, ONE open: --batch shares a single meshprobe session so the (large)
+# GLB is imported once instead of re-opened per pair
+uv run comparisons/tools/pose_to_meshprobe.py --batch | bash
+
 # just the computed params, no shell
 uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002 --format json
 ```
 
-The render lands in `comparisons/render/meshprobe/<id>.png`. Useful flags:
-`--canvas WxH` (forces the render canvas — **distance depends on its
-portrait/landscape aspect**, so pass it when no reference image is available or
-the run warns about the landscape default), `--glb <path>` / `--fetch-glb`
-(GLB source), `--boxes <path>` (scene-bbox source; by default it derives the
-bbox straight from the local GLB), `--blender <path>` (Blender ≥ 5.2).
+The emitted commands invoke `uv run meshprobe` (so the pipe-to-`bash` flow works
+without a global install; override with `--meshprobe`). Renders land in
+`comparisons/render/meshprobe/<id>.png`. Useful flags: `--batch` / `--session
+<name>` (one shared session, open once), `--canvas WxH` (forces the render
+canvas — **distance depends on its portrait/landscape aspect**, so pass it when
+no reference image is available or the run warns about the landscape default),
+`--glb <path>` / `--fetch-glb` (GLB source; the scene-bbox source tracks it),
+`--boxes <path>` (explicit per-part boxes), `--blender <path>` (Blender ≥ 5.2).
 
 Mapping (verified against the `open` receipt): pose_studio model coords
 `(x, y, z)` → meshprobe world `(x, −z, y)`; `azimuth = az − 90`,

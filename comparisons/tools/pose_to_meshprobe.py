@@ -149,19 +149,22 @@ def compute_framing(cam, boxes, mesh_lo, mesh_hi, ext, w, h):
 def normalize_camera(cam: dict) -> dict:
     """Accept a manifest pair camera OR a findings-deltas camera; canonicalise.
 
-    Manifest nests the lens as ``perspective.focal_length_mm``; the deltas export
-    flattens it to a top-level ``focal_length_mm`` (null for ortho).
+    The manifest nests the lens as a ``perspective`` dict (``focal_length_mm``,
+    or the ``object_sizes_away`` + ``sensor_dim_mm`` form ``lens_params`` also
+    handles); the deltas export flattens it to a top-level ``focal_length_mm``
+    (null for ortho). Carry the whole perspective dict through so a non-focal
+    spec is not silently downgraded to orthographic.
     """
-    focal = (cam.get("perspective") or {}).get("focal_length_mm")
-    if focal is None:
-        focal = cam.get("focal_length_mm")
+    persp = cam.get("perspective")
+    if persp is None and cam.get("focal_length_mm"):  # deltas flattened the lens
+        persp = {"focal_length_mm": float(cam["focal_length_mm"])}
     return {
         "az_deg": float(cam.get("az_deg", 0.0)),
         "el_deg": float(cam.get("el_deg", 0.0)),
         "roll_deg": float(cam.get("roll_deg", 0.0)),
         "zoom": float(cam.get("zoom") or 1.0),
         "target_mm": cam.get("target_mm"),
-        "perspective": {"focal_length_mm": float(focal)} if focal else None,
+        "perspective": persp,
         "frame_components": cam.get("frame_components"),
     }
 
@@ -175,48 +178,73 @@ def load_pairs(path: Path) -> tuple[list[dict], str]:
         return pairs, "manifest"
     if isinstance(doc, dict) and "camera" in doc:  # findings/<pair>_deltas.json
         pid = doc.get("pair") or path.stem
-        return [{"id": pid, "model": "harmonic_analyzer", "camera": doc["camera"]}], "deltas"
+        pair = {"id": pid, "model": "harmonic_analyzer", "camera": doc["camera"]}
+        _enrich_from_manifest(pair)  # recover reference/model for canvas sizing
+        return [pair], "deltas"
     if isinstance(doc, dict) and {"az_deg", "el_deg"} & doc.keys():  # bare camera dict
         return [{"id": path.stem, "model": "harmonic_analyzer", "camera": doc}], "camera"
     raise SystemExit(f"{path}: not a manifest, deltas, or camera JSON")
+
+
+def _enrich_from_manifest(pair: dict) -> None:
+    """Best-effort: a deltas file carries no ``reference``, so canvas_for would fall
+    back to the landscape default and distort the distance. Pull the reference/model
+    from the manifest pair this delta derives from (by id) when available."""
+    mf = REPO / "comparisons" / "manifest.json"
+    if not mf.exists():
+        return
+    try:
+        pairs = json.loads(mf.read_text(encoding="utf-8")).get("pairs", [])
+    except (ValueError, OSError):
+        return
+    match = next((p for p in pairs if p.get("id") == pair["id"]), None)
+    if not match:
+        return
+    if match.get("reference"):
+        pair["reference"] = match["reference"]
+    pair["model"] = match.get("model", pair["model"])
 
 
 def scene_bbox(model: str, boxes_path: Path | None, glb_hint: str | None,
                fetch: bool, tag: str | None) -> tuple[tuple, tuple, float, list]:
     """(mesh_lo, mesh_hi, ext, boxes) in mm for the framing math.
 
-    Prefers a boxes/scene JSON (it also carries per-part boxes, needed only if a
-    camera uses ``frame_components``). Falls back to deriving the scene bbox
-    straight from the local GLB you already need for ``open`` -- it is the same
-    untranslated model geometry in metres, so bounds*1000 gives an identical mm
-    bbox (boxes=[], so ``frame_components`` framing is unavailable in this mode)."""
+    The bbox MUST come from the same geometry ``open`` will load, or target/distance
+    are computed against different geometry than is rendered. So the source tracks
+    the resolved GLB: an explicit ``--boxes`` wins (per-part boxes for
+    ``frame_components``); else an explicit ``--glb`` derives from that file; else
+    ``--fetch-glb`` pulls the release's own boxes (matching the fetched GLB); else
+    the local build's boxes JSON, falling back to the local GLB. Deriving from a GLB
+    gives boxes=[], so ``frame_components`` framing needs a boxes JSON.
+    A metre-authored GLB * 1000 is an identical mm bbox to its boxes JSON."""
     dashed = model.replace("_", "-")
-    member = f"boxes/{dashed}.json"
-    candidates = [boxes_path] if boxes_path else [CAD_OUT / "boxes" / f"{dashed}.json"]
-    src = next((c for c in candidates if c and c.exists()), None)
-    if src is not None:
-        data = json.loads(src.read_text(encoding="utf-8"))
-        boxes = [(e["name"], e["box"]) for e in data.get("boxes", [])]
-        if not boxes:
-            raise SystemExit(f"{src}: no boxes[] to derive the scene bbox from")
-        lo = tuple(min(b[i] for _n, b in boxes) for i in range(3))
-        hi = tuple(max(b[i + 3] for _n, b in boxes) for i in range(3))
-        return lo, hi, max(hi[i] - lo[i] for i in range(3)), boxes
-
-    glb = Path(glb_hint) if glb_hint else CAD_OUT / "gltf" / f"{dashed}.glb"
-    if glb.exists():
-        return _bbox_from_glb(glb)
+    if boxes_path and boxes_path.exists():
+        return _bbox_from_boxes(boxes_path)
+    if glb_hint and Path(glb_hint).exists():
+        return _bbox_from_glb(Path(glb_hint))
     if fetch:
-        src = release_member(member, tag)
-        data = json.loads(src.read_text(encoding="utf-8"))
-        boxes = [(e["name"], e["box"]) for e in data.get("boxes", [])]
-        lo = tuple(min(b[i] for _n, b in boxes) for i in range(3))
-        hi = tuple(max(b[i + 3] for _n, b in boxes) for i in range(3))
-        return lo, hi, max(hi[i] - lo[i] for i in range(3)), boxes
+        return _bbox_from_boxes(release_member(f"boxes/{dashed}.json", tag))
+    local_boxes = CAD_OUT / "boxes" / f"{dashed}.json"
+    if local_boxes.exists():
+        return _bbox_from_boxes(local_boxes)
+    local_glb = CAD_OUT / "gltf" / f"{dashed}.glb"
+    if local_glb.exists():
+        return _bbox_from_glb(local_glb)
     raise SystemExit(
         f"no scene bbox for {model}: no boxes JSON (cad/out/boxes/{dashed}.json) and no "
         f"GLB (cad/out/gltf/{dashed}.glb). Pass --boxes/--glb, --fetch-glb to pull from "
         f"the latest release, or build locally (doit export / export_glb.py).")
+
+
+def _bbox_from_boxes(path: Path) -> tuple[tuple, tuple, float, list]:
+    """Scene AABB in mm (+ per-part boxes) from a boxes/scene JSON."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    boxes = [(e["name"], e["box"]) for e in data.get("boxes", [])]
+    if not boxes:
+        raise SystemExit(f"{path}: no boxes[] to derive the scene bbox from")
+    lo = tuple(min(b[i] for _n, b in boxes) for i in range(3))
+    hi = tuple(max(b[i + 3] for _n, b in boxes) for i in range(3))
+    return lo, hi, max(hi[i] - lo[i] for i in range(3)), boxes
 
 
 def _bbox_from_glb(glb: Path) -> tuple[tuple, tuple, float, list]:
@@ -369,42 +397,90 @@ def _gh(args: list[str]) -> str:
 # --------------------------------------------------------------------------- #
 # emission
 # --------------------------------------------------------------------------- #
-def emit_commands(cvt: dict, glb: str, glb_src: str, unit_scale: float, blender: str,
-                  out_dir: str) -> list[str]:
-    session = cvt["id"].split("--")[-1] or cvt["id"]
-    ar = cvt["aspect_ratio"]
-    base = ["meshprobe", "-s", session]
-    lines = []
-
-    open_cmd = base + ["open", glb, "--blender", blender, "--aspect-ratio", f"{ar:.5f}"]
+# -- shared per-op command lines (session-scoped) --------------------------- #
+def _open_line(mp: list[str], session: str, glb: str, unit_scale: float,
+               blender: str, aspect: float) -> str:
+    cmd = [*mp, "-s", session, "open", glb, "--blender", blender,
+           "--aspect-ratio", f"{aspect:.5f}"]
     if unit_scale != 1.0:
-        open_cmd += ["--unit-scale", str(unit_scale)]
-    lines.append(_fmt(open_cmd))
+        cmd += ["--unit-scale", str(unit_scale)]
+    return _fmt(cmd)
 
-    orbit = base + ["view-orbit",
-                    "--target", *[f"{v:g}" for v in cvt["target_mm"]],
-                    "--azimuth", f"{cvt['azimuth_deg']:g}",
-                    "--elevation", f"{cvt['elevation_deg']:g}",
-                    "--distance", f"{cvt['distance_mm']:g}",
-                    "--roll", f"{cvt['roll_deg']:g}",
-                    "--aspect-ratio", f"{ar:.5f}"]
-    if cvt["projection"]:
-        orbit += ["--projection-json", json.dumps(cvt["projection"], separators=(",", ":"))]
-    else:
-        orbit += ["--ortho-scale", f"{cvt['ortho_scale_mm']:g}"]
-    lines.append(_fmt(orbit))
 
+def _illum_line(mp: list[str], session: str) -> str:
     # High-key white background so SW-exported PBR metals do not render near-black.
-    lines.append(_fmt(base + ["illumination-set", "high_key", "--background-rgb", "1", "1", "1"]))
+    return _fmt([*mp, "-s", session, "illumination-set", "high_key",
+                 "--background-rgb", "1", "1", "1"])
 
+
+def _orbit_line(mp: list[str], session: str, cvt: dict) -> str:
+    cmd = [*mp, "-s", session, "view-orbit",
+           "--target", *[f"{v:g}" for v in cvt["target_mm"]],
+           "--azimuth", f"{cvt['azimuth_deg']:g}",
+           "--elevation", f"{cvt['elevation_deg']:g}",
+           "--distance", f"{cvt['distance_mm']:g}",
+           "--roll", f"{cvt['roll_deg']:g}",
+           "--aspect-ratio", f"{cvt['aspect_ratio']:.5f}"]
+    if cvt["projection"]:
+        cmd += ["--projection-json", json.dumps(cvt["projection"], separators=(",", ":"))]
+    else:
+        cmd += ["--ortho-scale", f"{cvt['ortho_scale_mm']:g}"]
+    return _fmt(cmd)
+
+
+def _render_line(mp: list[str], session: str, cvt: dict, out_dir: str) -> str:
     out_png = str(Path(out_dir) / f"{cvt['id']}.png")
-    lines.append(_fmt(base + ["render-image", "--style", "shaded_edges",
-                              "--width", str(cvt["canvas"][0]), "--height", str(cvt["canvas"][1]),
-                              "--output", out_png]))
-    header = (f"# {cvt['id']}  (az={cvt['azimuth_deg']:g} el={cvt['elevation_deg']:g} "
-              f"roll={cvt['roll_deg']:g} dist={cvt['distance_mm']:g}mm)\n"
-              f"# glb: {glb}  [{glb_src}]")
-    return [header, *lines, ""]
+    return _fmt([*mp, "-s", session, "render-image", "--style", "shaded_edges",
+                 "--width", str(cvt["canvas"][0]), "--height", str(cvt["canvas"][1]),
+                 "--output", out_png])
+
+
+def _pose_comment(cvt: dict) -> str:
+    return (f"# {cvt['id']}  (az={cvt['azimuth_deg']:g} el={cvt['elevation_deg']:g} "
+            f"roll={cvt['roll_deg']:g} dist={cvt['distance_mm']:g}mm)")
+
+
+def emit_commands(mp: list[str], cvt: dict, glb: str, glb_src: str, unit_scale: float,
+                  blender: str, out_dir: str) -> list[str]:
+    """Per-pair isolation: a dedicated session that opens the GLB for this pair alone."""
+    session = cvt["id"].split("--")[-1] or cvt["id"]
+    header = f"{_pose_comment(cvt)}\n# glb: {glb}  [{glb_src}]"
+    return [header,
+            _open_line(mp, session, glb, unit_scale, blender, cvt["aspect_ratio"]),
+            _orbit_line(mp, session, cvt),
+            _illum_line(mp, session),
+            _render_line(mp, session, cvt, out_dir), ""]
+
+
+def emit_batch(mp: list[str], results: list[dict], glb_cache: dict, unit_scale: float,
+               blender: str, out_dir: str, session: str) -> list[str]:
+    """Single shared session per model: open the GLB ONCE, then pose+render per pair.
+
+    Avoids re-importing the (large) GLB for every pair. Pairs spanning multiple
+    models get one session each (``<session>-<model>``); each view-orbit carries
+    its own aspect/projection and each render its own size, so differing canvases
+    coexist in one open."""
+    models: list[str] = []
+    for cvt in results:
+        if cvt["model"] not in models:
+            models.append(cvt["model"])
+    multi = len(models) > 1
+    lines: list[str] = []
+    for model in models:
+        cvts = [c for c in results if c["model"] == model]
+        glb, glb_src = glb_cache[model]
+        sess = f"{session}-{model.replace('_', '-')}" if multi else session
+        lines.append(f"# batch session '{sess}': {len(cvts)} pose(s), one open")
+        lines.append(f"# glb: {glb}  [{glb_src}]")
+        lines.append(_open_line(mp, sess, glb, unit_scale, blender, cvts[0]["aspect_ratio"]))
+        lines.append(_illum_line(mp, sess))
+        for cvt in cvts:
+            lines.append(_pose_comment(cvt))
+            lines.append(_orbit_line(mp, sess, cvt))
+            lines.append(_render_line(mp, sess, cvt, out_dir))
+        lines.append(_fmt([*mp, "-s", sess, "close"]))
+        lines.append("")
+    return lines
 
 
 def _fmt(argv: list[str]) -> str:
@@ -432,7 +508,20 @@ def main() -> int:
                     help="render-image --output directory")
     ap.add_argument("--format", choices=["sh", "json"], default="sh",
                     help="emit meshprobe commands (sh) or the computed params (json)")
+    ap.add_argument("--batch", action="store_true",
+                    help="emit ONE shared session per model (open the GLB once, then "
+                         "view-orbit+render per pair) instead of a session + re-open per pair")
+    ap.add_argument("--session", help="shared session name for --batch (implies --batch; "
+                                      "default 'poses'); suffixed per model when pairs span models")
+    ap.add_argument("--meshprobe", default="uv run meshprobe",
+                    help="meshprobe invocation in the emitted commands (default 'uv run "
+                         "meshprobe' so `... | bash` works in-project; use 'meshprobe' for a "
+                         "global install)")
     args = ap.parse_args()
+
+    batch = args.batch or bool(args.session)
+    session = args.session or "poses"
+    mp = shlex.split(args.meshprobe)
 
     override = None
     if args.canvas:
@@ -458,15 +547,19 @@ def main() -> int:
         cvt = convert(pair, bbox_cache[model], w, h)
         cvt["canvas_source"] = src
         results.append(cvt)
-        if args.format == "sh":
-            if model not in glb_cache:
-                glb_cache[model] = resolve_glb(model, args.glb, args.fetch_glb, args.release_tag)
+        if args.format == "sh" and model not in glb_cache:
+            glb_cache[model] = resolve_glb(model, args.glb, args.fetch_glb, args.release_tag)
+        if args.format == "sh" and not batch:
             glb, glb_src = glb_cache[model]
-            blocks += emit_commands(cvt, glb, glb_src, args.unit_scale, args.blender, args.out_dir)
+            blocks += emit_commands(mp, cvt, glb, glb_src, args.unit_scale,
+                                    args.blender, args.out_dir)
 
     if args.format == "json":
         print(json.dumps(results, indent=2))
         return 0
+    if batch:
+        blocks = emit_batch(mp, results, glb_cache, args.unit_scale, args.blender,
+                            args.out_dir, session)
     print("\n".join(blocks))
     return 0
 
