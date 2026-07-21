@@ -61,6 +61,15 @@ def test_native_gdt_and_finish_present() -> None:
     assert "add_native_hole_callout(" in source
 
 
+def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
+    edge_x, edge_y = drawing.BORE_FINISH_EDGE
+    symbol_x, symbol_y = drawing.BORE_FINISH_SYMBOL
+    assert symbol_x > edge_x
+    assert symbol_y > edge_y
+    assert symbol_y > drawing.FRONT_KEEP["StrapBoreDia"][1] + 0.010
+    assert symbol_x < 0.250
+
+
 def test_part_stamps_make_critical_drawing_properties() -> None:
     source = Path(rod.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source

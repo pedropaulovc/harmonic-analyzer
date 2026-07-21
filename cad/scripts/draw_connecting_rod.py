@@ -90,6 +90,9 @@ FRONT_KEEP = {
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 
+BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
+BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -181,12 +184,11 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="strap bore axis",
     )
-    bore_bottom = _sheet_xy(0.0, -RING_BORE_DIA / 2.0)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_bottom,
-        symbol_xy=(bore_bottom[0] + 0.010, bore_bottom[1] - 0.020),
+        edge_xy=BORE_FINISH_EDGE,
+        symbol_xy=BORE_FINISH_SYMBOL,
         roughness_ra="1.6",
         label="strap bore finish",
     )

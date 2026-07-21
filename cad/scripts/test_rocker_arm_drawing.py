@@ -70,6 +70,42 @@ def test_native_gdt_and_finish_present() -> None:
     assert "add_native_hole_callout(" in source
 
 
+def test_large_radius_dimensions_are_shortened_before_export(monkeypatch) -> None:
+    class Display:
+        ShortenedRadius = False
+
+    class Annotation:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.display = Display()
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+    class Model:
+        redraws = 0
+
+        def GraphicsRedraw2(self) -> None:
+            self.redraws += 1
+
+    class Adapter:
+        currentModel = Model()
+
+    annotations = [Annotation("TopRadius"), Annotation("BottomRadius")]
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(
+        drawing._sw_type_info, "early_bound", lambda item, *_args: item
+    )
+
+    adapter = Adapter()
+    drawing._shorten_radius_dimensions(
+        adapter, annotations, {"TopRadius", "BottomRadius"}
+    )
+
+    assert all(item.display.ShortenedRadius for item in annotations)
+    assert adapter.currentModel.redraws == 1
+
+
 def test_part_stamps_make_critical_drawing_properties() -> None:
     source = Path(arm.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
