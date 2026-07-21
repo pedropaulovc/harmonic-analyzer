@@ -76,7 +76,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert 'quantity="4X DIA 13 THRU HOLES"' in source
     assert 'quantity="8X BLIND TAPPED HOLES"' in source
     assert 'quantity="1X DIA 6.53 BLIND HOLE"' in source
-    assert "drawing_doc.HideEdge()" in source
+    assert "underside-only counterbore rims are visible" in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
     assert "expected_redundant_notes=3" in source
 

@@ -121,8 +121,8 @@ ALL_HOLES = (
 
 def _visible_hole_table_entities(
     adapter: Any, view: Any
-) -> tuple[Any, tuple[Any, ...], tuple[Any, ...], Any, Any]:
-    """Return plan origin, hole rims, underside counterbores, and B/C edges."""
+) -> tuple[Any, tuple[Any, ...], Any, Any]:
+    """Return plan origin, hole rims, and the B/C datum edges."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     vertices: list[tuple[tuple[float, float, float], Any]] = []
     circles: list[tuple[float, float, float, Any]] = []
@@ -155,6 +155,23 @@ def _visible_hole_table_entities(
 
     if not vertices:
         raise RuntimeError("harmonic-base plan has no visible footprint vertices")
+
+    visible_counterbores = [
+        (x_mm, z_mm)
+        for x_mm, z_mm in HOLE_XZ
+        if any(
+            abs(x - x_mm / 1000.0)
+            + abs(z - z_mm / 1000.0)
+            + abs(radius - CBORE_DIA / 2000.0)
+            <= 5e-5
+            for x, z, radius, _edge in circles
+        )
+    ]
+    if visible_counterbores:
+        raise RuntimeError(
+            "underside-only counterbore rims are visible in the top view: "
+            f"{visible_counterbores!r}"
+        )
 
     x_min = min(point[0] for point, _entity in vertices)
     z_max = max(point[2] for point, _entity in vertices)
@@ -199,26 +216,6 @@ def _visible_hole_table_entities(
         used.add(index)
         selected_edges.append(edge)
 
-    counterbore_edges: list[Any] = []
-    for x_mm, z_mm in HOLE_XZ:
-        expected = (x_mm / 1000.0, z_mm / 1000.0, CBORE_DIA / 2000.0)
-        candidates = sorted(
-            (
-                abs(x - expected[0])
-                + abs(z - expected[1])
-                + abs(radius - expected[2]),
-                edge,
-            )
-            for x, z, radius, edge in circles
-        )
-        if not candidates or candidates[0][0] > 5e-5:
-            nearest = candidates[0][0] if candidates else None
-            raise RuntimeError(
-                "harmonic-base plan has no visible underside counterbore rim at "
-                f"({x_mm:g}, {z_mm:g}); nearest error={nearest!r} m"
-            )
-        counterbore_edges.append(candidates[0][1])
-
     datum_b_candidates = [
         edge
         for parameters, edge in lines
@@ -239,32 +236,9 @@ def _visible_hole_table_entities(
     return (
         max(datum_candidates, key=lambda candidate: candidate[0])[1],
         tuple(selected_edges),
-        tuple(counterbore_edges),
         datum_b_candidates[0],
         datum_c_candidates[0],
     )
-
-
-def _hide_underside_counterbores(adapter: Any, edges: tuple[Any, ...]) -> None:
-    """Hide bottom-only counterbore rims that are not visible from the plan."""
-    draw = adapter.currentModel
-    selection_manager = _early_bound(
-        draw.SelectionManager, "ISelectionMgr", "CreateSelectData"
-    )
-    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
-    selection_data.Mark = 0
-    draw.ClearSelection2(True)
-    for index, edge in enumerate(edges):
-        selectable = _early_bound(edge, "IEntity")
-        if not selectable.Select4(index > 0, selection_data):
-            raise RuntimeError(
-                f"failed to select underside counterbore rim {index + 1} for hiding"
-            )
-    drawing_doc = _early_bound(draw, "IDrawingDoc")
-    drawing_doc.HideEdge()
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    _telemetry.success(f"hid {len(edges)} underside-only counterbore rims in plan")
 
 
 def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -355,7 +329,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
-    datum_entity, hole_entities, counterbore_edges, datum_b_edge, datum_c_edge = (
+    datum_entity, hole_entities, datum_b_edge, datum_c_edge = (
         _visible_hole_table_entities(adapter, top)
     )
     datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
@@ -374,7 +348,6 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=True,
         label="harmonic-base mounting",
     )
-    _hide_underside_counterbores(adapter, counterbore_edges)
     add_datum_feature(
         adapter,
         side,
