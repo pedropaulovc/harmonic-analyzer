@@ -38,10 +38,10 @@ def thread_control_notes(
     return (
         f"{thread_designation} PER ASME B1.1-2024.",
         "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
-        f"{underhead_length_mm:.2f} +/-0.20 UNDER-HEAD LENGTH; FULL THREAD "
-        "EXTENT = ENTIRE LENGTH.",
-        f"{min_full_form:.2f} MIN FULL-FORM THREAD.",
-        "INCOMPLETE THREAD 2P MAX AT EACH END.",
+        f"{underhead_length_mm:.2f} +/-0.20 UNDER-HEAD LENGTH.",
+        "THREAD EXTENT FROM UNDERHEAD FILLET TO DISTAL START CHAMFER.",
+        f"{min_full_form:.2f} MIN FULL THREAD FORM; INCOMPLETE THREAD 2P MAX "
+        "AT EACH END.",
         f"DISTAL START CHAMFER C{lead_chamfer:.2f} +/-0.05 X 45 DEG +/-1 DEG.",
         f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX; THREAD LIMITS APPLY "
         "AFTER FINISH.",
@@ -56,8 +56,8 @@ def slotted_round_head_notes(
     """Return controls for a cylindrical head with a straight driver slot."""
     return (
         f"HEAD DIA {head_dia_mm:.2f} +/-0.10 X {head_height_mm:.2f} +/-0.10 HIGH.",
-        "DATUM A = THREAD PITCH-DIAMETER AXIS.",
-        "HEAD OD TOTAL RUNOUT 0.10 TO A; BEARING FACE PERP 0.10 TO A.",
+        "HEAD OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS.",
+        "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
         f"DRIVER SLOT {slot_width_mm:.2f} +/-0.10 WIDE X "
         f"{slot_depth_mm:.2f} +/-0.10 DEEP.",
         "SLOT FLAT BOTTOM; DEPTH FROM TOP; MIDPLANE OFFSET FROM HEAD OD AXIS "
@@ -83,8 +83,8 @@ def reeded_head_notes(
     return (
         f"{head_name} DIA {head_dia_mm:.2f} +/-0.10 X "
         f"{head_length_mm:.2f} +/-0.10 LONG.",
-        "DATUM A = THREAD PITCH-DIAMETER AXIS.",
-        f"{head_name} OD TOTAL RUNOUT 0.10 TO A; BEARING FACE PERP 0.10 TO A.",
+        f"{head_name} OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS.",
+        "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
         f"{groove_count}X R{groove_radius:.2f} +/-0.05 AXIAL GROOVES, EQUALLY SPACED.",
         f"GROOVE ROOT DIA {root_dia:.2f} +/-0.10; FULL {head_name} LENGTH.",
     )

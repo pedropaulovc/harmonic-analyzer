@@ -165,9 +165,12 @@ def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter
     assert "FLAT-END PINCH SCREW; NO CONICAL POINT" in spec.DRAWING_NOTES
     assert "DISTAL START CHAMFER" in spec.DRAWING_NOTES
     assert "MIDPLANE OFFSET FROM HEAD OD AXIS 0.00 +/-0.05" in spec.DRAWING_NOTES
-    assert "DATUM A = THREAD PITCH-DIAMETER AXIS." in spec.DRAWING_NOTES
-    assert "HEAD OD TOTAL RUNOUT 0.10 TO A" in spec.DRAWING_NOTES
-    assert "BEARING FACE PERP 0.10 TO A" in spec.DRAWING_NOTES
+    assert "HEAD OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS" in (
+        spec.DRAWING_NOTES
+    )
+    assert "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS" in (
+        spec.DRAWING_NOTES
+    )
 
 
 @pytest.mark.parametrize("spec_name", ("hanger_screw_spec", "thumb_screw_spec"))
@@ -180,9 +183,12 @@ def test_long_reference_note_is_split_for_readable_rendering(spec_name: str) -> 
 
 def test_hanger_hex_head_is_controlled_to_thread_axis() -> None:
     spec = importlib.import_module("hanger_screw_spec")
-    assert "DATUM A = THREAD PITCH-DIAMETER AXIS." in spec.DRAWING_NOTES
-    assert "HEX CENTER WITHIN DIA 0.10 OF A" in spec.DRAWING_NOTES
-    assert "BEARING FACE PERP 0.10 TO A" in spec.DRAWING_NOTES
+    assert "HEX CENTER WITHIN DIA 0.10 OF THREAD PITCH-DIAMETER AXIS" in (
+        spec.DRAWING_NOTES
+    )
+    assert "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS" in (
+        spec.DRAWING_NOTES
+    )
 
 
 def test_thumb_note_uses_short_lines_in_a_raised_lane() -> None:
@@ -228,7 +234,11 @@ def test_reeded_builder_uses_spec_groove_count(
     source = Path(build.__file__).read_text(encoding="utf-8")
     assert build.GROOVE_COUNT == spec.GROOVE_COUNT
     assert "groove_count=GROOVE_COUNT" in source
-    assert "DATUM A = THREAD PITCH-DIAMETER AXIS." in spec.DRAWING_NOTES
     head_name = "KNOB" if spec_name == "pen_set_screw_spec" else "HEAD"
-    assert f"{head_name} OD TOTAL RUNOUT 0.10 TO A" in spec.DRAWING_NOTES
-    assert "BEARING FACE PERP 0.10 TO A" in spec.DRAWING_NOTES
+    assert (
+        f"{head_name} OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS"
+        in spec.DRAWING_NOTES
+    )
+    assert "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS" in (
+        spec.DRAWING_NOTES
+    )

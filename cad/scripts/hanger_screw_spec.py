@@ -33,8 +33,8 @@ DRAWING_NOTES = "\n".join(
             underhead_length_mm=SHANK_LEN,
         ),
         *hex_head_notes(across_flats_mm=HEAD_AF, head_height_mm=HEAD_H),
-        "DATUM A = THREAD PITCH-DIAMETER AXIS.",
-        "HEX CENTER WITHIN DIA 0.10 OF A; BEARING FACE PERP 0.10 TO A.",
+        "HEX CENTER WITHIN DIA 0.10 OF THREAD PITCH-DIAMETER AXIS.",
+        "BEARING FACE PERPENDICULAR 0.10 TO THREAD PITCH-DIAMETER AXIS.",
     )
 )
 END_VIEW_NOTE = "HEX-HEAD VIEW"
