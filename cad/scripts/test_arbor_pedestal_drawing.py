@@ -49,7 +49,6 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
 
 def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
-    assert "ARBOR BORE" in notes
     assert "MATING ARBOR LIMITS DIA 9.505-9.525" in notes
     assert "#4" in notes  # the flange hold-down clearance hole
     assert "DIA 3.264 +0.10/-0.00" in notes
@@ -60,14 +59,22 @@ def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     assert "MACHINE FROM CONTINUOUS-CAST STOCK" in notes
+    assert "TAPER FLANKS PROJECT TO 24.00 WIDTH AT DATUM A" in notes
+    assert "VISIBLE TAPER STARTS AT THE TOP OF THE" in notes
+    assert "FARTHEST FROM THE TOP-VIEW" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_datum_and_parallelism_frame_are_present() -> None:
+def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'datum="A"' in source
-    assert 'characteristic="parallelism"' in source
+    assert 'datum="B"' in source
+    assert 'datum="C"' in source
+    assert 'characteristic="position"' in source
+    assert 'characteristic="circular_runout"' in source
+    assert 'characteristic="perpendicularity"' in source
+    assert source.count("set_basic_dimension(") == 2
     assert 'roughness_ra="1.6"' in source
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "CYLINDRICAL ZONE" not in notes
