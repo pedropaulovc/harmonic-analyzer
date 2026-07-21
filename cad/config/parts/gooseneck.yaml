@@ -1,5 +1,8 @@
 gooseneck:
   number: MHA-032
   material: Chrome Stainless Steel
+  material_specification: chrome-plated steel tube (AISI 1010 core)
+  finish: polished chrome
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"
