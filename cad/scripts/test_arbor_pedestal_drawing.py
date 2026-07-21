@@ -66,6 +66,8 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "NO TANGENCY" in notes
     assert "BOXED 12.00 LOCATES BOTH BORE AND FLANGE-HOLE AXES" in notes
     assert "BOXED 6.00 LOCATES STRAP NEAR FACE FROM D" in notes
+    assert "MASK ARBOR BORE AND FOOT SEAT DURING COATING" in notes
+    assert "DIMENSIONAL INSPECTION" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_native_hole_callout(" in source
@@ -129,6 +131,5 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "black japan varnish" in finish
     assert "2 coats" in finish
     assert "25-50um dft" in finish
-    assert "mask bore/foot seat" in finish
-    assert "after inspection" in finish
+    assert "mask" not in finish
     assert int(config["quantity"]) == 1
