@@ -57,6 +57,7 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert 'symbol_xy=(0.245, 0.105), datum="C"' in source
     assert 'quantity="4X COLUMN BORES"' in source
     assert 'quantity="4X BOSS ODS"' in source
+    assert 'allow_coincident=True' in source
     assert 'quantity="GOOSENECK BORE"' in source
     assert '{"Width": "+/-0.25", "Depth": "+/-0.25"}' in source
 

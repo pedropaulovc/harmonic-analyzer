@@ -102,7 +102,14 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
             if curve.IsLine():
                 lines.append((tuple(float(value) for value in curve.LineParams), edge))
 
-    def _circle(x_mm: float, z_mm: float, diameter_mm: float, label: str) -> Any:
+    def _circle(
+        x_mm: float,
+        z_mm: float,
+        diameter_mm: float,
+        label: str,
+        *,
+        allow_coincident: bool = False,
+    ) -> Any:
         matches = [
             edge
             for x, z, radius, edge in circles
@@ -111,8 +118,11 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
             + abs(radius - diameter_mm / 2000.0)
             <= 5e-5
         ]
-        if len(matches) != 1:
+        if not matches or (len(matches) != 1 and not allow_coincident):
             raise RuntimeError(f"top-frame plan expected one visible {label}, got {len(matches)}")
+        # A boss projects both coincident end rims in the plan view. They are
+        # the same cylindrical feature at the same model coordinates, so either
+        # visible rim is a valid annotation attachment.
         return matches[0]
 
     datum_b = [
@@ -129,7 +139,13 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
         raise RuntimeError("top-frame plan is missing the B/C outer rail datum edges")
     return (
         _circle(-COLUMN_X, COLUMN_Z, BORE_DIA, "column bore"),
-        _circle(-COLUMN_X, COLUMN_Z, BOSS_DIA, "column boss OD"),
+        _circle(
+            -COLUMN_X,
+            COLUMN_Z,
+            BOSS_DIA,
+            "column boss OD",
+            allow_coincident=True,
+        ),
         _circle(GOOSENECK_X, GOOSENECK_Z, GOOSENECK_BORE_DIA, "gooseneck bore"),
         datum_b[0],
         datum_c[0],

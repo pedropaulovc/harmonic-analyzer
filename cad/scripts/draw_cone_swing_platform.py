@@ -61,9 +61,9 @@ SHEET_SCALE = (1.0, 3.0)   # 1:3 keeps the 214 mm plan plus dimensions in-zone
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view; the
 # isometric and an end view occupy the open right-hand field.
-TOP_CENTER = (0.115, 0.195)
+TOP_CENTER = (0.115, 0.210)
 ISO_CENTER = (0.330, 0.175)
-END_CENTER = (0.330, 0.083)
+END_CENTER = (0.330, 0.095)
 
 # Per-view survivor: overall axis length only. Axis-relative end offsets in the
 # notes define both asymmetric end widths without redundant chained dimensions.
@@ -193,7 +193,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         end,
-        symbol_xy=(0.305, 0.066),
+        symbol_xy=(0.330, 0.080),
         datum="A",
         label="lower broad face",
         entity=datum_a_edge,
@@ -202,7 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         end,
-        frame_xy=(0.270, 0.078),
+        frame_xy=(0.270, 0.090),
         characteristic="flatness",
         tolerance="0.10",
         quantity="DATUM A BROAD FACE",
@@ -212,7 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         end,
-        frame_xy=(0.355, 0.095),
+        frame_xy=(0.355, 0.107),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
@@ -222,9 +222,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
-    add_property_linked_note(adapter, "Plan View Note", 0.040, 0.036)
-    add_property_linked_note(adapter, "Isometric View Note", 0.290, 0.108)
-    add_property_linked_note(adapter, "End View Note", 0.298, 0.055)
+    add_property_linked_note(adapter, "Plan View Note", 0.190, 0.205)
+    add_property_linked_note(adapter, "Isometric View Note", 0.290, 0.135)
+    add_property_linked_note(adapter, "End View Note", 0.300, 0.125)
 
     return await finalize_drawing(
         adapter,
