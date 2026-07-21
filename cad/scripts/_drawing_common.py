@@ -901,6 +901,62 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
     )
 
 
+_TEMPLATE_EDGE_BREAK_PREFIX = "REMOVE BURRS AND BREAK SHARP EDGES"
+_METRIC_EDGE_BREAK_NOTE = (
+    "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
+)
+
+
+def _replace_template_edge_break_note(adapter: Any, ddoc: Any) -> None:
+    """Replace the template's inch-origin edge-break note with metric values.
+
+    The checked-in binary template still carries ``R.01 / CHAMFER .01`` from
+    its inch ancestry even though every project sheet is explicitly millimetres.
+    Rewriting its one literal sheet-format note at drawing creation keeps the
+    rendered requirement physically sensible without duplicating it in each
+    part's general notes.
+    """
+    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
+    if sheet_view is None:
+        raise RuntimeError("project drawing template has no sheet view")
+    annotations = adapter._attempt(
+        lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
+    ) or []
+    matches: list[Any] = []
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
+        )
+        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
+            continue
+        note = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if note is None:
+            continue
+        note = _sw_type_info.early_bound_or_flag(
+            note, "INote", "GetText", "SetText"
+        )
+        text = str(adapter._get_attr_or_call(note, "GetText") or "").strip()
+        if text.startswith(_TEMPLATE_EDGE_BREAK_PREFIX):
+            matches.append(note)
+    if len(matches) != 1:
+        raise RuntimeError(
+            "expected exactly one template edge-break note, found "
+            f"{len(matches)}"
+        )
+    note = matches[0]
+    current = str(adapter._get_attr_or_call(note, "GetText") or "").strip()
+    if current != _METRIC_EDGE_BREAK_NOTE:
+        if not note.SetText(_METRIC_EDGE_BREAK_NOTE):
+            raise RuntimeError("failed to replace the template edge-break note")
+    applied = str(adapter._get_attr_or_call(note, "GetText") or "").strip()
+    if applied != _METRIC_EDGE_BREAK_NOTE:
+        raise RuntimeError(
+            f"template edge-break note did not persist: {applied!r}"
+        )
+    adapter.currentModel.EditRebuild3()
+    _telemetry.event("drawing.metric_edge_break_note", text=applied)
+
+
 def new_project_drawing(
     adapter: Any,
     *,
