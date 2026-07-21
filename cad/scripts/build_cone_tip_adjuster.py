@@ -67,6 +67,17 @@ def _slot_strip_area(r: float, w: float) -> float:
     return 2.0 * (h * math.sqrt(r * r - h * h) + r * r * math.asin(h / r))
 
 
+def _slotted_rim_chamfer_volume(r: float, chamfer: float, slot_w: float) -> float:
+    """45-degree rim-chamfer volume remaining after a centered through-slot."""
+    centroid_radius = r - chamfer / 3.0
+    slot_half = slot_w / 2.0
+    if not 0.0 < slot_half < centroid_radius:
+        raise ValueError("slot must remove less than the full chamfer rim")
+    full_volume = math.pi * chamfer**2 * centroid_radius
+    missing_fraction = 2.0 * math.asin(slot_half / centroid_radius) / math.pi
+    return full_volume * (1.0 - missing_fraction)
+
+
 def _insert_cosmetic_thread(adapter) -> bool:
     """Attach the 5/16-18 cosmetic thread to the exact north-end outer edge."""
     part = _early_bound(adapter.currentModel, "IPartDoc", "GetBodies2")
@@ -216,14 +227,18 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ThreadStartChamfers")
-    # Full circular 45-degree chamfer removal by Pappus. The south slot already
-    # removes ~6% of that rim, so allow only that explicit overlap.
+    # Full north-rim 45-degree chamfer removal by Pappus. The centered driver
+    # slot removes a calculable arc fraction from the south rim before its
+    # chamfer is cut, so account for that missing circumference explicitly.
     v_one_chamfer = math.pi * CHAMFER**2 * (radius - CHAMFER / 3.0)
+    v_slotted_chamfer = _slotted_rim_chamfer_volume(
+        radius, CHAMFER, SLOT_W
+    )
     volume = await volume_check(
         adapter,
         "thread-start chamfers",
-        volume - 2.0 * v_one_chamfer,
-        0.15 * v_one_chamfer,
+        volume - v_one_chamfer - v_slotted_chamfer,
+        0.05 * v_one_chamfer,
     )
 
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "screw axis")

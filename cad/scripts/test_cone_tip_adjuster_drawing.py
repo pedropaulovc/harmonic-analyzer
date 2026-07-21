@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import math
 
 import build_cone_tip_adjuster as part
 import cone_tip_adjuster_spec
@@ -41,6 +42,15 @@ def test_thread_callout_is_the_catalog_thread() -> None:
     assert part.CHAMFER == drawing.CHAMFER == 0.4
     assert 'name_last_feature(adapter, "ThreadStartChamfers")' in part_source
     assert "await adapter.add_chamfer(" in part_source
+
+
+def test_slotted_south_rim_reduces_only_its_chamfer_arc() -> None:
+    radius = part.BODY_DIA / 2.0
+    full = math.pi * part.CHAMFER**2 * (radius - part.CHAMFER / 3.0)
+    slotted = part._slotted_rim_chamfer_volume(
+        radius, part.CHAMFER, part.SLOT_W
+    )
+    assert 0.80 * full < slotted < 0.90 * full
 
 
 def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> None:
