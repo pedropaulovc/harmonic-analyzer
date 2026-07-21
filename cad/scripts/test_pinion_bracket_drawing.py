@@ -93,6 +93,11 @@ def test_hole_states_are_annotated() -> None:
     assert "TOTAL DEPTH" in callouts["PinSeatDepth"]
 
 
+def test_blind_seat_depth_uses_the_marked_drawing_name() -> None:
+    source = Path(bracket.__file__).read_text(encoding="utf-8")
+    assert 'name_dimensions(adapter, "PinSeat", ["PinSeatDepth"])' in source
+
+
 def test_direct_limits_replace_ambiguous_datum_scheme() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source
