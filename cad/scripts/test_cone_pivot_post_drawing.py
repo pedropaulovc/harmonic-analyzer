@@ -42,22 +42,21 @@ def test_marked_dimensions_cover_the_column_and_journal() -> None:
 
 def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     notes = cone_pivot_post_spec.DRAWING_NOTES
+    axis = cone_pivot_post_spec.CRANK_AXIS_BASIC_NOTE
     assert "9.545-9.555" in notes
     assert "FINISH RA 1.6" in notes
-    # The oblique bore's size and basic geometry supplement its native position
-    # frame because the feature projects as an ellipse in every square view.
-    assert "CRANK BORE" in notes
-    assert "10.025" in notes
-    assert "85.835" in notes
-    assert "BASIC ACUTE ANGLE TO DATUM AXIS C IS 12.52 DEG" in notes
-    assert "BASIC 85.835 ABOVE A" in notes
-    assert "SHORTEST DISTANCE FROM B IS 0.950" in notes
-    assert "SHEET RIGHT/DOWN" in notes
+    assert "BASIC CRANK-BORE AXIS DEFINITION" in axis
+    assert "INTERSECTION OF DATUM A AND DATUM AXIS B" in axis
+    assert "+Z PARALLEL C, DOWN IN UPPER PLAN" in axis
+    assert "LINE = (-0.927, 85.835, -0.206)" in axis
+    assert "+ t(-0.21675, 0, +0.97623)" in axis
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     assert "MACHINE FROM CONTINUOUS-CAST ROUND STOCK" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'text="CRANK BORE <MOD-DIAM>10.025 +/-0.025 THRU"' in source
+    assert "note.SetBalloon(4, 0)" in source
 
 
 def test_datum_and_notes_control_the_journal_bore() -> None:
@@ -74,7 +73,7 @@ def test_datum_and_notes_control_the_journal_bore() -> None:
     assert 'datums=("A", "B")' in source
     assert 'datums=("A", "B", "C")' in source
     assert 'diameter=True' in source
-    assert "AXIS BASICALLY INTERSECTS DATUM AXIS B" in cone_pivot_post_spec.DRAWING_NOTES
+    assert "CRANK_AXIS_BASIC_NOTE" in source
     assert "add_surface_finish(" not in source
     assert "B IS COLUMN OD" in cone_pivot_post_spec.DRAWING_NOTES
     assert "C IS JOURNAL-BORE AXIS" in cone_pivot_post_spec.DRAWING_NOTES
@@ -97,4 +96,5 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "A48" in str(config["material_specification"])
     assert "A48" in str(config["material"])
     assert config["finish"]
+    assert "datum b od" in str(config["finish"]).lower()
     assert int(config["quantity"]) == 1

@@ -78,6 +78,7 @@ def test_datum_and_position_controls_are_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'datum="A"' in source
     assert 'datum="B"' in source
+    assert 'annotation=by_name["Width"]' in source
     assert 'datum="C"' in source
     assert 'datum="D"' in source
     assert "shoulder=True" in source

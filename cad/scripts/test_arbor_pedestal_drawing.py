@@ -52,7 +52,7 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
 def test_notes_specify_part_requirements_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "MATING ARBOR LIMITS DIA 9.505-9.525 (REF)" in notes
-    assert "COPLANAR FOOT/STRAP FAR FACES" in notes
+    assert "STRAP NEAR/FAR FACES" in notes
     assert "RESULTING STRAP THICKNESS 10.00 REF" in notes
     assert "MATERIAL" not in notes
     assert "JAPANNED" not in notes
@@ -61,18 +61,19 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "BREAK EDGES" not in notes
     assert "MACHINE FROM CONTINUOUS-CAST STOCK" in notes
     assert "DATUM B IS LEFT FOOT SIDE FACE SHOWN" in notes
-    assert "2X STRAIGHT FLANKS RUN FROM TOP CORNERS" in notes
-    assert "BOXED 24.00 X 5.00 FOOT" in notes
+    assert "2X STRAIGHT FLANKS JOIN BOXED 24.00 X 5.00 FOOT TOP CORNERS" in notes
     assert "NO TANGENCY" in notes
     assert "BOXED 12.00 LOCATES BOTH BORE AND FLANGE-HOLE AXES" in notes
-    assert "BOXED 6.00 LOCATES STRAP NEAR FACE FROM D" in notes
+    assert "BOXED 6.00/16.00 LOCATE STRAP NEAR/FAR FACES FROM D" in notes
     assert "DIMENSIONS AND GD&T APPLY BEFORE COATING" in notes
-    assert "MASK ARBOR BORE, DIA 3.26 HOLE" in notes
-    assert "DATUM A/B/D FEATURES" in notes
-    assert "ALL PROFILE-CONTROLLED SURFACES" in notes
-    assert "25-50 um TOTAL DFT OVER TWO COATS" in notes
+    assert "MASK ARBOR BORE" in notes
+    assert "DIA 3.26\nHOLE" in notes
+    assert "FOOT SEAT A, LEFT SIDE B" in notes
+    assert "PROFILE-CONTROLLED SURFACES" in notes
+    assert "25-50 um" not in notes
+    assert "TWO COATS" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.083)' in source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)' in source
     assert "add_native_hole_callout(" in source
     assert 'label="flange-hole location from datum D"' in source
 

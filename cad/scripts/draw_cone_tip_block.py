@@ -253,11 +253,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=FRONT_KEEP["Width"],
-        symbol_xy=(0.055, _front_y(0.0) + 0.010),
+        symbol_xy=FRONT_KEEP["Width"],
         datum="B",
         label="block-width median plane",
-        entity_type="DIMENSION",
+        annotation=by_name["Width"],
     )
     add_datum_feature(
         adapter,

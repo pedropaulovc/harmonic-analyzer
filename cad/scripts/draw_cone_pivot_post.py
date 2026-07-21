@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -32,8 +33,10 @@ from cone_pivot_post_spec import (
     BORE_HEIGHT,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
+    CRANK_AXIS_BASIC_NOTE,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -157,6 +160,49 @@ def _crank_bore_edge(
             f"cylinder at radius {expected_radius_m:g} m"
         )
     return candidates[0], (FRONT_CENTER[0], _front_y(CRANK_BORE_HEIGHT))
+
+
+def _add_basic_crank_axis_note(adapter: Any) -> Any:
+    """Add and verify the boxed exact datum-coordinate definition."""
+    note = add_note(
+        adapter,
+        CRANK_AXIS_BASIC_NOTE,
+        0.220,
+        0.265,
+    )
+    if note is None:
+        raise RuntimeError("failed to add the basic crank-axis definition")
+    note = _early_bound(
+        note,
+        "INote",
+        "SetBalloon",
+        "HasBalloon",
+        "GetBalloonStyle",
+        "GetBalloonSize",
+        "GetAnnotation",
+    )
+    # swBS_Box=4 and swBF_Tightest=0.  This produces the rectangular frame
+    # used by ASME-style BASIC dimensions; verify the COM write rather than
+    # trusting the method's success return alone.
+    if not note.SetBalloon(4, 0):
+        raise RuntimeError("SolidWorks rejected the basic crank-axis box")
+    if (
+        not note.HasBalloon()
+        or int(note.GetBalloonStyle()) != 4
+        or int(note.GetBalloonSize()) != 0
+    ):
+        raise RuntimeError("basic crank-axis box did not persist")
+    annotation = _early_bound(
+        note.GetAnnotation(), "IAnnotation", "GetTextFormat", "SetTextFormat"
+    )
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("basic crank-axis note has no text format")
+    text_format.CharHeight = 0.0025
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError("failed to size the basic crank-axis definition")
+    adapter.currentModel.EditRebuild3()
+    return note
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -292,6 +338,15 @@ async def build(adapter: Any) -> dict[str, str]:
         position_tolerance_m=0.016,
     )
     crank_entity, crank_xy = _crank_bore_edge(adapter, front)
+    add_attached_note(
+        adapter,
+        front,
+        text="CRANK BORE <MOD-DIAM>10.025 +/-0.025 THRU",
+        edge_xy=crank_xy,
+        note_xy=(0.145, _front_y(CRANK_BORE_HEIGHT) + 0.025),
+        label="crank-bore size",
+        entity=crank_entity,
+    )
     add_feature_control_frame(
         adapter,
         front,
@@ -304,6 +359,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank-bore true position",
         entity=crank_entity,
     )
+    _add_basic_crank_axis_note(adapter)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
     return await finalize_drawing(
