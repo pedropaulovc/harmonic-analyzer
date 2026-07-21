@@ -35,6 +35,13 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "UOS" not in notes
     assert "PIVOT HOLE" in notes
     assert "LOCK NOTCH" in notes
+    assert "6.35 PLATE" in notes
+    assert "6.756 THRU" in notes
+    assert "24.5 WEST AND 190.1 SOUTH" in notes
+    assert "7.35 DEG NORTH" in notes
+    assert "NE R10, NW R8, SW R10, SE R12" in notes
+    assert "AS MODELLED" not in notes
+    assert "SEE PLAN" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
