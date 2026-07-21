@@ -147,4 +147,7 @@ def test_each_sheet_uses_three_hlr_views_bom_and_balloons() -> None:
             drawing.ARTIFACT_STEM
         )
         assert "part_numbers=BOM_PART_NUMBERS" in source, drawing.ARTIFACT_STEM
-        assert source.count("add_auto_balloons(") == 1, drawing.ARTIFACT_STEM
+        balloon_calls = source.count("add_auto_balloons(") + source.count(
+            "add_auto_balloons_across_views("
+        )
+        assert balloon_calls == 1, drawing.ARTIFACT_STEM

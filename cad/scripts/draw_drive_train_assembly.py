@@ -22,7 +22,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_auto_balloons,
+    add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -181,13 +181,14 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=BOM_ANCHOR,
         descriptions=BOM_COMPONENTS,
         part_numbers=BOM_PART_NUMBERS,
+        display_as_one_item=True,
         label="drive-train assembly",
     )
     # Balloon the ISOMETRIC view: the pictorial keeps the cone/pinion/crank
     # clusters visible, while the orthographic projections stack the ~30
     # components under hidden-lines-removed.
-    add_auto_balloons(
-        adapter, iso, expected=len(BOM_COMPONENTS),
+    add_auto_balloons_across_views(
+        adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
         label="drive-train assembly balloons",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:

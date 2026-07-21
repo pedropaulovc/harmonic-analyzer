@@ -22,7 +22,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_auto_balloons,
+    add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -160,11 +160,10 @@ async def build(adapter: Any) -> dict[str, str]:
         part_numbers=BOM_PART_NUMBERS,
         label="channel assembly",
     )
-    # Balloon the ISOMETRIC view: the pictorial keeps every component family
-    # visible, while the orthographic projections stack the 20-channel spine so
-    # densely that the balloons would pile up under hidden-lines-removed.
-    add_auto_balloons(
-        adapter, iso, expected=len(BOM_COMPONENTS),
+    # No single view exposes all eleven component families in the dense bank.
+    # Cover the BOM across the three projections and validate every item number.
+    add_auto_balloons_across_views(
+        adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
         label="channel assembly balloons",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:

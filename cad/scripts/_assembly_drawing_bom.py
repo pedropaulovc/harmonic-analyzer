@@ -34,6 +34,7 @@ def insert_identified_bom_table(
     anchor_xy: tuple[float, float],
     descriptions: Mapping[str, str],
     part_numbers: Mapping[str, str],
+    display_as_one_item: bool = False,
     label: str,
 ) -> Any:
     """Insert a validated BOM, then replace filename stems with MHA identifiers."""
@@ -57,6 +58,7 @@ def insert_identified_bom_table(
         anchor_xy=anchor_xy,
         expected_components=components,
         descriptions=dict(descriptions),
+        display_as_one_item=display_as_one_item,
         label=label,
     )
 

@@ -82,7 +82,9 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
 def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
-    assert source.count("add_auto_balloons(") == 1
+    assert source.count("add_auto_balloons_across_views(") == 1
+    assert "display_as_one_item=True" in source
+    assert "adapter, (front, right, iso)" in source
     assert source.count("add_note(") == 1
     assert source.count("scale=VIEW_SCALE") == 3
     assert "T006-T120" in drawing.ASSEMBLY_NOTES

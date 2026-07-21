@@ -2314,6 +2314,7 @@ def insert_bom_table(
     anchor_xy: tuple[float, float],
     expected_components: Sequence[str],
     descriptions: dict[str, str] | None = None,
+    display_as_one_item: bool = False,
     label: str,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
@@ -2345,7 +2346,7 @@ def insert_bom_table(
         0,  # swNumberingType_e.swNumberingType_None (non-indented BOM)
         False,  # DetailedCutList
         False,  # DissolvePartLevelRows
-        False,  # DisplayAsOneItem
+        display_as_one_item,
     )
     draw.ClearSelection2(True)
     if bom is None:
@@ -2703,6 +2704,47 @@ def _spread_balloons(
 
 
 @_telemetry.traced("drawing.auto_balloons", label_param="label")
+def _create_auto_balloons(
+    adapter: Any, view: Any, *, label: str, allow_empty: bool = False
+) -> list[Any]:
+    """Create item-number balloons for one selected view without repositioning."""
+    _activate_and_select_view(adapter, view, label=label)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    options = ddoc.CreateAutoBalloonOptions()
+    if options is None:
+        raise RuntimeError(f"failed to create auto-balloon options ({label})")
+    options = _sw_type_info.early_bound_or_flag(options, "IAutoBalloonOptions")
+    options.Layout = 1
+    options.ReverseDirection = False
+    options.IgnoreMultiple = True
+    options.InsertMagneticLine = False
+    options.LeaderAttachmentToFaces = True
+    options.Style = 1
+    options.Size = 2
+    options.UpperTextContent = 1
+    options.ItemNumberStart = 1
+    options.ItemNumberIncrement = 1
+    options.ItemOrder = 1
+    notes = ddoc.AutoBalloon5(options)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if not notes or isinstance(notes, str):
+        if allow_empty:
+            return []
+        raise RuntimeError(f"AutoBalloon5 produced no balloons ({label})")
+    return list(notes)
+
+
+def _balloon_item_number(adapter: Any, note: Any, *, label: str) -> str:
+    """Read one BOM balloon's displayed upper item number."""
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetBomBalloonText")
+    item = str(adapter._attempt(lambda: note.GetBomBalloonText(True)) or "").strip()
+    if not item:
+        raise RuntimeError(f"{label}: BOM balloon has no upper item number")
+    return item
+
+
 def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> list[Any]:
     """Auto-insert circular item-number balloons around one assembly view.
 
@@ -2712,32 +2754,8 @@ def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> 
     per component (``IgnoreMultiple``). Fails loud unless at least ``expected``
     balloons landed. Returns the balloon notes.
     """
-    _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    options = ddoc.CreateAutoBalloonOptions()
-    if options is None:
-        raise RuntimeError(f"failed to create auto-balloon options ({label})")
-    options = _sw_type_info.early_bound_or_flag(options, "IAutoBalloonOptions")
-    options.Layout = 1  # swBalloonLayoutType_e.swDetailingBalloonLayout_Square
-    options.ReverseDirection = False
-    options.IgnoreMultiple = True  # one balloon per component, not per instance
-    options.InsertMagneticLine = False
-    options.LeaderAttachmentToFaces = True
-    options.Style = 1  # swBalloonStyle_e.swBS_Circular
-    options.Size = 2  # swBalloonFit_e.swBF_2Chars
-    options.UpperTextContent = 1  # swBalloonTextContent_e.swBalloonTextItemNumber
-    options.ItemNumberStart = 1
-    options.ItemNumberIncrement = 1
-    # swBalloonItemNumbersOrder_e.swBalloonItemNumbers_DoNotChangeItemNumbers:
-    # the BOM table owns the item numbering; balloons must not resequence it.
-    options.ItemOrder = 1
-    notes = ddoc.AutoBalloon5(options)
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    if not notes or isinstance(notes, str):
-        raise RuntimeError(f"AutoBalloon5 produced no balloons ({label})")
-    balloons = list(notes)
+    balloons = _create_auto_balloons(adapter, view, label=label)
     if len(balloons) < expected:
         raise RuntimeError(
             f"{label}: {len(balloons)} balloons landed, expected >= {expected}"
@@ -2746,6 +2764,50 @@ def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> 
     draw.EditRebuild3()
     _telemetry.success(f"{label}: {len(balloons)} BOM balloons inserted")
     return balloons
+
+
+@_telemetry.traced("drawing.auto_balloons_across_views", label_param="label")
+def add_auto_balloons_across_views(
+    adapter: Any,
+    views: Sequence[Any],
+    *,
+    expected: int,
+    label: str,
+) -> list[Any]:
+    """Balloon successive views until every BOM item number is represented.
+
+    Dense assemblies can hide whole component families in one pictorial view.
+    AutoBalloon5 only balloons items visible in the selected view, so run it on
+    each orthographic and pictorial view, preserve every placed balloon, and
+    validate the union of displayed BOM item numbers against the table's full
+    contiguous item range. Each view's balloons are spread around that view.
+    """
+    all_balloons: list[Any] = []
+    item_numbers: set[str] = set()
+    for index, view in enumerate(views, start=1):
+        view_label = f"{label} view {index}"
+        balloons = _create_auto_balloons(
+            adapter, view, label=view_label, allow_empty=True
+        )
+        if not balloons:
+            continue
+        _spread_balloons(adapter, view, balloons)
+        for note in balloons:
+            item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
+        all_balloons.extend(balloons)
+    expected_numbers = {str(item) for item in range(1, expected + 1)}
+    missing = sorted(expected_numbers - item_numbers, key=int)
+    unexpected = sorted(item_numbers - expected_numbers)
+    if missing or unexpected:
+        raise RuntimeError(
+            f"{label}: balloon item coverage mismatch; missing={missing}, "
+            f"unexpected={unexpected}, seen={sorted(item_numbers)}"
+        )
+    adapter.currentModel.EditRebuild3()
+    _telemetry.success(
+        f"{label}: {len(all_balloons)} balloons cover all {expected} BOM items"
+    )
+    return all_balloons
 
 
 def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:
