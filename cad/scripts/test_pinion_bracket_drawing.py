@@ -109,3 +109,18 @@ def test_shared_template_edge_break_is_metric_and_not_duplicated() -> None:
     common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
     assert "_replace_template_edge_break_note(adapter, ddoc)" in common_source
     assert "REMOVE BURRS" not in pinion_bracket_spec.DRAWING_NOTES
+
+
+def test_drawing_exports_pdf_before_view_only_reopen() -> None:
+    import _drawing_common
+
+    common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
+    first_pdf_export = common_source.index(
+        "adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)"
+    )
+    first_reopen = common_source.index(
+        "await reopen_drawing(adapter, outputs.slddrw)", first_pdf_export
+    )
+    assert first_pdf_export < first_reopen
+    assert 'adapter._get_attr_or_call(drawing_model, "GetSaveFlag")' in common_source
+    assert "if sheet_scale_dirty:" in common_source
