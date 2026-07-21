@@ -42,6 +42,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GRAY IRON" not in notes
     assert "ASTM A48" not in notes
     assert "GREEN ENAMEL" not in notes
+    assert "DEBURR" not in notes
     assert "UOS" not in notes
     assert "REVEAL" in notes
     assert "TAPPED AT THE MODELLED" in notes

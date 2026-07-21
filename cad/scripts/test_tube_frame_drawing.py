@@ -37,6 +37,7 @@ def test_notes_and_native_gdt() -> None:
     notes = tube_frame_spec.DRAWING_NOTES
     assert "STEEL TUBE" not in notes
     assert "POLISH" not in notes
+    assert "DEBURR" not in notes
     assert "UOS" not in notes
     assert "FACED SQUARE TO THE TUBE AXIS" in notes
     assert "X.XX" not in notes

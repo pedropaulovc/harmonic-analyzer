@@ -31,6 +31,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     notes = cone_swing_platform_spec.DRAWING_NOTES
     assert "STEEL PLATE" not in notes
     assert "BLACK OXIDE" not in notes
+    assert "DEBURR" not in notes
     assert "UOS" not in notes
     assert "PIVOT HOLE" in notes
     assert "LOCK NOTCH" in notes
