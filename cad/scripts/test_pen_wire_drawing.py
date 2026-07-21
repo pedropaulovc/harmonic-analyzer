@@ -28,7 +28,7 @@ def test_notes_describe_the_wire_and_chain() -> None:
     notes = pen_wire_spec.DRAWING_NOTES
     assert "CUT-WIRE BLANK" in notes
     assert "END-FACE AXIAL VARIATION" in notes
-    assert "TITLE-BLOCK EDGE BREAK DOES NOT" in notes
+    assert "R0.25/CHAMFER 0.25 LIMIT DOES NOT" in notes
     assert "FLAT SURFACE PLATE; 0.50 MAX GAP" in notes
     assert "ASTM" not in notes
     assert "X.XX" not in notes
