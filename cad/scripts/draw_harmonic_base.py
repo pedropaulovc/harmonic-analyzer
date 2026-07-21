@@ -382,8 +382,8 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.20",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="E1-E4 THRU/C'BORE COMMON AXES",
-        label="through-hole/counterbore common-axis true position",
+        quantity="E1-E4 DIA 13 THRU",
+        label="through-hole true position",
         entity=hole_entities[2],
     )
     add_feature_control_frame(
@@ -413,20 +413,22 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.075, 0.115),
+        frame_xy=(0.075, 0.105),
         characteristic="perpendicularity",
         tolerance="0.10",
         datums=("A",),
+        quantity="DATUM B LONG SIDE",
         label="datum B perpendicularity to A",
         entity=datum_b_edge,
     )
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.025, 0.120),
+        frame_xy=(0.018, 0.135),
         characteristic="perpendicularity",
         tolerance="0.10",
         datums=("A", "B"),
+        quantity="DATUM C LEFT END",
         label="datum C perpendicularity to A and B",
         entity=datum_c_edge,
     )

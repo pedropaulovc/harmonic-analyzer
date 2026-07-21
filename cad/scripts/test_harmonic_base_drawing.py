@@ -51,10 +51,12 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "JOINED" not in notes
     assert "MACHINE FROM SOLID STOCK" in notes
     assert "NO DRAFT" in notes
+    assert "PAD-TO-FLANGE ROOT R0.50 MAX" in notes
     assert "NEAR LONG SIDE 6.35 +/-0.10 FROM B" in notes
     assert "NEAR LEFT END 6.35 +/-0.10 FROM C" in notes
     assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
     assert "PLAN RIMS AT E1-E4 ARE THE DIA 13.00 THRU FEATURES" in notes
+    assert "C'BORE AXIS OFFSET FROM ASSOCIATED DIA 13.00 AXIS: 0.05 MAX" in notes
     assert "PROCESS DATA" not in notes
     assert "B1 IS UNTHREADED" in notes
     assert "A1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
@@ -74,7 +76,9 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GetVisibleEntities2(c, 1)" in source
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 6
-    assert 'quantity="E1-E4 THRU/C\'BORE COMMON AXES"' in source
+    assert 'quantity="E1-E4 DIA 13 THRU"' in source
+    assert 'quantity="DATUM B LONG SIDE"' in source
+    assert 'quantity="DATUM C LEFT END"' in source
     assert 'quantity="A1, C1-C3, D1-D4"' in source
     assert 'quantity="1X DIA 6.53 BLIND HOLE"' in source
     assert "underside-only counterbore rims are visible" in source
@@ -112,12 +116,13 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == config["material_specification"]
     assert "gray cast iron" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
-    assert "sspc-sp 3" in finish
+    assert "sspc-sp3" in finish
     assert "alkyd primer/green enamel" in finish
-    assert "75-125 um dft" in finish
+    assert "75-125um dft" in finish
     assert "mask a/b/c" in finish
-    assert "pad" in finish
-    assert "all bores/threads" in finish
+    assert "pad top only" in finish
+    assert "coat pad sides/roots" in finish
+    assert "bores/threads" in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
 
