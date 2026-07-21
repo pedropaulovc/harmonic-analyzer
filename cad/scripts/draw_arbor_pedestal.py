@@ -76,7 +76,7 @@ def _front_y(model_y: float) -> float:
 # Front elevation carries the foot width + flange height, the arbor-bore station
 # and diameter, and the dome diameter; the plan carries the 16 foot depth.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _front_y(0.0) + 0.018),
+    "Width": (FRONT_CENTER[0], _front_y(0.0) + 0.032),
     "FootHt": (FRONT_CENTER[0] - 0.030, _front_y(FOOT_HEIGHT / 2.0)),
     "BoreDia": (FRONT_CENTER[0] + 0.068, _front_y(BORE_HEIGHT) - 0.004),
     "DomeDia": (FRONT_CENTER[0] + 0.066, _front_y(BORE_HEIGHT + 9.0)),
@@ -387,7 +387,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=foot_edge,
-        symbol_xy=(FRONT_CENTER[0] + 0.034, _front_y(0.0) + 0.014),
+        symbol_xy=(FRONT_CENTER[0] + 0.050, _front_y(0.0) + 0.010),
         datum="A",
         label="foot seat face",
         entity=foot_entity,
@@ -405,7 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=foot_edge,
-        frame_xy=(0.105, 0.105),
+        frame_xy=(0.185, 0.100),
         characteristic="flatness",
         tolerance="0.05",
         label="datum-A seat flatness",

@@ -111,7 +111,7 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.FRONT_CENTER == (0.100, 0.150)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(2, 1)") == 3  # elevation + plan + pictorial
-    assert "frame_xy=(0.105, 0.105)" in source
+    assert "frame_xy=(0.185, 0.100)" in source
     assert "frame_xy=(0.020, 0.105)" in source
 
 
