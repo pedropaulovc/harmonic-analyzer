@@ -49,6 +49,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "JOINED" not in notes
     assert "REVEAL" in notes
     assert "BLIND FROM THE TOP FACE" in notes
+    assert "A1-A4" not in notes
+    assert "FOUR DIA 13 THRU / DIA 23 X 6.5 DEEP COUNTERBORES" in notes
     assert "LOCATION TOLERANCE +/-0.25" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")

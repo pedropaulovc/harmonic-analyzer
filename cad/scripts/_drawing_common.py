@@ -22,7 +22,6 @@ from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
     LayoutElement,
-    LeaderCrossing,
     LeaderSegment,
     audit_layout,
     format_findings,
@@ -38,6 +37,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     iter_views,
     new_drawing,
+    remove_notes_matching as remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
@@ -341,26 +341,6 @@ def add_datum_feature(
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return tag
-
-
-@_telemetry.traced("drawing.centerline", label_param="label")
-def add_view_centerline(
-    adapter: Any,
-    view: Any,
-    *,
-    face_xy: tuple[float, float],
-    label: str,
-) -> Any:
-    """Insert the axis centerline of a cylindrical face seen side-on in a view."""
-    _select_view_entity(adapter, view, "FACE", face_xy, label=label)
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    centerline = ddoc.InsertCenterLine2()
-    if centerline is None:
-        raise RuntimeError(f"failed to insert centerline ({label})")
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    return centerline
 
 
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
@@ -2689,7 +2669,7 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     the balloon's rendered radius, which INote::GetBalloonInfo had all along (see
     :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
-    with _telemetry.span("drawing.layout_audit") as span:
+    with _telemetry.span("drawing.layout_audit"):
         elements, leaders, region = collect_layout_elements(adapter)
         overlaps, overflows, crossings = audit_layout(
             elements, region, leaders=leaders
