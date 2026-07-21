@@ -36,6 +36,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -76,19 +77,15 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not drawing.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate cone-platform plan for axis centerline")
-    sketch_manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    # An active drawing-view sketch accepts model-space coordinates and maps
-    # them through that view.  Feeding ModelToViewTransform output here applies
-    # the view transform twice and strands the line outside the part.
-    centerline = sketch_manager.CreateCenterLine(
-        0.0,
-        0.0,
-        NORTH_OVERHANG / 1000.0,
-        0.0,
-        0.0,
-        (NORTH_OVERHANG - PLATE_LEN) / 1000.0,
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    # IModelDoc2.CreateCenterLine accepts point arrays in the activated drawing
+    # view. ISketchManager.CreateCenterLine requires an active sketch and is
+    # rejected when only a drawing view is active.
+    created = model.CreateCenterLine(
+        double_array([0.0, 0.0, NORTH_OVERHANG / 1000.0]),
+        double_array([0.0, 0.0, (NORTH_OVERHANG - PLATE_LEN) / 1000.0]),
     )
-    if centerline is None:
+    if not created:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()

@@ -424,7 +424,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.018, 0.135),
+        frame_xy=(0.022, 0.135),
         characteristic="perpendicularity",
         tolerance="0.10",
         datums=("A", "B"),
@@ -443,7 +443,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=top_pad_edge,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.062)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.064)
     add_property_linked_note(adapter, "Side View Note", 0.235, 0.088)
 
     return await finalize_drawing(
