@@ -58,7 +58,7 @@ def test_view_scales_are_explicit() -> None:
     assert '"*Front"' in source
     assert "scale=(1, 4)" in source
     assert top_frame_spec.TOP_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
-    assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4 - THIRD ANGLE"
+    assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4"
 
 
 def test_part_stamps_make_critical_properties() -> None:
