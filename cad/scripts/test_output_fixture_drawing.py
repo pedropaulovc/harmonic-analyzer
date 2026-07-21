@@ -32,6 +32,8 @@ def test_notes_describe_bore_and_cross_hole() -> None:
     assert "FINISHED COLLAR" in notes
     assert "ROD BORE" in notes
     assert "CROSS-HOLE" in notes
+    assert "RELATIVE TO THE ROD-BORE AXIS" in notes
+    assert "TAP FIRST WALL ONLY #4-40 UNC-2B RH" in notes
     assert "CDA" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
