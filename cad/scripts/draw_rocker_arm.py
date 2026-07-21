@@ -257,7 +257,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rod-pin hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.082)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.150)
 
     return await finalize_drawing(

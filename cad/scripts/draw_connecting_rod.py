@@ -72,7 +72,7 @@ SHEET_SCALE = (1.0, 1.0)  # 1:1
 _BBOX_CY = (RING_BOTTOM_Y + HEAD_TOP_Y) / 2.0
 
 FRONT_CENTER = (0.180, 0.135)
-RIGHT_CENTER = (0.270, 0.135)  # stepped-thickness profile (ring 3.0 / shank 2.5)
+LEFT_CENTER = (0.080, 0.135)  # stepped-thickness profile (ring 3.0 / shank 2.5)
 ISO_CENTER = (0.360, 0.140)
 
 
@@ -138,12 +138,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    # The 1:1 right view shows the stepped thickness (ring 3.0 / shank+head
-    # 2.5) the notes describe -- a single orthographic view left the step
-    # geometry to prose (machinist round 2).
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    # The 1:1 left view (third angle: placed LEFT of the front) shows the
+    # stepped thickness (ring 3.0 / shank+head 2.5) the notes describe -- a
+    # single orthographic view left the step geometry to prose (machinist
+    # round 2).  The right-hand column belongs to the title block, so the
+    # section lives on the left.
+    left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (right, iso):
+    for view in (left, iso):
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
@@ -246,7 +248,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rocker pin hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.098)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
     return await finalize_drawing(
