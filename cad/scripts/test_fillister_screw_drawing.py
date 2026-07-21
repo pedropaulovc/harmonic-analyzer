@@ -32,18 +32,19 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert spec.SHANK_LEN == catalog.length_mm
     assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC-2A"
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
-    # The thread designation is the callout stamped below the shank diameter.
-    assert drawing.DIMENSION_CALLOUTS["ShankDia"] == spec.THREAD_DESIGNATION
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert "FULL THREAD" in spec.DRAWING_NOTES
 
 
 def test_lengths_are_inserted_from_named_model_dimensions() -> None:
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg"}
 
 
-def test_commercial_note_states_standards_conformance() -> None:
+def test_made_part_note_states_standards_conformance() -> None:
     notes = spec.DRAWING_NOTES
-    assert "COMMERCIAL" in notes
-    assert "ACCEPTABLE" in notes
+    assert "ASME B1.1" in notes
+    assert "0.8 WIDE X 0.7 DEEP" in notes
+    assert "COMMERCIAL" not in notes
     # Deburr/edge-break is a title-block note; repeating it here would duplicate.
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
 

@@ -28,7 +28,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from bracket_screw_spec import THREAD_DESIGNATION
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -57,9 +56,8 @@ ISO_CENTER = (0.300, 0.175)
 
 END_KEEP = {
     "HeadDia": (0.028, END_CENTER[1] + 0.026),
-    "ShankDia": (0.028, END_CENTER[1] - 0.026),
 }
-DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 SIDE_KEEP = {
     "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.038),
     "ShankLg": (SIDE_CENTER[0] - 0.036, SIDE_CENTER[1] - 0.038),
@@ -108,7 +106,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(6, 1))
-    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(6, 1))
+    end = place_view(adapter, str(SOURCE), "*Back", *END_CENTER, scale=(6, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(6, 1))
     set_hidden_lines_removed(adapter, side)
     set_hidden_lines_removed(adapter, iso)

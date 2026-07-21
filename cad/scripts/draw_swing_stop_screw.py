@@ -11,7 +11,6 @@ from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
-from swing_stop_screw_spec import THREAD_DESIGNATION
 
 
 SPEC = DRAWINGS_BY_NAME["swing_stop_screw"]
@@ -21,11 +20,11 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (6.0, 1.0)
-END_KEEP = {"HeadDiaDim": (0.028, 0.176), "ShankDiaDim": (0.028, 0.124)}
-DIMENSION_CALLOUTS = {"ShankDiaDim": THREAD_DESIGNATION}
+END_KEEP = {"HeadDiaDim": (0.028, 0.176)}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Swing Stop Screw Manufacturing Drawing",
-    keywords="swing stop screw; slotted fillister screw; commercial fastener",
+    keywords="swing stop screw; slotted fillister screw; made part",
     scale=SHEET_SCALE,
     side_view="*Front",
     end_view="*Top",

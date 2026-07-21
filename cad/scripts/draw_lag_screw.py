@@ -35,7 +35,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from lag_screw_spec import (
     HEAD_H,
     SHANK_LEN,
-    THREAD_DESIGNATION,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -81,9 +80,8 @@ _SHANK_END_Y = _side_y(SHANK_LEN)  # shank tip (top)
 END_DIM_X = 0.043
 END_KEEP = {
     "HeadDia": (END_DIM_X, END_CENTER[1] + 0.030),
-    "ShankDia": (END_DIM_X, END_CENTER[1] - 0.030),
 }
-DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 # Side view: the head-height and under-head length as the extrude-depth model
 # dims (the vertical profile cannot point-select the edge-on shoulder/tip).

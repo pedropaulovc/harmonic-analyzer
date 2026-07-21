@@ -33,7 +33,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from foot_screw_spec import (
     HEAD_H,
     SHANK_LEN,
-    THREAD_DESIGNATION,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -82,9 +81,8 @@ _SHANK_END_Y = _side_y(-SHANK_LEN)  # shank tip (bottom)
 END_DIM_X = 0.040
 END_KEEP = {
     "HeadDia": (END_DIM_X, END_CENTER[1] + 0.024),
-    "ShankDia": (END_DIM_X, END_CENTER[1] - 0.024),
 }
-DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 # Side view: the head-height and under-head length as model dimensions, stacked
 # to the right of the profile clear of the geometry.

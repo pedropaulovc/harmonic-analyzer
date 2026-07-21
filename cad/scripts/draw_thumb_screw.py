@@ -11,7 +11,6 @@ from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
-from thumb_screw_spec import THREAD_DESIGNATION
 
 
 SPEC = DRAWINGS_BY_NAME["thumb_screw"]
@@ -21,11 +20,11 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (6.0, 1.0)
-END_KEEP = {"HeadDia": (0.028, 0.176), "ShankDia": (0.028, 0.124)}
-DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+END_KEEP = {"HeadDia": (0.028, 0.176)}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Thumb Screw Manufacturing Drawing",
-    keywords="magnifier thumb screw; knurled screw; commercial fastener",
+    keywords="magnifier thumb screw; reeded screw; made part",
     scale=SHEET_SCALE,
     side_view="*Front",
     end_view="*Right",

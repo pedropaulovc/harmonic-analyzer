@@ -28,13 +28,11 @@ THREAD_DESIGNATION = f"{THREAD} UNC-2A"
 # will not point-select, so a drawing-native edge dimension cannot pick them.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia"},
-    "ShankProfile": {"ShankDia"},
     "Head": {"HeadHt"},
     "Shank": {"ShankLg"},
 }
 END_VIEW_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia"},
-    "ShankProfile": {"ShankDia"},
 }
 SIDE_VIEW_DIMENSIONS: dict[str, set[str]] = {
     "Head": {"HeadHt"},
@@ -43,11 +41,12 @@ SIDE_VIEW_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        f"COMMERCIAL {THREAD_DESIGNATION} SLOTTED FILLISTER-HEAD MACHINE SCREW, "
-        f"{SHANK_LEN:g} LONG, PER ASME B18.6.3, ACCEPTABLE IN PLACE OF A "
-        "MADE PART.",
-        "SHANK MODELED AT THREAD MINOR DIA; THREADS OMITTED FOR CLARITY.",
-        "HEAD CARRIES A STRAIGHT DRIVER SLOT PER THE HEAD-END VIEW.",
+        f"{THREAD_DESIGNATION} FULL THREAD OVER {SHANK_LEN:g} UNDER-HEAD LENGTH; "
+        "THREAD FORM, RUNOUT, AND LIMITS PER ASME B1.1.",
+        "THREAD GEOMETRY OMITTED IN VIEWS; CYLINDRICAL SHANK OUTLINE IS "
+        "REFERENCE ONLY.",
+        "STRAIGHT DRIVER SLOT 0.8 WIDE X 0.7 DEEP, CENTERED, THROUGH HEAD "
+        "DIAMETER.",
     )
 )
-END_VIEW_NOTE = "HEAD-END VIEW"
+END_VIEW_NOTE = "DRIVER-FACE VIEW"

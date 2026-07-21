@@ -24,16 +24,15 @@ THREAD_DESIGNATION = f"{THREAD} UNC-2A"
 
 # The hex head carries no single diameter dim, so only the shank Ø is marked;
 # HEAD_AF (across flats) and the head height are drawing-native linears.
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "ShankProfile": {"ShankDia"},
-}
+DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
 DRAWING_NOTES = "\n".join(
     (
-        f"COMMERCIAL {THREAD_DESIGNATION} HEX-HEAD BOLT, {SHANK_LEN:g} LONG, "
-        "PER ASME B18.2.1, ACCEPTABLE IN PLACE OF A MADE PART.",
-        "SHANK MODELED AT THREAD MINOR DIA; THREADS OMITTED FOR CLARITY.",
+        f"{THREAD_DESIGNATION} FULL THREAD OVER {SHANK_LEN:g} UNDER-HEAD LENGTH; "
+        "THREAD FORM, RUNOUT, AND LIMITS PER ASME B1.1.",
+        "THREAD GEOMETRY OMITTED IN VIEWS; CYLINDRICAL SHANK OUTLINE IS "
+        "REFERENCE ONLY.",
         f"HEAD IS A REGULAR HEXAGON, {HEAD_AF:g} ACROSS FLATS X {HEAD_H:g} HIGH.",
     )
 )
-END_VIEW_NOTE = "HEAD-END VIEW"
+END_VIEW_NOTE = "HEX-HEAD VIEW"

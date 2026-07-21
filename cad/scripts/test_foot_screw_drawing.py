@@ -38,7 +38,7 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert spec.SHANK_LEN == catalog.length_mm
     assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC-2A"
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShankDia"] == spec.THREAD_DESIGNATION
+    assert drawing.DIMENSION_CALLOUTS == {}
 
 
 def test_head_end_cluster_is_clear_of_the_left_zone_border() -> None:
@@ -60,10 +60,11 @@ def test_lengths_are_marked_extrude_depth_model_dims() -> None:
     assert 'keep=SIDE_KEEP, view_label="side"' in draw_source
 
 
-def test_commercial_note_states_standards_conformance() -> None:
+def test_made_part_note_completely_defines_thread_and_slot() -> None:
     notes = spec.DRAWING_NOTES
-    assert "COMMERCIAL" in notes
-    assert "ACCEPTABLE" in notes
+    assert "FULL THREAD" in notes
+    assert "0.8 WIDE X 0.7 DEEP" in notes
+    assert "COMMERCIAL" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
 
 

@@ -39,7 +39,7 @@ def test_notes_are_complete_but_do_not_repeat_title_or_template_requirements() -
 
         assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES, part_name
         assert (
-            "THREADS OMITTED FOR CLARITY" in notes
+            "THREAD GEOMETRY OMITTED IN VIEWS" in notes
             or "THREADED END BELOW IT IS NOT MODELED" in notes
         ), part_name
         assert "HEAD" in notes or "KNOB" in notes, part_name

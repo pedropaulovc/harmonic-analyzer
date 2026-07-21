@@ -20,7 +20,7 @@ class Case:
     spec_name: str
     build_name: str
     shank_dim: str
-    thread_on_dimension: bool = True
+    thread_on_dimension: bool = False
 
 
 CASES = (
@@ -30,7 +30,6 @@ CASES = (
         "cone_pivot_screw_spec",
         "build_cone_pivot_screw",
         "ShankDiaDim",
-        thread_on_dimension=False,
     ),
     Case(
         "cone-tip-pinch-screw",
@@ -108,11 +107,12 @@ def test_catalog_thread_and_dimension_callout_are_not_invented(case: Case) -> No
     assert part.SHANK_LEN == spec.SHANK_LEN
     assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC-2A"
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
-    if case.thread_on_dimension:
-        assert drawing.DIMENSION_CALLOUTS[case.shank_dim] == spec.THREAD_DESIGNATION
-        return
     assert drawing.DIMENSION_CALLOUTS == {}
-    assert "GROUND" in spec.DRAWING_NOTES
+    if case.part_name == "cone-pivot-screw":
+        assert "GROUND" in spec.DRAWING_NOTES
+        return
+    assert "REFERENCE ONLY" in spec.DRAWING_NOTES
+    assert "FULL THREAD" in spec.DRAWING_NOTES
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.part_name)

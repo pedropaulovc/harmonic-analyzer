@@ -11,7 +11,6 @@ from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
-from hex_bolt_spec import THREAD_DESIGNATION
 
 
 SPEC = DRAWINGS_BY_NAME["hex_bolt"]
@@ -21,11 +20,11 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
-END_KEEP = {"ShankDia": (0.028, 0.150)}
-DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+END_KEEP: dict[str, tuple[float, float]] = {}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Hex Bolt Manufacturing Drawing",
-    keywords="portal foot bolt; hex-head bolt; commercial fastener",
+    keywords="portal foot bolt; hex-head bolt; made part",
     scale=SHEET_SCALE,
     side_view="*Front",
     end_view="*Top",

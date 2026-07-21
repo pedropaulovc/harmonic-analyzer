@@ -11,7 +11,6 @@ from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
-from pen_set_screw_spec import THREAD_DESIGNATION
 
 
 SPEC = DRAWINGS_BY_NAME["pen_set_screw"]
@@ -21,11 +20,11 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (5.0, 1.0)
-END_KEEP = {"KnobDia": (0.028, 0.176), "ShankDia": (0.028, 0.124)}
-DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+END_KEEP = {"KnobDia": (0.028, 0.176)}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Pen Set Screw Manufacturing Drawing",
-    keywords="pen set screw; knurled thumb screw; commercial fastener",
+    keywords="pen set screw; reeded thumb screw; made part",
     scale=SHEET_SCALE,
     side_view="*Front",
     end_view="*Right",

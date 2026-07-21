@@ -33,7 +33,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from slotted_screw_spec import (
     HEAD_H,
     SHANK_LEN,
-    THREAD_DESIGNATION,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -78,9 +77,8 @@ _SHANK_END_Y = _side_y(-SHANK_LEN)  # shank tip (bottom)
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
 END_KEEP = {
     "HeadDia": (0.030, END_CENTER[1] + 0.026),
-    "ShankDia": (0.030, END_CENTER[1] - 0.026),
 }
-DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 # Side view: the head-height and under-head length as the extrude-depth model
 # dims (the vertical profile cannot point-select the edge-on shoulder/tip).

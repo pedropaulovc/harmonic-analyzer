@@ -31,17 +31,19 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert spec.SHANK_LEN == catalog.length_mm
     assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC-2A"
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShankDia"] == spec.THREAD_DESIGNATION
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert "FULL THREAD" in spec.DRAWING_NOTES
 
 
 def test_lengths_are_inserted_from_named_model_dimensions() -> None:
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShankLg"}
 
 
-def test_commercial_note_states_standards_conformance() -> None:
+def test_made_part_note_states_standards_conformance() -> None:
     notes = spec.DRAWING_NOTES
-    assert "COMMERCIAL" in notes
-    assert "ACCEPTABLE" in notes
+    assert "ASME B1.1" in notes
+    assert "1.2 WIDE X 1.0 DEEP" in notes
+    assert "COMMERCIAL" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
 
 
