@@ -59,7 +59,7 @@ RIGHT_CENTER = (
 ISO_CENTER = (0.320, 0.200)
 
 FRONT_KEEP = {
-    "PinDia": (0.030, FRONT_CENTER[1]),
+    "PinDia": (0.030, 0.235),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.030),
