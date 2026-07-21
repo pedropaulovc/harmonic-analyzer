@@ -90,11 +90,11 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
     sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
     centerline = sketch_manager.CreateCenterLine(
         0.0,
-        0.0,
         NORTH_OVERHANG / 1000.0,
         0.0,
         0.0,
         (NORTH_OVERHANG - PLATE_LEN) / 1000.0,
+        0.0,
     )
     drawing.EditSheet()
     if centerline is None:

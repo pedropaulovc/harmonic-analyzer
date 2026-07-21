@@ -443,7 +443,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=top_pad_edge,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.064)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.074)
     add_property_linked_note(adapter, "Side View Note", 0.235, 0.088)
 
     return await finalize_drawing(
