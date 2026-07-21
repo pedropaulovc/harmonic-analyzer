@@ -24,7 +24,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     SketchDims,
     apply_material,
     check,
@@ -33,6 +32,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -40,26 +40,39 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import (
     NUMBER_DRILL_MM,
     HoleSpec,
     cross_hole_volume_mm3,
     wizard_hole_on_cylinder,
 )
+from crankshaft_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    PIN_HOLE_HEIGHT,
+    SHAFT_DIA,
+    SHAFT_LENGTH,
+)
 
 PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-SHAFT_DIA = 0.375 * IN  # ch11: legacy ShaftDiameter, uncontradicted
-SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats);
-# lengthened again with the ch30 GT re-read (2026-07-02): the crank plane moved
-# south (arm hub at machine z -175..-167, T12 at -157.5, pedestal slab at
-# -145..-125) while the inboard 16T station stayed, so the shaft spans
-# -175..-30. The arm/handle sweep entirely in front of the chain plane and
-# cannot foul the chain when turning (book ch30 p005/p002).
-# pin cross-hole: was Ø5.0 photo-read, now #9 drill (Ø4.978, wizard) -- the
-# nearest number drill; radial through the shaft at the crank-seat height.
-PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
+# SHAFT_DIA / SHAFT_LENGTH / PIN_HOLE_HEIGHT live in crankshaft_spec (the
+# COM-free contract the drawing shares). Provenance: dia is the ch11 legacy
+# ShaftDiameter (uncontradicted); length was rederived with the ch30 GT re-read
+# (2026-07-02): the crank plane moved south (arm hub at machine z -175..-167,
+# T12 at -157.5, pedestal slab at -145..-125) while the inboard 16T station
+# stayed, so the shaft spans -175..-30. The arm/handle sweep entirely in front
+# of the chain plane and cannot foul the chain when turning (book ch30
+# p005/p002). Pin cross-hole: was Ø5.0 photo-read, now #9 drill (Ø4.978,
+# wizard) -- the nearest number drill; radial through the shaft at the
+# crank-seat height.
 # Keyed-chain seat stations (local +Y from the outboard origin): named datum
 # planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
 # assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
@@ -120,6 +133,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=SHAFT_LENGTH)),
     )
     name_last_feature(adapter, "Shaft")
+    depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
 
@@ -178,6 +193,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
