@@ -478,12 +478,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_hanger_screw.py",
     ),
     DrawingSpec(
-        name="hex_bolt",
-        part="hex_bolt",
-        artifact_stem="hex-bolt",
-        script_name="draw_hex_bolt.py",
-    ),
-    DrawingSpec(
         name="pen_set_screw",
         part="pen_set_screw",
         artifact_stem="pen-set-screw",

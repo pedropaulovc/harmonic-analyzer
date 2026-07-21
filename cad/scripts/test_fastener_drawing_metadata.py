@@ -17,7 +17,6 @@ FASTENER_SPECS = {
     "fillister-screw": "fillister_screw_spec",
     "foot-screw": "foot_screw_spec",
     "hanger-screw": "hanger_screw_spec",
-    "hex-bolt": "hex_bolt_spec",
     "lag-screw": "lag_screw_spec",
     "pen-set-screw": "pen_set_screw_spec",
     "slotted-screw": "slotted_screw_spec",

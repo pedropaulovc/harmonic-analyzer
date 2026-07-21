@@ -1,4 +1,4 @@
-"""Offline contracts for the seven completed PR 358 fastener sheets."""
+"""Offline contracts for the six remaining PR 358 fastener sheets."""
 
 from __future__ import annotations
 
@@ -43,13 +43,6 @@ CASES = (
         "draw_hanger_screw",
         "hanger_screw_spec",
         "build_hanger_screw",
-        "ShankDia",
-    ),
-    Case(
-        "hex-bolt",
-        "draw_hex_bolt",
-        "hex_bolt_spec",
-        "build_hex_bolt",
         "ShankDia",
     ),
     Case(
@@ -155,10 +148,9 @@ def test_cone_pivot_does_not_hide_the_missing_threaded_tail_definition() -> None
     assert "USE THE COMMERCIAL SHOULDER SCREW" in spec.DRAWING_NOTES
 
 
-def test_hex_bolt_long_notes_stay_below_the_raised_side_view() -> None:
-    drawing = importlib.import_module("draw_hex_bolt")
-    assert drawing.RECIPE.side_center == (0.200, 0.180)
-    assert drawing.RECIPE.note_xy == (0.020, 0.115)
+def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
+    drawing = importlib.import_module("draw_cone_pivot_screw")
+    assert drawing.RECIPE.end_view == "*Bottom"
 
 
 @pytest.mark.parametrize("spec_name", ("hanger_screw_spec", "thumb_screw_spec"))
