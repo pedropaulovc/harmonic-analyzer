@@ -407,12 +407,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         top,
-        text=(
-            "ON 24.00 WIDTH CL; 3.00 +/-0.10 FROM\n"
-            "EXPOSED FLANGE EDGE"
-        ),
+        text="3.00 +/-0.10 FROM EXPOSED EDGE; ON 24.00 WIDTH CL",
         edge_xy=(TOP_CENTER[0] + _screw_r, TOP_CENTER[1] + 0.010),
-        note_xy=(0.020, 0.220),
+        note_xy=(0.165, 0.260),
         label="flange-hole location",
         entity=screw_entity,
     )
@@ -420,7 +417,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=(TOP_CENTER[0] + SCREW_CLEARANCE_DIA / 2.0 * _S, TOP_CENTER[1]),
-        frame_xy=(0.165, 0.250),
+        frame_xy=(0.300, 0.250),
         characteristic="perpendicularity",
         tolerance="0.10",
         datums=("A",),
