@@ -7,8 +7,17 @@ family note. See the batch gear-drawing pattern in ``cylinder_gear_spec``.
 
 from __future__ import annotations
 
+import _config
+
 
 MM_PER_IN = 25.4
+
+# Family alloy split (config-owned, cad/config/parts/cone-gear.yaml): the
+# title-block material (C36000) covers T030-T120; the four tip gears are the
+# harder alloy below (dimensions.yaml ch.12 p.21).
+_MFG = _config.parts("cone-gear")
+BODY_MATERIAL_SPEC = str(_MFG["material_specification"])
+TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
 TEETH = 120                       # drawn (fundamental) configuration
 DIAMETRAL_PITCH = 49.82           # cad/config/machine/gear_train.yaml
@@ -60,6 +69,8 @@ DRAWING_NOTES = "\n".join(
         "CUT TEETH PER GEAR DATA.",
         "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX TO DATUM A.",
         "CONE SET: MAKE 1 OF EACH CONFIGURATION (T006-T120 BY 6; 20 GEARS TOTAL).",
+        "TITLE-BLOCK MATERIAL APPLIES TO T030-T120 ONLY.",
+        f"T006-T024 TIP GEARS: {TIP_MATERIAL_SPEC.upper()}, DRAWN ROD (HARDER ALLOY; FINEST TEETH WEAR MOST).",
         "ALL 20 GEARS PLAIN-BORED (NO KEYWAY); SOLDER TO MATCHING SHAFT SEATS.",
         "THIS SHEET SHOWS T120; FAMILY ROWS ABOVE GOVERN TOOTH COUNT AND BORE.",
         "  PITCH DIA=N×25.4/DP; OUTSIDE DIA=(N+2)×25.4/DP.",

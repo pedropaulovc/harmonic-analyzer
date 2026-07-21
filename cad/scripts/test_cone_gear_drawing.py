@@ -60,6 +60,8 @@ def test_manufacturing_notes_cover_teeth_and_family() -> None:
     assert "20 GEARS TOTAL" in notes
     assert "NO KEYWAY" in notes
     assert "SOLDER TO MATCHING SHAFT SEATS" in notes
+    assert "TITLE-BLOCK MATERIAL APPLIES TO T030-T120 ONLY" in notes
+    assert "T006-T024 TIP GEARS: C67500 MANGANESE BRONZE" in notes
     assert "X.XX" not in notes
     assert "SET TABLE" not in notes
     assert "CONE-SHAFT DRAWING" not in notes
@@ -81,5 +83,7 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-gear")
     assert config["material_specification"] == "C36000 free-machining brass"
+    assert config["material_tip_specification"] == "C67500 manganese bronze"
+    assert spec.TIP_MATERIAL_SPEC == config["material_tip_specification"]
     assert config["finish"] == "gear teeth cut; polished brass"
     assert int(config["quantity"]) == 1
