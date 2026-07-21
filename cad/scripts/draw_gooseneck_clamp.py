@@ -140,7 +140,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the clamp bore")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.066)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.071)
     add_property_linked_note(adapter, "Isometric View Note", 0.322, 0.108)
 
     return await finalize_drawing(
