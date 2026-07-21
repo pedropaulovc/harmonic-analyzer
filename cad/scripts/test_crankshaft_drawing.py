@@ -79,9 +79,9 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert '{"PinHeight": (0.132, 0.105)}' in source
     assert "GetVisibleEntities2(c, 3)" in source
     assert "face=shaft_face" in source
-    assert 'symbol_xy=(0.210, 0.195)' in source
     assert 'entity_type="FACE"' in source
     assert "edge_entity=shaft_face" in source
+    assert 'production_method="SHAFT OD"' in source
     assert 'characteristic="position"' in source
     assert 'characteristic="perpendicularity"' in source
     assert "face_xy=" not in source

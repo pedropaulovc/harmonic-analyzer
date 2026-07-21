@@ -492,6 +492,7 @@ def add_surface_finish(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    production_method: str = "",
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
 
@@ -542,10 +543,16 @@ def add_surface_finish(
     )
     if not symbol.SetText(8, f"Ra {roughness_ra}"):  # current-profile roughness value
         raise RuntimeError(f"failed to set Ra {roughness_ra} ({label})")
+    if production_method and not symbol.SetText(2, production_method):
+        raise RuntimeError(
+            f"failed to set surface target {production_method!r} ({label})"
+        )
     if int(symbol.GetSymbol()) != 1:
         raise RuntimeError(f"surface-finish symbol type did not persist ({label})")
     if str(symbol.GetText(8) or "").strip() != f"Ra {roughness_ra}":
         raise RuntimeError(f"surface-finish roughness did not persist ({label})")
+    if production_method and str(symbol.GetText(2) or "").strip() != production_method:
+        raise RuntimeError(f"surface target did not persist ({label})")
     annotation = _sw_type_info.early_bound_or_flag(
         symbol.GetAnnotation(), "IAnnotation", "SetPosition2", "SetLeader3"
     )

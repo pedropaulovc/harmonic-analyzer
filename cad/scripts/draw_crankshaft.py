@@ -326,11 +326,12 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         right,
-        symbol_xy=(0.210, 0.195),
+        symbol_xy=(0.195, 0.065),
         roughness_ra="1.6",
         label="crankshaft bearing finish",
         entity_type="FACE",
         edge_entity=shaft_face,
+        production_method="SHAFT OD",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.056)
     # Identify the enlarged circular projection without relying on its position.
