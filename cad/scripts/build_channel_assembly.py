@@ -277,25 +277,27 @@ PIVOT_SHAFT_Z = -12.7  # = (88.9 - 114.3) / 2; the 203.2-long shaft spans ±101.
 RAIL_TOP_Y = 1040.7
 LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
 
-# --- spring (build_channel_spring_installed.py locals) ----------------------
+# --- spring (channel_spring_installed_spec) ---------------------------------
 from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
-from build_channel_spring_installed import (  # noqa: E402
-    BOTTOM_LEAD as SPRING_BOTTOM_LEAD,  # 2.0: normal hook lead (no longer spans plate)
+from channel_spring_installed_spec import (  # noqa: E402
+    HOOK_LEAD as SPRING_HOOK_LEAD,  # 2.0 each end (no longer spans the plate)
     INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 61.98: the neutral installed body
     PLATE_EYE_Y,  # 996.54: bottom-eye y, ABOVE the plate on the hook arm
-    TOP_LEAD as SPRING_TOP_LEAD,  # 2.0
 )
+
+SPRING_BOTTOM_LEAD = SPRING_HOOK_LEAD
+SPRING_TOP_LEAD = SPRING_HOOK_LEAD
 
 SPRING_LOOP_R = 2.75  # = coil mean radius
 SPRING_WIRE_DIA = 1.0
 SPRING_EYE_DROP = 3.37  # top eye centre below the lever spring hole
 SPRING_HOLE_DIA = 4.0  # build_channel_lever.py (O3 photo read enlarged: threading)
 
-# --- spring-hook fastener (build_spring_hook.py locals) ---------------------
+# --- spring-hook fastener (spring_hook_spec) --------------------------------
 # A little open J-hook seats shank-up in each plate bore; its +X arm, presented
 # just above the plate, threads the spring's bottom eye. So the shank sits one
 # arm-offset -X of the (vertical) spring eye and the arm reaches back to it.
-from build_spring_hook import (  # noqa: E402
+from spring_hook_spec import (  # noqa: E402
     ELBOW_R as HOOK_ELBOW_R,
     ROD_DIA as HOOK_ROD_DIA,
     ARM_RUN as HOOK_ARM_RUN,

@@ -13,12 +13,12 @@ import _config
 CHANNEL_SPECS = {
     "amplitude-bar": "amplitude_bar_spec",
     "channel-lever": "channel_lever_spec",
-    "channel-spring-installed": "channel_spring_installed_spec",
+    "channel-spring-installed": "channel_spring_installed_notes",
     "connecting-rod": "connecting_rod_notes",
-    "counter-spring": "counter_spring_spec",
+    "counter-spring": "counter_spring_notes",
     "rocker-arm": "rocker_arm_notes",
-    "spring-hook": "spring_hook_spec",
-    "summing-lever": "summing_lever_spec",
+    "spring-hook": "spring_hook_notes",
+    "summing-lever": "summing_lever_notes",
 }
 
 

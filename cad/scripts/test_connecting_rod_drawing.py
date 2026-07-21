@@ -19,8 +19,8 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert rod.DRAWING_DIMENSIONS is connecting_rod_spec.DRAWING_DIMENSIONS
-    marked = set().union(*connecting_rod_spec.DRAWING_DIMENSIONS.values())
+    assert rod.DRAWING_DIMENSIONS is connecting_rod_notes.DRAWING_DIMENSIONS
+    marked = set().union(*connecting_rod_notes.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
 

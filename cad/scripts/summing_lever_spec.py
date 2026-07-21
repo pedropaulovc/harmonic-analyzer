@@ -43,29 +43,11 @@ HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET  # 6
 HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
 HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # 9.90 from -Z end
 HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
+HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
+HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 
-
-# --- Marked-dimension contract.  build_summing_lever marks exactly these. ---
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateProfile": {"PlateWidth", "PlateLength"},
-    "CylinderProfile": {"CylDia"},
-    "SummationAnchorProfile": {"AnchorOuterDia"},
-}
-
-# The spring-hole pattern (count, size, row X, start offset, pitch) and the
-# anchor-eye size/location are dimensioned NATIVELY on the sheet (basic
-# coordinates + position frames); the notes must not repeat those numbers.
-DRAWING_NOTES = "\n".join(
-    (
-        f"1. HEX TRUNNIONS {HEX_W:.2f} W x {HEX_H:.2f} HIGH,",
-        f"   {HEX_DEPTH:.2f} LONG EACH END; VERTEX UP IS",
-        "   THE KNIFE EDGE.",
-        f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK.",
-        f"3. PIVOT CYLINDER {PLATE_L:.2f} LONG; NO BORE.",
-        "4. CAST PART: UNDIMENSIONED CONTOURS",
-        "   PER SUPPLIED MODEL/PATTERN. ONLY",
-        "   KNIFE EDGES AND ANCHOR BORE",
-        "   ARE MACHINED.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
+# DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) live in ``summing_lever_notes`` --
+# ``build_summing_assembly`` / ``build_knife_mount`` import this module, so
+# drawing-only data here would put every notes edit in their rebuild
+# closures (codex #354).

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import spring_hook_notes
 import spring_hook_spec
 import draw_spring_hook as drawing
 import build_spring_hook as hook
@@ -18,8 +19,8 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert hook.DRAWING_DIMENSIONS is spring_hook_spec.DRAWING_DIMENSIONS
-    marked = set().union(*spring_hook_spec.DRAWING_DIMENSIONS.values())
+    assert hook.DRAWING_DIMENSIONS is spring_hook_notes.DRAWING_DIMENSIONS
+    marked = set().union(*spring_hook_notes.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
 
@@ -34,12 +35,12 @@ def test_sheet_runs_at_5_to_1() -> None:
     assert drawing.SHEET_SCALE == (5.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(5, 1)" in source
-    assert spring_hook_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 5:1"
+    assert spring_hook_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 5:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_linked_notes_describe_the_form() -> None:
-    notes = spring_hook_spec.DRAWING_NOTES
+    notes = spring_hook_notes.DRAWING_NOTES
     assert "R1.5" in notes
     assert "LINEAR +/-" not in notes
     assert "STEEL WIRE" not in notes

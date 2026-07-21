@@ -57,7 +57,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
-from spring_hook_spec import (
+from spring_hook_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,

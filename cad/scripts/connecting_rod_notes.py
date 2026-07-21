@@ -18,6 +18,14 @@ from __future__ import annotations
 # stepped-thickness view (outline ~180 mm tall), and the column between the
 # bottom border and the top zone border is ~186 mm -- a taller block either
 # overlaps the view or pushes it across the border (layout audit).
+# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
+# print shows.  build_connecting_rod marks exactly these. ---
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "RingDiscProfile": {"RingOuterDia"},
+    "StrapBoreProfile": {"StrapBoreDia"},
+    "ShankProfile": {"ShankWidthDim"},
+}
+
 DRAWING_NOTES = "\n".join(
     (
         "1. STRAP BORE MACHINED; RUNS THE 30.60",

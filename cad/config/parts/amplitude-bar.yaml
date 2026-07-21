@@ -1,6 +1,6 @@
 amplitude-bar:
   number: MHA-003
-  material: AISI 1018 cold-rolled steel
+  material: Plain Carbon Steel
   material_specification: AISI 1018 cold-rolled steel, 6.35 sq
   finish: bright chrome plated
   quantity: 20

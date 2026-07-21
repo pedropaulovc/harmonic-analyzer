@@ -80,7 +80,7 @@ from _drawing_marks import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
-from rocker_arm_spec import DRAWING_DIMENSIONS
+from rocker_arm_notes import DRAWING_DIMENSIONS
 
 PART_NAME = "rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring

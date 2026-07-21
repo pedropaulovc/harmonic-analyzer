@@ -66,15 +66,15 @@ KNIFE = (-15.0, 990.0)  # summing-lever knife-edge line (x, y), along Z
 COLUMN_X = -197.0  # east column (the crank side is machine -X)
 
 # --- knife bearing supports (build_knife_mount) -----------------------------
-from build_summing_lever import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
+from summing_lever_spec import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
 
 KNIFE_CONTACT_Y = KNIFE[1] + HEX_H / 2.0  # knife-edge contact ridge line (995.13)
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
-# --- counter-spring chain (build_boss_hook / build_counter_spring) ----------
+# --- counter-spring chain (build_boss_hook / counter_spring_spec) -----------
 from build_boss_hook import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
-from build_counter_spring import (  # noqa: E402
-    BOTTOM_LEAD as CS_BOTTOM_LEAD,
+from counter_spring_spec import (  # noqa: E402
+    BOTTOM_HOOK_LEAD as CS_BOTTOM_LEAD,
     COIL_OD as CS_COIL_OD,
     WIRE_DIA as CS_WIRE_DIA,
 )

@@ -20,23 +20,7 @@ ARM_HEIGHT = SHANK_RISE + ELBOW_R  # 9.1 arm centreline above the shank base
 ARM_TIP_X = ELBOW_R + ARM_RUN  # 4.0 arm tip
 
 
-# --- Marked-dimension contract. ---
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "HookPath": {"Rise", "ArmRun"},
-    "WireProfile": {"RodDia"},
-}
-
-DRAWING_NOTES = "\n".join(
-    (
-        "1. OPEN J-HOOK: SHANK, 90 DEG ELBOW",
-        "   R1.50 CL, THEN A 2.50 ARM.",
-        "2. SHANK SEATS IN THE SUMMING-LEVER",
-        "   PLATE BORE; ARM CATCHES THE",
-        "   CHANNEL-SPRING BOTTOM EYE.",
-        "3. Ra SYMBOL APPLIES TO THE STRAIGHT",
-        "   SHANK OD (PLATE SEAT).",
-        "4. FORM COLD FROM ANNEALED WIRE;",
-        "   NO SHARP KINKS AT THE ELBOW.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 5:1"
+# Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
+# DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) live in ``spring_hook_notes`` --
+# ``build_channel_assembly`` imports this module, so drawing-only data here
+# would put every notes edit in the assembly rebuild closure (codex #354).

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import counter_spring_notes
 import counter_spring_spec
 import draw_counter_spring as drawing
 import build_counter_spring as spring
@@ -20,8 +21,8 @@ def test_required_drawing_paths() -> None:
 def test_spec_sheet_has_no_graphical_marked_dimensions() -> None:
     # A coil spring is defined by its data table, so the marked set is empty and
     # the kept set is empty too.
-    assert spring.DRAWING_DIMENSIONS is counter_spring_spec.DRAWING_DIMENSIONS
-    assert counter_spring_spec.DRAWING_DIMENSIONS == {}
+    assert spring.DRAWING_DIMENSIONS is counter_spring_notes.DRAWING_DIMENSIONS
+    assert counter_spring_notes.DRAWING_DIMENSIONS == {}
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == set()
 
@@ -40,7 +41,7 @@ def test_spring_data_matches_the_build() -> None:
 
 
 def test_data_table_carries_the_spring_parameters() -> None:
-    notes = counter_spring_spec.DRAWING_NOTES
+    notes = counter_spring_notes.DRAWING_NOTES
     for token in ("WIRE DIA", "COIL OD", "FREE BODY LENGTH", "TOTAL COILS", "WIND", "ENDS"):
         assert token in notes
     assert f"{counter_spring_spec.WIRE_DIA:.2f}" in notes
@@ -58,7 +59,7 @@ def test_sheet_runs_at_1_to_2_with_1_to_3_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 2.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 3)" in source  # the isometric override
-    assert counter_spring_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
+    assert counter_spring_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 

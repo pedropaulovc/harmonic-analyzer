@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import summing_lever_notes
 import summing_lever_spec
 import draw_summing_lever as drawing
 import build_summing_lever as lever
@@ -18,8 +19,8 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert lever.DRAWING_DIMENSIONS is summing_lever_spec.DRAWING_DIMENSIONS
-    marked = set().union(*summing_lever_spec.DRAWING_DIMENSIONS.values())
+    assert lever.DRAWING_DIMENSIONS is summing_lever_notes.DRAWING_DIMENSIONS
+    marked = set().union(*summing_lever_notes.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
 
@@ -45,12 +46,12 @@ def test_sheet_runs_at_1_to_2_with_1_to_4_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 2.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 4)" in source  # the isometric override
-    assert summing_lever_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
+    assert summing_lever_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_linked_notes_describe_the_hung_lever() -> None:
-    notes = summing_lever_spec.DRAWING_NOTES
+    notes = summing_lever_notes.DRAWING_NOTES
     assert "KNIFE EDGE" in notes
     assert "8.65 W x 10.27 HIGH" in notes
     assert "21.72 LONG EACH END" in notes

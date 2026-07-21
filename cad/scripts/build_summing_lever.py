@@ -96,7 +96,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
-from summing_lever_spec import (
+from summing_lever_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,

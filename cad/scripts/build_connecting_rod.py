@@ -65,7 +65,7 @@ from _drawing_marks import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from connecting_rod_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
-from connecting_rod_spec import DRAWING_DIMENSIONS
+from connecting_rod_notes import DRAWING_DIMENSIONS
 
 import _telemetry
 

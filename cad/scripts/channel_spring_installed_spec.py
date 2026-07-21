@@ -21,49 +21,36 @@ COIL_OD = 6.5
 WIRE_DIA = 1.0
 COIL_COUNT = 28
 
-# Installed (in-machine) stretched body length -- from build_channel_spring_installed.
-INSTALLED_BODY_LENGTH = 61.98
+# Installed (in-machine) eye anchor heights -- the assembly-facing placement
+# contract (build_channel_assembly imports these; moved here from
+# build_channel_spring_installed so the assembly needs no builder import).
+LEVER_EYE_Y = 1062.5234  # LIVE neutral top eye = lever spring hole 1065.89 -
+# drop 3.37 (ch14 ROM re-derive: the LEVEL rocker rest pose flattens the neutral
+# lever tilt to -0.002 deg, dropping the eye 0.73; was 1063.25 at the ch30 GT
+# re-anchor's 0.231 deg tilt). The assembly's solve_state is the authority --
+# verify:math spring:neutral-body-canonical guards this value.
+PLATE_EYE_Y = 996.54  # bottom eye centre, ABOVE the .cs plate (top 992.54) on the
+# spring-hook arm: plate bottom 987.44 + hook arm height (SHANK_RISE 7.6 + ELBOW_R
+# 1.5 = 9.1). High enough that the eye's O5.5 ring clears the plate (its bottom
+# 993.29 > 992.54). The spring no longer threads the plate -- the hook bridges it.
 
 COIL_ID = COIL_OD - 2.0 * WIRE_DIA  # 4.5
 MEAN_DIA = COIL_OD - WIRE_DIA  # 5.5
 HOOK_LEAD = 2.0 * WIRE_DIA
 HOOK_CL_RADIUS = MEAN_DIA / 2.0
 FREE_EYE_C2C = FREE_BODY_LENGTH + 2.0 * HOOK_LEAD
+# Installed (in-machine) stretched body length -- exact (61.9834); the table
+# renders it .2f. build_channel_spring_installed and the channel assembly both
+# derive from this single value.
+INSTALLED_BODY_LENGTH = LEVER_EYE_Y - PLATE_EYE_Y - 2.0 * HOOK_LEAD
 INSTALLED_EYE_C2C = round(INSTALLED_BODY_LENGTH + 2.0 * HOOK_LEAD, 2)
 FREE_PITCH = FREE_BODY_LENGTH / COIL_COUNT  # 1.14 -- NOT close-wound
 # Nominal rate k = G d^4 / (8 Dm^3 n), ASTM A228 G = 79.3 GPa -- stated REF so
 # the table carries a functional requirement, not just geometry.
 SPRING_RATE_REF = 79300.0 * WIRE_DIA**4 / (8.0 * MEAN_DIA**3 * COIL_COUNT)
 
-
-# No graphical marked dimensions -- the data table governs (see counter_spring).
-DRAWING_DIMENSIONS: dict[str, set[str]] = {}
-
-# The free pitch is stated (28 x 1.00 close-wound would be 28, not 32 -- the
-# body is wound slightly OPEN and the table must say so); hook leads carry
-# their measurement endpoints; the rate is a REF functional requirement; the
-# title-block QTY cell owns the 20-off count.
-DRAWING_NOTES = "\n".join(
-    (
-        "EXTENSION SPRING DATA",
-        f"  WIRE DIA .......... {WIRE_DIA:.2f}",
-        f"  COIL OD ........... {COIL_OD:.2f}",
-        f"  COIL ID ........... {COIL_ID:.2f}",
-        f"  MEAN DIA .......... {MEAN_DIA:.2f}",
-        f"  FREE BODY LENGTH .. {FREE_BODY_LENGTH:.2f} (RELAXED)",
-        f"  INSTALLED BODY .... {INSTALLED_BODY_LENGTH:.2f} (STRETCHED)",
-        f"  TOTAL COILS ....... {COIL_COUNT}",
-        f"  FREE PITCH ........ {FREE_PITCH:.2f} (OPEN-WOUND)",
-        "  WIND .............. RIGHT HAND",
-        f"  RATE .............. ~{SPRING_RATE_REF:.2f} N/MM (REF)",
-        f"  HOOK LEADS ......... {HOOK_LEAD:.2f} EACH END",
-        "    (BODY END TO EYE C/L)",
-        f"  ENDS .............. 270 DEG LOOP, R{HOOK_CL_RADIUS:.2f} CL;",
-        "    EYES COPLANAR (0 DEG CLOCKING)",
-        f"  FREE EYE C-C ...... {FREE_EYE_C2C:.2f}",
-        f"  INSTALLED EYE C-C . {INSTALLED_EYE_C2C:.2f}",
-        "NOTE: DRAWN AT THE INSTALLED LENGTH;",
-        f"SPRING SHIPS RELAXED AT {FREE_BODY_LENGTH:.2f} BODY.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+# The spec-sheet data table + marked-dimension contract (DRAWING_DIMENSIONS /
+# DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) live in ``channel_spring_installed_notes``
+# -- ``_spring`` (in the channel-assembly closure) imports this module, so
+# drawing-only data here would put every table edit in the assembly rebuild
+# closure (codex #354).

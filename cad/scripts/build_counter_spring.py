@@ -67,11 +67,13 @@ from counter_spring_spec import (
     COIL_BODY_LENGTH,
     COIL_COUNT,
     COIL_OD,
+    TOP_HOOK_LEAD as TOP_LEAD,
+    WIRE_DIA,
+)
+from counter_spring_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
-    TOP_HOOK_LEAD as TOP_LEAD,
-    WIRE_DIA,
 )
 
 import _telemetry

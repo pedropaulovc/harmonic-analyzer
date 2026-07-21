@@ -1,6 +1,6 @@
 spring-hook:
   number: MHA-090
-  material: AISI 1018 steel wire
+  material: Plain Carbon Steel
   material_specification: AISI 1018 steel wire, 1.4 dia, annealed (cold-formable)
   finish: black oxide
   quantity: 20

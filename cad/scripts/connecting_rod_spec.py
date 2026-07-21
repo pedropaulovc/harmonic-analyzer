@@ -32,11 +32,9 @@ RING_BOTTOM_Y = -RING_OUTER_RADIUS  # -20.4
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_connecting_rod marks exactly these; draw_connecting_rod
 # keeps exactly their union across its per-view ``keep`` maps. ---
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "RingDiscProfile": {"RingOuterDia"},
-    "StrapBoreProfile": {"StrapBoreDia"},
-    "ShankProfile": {"ShankWidthDim"},
-}
+# The marked-dimension contract moved to ``connecting_rod_notes`` with the rest
+# of the drawing-only data (codex #354): it changes for drawing-only mark/keep
+# updates, and ``build_channel_assembly`` imports this module.
 
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # connecting_rod_notes.py so assemblies importing this spec never inherit a

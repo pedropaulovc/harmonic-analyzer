@@ -15,6 +15,13 @@ from __future__ import annotations
 # their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
 # fit and count, never a second copy of a sheet dimension.  16.00 depth is a
 # REF: it is fixed by the concentric R800/R816 edges.
+# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
+# print shows.  build_rocker_arm marks exactly these. ---
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "StrapProfile": {"TopRadius", "BottomRadius"},
+    "PivotHoleProfile": {"PivotDia"},
+}
+
 DRAWING_NOTES = "\n".join(
     (
         "1. PROFILE MIRROR-SYMMETRIC ABOUT THE",

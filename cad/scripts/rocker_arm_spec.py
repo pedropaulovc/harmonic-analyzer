@@ -49,10 +49,9 @@ ROD_HOLE_Y = (CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_HOLE_X * ROD_HOLE_X)) + ROD
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. build_rocker_arm marks exactly these; draw_rocker_arm keeps
 # exactly their union across its per-view ``keep`` maps. ---
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "StrapProfile": {"TopRadius", "BottomRadius"},
-    "PivotHoleProfile": {"PivotDia"},
-}
+# The marked-dimension contract moved to ``rocker_arm_notes`` with the rest of
+# the drawing-only data (codex #354): it changes for drawing-only mark/keep
+# updates, and assemblies import this module.
 
 # The pivot bore rides at the strap mid-depth; assemblies place the arm off
 # this (imported from here, never from build_rocker_arm, so drawing-only edits

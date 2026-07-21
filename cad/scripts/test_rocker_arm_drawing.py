@@ -21,8 +21,8 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # The drift alarm: build marks exactly the spec's map, the drawing keeps
     # exactly its union across the per-view keep-maps.
-    assert arm.DRAWING_DIMENSIONS is rocker_arm_spec.DRAWING_DIMENSIONS
-    marked = set().union(*rocker_arm_spec.DRAWING_DIMENSIONS.values())
+    assert arm.DRAWING_DIMENSIONS is rocker_arm_notes.DRAWING_DIMENSIONS
+    marked = set().union(*rocker_arm_notes.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept | drawing.NOTE_ONLY_DIMENSIONS == marked
 
