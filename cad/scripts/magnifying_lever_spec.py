@@ -34,9 +34,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "STOCK: Ø6 ROUND BRASS ROD, ONE PIECE; OVERALL LENGTH 165.",
+        "Ø6 ROUND BAR, ONE PIECE; OVERALL LENGTH 165.",
         "FORM BOTH ENDS TO A FULL HEMISPHERE (R3 = ROD RADIUS).",
-        "TURN OR CENTRELESS-GRIND THE OD STRAIGHT AND SMOOTH, Ra 1.6 -",
+        "OD STRAIGHT AND SMOOTH, Ra 1.6 -",
         "THE CLAMP BLOCK SLIDES ALONG IT TO SET THE MAGNIFICATION.",
     )
 )
