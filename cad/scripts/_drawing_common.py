@@ -2449,26 +2449,6 @@ def insert_bom_table(
                 table.DisplayedText2(row, description_column, False) or ""
             )
             if applied != text:
-                # BOM cells can defer evaluation until the drawing rebuilds,
-                # especially when this row aggregates several configurations.
-                # Rebuild before deciding that the documented Text2 write was
-                # discarded; the immediate DisplayedText2 value is not a
-                # reliable postcondition for a grouped row.
-                adapter.currentModel.EditRebuild3()
-                applied = str(
-                    table.DisplayedText2(row, description_column, False) or ""
-                )
-            if applied != text and configuration_grouping == "same-part":
-                # A same-part row is a visible aggregate over hidden per-config
-                # rows. SetText2(False) addresses only the aggregate and 2026
-                # silently discards it; IncludeHidden=True writes the grouped
-                # backing cells that drive the displayed aggregate.
-                table.SetText2(row, description_column, True, text)
-                adapter.currentModel.EditRebuild3()
-                applied = str(
-                    table.DisplayedText2(row, description_column, False) or ""
-                )
-            if applied != text:
                 raise RuntimeError(
                     f"{label} BOM description did not persist: {applied!r} != {text!r}"
                 )

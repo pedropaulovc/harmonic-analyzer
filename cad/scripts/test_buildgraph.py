@@ -284,21 +284,15 @@ def test_module_deps_follow_non_helper_siblings():
 
 
 def test_stamps_part_properties_only_genuine_stampers():
-    """Only assemblies that STAMP properties in-script are flagged, via the
-    function-level call graph. channel calls _spring.build_spring
-    (-> save_part_and_images) so it stamps its stretched springs; pen stamps its
-    OWN assembly doc's title-block/BOM properties (apply_custom_properties +
-    part_properties, added with the pen assembly drawing) — so its
-    title_block.yaml dep is genuine and an edit there must rebuild it, at the
-    accepted cost of the conservative parts-row/template over-deps.
-    summing/magnifier import part-builder CONSTANTS and paper_drive reaches only
-    build_cone_gear MATH helpers, so none of them stamp and a registry-row edit
-    only REFRESHES them, no FULL (codex P2)."""
-    assert stamps_part_properties(script_for("channel")), "channel stamps stretched springs"
-    assert stamps_part_properties(script_for("pen")), \
-        "pen stamps its assembly title-block properties in-script"
-    for non in ("frame", "summing", "magnifier", "paper_drive", "drive_train"):
-        assert not stamps_part_properties(script_for(non)), f"{non} must not be a stamper"
+    """Every released assembly drawing now has source-owned title-block data.
+
+    Each assembly builder stamps its own Number/Revision/material-deferment and
+    title-block tolerance properties before saving, so the function-level call
+    graph must classify every assembly recipe as a genuine stamper. Channel
+    additionally stamps its stretched spring parts through ``build_spring``.
+    """
+    for stem in ASSEMBLY_ORDER:
+        assert stamps_part_properties(script_for(stem)), f"{stem} must be a stamper"
     # a part build script genuinely stamps its own properties (sanity on the graph).
     assert stamps_part_properties(SCRIPTS_DIR / "build_fillister_screw.py")
 

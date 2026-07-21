@@ -83,6 +83,7 @@ from _common import (
     SketchDims,
     _early_bound,
     _read_member,
+    apply_custom_properties,
     apply_material,
     check,
     drive_dimension,
@@ -807,6 +808,10 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
     check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
+    description = str(_config.parts(PART_NAME).get("description", "")).strip()
+    if not description:
+        raise RuntimeError("cone-gear registry description is required for grouped BOMs")
+    apply_custom_properties(adapter, {"Description": description})
     await report_mass_properties(adapter)
 
     # Mark the bore as the single manufacturing model dimension (on the drawn

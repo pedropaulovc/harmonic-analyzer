@@ -1,5 +1,6 @@
 cone-gear:
   number: MHA-013
+  description: "CONE GEAR, T006-T120 BY 6; 1 EACH"
   material: Brass
   material_specification: C36000 free-machining brass
   # The four cone-tip gears (T006-T024) are a harder high-zinc yellow metal in

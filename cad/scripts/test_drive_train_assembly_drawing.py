@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import _config
 import draw_drive_train_assembly as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -66,6 +67,15 @@ def test_bom_covers_every_top_level_component_family() -> None:
     for component in drawing.BOM_COMPONENTS:
         assert f'"{component}"' in source, f"{component} not placed by build"
     assert len(drawing.BOM_COMPONENTS) == 32
+
+
+def test_grouped_cone_gear_row_has_a_source_description_property() -> None:
+    description = _config.parts("cone-gear")["description"]
+    assert description == drawing.BOM_COMPONENTS["cone-gear"]
+    source = (Path(__file__).parent / "build_cone_gear.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'apply_custom_properties(adapter, {"Description": description})' in source
 
 
 def test_assembly_owns_see_parts_list_title_block() -> None:
