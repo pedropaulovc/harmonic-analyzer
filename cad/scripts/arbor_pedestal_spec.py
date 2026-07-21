@@ -26,23 +26,20 @@ SCREW_CLEARANCE_DIA = 3.264
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},
     "Foot": {"FootHt"},
-    "BoreProfile": {"BoreHeight", "BoreDia"},
+    # BoreHeight is recreated in the drawing between the actual datum-A foot
+    # edge and the bore circle so its BASIC witness cannot collapse onto the
+    # visually adjacent top of the flange.
+    "BoreProfile": {"BoreDia"},
     "DomeProfile": {"DomeDia"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
         "MACHINE FROM CONTINUOUS-CAST STOCK; REMOVE AS-CAST SKIN.",
-        "DATUM A IS FOOT SEAT. MATING ARBOR LIMITS DIA 9.505-9.525.",
-        "TAPER FLANKS PROJECT TO 24.00 WIDTH AT DATUM A AND ARE TANGENT",
-        "TO THE DIA 20.00 DOME AT THE BORE CENTERLINE. FRONT PROFILE IS",
-        "SYMMETRIC ABOUT THE VERTICAL CENTERLINE THROUGH THE BORE AXIS.",
+        "DATUM A IS FOOT SEAT; DATUM B IS LEFT FOOT SIDE FACE SHOWN.",
+        "MATING ARBOR LIMITS DIA 9.505-9.525.",
+        "FRONT PROFILE IS SYMMETRIC ABOUT THE BORE CENTERLINE.",
         "STRAP 10.00 +/-0.10 THICK; FAR FACE IS FLUSH WITH THE 16.00-DEEP",
-        "FOOT FACE WITHIN 0.10; 6.00 EXPOSED FLANGE IS REFERENCE ONLY",
-        "ON THE HOLE SIDE SHOWN IN THE TOP VIEW.",
-        f"FLANGE HOLE DIA {SCREW_CLEARANCE_DIA:.3f} +0.10/-0.00 "
-        f"({SCREW_THREAD} NORMAL CLEARANCE) THRU;",
-        "AXIS ON THE 24.00 WIDTH CENTERLINE +/-0.05 AND 5.00 +/-0.10",
-        "FROM THE FOOT CENTER PLANE TOWARD THE EXPOSED FLANGE.",
+        "FOOT FACE WITHIN 0.10. 6.00 EXPOSED FLANGE IS REFERENCE ONLY.",
     )
 )

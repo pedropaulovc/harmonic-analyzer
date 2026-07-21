@@ -26,7 +26,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert marked == {
-        "Width", "Depth", "FootHt", "BoreHeight", "BoreDia", "DomeDia"
+        "Width", "Depth", "FootHt", "BoreDia", "DomeDia"
     }
 
 
@@ -36,7 +36,7 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     assert round(arbor_pedestal_spec.BORE_DIA, 3) == 9.525
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "+0.055/+0.025 THRU"
     assert "BoreHeight" not in drawing.DIMENSION_CALLOUTS
-    assert "DomeDia" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS["DomeDia"] == "+/-0.10"
     assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
     assert "ARBOR BORE LIMITS" not in arbor_pedestal_spec.DRAWING_NOTES
     shaft_limits = (9.505, 9.525)
@@ -49,11 +49,9 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     assert tuple(round(value, 3) for value in clearances) == expected
 
 
-def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
+def test_notes_specify_part_requirements_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "MATING ARBOR LIMITS DIA 9.505-9.525" in notes
-    assert "#4" in notes  # the flange hold-down clearance hole
-    assert "DIA 3.264 +0.10/-0.00" in notes
     assert "STRAP 10.00 +/-0.10 THICK" in notes
     assert "MATERIAL" not in notes
     assert "JAPANNED" not in notes
@@ -61,26 +59,30 @@ def test_notes_specify_bore_and_screw_without_title_block_duplicates() -> None:
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     assert "MACHINE FROM CONTINUOUS-CAST STOCK" in notes
-    assert "TAPER FLANKS PROJECT TO 24.00 WIDTH AT DATUM A" in notes
-    assert "SYMMETRIC ABOUT THE VERTICAL CENTERLINE" in notes
+    assert "DATUM B IS LEFT FOOT SIDE FACE SHOWN" in notes
+    assert "SYMMETRIC ABOUT THE BORE CENTERLINE" in notes
     assert "6.00 EXPOSED FLANGE IS REFERENCE ONLY" in notes
     assert "FLUSH WITH THE 16.00-DEEP" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "add_native_hole_callout(" in source
+    assert 'label="flange-hole location"' in source
+    assert "3.00 +/-0.10 FROM" in source
 
 
 def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'datum="A"' in source
     assert 'datum="B"' in source
-    assert 'datum="C"' in source
     assert 'characteristic="position"' in source
     assert 'characteristic="profile_surface"' in source
     assert 'characteristic="perpendicularity"' in source
-    assert source.count("set_basic_dimension(") == 3
-    assert "side_origin" in source
+    assert source.count("_add_bore_basic(") == 3  # helper plus X and Y calls
+    assert 'orientation="horizontal"' in source
+    assert 'orientation="vertical"' in source
     assert "for index in (1, 2):" in source
     assert "if result != 0:" in source
+    assert "2X 2.12<MOD-DEG> +/-0.10<MOD-DEG> FROM VERTICAL" in source
     assert 'roughness_ra="1.6"' in source
     common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
         encoding="utf-8"
