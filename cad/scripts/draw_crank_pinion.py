@@ -26,6 +26,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
 from crank_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -110,6 +111,7 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
+    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
     bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
@@ -119,6 +121,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.033),
         datum="A",
         label="crank pinion bore axis",
+        entity=bore_edge,
+        shoulder=True,
     )
     add_feature_control_frame(
         adapter,
@@ -138,6 +142,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.017, FRONT_CENTER[1] - 0.060),
         roughness_ra="1.6",
         label="crank pinion bore finish",
+        entity=bore_edge,
     )
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)

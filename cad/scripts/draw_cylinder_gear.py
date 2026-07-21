@@ -31,6 +31,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
 from cylinder_gear_spec import BORE_DIA, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -72,33 +73,6 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "THRU - REAM\n+0.05/+0.03",
 }
 DIMENSION_PRECISION = {"BoreDia": 3}
-
-
-def _visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
-    """Return a visible circular model edge matching ``diameter_mm``."""
-    candidates: list[tuple[float, Any]] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            radius_mm = float(curve.CircleParams[6]) * 1000.0
-            candidates.append((radius_mm, edge))
-    target_radius = diameter_mm / 2.0
-    if not candidates:
-        raise RuntimeError("front view has no visible circular model edge")
-    radius_mm, edge = min(candidates, key=lambda item: abs(item[0] - target_radius))
-    if abs(radius_mm - target_radius) > 0.01:
-        raise RuntimeError(
-            f"no visible circle matches radius {target_radius:.4f} mm; "
-            f"nearest is {radius_mm:.4f} mm"
-        )
-    return edge
 
 
 def _largest_visible_planar_face(adapter: Any, view: Any) -> Any:
@@ -173,7 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
-    bore_edge = _visible_circle_edge(adapter, front, BORE_DIA)
+    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
     gear_face = _largest_visible_planar_face(adapter, front)
 
     # Datum A: the bore axis (front view, 12 o'clock pick with the symbol above,

@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import _config
 import alignment_pinion_spec
 import cone_gear_spec
 import crank_drive_gear_spec
 import crank_pinion_spec
 import cylinder_gear_spec
+import draw_alignment_pinion
+import draw_cone_gear
+import draw_crank_drive_gear
+import draw_crank_pinion
+import draw_cylinder_gear
+import draw_rack_pinion
+import draw_transgear_feed_pinion
+import draw_transgear_pinion
 import rack_pinion_spec
 import transgear_feed_pinion_spec
 import transgear_pinion_spec
@@ -22,6 +32,17 @@ SHEETS = (
     ("rack-pinion", rack_pinion_spec),
     ("transgear-feed-pinion", transgear_feed_pinion_spec),
     ("transgear-pinion", transgear_pinion_spec),
+)
+
+DRAWING_MODULES = (
+    draw_alignment_pinion,
+    draw_cone_gear,
+    draw_crank_drive_gear,
+    draw_crank_pinion,
+    draw_cylinder_gear,
+    draw_rack_pinion,
+    draw_transgear_feed_pinion,
+    draw_transgear_pinion,
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
@@ -63,3 +84,11 @@ def test_notes_do_not_repeat_title_block_quantity() -> None:
             # repeat of the per-configuration title-block quantity.
             continue
         assert " REQUIRED" not in spec.DRAWING_NOTES.upper(), part_name
+
+
+def test_bore_annotations_use_exact_model_edge_identity() -> None:
+    for module in DRAWING_MODULES:
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "bore_edge = visible_circle_edge(" in source, module.__name__
+        assert source.count("entity=bore_edge") >= 2, module.__name__
+        assert "shoulder=True" in source, module.__name__
