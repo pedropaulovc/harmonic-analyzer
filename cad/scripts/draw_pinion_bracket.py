@@ -23,16 +23,11 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -41,15 +36,12 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_bracket_spec import (
     ARBOR_BORE,
-    C2C,
-    HALF_WIDTH,
+    C2C as C2C,
     OVERALL_LENGTH,
-    PIN_DROP,
     PIVOT_BORE,
     R_END,
     THICKNESS,
 )
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -114,12 +106,13 @@ RIGHT_KEEP = {
     "PinSeatCz": (0.225, 0.180),
 }
 DIMENSION_CALLOUTS = {
-    # The pivot bore is an exact 1/4 in reamed bore (6.35 = 1/4 in); the arbor
-    # bore is a metric Ø8 (no fractional-inch reamer matches it -- a 5/16 in
-    # reamer is 7.94, undersize -- so it is called out as a metric ream).
-    "PivotBoreDia": "THRU - REAM 1/4 IN\n+0.05/-0.00",
-    "ArborBoreDia": "REAM THRU\n+0.05/-0.00",
-    "PinSeatDia": "4 DEEP - FLAT BOTTOM",
+    "ArborBoreCz": "+/-0.10",
+    "PivotBoreDia": "THRU - REAM\n6.360/6.375\nRa 1.6",
+    "ArborBoreDia": "THRU - REAM\n8.010/8.025\nRa 1.6",
+    "PinSeatCy": "PIN AXIS 2.00 BELOW PIVOT AXIS",
+    "Depth": "ONE STRAP THICKNESS",
+    "PinSeatDia": "4.000/4.012 H7\n4.00 DEEP - FLAT BOTTOM\nDRILL FROM LEFT EDGE",
+    "PinSeatCz": "PIN AXIS AT MID-THICKNESS",
 }
 
 
@@ -190,105 +183,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view, label in ((front, "front"), (right, "right")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
-
-    # Native datum/GD&T/surface annotations.  A = the strap broad face (right
-    # view's sheet-right edge, z = THICKNESS); B = the pivot bore axis (the
-    # primary locating bore); C = a strap width side (front view's right edge).
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] + HALF_THICK_SHEET, RIGHT_CENTER[1]),
-        symbol_xy=(RIGHT_CENTER[0] + HALF_THICK_SHEET + 0.016, RIGHT_CENTER[1] + 0.020),
-        datum="A",
-        label="strap broad face",
-    )
-    # Pivot bore tagged at its LOWER-LEFT (the symbol sits down-left, so pick
-    # the circle where that direction agrees -- normal component positive).
-    pivot_edge = (
-        _front_x(0.0) - PIVOT_R_SHEET,
-        _front_y(0.0),
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=pivot_edge,
-        symbol_xy=(_front_x(0.0) - 0.020, _front_y(0.0) - 0.006),
-        datum="B",
-        label="pivot bore axis",
-    )
-    # Strap width side (front view's right STRAIGHT edge, at mid-height where
-    # that edge exists -- below y=0 the outline is the bottom cap arc, not a
-    # straight edge, so a pick there lands in empty space).  Outward normal +X,
-    # so the symbol sits to the RIGHT of the edge.  The pivot-bore Ra now routes
-    # BELOW the bores, leaving this mid-height band clear.
-    side_edge = (
-        _front_x(HALF_WIDTH),
-        _front_y(FRONT_BBOX_CY),
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=side_edge,
-        symbol_xy=(_front_x(HALF_WIDTH) + 0.018, _front_y(FRONT_BBOX_CY)),
-        datum="C",
-        label="strap width side",
-    )
-    # Arbor bore position wrt A, B, C -- locates the second bore on the strap
-    # centreline at the basic C2C.
-    arbor_edge = (
-        _front_x(0.0) + ARBOR_R_SHEET,
-        _front_y(C2C),
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=arbor_edge,
-        frame_xy=(0.150, 0.210),
-        characteristic="position",
-        tolerance="0.25",
-        datums=("A", "B", "C"),
-        diameter=True,
-        label="arbor bore position",
-    )
-    # Arbor bore parallel to the pivot bore axis (both ride parallel shafts).
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_front_x(0.0) - ARBOR_R_SHEET, _front_y(C2C)),
-        frame_xy=(0.048, 0.200),
-        characteristic="parallelism",
-        tolerance="0.10",
-        datums=("B",),
-        diameter=True,
-        label="arbor bore parallelism",
-    )
-    # The bore-to-bore centre distance is a BASIC dimension governed by the
-    # position FCF above.  curate_view_dimensions hands back IAnnotation
-    # wrappers; set_basic_dimension wants the IDisplayDimension, reached via
-    # GetSpecificAnnotation (the same hop set_dimension_callouts makes).
-    for annotation in front_annotations:
-        if dimension_name(adapter, annotation) == "ArborBoreCz":
-            annotation = _sw_type_info.early_bound_or_flag(
-                annotation, "IAnnotation", "GetSpecificAnnotation"
-            )
-            display = annotation.GetSpecificAnnotation()
-            set_basic_dimension(adapter, display, label="bore centre distance")
-            break
-    else:
-        raise RuntimeError("ArborBoreCz dimension not found for basic conversion")
-
-    # Pivot bore finish (running fit on the torque shaft): pick the bore at its
-    # 6 o'clock and drop the symbol below-right, so the leader routes to a target
-    # BELOW the anchor (always a clean run -- no strike through the symbol text)
-    # into the open band between the two bores' callouts.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(_front_x(0.0), _front_y(0.0) - PIVOT_R_SHEET),
-        symbol_xy=(0.138, 0.086),
-        roughness_ra="1.6",
-        label="pivot bore finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.178)

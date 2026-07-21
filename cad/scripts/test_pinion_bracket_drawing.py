@@ -49,15 +49,15 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
+def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
     notes = pinion_bracket_spec.DRAWING_NOTES
-    assert "REAM THRU" in notes
     assert "PRESS FIT" in notes
-    assert "1/4 IN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
-    # The arbor bore is metric Ø8 -- no fractional-inch reamer matches, so it is
-    # a plain metric ream (NOT a wrong 5/16 in reamer, which is 7.94 undersize).
+    assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
+    assert "8.010/8.025" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
+    assert "4.000/4.012" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
+    assert "1/4 IN" not in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "5/16" not in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
-    assert "REAM THRU" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
+    assert "THRU - REAM" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
     assert "LINEAR +/-" not in notes
@@ -78,14 +78,13 @@ def test_hole_states_are_annotated() -> None:
     assert "DEEP" in callouts["PinSeatDia"]
 
 
-def test_native_gdt_replaces_form_orientation_notes() -> None:
+def test_direct_limits_replace_ambiguous_datum_scheme() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="parallelism"' in source
-    assert 'characteristic="position"' in source
-    assert "add_surface_finish(" in source
-    assert "set_basic_dimension(" in source  # the bore centre distance
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_surface_finish(" not in source
+    assert drawing.DIMENSION_CALLOUTS["ArborBoreCz"] == "+/-0.10"
+    assert "MID-THICKNESS" in drawing.DIMENSION_CALLOUTS["PinSeatCz"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -95,6 +94,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("pinion-bracket")
+    assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 2  # the book uses two swing brackets

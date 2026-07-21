@@ -21,16 +21,16 @@ BOSS_Z = 1.7  # boss axis station from the front face
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},
-    "Bore": {"BoreDia"},
+    "BoreProfile": {"BoreDia"},
     "Collar": {"Depth"},
-    "BossProfile": {"BossDia"},
+    "BossProfile": {"BossDia", "BossCz"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
         "ECCENTRIC COLLAR: THE <MOD-DIAM>6.35 BORE AND THE <MOD-DIAM>9.2 OD ARE NOT",
         "CONCENTRIC -- THE BORE IS OFFSET 1.0 FROM THE OD AXIS (2.0 FULL LIFT).",
-        "REAM THE BORE THRU; RUNNING FIT ON THE LIFT ROD.",
+        "REAM THE BORE 6.360-6.375 THRU; SLIDING FIT ON THE LIFT ROD; Ra 1.6.",
         "SET-PIN BOSS ON THE THICK SIDE: <MOD-DIAM>3.2, PROUD 0.5 OF THE OD;",
         "DRILL AND PIN TO THE ROD AT ASSEMBLY.",
     )

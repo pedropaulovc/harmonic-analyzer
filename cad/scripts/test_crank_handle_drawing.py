@@ -40,7 +40,7 @@ def test_diameters_are_a_turning_schedule_not_marked_dims() -> None:
     assert marked == {"HandleLength", "CollarLength", "FrontArcCx"}
     notes = crank_handle_spec.DRAWING_NOTES
     assert "TURNING SCHEDULE" in notes
-    assert "SAND TO A COMFORTABLE GRIP" in notes
+    assert "SMOOTH PEAR CURVE" in notes
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
@@ -53,7 +53,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = crank_handle_spec.DRAWING_NOTES
-    assert "OAK" in notes
+    assert "CDA 260" not in notes
+    assert "<MOD-DIAM>9.6 BORE" in notes
     assert "COIL" not in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
@@ -62,12 +63,11 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_native_gdt_is_present() -> None:
+def test_feature_requirements_do_not_use_ambiguous_unused_datums() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="cylindricity"' in source
-    assert "add_surface_finish(" in source
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_surface_finish(" not in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -77,6 +77,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("crank-handle")
+    assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1

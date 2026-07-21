@@ -154,7 +154,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += grip.apply(adapter, "GripProfile")
     extrude_at_offset(adapter, GRIP_LEN, -GRIP_LEN / 2.0)
     name_last_feature(adapter, "Grip")
-    drive_jobs += [(name_dimensions(adapter, "Grip", ["Depth"])[0], '"GripLen"')]
+    drive_jobs += [(name_dimensions(adapter, "Grip", ["GripLen"])[0], '"GripLen"')]
     expected = V_GRIP
     await volume_check(adapter, "grip", expected, 0.005 * V_GRIP)
 
@@ -255,7 +255,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += tube.apply(adapter, "TubeProfile")
     extrude_at_offset(adapter, TUBE_LEN, GRIP_LEN / 2.0 + WALL_T)
     name_last_feature(adapter, "Tube")
-    drive_jobs += [(name_dimensions(adapter, "Tube", ["Depth"])[0], '"TubeLen"')]
+    drive_jobs += [(name_dimensions(adapter, "Tube", ["TubeLen"])[0], '"TubeLen"')]
     expected += V_TUBE
     await volume_check(adapter, "tube", expected, 0.01 * V_TUBE)
 
@@ -274,7 +274,7 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, ROD_DOWN + ROD_UP, -ROD_DOWN)
     name_last_feature(adapter, "Rod")
     drive_jobs += [
-        (name_dimensions(adapter, "Rod", ["Depth"])[0], '"RodDown" + "RodUp"')
+        (name_dimensions(adapter, "Rod", ["RodSpan"])[0], '"RodDown" + "RodUp"')
     ]
     await volume_check(adapter, "handle", V_TOTAL, 0.01 * V_ROD)
 

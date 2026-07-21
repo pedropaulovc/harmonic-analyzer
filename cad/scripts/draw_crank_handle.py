@@ -24,10 +24,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -38,7 +35,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from crank_handle_spec import COLLAR_DIA, COLLAR_LENGTH, HANDLE_LENGTH
+from crank_handle_spec import COLLAR_DIA, HANDLE_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -137,38 +134,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-
-    # Datum A is the collar axis (the turned brass diameter that bears on the
-    # pivot), tagged on the collar top edge so the tag runs radially up.
-    collar_top = (_front_x(COLLAR_LENGTH / 2.0), _front_y(COLLAR_R))
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=collar_top,
-        symbol_xy=(_front_x(COLLAR_LENGTH / 2.0), _front_y(COLLAR_R) + 0.024),
-        datum="A",
-        label="collar axis",
-    )
-    # Collar cylindricity: the one precision turned diameter must run true so
-    # the handle spins without wobble.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_front_x(COLLAR_LENGTH * 0.8), _front_y(COLLAR_R)),
-        frame_xy=(0.040, 0.230),
-        characteristic="cylindricity",
-        tolerance="0.05",
-        label="collar cylindricity",
-    )
-    # Collar finish (bears on the pivot), picked on the collar top edge.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(_front_x(COLLAR_LENGTH * 0.4), _front_y(COLLAR_R)),
-        symbol_xy=(0.028, 0.210),
-        roughness_ra="1.6",
-        label="collar finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.116)

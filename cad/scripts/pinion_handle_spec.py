@@ -20,24 +20,26 @@ TUBE_OD = 10.5  # blind hub cap OD over the arbor stub
 TUBE_ID = 8.0  # = the arbor stub Ø8
 TUBE_LEN = 10.0  # stub seat depth
 WALL_T = 2.0  # blind wall between grip and tube
+CAP_RADIUS = ((GRIP_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 
 ROD_SPAN = ROD_DOWN + ROD_UP  # 85.0: cross-rod tip to tip
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripProfile": {"GripDia"},
-    "Grip": {"Depth"},
+    "Grip": {"GripLen"},
     "TubeProfile": {"TubeOd", "TubeId"},
-    "Tube": {"Depth"},
+    "Tube": {"TubeLen"},
     "RodProfile": {"RodDia"},
-    "Rod": {"Depth"},
+    "Rod": {"RodSpan"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
         "TURN THE GRIP, WALL AND HUB IN ONE SETUP ON THE ARBOR AXIS.",
-        "HUB: BORE <MOD-DIAM>8 X 10 DEEP, BLIND; SLIP FIT OVER THE ARBOR STUB.",
-        "DOME THE GRIP CAP TO A SHALLOW CROWN, 2.0 HIGH (REF).",
-        "CROSS ROD <MOD-DIAM>6 PRESSED THROUGH THE GRIP; ARMS 42 AND 43 LONG.",
+        "GRIP: <MOD-DIAM>23 X 14.00 LONG. HUB: <MOD-DIAM>10.5 OD; BORE 8.010-8.025",
+        "  X 10.00 DEEP FROM THE FLAT END, BLIND; 2.00 END WALL; BORE Ra 1.6.",
+        f"DOME THE OPPOSITE GRIP FACE TO SPHERICAL R{CAP_RADIUS:.2f}, 2.00 AXIAL CROWN.",
+        "CROSS ROD <MOD-DIAM>6 PRESSED THROUGH THE GRIP; 42.00 AND 43.00 FROM THE GRIP AXIS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

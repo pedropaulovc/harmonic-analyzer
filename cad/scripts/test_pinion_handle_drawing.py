@@ -42,8 +42,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_handle_spec.DRAWING_NOTES
-    assert "SLIP FIT" in notes
     assert "BLIND" in notes
+    assert "8.010-8.025" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -51,12 +51,15 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_native_gdt_is_present() -> None:
+def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="cylindricity"' in source
-    assert "add_surface_finish(" in source
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_surface_finish(" not in source
+    assert {"GripLen", "TubeLen", "RodSpan"} <= set().union(
+        *pinion_handle_spec.DRAWING_DIMENSIONS.values()
+    )
+    assert "8.010/8.025" in drawing.DIMENSION_CALLOUTS["TubeId"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -66,6 +69,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("pinion-handle")
+    assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1

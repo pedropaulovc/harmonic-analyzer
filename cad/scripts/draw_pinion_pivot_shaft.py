@@ -20,10 +20,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -33,7 +30,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_pivot_shaft_spec import SHAFT_DIA, SHAFT_LEN
+from pinion_pivot_shaft_spec import SHAFT_DIA as SHAFT_DIA, SHAFT_LEN
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -71,7 +68,10 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
+DIMENSION_CALLOUTS = {
+    "ShaftDia": "6.330/6.350 FULL LENGTH\nRa 1.6\nCYLINDRICITY 0.01",
+    "Depth": "+/-0.25 BETWEEN CROWN TANGENCY PLANES",
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -126,56 +126,17 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    )
+    set_dimension_callouts(
+        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
-
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-    )
-    # Datum A is the turned axis, taken from the end circle at 12 o'clock so the
-    # tag runs radially straight up (matching the pick's clock position, the
-    # fulcrum-shaft spelling that keeps symbol_xy live).
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=end_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-        datum="A",
-        label="torque shaft axis",
-    )
-    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
-    end_circle = (FRONT_CENTER[0] + end_radius, FRONT_CENTER[1])
-    # Cylindricity of the bearing surface, anchored up-RIGHT of the end circle so
-    # its leader comes in from the right and never crosses the circle.
-    end_upper = (
-        FRONT_CENTER[0] + end_radius * 0.64,
-        FRONT_CENTER[1] + end_radius * 0.77,
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=end_upper,
-        frame_xy=(0.065, 0.250),
-        characteristic="cylindricity",
-        tolerance="0.01",
-        label="torque shaft cylindricity",
-    )
-    # Bearing OD finish, picked at 3 o'clock so the leader runs level out to the
-    # right, clear of the datum tag above.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=end_circle,
-        symbol_xy=(0.075, 0.222),
-        roughness_ra="1.6",
-        label="torque shaft bearing finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)

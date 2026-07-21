@@ -50,7 +50,8 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
-    assert "RUNNING FIT" in notes
+    assert "SLIDING FIT" in notes
+    assert "6.360-6.375" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -58,11 +59,13 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_native_gdt_is_present() -> None:
+def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert "add_surface_finish(" in source
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_surface_finish(" not in source
+    assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["CollarCy"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -72,6 +75,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("pinion-cam")
+    assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 2

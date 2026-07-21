@@ -22,10 +22,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -81,16 +78,20 @@ FRONT_KEEP = {
     "GripDia": (0.024, 0.196),
     "TubeOd": (0.024, 0.116),
     "TubeId": (0.024, 0.096),
-    "Depth": (0.044, 0.232),
+    "RodSpan": (0.044, 0.232),
 }
 RIGHT_KEEP = {
-    "Depth": (0.158, 0.086),
+    "GripLen": (0.148, 0.086),
+    "TubeLen": (0.180, 0.105),
 }
 TOP_KEEP = {
     "RodDia": (0.300, 0.078),
 }
 DIMENSION_CALLOUTS = {
-    "TubeId": "REAM BLIND 10 DEEP\nSLIP FIT ON THE Ø8 STUB",
+    "TubeId": "8.010/8.025\n10.00 DEEP FROM FLAT END\nRa 1.6",
+    "GripLen": "+/-0.10",
+    "TubeLen": "+/-0.10",
+    "RodSpan": "42.00/43.00 FROM GRIP AXIS",
 }
 
 
@@ -160,38 +161,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-
-    # Datum A is the blind-hub bore axis (the seat on the arbor stub), tagged on
-    # the Ø8 bore circle at 12 o'clock so the tag runs radially up.
-    bore_top = (_front_x(0.0), _front_y(0.0) + BORE_R_SHEET)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(_front_x(0.0), _front_y(0.0) + 0.026),
-        datum="A",
-        label="hub bore axis",
-    )
-    # Bore cylindricity, anchored down-left of the grip in the open corner.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_front_x(0.0) - BORE_R_SHEET, _front_y(0.0) - BORE_R_SHEET),
-        frame_xy=(0.022, 0.136),
-        characteristic="cylindricity",
-        tolerance="0.02",
-        label="hub bore cylindricity",
-    )
-    # Hub bore finish (slip fit on the arbor stub), picked at 3 o'clock so the
-    # leader runs level out to the right.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(_front_x(0.0) + BORE_R_SHEET, _front_y(0.0)),
-        symbol_xy=(0.112, 0.086),
-        roughness_ra="1.6",
-        label="hub bore finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.184)

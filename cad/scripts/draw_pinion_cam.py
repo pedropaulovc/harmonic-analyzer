@@ -21,10 +21,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -83,10 +80,14 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "Depth": (0.085, 0.205),
     "BossDia": (0.150, 0.232),
+    "BossCz": (0.150, 0.208),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM THRU",
-    "CollarCy": "ECCENTRICITY",
+    "BoreDia": "REAM 6.360/6.375 THRU\nRa 1.6",
+    "CollarOd": "+/-0.05",
+    "CollarCy": "ECCENTRICITY +/-0.05",
+    "Depth": "+/-0.05",
+    "BossCz": "FROM FRONT FACE",
 }
 
 
@@ -148,40 +149,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-
-    # Datum A is the bore axis (the rod journal), taken from the bore circle at
-    # 12 o'clock so the tag runs radially up from the pick's clock position.
-    bore_top = (_front_x(0.0), _front_y(0.0) + BORE_R_SHEET)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(_front_x(0.0), _front_y(0.0) + 0.024),
-        datum="A",
-        label="cam bore axis",
-    )
-    # OD position relative to the bore at the basic eccentricity.
-    od_right = (_front_x(0.0) + CAM_R_SHEET, _front_y(-ECC))
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=od_right,
-        frame_xy=(0.128, 0.120),
-        characteristic="position",
-        tolerance="0.05",
-        datums=("A",),
-        diameter=True,
-        label="cam OD position",
-    )
-    # Bore finish (running fit on the lift rod), picked at 3 o'clock.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(_front_x(0.0) + BORE_R_SHEET, _front_y(0.0)),
-        symbol_xy=(0.120, 0.096),
-        roughness_ra="1.6",
-        label="cam bore finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.205, 0.150)

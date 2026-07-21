@@ -19,6 +19,7 @@ HUB_LEN = 10.0  # hub length along the lift rod (z -5..+5)
 BORE = 6.35  # clamp bore -- grips the Ø6.35 lift rod
 WALL_T = 2.0  # blind wall behind the bore (south end)
 CAP_SAG = 1.5  # domed south cap crown height
+CAP_RADIUS = ((HUB_OD / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
@@ -27,10 +28,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "CLAMP HUB: BORE <MOD-DIAM>6.35 REAM THRU THE HUB; SLIDING FIT ON THE LIFT ROD.",
-        "GRIP ROD: TURN A STRAIGHT TAPER FROM <MOD-DIAM>4 AT THE HUB TO <MOD-DIAM>6 AT THE TIP;",
-        "  ROD RADII SHOWN, NO STEPS.",
-        "DOME THE SOUTH HUB FACE TO A SHALLOW CROWN, 1.5 HIGH (REF).",
+        "CLAMP HUB: <MOD-DIAM>13 OD X 10.0 LONG; <MOD-DIAM>6.35 BORE 8.0 DEEP FROM THE FLAT FACE,",
+        "  REAM 6.360-6.375; SLIDING FIT ON THE LIFT ROD; BORE FINISH Ra 1.6.",
+        "GRIP ROD IS INTEGRAL: R2.00 AT HUB (<MOD-DIAM>4) TO R3.00 AT TIP (<MOD-DIAM>6),",
+        "  STRAIGHT TAPER, NO STEPS; 86.00 FROM HUB AXIS TO TIP.",
+        f"DOME THE FACE OPPOSITE THE BORE OPENING TO SPHERICAL R{CAP_RADIUS:.2f}, 1.50 AXIAL CROWN.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

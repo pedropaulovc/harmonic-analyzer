@@ -14,6 +14,7 @@ PIN_DIA = 4.0  # press fit in the strap's blind edge bore (pinion_bracket PIN_BO
 PIN_LEN = 15.0  # 4.0 seated + 11 proud west, over the cam collar
 SEAT_LEN = 4.0  # into the blind edge bore (clear of the strap pivot bore)
 CAP_SAG = 0.8  # domed outer end crown height
+CAP_RADIUS = ((PIN_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia"},
@@ -22,9 +23,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "TURN FROM BRIGHT STEEL ROD; NO STEPS ALONG THE SHANK.",
-        "SEAT END 4.0 PRESS FIT INTO THE STRAP WEST-EDGE BORE, 11 PROUD.",
-        "CROWN THE OUTER END TO A SHALLOW SPHERICAL DOME, 0.8 HIGH (REF).",
+        "TURN A STRAIGHT, STEP-FREE SHANK TO <MOD-DIAM>4 p6 (4.012-4.020), Ra 0.8.",
+        "SEAT THE FLAT END 4.00 INTO THE STRAP BORE; 11.00 REMAINS PROUD.",
+        f"CROWN THE OUTER END TO SPHERICAL R{CAP_RADIUS:.2f}, 0.80 AXIAL CROWN.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 8:1"

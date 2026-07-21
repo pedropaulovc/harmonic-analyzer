@@ -42,8 +42,9 @@ def test_sheet_runs_at_1_to_1_with_2_to_1_end_view_and_1_to_2_iso() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_pivot_shaft_spec.DRAWING_NOTES
-    assert "RUNNING FIT" in notes
-    assert "+0.00/-0.02" in drawing.DIMENSION_CALLOUTS["ShaftDia"]
+    assert "6.330-6.350" in notes
+    assert "194.40 OVERALL" in notes
+    assert "6.330/6.350" in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
@@ -52,12 +53,12 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_native_gdt_is_present() -> None:
+def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="cylindricity"' in source
-    assert "add_surface_finish(" in source
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_surface_finish(" not in source
+    assert "CYLINDRICITY 0.01" in drawing.DIMENSION_CALLOUTS["ShaftDia"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
@@ -67,6 +68,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("pinion-pivot-shaft")
+    assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1

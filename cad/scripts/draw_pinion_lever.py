@@ -20,10 +20,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -34,7 +31,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_lever_spec import BORE, HUB_OD, ROD_LEN, ROD_Y0
+from pinion_lever_spec import BORE, HUB_OD, ROD_LEN
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -86,7 +83,9 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "HubBore": "REAM THRU",
+    "HubBore": "8.0 DEEP FROM FLAT FACE\nREAM 6.360-6.375\nRa 1.6",
+    "RodRootR": "RADIUS - <MOD-DIAM>4.00 AT HUB",
+    "RodTipR": "RADIUS - <MOD-DIAM>6.00 AT TIP",
 }
 
 
@@ -146,39 +145,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-
-    # Datum A is the clamp-bore axis, tagged on the hub circle at 12 o'clock so
-    # the tag runs radially up (matching the pick's clock position).
-    bore_top = (_front_x(0.0), _front_y(0.0) + BORE_R_SHEET)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(_front_x(0.0), _front_y(0.0) + 0.024),
-        datum="A",
-        label="clamp bore axis",
-    )
-    # Bore cylindricity, anchored down-left of the hub in the open corner.
-    hub_lower = (_front_x(0.0) - HUB_R_SHEET * 0.7, _front_y(0.0) - HUB_R_SHEET * 0.7)
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=hub_lower,
-        frame_xy=(0.026, 0.114),
-        characteristic="cylindricity",
-        tolerance="0.02",
-        label="clamp bore cylindricity",
-    )
-    # Clamp bore finish (sliding fit on the lift rod), picked at the bore's 3
-    # o'clock so the leader runs level out to the right.
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=(_front_x(0.0) + BORE_R_SHEET, _front_y(0.0)),
-        symbol_xy=(0.108, 0.080),
-        roughness_ra="1.6",
-        label="clamp bore finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)

@@ -13,6 +13,7 @@ from __future__ import annotations
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 SHAFT_LEN = 192.0  # ends flush with the pivot blocks' outer faces
 CAP_SAG = 1.2  # shallow spherical crown height at each end
+CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDia"},
@@ -21,9 +22,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "TURN OR CENTRELESS-GRIND FULL LENGTH; NO FLATS OR STEPS.",
-        "RUNNING FIT IN THE PIVOT-BLOCK AND STRAP BORES.",
-        "CROWN BOTH ENDS TO A SHALLOW SPHERICAL DOME, 1.2 HIGH (REF).",
+        "SHAFT: <MOD-DIAM>6.330-6.350 FULL LENGTH, Ra 1.6; CYLINDRICITY 0.01; NO FLATS OR STEPS.",
+        "192.00 BETWEEN CROWN TANGENCY PLANES; 194.40 OVERALL AFTER CROWNING.",
+        f"CROWN BOTH ENDS TO SPHERICAL R{CAP_RADIUS:.2f}, 1.20 AXIAL CROWN EACH.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 4:1"

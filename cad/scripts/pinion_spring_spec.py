@@ -24,6 +24,7 @@ R_KINK = 1.5  # the subtle bend-back near the top
 KINK_DEG = 20.0  # turn back west near the tip
 FLAT_LEN = 2.0  # free flat above the kink
 BLADE_TILT_DEG = 12.38  # blade lean off the foot plane (= strap parked lean)
+BLADE_STRAIGHT_LEN = 39.6410821736783  # tangent length between the two bends
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {"FootLen", "BendR", "KinkR", "FlatLen"},
@@ -31,11 +32,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "FORM FROM 0.8 THK X 4.0 WIDE HALF-HARD BRASS STRIP (CDA 260).",
+        "FORM FROM 0.80 THK X 4.00 WIDE STRIP.",
         "PROFILE SHOWN IS THE STRIP CENTRELINE; ALL BEND RADII TO CENTRELINE.",
-        "BLADE RISES 12.4 DEG OFF THE FOOT PLANE; SUBTLE KINK 20 DEG TOWARD THE FOOT NEAR THE TIP.",
+        f"STRAIGHT BLADE TANGENT LENGTH {BLADE_STRAIGHT_LEN:.2f}; RISES 12.38 DEG OFF THE FOOT PLANE;",
+        "  KINK TURNS 20.00 DEG TOWARD THE FOOT NEAR THE TIP.",
         "FOOT SCREW HOLE <MOD-DIAM>3.25 (#4 CLEARANCE), 3.1 FROM THE FREE END.",
-        "DEBURR AND BREAK SHARP EDGES; DO NOT NICK THE BLADE.",
+        "FOOT MOUNTING FACE FLATNESS 0.10; CONTACT FACE Ra 0.8; DO NOT NICK THE BLADE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

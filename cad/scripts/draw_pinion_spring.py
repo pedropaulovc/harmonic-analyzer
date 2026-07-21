@@ -23,10 +23,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -37,7 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_spring_spec import BLADE_TILT_DEG, FOOT_LEN, THICK
+from pinion_spring_spec import BLADE_TILT_DEG
 from build_pinion_spring import (
     BEND_EXIT,
     FLAT_TIP,
@@ -158,42 +155,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
-
-    # Datum A is the foot mounting face (the flat that screws down to the base),
-    # picked on the foot underside near its midspan so the tag hangs below.
-    foot_base = (_front_x(_FOOT_MID_X), _front_y(FOOT_Y - THICK / 2.0))
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=foot_base,
-        symbol_xy=(_front_x(_FOOT_MID_X), _front_y(FOOT_Y) - 0.030),
-        datum="A",
-        label="foot mounting face",
-    )
-    # Foot flatness: it must seat flat to the base under the screw.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_front_x(_FOOT_MID_X - 6.0), _front_y(FOOT_Y - THICK / 2.0)),
-        frame_xy=(0.040, 0.086),
-        characteristic="flatness",
-        tolerance="0.1",
-        label="foot flatness",
-    )
-    # Blade contact-face finish (it bears on the swing strap flank), picked on
-    # the blade's east flank near midspan.
-    blade_face = (
-        _front_x(_BLADE_MID[0] + (THICK / 2.0) * _N[0]),
-        _front_y(_BLADE_MID[1] + (THICK / 2.0) * _N[1]),
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=blade_face,
-        symbol_xy=(0.086, 0.170),
-        roughness_ra="0.8",
-        label="blade contact finish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.164)
