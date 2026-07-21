@@ -28,7 +28,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
 DRAWING_NOTES = "\n".join(
     (
-        "APPLICATION NAME ONLY: FLAT-END PINCH SCREW; NO CONICAL POINT.",
+        "FLAT-END PINCH SCREW; NO CONICAL POINT.",
         *thread_control_notes(
             thread=THREAD,
             thread_designation=THREAD_DESIGNATION,

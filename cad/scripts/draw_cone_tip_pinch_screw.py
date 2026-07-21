@@ -23,8 +23,8 @@ SHEET_SCALE = (8.0, 1.0)
 END_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
-    title="Cone Tip Pinch Screw Manufacturing Drawing",
-    keywords="cone tip pinch screw; slotted fillister screw; made part",
+    title="Flat-End Pinch Screw Manufacturing Drawing",
+    keywords="flat-end pinch screw; slotted fillister screw; made part",
     scale=SHEET_SCALE,
     side_view="*Front",
     end_view="*Top",
@@ -33,6 +33,8 @@ RECIPE = FastenerSheet(
     iso_center=(0.310, 0.170),
     end_keep=END_KEEP,
     dimension_callouts=DIMENSION_CALLOUTS,
+    side_centerline_face_xy=(0.185, 0.160),
+    end_center_mark="required",
 )
 
 

@@ -113,6 +113,7 @@ def apply_drawing_properties(
     apply_custom_properties(
         adapter,
         {
+            "Title": str(spec.get("title") or part_name),
             "Material Specification": str(spec["material_specification"]),
             "Finish": str(spec["finish"]),
             "Quantity": str(spec["quantity"]),

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping
 
 from _common import check
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -18,7 +19,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,8 @@ class FastenerSheet:
     dimension_callouts: Mapping[str, str]
     note_xy: tuple[float, float] = (0.020, 0.115)
     end_note_xy: tuple[float, float] = (0.050, 0.220)
+    side_centerline_face_xy: tuple[float, float] | None = None
+    end_center_mark: Literal["required", "not_applicable"] = "not_applicable"
 
 
 async def build_fastener_sheet(
@@ -113,6 +116,18 @@ async def build_fastener_sheet(
     # hidden circle reads like a counterbore or boss on these tiny sheets and
     # adds no manufacturing information; the thread callout owns that feature.
     set_hidden_lines_removed(adapter, end)
+
+    if recipe.side_centerline_face_xy is not None:
+        add_view_centerline(
+            adapter,
+            side,
+            face_xy=recipe.side_centerline_face_xy,
+            label=f"{property_view} side-view axis centerline",
+        )
+    if recipe.end_center_mark == "required" and not auto_center_marks(
+        adapter, end, holes=True, size=0.0025
+    ):
+        raise RuntimeError(f"failed to add ASME center mark to {property_view} end view")
 
     end_annotations = curate_view_dimensions(
         adapter, end, keep=recipe.end_keep, view_label="head-end"
