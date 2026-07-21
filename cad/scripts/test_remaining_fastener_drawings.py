@@ -159,3 +159,10 @@ def test_hex_bolt_long_notes_stay_below_the_raised_side_view() -> None:
     drawing = importlib.import_module("draw_hex_bolt")
     assert drawing.RECIPE.side_center == (0.200, 0.180)
     assert drawing.RECIPE.note_xy == (0.020, 0.095)
+
+
+@pytest.mark.parametrize("spec_name", ("hanger_screw_spec", "thumb_screw_spec"))
+def test_long_reference_note_is_split_for_readable_rendering(spec_name: str) -> None:
+    spec = importlib.import_module(spec_name)
+    assert "THREAD GEOMETRY OMITTED IN VIEWS;\n" in spec.DRAWING_NOTES
+    assert "\nCYLINDRICAL SHANK OUTLINE IS REFERENCE ONLY." in spec.DRAWING_NOTES
