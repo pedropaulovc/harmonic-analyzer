@@ -26,6 +26,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -126,6 +127,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
+    set_dimension_precision(adapter, front_annotations, {"PinDia": 3})
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 

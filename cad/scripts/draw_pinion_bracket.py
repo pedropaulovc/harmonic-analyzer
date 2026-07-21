@@ -98,7 +98,6 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.162, 0.130),
     "BottomCapRadius": (0.098, 0.076),
     "PinSeatCy": (0.058, 0.128),
-    "PinSeatDepth": (0.205, 0.105),
 }
 RIGHT_KEEP = {
     "Depth": (0.200, 0.082),
@@ -112,8 +111,10 @@ DIMENSION_CALLOUTS = {
     "ArborBoreDia": "ARBOR BORE; NOMINAL REF\nTHRU - REAM\n8.025 MAX / 8.010 MIN\nRa 1.6",
     "PinSeatCy": "PIN-SEAT AXIS\n+/-0.05 BELOW\nPIVOT-BORE AXIS",
     "Depth": "+/-0.05 ONE STRAP THICKNESS",
-    "PinSeatDia": "NOMINAL REF\nH7: 4.012 MAX / 4.000 MIN\nBLIND; FLAT BOTTOM",
-    "PinSeatDepth": "+0.10/-0.00 TOTAL DEPTH\nDRILL FROM LEFT EDGE SHOWN",
+    "PinSeatDia": (
+        "NOMINAL REF\nH7: 4.012 MAX / 4.000 MIN\nBLIND; FLAT BOTTOM\n"
+        "4.00 +0.10/-0.00 DEEP\nDRILL FROM LEFT EDGE SHOWN"
+    ),
     "PinSeatCz": "+/-0.05 FROM EITHER BROAD FACE",
 }
 

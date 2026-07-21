@@ -90,7 +90,7 @@ def test_hole_states_are_annotated() -> None:
     assert "THRU - REAM" in callouts["PivotBoreDia"]
     assert "THRU" in callouts["ArborBoreDia"]
     assert "FLAT BOTTOM" in callouts["PinSeatDia"]
-    assert "TOTAL DEPTH" in callouts["PinSeatDepth"]
+    assert "4.00 +0.10/-0.00 DEEP" in callouts["PinSeatDia"]
 
 
 def test_blind_seat_depth_uses_the_marked_drawing_name() -> None:

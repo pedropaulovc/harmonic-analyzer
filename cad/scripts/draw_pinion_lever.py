@@ -52,16 +52,15 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (2.0, 1.0)
+SHEET_SCALE = (1.0, 1.0)
 
 # Front view (XY): the hub is a Ø13 circle at the origin with the tapered rod
 # rising +Y to the tip (model y=ROD_LEN).  bbox y runs -HUB_OD/2..ROD_LEN.
 FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
-# The 86 mm rod runs the full sheet height at 2:1, so the hub sits low.  Lift
-# both views ~10 mm above centre so the hub clears the bottom notes band while
-# the rod tip still stays inside the top border.
-FRONT_CENTER = (0.078, 0.160)
-RIGHT_CENTER = (0.165, 0.160)
+# At 1:1 the full 86 mm rod leaves enough room for the hub callouts and GD&T
+# without crowding the orthographic views.
+FRONT_CENTER = (0.078, 0.170)
+RIGHT_CENTER = (0.165, 0.170)
 ISO_CENTER = (0.330, 0.205)
 
 
@@ -132,8 +131,8 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
     # Front carries the hub bore as a true circle; the right view shows the hub

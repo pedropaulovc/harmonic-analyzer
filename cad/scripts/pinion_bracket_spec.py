@@ -50,7 +50,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # PinSeatCz locates the blind pin seat THROUGH the 5 mm thickness (mid-
     # thickness), so the seat is fully located, not just drawn centred.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
-    "PinSeat": {"PinSeatDepth"},
 }
 
 # True free-text instructions only. Geometry, datum structure, form/orientation

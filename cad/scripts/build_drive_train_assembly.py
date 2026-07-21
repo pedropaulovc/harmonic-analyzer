@@ -1195,8 +1195,8 @@ if SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0 + 0.25 > SPRING_X - SPR_FOOT_END_L[0]:
 # authored pose) the collar top hovers a designed ~0.15 under the pin (exact
 # tangency tips the interference gate on FP noise -- the PR5 gap lesson); the
 # return spring holds the strap west on it.
-if abs(STRAP_PIN_BORE - FPIN_DIA) > 1e-9:
-    raise AssertionError("follower pin dia disagrees with the strap seat bore")
+if not STRAP_PIN_BORE <= FPIN_DIA <= STRAP_PIN_BORE + 0.020:
+    raise AssertionError("follower pin nominal is outside the strap press-fit band")
 if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
 if not 6.36 <= CAM_BORE_DIA <= 6.375:

@@ -27,6 +27,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert drawing.PIN_DIA == pinion_cam_pin_spec.PIN_DIA
+    assert drawing.PIN_DIA == 4.016
     assert drawing.PIN_LEN == pinion_cam_pin_spec.PIN_LEN
 
 
