@@ -51,7 +51,12 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     notes = rocker_arm_spec.DRAWING_NOTES
     assert "R800" in notes
     assert "R816" in notes
-    assert "#47 DRILL" in notes
+    # The rod hole rides its native Ø1.99 THRU ALL callout; the notes state
+    # count and process only, never a second copy of a sheet dimension.
+    assert "(1X)" in notes
+    assert "#47" not in notes
+    assert "REAM +0.03/0" in notes
+    assert "16.00 REF" in notes
     assert "11.5 IN" not in notes
     assert "0.22 IN" not in notes
     # General tolerances live in the title block ONLY.
@@ -63,8 +68,11 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
 
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
+    # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
+    # face; the rod-pin position frame references all three.
+    assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 1
+    assert 'datums=("A", "B", "C")' in source
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source

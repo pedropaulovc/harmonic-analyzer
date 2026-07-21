@@ -1,6 +1,6 @@
 rocker-arm:
   number: MHA-071
-  material: Plain Carbon Steel
+  material: AISI 1018 cold-rolled steel
   material_specification: AISI 1018 cold-rolled steel strap
   finish: matte black oxide
   quantity: 20

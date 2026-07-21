@@ -50,11 +50,16 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
 
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = connecting_rod_spec.DRAWING_NOTES
-    assert "#47 DRILL" in notes
-    assert "RING 3.00 THICK" in notes
-    assert "SHANK AND HEAD\n   2.50 THICK" in notes
-    assert "HEAD 10.00 W x 10.50 HIGH, R5.00" in notes
+    # The pin hole rides its native Ø1.99 THRU ALL callout and the bore its
+    # +0.10/0 dimension callout; notes never repeat a sheet dimension.
+    assert "#47" not in notes
+    assert "1X" in notes
+    assert "RING 3.00, SHANK AND HEAD 2.50 THICK" in notes
+    assert "CENTRED ON ONE MIDPLANE" in notes
+    assert "HEAD 10.00 W x 10.50 HIGH, R5.00 CROWN" in notes
     assert "PIN C/L 2.40 BELOW CROWN" in notes
+    assert "AS CAST" in notes
+    assert "147.67" not in notes  # the BASIC sheet dimension owns it
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "GRAY-IRON" not in notes
@@ -64,9 +69,13 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
 
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
+    # A = strap bore axis, B = shank left flank (clocking); the pin-hole
+    # position frame references both and the bore carries a fit callout.
+    assert source.count("add_datum_feature(") == 2
     assert source.count("add_feature_control_frame(") == 1
+    assert 'datums=("A", "B")' in source
     assert 'characteristic="position"' in source
+    assert '"StrapBoreDia": "BORE +0.10/0"' in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
     # The callout owns the 9-o'clock rim; the position FCF anchors the

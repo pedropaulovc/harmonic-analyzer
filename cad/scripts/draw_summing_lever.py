@@ -228,12 +228,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # start-Z / pitch coordinates off A|B, a native #47 callout, and a 20X
     # position frame -- the inspectable pattern definition (the notes no longer
     # carry these numbers as prose).
-    plate_end_edge = _top_xy(29.0, -PLATE_L / 2.0)
+    # Pick B toward the plate's -X side and hang its tag down-LEFT: the seed
+    # hole's callout leader sweeps down-right from the hole and crossed a
+    # right-hung tag (layout audit).
+    plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
     add_datum_feature(
         adapter,
         top,
         edge_xy=plate_end_edge,
-        symbol_xy=(plate_end_edge[0] + 0.013, plate_end_edge[1] - 0.011),
+        symbol_xy=(plate_end_edge[0] - 0.013, plate_end_edge[1] - 0.011),
         datum="B",
         label="plate -Z end face",
     )

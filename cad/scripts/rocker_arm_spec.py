@@ -55,18 +55,23 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # True free-text instructions only; geometry / datum structure / roughness live
-# in native dimensions / datum tags / FCFs / surface symbols.
+# in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
+# their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
+# fit and count, never a second copy of a sheet dimension.  16.00 depth is a
+# REF: it is fixed by the concentric R800/R816 edges.
 DRAWING_NOTES = "\n".join(
     (
-        "1. SYMMETRIC MID-PIVOT SEESAW.",
-        "2. STRAP 16.00 DEEP x 2.50 THICK.",
+        "1. PROFILE SYMMETRIC ABOUT THE PIVOT;",
+        "   ROD-PIN HOLE ON +X ARM ONLY (1X).",
+        "2. STRAP 2.50 THICK; ALL HOLES THRU",
+        "   THE THICKNESS.",
         "3. TOP EDGE R800.00, BOTTOM EDGE R816.00,",
-        "   CONCENTRIC; CENTRE 808.00 ABOVE PIVOT.",
+        "   CONCENTRIC; CENTRE 808.00 ABOVE PIVOT",
+        "   (STRAP DEPTH 16.00 REF).",
         "4. ARC LENGTHS 292.10 TOP / 266.70 BOTTOM",
         "   TAPER THE ENDS.",
         "5. EACH TIP: 5.59 FACE PERP TO TOP EDGE.",
-        "6. PIVOT HOLE: REAM 6.50 THRU.",
-        "7. ROD-PIN HOLE: #47 DRILL THRU.",
+        "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

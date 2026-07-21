@@ -18,6 +18,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -42,9 +43,14 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from rocker_arm_spec import (
+    ARM_THICKNESS,
     PIVOT_HOLE_DIA,
+    R_TOP,
     ROD_HOLE_X,
     ROD_HOLE_Y,
+    TIP_FACE,
+    TOP_ARC_LEN,
+    TOP_END_X,
     TOP_END_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -75,7 +81,13 @@ _ROD_HOLE_DIA = 1.994  # #47 drill
 _BBOX_CY = TOP_END_Y / 2.0
 
 FRONT_CENTER = (0.180, 0.175)
+RIGHT_CENTER = (0.300, 0.165)
 ISO_CENTER = (0.345, 0.205)
+
+# Tip-face midpoint (model mm): the top-arc endpoint pushed half the tip face
+# outward along the end radius -- where datum C (clocking) attaches.
+_TIP_FACE_MID_X = TOP_END_X + (TIP_FACE / 2.0) * (TOP_END_X / R_TOP)
+_TIP_FACE_MID_Y = TOP_END_Y - (TIP_FACE / 2.0) * math.cos(TOP_ARC_LEN / 2.0 / R_TOP)
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -140,8 +152,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Explicit per-view scale (an auto-scaled view shifts every coordinate pick).
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
+    # 1:1 right end view: the 2.50 x ~29 strap section -- shows the section the
+    # profile notes describe, gives the through direction, and carries datum B
+    # (the broad face) so the rod-pin position frame has an orientation datum.
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    set_hidden_lines_removed(adapter, iso)
+    for view in (right, iso):
+        set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
@@ -207,6 +224,27 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="pivot bore finish",
     )
+    # Datum B (broad face, on the end view) orients the hole axes; datum C
+    # (the +X tip face) clocks rotation about the pivot axis, so the X/Y BASIC
+    # coordinates above have an inspectable direction.
+    broad_face = (RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0, RIGHT_CENTER[1])
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=broad_face,
+        symbol_xy=(broad_face[0] - 0.016, broad_face[1] - 0.014),
+        datum="B",
+        label="broad face",
+    )
+    tip_face = _sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=tip_face,
+        symbol_xy=(tip_face[0] + 0.012, tip_face[1] + 0.012),
+        datum="C",
+        label="rod-side tip face",
+    )
     add_feature_control_frame(
         adapter,
         front,
@@ -214,7 +252,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.300, 0.195),
         characteristic="position",
         tolerance="0.20",
-        datums=("A",),
+        datums=("A", "B", "C"),
         diameter=True,
         label="rod-pin hole position",
     )

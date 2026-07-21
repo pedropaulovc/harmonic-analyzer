@@ -38,18 +38,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShankProfile": {"ShankWidthDim"},
 }
 
+# The strap-bore fit rides the Ø30.80 dimension callout (+0.10/0); the ring
+# centre-to-pin distance is a BASIC sheet dimension.  Notes carry only what the
+# sheet does not dimension natively, so no number appears in both places.
 DRAWING_NOTES = "\n".join(
     (
-        "1. STRAP BORE MACHINED FOR THE",
+        "1. STRAP BORE MACHINED; RUNS THE",
         "   30.60 ECCENTRIC CAM, 0.10 CLR/SIDE.",
-        "2. ROD HANGS PLUMB; RING CENTRE TO",
-        "   ROCKER PIN 147.67.",
-        "3. RING 3.00 THICK; SHANK AND HEAD",
-        "   2.50 THICK.",
-        "4. HEAD 10.00 W x 10.50 HIGH, R5.00",
-        "   CROWN; 1.20 SHOULDER TAPER FROM",
-        "   8.00 SHANK. PIN C/L 2.40 BELOW CROWN.",
-        "5. ROCKER PIN HOLE: #47 DRILL THRU.",
+        "2. ROD HANGS PLUMB.",
+        "3. RING 3.00, SHANK AND HEAD 2.50 THICK,",
+        "   ALL CENTRED ON ONE MIDPLANE.",
+        "4. HEAD 10.00 W x 10.50 HIGH, R5.00 CROWN;",
+        "   SHOULDERS RISE 1.20 WIDENING THE 8.00",
+        "   SHANK. PIN C/L 2.40 BELOW CROWN.",
+        "5. ROCKER PIN HOLE 1X, ON SHANK C/L.",
+        "6. GENERAL Ra 3.2 APPLIES TO MACHINED",
+        "   SURFACES; UNSPECIFIED SURFACES AS CAST.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

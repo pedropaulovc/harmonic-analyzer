@@ -34,6 +34,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_basic_dimension,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -140,7 +141,15 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_visible(adapter, front)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    # The strap bore is a machined fit over the 30.60 cam: the general ±0.51
+    # block would even allow interference, so the bore dimension carries its
+    # own +0.10/0 callout (the notes explain the running clearance).
+    set_dimension_callouts(
+        adapter, front_annotations, {"StrapBoreDia": "BORE +0.10/0"}
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -183,6 +192,29 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="strap bore axis",
     )
+    # Datum B: the shank's left flank.  A alone leaves rotation about the bore
+    # axis unconstrained, so the pin-hole position (and the 147.67 direction)
+    # could not be inspected; B clocks the rod and the 4.00 BASIC below ties
+    # the pin to the shank centreline.
+    shank_flank = _sheet_xy(-4.0, 100.0)
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=shank_flank,
+        symbol_xy=(shank_flank[0] - 0.016, shank_flank[1] - 0.010),
+        datum="B",
+        label="shank left flank",
+    )
+    pin_offset = add_edge_dimension(
+        adapter,
+        front,
+        p0=shank_flank,
+        p1=pin_rim,
+        text_xy=(0.152, 0.224),
+        label="pin C/L from shank flank",
+        orientation="horizontal",
+    )
+    set_basic_dimension(adapter, pin_offset, label="pin C/L from shank flank")
     add_surface_finish(
         adapter,
         front,
@@ -203,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.222, 0.222),
         characteristic="position",
         tolerance="0.20",
-        datums=("A",),
+        datums=("A", "B"),
         diameter=True,
         label="rocker pin hole position",
     )
