@@ -73,8 +73,6 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 1
     assert 'quantity="13X A1-E4"' in source
-    assert 'remove_notes_matching(adapter, "Tapped Hole")' in source
-    assert "removed_tap_notes != 3" in source
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:

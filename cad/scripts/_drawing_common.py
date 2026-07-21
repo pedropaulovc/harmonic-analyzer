@@ -2151,8 +2151,10 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     if note is None:
         return None
     note = _sw_type_info.early_bound_or_flag(
-        note, "INote", "GetExtent", "IsBomBalloon", "GetBalloonInfo"
+        note, "INote", "GetExtent", "GetText", "IsBomBalloon", "GetBalloonInfo"
     )
+    text = str(adapter._attempt(lambda: note.GetText(), default="") or "")
+    diagnostic_name = f"{name} {text!r}" if text else name
     # A BOM balloon's GetExtent includes its LEADER -- the box spans from the
     # balloon circle to the pointed-at component (same leader-polluted-box dead
     # end as GD&T symbols), so neighboring balloons' boxes always intersect near
@@ -2172,7 +2174,7 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
         # (probed on pen-assembly), so it boxed the balloon off-centre.
         cx, cy, half = float(info[0]), float(info[1]), float(info[6])
         return LayoutElement(
-            name, "note", cx - half, cy - half, cx + half, cy + half,
+            diagnostic_name, "note", cx - half, cy - half, cx + half, cy + half,
             scope=CollisionScope.NON_VIEW,
         )
     extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
@@ -2180,7 +2182,7 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
         return None
     x0, y0, _z0, x1, y1, _z1 = (float(v) for v in extent)
     return LayoutElement(
-        name,
+        diagnostic_name,
         "note",
         min(x0, x1),
         min(y0, y1),

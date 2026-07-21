@@ -33,7 +33,6 @@ from _drawing_common import (
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
-    remove_notes_matching,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -331,13 +330,6 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=True,
         label="harmonic-base mounting",
     )
-    removed_tap_notes = remove_notes_matching(adapter, "Tapped Hole")
-    if removed_tap_notes != 3:
-        raise RuntimeError(
-            "harmonic-base expected three redundant automatic tapped-hole "
-            f"notes, removed {removed_tap_notes}"
-        )
-
     add_datum_feature(
         adapter,
         side,
