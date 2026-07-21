@@ -278,7 +278,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - _bore_r, _front_y(BORE_HEIGHT)),
-        symbol_xy=(0.075, _front_y(BORE_HEIGHT) + 0.012),
+        symbol_xy=(0.075, _front_y(BORE_HEIGHT) + 0.030),
         datum="C",
         label="journal-bore clocking axis",
     )
