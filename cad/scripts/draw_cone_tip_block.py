@@ -65,7 +65,7 @@ FRONT_KEEP = {
     "PassageDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(47.65)),
     # Keep the slit width above/right of the native 5/16-18 thread callout.
     # At the old x=0.144 position their text occupied the same line.
-    "SlitW": (0.155, 0.220),
+    "SlitW": (0.220, 0.220),
 }
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.036, TOP_CENTER[1]),
