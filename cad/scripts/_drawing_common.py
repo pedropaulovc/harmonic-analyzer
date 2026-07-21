@@ -2861,11 +2861,23 @@ def position_bom_balloon(
     if annotation is None:
         raise RuntimeError(f"{label}: item {item_number} has no annotation")
     annotation = _sw_type_info.early_bound_or_flag(
-        annotation, "IAnnotation", "SetPosition"
+        annotation, "IAnnotation", "SetPosition2"
     )
-    if not annotation.SetPosition(position_xy[0], position_xy[1], 0.0):
+    if not annotation.SetPosition2(position_xy[0], position_xy[1], 0.0):
         raise RuntimeError(f"{label}: failed to position item {item_number}")
+    # Auto-balloon layout is recomputed by EditRebuild3.  Anchor the checked
+    # manual correction first so a successful SetPosition2 cannot be silently
+    # undone by that rebuild.
+    note.LockPosition = True
     adapter.currentModel.EditRebuild3()
+    position = annotation.GetPosition()
+    if position is None or len(position) < 2:
+        raise RuntimeError(f"{label}: item {item_number} position has no read-back")
+    actual_xy = (float(position[0]), float(position[1]))
+    if any(abs(actual - expected) > 1e-6 for actual, expected in zip(actual_xy, position_xy)):
+        raise RuntimeError(
+            f"{label}: item {item_number} moved to {actual_xy}, expected {position_xy}"
+        )
 
 
 def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:

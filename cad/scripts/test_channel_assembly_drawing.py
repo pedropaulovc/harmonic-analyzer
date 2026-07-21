@@ -116,3 +116,12 @@ def test_drawing_places_bom_and_balloons() -> None:
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
     )
+
+
+def test_manual_balloon_moves_are_locked_and_read_back() -> None:
+    source = (Path(__file__).parent / "_drawing_common.py").read_text(encoding="utf-8")
+    helper = source[source.index("def position_bom_balloon(") :]
+    helper = helper[: helper.index("\ndef stamp_drawing_summary(")]
+    assert "SetPosition2" in helper
+    assert "note.LockPosition = True" in helper
+    assert "annotation.GetPosition()" in helper
