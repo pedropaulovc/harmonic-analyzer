@@ -43,33 +43,58 @@ from __future__ import annotations
 
 import sys
 
-from _common import run_build
+from _common import run_build, save_part_and_images
 from _spring import COIL_BODY_LENGTH, HOOK_LEAD, build_spring
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from channel_spring_installed_notes import (
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
+from channel_spring_installed_spec import INSTALLED_BODY_LENGTH
 
 PART_NAME = "channel-spring-installed"
 
-LEVER_EYE_Y = 1062.5234  # LIVE neutral top eye = lever spring hole 1065.89 -
-# drop 3.37 (ch14 ROM re-derive: the LEVEL rocker rest pose flattens the neutral
-# lever tilt to -0.002 deg, dropping the eye 0.73; was 1063.25 at the ch30 GT
-# re-anchor's 0.231 deg tilt). The assembly's solve_state is the authority --
-# verify:math spring:neutral-body-canonical guards this value.
-PLATE_EYE_Y = 996.54  # bottom eye centre, ABOVE the .cs plate (top 992.54) on the
-# spring-hook arm: plate bottom 987.44 + hook arm height (SHANK_RISE 7.6 + ELBOW_R
-# 1.5 = 9.1). High enough that the eye's O5.5 ring clears the plate (its bottom
-# 993.29 > 992.54). The spring no longer threads the plate -- the hook bridges it.
+# LEVER_EYE_Y / PLATE_EYE_Y / INSTALLED_BODY_LENGTH moved to the spec (the
+# assembly-facing placement contract; codex #354).
 TOP_LEAD = HOOK_LEAD  # 2.0
 BOTTOM_LEAD = HOOK_LEAD  # 2.0: normal hook lead (no longer spans the plate)
-INSTALLED_BODY_LENGTH = LEVER_EYE_Y - PLATE_EYE_Y - TOP_LEAD - BOTTOM_LEAD  # 61.98
 TOP_EYE_LOCAL_Y = INSTALLED_BODY_LENGTH + TOP_LEAD  # 63.98 above the part origin
 
 assert INSTALLED_BODY_LENGTH > COIL_BODY_LENGTH, "installed spring must be stretched"
 
 
 async def build(adapter) -> dict[str, str]:
-    return await build_spring(
+    result = await build_spring(
         adapter, PART_NAME, INSTALLED_BODY_LENGTH, leads=(BOTTOM_LEAD, TOP_LEAD),
         eye_axes=True,
     )
+    # Manufacturing spec-sheet support: a coil spring carries no graphical marked
+    # dimensions (the data table governs), so no mark loop; stamp the
+    # make-critical title-block properties + the spring data table, then re-save.
+    # (build_spring already saved once; this re-stamps the canonical installed
+    # part only -- the mass-produced stretch variants never take this path.)
+    clear_dimensions_for_drawing(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "Isometric View Note",
+        ),
+    )
+    return {**result, **artefacts}
 
 
 if __name__ == "__main__":

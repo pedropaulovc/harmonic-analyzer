@@ -41,7 +41,6 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     bbox_extent_check,
-    measure_check,
     name_bore_axis,
     name_last_feature,
     report_mass_properties,
@@ -51,6 +50,18 @@ from _common import (
     volume_check,
 )
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from amplitude_bar_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 import _telemetry
 
@@ -289,22 +300,43 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, BAR_STEEL)  # ch30 plates: see _common palette
 
     # Verify the two book-sourced dims on the built solid (ch. 15).
-    mid_y = BAR_LENGTH / 2.0
     await bbox_extent_check(adapter, "bar width (annotated 6.35)", "x", BAR_WIDTH)
-    # End-face pair selection fails (the far face is hidden in the active
-    # view and point picking is screen-projected) — use a long silhouette
-    # edge instead; the notches only cut the end faces, so it runs full
-    # length.
-    await measure_check(
+    # A point-picked long edge is view-dependent: the back silhouette is hidden
+    # in some SolidWorks sessions and selection then fails before measurement.
+    # The end notches do not change the Y extent, so the bounding box is the
+    # direct, view-independent proof of the book-sourced overall length.
+    await bbox_extent_check(
         adapter,
         "bar length (stated ~80 cm / legacy 32 in)",
-        [{"entity_type": "EDGE", "point": [0.0, mid_y, BAR_DEPTH]}],
-        "length",
+        "y",
         BAR_LENGTH,
     )
 
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "Isometric View Note", "End View Note",
+        ),
+    )
+    return artefacts
 
 
 if __name__ == "__main__":

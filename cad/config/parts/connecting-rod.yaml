@@ -1,6 +1,9 @@
 connecting-rod:
   number: MHA-017
   material: Gray Cast Iron
+  material_specification: ASTM A48 Class 30 gray cast iron
+  finish: black rough cast; bore machined
+  quantity: 20
   tolerance_class: machined_block
   fit_class: cam_follower_contact
   process: "cast + machined"

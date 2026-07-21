@@ -249,6 +249,54 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="lever-wire",
         script_name="draw_lever_wire.py",
     ),
+    DrawingSpec(
+        name="rocker_arm",
+        part="rocker_arm",
+        artifact_stem="rocker-arm",
+        script_name="draw_rocker_arm.py",
+    ),
+    DrawingSpec(
+        name="connecting_rod",
+        part="connecting_rod",
+        artifact_stem="connecting-rod",
+        script_name="draw_connecting_rod.py",
+    ),
+    DrawingSpec(
+        name="channel_lever",
+        part="channel_lever",
+        artifact_stem="channel-lever",
+        script_name="draw_channel_lever.py",
+    ),
+    DrawingSpec(
+        name="amplitude_bar",
+        part="amplitude_bar",
+        artifact_stem="amplitude-bar",
+        script_name="draw_amplitude_bar.py",
+    ),
+    DrawingSpec(
+        name="counter_spring",
+        part="counter_spring",
+        artifact_stem="counter-spring",
+        script_name="draw_counter_spring.py",
+    ),
+    DrawingSpec(
+        name="channel_spring_installed",
+        part="channel_spring_installed",
+        artifact_stem="channel-spring-installed",
+        script_name="draw_channel_spring_installed.py",
+    ),
+    DrawingSpec(
+        name="spring_hook",
+        part="spring_hook",
+        artifact_stem="spring-hook",
+        script_name="draw_spring_hook.py",
+    ),
+    DrawingSpec(
+        name="summing_lever",
+        part="summing_lever",
+        artifact_stem="summing-lever",
+        script_name="draw_summing_lever.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

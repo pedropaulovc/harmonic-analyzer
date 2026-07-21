@@ -206,6 +206,7 @@ _GTOL_SYMBOLS = {
     "flatness": "GTOL-FLAT",
     "parallelism": "GTOL-PARA",
     "position": "GTOL-POSI",
+    "profile_surface": "GTOL-SPROF",
     "perpendicularity": "GTOL-PERP",
 }
 
@@ -343,6 +344,7 @@ def add_feature_control_frame(
     datums: Sequence[str] = (),
     diameter: bool = False,
     quantity: str = "",
+    all_around: bool = False,
     label: str,
     entity_type: str = "EDGE",
 ) -> Any:
@@ -442,7 +444,7 @@ def add_feature_control_frame(
             _LEADER_SIDE_SMART,
             True,  # smart arrowhead
             False,  # perpendicular (GTol-only; not wanted here)
-            False,  # all-around
+            all_around,
             False,  # dashed
         )
     )
@@ -469,7 +471,8 @@ def add_surface_finish(
     adapter: Any,
     view: Any,
     *,
-    edge_xy: tuple[float, float],
+    edge_xy: tuple[float, float] | None = None,
+    edge_entity: Any | None = None,
     symbol_xy: tuple[float, float],
     roughness_ra: str,
     label: str,
@@ -477,11 +480,26 @@ def add_surface_finish(
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
 
-    ``entity_type`` widens the pick for entities that are not model edges —
-    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+    ``entity_type`` widens a coordinate pick for entities that are not model
+    edges — a revolve's flank lines are ``"SILHOUETTE"`` edges.  Pass a model
+    ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
+    overlapping projection makes coordinate selection ambiguous.
     """
-    _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
     draw = adapter.currentModel
+    if edge_entity is not None:
+        draw.ClearSelection2(True)
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = selection_manager.CreateSelectData()
+        selection_data.View = view
+        selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
+        if not selected:
+            selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
+        if not selected:
+            raise RuntimeError(f"failed to select {label} edge entity in drawing view")
+    elif edge_xy is not None:
+        _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
+    else:
+        raise ValueError(f"surface finish {label} requires edge_xy or edge_entity")
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
         _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
@@ -1218,6 +1236,7 @@ def add_edge_dimension(
     p1: tuple[float, float],
     text_xy: tuple[float, float],
     label: str,
+    orientation: str = "smart",
 ) -> Any:
     """Dimension across two edges picked at explicit sheet points (meters).
 
@@ -1226,6 +1245,12 @@ def add_edge_dimension(
     its coordinate picks can miss.  Recipes know their layout exactly — the
     explicit points make the pick deterministic.  Fails loud on either pick or
     on dimension creation.
+
+    ``orientation`` pins the measured direction: ``"smart"`` (default) lets
+    SolidWorks infer from the picks and text position, while ``"horizontal"`` /
+    ``"vertical"`` force the X/Y component — required when a hole is located by
+    coordinate components off a datum rather than a slant centre distance (a
+    slant reads ambiguous for holes not collinear with their datum).
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -1241,11 +1266,18 @@ def add_edge_dimension(
             raise RuntimeError(
                 f"failed to select {label} edge {index} at sheet ({x:g}, {y:g})"
             )
-    dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    if orientation == "horizontal":
+        dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)
+    elif orientation == "vertical":
+        dimension = draw.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
+    elif orientation == "smart":
+        dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    else:
+        raise ValueError(f"unknown dimension orientation {orientation!r}")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     if dimension is None:
-        raise RuntimeError(f"failed to add the {label} dimension")
+        raise RuntimeError(f"failed to add the {label} {orientation} dimension")
     return dimension
 
 

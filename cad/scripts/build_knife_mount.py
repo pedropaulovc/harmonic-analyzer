@@ -57,7 +57,7 @@ from _common import (
     set_global,
     volume_check,
 )
-from build_summing_lever import HEX_H, HEX_W
+from summing_lever_spec import HEX_H, HEX_W
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,

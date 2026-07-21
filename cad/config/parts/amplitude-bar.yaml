@@ -1,6 +1,9 @@
 amplitude-bar:
   number: MHA-003
   material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-rolled steel, 6.35 sq
+  finish: bright chrome plated
+  quantity: 20
   tolerance_class: machined_block
   fit_class: sliding_amplitude_bar_on_rocker
   process: "machined (steel)"
