@@ -43,29 +43,23 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from magnifying_lever_geom import KNIFE_LOCAL_X, KNIFE_LOCAL_Y, ROD_DIA, ROD_LENGTH
+from magnifying_lever_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    ISO_VIEW_NOTE,
+)
 
 PART_NAME = "magnifying-lever"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-ROD_LENGTH = 165.0  # DIMENSIONS.md ch20: calibrated p1, x -200..-35 (med,
-# supersedes the 310 "4x" guess -- see docstring)
-ROD_DIA = 6.0  # DIMENSIONS.md ch20: round brass rod (low)
-
 R = ROD_DIA / 2.0
-
-# --- knife-edge pivot axis (KnifeAxis = Axis2) --------------------------------
-# The lever does NOT spin in the bracket collar: it EXTENDS FROM the pivoted
-# summing bar and pivots WITH it about the knife-edge ridge (engineerguy video
-# 2/4 "at the pivoted bar we see that it sweeps out a small arc" + 4/4 "this
-# cylindrical rod extends from the pivoted summing bar"; the tip draws a ~6 mm
-# arc, and the clamp's position along the rod -- the radius from this pivot --
-# is what sets the <=4x magnification). The ridge line runs along Z at machine
-# (pre-mirror) (15, 995.134) = build_summing_assembly.KNIFE_CONTACT_Y; in
-# lever-local coords (assembly placement (-200, 990, -85), rod along +X) that
-# is (215, 5.134). Duplicated literals -- build_magnifier_assembly asserts them
-# against build_summing_assembly's KNIFE/KNIFE_CONTACT_Y and its own placement.
-KNIFE_LOCAL_X = 215.0
-KNIFE_LOCAL_Y = 5.134
 
 
 async def build(adapter) -> dict[str, str]:
@@ -191,6 +185,22 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+
+    # Manufacturing drawing support: mark exactly the print's dimensions (the
+    # drawing recipe imports the marked set and must find every one of these),
+    # and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+            "Iso View Note": ISO_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

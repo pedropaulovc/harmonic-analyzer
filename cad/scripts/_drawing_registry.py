@@ -201,6 +201,42 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="pen-rod",
         script_name="draw_pen_rod.py",
     ),
+    DrawingSpec(
+        name="magnifying_lever",
+        part="magnifying_lever",
+        artifact_stem="magnifying-lever",
+        script_name="draw_magnifying_lever.py",
+    ),
+    DrawingSpec(
+        name="magnifying_vertical_rod",
+        part="magnifying_vertical_rod",
+        artifact_stem="magnifying-vertical-rod",
+        script_name="draw_magnifying_vertical_rod.py",
+    ),
+    DrawingSpec(
+        name="magnifying_clamp",
+        part="magnifying_clamp",
+        artifact_stem="magnifying-clamp",
+        script_name="draw_magnifying_clamp.py",
+    ),
+    DrawingSpec(
+        name="knife_mount",
+        part="knife_mount",
+        artifact_stem="knife-mount",
+        script_name="draw_knife_mount.py",
+    ),
+    DrawingSpec(
+        name="wheel_bar",
+        part="wheel_bar",
+        artifact_stem="wheel-bar",
+        script_name="draw_wheel_bar.py",
+    ),
+    DrawingSpec(
+        name="magnifying_wheel",
+        part="magnifying_wheel",
+        artifact_stem="magnifying-wheel",
+        script_name="draw_magnifying_wheel.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
