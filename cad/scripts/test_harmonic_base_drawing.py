@@ -77,6 +77,7 @@ def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     assert "basic_locations=False" in source
     assert '"*Front"' in source
     assert len(drawing.TOP_KEEP) == 2
+    assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
 
 
 def test_part_stamps_make_critical_properties() -> None:

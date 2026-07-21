@@ -98,7 +98,7 @@ def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
     """Sheet point for a plan station (machine X, Z in mm), top view."""
     return (
         TOP_CENTER[0] + x_mm * VIEW_SCALE / 1000.0,
-        TOP_CENTER[1] + z_mm * VIEW_SCALE / 1000.0,
+        TOP_CENTER[1] - z_mm * VIEW_SCALE / 1000.0,
     )
 
 
@@ -124,7 +124,9 @@ def _visible_hole_table_entities(
     vertices: list[tuple[float, Any]] = []
     circles: list[tuple[float, float, float, Any]] = []
     datum_x_m = -BOTTOM_LENGTH / 2000.0
-    datum_z_m = -BOTTOM_WIDTH / 2000.0
+    # A SolidWorks Top-plane sketch maps sketch +Y to model -Z.  Therefore the
+    # lower-left corner in the *Top drawing view is model +Z.
+    datum_z_m = BOTTOM_WIDTH / 2000.0
 
     for component in components:
         visible_vertices = adapter._attempt(
