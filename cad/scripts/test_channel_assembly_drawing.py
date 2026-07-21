@@ -102,6 +102,9 @@ def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("add_auto_balloons_across_views(") == 1
+    assert source.count("position_bom_balloon(") == 1
+    assert 'item_number="4"' in source
+    assert "position_xy=(0.150, 0.066)" in source
     assert "adapter, (front, right, iso)" in source
     assert drawing.SHEET_SCALE == (1.0, 7.0)
     assert source.count("scale=VIEW_SCALE") == 3  # every view pins its scale

@@ -25,6 +25,7 @@ from _drawing_common import (
     add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
+    position_bom_balloon,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -162,9 +163,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # No single view exposes all eleven component families in the dense bank.
     # Cover the BOM across the three projections and validate every item number.
-    add_auto_balloons_across_views(
+    balloons = add_auto_balloons_across_views(
         adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
         label="channel assembly balloons",
+    )
+    # Item 4 and item 7 attach at nearly the same X in the right view. Keep
+    # their balloon centres in that same left-to-right order so their leaders
+    # cannot exchange sides on the way to the component.
+    position_bom_balloon(
+        adapter,
+        balloons,
+        item_number="4",
+        position_xy=(0.150, 0.066),
+        label="channel item 4 crossing correction",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add channel assembly notes")

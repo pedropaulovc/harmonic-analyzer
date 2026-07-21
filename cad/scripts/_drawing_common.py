@@ -2857,6 +2857,37 @@ def add_auto_balloons_across_views(
     return all_balloons
 
 
+@_telemetry.traced("drawing.position_bom_balloon", label_param="label")
+def position_bom_balloon(
+    adapter: Any,
+    balloons: Sequence[Any],
+    *,
+    item_number: str,
+    position_xy: tuple[float, float],
+    label: str,
+) -> None:
+    """Move one uniquely identified BOM balloon to a checked sheet position."""
+    matches = [
+        note
+        for note in balloons
+        if _balloon_item_number(adapter, note, label=label) == item_number
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one balloon for item {item_number}, got {len(matches)}"
+        )
+    note = _sw_type_info.early_bound_or_flag(matches[0], "INote", "GetAnnotation")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: item {item_number} has no annotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "SetPosition"
+    )
+    if not annotation.SetPosition(position_xy[0], position_xy[1], 0.0):
+        raise RuntimeError(f"{label}: failed to position item {item_number}")
+    adapter.currentModel.EditRebuild3()
+
+
 def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:
     """Write and read-verify the drawing document summary metadata."""
     model_doc = _sw_type_info.early_bound_or_flag(drawing_model, "IModelDoc2")
