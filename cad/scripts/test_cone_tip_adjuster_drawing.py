@@ -74,10 +74,9 @@ def test_notes_specify_thread_cup_and_slot_without_title_block_duplicates() -> N
 
 def test_thread_axis_datum_and_slot_position_are_native_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'label="thread pitch-cylinder axis"' in source
-    assert 'entity_type="DIMENSION",\n        shoulder=True,' in source
-    assert 'entity_type="DIMENSION"' in source
-    assert 'edge_xy=FRONT_KEEP["BodyDiaDim"]' in source
+    assert 'label="threaded cylindrical feature"' in source
+    assert 'entity_type="SILHOUETTE"' in source
+    assert 'BODY_DIA / 2.0 * SHEET_SCALE[0] / 1000.0' in source
     assert 'label="driver-slot median-plane position"' in source
     assert 'quantity="SLOT MEDIAN PLANE"' in source
     assert 'characteristic="position"' in source

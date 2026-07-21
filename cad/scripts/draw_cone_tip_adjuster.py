@@ -26,6 +26,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_adjuster_spec import (
+    BODY_DIA,
     BODY_LEN,
     CHAMFER as CHAMFER,
     CUP_DIA,
@@ -194,19 +195,23 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
-    # Attach datum A directly to the external-thread size/callout.  A datum
-    # tag on the modeled major-diameter silhouette could be read as the end
-    # face or as an axis derived from the wrong cylindrical element; the thread
-    # dimension unambiguously establishes the pitch-cylinder datum axis.
+    # The datum-feature symbol identifies the cylindrical threaded feature;
+    # the linked manufacturing note explicitly establishes its pitch cylinder,
+    # rather than the model's interference-safe cosmetic-thread envelope, as A.
+    # A tag attached directly to the size dimension is not usable here: SW 2026
+    # pins the square tag inside the two-line thread callout even after an
+    # explicit SetPosition2 and shoulder request.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=FRONT_KEEP["BodyDiaDim"],
-        symbol_xy=(0.205, FRONT_CENTER[1] + 0.010),
+        edge_xy=(
+            FRONT_CENTER[0] + BODY_DIA / 2.0 * SHEET_SCALE[0] / 1000.0,
+            FRONT_CENTER[1],
+        ),
+        symbol_xy=(0.145, 0.230),
         datum="A",
-        label="thread pitch-cylinder axis",
-        entity_type="DIMENSION",
-        shoulder=True,
+        label="threaded cylindrical feature",
+        entity_type="SILHOUETTE",
     )
     cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
     add_feature_control_frame(
