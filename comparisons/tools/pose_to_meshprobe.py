@@ -204,8 +204,8 @@ def _enrich_from_manifest(pair: dict) -> None:
 
 
 def scene_bbox(model: str, boxes_path: Path | None, glb_hint: str | None,
-               fetch: bool, tag: str | None) -> tuple[tuple, tuple, float, list]:
-    """(mesh_lo, mesh_hi, ext, boxes) in mm for the framing math.
+               fetch: bool, tag: str | None, unit_scale: float) -> tuple[tuple, tuple, float, list]:
+    """(mesh_lo, mesh_hi, ext, boxes) in meshprobe mm space for the framing math.
 
     The bbox MUST come from the same geometry ``open`` will load, or target/distance
     are computed against different geometry than is rendered. So the source tracks
@@ -214,24 +214,36 @@ def scene_bbox(model: str, boxes_path: Path | None, glb_hint: str | None,
     ``--fetch-glb`` pulls the release's own boxes (matching the fetched GLB); else
     the local build's boxes JSON, falling back to the local GLB. Deriving from a GLB
     gives boxes=[], so ``frame_components`` framing needs a boxes JSON.
-    A metre-authored GLB * 1000 is an identical mm bbox to its boxes JSON."""
+    A metre-authored GLB * 1000 is an identical mm bbox to its boxes JSON.
+
+    ``open --unit-scale S`` scales the imported geometry, so meshprobe reports/accepts
+    mm as real_mm * S; the whole bbox is scaled by S here so target/distance land in
+    that same space (no-op at the default S=1.0)."""
     dashed = model.replace("_", "-")
     if boxes_path and boxes_path.exists():
-        return _bbox_from_boxes(boxes_path)
-    if glb_hint and Path(glb_hint).exists():
-        return _bbox_from_glb(Path(glb_hint))
-    if fetch:
-        return _bbox_from_boxes(release_member(f"boxes/{dashed}.json", tag))
-    local_boxes = CAD_OUT / "boxes" / f"{dashed}.json"
-    if local_boxes.exists():
-        return _bbox_from_boxes(local_boxes)
-    local_glb = CAD_OUT / "gltf" / f"{dashed}.glb"
-    if local_glb.exists():
-        return _bbox_from_glb(local_glb)
-    raise SystemExit(
-        f"no scene bbox for {model}: no boxes JSON (cad/out/boxes/{dashed}.json) and no "
-        f"GLB (cad/out/gltf/{dashed}.glb). Pass --boxes/--glb, --fetch-glb to pull from "
-        f"the latest release, or build locally (doit export / export_glb.py).")
+        bbox = _bbox_from_boxes(boxes_path)
+    elif glb_hint and Path(glb_hint).exists():
+        bbox = _bbox_from_glb(Path(glb_hint))
+    elif fetch:
+        bbox = _bbox_from_boxes(release_member(f"boxes/{dashed}.json", tag))
+    elif (CAD_OUT / "boxes" / f"{dashed}.json").exists():
+        bbox = _bbox_from_boxes(CAD_OUT / "boxes" / f"{dashed}.json")
+    elif (CAD_OUT / "gltf" / f"{dashed}.glb").exists():
+        bbox = _bbox_from_glb(CAD_OUT / "gltf" / f"{dashed}.glb")
+    else:
+        raise SystemExit(
+            f"no scene bbox for {model}: no boxes JSON (cad/out/boxes/{dashed}.json) and no "
+            f"GLB (cad/out/gltf/{dashed}.glb). Pass --boxes/--glb, --fetch-glb to pull from "
+            f"the latest release, or build locally (doit export / export_glb.py).")
+    return _scale_bbox(bbox, unit_scale)
+
+
+def _scale_bbox(bbox: tuple, s: float) -> tuple[tuple, tuple, float, list]:
+    if s == 1.0:
+        return bbox
+    lo, hi, ext, boxes = bbox
+    return (tuple(v * s for v in lo), tuple(v * s for v in hi), ext * s,
+            [(n, [c * s for c in b]) for n, b in boxes])
 
 
 def _bbox_from_boxes(path: Path) -> tuple[tuple, tuple, float, list]:
@@ -308,7 +320,11 @@ def convert(pair: dict, bbox, w: int, h: int) -> dict:
         "canvas": [w, h],
     }
     out["projection"] = projection_json(f["lens"], w, h) if f["lens"] else None
-    out["ortho_scale_mm"] = None if f["lens"] else round(f["frame_w"] * h / w, 3)
+    # meshprobe ortho scale_mm -> Blender ortho_scale, fitted horizontally for a
+    # landscape canvas (aspect >= 1) and vertically for portrait; render_offline
+    # fixes the HORIZONTAL extent at frame_w, so only portrait converts width->height.
+    out["ortho_scale_mm"] = (None if f["lens"]
+                             else round(f["frame_w"] if w >= h else f["frame_w"] * h / w, 3))
     return out
 
 
@@ -361,12 +377,14 @@ def resolve_glb(model: str, explicit: str | None, fetch: bool, tag: str | None) 
     dashed = model.replace("_", "-")
     if explicit:
         return explicit, "explicit"
+    # --fetch-glb wins over a local GLB so the opened geometry matches the release
+    # boxes scene_bbox pulls under the same flag (else open local / frame release).
+    if fetch:
+        return str(release_member(f"gltf/{dashed}.glb", tag)), f"release {tag or 'latest'}"
     local = CAD_OUT / "gltf" / f"{dashed}.glb"
     if local.exists():
         return str(local), "local build"
-    if not fetch:
-        return str(local), "EXPECTED (local build missing; pass --fetch-glb for the release GLB)"
-    return str(release_member(f"gltf/{dashed}.glb", tag)), f"release {tag or 'latest'}"
+    return str(local), "EXPECTED (local build missing; pass --fetch-glb for the release GLB)"
 
 
 def release_member(member: str, tag: str | None) -> Path:
@@ -551,8 +569,8 @@ def main() -> int:
     for pair in pairs:
         model = pair["model"]
         if model not in bbox_cache:
-            bbox_cache[model] = scene_bbox(model, args.boxes, args.glb,
-                                           args.fetch_glb, args.release_tag)
+            bbox_cache[model] = scene_bbox(model, args.boxes, args.glb, args.fetch_glb,
+                                           args.release_tag, args.unit_scale)
         w, h, src = canvas_for(pair, 1600, override)
         cvt = convert(pair, bbox_cache[model], w, h)
         cvt["canvas_source"] = src

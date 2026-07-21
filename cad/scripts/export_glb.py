@@ -54,12 +54,12 @@ async def build(adapter: Any) -> dict[str, str]:
     loaded = len(comps) - missing
     log(f"{src.name}: {len(comps)} components ({loaded} loaded, {missing} suppressed/mismatched)")
     # No-partial-glb guarantee: ANY unresolved component would be silently omitted
-    # from the export, so abort on the first one (a large partial can still clear a
-    # component floor). An empty/near-empty enumeration means open never resolved.
-    if len(comps) < 100:
+    # from the export. Gate on an EMPTY enumeration (open never resolved the tree)
+    # and on any missing component -- not a fixed count, since a valid subassembly
+    # (frame ~11, summing/pen ~8) legitimately has few components.
+    if not comps:
         raise SystemExit(
-            f"only {len(comps)} components enumerated -- references did not resolve "
-            f"(expected ~400); aborting so no partial glb is written")
+            f"{src.name}: no components enumerated -- open did not resolve the assembly")
     if missing:
         raise SystemExit(
             f"{missing} of {len(comps)} components unresolved (suppressed/id-mismatch) -- "
