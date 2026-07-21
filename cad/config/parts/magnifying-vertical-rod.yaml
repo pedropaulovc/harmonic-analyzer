@@ -2,7 +2,7 @@ magnifying-vertical-rod:
   number: MHA-044
   material: C36000 free-machining brass rod
   material_specification: C36000 free-machining brass rod
-  finish: turned or centreless-ground, deburred, oiled
+  finish: turned or centreless-ground, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing

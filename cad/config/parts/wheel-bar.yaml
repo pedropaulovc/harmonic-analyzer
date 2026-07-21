@@ -2,7 +2,7 @@ wheel-bar:
   number: MHA-085
   material: AISI 1018 cold-finished steel bar
   material_specification: AISI 1018 cold-finished steel bar
-  finish: machined, deburred, black oxide
+  finish: machined, black oxide
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"
