@@ -61,6 +61,17 @@ def test_manufacturing_notes_cover_cam_and_teeth() -> None:
     assert "RADIAL PLANE THROUGH BORE AXIS + NOTCH CENTERLINE" in notes
     assert "X.XX" not in notes
     assert "DEBUR" not in notes
+    assert "20 REQUIRED" not in notes
+    assert "30.60 +0/-0.05" in notes
+    assert "8.640 +/-0.025" in notes
+    assert "MATCH CAM ECCENTRICITY WITHIN 0.025" in notes
+
+
+def test_running_bore_limits_match_the_shaft_fit_policy() -> None:
+    assert drawing.DIMENSION_CALLOUTS == {
+        "BoreDia": "THRU - REAM\n+0.05/+0.03"
+    }
+    assert drawing.DIMENSION_PRECISION == {"BoreDia": 3}
 
 
 def test_native_gdt_controls_bore_datum_and_finish() -> None:

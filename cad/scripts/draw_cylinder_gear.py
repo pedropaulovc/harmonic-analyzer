@@ -25,6 +25,8 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -63,6 +65,13 @@ BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0  # bore radius on the sheet (m)
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
 }
+DIMENSION_CALLOUTS = {
+    # The 9.525 +0.03/+0.05 reamed bore against the arbor's
+    # 9.525 +0.00/-0.02 journal guarantees 0.03..0.07 diametral clearance,
+    # inside the project's 0.025..0.075 shaft-in-bushing policy.
+    "BoreDia": "THRU - REAM\n+0.05/+0.03",
+}
+DIMENSION_PRECISION = {"BoreDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -112,7 +121,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
 

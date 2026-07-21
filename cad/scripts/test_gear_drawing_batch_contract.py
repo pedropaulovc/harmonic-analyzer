@@ -54,3 +54,12 @@ def test_finish_field_does_not_repeat_generic_edge_break_instruction() -> None:
         assert "DEBUR" not in finish, part_name
         assert "REMOVE BURR" not in finish, part_name
         assert "BREAK SHARP" not in finish, part_name
+
+
+def test_notes_do_not_repeat_title_block_quantity() -> None:
+    for part_name, spec in SHEETS:
+        if part_name == "cone-gear":
+            # One of each configuration is essential family-table scope, not a
+            # repeat of the per-configuration title-block quantity.
+            continue
+        assert " REQUIRED" not in spec.DRAWING_NOTES.upper(), part_name
