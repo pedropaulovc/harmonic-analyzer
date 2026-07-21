@@ -60,6 +60,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "PROCESS DATA" not in notes
     assert "B1 IS UNTHREADED" in notes
     assert "A1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
+    assert "MASK DATUM A/B/C FACES, ALL BORES/THREADS" in notes
+    assert "PAD TOP; COAT PAD SIDES AND ROOTS" in notes
     assert "A1-A4" not in notes
     assert "FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES" in notes
     assert "LOCATIONS ARE BASIC" in notes
@@ -119,10 +121,7 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "sspc-sp3" in finish
     assert "alkyd primer/green enamel" in finish
     assert "75-125um dft" in finish
-    assert "mask a/b/c" in finish
-    assert "pad top only" in finish
-    assert "coat pad sides/roots" in finish
-    assert "bores/threads" in finish
+    assert "mask" not in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
 
