@@ -1501,8 +1501,11 @@ def insert_hole_table(
         )
 
     def _select_entity(entity: Any, *, append: bool, mark: int) -> bool:
+        selection_manager = _early_bound(
+            draw.SelectionManager, "ISelectionMgr", "CreateSelectData"
+        )
         selection_data = _early_bound(
-            draw.SelectionManager.CreateSelectData(), "ISelectData"
+            selection_manager.CreateSelectData(), "ISelectData"
         )
         selection_data.Mark = mark
         selectable = _early_bound(entity, "IEntity")
