@@ -1,14 +1,14 @@
 r"""Create the curated machinist drawing for the two-plate harmonic base.
 
 The SLDPRT remains authoritative.  This recipe supplies only the base's views,
-overall footprint dimensions, the mounting-hole table, and casting notes; every
+overall footprint dimensions, the mounting-hole table, and manufacturing notes; every
 shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The base is a one-piece gray-iron casting: an 18 x 11 in lower flange with a
+The base is machined from one-piece gray-iron stock: an 18 x 11 in lower flange with a
 centred 17.5 x 10.5 in upper pad (a 6.35 mm reveal per long side), four counterbored
 lag-screw mounting holes, and nine assembly-drilled hardware seats.  The plate
-is 457 mm long, so the whole sheet runs 1:2; the isometric drops to 1:4.
+is 457 mm long, so the whole sheet runs 1:2; the front elevation drops to 1:4.
 
 Run with SolidWorks open::
 
@@ -73,8 +73,7 @@ SHEET_SCALE = (1.0, 2.0)          # 1:2 whole sheet (457 mm plate)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-mm
 
 # Sheet layout (meters).  The plan (top) carries the footprint + the hole
-# pattern; the isometric (1:4) shows the two-plate stack + reveal in 3D (so no
-# flat front view is needed -- the plate thicknesses are in note 2); the hole
+# pattern; the front elevation (1:4) shows the stepped stack; the hole
 # table sits upper-right and the notes fill the lower-left.  The plan runs at the
 # sheet's 1:2; only the 1:4 isometric carries a scale note.
 TOP_CENTER = (0.130, 0.170)
@@ -314,7 +313,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Harmonic Base Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "harmonic base; two-plate; gray iron casting",
+            3: "harmonic base; stepped; gray iron stock",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -383,21 +382,9 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.20",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="4X DIA 13 THRU HOLES",
-        label="through-hole true position",
+        quantity="E1-E4 THRU/C'BORE COMMON AXES",
+        label="through-hole/counterbore common-axis true position",
         entity=hole_entities[2],
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.190, 0.085),
-        characteristic="position",
-        tolerance="0.20",
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="4X DIA 23 UNDERSIDE C'BORES",
-        label="underside counterbore true position",
-        entity=hole_entities[0],
     )
     add_feature_control_frame(
         adapter,
@@ -407,7 +394,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.50",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="8X BLIND TAPPED HOLES",
+        quantity="A1, C1-C3, D1-D4",
         label="tapped-hole true position",
         entity=hole_entities[8],
     )
@@ -442,15 +429,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A", "B"),
         label="datum C perpendicularity to A and B",
         entity=datum_c_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        frame_xy=(0.295, 0.093),
-        characteristic="flatness",
-        tolerance="0.10",
-        label="datum A flatness",
-        entity=datum_a_edge,
     )
     add_feature_control_frame(
         adapter,
