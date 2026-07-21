@@ -56,7 +56,9 @@ SHEET_SCALE = (1.0, 3.0)   # 1:3 whole sheet (~506 mm tall post)
 # sits far right; the notes fill the lower-left.
 FRONT_CENTER = (0.180, 0.150)
 ISO_CENTER = (0.350, 0.150)
-LUG_DETAIL_SOURCE = (0.145, 0.205)
+# An activated drawing-view sketch uses projected MODEL coordinates (meters),
+# not sheet coordinates.  The lug/pin centre is model (-105, +165) mm.
+LUG_DETAIL_SOURCE = (-0.105, 0.165)
 LUG_DETAIL_CENTER = (0.275, 0.190)
 LUG_DETAIL_RADIUS = 0.010
 
