@@ -282,14 +282,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] - _bore_r, _front_y(BORE_HEIGHT)),
+        edge_xy=(FRONT_CENTER[0], _front_y(BORE_HEIGHT) - _bore_r),
         symbol_xy=(
-            FRONT_CENTER[0] - _bore_r - 0.022,
-            _front_y(BORE_HEIGHT) + 0.002,
+            FRONT_CENTER[0],
+            _front_y(BORE_HEIGHT) - _bore_r - 0.015,
         ),
         datum="C",
         label="journal-bore clocking axis",
-        position_tolerance_m=0.0005,
+        position_tolerance_m=0.016,
     )
     crank_entity, crank_xy = _crank_bore_edge(adapter, front)
     add_feature_control_frame(

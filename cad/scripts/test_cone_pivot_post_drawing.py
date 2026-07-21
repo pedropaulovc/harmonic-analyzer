@@ -68,9 +68,9 @@ def test_datum_and_notes_control_the_journal_bore() -> None:
     assert "post_od_entity = _circular_edge(" in source
     assert 'label="column outside diameter",\n        entity=post_od_entity' in source
     assert "position_tolerance_m=0.016" in source
-    assert "FRONT_CENTER[0] - _bore_r - 0.022" in source
-    assert "_front_y(BORE_HEIGHT) + 0.002" in source
-    assert source.count("position_tolerance_m=0.0005") == 1
+    assert "_front_y(BORE_HEIGHT) - _bore_r" in source
+    assert "_front_y(BORE_HEIGHT) - _bore_r - 0.015" in source
+    assert source.count("position_tolerance_m=0.016") == 2
     assert 'datums=("A", "B")' in source
     assert 'datums=("A", "B", "C")' in source
     assert 'diameter=True' in source
