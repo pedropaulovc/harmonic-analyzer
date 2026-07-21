@@ -222,7 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=hub_right,
-        frame_xy=(0.070, 0.257),
+        frame_xy=(0.112, 0.120),
         characteristic="circular_runout",
         tolerance="0.05",
         datums=("A",),

@@ -25,9 +25,11 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -87,10 +89,12 @@ TOP_KEEP = {
 DIMENSION_CALLOUTS = {
     "BoreDia": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU\nRa 1.6",
     "CollarOd": "+/-0.05",
-    "CollarCy": "ECCENTRICITY +/-0.05",
+    "CollarCy": "ECCENTRICITY +/-0.05 AT BOTH END FACES",
     "Depth": "+/-0.05",
-    "BossDia": "INTEGRAL BOSS\n+/-0.05; PROJECTION 0.50+/-0.05",
-    "BossCz": "+/-0.05 FROM FRONT FACE",
+    "BossDia": (
+        "INTEGRAL BOSS\n+/-0.05; PROJECTION 0.50+/-0.05\n"
+        "RADIALLY BEYOND DIA 9.20 OD"
+    ),
 }
 
 
@@ -150,11 +154,21 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
+    top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
+    boss_station = top_by_name["BossCz"]
+    boss_station_display = adapter._attempt(
+        lambda: boss_station.GetSpecificAnnotation()
+    )
+    if boss_station_display is None:
+        raise RuntimeError("BossCz has no display dimension to box")
+    set_basic_dimension(
+        adapter, boss_station_display, label="boss/tap axial station"
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
     bore_center = (FRONT_CENTER[0], _front_y(0.0))
-    bore_top = (bore_center[0], bore_center[1] + BORE_R_SHEET)
+    bore_bottom = (bore_center[0], bore_center[1] - BORE_R_SHEET)
     front_face_x = TOP_CENTER[0] - CAM_LEN * SHEET_SCALE[0] / 2000.0
     front_face = (front_face_x, TOP_CENTER[1])
     boss_center_x = front_face_x + BOSS_Z * SHEET_SCALE[0] / 1000.0
@@ -163,7 +177,7 @@ async def build(adapter: Any) -> dict[str, str]:
         TOP_CENTER[1] + BOSS_DIA * SHEET_SCALE[0] / 2000.0,
     )
     od_center = (FRONT_CENTER[0], _front_y(-ECC))
-    od_right = (od_center[0] + CAM_R_SHEET, od_center[1])
+    od_bottom = (od_center[0], od_center[1] - CAM_R_SHEET)
     add_datum_feature(
         adapter,
         top,
@@ -176,21 +190,18 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=bore_top,
-        symbol_xy=(bore_center[0], bore_center[1] + 0.038),
+        edge_xy=bore_bottom,
+        symbol_xy=(0.065, 0.112),
         datum="B",
         label="cam final bore axis",
     )
-    add_feature_control_frame(
+    add_datum_feature(
         adapter,
         front,
-        edge_xy=od_right,
-        frame_xy=(0.160, 0.118),
-        characteristic="parallelism",
-        tolerance="0.03",
-        datums=("B",),
-        diameter=True,
-        label="cam OD axis parallelism",
+        edge_xy=od_bottom,
+        symbol_xy=(0.125, 0.112),
+        datum="C",
+        label="cam OD datum axis",
     )
     add_feature_control_frame(
         adapter,
@@ -199,8 +210,9 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.190, 0.255),
         characteristic="position",
         tolerance="0.05",
-        datums=("A", "B"),
+        datums=("A", "B", "C"),
         diameter=True,
+        quantity="2X COAXIAL AXES",
         label="cam boss axis position",
         entity_type="SILHOUETTE",
     )

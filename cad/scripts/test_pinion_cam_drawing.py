@@ -64,7 +64,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "SLIDING FIT" not in notes
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "LINEAR +/-" not in notes
-    assert "BA" not in notes
+    assert "BRASS" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -80,8 +80,11 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
 
 def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 2
+    assert source.count("add_datum_feature(") == 3
+    assert source.count("add_feature_control_frame(") == 1
+    assert "set_basic_dimension(" in source
+    assert 'datums=("A", "B", "C")' in source
+    assert 'quantity="2X COAXIAL AXES"' in source
     assert "add_surface_finish(" not in source
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 3
