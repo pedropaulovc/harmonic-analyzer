@@ -41,7 +41,6 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     bbox_extent_check,
-    measure_check,
     name_bore_axis,
     name_last_feature,
     report_mass_properties,
@@ -300,17 +299,15 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, BAR_STEEL)  # ch30 plates: see _common palette
 
     # Verify the two book-sourced dims on the built solid (ch. 15).
-    mid_y = BAR_LENGTH / 2.0
     await bbox_extent_check(adapter, "bar width (annotated 6.35)", "x", BAR_WIDTH)
-    # End-face pair selection fails (the far face is hidden in the active
-    # view and point picking is screen-projected) — use a long silhouette
-    # edge instead; the notches only cut the end faces, so it runs full
-    # length.
-    await measure_check(
+    # A point-picked long edge is view-dependent: the back silhouette is hidden
+    # in some SolidWorks sessions and selection then fails before measurement.
+    # The end notches do not change the Y extent, so the bounding box is the
+    # direct, view-independent proof of the book-sourced overall length.
+    await bbox_extent_check(
         adapter,
         "bar length (stated ~80 cm / legacy 32 in)",
-        [{"entity_type": "EDGE", "point": [0.0, mid_y, BAR_DEPTH]}],
-        "length",
+        "y",
         BAR_LENGTH,
     )
 
