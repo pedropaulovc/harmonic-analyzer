@@ -35,24 +35,32 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "UOS" not in notes
     assert "PIVOT HOLE" in notes
     assert "LOCK NOTCH" in notes
-    assert "6.35 PLATE" not in notes
-    assert "6.756 THRU" in notes
-    assert "24.5 WEST AND 190.1 SOUTH" in notes
-    assert "7.35 DEG NORTH" in notes
-    assert "NE R10, NW R8, SW R10, SE R12" in notes
+    assert "6.756 +0.050/0 THRU" in notes
+    assert "24.50 +/-0.10 WEST AND 190.10 +/-0.10 SOUTH" in notes
+    assert "7.35 +/-0.10 DEG NORTH" in notes
+    assert "8.000 +0.100/0 WIDE WITH R4.000 +0.050/0" in notes
+    assert "NE R10.00, NW R8.00, SW R10.00, SE R12.00" in notes
+    assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
+    assert "BROAD FACES PARALLEL WITHIN 0.10" in notes
     assert "AS MODELLED" not in notes
     assert "SEE PLAN" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "_add_cone_axis_centerline(adapter, top)" in source
+    assert '{"PlateLenDim": "+/-0.25"}' in source
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 2.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 2)" in source
-    assert "scale=(1, 4)" in source
+    assert source.count("scale=(1, 2)") == 2
     assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
+    assert (
+        cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE
+        == "ISOMETRIC VIEW SCALE 1:2"
+    )
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -64,5 +72,7 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("cone-swing-platform")
     assert config["material"] == config["material_specification"]
     assert "steel" in str(config["material_specification"]).lower()
-    assert config["finish"]
+    finish = str(config["finish"]).lower()
+    assert "mil-dtl-13924 class 1" in finish
+    assert "oil seal" in finish
     assert int(config["quantity"]) == 1
