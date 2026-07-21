@@ -70,12 +70,30 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
-def _top_xy(mx: float, mz: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model point in the bbox-centred top view (5:1)."""
-    return (
-        TOP_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
-        TOP_CENTER[1] + mz * _S / 1000.0,
-    )
+def _shank_end_edge(adapter: Any, view: Any) -> Any:
+    """Return the visible circular edge at the shank's model-space origin."""
+    components = adapter._attempt(lambda: view.GetVisibleComponents()) or ()
+    candidates: list[tuple[float, float, Any]] = []
+    for component in components:
+        edges = adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 1)) or ()
+        for edge in edges:
+            curve = adapter._attempt(lambda e=edge: e.GetCurve())
+            if curve is None or not adapter._attempt(lambda c=curve: c.IsCircle()):
+                continue
+            params = adapter._get_attr_or_call(curve, "CircleParams")
+            if not params or len(params) < 7:
+                continue
+            center_distance = sum(float(value) ** 2 for value in params[:3]) ** 0.5
+            candidates.append((center_distance, abs(float(params[6]) - ROD_DIA / 2000.0), edge))
+    if not candidates:
+        raise RuntimeError("top view exposes no circular spring-hook end edge")
+    center_distance, radius_error, edge = min(candidates, key=lambda item: item[:2])
+    if center_distance > 1e-6 or radius_error > 1e-6:
+        raise RuntimeError(
+            "could not identify the shank end edge: "
+            f"center distance={center_distance:g}m radius error={radius_error:g}m"
+        )
+    return edge
 
 
 FRONT_KEEP = {
@@ -138,17 +156,17 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # Attach Ra to the visible 9-o'clock rim of the shank end in the top view.
-    # The leader denotes the adjacent cylindrical seating surface.
-    shank_edge = _top_xy(-ROD_DIA / 2.0, 0.0)
+    # Attach Ra to the visible shank-end rim in the top view.  The leader denotes
+    # the adjacent cylindrical seating surface.  Entity selection avoids the
+    # ambiguity of this small circle overlapping the projected formed-wire path.
+    shank_edge = _shank_end_edge(adapter, top)
     add_surface_finish(
         adapter,
         top,
-        edge_xy=shank_edge,
-        symbol_xy=(shank_edge[0] - 0.016, shank_edge[1] + 0.010),
+        edge_entity=shank_edge,
+        symbol_xy=(0.180, 0.160),
         roughness_ra="1.6",
         label="shank seating finish",
-        entity_type="EDGE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)

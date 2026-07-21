@@ -48,8 +48,8 @@ def test_linked_notes_describe_the_form() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_surface_finish(" in source
-    assert "_top_xy(-ROD_DIA / 2.0, 0.0)" in source
-    assert 'entity_type="EDGE"' in source
+    assert "_shank_end_edge(adapter, top)" in source
+    assert "edge_entity=shank_edge" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

@@ -469,7 +469,8 @@ def add_surface_finish(
     adapter: Any,
     view: Any,
     *,
-    edge_xy: tuple[float, float],
+    edge_xy: tuple[float, float] | None = None,
+    edge_entity: Any | None = None,
     symbol_xy: tuple[float, float],
     roughness_ra: str,
     label: str,
@@ -477,11 +478,20 @@ def add_surface_finish(
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
 
-    ``entity_type`` widens the pick for entities that are not model edges —
-    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+    ``entity_type`` widens a coordinate pick for entities that are not model
+    edges — a revolve's flank lines are ``"SILHOUETTE"`` edges.  Pass a model
+    ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
+    overlapping projection makes coordinate selection ambiguous.
     """
-    _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
     draw = adapter.currentModel
+    if edge_entity is not None:
+        draw.ClearSelection2(True)
+        if not view.SelectEntity(edge_entity, False):
+            raise RuntimeError(f"failed to select {label} edge entity in drawing view")
+    elif edge_xy is not None:
+        _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
+    else:
+        raise ValueError(f"surface finish {label} requires edge_xy or edge_entity")
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
         _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
