@@ -1199,8 +1199,8 @@ if abs(STRAP_PIN_BORE - FPIN_DIA) > 1e-9:
     raise AssertionError("follower pin dia disagrees with the strap seat bore")
 if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
-if abs(CAM_BORE_DIA - 6.35) > 1e-9:
-    raise AssertionError("cam bore no longer rides the O6.35 lift rod")
+if not 6.36 <= CAM_BORE_DIA <= 6.375:
+    raise AssertionError("cam bore nominal is outside its O6.360-O6.375 fit limits")
 # Blind-seat integrity: nearest approach of the seat cylinder to the pivot
 # bore (perpendicular skew axes; the worst point is the seat bottom).
 _FPIN_S0 = STRAP_R_END - FPIN_SEAT  # 5.0: seat bottom, from the centreline

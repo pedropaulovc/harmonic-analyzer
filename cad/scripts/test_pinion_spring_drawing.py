@@ -73,8 +73,10 @@ def test_feature_requirements_use_inspectable_datum_controls() -> None:
     assert "characteristic=\"parallelism\"" in source
     assert "add_surface_finish(" in source
     assert source.count('entity_type="FACE"') == 2
-    assert 'quantity="FORMED BROAD FACE"' in source
-    assert "TOP VIEW (REMOVED) SCALE 2:1" in source
+    assert "TOP VIEW SCALE 2:1" in source
+    assert "THRU" in pinion_spring_spec.DRAWING_NOTES
+    assert "NO TWIST" not in pinion_spring_spec.DRAWING_NOTES
+    assert 'quantity="BLADE-SIDE BROAD FACE"' in source
     assert abs(spring._BLADE_LEN - pinion_spring_spec.BLADE_STRAIGHT_LEN) < 1e-9
     assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["BendR"]
     assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["KinkR"]

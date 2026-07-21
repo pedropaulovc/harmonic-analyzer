@@ -81,17 +81,20 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
 
 def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
+    assert source.count("add_datum_feature(") == 4
     assert source.count("add_feature_control_frame(") == 2
     assert "set_basic_dimension(" in source
     assert 'datums=("A", "B", "C")' in source
+    assert 'datums=("D",)' in source
     assert 'quantity="BOSS OD AXIS"' in source
     assert 'quantity="M2.5 TAP PITCH AXIS"' in source
     assert "COMMON ZONE" not in pinion_cam_spec.DRAWING_NOTES
-    assert "SEPARATE POSITION FRAMES" in pinion_cam_spec.DRAWING_NOTES
+    assert "POSITION TAP PITCH AXIS TO DATUM D" in pinion_cam_spec.DRAWING_NOTES
     assert "add_surface_finish(" in source
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 2
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 1
+    assert "*Bottom" in source
+    assert "BOSS END VIEW SCALE 2:1" in source
     assert "A TO BOSS / TAP AXIS" in drawing.DIMENSION_CALLOUTS["BossCz"]
     assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["CollarCy"]
 

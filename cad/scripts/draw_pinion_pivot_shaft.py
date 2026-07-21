@@ -21,6 +21,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
@@ -33,7 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_pivot_shaft_spec import SHAFT_DIA as SHAFT_DIA, SHAFT_LEN
+from pinion_pivot_shaft_spec import CAP_SAG, SHAFT_DIA as SHAFT_DIA, SHAFT_LEN
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -155,6 +156,30 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="cylindricity",
         tolerance="0.01",
         label="pinion pivot cylindrical body",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=end_circle,
+        symbol_xy=(0.035, 0.222),
+        datum="A",
+        label="pinion pivot cylindrical-body axis",
+    )
+    right_crown = (
+        RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + CAP_SAG) / 1000.0,
+        RIGHT_CENTER[1],
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=right_crown,
+        frame_xy=(0.245, 0.250),
+        characteristic="profile_surface",
+        tolerance="0.05",
+        datums=("A",),
+        quantity="BOTH CROWNS",
+        label="pinion pivot crown profile",
+        entity_type="SILHOUETTE",
     )
     add_surface_finish(
         adapter,

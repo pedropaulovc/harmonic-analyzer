@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion lift cam.
 
-An eccentric steel collar: the Ø6.35 bore is offset 1.0 mm from the Ø9.2 OD
+An eccentric steel collar: the Ø6.37 bore is offset 1.0 mm from the Ø9.2 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
 offset explicitly, per the cam-note precedent).  The collar/bore sketches live
 on the Front plane (front view carries OD/bore/eccentricity); the boss and the
@@ -39,6 +39,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_cam_spec import BORE, BOSS_DIA, BOSS_Z, CAM_LEN, CAM_OD, ECC
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -64,6 +65,7 @@ FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + 0.5))) / 2.0
 FRONT_CENTER = (0.105, 0.150)
 TOP_CENTER = (0.100, 0.232)
 ISO_CENTER = (0.230, 0.185)
+BOTTOM_CENTER = (0.270, 0.195)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -88,7 +90,7 @@ TOP_KEEP = {
     "BossCz": (0.155, 0.200),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU",
+    "BoreDia": "FINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU",
     "CollarOd": "+/-0.05",
     "CollarCy": "+/-0.05 BOTH END FACES",
     "Depth": "+/-0.05",
@@ -141,9 +143,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
-    iso = place_view(adapter, str(SOURCE), "*Trimetric", *ISO_CENTER, scale=(2, 1))
+    bottom = place_view(
+        adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1)
+    )
+    iso = place_view(adapter, str(SOURCE), "*Trimetric", 0.350, 0.185, scale=(2, 1))
     set_hidden_lines_removed(adapter, iso)
-    for view in (front, top):
+    for view in (front, top, bottom):
         set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
@@ -167,16 +172,21 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
+    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to boss end view")
 
     bore_center = (FRONT_CENTER[0], _front_y(0.0))
     bore_bottom = (bore_center[0], bore_center[1] - BORE_R_SHEET)
     bore_right = (bore_center[0] + BORE_R_SHEET, bore_center[1])
     front_face_x = TOP_CENTER[0] - CAM_LEN * SHEET_SCALE[0] / 2000.0
     front_face = (front_face_x, TOP_CENTER[1])
-    boss_center_x = front_face_x + BOSS_Z * SHEET_SCALE[0] / 1000.0
-    boss_top = (
-        boss_center_x,
-        TOP_CENTER[1] + BOSS_DIA * SHEET_SCALE[0] / 2000.0,
+    bottom_boss_center = (
+        BOTTOM_CENTER[0],
+        BOTTOM_CENTER[1] + (BOSS_Z - CAM_LEN / 2.0) * 2.0 / 1000.0,
+    )
+    bottom_boss_right = (
+        bottom_boss_center[0] + BOSS_DIA / 1000.0,
+        bottom_boss_center[1],
     )
     od_center = (FRONT_CENTER[0], _front_y(-ECC))
     od_bottom = (od_center[0], od_center[1] - CAM_R_SHEET)
@@ -205,35 +215,41 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="cam OD datum axis",
     )
+    add_datum_feature(
+        adapter,
+        bottom,
+        edge_xy=bottom_boss_right,
+        symbol_xy=(0.290, 0.185),
+        datum="D",
+        label="cam boss OD axis",
+    )
     add_feature_control_frame(
         adapter,
-        top,
-        edge_xy=boss_top,
-        frame_xy=(0.150, 0.265),
+        bottom,
+        edge_xy=bottom_boss_right,
+        frame_xy=(0.285, 0.240),
         characteristic="position",
         tolerance="0.03",
         datums=("A", "B", "C"),
         diameter=True,
         quantity="BOSS OD AXIS",
         label="cam boss axis position",
-        entity_type="SILHOUETTE",
     )
     add_feature_control_frame(
         adapter,
-        top,
+        bottom,
         # The M2.5 thread is a drawing-specified machining operation at the
         # integral boss centre, so no pre-machining tap edge exists to select.
         # Attach its separate axis requirement to the same real boss silhouette;
         # the quantity compartment identifies the controlled derived axis.
-        edge_xy=boss_top,
-        frame_xy=(0.270, 0.250),
+        edge_xy=bottom_boss_right,
+        frame_xy=(0.315, 0.215),
         characteristic="position",
         tolerance="0.03",
-        datums=("A", "B", "C"),
+        datums=("D",),
         diameter=True,
         quantity="M2.5 TAP PITCH AXIS",
         label="cam tap pitch axis position",
-        entity_type="SILHOUETTE",
     )
     add_surface_finish(
         adapter,
@@ -245,7 +261,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.250, 0.145)
+    if add_note(adapter, "BOSS END VIEW SCALE 2:1", 0.245, 0.174) is None:
+        raise RuntimeError("failed to label cam boss end view")
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.145)
 
     return await finalize_drawing(
         adapter,

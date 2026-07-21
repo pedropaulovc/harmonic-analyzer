@@ -226,7 +226,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.080)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.116)
 
     return await finalize_drawing(

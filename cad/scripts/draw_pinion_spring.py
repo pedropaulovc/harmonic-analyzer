@@ -95,8 +95,8 @@ _BLADE_MID = (
 FRONT_KEEP = {
     "FootLen": (_front_x(_FOOT_MID_X), 0.088),
     "BendR": (0.036, 0.120),
-    "KinkR": (0.150, 0.220),
-    "FlatLen": (0.205, 0.188),
+    "KinkR": (0.120, 0.255),
+    "FlatLen": (0.205, 0.240),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {
@@ -214,7 +214,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="parallelism",
         tolerance="0.20",
         datums=("A",),
-        quantity="FORMED BROAD FACE",
+        quantity="BLADE-SIDE BROAD FACE",
         label="spring formed broad-face coplanarity",
     )
     add_surface_finish(
@@ -225,8 +225,8 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="0.8",
         label="spring concave blade broad face",
     )
-    if add_note(adapter, "TOP VIEW (REMOVED) SCALE 2:1", 0.270, 0.078) is None:
-        raise RuntimeError("failed to label removed spring top view")
+    if add_note(adapter, "TOP VIEW SCALE 2:1", 0.270, 0.078) is None:
+        raise RuntimeError("failed to label spring top view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.164)

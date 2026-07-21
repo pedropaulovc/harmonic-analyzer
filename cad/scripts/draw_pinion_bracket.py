@@ -98,11 +98,11 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.162, 0.130),
     "BottomCapRadius": (0.098, 0.076),
     "PinSeatCy": (0.058, 0.128),
+    "PinSeatDepth": (0.205, 0.105),
 }
 RIGHT_KEEP = {
     "Depth": (0.200, 0.082),
     "PinSeatDia": (0.262, 0.128),
-    "PinSeatDepth": (0.285, 0.105),
     # Locates the pin seat through the thickness (mid-plane) in the section view.
     "PinSeatCz": (0.225, 0.180),
 }
