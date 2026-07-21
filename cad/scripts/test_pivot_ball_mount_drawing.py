@@ -56,7 +56,9 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert 'datum="B"' in source
     assert 'characteristic="position"' in source
     assert 'characteristic="perpendicularity"' in source
-    assert source.count('characteristic="circular_runout"') == 2
+    assert source.count('characteristic="circular_runout"') == 1
+    assert 'characteristic="profile_surface"' in source
+    assert 'quantity="STEM AXIS"' in source
     assert "set_basic_dimension(" in source
     assert "add_view_centerline(" in source
     assert 'roughness_ra="1.6"' in source
