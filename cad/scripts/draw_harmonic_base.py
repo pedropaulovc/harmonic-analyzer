@@ -122,6 +122,7 @@ def _visible_hole_table_entities(
     """Return the plan datum vertex and hole rims by model geometry."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     vertices: list[tuple[float, Any]] = []
+    visible_points: list[tuple[float, float, float]] = []
     circles: list[tuple[float, float, float, Any]] = []
     datum_x_m = -BOTTOM_LENGTH / 2000.0
     # A SolidWorks Top-plane sketch maps sketch +Y to model -Z.  Therefore the
@@ -136,6 +137,7 @@ def _visible_hole_table_entities(
         for vertex in visible_vertices:
             vertex = _early_bound(vertex, "IVertex")
             point = tuple(float(value) for value in vertex.GetPoint())
+            visible_points.append(point)
             error = abs(point[0] - datum_x_m) + abs(point[2] - datum_z_m)
             if error <= 2e-6:
                 # Prefer the upper visible copy when a vertical edge exposes
@@ -157,7 +159,8 @@ def _visible_hole_table_entities(
     if not vertices:
         raise RuntimeError(
             "harmonic-base plan has no visible lower-left footprint vertex at "
-            f"({datum_x_m:g}, {datum_z_m:g}) m"
+            f"({datum_x_m:g}, {datum_z_m:g}) m; visible model points="
+            f"{sorted(set(visible_points))!r}"
         )
 
     selected_edges: list[Any] = []
