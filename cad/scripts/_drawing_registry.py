@@ -459,6 +459,48 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="lag-screw",
         script_name="draw_lag_screw.py",
     ),
+    DrawingSpec(
+        name="cone_pivot_screw",
+        part="cone_pivot_screw",
+        artifact_stem="cone-pivot-screw",
+        script_name="draw_cone_pivot_screw.py",
+    ),
+    DrawingSpec(
+        name="cone_tip_pinch_screw",
+        part="cone_tip_pinch_screw",
+        artifact_stem="cone-tip-pinch-screw",
+        script_name="draw_cone_tip_pinch_screw.py",
+    ),
+    DrawingSpec(
+        name="hanger_screw",
+        part="hanger_screw",
+        artifact_stem="hanger-screw",
+        script_name="draw_hanger_screw.py",
+    ),
+    DrawingSpec(
+        name="hex_bolt",
+        part="hex_bolt",
+        artifact_stem="hex-bolt",
+        script_name="draw_hex_bolt.py",
+    ),
+    DrawingSpec(
+        name="pen_set_screw",
+        part="pen_set_screw",
+        artifact_stem="pen-set-screw",
+        script_name="draw_pen_set_screw.py",
+    ),
+    DrawingSpec(
+        name="swing_stop_screw",
+        part="swing_stop_screw",
+        artifact_stem="swing-stop-screw",
+        script_name="draw_swing_stop_screw.py",
+    ),
+    DrawingSpec(
+        name="thumb_screw",
+        part="thumb_screw",
+        artifact_stem="thumb-screw",
+        script_name="draw_thumb_screw.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

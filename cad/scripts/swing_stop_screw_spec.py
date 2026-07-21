@@ -16,6 +16,8 @@ _SPEC = fastener("swing-stop-screw")
 
 HEAD_DIA = 8.0  # slotted head OD
 HEAD_T = 2.5  # head thickness
+SLOT_W = 1.2
+SLOT_D = 1.0
 
 SHANK_DIA = _SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 SHANK_LEN = _SPEC.length_mm  # full shank (proud + embedded), the nominal length
@@ -33,7 +35,8 @@ DRAWING_NOTES = "\n".join(
         f"{SHANK_LEN:g} LONG, PER ASME B18.6.3, ACCEPTABLE IN PLACE OF A "
         "MADE PART.",
         "SHANK MODELED AT THREAD MINOR DIA; THREADS OMITTED FOR CLARITY.",
-        "HEAD CARRIES A STRAIGHT DRIVER SLOT PER THE HEAD-END VIEW.",
+        f"HEAD {HEAD_T:g} THICK; STRAIGHT DRIVER SLOT {SLOT_W:g} WIDE X "
+        f"{SLOT_D:g} DEEP.",
     )
 )
 END_VIEW_NOTE = "HEAD-END VIEW"

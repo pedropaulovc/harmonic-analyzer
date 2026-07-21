@@ -51,15 +51,13 @@ from cone_tip_pinch_screw_spec import (
     HEAD_T,
     SHANK_DIA,
     SHANK_LEN,
+    SLOT_D,
+    SLOT_W,
 )
 
 PART_NAME = "cone-tip-pinch-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # bright screw (t00471 chrome head)
-
-SLOT_W = 0.8
-SLOT_D = 0.8
-
 
 def _slot_strip_area(r: float, w: float) -> float:
     h = w / 2.0

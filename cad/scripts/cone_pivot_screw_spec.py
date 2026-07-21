@@ -17,6 +17,8 @@ _SPEC = fastener("cone-pivot-screw")
 
 HEAD_DIA = 9.5  # slotted head OD
 HEAD_T = 3.0  # head thickness
+SLOT_W = 1.6
+SLOT_D = 1.2
 
 SHANK_DIA = _SPEC.model_diameter_mm  # Ø6.35 ground shoulder (rides the Ø6.5 hole)
 SHANK_LEN = _SPEC.length_mm  # shoulder length (plate + engagement)
@@ -37,7 +39,10 @@ DRAWING_NOTES = "\n".join(
         "MADE PART.",
         f"SHANK IS THE GROUND Ø{SHANK_DIA:g} SHOULDER; THE {THREAD} THREADED END "
         "BELOW IT IS NOT MODELED (REF).",
-        "HEAD CARRIES A STRAIGHT DRIVER SLOT PER THE HEAD-END VIEW.",
+        f"HEAD {HEAD_T:g} THICK; STRAIGHT DRIVER SLOT {SLOT_W:g} WIDE X "
+        f"{SLOT_D:g} DEEP.",
+        "THREADED-END LENGTH IS NOT DEFINED. DO NOT RELEASE AS A MADE-PART "
+        "DRAWING; USE THE COMMERCIAL SHOULDER SCREW.",
     )
 )
 END_VIEW_NOTE = "HEAD-END VIEW"

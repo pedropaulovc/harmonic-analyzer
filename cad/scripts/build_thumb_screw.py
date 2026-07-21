@@ -49,18 +49,19 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from thumb_screw_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, END_VIEW_NOTE
+from thumb_screw_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    HEAD_DIA,
+    HEAD_LENGTH,
+    SHANK_DIA,
+    SHANK_LEN,
+)
 
 PART_NAME = "thumb-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
-
-HEAD_DIA = 10.0  # DIMENSIONS.md ch20: knurled head, p.48 (low)
-HEAD_LENGTH = 5.0  # DIMENSIONS.md ch20 (low)
-SHANK_DIA = SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
-# (threads #4-40 into the clamp block / output fixture)
-SHANK_LENGTH = SPEC.length_mm  # DIMENSIONS.md ch20 (low)
-
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -75,7 +76,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "HeadDia", f"{HEAD_DIA}mm")
     await set_global(adapter, "HeadLength", f"{HEAD_LENGTH}mm")
     await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
-    await set_global(adapter, "ShankLength", f"{SHANK_LENGTH}mm")
+    await set_global(adapter, "ShankLength", f"{SHANK_LEN}mm")
     await set_global(adapter, "ShankExtent", '"HeadLength" + "ShankLength"')
 
     drive_jobs: list[tuple[str, str]] = []
@@ -85,7 +86,7 @@ async def build(adapter) -> dict[str, str]:
     # ignored. Name + record each sketch BEFORE its extrude absorbs it.
     for label, dia, length, dia_name, dia_drive in (
         ("head", HEAD_DIA, HEAD_LENGTH, "HeadDia", '"HeadDia"'),
-        ("shank", SHANK_DIA, HEAD_LENGTH + SHANK_LENGTH, "ShankDia", '"ShankDia"'),
+        ("shank", SHANK_DIA, HEAD_LENGTH + SHANK_LEN, "ShankDia", '"ShankDia"'),
     ):
         sd = SketchDims()
         check(f"create_sketch {label}", await adapter.create_sketch("Right"))
@@ -104,7 +105,7 @@ async def build(adapter) -> dict[str, str]:
         )
         name_last_feature(adapter, label.capitalize())
     v_blank = math.pi * (
-        (HEAD_DIA / 2.0) ** 2 * HEAD_LENGTH + (SHANK_DIA / 2.0) ** 2 * SHANK_LENGTH
+        (HEAD_DIA / 2.0) ** 2 * HEAD_LENGTH + (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     )
     await volume_check(adapter, "stepped blank", v_blank, 0.005 * v_blank)
 
@@ -119,7 +120,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "driven stepped blank (equations neutral)", v_blank, 0.005 * v_blank)
 
     await add_reeded_head_and_thread(
-        adapter, HEAD_DIA, HEAD_LENGTH, SHANK_DIA, SHANK_LENGTH, groove_count=24
+        adapter, HEAD_DIA, HEAD_LENGTH, SHANK_DIA, SHANK_LEN, groove_count=24
     )
 
     await apply_material(adapter, MATERIAL)

@@ -15,6 +15,8 @@ _SPEC = fastener("cone-tip-pinch-screw")
 
 HEAD_DIA = 4.8  # slotted head OD
 HEAD_T = 2.0  # head thickness
+SLOT_W = 0.8
+SLOT_D = 0.8
 
 SHANK_DIA = _SPEC.model_diameter_mm  # #3-48 modeled thread minor diameter
 SHANK_LEN = _SPEC.length_mm  # nominal under-head length
@@ -32,7 +34,8 @@ DRAWING_NOTES = "\n".join(
         f"{SHANK_LEN:g} LONG, PER ASME B18.6.3, ACCEPTABLE IN PLACE OF A "
         "MADE PART.",
         "SHANK MODELED AT THREAD MINOR DIA; THREADS OMITTED FOR CLARITY.",
-        "HEAD CARRIES A STRAIGHT DRIVER SLOT PER THE HEAD-END VIEW.",
+        f"HEAD {HEAD_T:g} THICK; STRAIGHT DRIVER SLOT {SLOT_W:g} WIDE X "
+        f"{SLOT_D:g} DEEP.",
     )
 )
 END_VIEW_NOTE = "HEAD-END VIEW"

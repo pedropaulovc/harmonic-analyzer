@@ -52,15 +52,13 @@ from cone_pivot_screw_spec import (
     HEAD_T,
     SHANK_DIA,
     SHANK_LEN,
+    SLOT_D,
+    SLOT_W,
 )
 
 PART_NAME = "cone-pivot-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # bright steel screw (v4 stills)
-
-SLOT_W = 1.6  # driver slot width
-SLOT_D = 1.2  # driver slot depth into the head top
-
 
 def _slot_strip_area(r: float, w: float) -> float:
     """Plan area of a width-w strip across a radius-r circle (exact)."""

@@ -35,7 +35,7 @@ def test_title_block_uses_the_exact_material_grade_and_finish() -> None:
 def test_notes_are_complete_but_do_not_repeat_title_or_template_requirements() -> None:
     for part_name, module_name in FASTENER_SPECS.items():
         spec = importlib.import_module(module_name)
-        notes = spec.DRAWING_NOTES.upper()
+        notes = "\n".join((spec.DRAWING_NOTES, spec.END_VIEW_NOTE)).upper()
 
         assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES, part_name
         assert (
