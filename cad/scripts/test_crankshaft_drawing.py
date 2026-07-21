@@ -39,6 +39,8 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     assert "#9" not in notes
     assert "TAPER PIN" in notes
     assert "FINISHED PILOT-HOLE CONDITION" in notes
+    assert "<MOD-DIAM>4.98" not in notes
+    assert "+0.10/0" not in notes
     assert "INTERSECTS THE SHAFT AXIS" in notes
     assert "PART ACCEPTANCE:" not in notes
     assert "CUSTOM TAPER PIN" in notes and "MHA-024" in notes
@@ -73,6 +75,8 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert source.count("add_feature_control_frame(") == 0
     assert source.count("add_surface_finish(") == 1
     assert "add_view_centerline(" in source
+    assert 'offset_dimension_text(' in source
+    assert '{"PinHeight": (0.132, 0.105)}' in source
     assert "GetVisibleEntities2(c, 3)" in source
     assert "face=shaft_face" in source
     assert 'symbol_xy=(0.185, 0.065)' in source

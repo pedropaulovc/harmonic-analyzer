@@ -1308,6 +1308,35 @@ def set_dimension_precision(
     adapter.currentModel.EditRebuild3()
 
 
+def offset_dimension_text(
+    adapter: Any,
+    annotations: Iterable[Any],
+    positions: dict[str, tuple[float, float]],
+) -> None:
+    """Move named linear-dimension text off its dimension line with a leader."""
+    remaining = dict(positions)
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation", "SetPosition2"
+        )
+        name = dimension_name(adapter, annotation)
+        position = remaining.pop(name, None)
+        if position is None:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "OffsetText"
+        )
+        display.OffsetText = True
+        if not annotation.SetPosition2(position[0], position[1], 0.0):
+            raise RuntimeError(f"failed to offset dimension text {name!r}")
+    if remaining:
+        raise RuntimeError(f"dimension text not offset: {sorted(remaining)}")
+    adapter.currentModel.EditRebuild3()
+
+
 def add_edge_dimension(
     adapter: Any,
     view: Any,

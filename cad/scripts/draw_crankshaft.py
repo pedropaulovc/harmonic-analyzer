@@ -31,6 +31,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
@@ -217,6 +218,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # contradict the crank-arm bore note, so keep three.
     set_dimension_precision(
         adapter, [*front_annotations, *right_annotations], {"ShaftDiaDim": 3}
+    )
+    offset_dimension_text(
+        adapter, right_annotations, {"PinHeight": (0.132, 0.105)}
     )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
