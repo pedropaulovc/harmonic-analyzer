@@ -27,7 +27,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
-        "UOS, DIMENSIONS IN MM: LENGTH +/-0.25; HOLE CENTRES +/-0.10.",
         "DEBURR; BREAK ENDS 0.15 MAX; CENTRE MARKS 1.0 DEEP MAX.",
         "TURN OR CENTRELESS-GRIND FULL BEARING LENGTH; NO FLATS OR STEPS.",
         "BOTH ENDS FACED SQUARE TO AXIS A WITHIN 0.05; END FACES 3.2 Ra.",
