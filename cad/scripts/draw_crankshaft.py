@@ -282,7 +282,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         right,
-        symbol_xy=(RIGHT_CENTER[0] - SHAFT_DIA / 4000.0, 0.060),
+        symbol_xy=(0.175, _SIDE_BOTTOM),
         datum="B",
         label="crank-end datum face",
         entity=crank_end_edge,
@@ -313,7 +313,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        frame_xy=(0.205, 0.128),
+        frame_xy=(0.105, 0.055),
         characteristic="position",
         tolerance="0.20",
         datums=("A", "B"),
@@ -326,14 +326,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         right,
-        symbol_xy=(0.195, 0.065),
+        symbol_xy=(0.205, 0.055),
         roughness_ra="1.6",
         label="crankshaft bearing finish",
         entity_type="FACE",
         edge_entity=shaft_face,
         production_method="SHAFT OD",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.056)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)
     # Identify the enlarged circular projection without relying on its position.
     add_property_linked_note(adapter, "End View Note", 0.018, 0.112)
 
