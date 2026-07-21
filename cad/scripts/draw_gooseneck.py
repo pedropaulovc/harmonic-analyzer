@@ -22,7 +22,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -34,7 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["gooseneck"]
@@ -56,19 +56,15 @@ SHEET_SCALE = (1.0, 3.0)   # 1:3 whole sheet (~506 mm tall post)
 # sits far right; the notes fill the lower-left.
 FRONT_CENTER = (0.180, 0.150)
 ISO_CENTER = (0.350, 0.150)
-# An activated drawing-view sketch uses projected MODEL coordinates (meters),
-# not sheet coordinates -- BUT the two transforms are anchored differently:
-# CreateDrawViewFromModelView3 places the geometry-bbox CENTER at FRONT_CENTER,
-# while the activated-view sketch maps the model ORIGIN there.  Shift model
-# coords by the bbox centre or the fence lands (bbox_c * scale) off target
-# (seen live: the fence rendered ~(17, 24) mm sheet off the lug, exactly
-# bbox_c/3).  Model bbox: x [-112 (arm end), +8 (leg OD)], y [-330 (leg
-# bottom), +184 (arm top)] -> centre (-52, -73).
-_BBOX_CENTER = (-0.052, -0.073)
-# The lug/pin centre is model (-105, +165) mm.
-LUG_DETAIL_SOURCE = (-0.105 - _BBOX_CENTER[0], 0.165 - _BBOX_CENTER[1])
-LUG_DETAIL_CENTER = (0.275, 0.190)
-LUG_DETAIL_RADIUS = 0.010
+# NO lug detail view. Four attempts (three commits + a bbox-shift fix) left
+# CreateDetailViewAt4 rendering an empty or near-empty circle even with the
+# fence verified ON the lug: the activated-view sketch transform anchors the
+# model ORIGIN at the view position while CreateDrawViewFromModelView3 centers
+# the geometry BBOX there, and even a correctly-shifted fence produced a detail
+# whose content window did not match its fence. The lug/pin are fully specified
+# by notes 3-5 (sizes, locations, braze schedule), matching the note-based
+# style the rest of this batch already uses, so the detail adds legibility
+# only -- not manufacturability -- and is dropped rather than iterated again.
 
 # Per-view survivors of the marked-dimension import: the bend radius (R51) and
 # the horizontal arm run, both on the Front-plane sweep path (so both project to
@@ -77,39 +73,6 @@ FRONT_KEEP = {
     "BendRadius": (0.225, 0.212),
     "ArmRun": (0.150, 0.250),
 }
-
-
-def _add_lug_detail(adapter: Any, front: Any) -> Any:
-    """Create an enlarged detail of the lug/pin region from the elevation."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    if not ddoc.ActivateView(view_name(adapter, front)):
-        raise RuntimeError("failed to activate the gooseneck elevation")
-    draw.ClearSelection2(True)
-    sketch = draw.SketchManager.CreateCircleByRadius(
-        LUG_DETAIL_SOURCE[0], LUG_DETAIL_SOURCE[1], 0.0, LUG_DETAIL_RADIUS
-    )
-    if sketch is None:
-        raise RuntimeError("failed to create the gooseneck lug detail circle")
-    detail = ddoc.CreateDetailViewAt4(
-        LUG_DETAIL_CENTER[0],
-        LUG_DETAIL_CENTER[1],
-        0.0,
-        0,      # swDetViewSTANDARD
-        2.0,
-        1.0,
-        "A",
-        1,      # swDetCircleCIRCLE
-        True,
-        False,
-        False,
-        5,
-    )
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    if detail is None:
-        raise RuntimeError("failed to create the gooseneck lug detail view")
-    return detail
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -158,7 +121,6 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
-    _add_lug_detail(adapter, front)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
