@@ -241,15 +241,15 @@ async def build(adapter) -> dict[str, str]:
     # Manufacturing drawing support: the Ø0.8 wire carries NO marked model
     # dimension (nothing on it is a dependable pick), so the mark loop is a no-op
     # over an empty contract; only the make-critical properties are stamped.  The
-    # developed cut length is COMPUTED here and APPENDED to the notes, so the
-    # derived value is never duplicated in the (import-pure) spec.
+    # straight rest-run length is COMPUTED here and APPENDED to the notes, so
+    # the derived value is never duplicated in the (import-pure) spec.  It is
+    # deliberately NOT called a cut length: hook + wrap development is absent.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     notes = (
         DRAWING_NOTES
-        + f"\nCUT LENGTH {WIRE_LEN:.1f} (STRAIGHT-RUN DEVELOPED LENGTH; "
-        "ADD WRAP + HOOK ALLOWANCE)."
+        + f"\nSTRAIGHT REST-RUN LENGTH {WIRE_LEN:.1f}; NOT A CUT LENGTH."
     )
     apply_drawing_properties(
         adapter,

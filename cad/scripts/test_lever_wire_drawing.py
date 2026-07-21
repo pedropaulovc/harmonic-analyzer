@@ -41,19 +41,23 @@ def test_form_and_finish_are_note_based_on_the_unpickable_wire() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_notes_carry_the_diameter_and_the_computed_cut_length() -> None:
+def test_notes_do_not_misrepresent_the_rest_run_as_a_cut_length() -> None:
     notes = lever_wire_spec.DRAWING_NOTES
     assert "Ø0.8" in notes
     assert "ASTM A228" not in notes
     assert "SPRING-STEEL" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
-    assert "WRAP THE Ø20 WHEEL HUB" in notes
+    assert "DO NOT RELEASE" in notes
+    assert "DEVELOPED CUT LENGTH ARE NOT DEFINED" in notes
+    assert "PER THE MAGNIFIER ASSEMBLY" not in notes
     assert "X.XX" not in notes and "X.XXX" not in notes
-    # The developed cut length is COMPUTED in the build and appended to the notes,
-    # never duplicated as a literal in the import-pure spec.
+    # The endpoint chord is computed in the build and labelled only as the
+    # straight rest-run length.  The unmodeled hook/wrap cannot be assigned a
+    # fabricated cut length without inventing an allowance.
     assert lever_wire_spec.WIRE_DIA == part.WIRE_DIA == 0.8
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "CUT LENGTH {WIRE_LEN" in part_source
+    assert "STRAIGHT REST-RUN LENGTH {WIRE_LEN" in part_source
+    assert "NOT A CUT LENGTH" in part_source
 
 
 def test_wire_keeps_no_geom_split_but_stays_assembly_coupled() -> None:

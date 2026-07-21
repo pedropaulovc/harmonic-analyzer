@@ -56,6 +56,10 @@ def test_notes_carry_the_collar_and_fit_that_have_no_marked_dim() -> None:
     assert "BLACK-OXIDE" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes and "X.XXX" not in notes
+    assert "MATCH-DRILLED" not in notes
+    assert "UNDRILLED BLANK" in notes
+    assert "AXIS AND PATTERN ARE NOT DEFINED" in notes
+    assert "DO NOT RELEASE" in notes
 
 
 def test_collar_bore_takes_the_center_mark() -> None:
@@ -63,6 +67,12 @@ def test_collar_bore_takes_the_center_mark() -> None:
     assert source.count("auto_center_marks(") == 1
     # First draft leans on marked plan dims + notes; no coordinate-picked GD&T.
     assert source.count("add_edge_dimension(") == 0
+
+
+def test_unresolved_mounting_pattern_is_not_encoded_as_fake_geometry() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "SCREW_HOLE_DIA" not in source
+    assert "SCREW_HOLE_X" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

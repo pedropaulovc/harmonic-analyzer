@@ -3,7 +3,9 @@ r"""Create the curated machinist drawing for the lever wire (WIRE 1).
 The lever wire is a Ø0.8 drawn-steel cylinder ~363 long -- a hair-thin
 silhouette with no flat face, no pickable end and no selectable silhouette edge,
 so the print is note-based: nothing is a marked dimension, and the diameter +
-the developed cut length ride the notes (the build stamps the computed length).
+straight rest-run length ride the notes (the build stamps the computed length).
+That chord is not represented as a developed cut length because the source model
+does not define the formed hook or hub-wrap allowance.
 The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
 (1:5) and the isometric confirms it is a plain straight rod.
 

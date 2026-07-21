@@ -13,10 +13,10 @@ whole endpoint solver, which is not worth the churn.  Flagged, accepted.
 
 The wire is a Ø0.8 drawn-steel cylinder ~363 long -- a thin silhouette with no
 flat face, no end-face big enough to pick and no selectable silhouette edge, so
-NOTHING is a marked dimension; the diameter and the developed cut length ride the
-notes.  The cut length is COMPUTED (the straight rest-run distance between the two
-solved endpoints), so the build appends it to these notes at stamp time rather
-than duplicating a derived value here.
+NOTHING is a marked dimension; the diameter and straight rest-run length ride the
+notes.  The rest-run length is COMPUTED between the two solved endpoints, but it
+is NOT a developed cut length: the source model deliberately omits both end
+terminations and the hub wrap, so their development allowance is unknown.
 """
 
 from __future__ import annotations
@@ -32,13 +32,13 @@ WIRE_DIA = 0.8
 DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
 # True free-text instructions only; the build stamps these and APPENDS the
-# computed cut-length line, then the drawing displays only the $PRPSHEET link.
+# computed straight-run line, then the drawing displays only the $PRPSHEET link.
 DRAWING_NOTES = "\n".join(
     (
         "Ø0.8 WIRE, ONE PIECE.",
-        "SHOWN AS THE STRAIGHT REST RUN; FORM + ROUTE PER THE MAGNIFIER ASSEMBLY:",
-        "HOOK THROUGH THE OUTPUT-FIXTURE CROSS HOLE, WRAP THE Ø20 WHEEL HUB GROOVE.",
-        "RUNS IN TENSION - MUST NOT TAKE A PERMANENT SET UNDER THE LEVER LOAD.",
+        "THIS SHEET DEFINES THE STRAIGHT REST RUN ONLY.",
+        "FORMED HOOK, HUB WRAP, AND DEVELOPED CUT LENGTH ARE NOT DEFINED BY",
+        "THE SOURCE MODEL. DO NOT RELEASE UNTIL THOSE DETAILS ARE SPECIFIED.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:5"

@@ -5,10 +5,9 @@ lever: a flange butted against the coefficients plate's front edge FACE
 and a forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps
 into. The collar/rod sit at the plate centreline (machine y 990) so the
 rod is coplanar with the plate; the flange spans the plate's full height
-(987.46..992.54) and bolts to its front face. M6.10 fasteners: two O3.2
-holes bored +Z through the flange (into the plate front face, engagement
-not modeled), placed at local x -9.5/-6.5 -- east of the collar/arm
-(|x|>5) so the bore touches only the flange band z 6..14.75.
+(987.46..992.54). The current source model is an UNDRILLED blank. The older
+mounting-screw description predates the butt-flange orientation and conflicts
+on the screw axis/stations, so no hole geometry is asserted here.
 
 Layout: origin at the collar centre (machine (+40, 990, -128.3) after the
 2026-07-04 depth re-anchor); collar axis along X (the rod direction), arm
@@ -95,11 +94,6 @@ FLANGE_Z = (47.3, 51.85)  # SAME machine band as ever (-81..-76.45): north face
 # earlier mis-read); the flange butts that face. Local values shifted by the
 # 2026-07-04 depth re-anchor (collar/origin at machine -123.5, was -85); only
 # the ARM between them lengthened.
-SCREW_HOLE_DIA = 3.2  # M6.10 mounting-screw holes (O2.9 fillister shanks)
-SCREW_HOLE_X = (-9.5, -6.5)  # machine x +30.5 / +33.5: west of the collar/arm
-# (|x|>5), in the flange-only band, so the +Z bore hits ONLY the flange
-
-
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
@@ -295,12 +289,9 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
     expected = vol
 
-    # NOTE: the two cosmetic mounting-screw holes are omitted. With the flange now
-    # a thin slab offset from every standard plane (z 6..14.75, no body on the
-    # Front plane at the |x|>5 hole line), FeatureCut auto-select cannot grab a
-    # body to bore -- all three overloads fail. The assembly's fillister-screw
-    # heads seat flush on the flange front face regardless (engagement into the
-    # plate not modeled), so the holes were a non-load cosmetic detail; deferred.
+    # Mounting holes are intentionally absent.  The older source description
+    # conflicts with this butt-flange revision on both axis and stations; do not
+    # turn that unresolved design input into guessed geometry.
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
