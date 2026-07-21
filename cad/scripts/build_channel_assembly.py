@@ -170,21 +170,23 @@ from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
 # OD-62.2 re-anchor that moved ECCENTRICITY to 3.06, mislocating the ring 2.02 mm
 # south of the lobe -> the Ø30.8 bore dug into the Ø30.6 cam (20 x 171.67 mm^3).
-from build_connecting_rod import CENTER_DISTANCE as ROD_C2C  # ring centre ->
+from connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
 # rocker pin (imported, NOT copied -- the part and the assembly must agree on
-# the link length or the J2 revolute drags the ring off the cam). Solved in
-# build_connecting_rod for the LEVEL rest pose: plumb rod from the level arm's
-# pin down to the lobe-up phased cam centre.
-from build_rocker_arm import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
-from build_rocker_arm import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
+# the link length or the J2 revolute drags the ring off the cam). Solved for
+# the LEVEL rest pose: plumb rod from the level arm's pin down to the lobe-up
+# phased cam centre.  Imported from the PURE-DATA spec, not the part builder:
+# the builder's closure carries drawing prose, and pulling it here made every
+# notes edit full-rebuild this assembly (codex #354).
+from rocker_arm_spec import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
+from rocker_arm_spec import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
 # in the strap (bottom-arc y + 5.3, ch14 fan photo), NOT mid-depth like the pivot
-from build_rocker_arm import _mid_y as _arm_mid_y  # tapered-strap mid-depth y(x)
-# Same imported-not-copied rule as CAM_ECC, and for the same reason: the rocker's
-# rod-pin bore is NOT level with the pivot bore (ROD_HOLE_Y = 15.30 vs
-# _mid_y(0) = 8.0). _arc_geometry must model that intrinsic 3.28 deg lever angle
-# or the placed pin lands 7 mm off the solved point and the J2 revolute drags
-# the ring off the cam (the 0.9 deg/0.4 mm version of this slip already cost
-# 20 x 20.27 mm^3 of cylinder-gear interference at the top level, ch30 rebuild).
+from rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-depth
+# at the pivot. Same imported-not-copied rule as CAM_ECC, and for the same
+# reason: the rocker's rod-pin bore is NOT level with the pivot bore
+# (ROD_HOLE_Y = 15.30 vs 8.0). _arc_geometry must model that intrinsic 3.28 deg
+# lever angle or the placed pin lands 7 mm off the solved point and the J2
+# revolute drags the ring off the cam (the 0.9 deg/0.4 mm version of this slip
+# already cost 20 x 20.27 mm^3 of cylinder-gear interference at the top level).
 
 ASM_NAME = "channel"
 
@@ -203,7 +205,6 @@ CAM_DZ = 3.3  # cam / rod-ring mid-plane at z_j + 3.3
 
 # --- rocker bank ------------------------------------------------------------
 PIVOT = (72.9, 253.8)  # rocker pivot shaft axis (x, y); machine frame (crank at -X)
-ARM_PIVOT_LOCAL_Y = _arm_mid_y(0.0)  # 8.0: pivot hole at local (0, 8) in the arm
 # True pivot->rod-pin lever: 127.37 along the arm (near the rod-side tip) PLUS
 # the low pin's rise above the pivot bore (ROD_HOLE_Y 15.30 - 8.0 = 7.30).
 # Length 127.583; the intrinsic lever angle beta (3.2813 deg above the arm's
@@ -230,7 +231,7 @@ RING_CENTER = (
 )  # phased cam centre at ECC 8.64: machine (-54.474, 113.437). The drum sits at
 # machine -54.7 (build_drive_train X_DRUM, crank side -X); y off the ch30 GT drive
 # height 104.8 (was 126.8). MUST stay in sync with X_DRUM/Y_DRIVE.
-# ROD_C2C (imported above from build_connecting_rod.CENTER_DISTANCE, 147.6655):
+# ROD_C2C (imported above from connecting_rod_spec.CENTER_DISTANCE, 147.6655):
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
 # its cam -- the pin (ROD_HOLE_X 127.3738 out from the mid-seesaw pivot) sits
 # directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14

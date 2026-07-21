@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import connecting_rod_notes
 import connecting_rod_spec
 import draw_connecting_rod as drawing
 import build_connecting_rod as rod
@@ -44,12 +45,12 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 2)" in source  # the isometric override
-    assert connecting_rod_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
+    assert connecting_rod_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
-    notes = connecting_rod_spec.DRAWING_NOTES
+    notes = connecting_rod_notes.DRAWING_NOTES
     # The pin hole rides its native Ø1.99 THRU ALL callout and the bore its
     # +0.10/0 dimension callout; notes never repeat a sheet dimension.
     assert "#47" not in notes

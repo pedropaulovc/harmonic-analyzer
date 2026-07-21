@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import rocker_arm_notes
 import rocker_arm_spec
 import draw_rocker_arm as drawing
 import build_rocker_arm as arm
@@ -43,12 +44,12 @@ def test_sheet_runs_at_1_to_2() -> None:
     assert drawing.SHEET_SCALE == (1.0, 2.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 2)" in source
-    assert rocker_arm_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
+    assert rocker_arm_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
-    notes = rocker_arm_spec.DRAWING_NOTES
+    notes = rocker_arm_notes.DRAWING_NOTES
     assert "R800" in notes
     assert "R816" in notes
     # The rod hole rides its native Ø1.99 THRU ALL callout; the notes state
@@ -81,8 +82,8 @@ def test_native_gdt_and_finish_present() -> None:
 
 def test_large_radius_values_are_note_only() -> None:
     assert drawing.NOTE_ONLY_DIMENSIONS == {"TopRadius", "BottomRadius"}
-    assert "R800" in rocker_arm_spec.DRAWING_NOTES
-    assert "R816" in rocker_arm_spec.DRAWING_NOTES
+    assert "R800" in rocker_arm_notes.DRAWING_NOTES
+    assert "R816" in rocker_arm_notes.DRAWING_NOTES
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

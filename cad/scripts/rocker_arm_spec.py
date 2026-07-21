@@ -54,26 +54,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PivotHoleProfile": {"PivotDia"},
 }
 
-# True free-text instructions only; geometry / datum structure / roughness live
-# in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
-# their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
-# fit and count, never a second copy of a sheet dimension.  16.00 depth is a
-# REF: it is fixed by the concentric R800/R816 edges.
-DRAWING_NOTES = "\n".join(
-    (
-        "1. PROFILE MIRROR-SYMMETRIC ABOUT THE",
-        "   PIVOT-BORE AXIS; ROD-PIN HOLE AT ONE",
-        "   END ONLY (1X), THE END SHOWN.",
-        "2. STRAP 2.50 THICK; ALL HOLES THRU",
-        "   THE THICKNESS.",
-        "3. TOP EDGE R800.00, BOTTOM EDGE R816.00,",
-        "   CONCENTRIC; COMMON CENTRE ON THE",
-        "   MIRROR AXIS, 808.00 FROM THE PIVOT",
-        "   AXIS (STRAP DEPTH 16.00 REF).",
-        "4. ARC LENGTHS 292.10 TOP / 266.70 BOTTOM",
-        "   TAPER THE ENDS.",
-        "5. EACH TIP: 5.59 FACE PERP TO TOP EDGE.",
-        "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+# The pivot bore rides at the strap mid-depth; assemblies place the arm off
+# this (imported from here, never from build_rocker_arm, so drawing-only edits
+# stay out of assembly rebuild closures -- codex #354).
+PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
+
+# Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
+# rocker_arm_notes.py -- see connecting_rod_notes for the rationale.

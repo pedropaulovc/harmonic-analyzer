@@ -7,13 +7,16 @@ import importlib
 import _config
 
 
+# Module carrying each sheet's DRAWING_NOTES / ISOMETRIC_VIEW_NOTE.  Parts
+# whose geometry is imported by an assembly keep their prose in a separate
+# *_notes module (codex #354) so notes edits stay out of assembly closures.
 CHANNEL_SPECS = {
     "amplitude-bar": "amplitude_bar_spec",
     "channel-lever": "channel_lever_spec",
     "channel-spring-installed": "channel_spring_installed_spec",
-    "connecting-rod": "connecting_rod_spec",
+    "connecting-rod": "connecting_rod_notes",
     "counter-spring": "counter_spring_spec",
-    "rocker-arm": "rocker_arm_spec",
+    "rocker-arm": "rocker_arm_notes",
     "spring-hook": "spring_hook_spec",
     "summing-lever": "summing_lever_spec",
 }
