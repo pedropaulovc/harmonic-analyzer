@@ -26,10 +26,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_the_strap_channel_and_screw() -> None:
     notes = pen_hanger_spec.DRAWING_NOTES
-    assert "SQUARE THROUGH-HOLE" in notes
-    assert "INTERNAL CORNER R0.25 MAX" in notes
+    assert "SQUARE HOLE THRU" in notes
+    assert "INTERNAL R0.25 MAX" in notes
+    assert "WALL-THICKNESS DIFFERENCE 0.10 MAX" in notes
+    assert "HOLE CENTER 4.00 +/-0.05 FROM FRONT DEPTH FACE" in notes
     assert "AWS A5.8 BAg-7" in notes
-    assert "NO VISIBLE VOIDS" in notes
+    assert "COPLANAR BACK SEAM" in notes
+    assert "HORIZONTALLY RIGHT OF FRONT-VIEW TOP-LEFT CORNER" in notes
     assert "#6-32" in notes
     assert "AISI" not in notes
     assert "X.XX" not in notes
