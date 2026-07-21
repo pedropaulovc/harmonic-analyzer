@@ -55,7 +55,7 @@ def test_linked_notes_carry_the_notches_and_hole() -> None:
 
 def test_functional_notch_finish_is_feature_specific() -> None:
     notes = amplitude_bar_spec.DRAWING_NOTES
-    assert "BOTTOM NOTCH FOOT: Ra 0.8" in notes
+    assert "BOTTOM NOTCH FLOOR: Ra 0.8" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source
     assert "add_feature_control_frame(" not in source

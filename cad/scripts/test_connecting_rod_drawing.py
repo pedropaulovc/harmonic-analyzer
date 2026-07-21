@@ -64,7 +64,7 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "HANGS PLUMB" not in notes  # not an inspectable requirement
     assert "SHANK C/L" not in notes  # the 4.00 BASIC from datum B owns it
     assert "HEAD 10.00 W x 10.50 HIGH, R5.00 CROWN" in notes
-    assert "PIN C/L 2.40 BELOW CROWN" in notes
+    assert "PIN C/L 2.40 BELOW CROWN" in notes  # one line, with the 1X count
     assert "AS CAST" in notes
     assert "147.67" not in notes  # the BASIC sheet dimension owns it
     assert "LINEAR +/-" not in notes

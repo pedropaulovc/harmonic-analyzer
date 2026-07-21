@@ -72,7 +72,7 @@ SHEET_SCALE = (1.0, 1.0)  # 1:1
 _BBOX_CY = (RING_BOTTOM_Y + HEAD_TOP_Y) / 2.0
 
 FRONT_CENTER = (0.180, 0.135)
-LEFT_CENTER = (0.080, 0.180)  # stepped-thickness profile, above the notes block
+LEFT_CENTER = (0.080, 0.178)  # stepped-thickness profile, above the notes block
 ISO_CENTER = (0.360, 0.140)
 
 
@@ -248,7 +248,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rocker pin hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.090)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.083)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
     return await finalize_drawing(

@@ -287,6 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
+        diameter=True,
         label="fulcrum bore perpendicularity",
     )
     opposite_broad_face = (

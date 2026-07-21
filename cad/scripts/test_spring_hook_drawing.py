@@ -58,6 +58,6 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("spring-hook")
-    assert spec["material_specification"] == "AISI 1018 steel wire, 1.4 dia"
+    assert spec["material_specification"] == "AISI 1018 steel wire, 1.4 dia, annealed (cold-formable)"
     assert spec["finish"] == "black oxide"
     assert int(spec["quantity"]) == 20
