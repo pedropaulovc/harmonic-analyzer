@@ -191,11 +191,16 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="strap bore finish",
     )
+    # The hole callout owns the 9-o'clock rim and routes down-right to its
+    # text; anchoring the FCF at the same point crossed the two leaders (layout
+    # audit).  Attach the frame at 3 o'clock and keep it in a higher lane so
+    # its whole leader stays clear of the callout path.
+    pin_fcf_rim = _sheet_xy(PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=pin_rim,
-        frame_xy=(0.220, 0.218),
+        edge_xy=pin_fcf_rim,
+        frame_xy=(0.222, 0.222),
         characteristic="position",
         tolerance="0.20",
         datums=("A",),
