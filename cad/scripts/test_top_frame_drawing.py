@@ -47,6 +47,7 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 2
+    assert 'symbol_xy=(0.245, 0.105), datum="C"' in source
     assert 'quantity="4X COLUMN BORES"' in source
     assert 'quantity="GOOSENECK BORE"' in source
 

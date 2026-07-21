@@ -218,7 +218,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="left outer rail-face datum", entity=datum_b_edge, shoulder=True,
     )
     add_datum_feature(
-        adapter, top, symbol_xy=(0.135, 0.100), datum="C",
+        adapter, top, symbol_xy=(0.245, 0.105), datum="C",
         label="lower outer rail-face datum", entity=datum_c_edge, shoulder=True,
     )
     add_feature_control_frame(
