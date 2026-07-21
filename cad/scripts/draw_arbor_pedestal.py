@@ -85,7 +85,6 @@ TOP_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "+0.055/+0.025 THRU",
-    "BoreHeight": "+/-0.05",
     "DomeDia": "+/-0.10",
 }
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the

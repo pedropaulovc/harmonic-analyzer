@@ -35,6 +35,7 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
 
     assert round(arbor_pedestal_spec.BORE_DIA, 3) == 9.525
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "+0.055/+0.025 THRU"
+    assert "BoreHeight" not in drawing.DIMENSION_CALLOUTS
     assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
     assert "ARBOR BORE LIMITS" not in arbor_pedestal_spec.DRAWING_NOTES
     shaft_limits = (9.505, 9.525)
