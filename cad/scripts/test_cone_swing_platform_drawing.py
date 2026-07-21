@@ -52,6 +52,9 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "_add_cone_axis_centerline(adapter, top)" in source
     assert "view.ModelToViewTransform" in source
+    assert "view.GetVisibleEntities2" in source
+    assert "view.GetOutline()" in source
+    assert "after sheet registration" in source
     assert "drawing.EditSheet()" in source
     assert "drawing.EditSketch()" not in source
     assert "_visible_broad_face_edges(adapter, end)" in source

@@ -43,6 +43,9 @@ def test_notes_and_native_gdt() -> None:
     assert "NOT AN ACCEPTANCE DIMENSION" in notes
     assert "DO NOT MACHINE THE ID" in notes
     assert "FULL-LENGTH CYLINDRICITY CONTROL" in notes
+    assert "ASME RULE 1" in notes
+    assert "FORM DOES NOT OVERRIDE SIZE" in notes
+    assert "AS-RECEIVED OD 25.40 MIN" in notes
     assert "TOP/BOTTOM ORIENTATION IS NONFUNCTIONAL" in notes
     assert "BORE" not in notes
     assert "X.XX" not in notes

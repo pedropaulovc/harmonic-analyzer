@@ -45,6 +45,10 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "SHALL NOT EXCEED 0.10" in notes
     assert "FIT LEAST-SQUARES CYLINDERS" in notes
     assert "AXIS OFFSET 0.05 MAX" in notes
+    assert "8 EQUALLY SPACED AXIAL SECTIONS" in notes
+    assert "GREATEST AXIS" in notes and "SEPARATION AT EITHER END PLANE" in notes
+    assert "ALL 64 OD POINTS" in notes
+    assert "ADDITIONAL" in notes and "NATIVE SIZE AND POSITION CONTROLS" in notes
     assert "DIMENSIONS/GD&T APPLY BEFORE COATING" in notes
     assert "TIR" not in notes
     assert "GOOSENECK BORE" in notes
@@ -53,6 +57,9 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "ALL BORES Ra 1.6" in notes
     assert "MASK DATUM A/B/C FACES, ALL BORES" in notes
     assert "4X BOSS ANNULI" in notes
+    assert "BOTH PLANAR END" in notes
+    assert "4X CYLINDRICAL ODS OF THE BOSSES" in notes
+    assert "EXEMPT FROM" in notes and "0.25 MAX ROOT RADIUS" in notes
     assert "CYLINDRICAL ODS" in notes
     assert "-0.00" not in notes
     assert "X.XX" not in notes

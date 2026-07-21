@@ -76,17 +76,61 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
 
-    def _sheet_xy(z_mm: float) -> tuple[float, float]:
+    def _view_xy(point_xyz: tuple[float, float, float]) -> tuple[float, float]:
         point = _early_bound(
-            math_utility.CreatePoint(double_array([0.0, 0.0, z_mm / 1000.0])),
+            math_utility.CreatePoint(double_array(point_xyz)),
             "IMathPoint",
         )
         mapped = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         values = tuple(float(value) for value in mapped.ArrayData)
         return values[0], values[1]
 
+    projected_vertices: list[tuple[float, float]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+        ) or ()
+        for raw_edge in edges:
+            edge = _early_bound(raw_edge, "IEdge")
+            for getter in (edge.GetStartVertex, edge.GetEndVertex):
+                raw_vertex = adapter._attempt(getter, default=None)
+                if raw_vertex is None:
+                    continue
+                vertex = _early_bound(raw_vertex, "IVertex")
+                xyz = tuple(float(value) for value in vertex.GetPoint())
+                projected_vertices.append(_view_xy(xyz))
+    if not projected_vertices:
+        raise RuntimeError(
+            "cone-platform plan view has no visible vertices for sheet registration"
+        )
+
+    outline = tuple(float(value) for value in view.GetOutline())
+    view_x = [point[0] for point in projected_vertices]
+    view_y = [point[1] for point in projected_vertices]
+    dx = (outline[0] + outline[2] - min(view_x) - max(view_x)) / 2.0
+    dy = (outline[1] + outline[3] - min(view_y) - max(view_y)) / 2.0
+
+    def _sheet_xy(z_mm: float) -> tuple[float, float]:
+        x, y = _view_xy((0.0, 0.0, z_mm / 1000.0))
+        return x + dx, y + dy
+
     north = _sheet_xy(NORTH_OVERHANG)
     south = _sheet_xy(NORTH_OVERHANG - PLATE_LEN)
+    margin = 0.001
+    for label, point in (("north", north), ("south", south)):
+        if not (
+            outline[0] - margin <= point[0] <= outline[2] + margin
+            and outline[1] - margin <= point[1] <= outline[3] + margin
+        ):
+            raise RuntimeError(
+                f"cone-axis {label} endpoint {point!r} falls outside plan-view "
+                f"outline {outline!r} after sheet registration"
+            )
+    _telemetry.debug(
+        "cone-axis view-to-sheet registration "
+        f"dx={dx * 1000:.2f} mm dy={dy * 1000:.2f} mm"
+    )
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     model = adapter.currentModel
     # IDrawingDoc.EditSheet explicitly makes subsequently created geometry

@@ -317,14 +317,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         right,
-        callout_xy=(0.205, 0.104),
+        callout_xy=(0.095, 0.082),
         label="tapered-pin cross-hole",
         edge=cross_hole_edge,
     )
     add_feature_control_frame(
         adapter,
         right,
-        frame_xy=(0.070, 0.055),
+        frame_xy=(0.150, 0.055),
         characteristic="position",
         tolerance="0.20",
         datums=("A", "B"),
