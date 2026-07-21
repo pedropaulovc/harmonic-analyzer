@@ -61,7 +61,7 @@ DRAWING_NOTES = "\n".join(
         f"3. HOLE ROW {HOLE_EDGE_OFFSET:.2f} FROM FREE PLATE EDGE;",
         f"   END OFFSETS {HOLE_END_OFFSET_FIRST:.2f} AND {HOLE_END_OFFSET_LAST:.2f}.",
         f"4. SUMMATION EYE {2.0 * ANCHOR_R:.2f} THICK,",
-        f"   {2.0 * ANCHOR_BORE_R:.1f} BORE, {SUM_H:.2f} FROM PIVOT AXIS.",
+        f"   {2.0 * ANCHOR_BORE_R:.2f} BORE, {SUM_H:.2f} FROM PIVOT AXIS.",
         f"5. PIVOT CYLINDER {PLATE_L:.2f} LONG; NO BORE.",
     )
 )

@@ -63,23 +63,21 @@ from _drawing_marks import (
 )
 from _saved_part_guard import require_saved_drawing_properties
 from counter_spring_spec import (
+    BOTTOM_HOOK_LEAD as BOTTOM_LEAD,
+    COIL_BODY_LENGTH,
+    COIL_COUNT,
+    COIL_OD,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
+    TOP_HOOK_LEAD as TOP_LEAD,
+    WIRE_DIA,
 )
 
 import _telemetry
 
 PART_NAME = "counter-spring"
 MATERIAL = "Alloy Steel"  # see _common.apply_material docstring
-
-COIL_BODY_LENGTH = 315.0  # DIMENSIONS.md ch19: ch.19 photo, gooseneck-scaled (low)
-COIL_OD = 12.5  # DIMENSIONS.md ch19: scaled vs gooseneck tube O16 (low)
-WIRE_DIA = 1.8  # DIMENSIONS.md ch19: close-wound dark coil (low)
-COIL_COUNT = 165  # close-wound: pitch 1.91 leaves a 0.11 sweep-merge gap (derived)
-BOTTOM_LEAD = 40.0  # straight drop, coil bottom -> boss-hook ring centre
-# (body bottom y 1052 - ring centre y 1012; see build_summing_assembly.py)
-TOP_LEAD = 2.0 * WIRE_DIA  # standard short hook onto the gooseneck tip pin
 
 MEAN_RADIUS = (COIL_OD - WIRE_DIA) / 2.0
 PITCH = COIL_BODY_LENGTH / COIL_COUNT  # whole coils: both ends land at +X

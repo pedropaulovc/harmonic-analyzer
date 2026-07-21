@@ -35,16 +35,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 DRAWING_NOTES = "\n".join(
     (
         "EXTENSION SPRING DATA",
-        "  WIRE DIA .......... 1.8",
-        "  COIL OD ........... 12.5",
-        "  COIL ID ........... 8.9",
-        "  MEAN DIA .......... 10.7",
-        "  FREE BODY LENGTH .. 315",
-        "  TOTAL COILS ....... 165 (CLOSE-WOUND)",
+        f"  WIRE DIA .......... {WIRE_DIA:.2f}",
+        f"  COIL OD ........... {COIL_OD:.2f}",
+        f"  COIL ID ........... {COIL_ID:.2f}",
+        f"  MEAN DIA .......... {MEAN_DIA:.2f}",
+        f"  FREE BODY LENGTH .. {COIL_BODY_LENGTH:.2f}",
+        f"  TOTAL COILS ....... {COIL_COUNT} (CLOSE-WOUND)",
         "  WIND .............. RIGHT HAND",
-        "  HOOK LEADS ......... 40.0 BOTTOM / 3.6 TOP",
-        "  ENDS .............. 270 DEG LOOP, R5.35 CL",
-        "  FREE EYE C-C ...... 358.6",
+        f"  HOOK LEADS ......... {BOTTOM_HOOK_LEAD:.2f} BOTTOM / "
+        f"{TOP_HOOK_LEAD:.2f} TOP",
+        f"  ENDS .............. 270 DEG LOOP, R{HOOK_CL_RADIUS:.2f} CL",
+        f"  FREE EYE C-C ...... {FREE_EYE_C2C:.2f}",
         "NOTE: TOWERS ABOVE THE MACHINE;",
         "TENSION SET BY SLIDING THE GOOSENECK POST.",
     )

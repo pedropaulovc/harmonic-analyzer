@@ -43,10 +43,10 @@ def test_data_table_carries_the_spring_parameters() -> None:
     notes = counter_spring_spec.DRAWING_NOTES
     for token in ("WIRE DIA", "COIL OD", "FREE BODY LENGTH", "TOTAL COILS", "WIND", "ENDS"):
         assert token in notes
-    assert "1.8" in notes
-    assert "12.5" in notes
-    assert "315" in notes
-    assert "165" in notes
+    assert f"{counter_spring_spec.WIRE_DIA:.2f}" in notes
+    assert f"{counter_spring_spec.COIL_OD:.2f}" in notes
+    assert f"{counter_spring_spec.COIL_BODY_LENGTH:.2f}" in notes
+    assert str(counter_spring_spec.COIL_COUNT) in notes
     assert "HOOK LEADS" in notes
     assert "270 DEG LOOP" in notes
     assert "FREE EYE C-C" in notes

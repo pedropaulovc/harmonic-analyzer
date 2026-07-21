@@ -57,6 +57,7 @@ def test_linked_notes_describe_the_hung_lever() -> None:
     assert "4.60 FROM FREE PLATE EDGE" in notes
     assert "END OFFSETS 9.90 AND 8.43" in notes
     assert "76.20 FROM PIVOT AXIS" in notes
+    assert "3.00 BORE" in notes
     assert "19.05 THICK" in notes
     assert "8.65 W x 10.27 HIGH" in notes
     assert "21.72 LONG EACH END" in notes
