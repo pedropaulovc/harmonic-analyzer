@@ -18,7 +18,6 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
