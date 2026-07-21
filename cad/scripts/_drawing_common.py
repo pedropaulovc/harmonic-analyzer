@@ -28,7 +28,12 @@ from _drawing_layout_check import (
 )
 from _drawing_registry import PROJECT_DRWDOT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, dispatch_array
+from solidworks_mcp.adapters.com_variant import (
+    bool_array,
+    bstr_array,
+    dispatch_array,
+    double_array,
+)
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     TOL_BASIC,
@@ -673,6 +678,75 @@ def add_view_centerline(
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return centerline
+
+
+@_telemetry.traced("drawing.section_view", label_param="label")
+def create_section_view(
+    adapter: Any,
+    parent_view: Any,
+    *,
+    line_start: tuple[float, float],
+    line_end: tuple[float, float],
+    view_xy: tuple[float, float],
+    section_label: str,
+    scale: tuple[int, int] = (1, 1),
+    label: str,
+) -> Any:
+    """Create a full, unaligned section from one straight cutting-plane line.
+
+    The coordinates are drawing-sheet meters.  ``CreateLine2`` leaves the new
+    sketch segment selected, which is the documented precondition for
+    ``CreateSectionViewAt5``.  The section is deliberately unaligned so a part
+    recipe can place and scale it independently of the parent view.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, parent_view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate section parent view {name!r} ({label})")
+    draw.ClearSelection2(True)
+    segment = ddoc.CreateLine2(
+        float(line_start[0]),
+        float(line_start[1]),
+        0.0,
+        float(line_end[0]),
+        float(line_end[1]),
+        0.0,
+    )
+    if segment is None:
+        raise RuntimeError(f"failed to create section line ({label})")
+    # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
+    section = ddoc.CreateSectionViewAt5(
+        float(view_xy[0]),
+        float(view_xy[1]),
+        0.0,
+        section_label,
+        0x1 | 0x8,
+        None,
+        0.0,
+    )
+    if section is None:
+        raise RuntimeError(f"failed to create section view ({label})")
+    section = _sw_type_info.early_bound_or_flag(
+        section, "IView", "GetSection", "SetViewPosition"
+    )
+    section.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+    if not section.SetViewPosition(
+        double_array([float(view_xy[0]), float(view_xy[1])]), False
+    ):
+        raise RuntimeError(f"failed to position section view ({label})")
+    dr_section = section.GetSection()
+    if dr_section is None:
+        raise RuntimeError(f"section view has no section definition ({label})")
+    dr_section = _sw_type_info.early_bound_or_flag(
+        dr_section, "IDrSection", "SetAutoHatch", "SetLabel2"
+    )
+    dr_section.SetAutoHatch(True)
+    if int(dr_section.SetLabel2(section_label)) < 0:
+        raise RuntimeError(f"failed to persist section label ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return section
 
 
 @_telemetry.traced("drawing.linked_note", label_param="property_name")

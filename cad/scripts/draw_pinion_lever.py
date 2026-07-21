@@ -1,9 +1,9 @@
 r"""Create the curated machinist drawing for the pinion engage lever.
 
-A clamp hub (Ø13 OD, Ø6.35 bore) with a tapered grip rod (Ø4 at the hub to Ø6
+A clamp hub (Ø13 OD, Ø6.3675 bore) with a tapered grip rod (Ø4 at the hub to Ø6
 at the tip) rising 86 mm out of it.  The rod-revolve and hub sketches both live
 on the Front plane, so every marked dimension imports into the FRONT view; the
-right view carries the hub length and domed cap as a reference silhouette.
+longitudinal section controls the blind bore, end wall, and spherical crown.
 
 Run with SolidWorks open::
 
@@ -20,9 +20,13 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
+    add_view_centerline,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -33,7 +37,15 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_lever_spec import BORE, CAP_SAG, HUB_LEN, HUB_OD, ROD_LEN, ROD_ROOT_DIA
+from pinion_lever_spec import (
+    BORE,
+    CAP_RADIUS,
+    CAP_SAG,
+    HUB_LEN,
+    HUB_OD,
+    ROD_LEN,
+    ROD_ROOT_DIA,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -60,7 +72,7 @@ FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
 # At 1:1 the full 86 mm rod leaves enough room for the hub callouts and GD&T
 # without crowding the orthographic views.
 FRONT_CENTER = (0.078, 0.170)
-RIGHT_CENTER = (0.165, 0.170)
+SECTION_CENTER = (0.190, 0.150)
 ISO_CENTER = (0.330, 0.205)
 
 
@@ -76,22 +88,18 @@ HUB_R_SHEET = HUB_OD * SHEET_SCALE[0] / 2000.0
 BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "HubOd": (0.028, 0.112),
-    "HubBore": (0.108, 0.105),
+    "HubOd": (0.025, 0.102),
+    "HubBore": (0.115, 0.090),
     "RodTipY": (0.044, 0.170),
-    "RodRootR": (0.145, 0.132),
-    "RodTipR": (0.120, 0.232),
 }
 RIGHT_KEEP = {
-    "BoreDepth": (0.185, 0.128),
-    "EndWall": (0.205, 0.142),
+    "BoreDepth": (0.205, 0.116),
+    "EndWall": (0.225, 0.132),
 }
 DIMENSION_CALLOUTS = {
-    "HubBore": "NOMINAL REF ONLY\n6.375 MAX / 6.360 MIN\nRa 1.6",
-    "BoreDepth": "+0.10/-0.00 FULL-DIA BORE DEPTH FROM B; FLAT BOTTOM",
-    "EndWall": "+/-0.05 END WALL",
-    "RodRootR": "RESULTING <MOD-DIAM>4.00 AT HUB",
-    "RodTipR": "RESULTING <MOD-DIAM>6.00 AT TIP",
+    "HubBore": "SIZE LIMITS: 6.360 MIN / 6.375 MAX",
+    "BoreDepth": "+0.10/-0.00 FULL-DIA DEPTH FROM B; FLAT BOTTOM",
+    "EndWall": "+/-0.05 END WALL TO CROWN ROOT PLANE",
     "RodTipY": "+/-0.25 FROM HUB AXIS",
 }
 
@@ -137,20 +145,27 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
-    # Front carries the hub bore as a true circle; the right view shows the hub
-    # length and the domed cap in section-like silhouette.  HLV keeps the bore's
-    # hidden through-line readable in the right view.
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_visible(adapter, front)
+    hub_center = (FRONT_CENTER[0], _front_y(0.0))
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=(FRONT_CENTER[0], hub_center[1] - 0.011),
+        line_end=(FRONT_CENTER[0], hub_center[1] + 0.018),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=(2, 1),
+        label="lever longitudinal hub section",
+    )
+    set_hidden_lines_removed(adapter, section)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+        adapter, section, keep=RIGHT_KEEP, view_label="section"
     )
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
@@ -158,7 +173,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    hub_center = (FRONT_CENTER[0], _front_y(0.0))
     bore_top = (hub_center[0], hub_center[1] + BORE_R_SHEET)
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
     # The south crown makes the right-view bounds asymmetric about z=0.  View
@@ -167,8 +181,10 @@ async def build(adapter: Any) -> dict[str, str]:
     z_min = -HUB_LEN / 2.0 - CAP_SAG
     z_max = HUB_LEN / 2.0
     z_center = (z_min + z_max) / 2.0
-    flat_face_x = RIGHT_CENTER[0] - (z_max - z_center) * SHEET_SCALE[0] / 1000.0
-    flat_face = (flat_face_x, hub_center[1])
+    section_scale = 2.0
+    section_hub_y = SECTION_CENTER[1] - (FRONT_BBOX_CY * section_scale / 1000.0)
+    flat_face_x = SECTION_CENTER[0] - (z_max - z_center) * section_scale / 1000.0
+    flat_face = (flat_face_x, section_hub_y)
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
     add_datum_feature(
         adapter,
@@ -180,9 +196,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_datum_feature(
         adapter,
-        right,
+        section,
         edge_xy=flat_face,
-        symbol_xy=(flat_face_x - 0.018, hub_center[1] - 0.018),
+        symbol_xy=(flat_face_x - 0.025, section_hub_y - 0.018),
         datum="B",
         label="lever flat end face",
     )
@@ -198,9 +214,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        right,
+        section,
         edge_xy=flat_face,
-        frame_xy=(0.205, 0.105),
+        frame_xy=(0.245, 0.098),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
@@ -211,12 +227,68 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=grip_edge,
         frame_xy=(0.125, 0.245),
-        characteristic="position",
-        tolerance="0.05",
+        characteristic="profile_surface",
+        tolerance="0.10",
         datums=("A", "B"),
-        diameter=True,
-        quantity="GRIP AXIS",
-        label="lever grip-axis position",
+        quantity="GRIP PROFILE; BASIC AXIS 5.00 FROM B, 90 DEG TO A, INTERSECTS A",
+        label="lever grip profile",
+        entity_type="SILHOUETTE",
+    )
+    add_view_centerline(
+        adapter,
+        front,
+        face_xy=grip_edge,
+        label="lever tapered grip axis",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=bore_top,
+        symbol_xy=(0.116, 0.070),
+        roughness_ra="1.6",
+        label="lever finished bore",
+    )
+    add_attached_note(
+        adapter,
+        front,
+        text=(
+            "STRAIGHT CONICAL GRIP PROFILE\n"
+            "<MOD-DIAM>4.00+/-0.05 AT BASIC 3.50 FROM HUB AXIS\n"
+            "<MOD-DIAM>6.00+/-0.05 AT TIP"
+        ),
+        entity_xy=grip_edge,
+        note_xy=(0.120, 0.235),
+        label="lever conical grip size",
+        entity_type="SILHOUETTE",
+    )
+    crown_edge = (
+        SECTION_CENTER[0]
+        + (HUB_LEN / 2.0 + CAP_SAG - z_center) * section_scale / 1000.0,
+        section_hub_y,
+    )
+    add_attached_note(
+        adapter,
+        section,
+        text=(
+            f"SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10\n"
+            "10.00+/-0.10 B TO CROWN ROOT PLANE\n"
+            "11.50 REF B TO APEX"
+        ),
+        entity_xy=crown_edge,
+        note_xy=(0.245, 0.155),
+        label="lever spherical crown definition",
+        entity_type="SILHOUETTE",
+    )
+    add_feature_control_frame(
+        adapter,
+        section,
+        edge_xy=crown_edge,
+        frame_xy=(0.245, 0.180),
+        characteristic="profile_surface",
+        tolerance="0.10",
+        datums=("A", "B"),
+        quantity="CROWN",
+        label="lever crown profile",
         entity_type="SILHOUETTE",
     )
 

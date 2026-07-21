@@ -42,9 +42,9 @@ def test_sheet_runs_at_1_to_1_with_1_to_1_isometric() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
-    assert "SPHERICAL CROWN" in notes
-    assert "1.50 REF HIGH" in notes
-    assert "1.50+/-0.05" not in notes
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "SPHERICAL CROWN" in source
+    assert "BLIND BORE BOTTOM" in notes
     assert "DATUM A" in notes and "DATUM B" in notes
     assert "LINEAR +/-" not in notes
     assert "BREAK ALL" not in notes
@@ -58,25 +58,25 @@ def test_lever_drive_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "AT ASSEMBLY" not in notes
     assert "LIFT ROD" not in notes
-    assert "GRIP AXIS BASICALLY INTERSECTS A" in notes
-    assert "5.00 FROM B" in notes
-    assert "POSITION IS CONTROLLED" in notes
+    assert "GRIP AXIS: BASIC 5.00 FROM B" in notes
+    assert "BASIC 90 DEG TO A" in notes
 
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 3
-    assert source.count('entity_type="SILHOUETTE"') == 1
-    assert 'characteristic="position"' in source
+    assert source.count("add_feature_control_frame(") == 4
+    assert source.count('entity_type="SILHOUETTE"') == 4
+    assert 'characteristic="profile_surface"' in source
     assert 'datums=("A", "B")' in source
-    assert "add_surface_finish(" not in source
-    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["HubBore"]
+    assert "add_surface_finish(" in source
+    assert "6.360 MIN / 6.375 MAX" in drawing.DIMENSION_CALLOUTS["HubBore"]
     assert "+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDepth"]
     assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
     assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall"}
-    assert "<MOD-DIAM>4.00" in drawing.DIMENSION_CALLOUTS["RodRootR"]
-    assert "<MOD-DIAM>6.00" in drawing.DIMENSION_CALLOUTS["RodTipR"]
+    assert "<MOD-DIAM>4.00" in source
+    assert "<MOD-DIAM>6.00" in source
+    assert "create_section_view(" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
