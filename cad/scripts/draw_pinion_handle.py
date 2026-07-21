@@ -39,6 +39,7 @@ from pinion_handle_spec import (
     CAP_SAG,
     GRIP_DIA,
     GRIP_LEN,
+    ROD_DIA,
     ROD_DOWN,
     ROD_UP,
     TUBE_ID,
@@ -103,10 +104,19 @@ TOP_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "TubeId": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n8.025 MAX / 8.010 MIN\nRa 1.6",
-    "GripLen": "+/-0.10\nGRIP CYLINDRICAL LENGTH",
-    "TubeLen": "+0.10/-0.00 FULL-DIA\nBLIND-BORE DEPTH\n12.00 REF HUB PROJECTION",
-    "RodSpan": "42.00 DOWN / 43.00 UP\nFROM GRIP AXIS",
-    "RodDia": "PRESS ROD 6.015/6.020\nREAM BODY HOLE\n6.000/6.010 THRU",
+    "GripLen": "+/-0.10\nCYLINDRICAL LENGTH",
+    "TubeLen": (
+        "+0.10/-0.00 BLIND-BORE DEPTH\n"
+        "HUB PROJECTION 12.00 +0.10/-0.00"
+    ),
+    "RodSpan": (
+        "+/-0.10 OVERALL\n"
+        "DATUM A TO LOWER END 42.00 +/-0.10"
+    ),
+    "RodDia": (
+        "PRESS ROD 6.020 MAX / 6.015 MIN\n"
+        "REAM BODY HOLE 6.010 MAX / 6.000 MIN THRU"
+    ),
 }
 
 
@@ -192,6 +202,10 @@ async def build(adapter: Any) -> dict[str, str]:
     z_center = (z_min + z_max) / 2.0
     flat_end_x = RIGHT_CENTER[0] - (z_max - z_center) * SHEET_SCALE[0] / 1000.0
     flat_end = (flat_end_x, bore_center[1])
+    flat_end_face = (
+        flat_end_x,
+        bore_center[1] + TUBE_OD * SHEET_SCALE[0] / 4000.0,
+    )
     add_datum_feature(
         adapter,
         front,
@@ -203,8 +217,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         right,
-        edge_xy=flat_end,
-        symbol_xy=(flat_end_x - 0.020, bore_center[1]),
+        edge_xy=flat_end_face,
+        symbol_xy=(flat_end_x, bore_center[1] + 0.026),
         datum="B",
         label="handle flat hub end",
     )
@@ -237,6 +251,22 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.05",
         datums=("A",),
         label="handle flat-end perpendicularity",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(
+            _front_x(ROD_DIA / 2.0),
+            _front_y(ROD_UP - 8.0),
+        ),
+        frame_xy=(0.108, 0.232),
+        characteristic="position",
+        tolerance="0.05",
+        datums=("A", "B"),
+        diameter=True,
+        quantity="CROSS-HOLE / PRESSED-ROD AXIS",
+        label="handle transverse-axis position",
+        entity_type="SILHOUETTE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)

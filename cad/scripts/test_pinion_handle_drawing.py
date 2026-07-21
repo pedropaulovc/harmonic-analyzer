@@ -46,7 +46,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "SPHERICAL CROWN" in notes
     assert "DATUM A" in notes and "DATUM B" in notes
     assert "LINEAR +/-" not in notes
-    assert "BA" not in notes
+    assert "BREAK ALL" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -58,20 +58,45 @@ def test_handle_interfaces_are_fully_released_for_manufacture() -> None:
     assert "AT ASSEMBLY" not in notes
     assert "DOWEL" not in notes
     assert "PRESSED CROSS ROD" in notes
-    assert "6.000/6.010" in drawing.DIMENSION_CALLOUTS["RodDia"]
-    assert "6.015/6.020" in drawing.DIMENSION_CALLOUTS["RodDia"]
+    assert "6.010 MAX / 6.000 MIN" in drawing.DIMENSION_CALLOUTS["RodDia"]
+    assert "6.020 MAX / 6.015 MIN" in drawing.DIMENSION_CALLOUTS["RodDia"]
 
 
 def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 3
+    assert source.count("add_feature_control_frame(") == 4
     assert "add_surface_finish(" not in source
     assert {"GripLen", "TubeLen", "RodSpan"} <= set().union(
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()
     )
     assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["TubeId"]
-    assert "GRIP CYLINDRICAL LENGTH" in drawing.DIMENSION_CALLOUTS["GripLen"]
+    assert "CYLINDRICAL LENGTH" in drawing.DIMENSION_CALLOUTS["GripLen"]
+    assert "HUB PROJECTION 12.00 +0.10/-0.00" in drawing.DIMENSION_CALLOUTS[
+        "TubeLen"
+    ]
+    assert "DATUM A TO LOWER END 42.00 +/-0.10" in drawing.DIMENSION_CALLOUTS[
+        "RodSpan"
+    ]
+
+
+def test_transverse_axis_uses_basic_location_and_position_control() -> None:
+    notes = pinion_handle_spec.DRAWING_NOTES
+    assert "BASIC 19.00 FROM DATUM B" in notes
+    assert "POSITION IS CONTROLLED" in notes
+    assert "MID-LENGTH WITHIN" not in notes
+    assert "INTERSECTS A WITHIN" not in notes
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'characteristic="position"' in source
+    assert 'datums=("A", "B")' in source
+    assert "diameter=True" in source
+
+
+def test_crown_has_one_toleranced_form_control() -> None:
+    notes = pinion_handle_spec.DRAWING_NOTES
+    assert f"SR{pinion_handle_spec.CAP_RADIUS:.2f}+/-0.10" in notes
+    assert "2.00 REF HIGH" in notes
+    assert "2.00+/-0.10 HIGH" not in notes
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
