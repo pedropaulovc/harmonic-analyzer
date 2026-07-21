@@ -53,7 +53,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("top-frame")
-    assert config["material"] == "ASTM A48 Class 30 Gray Iron"
+    assert config["material"] == config["material_specification"]
     assert "gray cast iron" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

@@ -5,8 +5,8 @@ overall footprint dimensions, the mounting-hole table, and casting notes; every
 shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The base is a gray-iron casting: an 18 x 11 in bottom slab with a centred
-17.5 x 10.5 in top plate (a 6.35 mm reveal per long side), four counterbored
+The base is a one-piece gray-iron casting: an 18 x 11 in lower flange with a
+centred 17.5 x 10.5 in upper pad (a 6.35 mm reveal per long side), four counterbored
 lag-screw mounting holes, and nine assembly-drilled hardware seats.  The plate
 is 457 mm long, so the whole sheet runs 1:2; the isometric drops to 1:4.
 

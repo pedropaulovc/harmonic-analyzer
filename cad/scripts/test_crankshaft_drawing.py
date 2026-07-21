@@ -89,7 +89,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("crankshaft")
-    assert "1018" in str(config["material"])
+    assert config["material"] == config["material_specification"]
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1

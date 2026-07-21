@@ -1,6 +1,6 @@
 cone-swing-platform:
   number: MHA-091
-  material: AISI 1018 Steel Plate
+  material: AISI 1018 steel plate, 1/4 in
   material_specification: AISI 1018 steel plate, 1/4 in
   finish: black oxide
   quantity: 1

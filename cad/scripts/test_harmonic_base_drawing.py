@@ -44,6 +44,9 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GREEN ENAMEL" not in notes
     assert "DEBURR" not in notes
     assert "UOS" not in notes
+    assert "ONE-PIECE CASTING" in notes
+    assert "INTEGRAL;" in notes
+    assert "JOINED" not in notes
     assert "REVEAL" in notes
     assert "BLIND FROM THE TOP FACE" in notes
     assert "LOCATION TOLERANCE +/-0.25" in notes
@@ -72,7 +75,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("harmonic-base")
-    assert config["material"] == "ASTM A48 Class 30 Gray Iron"
+    assert config["material"] == config["material_specification"]
     assert "gray cast iron" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

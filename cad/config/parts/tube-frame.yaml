@@ -1,7 +1,7 @@
 tube-frame:
   number: MHA-083
-  material: 1 in x 0.12 in DOM/CDS Steel Tube
-  material_specification: standard 1 in OD x 0.12 in wall steel tube (DOM/CDS)
+  material: ASTM A513 Type 5 SAE 1020 DOM tube, 1.000 x 0.120 in
+  material_specification: ASTM A513 Type 5 SAE 1020 DOM tube, 1.000 x 0.120 in
   finish: polished OD, oiled
   quantity: 4
   tolerance_class: plate_profile

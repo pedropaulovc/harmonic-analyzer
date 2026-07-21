@@ -62,7 +62,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("cone-swing-platform")
-    assert config["material"] == "AISI 1018 Steel Plate"
+    assert config["material"] == config["material_specification"]
     assert "steel" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1
