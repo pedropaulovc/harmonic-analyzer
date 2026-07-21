@@ -174,21 +174,21 @@ async def build(adapter: Any) -> dict[str, str]:
     crown_radial = math.sqrt(
         CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
     )
-    right_crown = (
+    right_crown_face = (
         RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + crown_axial) / 1000.0,
-        RIGHT_CENTER[1] + crown_radial / 1000.0,
+        RIGHT_CENTER[1] + crown_radial / 2000.0,
     )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=right_crown,
+        edge_xy=right_crown_face,
         frame_xy=(0.245, 0.250),
         characteristic="profile_surface",
         tolerance="0.05",
         datums=("A",),
         quantity="BOTH CROWNS",
         label="pinion pivot crown profile",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
     )
     add_surface_finish(
         adapter,

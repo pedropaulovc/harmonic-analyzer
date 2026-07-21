@@ -64,6 +64,8 @@ def test_direct_limits_and_native_cylindricity_control_the_body() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert 'characteristic="profile_surface"' in source
     assert 'quantity="BOTH CROWNS"' in source
+    assert 'entity_type="FACE"' in source
+    assert 'entity_type="SILHOUETTE"' not in source
     assert "add_surface_finish(" in source
     assert "CYLINDRICITY" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
     assert "Ra 1.6" not in drawing.DIMENSION_CALLOUTS["ShaftDia"]
