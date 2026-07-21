@@ -1,11 +1,11 @@
 r"""Reproduction script: pinion engage lever (book ch. 25).
 
 The tapered rod that turns the lift rod (build_pinion_lift_rod.py) to
-swing the pinion into mesh: a cylindrical clamp HUB at the root grips
+swing the pinion into mesh: a cylindrical HUB at the root seats over
 the lift rod's front end (p.69 ``page002_img07``: a short fat cylinder
 with a slightly domed south cap -- NOT a ball, PR7 review item), the
-rod reaches up-and-out with a visible taper (Ø6 at the root thinning
-to ~Ø4 at the tip; the 86 length and taper both re-derived from img07
+rod reaches up-and-out with a visible taper (Ø4 at the root growing
+to ~Ø6 at the tip; the 86 length and taper both re-derived from img07
 against the annotated 6 mm rod). Standing up = disengaged, folded flat
 = engaged; the model carries the DISENGAGED rest pose.
 

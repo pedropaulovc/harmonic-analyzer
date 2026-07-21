@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the pinion engage lever and its
 manufacturing drawing.
 
-PURE DATA, no SolidWorks/COM imports.  A clamp hub gripping the lift rod, with a
+PURE DATA, no SolidWorks/COM imports.  A hub seated over the lift rod, with a
 tapered grip rod rising out of it -- turned steel.  The nominals drive the part's
 named equation globals AND the drawing's coordinate math; the marked-dimension
 map keeps the part marks and drawing keeps in lockstep
@@ -33,6 +33,8 @@ DRAWING_NOTES = "\n".join(
         "GRIP ROD IS INTEGRAL: R2.00 AT HUB (<MOD-DIAM>4) TO R3.00 AT TIP (<MOD-DIAM>6),",
         "  STRAIGHT TAPER, NO STEPS; 86.00 FROM HUB AXIS TO TIP.",
         f"DOME THE FACE OPPOSITE THE BORE OPENING TO SPHERICAL R{CAP_RADIUS:.2f}, 1.50 AXIAL CROWN.",
+        "RELEASE HOLD - DO NOT MANUFACTURE: DEFINE THE HUB-TO-LIFT-ROD TORQUE DRIVE",
+        "  AND AXIAL RETENTION; THE SPECIFIED SLIDING BORE ALONE CANNOT DRIVE THE CAMS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

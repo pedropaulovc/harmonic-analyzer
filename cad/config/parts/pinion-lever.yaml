@@ -5,5 +5,4 @@ pinion-lever:
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
-  fit_class: shaft_in_bushing
   process: "machined (steel)"

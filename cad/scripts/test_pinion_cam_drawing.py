@@ -86,4 +86,5 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
+    assert "fit_class" not in spec
     assert int(spec["quantity"]) == 2

@@ -52,6 +52,14 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
+def test_unresolved_lever_drive_is_an_explicit_release_hold() -> None:
+    notes = pinion_lever_spec.DRAWING_NOTES
+    assert "RELEASE HOLD - DO NOT MANUFACTURE" in notes
+    assert "HUB-TO-LIFT-ROD TORQUE DRIVE" in notes
+    assert "AXIAL RETENTION" in notes
+    assert "SLIDING BORE ALONE CANNOT DRIVE THE CAMS" in notes
+
+
 def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source
@@ -72,4 +80,5 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
+    assert "fit_class" not in spec
     assert int(spec["quantity"]) == 1
