@@ -175,6 +175,13 @@ def test_long_reference_note_is_split_for_readable_rendering(spec_name: str) -> 
     )
 
 
+def test_hanger_hex_head_is_controlled_to_thread_axis() -> None:
+    spec = importlib.import_module("hanger_screw_spec")
+    assert "DATUM A = THREAD PITCH-DIAMETER AXIS." in spec.DRAWING_NOTES
+    assert "HEX CENTER WITHIN DIA 0.10 OF A" in spec.DRAWING_NOTES
+    assert "BEARING FACE PERP 0.10 TO A" in spec.DRAWING_NOTES
+
+
 def test_thumb_note_uses_short_lines_in_a_raised_lane() -> None:
     drawing = importlib.import_module("draw_thumb_screw")
     spec = importlib.import_module("thumb_screw_spec")
