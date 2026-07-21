@@ -618,6 +618,7 @@ from pinion_handle_geometry import (  # noqa: E402
     GRIP_DIA as HANDLE_GRIP_DIA,
     GRIP_LEN as HANDLE_GRIP_LEN,
     CAP_SAG as HANDLE_CAP_SAG,
+    ROD_DIA as HANDLE_ROD_DIA,
     TUBE_ID as HANDLE_TUBE_ID,
     TUBE_LEN as HANDLE_TUBE_LEN,
     WALL_T as HANDLE_WALL_T,
@@ -1332,7 +1333,10 @@ if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
 # reaches hypot(43, 3) = 43.1)
 # in its own thin band; the grip + cap + tube hub stay ON AXIS (R11.5 worst),
 # only their z reach is wider.
-_TEE_DISC_Z = (HANDLE_Z - 3.0, HANDLE_Z + 3.0)
+_TEE_DISC_Z = (
+    HANDLE_Z - HANDLE_ROD_DIA / 2.0,
+    HANDLE_Z + HANDLE_ROD_DIA / 2.0,
+)
 _TEE_HUB_Z = (
     HANDLE_Z - HANDLE_GRIP_LEN / 2.0 - HANDLE_CAP_SAG,
     HANDLE_Z + HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T + HANDLE_TUBE_LEN,

@@ -75,6 +75,13 @@ def test_handle_interfaces_are_fully_released_for_manufacture() -> None:
     assert 'name_last_feature(adapter, "RodHole")' in source
 
 
+def test_drive_train_clearance_uses_the_released_rod_diameter() -> None:
+    assembly = Path(handle.__file__).with_name("build_drive_train_assembly.py")
+    source = assembly.read_text(encoding="utf-8")
+    assert "ROD_DIA as HANDLE_ROD_DIA" in source
+    assert "HANDLE_Z - HANDLE_ROD_DIA / 2.0" in source
+
+
 def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
