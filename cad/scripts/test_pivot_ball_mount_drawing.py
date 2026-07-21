@@ -74,6 +74,8 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert 'characteristic="perpendicularity"' in source
     assert source.count('characteristic="circular_runout"') == 1
     assert "frame_xy=(0.205, 0.165)" in source
+    assert "STEM_DIM_TEXT = (0.180, _front_y(12.0))" in source
+    assert "frame_xy=(0.190, _front_y(12.0) - 0.020)" in source
     assert 'characteristic="profile_surface"' in source
     assert 'quantity="STEM AXIS"' in source
     assert "leader=False" not in source

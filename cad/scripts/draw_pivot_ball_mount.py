@@ -84,7 +84,7 @@ TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "+0.00/-0.05 THRU",
 }
-STEM_DIM_TEXT = (0.050, _front_y(12.0))
+STEM_DIM_TEXT = (0.180, _front_y(12.0))
 
 
 def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
@@ -322,7 +322,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=STEM_DIM_TEXT,
-        frame_xy=(0.055, _front_y(12.0) - 0.020),
+        frame_xy=(0.190, _front_y(12.0) - 0.020),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
