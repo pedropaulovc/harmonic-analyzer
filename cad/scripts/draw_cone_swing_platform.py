@@ -202,7 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         end,
-        frame_xy=(0.270, 0.090),
+        frame_xy=(0.360, 0.080),
         characteristic="flatness",
         tolerance="0.10",
         quantity="DATUM A BROAD FACE",

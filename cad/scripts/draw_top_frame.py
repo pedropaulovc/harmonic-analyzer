@@ -139,9 +139,11 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
         raise RuntimeError("top-frame plan is missing the B/C outer rail datum edges")
     return (
         _circle(-COLUMN_X, COLUMN_Z, BORE_DIA, "column bore"),
+        # Use the upper-left representative for the 4X boss control so its
+        # leader stays separate from the lower-left bore and gooseneck controls.
         _circle(
             -COLUMN_X,
-            COLUMN_Z,
+            -COLUMN_Z,
             BOSS_DIA,
             "column boss OD",
             allow_coincident=True,
