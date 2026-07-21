@@ -37,7 +37,15 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_cam_spec import BORE, BOSS_DIA, BOSS_Z, CAM_LEN, CAM_OD, ECC
+from pinion_cam_spec import (
+    BORE,
+    BOSS_DIA,
+    BOSS_PROUD,
+    BOSS_Z,
+    CAM_LEN,
+    CAM_OD,
+    ECC,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -61,7 +69,9 @@ SHEET_SCALE = (3.0, 1.0)
 
 # Front view (XY): the collar circle is centred ECC BELOW the origin, the bore
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
-FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + 0.5))) / 2.0
+FRONT_BBOX_CY = (
+    (CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))
+) / 2.0
 FRONT_CENTER = (0.105, 0.150)
 TOP_CENTER = (0.100, 0.232)
 ISO_CENTER = (0.230, 0.185)
@@ -95,7 +105,7 @@ DIMENSION_CALLOUTS = {
     "CollarCy": "+/-0.05 BOTH END FACES",
     "Depth": "+/-0.05",
     "BossDia": (
-        "+/-0.05\nPROJECTION 0.50+/-0.05\nBEYOND DIA 9.20 OD"
+        f"+/-0.05\nPROJECTION {BOSS_PROUD:.2f}+/-0.05\nBEYOND DIA 9.20 OD"
     ),
     "BossCz": "A TO BOSS / TAP AXIS",
 }

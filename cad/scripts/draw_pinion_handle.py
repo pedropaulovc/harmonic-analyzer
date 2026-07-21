@@ -111,7 +111,7 @@ DIMENSION_CALLOUTS = {
     ),
     "RodSpan": (
         "+/-0.10 OAL\n"
-        "42.00 +/-0.10 A TO LOWER END"
+        f"{ROD_DOWN:.2f} +/-0.10 A TO LOWER END"
     ),
     "RodDia": (
         "PRESS ROD 6.020 MAX / 6.015 MIN\n"
