@@ -312,6 +312,7 @@ def add_datum_feature(
     entity: Any | None = None,
     shoulder: bool = False,
     annotation: Any | None = None,
+    shoulder: bool = False,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
