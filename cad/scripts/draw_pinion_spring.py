@@ -92,14 +92,14 @@ FRONT_KEEP = {
     "FootLen": (_front_x(_FOOT_MID_X), 0.088),
     "BendR": (0.036, 0.120),
     "KinkR": (0.135, 0.220),
-    "FlatLen": (0.185, 0.205),
+    "FlatLen": (0.180, 0.205),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {
     "FootLen": "+/-0.10 TRUE LENGTH\nFREE END TO BEND TANGENCY",
     "BendR": "+/-0.10 INSIDE RADIUS",
     "KinkR": "+/-0.10 INSIDE RADIUS",
-    "FlatLen": "+/-0.10 FREE-FLAT TANGENT LENGTH",
+    "FlatLen": "+/-0.10 TRUE LENGTH\nNEAR-VERTICAL INSIDE EDGE",
 }
 
 
@@ -180,10 +180,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=top_face,
-        frame_xy=(0.350, 0.118),
+        frame_xy=(0.305, 0.122),
         characteristic="flatness",
         tolerance="0.10",
-        quantity="SCREW-DOWN FOOT BROAD FACE",
+        quantity="FOOT BROAD FACE",
         label="spring screw-down foot flatness",
         entity_type="FACE",
     )
