@@ -85,18 +85,17 @@ TOP_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "+0.055/+0.025 THRU",
-    "DomeDia": "+/-0.10",
 }
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
 # 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
-def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
-    """Return foot-seat, left-side, bore, and dome edges from the front view."""
+def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
+    """Return foot, side, side-origin vertex, bore, and dome front entities."""
     drawing_view = _early_bound(view, "IView")
     foot_candidates: list[tuple[float, Any]] = []
-    side_candidates: list[tuple[float, Any]] = []
+    side_candidates: list[tuple[float, Any, Any]] = []
     bore_candidates: list[tuple[float, float, Any]] = []
     for component in drawing_view.GetVisibleComponents() or []:
         for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
@@ -121,7 +120,10 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
                 abs(p0[0] + FOOT_WIDTH / 2.0) <= 0.01
                 and abs(p1[0] + FOOT_WIDTH / 2.0) <= 0.01
             ):
-                side_candidates.append((abs(p1[1] - p0[1]), edge))
+                origin_vertex = start if p0[1] < p1[1] else end
+                side_candidates.append(
+                    (abs(p1[1] - p0[1]), edge, origin_vertex)
+                )
     if not foot_candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
@@ -129,7 +131,9 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
         raise RuntimeError(f"foot-seat edge span is only {foot_span:.3f} mm")
     if not side_candidates:
         raise RuntimeError("front view has no left foot-side edge")
-    side_span, side_edge = max(side_candidates, key=lambda item: item[0])
+    side_span, side_edge, side_origin = max(
+        side_candidates, key=lambda item: item[0]
+    )
     if side_span < FOOT_HEIGHT - 0.1:
         raise RuntimeError(f"left foot-side edge span is only {side_span:.3f} mm")
     if not bore_candidates:
@@ -150,7 +154,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
     )
     if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
         raise RuntimeError("front view has no circular dome edge")
-    return foot_edge, side_edge, bore_edge, dome_edge
+    return foot_edge, side_edge, side_origin, bore_edge, dome_edge
 
 
 def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> Any:
@@ -175,7 +179,7 @@ def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> 
 
 
 def _add_bore_horizontal_basic(
-    adapter: Any, view: Any, side_entity: Any, bore_entity: Any
+    adapter: Any, view: Any, origin_vertex: Any, bore_entity: Any
 ) -> Any:
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
@@ -183,7 +187,7 @@ def _add_bore_horizontal_basic(
         raise RuntimeError("failed to activate front view for bore X location")
     draw.ClearSelection2(True)
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    for append, raw_entity in ((False, side_entity), (True, bore_entity)):
+    for append, raw_entity in ((False, origin_vertex), (True, bore_entity)):
         selection_data = selection_manager.CreateSelectData()
         selection_data.View = view
         entity = _early_bound(raw_entity, "IEntity")
@@ -282,6 +286,13 @@ async def build(adapter: Any) -> dict[str, str]:
     if bore_height_display is None:
         raise RuntimeError("BoreHeight has no display dimension to box")
     set_basic_dimension(adapter, bore_height_display, label="bore height")
+    dome_diameter_annotation = front_by_name["DomeDia"]
+    dome_diameter_display = adapter._attempt(
+        lambda: dome_diameter_annotation.GetSpecificAnnotation()
+    )
+    if dome_diameter_display is None:
+        raise RuntimeError("DomeDia has no display dimension to box")
+    set_basic_dimension(adapter, dome_diameter_display, label="dome diameter")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the plan view")
 
@@ -290,8 +301,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # clamp-fit finish.
     _bore_r = BORE_DIA / 2.0 * _S
     foot_edge = (FRONT_CENTER[0] + 0.006, _front_y(0.0))
-    foot_entity, side_entity, bore_entity, dome_entity = _front_entities(adapter, front)
-    _add_bore_horizontal_basic(adapter, front, side_entity, bore_entity)
+    foot_entity, side_entity, side_origin, bore_entity, dome_entity = (
+        _front_entities(adapter, front)
+    )
+    _add_bore_horizontal_basic(adapter, front, side_origin, bore_entity)
     add_datum_feature(
         adapter,
         front,
@@ -305,7 +318,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(2.5)),
-        symbol_xy=(0.058, _front_y(2.5) + 0.012),
+        symbol_xy=(0.050, _front_y(2.5)),
         datum="B",
         label="left foot side",
         entity=side_entity,
@@ -328,7 +341,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - _bore_r, _front_y(BORE_HEIGHT)),
-        symbol_xy=(0.062, _front_y(BORE_HEIGHT) - 0.018),
+        symbol_xy=(0.055, _front_y(BORE_HEIGHT)),
         datum="C",
         label="arbor bore axis",
         entity=bore_entity,
@@ -338,10 +351,10 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(FRONT_CENTER[0] - TOP_RADIUS * _S, _front_y(BORE_HEIGHT)),
         frame_xy=(0.055, _front_y(BORE_HEIGHT) + 0.032),
-        characteristic="circular_runout",
-        tolerance="0.05",
+        characteristic="profile_surface",
+        tolerance="0.10",
         datums=("C",),
-        label="dome runout to arbor bore",
+        label="dome surface profile to arbor bore",
         entity=dome_entity,
     )
     add_surface_finish(

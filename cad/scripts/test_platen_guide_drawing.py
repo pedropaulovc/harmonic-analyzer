@@ -119,6 +119,9 @@ def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
     assert "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol>" in xml
     assert xml.count("<DatumCompartment>") == 3
     assert property_link("Manufacturing Notes") == '$PRPSHEET:"Manufacturing Notes"'
+    assert "GTOL-SPROF" in _gtol_frame_xml(
+        "profile_surface", "0.10", datums=("C",)
+    )
 
 
 def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:
