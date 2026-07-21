@@ -378,6 +378,8 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=3,
     )
 
 

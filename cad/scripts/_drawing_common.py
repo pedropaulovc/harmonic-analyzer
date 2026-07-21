@@ -2808,6 +2808,8 @@ async def finalize_drawing(
     *,
     pdf_title: str,
     scale: tuple[float, float] = (1.0, 1.0),
+    redundant_note_substrings: Sequence[str] = (),
+    expected_redundant_notes: int = 0,
 ) -> dict[str, str]:
     """Save, reopen-validate, and export the finished drawing (SLDDRW/PDF/PNG).
 
@@ -2873,6 +2875,19 @@ async def finalize_drawing(
     # read as inch values and get machined at the wrong scale (Codex P1).
     from _common import apply_custom_properties
     apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
+
+    removed_notes = sum(
+        remove_notes_matching(adapter, substring)
+        for substring in redundant_note_substrings
+    )
+    if removed_notes != expected_redundant_notes:
+        raise RuntimeError(
+            f"final drawing removed {removed_notes} redundant notes, "
+            f"expected {expected_redundant_notes}: "
+            f"{tuple(redundant_note_substrings)!r}"
+        )
+    if removed_notes:
+        _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
 
     # The layout is now complete -- audit element collisions / sheet overflow on
     # the finished sheet before the first save, so a broken layout never reaches
