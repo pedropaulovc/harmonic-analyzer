@@ -178,10 +178,6 @@ async def build(adapter: Any) -> dict[str, str]:
         boss_center_x,
         TOP_CENTER[1] + BOSS_DIA * SHEET_SCALE[0] / 2000.0,
     )
-    tap_bottom = (
-        boss_center_x,
-        TOP_CENTER[1] - 2.5 * SHEET_SCALE[0] / 2000.0,
-    )
     od_center = (FRONT_CENTER[0], _front_y(-ECC))
     od_bottom = (od_center[0], od_center[1] - CAM_R_SHEET)
     add_datum_feature(
@@ -225,7 +221,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=tap_bottom,
+        # The M2.5 thread is a drawing-specified machining operation at the
+        # integral boss centre, so no pre-machining tap edge exists to select.
+        # Attach its separate axis requirement to the same real boss silhouette;
+        # the quantity compartment identifies the controlled derived axis.
+        edge_xy=boss_top,
         frame_xy=(0.270, 0.250),
         characteristic="position",
         tolerance="0.03",
@@ -233,6 +233,7 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         quantity="M2.5 TAP PITCH AXIS",
         label="cam tap pitch axis position",
+        entity_type="SILHOUETTE",
     )
     add_surface_finish(
         adapter,
