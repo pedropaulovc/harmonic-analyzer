@@ -95,11 +95,12 @@ _BLADE_MID = (
 )
 # The spring is created as a one-sided thin feature from its open centreline.
 # In the front projection that centreline is the concave outline, not an
-# interior point of the visible broad face.  Move half a strip thickness along
-# the known outward normal so FACE selection lands unambiguously in the ribbon.
+# interior point of the visible broad face.  The live one-sided thin extrusion
+# lands opposite the outward contact normal, so move half a strip thickness in
+# that direction and pick unambiguously inside the projected ribbon.
 _BLADE_FACE_MID = (
-    _BLADE_MID[0] + THICK * _N[0] / 2.0,
-    _BLADE_MID[1] + THICK * _N[1] / 2.0,
+    _BLADE_MID[0] - THICK * _N[0] / 2.0,
+    _BLADE_MID[1] - THICK * _N[1] / 2.0,
 )
 
 FRONT_KEEP = {
