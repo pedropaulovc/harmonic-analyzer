@@ -375,7 +375,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         front,
-        text="2X 2.12<MOD-DEG> +/-0.10<MOD-DEG> FROM VERTICAL",
+        text="2X 2.12<MOD-DEG> +/-0.10<MOD-DEG>\nFROM VERTICAL",
         edge_xy=(FRONT_CENTER[0] - 11.0 * _S, _front_y(BORE_HEIGHT / 2.0)),
         note_xy=(0.020, _front_y(BORE_HEIGHT / 2.0) + 0.015),
         label="taper flank angle",

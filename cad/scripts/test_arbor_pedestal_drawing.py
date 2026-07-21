@@ -82,7 +82,7 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'orientation="vertical"' in source
     assert "for index in (1, 2):" in source
     assert "if result != 0:" in source
-    assert "2X 2.12<MOD-DEG> +/-0.10<MOD-DEG> FROM VERTICAL" in source
+    assert 'text="2X 2.12<MOD-DEG> +/-0.10<MOD-DEG>\\nFROM VERTICAL"' in source
     assert 'roughness_ra="1.6"' in source
     common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
         encoding="utf-8"
