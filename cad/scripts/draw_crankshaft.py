@@ -22,7 +22,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
@@ -97,6 +97,33 @@ RIGHT_KEEP = {
 DIMENSION_CALLOUTS = {"ShaftDiaDim": "+0.00/-0.02"}
 
 
+def _visible_shaft_face(adapter: Any, view: Any) -> Any:
+    """Return the modeled OD face visible in the crankshaft side view."""
+    expected_radius_m = SHAFT_DIA / 2000.0
+    candidates: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        faces = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 3),  # swViewEntityType_Face
+            default=(),
+        ) or ()
+        for face in faces:
+            face = _early_bound(face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if not surface.IsCylinder():
+                continue
+            parameters = surface.CylinderParams
+            if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
+                continue
+            candidates.append((float(face.GetArea()), face))
+    if not candidates:
+        raise RuntimeError(
+            f"crankshaft side view has no visible cylindrical face at "
+            f"radius {expected_radius_m:g} m"
+        )
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -165,11 +192,12 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
+    shaft_face = _visible_shaft_face(adapter, right)
     add_view_centerline(
         adapter,
         right,
-        face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.035),
         label="crankshaft bearing axis",
+        face=shaft_face,
     )
 
     # The #9 tapered-pin cross-hole: the associative wizard callout carries the
@@ -184,15 +212,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Crank End Note", 0.172, 0.078)
 
-    shaft_face = (RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.035)
     add_surface_finish(
         adapter,
         right,
-        edge_xy=shaft_face,
         symbol_xy=(0.238, 0.194),
         roughness_ra="1.6",
         label="crankshaft bearing finish",
         entity_type="FACE",
+        edge_entity=shaft_face,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.056)
     # Identify the enlarged circular projection without relying on its position.

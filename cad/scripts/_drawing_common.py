@@ -576,8 +576,9 @@ def add_view_centerline(
     adapter: Any,
     view: Any,
     *,
-    face_xy: tuple[float, float],
+    face_xy: tuple[float, float] | None = None,
     label: str,
+    face: Any | None = None,
 ) -> Any:
     """Insert the axis centerline of a cylindrical face shown in ``view``.
 
@@ -589,7 +590,9 @@ def add_view_centerline(
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    _select_view_entity(adapter, view, "FACE", face_xy, label=label)
+    _select_view_entity(
+        adapter, view, "FACE", face_xy, label=label, entity=face
+    )
     centerline = adapter._attempt(lambda: ddoc.InsertCenterLine2())
     if centerline is None:
         raise RuntimeError(f"failed to insert view centerline ({label})")

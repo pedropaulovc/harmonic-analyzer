@@ -70,6 +70,10 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert source.count("add_feature_control_frame(") == 0
     assert source.count("add_surface_finish(") == 1
     assert "add_view_centerline(" in source
+    assert "GetVisibleEntities2(c, 3)" in source
+    assert "face=shaft_face" in source
+    assert "entity=shaft_face" in source
+    assert "face_xy=" not in source
     assert "BOTH END FACES SQUARE" in crankshaft_spec.DRAWING_NOTES
 
 
