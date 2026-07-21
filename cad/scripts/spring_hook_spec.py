@@ -29,7 +29,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "1. OPEN J-HOOK: SHANK, 90 DEG ELBOW",
-        "   R1.5 CL, THEN A 2.5 ARM.",
+        "   R1.50 CL, THEN A 2.50 ARM.",
         "2. SHANK SEATS IN THE SUMMING-LEVER",
         "   PLATE BORE; ARM CATCHES THE",
         "   CHANNEL-SPRING BOTTOM EYE.",

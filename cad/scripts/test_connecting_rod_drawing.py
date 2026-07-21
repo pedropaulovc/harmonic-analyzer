@@ -51,7 +51,7 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = connecting_rod_spec.DRAWING_NOTES
     assert "#47 DRILL" in notes
-    assert "RING 3.0 THICK" in notes
+    assert "RING 3.00 THICK" in notes
     assert "SHANK AND HEAD\n   2.5 THICK" in notes
     assert "HEAD 10.0 W x 10.5 HIGH, R5.0" in notes
     assert "PIN C/L 2.40 BELOW CROWN" in notes

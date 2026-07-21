@@ -41,14 +41,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "1. STRAP BORE MACHINED FOR THE",
-        "   30.6 ECCENTRIC CAM, 0.1 CLR/SIDE.",
+        "   30.60 ECCENTRIC CAM, 0.10 CLR/SIDE.",
         "2. ROD HANGS PLUMB; RING CENTRE TO",
         "   ROCKER PIN 147.67.",
-        "3. RING 3.0 THICK; SHANK AND HEAD",
-        "   2.5 THICK.",
-        "4. HEAD 10.0 W x 10.5 HIGH, R5.0",
-        "   CROWN; 1.2 SHOULDER TAPER FROM",
-        "   8.0 SHANK. PIN C/L 2.40 BELOW CROWN.",
+        "3. RING 3.00 THICK; SHANK AND HEAD",
+        "   2.50 THICK.",
+        "4. HEAD 10.00 W x 10.50 HIGH, R5.00",
+        "   CROWN; 1.20 SHOULDER TAPER FROM",
+        "   8.00 SHANK. PIN C/L 2.40 BELOW CROWN.",
         "5. ROCKER PIN HOLE: #47 DRILL THRU.",
     )
 )

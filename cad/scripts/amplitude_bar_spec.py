@@ -41,7 +41,7 @@ DRAWING_NOTES = "\n".join(
         "2. ONE OF 20 FOURIER-COEFFICIENT BARS.",
         "3. BOTTOM NOTCH 3.18 W x 2.38 DEEP,",
         "   CENTRED; RIDES THE ROCKER ARM.",
-        "4. TOP NOTCH 3.18 W x 12.7 DEEP,",
+        "4. TOP NOTCH 3.18 W x 12.70 DEEP,",
         "   CENTRED; STRADDLES THE LEVER.",
         "5. TOP PIN HOLE: #47 DRILL THRU,",
         "   6.35 BELOW THE BAR TOP.",

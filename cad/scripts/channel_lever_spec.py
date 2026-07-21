@@ -34,7 +34,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "1. CASTING 3.0 THICK.",
+        "1. CASTING 3.00 THICK.",
         "2. THIRD-CLASS LEVER: FULCRUM AT THE",
         "   NOSE, SPRING PULL AT THE END TAB.",
         "3. FULCRUM HOLE: REAM 6.50 THRU.",
