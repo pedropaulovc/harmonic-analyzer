@@ -298,6 +298,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_summing_lever.py",
     ),
     DrawingSpec(
+        name="pinion_bracket",
+        part="pinion_bracket",
+        artifact_stem="pinion-bracket",
+        script_name="draw_pinion_bracket.py",
+    ),
+    DrawingSpec(
         name="boss_hook",
         part="boss_hook",
         artifact_stem="boss-hook",

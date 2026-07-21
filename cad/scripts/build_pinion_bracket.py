@@ -44,6 +44,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -52,34 +53,39 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from pinion_bracket_spec import (
+    ARBOR_BORE,
+    C2C,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+    PIN_BORE,
+    PIN_DROP,
+    PIN_SEAT,
+    PIVOT_BORE,
+    R_END,
+    THICKNESS,
+    WIDTH,
+)
 
 import _telemetry
 
 PART_NAME = "pinion-bracket"
 MATERIAL = "Plain Carbon Steel"  # p.68: bright steel strap
-
-WIDTH = 18.0  # ch25 strap width, photo-scaled vs the 42T drum tip O22.4 in
-# v4_pinion_018 (strap ~0.8x the tip OD; the teeth stand proud of BOTH flanks
-# -- the old 22 sat flush with the tips). Assembly guard: build_drive_train's
-# STRAP_R_END must match WIDTH / 2.
-C2C = 43.0  # pivot bore to arbor bore (ch30 GT 2026-07-02, was 31): the pinion
-# now parks LEVEL with the drive axis, 42.0 above the pivot bore, so the strap
-# spans sqrt(42^2 + 9.22^2) at a 12.4 deg west lean in the disengaged rest
-# (build_drive_train_assembly STRAP_C2C / STRAP_LEAN_DEG -- must match)
-THICKNESS = 5.0  # photo-scaled (low)
-PIVOT_BORE = 6.35  # torque shaft below (derived)
-ARBOR_BORE = 8.0  # drum arbor above (PR7: the separate steel arbor is O8
-# -- build_pinion_arbor SHAFT_DIA must match)
-PIN_BORE = 4.0  # cam-follower pin press seat (PR8) -- build_pinion_cam_pin
-# PIN_DIA must match; 0.5 walls in the 5-thick edge
-PIN_DROP = 2.0  # pivot bore centre -> pin bore axis, down the strap
-# centreline (img01: the pin rides at the pivot's height band). The blind
-# seat stops 5 short of the centreline, so the O6.35 pivot bore (which a
-# through bore at this drop would cut into) is untouched.
-PIN_SEAT = 4.0  # blind depth from the x -9 tangent plane (must match
-# build_pinion_cam_pin SEAT_LEN)
-
-R_END = WIDTH / 2.0
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 
 def _pin_bore_removed() -> float:
@@ -208,6 +214,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
     )
     name_last_feature(adapter, "Strap")
+    depth_dim = name_dimensions(adapter, "Strap", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"StrapThickness"')]
     area = (
         WIDTH * C2C
         + math.pi * R_END**2
@@ -300,10 +308,27 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven strap (equations neutral)", expected, 0.005 * expected)
 
+    # Manufacturing drawing support: mark exactly the print's dimensions (the
+    # drawing recipe imports the marked set and must find every one of these),
+    # and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

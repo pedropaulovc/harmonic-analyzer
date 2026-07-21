@@ -1,5 +1,8 @@
 pinion-bracket:
   number: MHA-056
   material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-rolled steel bar
+  finish: bright machined, oiled
+  quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
