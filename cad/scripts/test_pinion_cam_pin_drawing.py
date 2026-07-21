@@ -41,7 +41,6 @@ def test_sheet_runs_at_4_to_1_with_8_to_1_end_view() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_pin_spec.DRAWING_NOTES
-    assert "4.012-4.020" in notes
     assert "SPHERICAL" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
@@ -55,7 +54,8 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "add_datum_feature(" not in source
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
-    assert "4.012/4.020" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert "4.020 MAX / 4.012 MIN" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert "ISO 286-2" in drawing.DIMENSION_CALLOUTS["PinDia"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

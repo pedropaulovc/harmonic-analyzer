@@ -25,6 +25,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -37,6 +38,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from crank_handle_spec import COLLAR_DIA, HANDLE_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
     place_view,
 )
 
@@ -59,7 +61,8 @@ SHEET_SCALE = (2.0, 1.0)
 # (x=0) and butt at the right (x=HANDLE_LENGTH).  Centre on the axial midspan.
 FRONT_BBOX_CX = HANDLE_LENGTH / 2.0
 FRONT_CENTER = (0.150, 0.178)
-ISO_CENTER = (0.330, 0.150)
+RIGHT_CENTER = (0.285, 0.205)
+ISO_CENTER = (0.350, 0.150)
 
 COLLAR_R = COLLAR_DIA / 2.0
 
@@ -79,11 +82,15 @@ FRONT_KEEP = {
     "CollarLength": (0.070, 0.222),
     "PeakStation": (0.150, 0.242),
 }
+RIGHT_KEEP = {
+    "PivotBoreDia": (0.285, 0.170),
+}
 DIMENSION_CALLOUTS: dict[str, str] = {}
 DIMENSION_CALLOUTS = {
     "HandleLength": "+/-0.25 OVERALL",
     "CollarLength": "+/-0.10 FROM COLLAR FACE",
     "PeakStation": "+/-0.25 FROM COLLAR FACE",
+    "PivotBoreDia": "FINAL LIMITS 6.10/6.15 THRU",
 }
 
 
@@ -128,17 +135,32 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
-    set_hidden_lines_visible(adapter, front)
+    for view in (front, right):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    )
+    set_dimension_callouts(
+        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    )
+    add_view_centerline(
+        adapter,
+        front,
+        face_xy=(_front_x(35.0), _front_y(0.0)),
+        label="crank handle turning axis",
+    )
+    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to crank-handle end view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.116)
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.116)
 
     return await finalize_drawing(
         adapter,

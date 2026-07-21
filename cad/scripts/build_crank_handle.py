@@ -41,6 +41,7 @@ from _common import (
     apply_color,
     STAINED_OAK,
     check,
+    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -75,6 +76,7 @@ from crank_handle_spec import (  # noqa: E402
     ISOMETRIC_VIEW_NOTE,
     NECK_R,
     PEAK_X,
+    PIVOT_BORE_DIA,
 )
 
 COLLAR_R = COLLAR_DIA / 2.0
@@ -109,7 +111,7 @@ assert abs(abs(FRONT_CY - REAR_CY) - abs(FRONT_R - REAR_R)) < 1e-6
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -128,6 +130,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "NeckR", f"{NECK_R}mm")
     await set_global(adapter, "PeakX", f"{PEAK_X}mm")
     await set_global(adapter, "CapR", f"{CAP_R}mm")
+    await set_global(adapter, "PivotBoreDia", f"{PIVOT_BORE_DIA}mm")
 
     # Per-sketch SketchDims records each dim in emission order; apply() renames
     # them and collects the drive jobs run in one deferred batch at the end (every
@@ -279,8 +282,35 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Handle")
 
-    # Capture the as-built volume as the neutrality reference (the revolved
-    # twin-arc silhouette has no tidy closed form), then apply the deferred drive
+    # Axial running bore through the grip. The Right plane is normal to the
+    # handle's +X turning axis, so this cut is coaxial with the revolve and its
+    # true-circle end view gives the drawing an inspectable bore callout.
+    bore = SketchDims()
+    check("create_sketch pivot bore", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        PIVOT_BORE_DIA / 2.0,
+        "pivot bore",
+        dims=bore,
+        names=("PivotBoreCy", "PivotBoreCz", "PivotBoreDia"),
+        drives=(None, None, '"PivotBoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "pivot bore sketch")
+    check("exit_sketch pivot bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotBoreProfile")
+    drive_jobs += bore.apply(adapter, "PivotBoreProfile")
+    check(
+        "cut pivot bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.5 * HANDLE_LENGTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "PivotBore")
+
+    # Capture the as-built volume as the neutrality reference (the bored,
+    # revolved twin-arc silhouette has no tidy closed form), then apply the deferred drive
     # equations after the model + a rebuild exists so every target resolves. Each
     # equation evaluates to the value just built, so the geometry must not move.
     mass = await adapter.get_mass_properties()

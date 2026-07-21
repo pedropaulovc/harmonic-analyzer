@@ -65,8 +65,8 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.030),
 }
 DIMENSION_CALLOUTS = {
-    "PinDia": "FINAL LIMITS\n4.012/4.020 p6\nRa 0.8",
-    "Depth": "+/-0.05 CYLINDRICAL SHANK\n15.80 REF OVERALL",
+    "PinDia": "FINAL LIMITS\n4.020 MAX / 4.012 MIN\np6 PER ISO 286-2\nRa 0.8",
+    "Depth": "+/-0.05 CYLINDRICAL SHANK",
 }
 
 

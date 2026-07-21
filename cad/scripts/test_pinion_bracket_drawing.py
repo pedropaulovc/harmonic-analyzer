@@ -62,7 +62,8 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
     notes = pinion_bracket_spec.DRAWING_NOTES
-    assert "PRESS FIT" in notes
+    assert "3.00 MIN" in notes
+    assert "25 MM LONG GO PIN" in notes
     assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "8.010/8.025" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
     assert "4.000/4.012" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
@@ -96,7 +97,7 @@ def test_direct_limits_replace_ambiguous_datum_scheme() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
     assert drawing.DIMENSION_CALLOUTS["ArborBoreCz"] == "+/-0.10"
-    assert "MID-THICKNESS" in drawing.DIMENSION_CALLOUTS["PinSeatCz"]
+    assert "BROAD FACE" in drawing.DIMENSION_CALLOUTS["PinSeatCz"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

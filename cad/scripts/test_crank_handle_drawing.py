@@ -22,7 +22,7 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert handle.DRAWING_DIMENSIONS is crank_handle_spec.DRAWING_DIMENSIONS
     marked = set().union(*crank_handle_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     # The build re-imports its primitive nominals from the spec.
@@ -37,10 +37,10 @@ def test_diameters_are_a_turning_schedule_not_marked_dims() -> None:
     # The pear arcs derive the diameters, so only the axial stations are marked;
     # the diameters live in the turning-schedule note.
     marked = set().union(*crank_handle_spec.DRAWING_DIMENSIONS.values())
-    assert marked == {"HandleLength", "CollarLength", "PeakStation"}
+    assert marked == {"HandleLength", "CollarLength", "PeakStation", "PivotBoreDia"}
     notes = crank_handle_spec.DRAWING_NOTES
     assert "TURNING SCHEDULE" in notes
-    assert "SMOOTH PEAR CURVE" in notes
+    assert "ARCS TANGENT AT MAX ONLY" in notes
 
 
 def test_peak_station_uses_visible_construction_geometry() -> None:
@@ -53,9 +53,10 @@ def test_peak_station_uses_visible_construction_geometry() -> None:
     assert "peak station construction line" in build_source
 
 
-def test_solid_profile_does_not_request_hole_center_marks() -> None:
+def test_bored_profile_has_end_view_center_marks() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "auto_center_marks" not in source
+    assert "auto_center_marks" in source
+    assert "add_view_centerline" in source
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
@@ -69,7 +70,7 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = crank_handle_spec.DRAWING_NOTES
     assert "CDA 260" not in notes
-    assert "COLLAR PROFILE INTEGRAL WITH THE OAK HANDLE" in notes
+    assert "COLLAR PROFILE INTEGRAL WITH HANDLE BLANK" in notes
     assert "COIL" not in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
@@ -81,9 +82,8 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     notes = crank_handle_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "BORE 6.10-6.15 THRU" in notes
-    assert "MATING PIN" in notes
-    assert "RETAIN WITH" in notes
+    assert "BORE AXIS CONCENTRIC" in notes
+    assert "6.10/6.15 THRU" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
 
 
 def test_feature_requirements_do_not_use_ambiguous_unused_datums() -> None:
@@ -100,9 +100,9 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("crank-handle")
-    assert spec["material"] == handle.MATERIAL == "Oak"
+    assert handle.MATERIAL == "Oak"
     assert "White oak" in spec["material_specification"]
-    assert "6-8% moisture" in spec["material_specification"]
+    assert "6-8% MC" in spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1

@@ -62,7 +62,7 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "SLIDING FIT" in notes
-    assert "6.360-6.375" in notes
+    assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -73,9 +73,9 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "M3 X 0.5-6H" in notes
+    assert "M2.5 X 0.45-6H" in notes
     assert "ISO 4026" in notes
-    assert "THREADLOCKER" in notes
+    assert "2.00 MIN FULL THREAD" in notes
 
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
@@ -84,7 +84,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
     assert "6.360/6.375" in drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 2
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 3
     assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["CollarCy"]
 
 

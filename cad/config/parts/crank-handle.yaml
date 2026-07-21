@@ -1,8 +1,8 @@
 crank-handle:
   number: MHA-022
-  material: Oak
-  material_specification: White oak, clear straight-grain, 6-8% moisture content
-  finish: dark-walnut penetrating stain; three cured coats satin wiping polyurethane
+  material: White oak, FAS or Select grade; kiln-dried 6-8% MC; straight grain parallel to axis; no knots or checks
+  material_specification: White oak, FAS or Select grade; kiln-dried 6-8% MC; straight grain parallel to axis; no knots or checks
+  finish: sand P220; Minwax 2716 Dark Walnut stain; three coats Minwax 35055000 satin polyurethane, P320 between; cure 7 days
   quantity: 1
   tolerance_class: visual_noncritical
   process: "turned (wood)"
