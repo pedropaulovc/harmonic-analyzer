@@ -39,8 +39,8 @@ def test_diameters_are_a_turning_schedule_not_marked_dims() -> None:
     marked = set().union(*crank_handle_spec.DRAWING_DIMENSIONS.values())
     assert marked == {"HandleLength", "CollarLength", "PeakStation", "PivotBoreDia"}
     notes = crank_handle_spec.DRAWING_NOTES
-    assert "THEORETICALLY EXACT TURNING PROFILE" in notes
-    assert "ARCS ARE TANGENT AT MAX ONLY" in notes
+    assert "BASIC TRUE GRIP PROFILE" in notes
+    assert "ARCS TANGENT AT MAX ONLY" in notes
 
 
 def test_peak_station_uses_visible_construction_geometry() -> None:
@@ -70,7 +70,7 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = crank_handle_spec.DRAWING_NOTES
     assert "CDA 260" not in notes
-    assert "COLLAR PROFILE INTEGRAL WITH HANDLE BLANK" in notes
+    assert "TURN COLLAR INTEGRAL" in notes
     assert "COIL" not in notes
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
@@ -84,6 +84,10 @@ def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "BORE AXIS CONCENTRIC" not in notes
     assert "NO BLEND, RADIUS, OR CHAMFER" in notes
+    assert "BORE TOTAL RUNOUT 0.10 | A APPLIES FULL LENGTH" in notes
+    assert "GRAIN RUNS PARALLEL TO TURNING AXIS" in notes
+    assert "PROFILE 0.50 | A | B APPLIES" in notes
+    assert "NOMINAL REF ONLY" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "6.15 MAX / 6.10 MIN THRU" in drawing.DIMENSION_CALLOUTS[
         "PivotBoreDia"
     ]
@@ -95,6 +99,8 @@ def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert 'characteristic="total_runout"' in source
     assert 'characteristic="profile_surface"' in source
+    assert 'quantity="FULL BORE LENGTH"' in source
+    assert 'quantity="TURNED GRIP PROFILE - SEE NOTE"' in source
     assert "set_basic_dimension(" in source
     assert "add_surface_finish(" not in source
 

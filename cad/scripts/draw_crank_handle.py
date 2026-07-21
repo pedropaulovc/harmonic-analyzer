@@ -93,12 +93,14 @@ FRONT_KEEP = {
     "PeakStation": (0.150, 0.242),
 }
 RIGHT_KEEP = {
-    "PivotBoreDia": (0.285, 0.170),
+    "PivotBoreDia": (0.245, 0.178),
 }
-DIMENSION_CALLOUTS: dict[str, str] = {}
 DIMENSION_CALLOUTS = {
     "HandleLength": "+/-0.25 OVERALL",
-    "PivotBoreDia": "FINAL LIMITS 6.15 MAX / 6.10 MIN THRU",
+    "PivotBoreDia": (
+        "NOMINAL REF ONLY\n"
+        "FINAL LIMITS 6.15 MAX / 6.10 MIN THRU"
+    ),
 }
 
 
@@ -174,7 +176,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
 
-    collar_od_top = (RIGHT_CENTER[0], RIGHT_CENTER[1] + COLLAR_R_SHEET)
+    collar_od_right = (RIGHT_CENTER[0] + COLLAR_R_SHEET, RIGHT_CENTER[1])
     bore_top = (
         RIGHT_CENTER[0],
         RIGHT_CENTER[1] + PIVOT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -187,8 +189,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         right,
-        edge_xy=collar_od_top,
-        symbol_xy=(0.318, 0.224),
+        edge_xy=collar_od_right,
+        symbol_xy=(0.325, RIGHT_CENTER[1]),
         datum="A",
         label="collar OD datum axis",
     )
@@ -204,20 +206,22 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=bore_top,
-        frame_xy=(0.275, 0.252),
+        frame_xy=(0.240, 0.252),
         characteristic="total_runout",
         tolerance="0.10",
         datums=("A",),
+        quantity="FULL BORE LENGTH",
         label="full-length bore total runout",
     )
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=profile_peak,
-        frame_xy=(0.220, 0.257),
+        frame_xy=(0.205, 0.263),
         characteristic="profile_surface",
         tolerance="0.50",
         datums=("A", "B"),
+        quantity="TURNED GRIP PROFILE - SEE NOTE",
         label="turned handle profile",
         entity_type="SILHOUETTE",
     )
