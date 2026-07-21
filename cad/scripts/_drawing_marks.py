@@ -28,28 +28,59 @@ from _common import (
 def mark_dimensions_for_drawing(
     adapter: Any, feature_name: str, dimension_names: set[str]
 ) -> None:
-    """Mark only this part's explicit manufacturing dimensions for insertion."""
+    """Mark only this part's explicit manufacturing dimensions for insertion.
+
+    Hole Wizard placement dimensions belong to a ``ProfileFeature`` subfeature,
+    not to the top-level ``HoleWzd`` feature named by the part recipe.  Walk the
+    requested feature and its subfeature tree so those authored placement
+    dimensions remain usable as native drawing dimensions.  A requested name
+    must resolve exactly once within that tree; duplicate matches are rejected
+    instead of silently marking an arbitrary dimension.
+    """
     feature = _feature_by_name(adapter, feature_name)
-    marked: set[str] = set()
-    display = _read_member(feature, "GetFirstDisplayDimension")
-    for _ in range(1000):
-        if not display:
-            break
-        dimension = display.GetDimension2(0)
-        name = str(_read_member(dimension, "Name"))
-        if _dim_owner_feature(dimension) == feature_name and name in dimension_names:
-            display.MarkedForDrawing = True
-            if not bool(_read_member(display, "MarkedForDrawing")):
-                raise RuntimeError(f"{name}@{feature_name}: mark-for-drawing failed")
-            marked.add(name)
-        display = feature.GetNextDisplayDimension(display)
-    missing = dimension_names - marked
+    matches: dict[str, tuple[Any, str]] = {}
+    stack = [feature]
+    while stack:
+        current = stack.pop()
+        current_name = str(_read_member(current, "Name"))
+        display = _read_member(current, "GetFirstDisplayDimension")
+        for _ in range(1000):
+            if not display:
+                break
+            dimension = display.GetDimension2(0)
+            name = str(_read_member(dimension, "Name"))
+            owner = _dim_owner_feature(dimension)
+            if owner == current_name and name in dimension_names:
+                full_name = str(_read_member(dimension, "FullName"))
+                previous = matches.get(name)
+                if previous is not None and previous[1] != full_name:
+                    raise RuntimeError(
+                        f"{feature_name}: drawing dimension {name!r} is ambiguous: "
+                        f"{previous[1]!r}, {full_name!r}"
+                    )
+                matches[name] = (display, full_name)
+            display = current.GetNextDisplayDimension(display)
+
+        child = _read_member(current, "GetFirstSubFeature")
+        children: list[Any] = []
+        for _ in range(1000):
+            if not child:
+                break
+            children.append(child)
+            child = _read_member(child, "GetNextSubFeature")
+        stack.extend(reversed(children))
+
+    missing = dimension_names - matches.keys()
     if missing:
         raise RuntimeError(
             f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
         )
+    for name, (display, full_name) in matches.items():
+        display.MarkedForDrawing = True
+        if not bool(_read_member(display, "MarkedForDrawing")):
+            raise RuntimeError(f"{full_name}: mark-for-drawing failed")
     _telemetry.success(
-        f"marked for drawing {feature_name}: {', '.join(sorted(marked))}"
+        f"marked for drawing {feature_name}: {', '.join(sorted(matches))}"
     )
 
 

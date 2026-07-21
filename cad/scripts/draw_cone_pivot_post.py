@@ -3,7 +3,6 @@ r"""Create the curated machinist drawing for the cone pivot post."""
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -11,7 +10,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    _select_view_entity,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -34,8 +32,6 @@ from cone_pivot_post_spec import (
     BORE_HEIGHT,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
-    CRANK_BORE_OFFSET,
-    INCLINE_DEG,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -136,48 +132,31 @@ def _circular_edge(
 def _crank_bore_edge(
     adapter: Any, view: Any
 ) -> tuple[Any, tuple[float, float]]:
-    """Select one modeled rim edge of the oblique crank bore.
-
-    Hidden bore-intersection curves are selectable in a drawing but are not
-    returned by ``GetVisibleEntities2``.  Probe the two analytically projected
-    bore openings: their centers are the bore-axis intersections with the
-    Ø24 column, and their rim is the projected Ø10.025 circle.
-    """
-    incline = math.radians(INCLINE_DEG)
-    sin_i = math.sin(incline)
-    cos_i = math.cos(incline)
-    axis_x = FRONT_CENTER[0] - CRANK_BORE_OFFSET * cos_i * _S
-    half_chord = math.sqrt(
-        (BLOCK_DIA / 2.0) ** 2 - CRANK_BORE_OFFSET**2
-    )
-    opening_shift_x = half_chord * sin_i * _S
-    rim_x = CRANK_BORE_DIA / 2.0 * cos_i * _S
-    rim_y = CRANK_BORE_DIA / 2.0 * _S
-    center_y = _front_y(CRANK_BORE_HEIGHT)
-    for side in (-1.0, 1.0):
-        opening_x = axis_x + side * opening_shift_x
-        for index in range(36):
-            theta = math.tau * index / 36.0
-            xy = (
-                opening_x + rim_x * math.cos(theta),
-                center_y + rim_y * math.sin(theta),
-            )
-            try:
-                edge = _select_view_entity(
-                    adapter,
-                    view,
-                    "EDGE",
-                    xy,
-                    label="projected crank-bore rim",
-                )
-            except RuntimeError:
-                continue
-            _telemetry.info(
-                "selected crank-bore rim at projected sheet point "
-                f"({xy[0]:.6f}, {xy[1]:.6f})"
-            )
-            return edge, xy
-    raise RuntimeError("no modeled crank-bore rim accepted a projected edge pick")
+    """Return a visible rim edge adjacent to the modeled crank-bore cylinder."""
+    expected_radius_m = CRANK_BORE_DIA / 2000.0
+    drawing_view = _early_bound(view, "IView")
+    candidates: list[Any] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        for edge in drawing_view.GetVisibleEntities2(component, 1) or []:
+            edge = _early_bound(edge, "IEdge")
+            for face in edge.GetTwoAdjacentFaces2() or []:
+                if face is None:
+                    continue
+                face = _early_bound(face, "IFace2")
+                surface = _early_bound(face.GetSurface(), "ISurface")
+                if not surface.IsCylinder():
+                    continue
+                parameters = surface.CylinderParams
+                if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
+                    continue
+                candidates.append(edge)
+                break
+    if not candidates:
+        raise RuntimeError(
+            "front view has no visible edge adjacent to the modeled crank-bore "
+            f"cylinder at radius {expected_radius_m:g} m"
+        )
+    return candidates[0], (FRONT_CENTER[0], _front_y(CRANK_BORE_HEIGHT))
 
 
 async def build(adapter: Any) -> dict[str, str]:
