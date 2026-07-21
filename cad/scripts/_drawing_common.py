@@ -306,6 +306,7 @@ def add_datum_feature(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    shoulder: bool = False,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
@@ -320,10 +321,12 @@ def add_datum_feature(
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
     tag = _sw_type_info.early_bound_or_flag(
-        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel"
+        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel", "Shoulder"
     )
     if not tag.SetLabel(datum):
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
+    if shoulder:
+        tag.Shoulder = True
     annotation = _sw_type_info.early_bound_or_flag(
         tag.GetAnnotation(), "IAnnotation", "SetPosition2"
     )

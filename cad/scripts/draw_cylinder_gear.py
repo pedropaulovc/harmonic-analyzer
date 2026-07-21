@@ -183,10 +183,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
+        symbol_xy=(FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.020),
         datum="A",
         label="cylinder gear bore axis",
         entity=bore_edge,
+        shoulder=True,
     )
     # Gear face perpendicular to the bore axis (datum A), attached directly to
     # the largest visible planar gear face instead of a tooth-tip silhouette.
