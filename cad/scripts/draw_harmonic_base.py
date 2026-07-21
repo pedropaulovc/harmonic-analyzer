@@ -409,7 +409,7 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         quantity="8X BLIND TAPPED HOLES",
         label="tapped-hole true position",
-        entity=hole_entities[5],
+        entity=hole_entities[8],
     )
     add_feature_control_frame(
         adapter,
