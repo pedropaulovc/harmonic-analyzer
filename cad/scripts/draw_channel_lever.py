@@ -229,7 +229,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=broad_face,
-        symbol_xy=(broad_face[0] - 0.015, broad_face[1] + 0.018),
+        symbol_xy=(broad_face[0] - 0.018, broad_face[1] - 0.018),
         datum="A",
         label="broad machined face",
     )
