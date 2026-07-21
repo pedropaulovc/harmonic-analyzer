@@ -173,7 +173,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=knife_edge_datum,
-        symbol_xy=(knife_edge_datum[0] - 0.018, knife_edge_datum[1] - 0.012),
+        symbol_xy=(knife_edge_datum[0] + 0.020, knife_edge_datum[1] - 0.012),
         datum="A",
         label="knife-edge pivot axis",
     )
@@ -204,7 +204,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="summation anchor position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.045)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
     add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.150)
 
     return await finalize_drawing(
