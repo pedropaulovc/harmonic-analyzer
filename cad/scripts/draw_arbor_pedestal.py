@@ -93,11 +93,12 @@ DIMENSION_CALLOUTS = {
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
-def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
-    """Return the datum-A foot, datum-B side, bore, and crown entities."""
+def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
+    """Return the datum-A foot, datum-B side, right flank, bore, and crown."""
     drawing_view = _early_bound(view, "IView")
     foot_candidates: list[tuple[float, Any]] = []
     side_candidates: list[tuple[float, Any]] = []
+    flank_candidates: list[tuple[float, Any]] = []
     bore_candidates: list[tuple[float, float, Any]] = []
     for component in drawing_view.GetVisibleComponents() or []:
         for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
@@ -123,6 +124,12 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
                 and abs(p1[0] + FOOT_WIDTH / 2.0) <= 0.01
             ):
                 side_candidates.append((abs(p1[1] - p0[1]), edge))
+            if (
+                min(p0[0], p1[0]) > 0.0
+                and abs(p1[1] - p0[1]) > 40.0
+                and abs(p1[0] - p0[0]) > 0.5
+            ):
+                flank_candidates.append((abs(p1[1] - p0[1]), edge))
     if not foot_candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
@@ -133,6 +140,11 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
     side_span, side_edge = max(side_candidates, key=lambda item: item[0])
     if side_span < FOOT_HEIGHT - 0.1:
         raise RuntimeError(f"left foot-side edge span is only {side_span:.3f} mm")
+    if not flank_candidates:
+        raise RuntimeError("front view has no right taper-flank edge")
+    flank_span, flank_edge = max(flank_candidates, key=lambda item: item[0])
+    if flank_span < 40.0:
+        raise RuntimeError(f"right taper-flank span is only {flank_span:.3f} mm")
     if not bore_candidates:
         raise RuntimeError("front view has no circular model edges")
     radius, height, bore_edge = min(
@@ -151,7 +163,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
     )
     if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
         raise RuntimeError("front view has no circular dome edge")
-    return foot_edge, side_edge, bore_edge, dome_edge
+    return foot_edge, side_edge, flank_edge, bore_edge, dome_edge
 
 
 def _top_exposed_edge(adapter: Any, view: Any) -> Any:
@@ -332,8 +344,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # clamp-fit finish.
     _bore_r = BORE_DIA / 2.0 * _S
     foot_edge = (FRONT_CENTER[0] + 0.006, _front_y(0.0))
-    foot_entity, side_entity, bore_entity, dome_entity = _front_entities(
-        adapter, front
+    foot_entity, side_entity, flank_entity, bore_entity, dome_entity = (
+        _front_entities(adapter, front)
     )
     _add_circle_basic(
         adapter,
@@ -402,6 +414,18 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="CROWN ONLY",
         label="crown surface profile",
         entity=dome_entity,
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + 11.0 * _S, _front_y(BORE_HEIGHT / 2.0)),
+        frame_xy=(0.220, 0.095),
+        characteristic="profile_surface",
+        tolerance="0.10",
+        datums=("A", "B"),
+        quantity="2X FLANKS ONLY",
+        label="taper-flank surface profile",
+        entity=flank_entity,
     )
     add_surface_finish(
         adapter,

@@ -78,6 +78,7 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'characteristic="position"' in source
     assert 'characteristic="profile_surface"' in source
     assert 'quantity="CROWN ONLY"' in source
+    assert 'quantity="2X FLANKS ONLY"' in source
     assert 'characteristic="perpendicularity"' not in source
     assert source.count("_add_circle_basic(") == 4  # helper plus three calls
     assert 'orientation="horizontal"' in source
