@@ -13,6 +13,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -20,6 +21,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -69,8 +71,8 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
 DIMENSION_CALLOUTS = {
-    "ShaftDia": "6.330/6.350\nFULL LENGTH\nRa 1.6\nCYLINDRICITY 0.01",
-    "Depth": "+/-0.25 BETWEEN CROWN TANGENCY PLANES",
+    "ShaftDia": "FINAL LIMITS 6.330/6.350\nCYLINDRICAL BODY ONLY\nRa 1.6",
+    "Depth": "+/-0.25 BETWEEN CROWN BASE PLANES",
 }
 
 
@@ -137,6 +139,21 @@ async def build(adapter: Any) -> dict[str, str]:
     # makes the API a guaranteed no-op even though the end view is circular.
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
+
+    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
+    end_upper = (
+        FRONT_CENTER[0] + end_radius * math.cos(math.radians(45.0)),
+        FRONT_CENTER[1] + end_radius * math.sin(math.radians(45.0)),
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=end_upper,
+        frame_xy=(0.075, 0.245),
+        characteristic="cylindricity",
+        tolerance="0.01",
+        label="pinion pivot cylindrical body",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)

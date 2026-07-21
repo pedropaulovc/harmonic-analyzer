@@ -90,10 +90,11 @@ TOP_KEEP = {
     "RodDia": (0.300, 0.078),
 }
 DIMENSION_CALLOUTS = {
-    "TubeId": "8.010/8.025\n10.00 DEEP\nFROM FLAT END\nRa 1.6",
+    "TubeId": "FINAL REAM LIMITS\n8.010/8.025\n10.00 MIN FULL-DIA\nFROM FLAT END\nRa 1.6",
     "GripLen": "+/-0.10",
     "TubeLen": "+/-0.10",
-    "RodSpan": "42.00/43.00 FROM GRIP AXIS",
+    "RodSpan": "85.00 OVERALL\n42.00/43.00 FROM GRIP AXIS\nMATCH-MARK 43 SIDE",
+    "RodDia": "ROD FINAL LIMITS\n6.012/6.020 PRESS FIT",
 }
 
 

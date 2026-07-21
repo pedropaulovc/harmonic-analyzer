@@ -78,12 +78,12 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_unresolved_pivot_interface_is_an_explicit_release_hold() -> None:
+def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     notes = crank_handle_spec.DRAWING_NOTES
-    assert "RELEASE HOLD - DO NOT MANUFACTURE" in notes
-    assert "HANDLE PIVOT BORE/PIN" in notes
-    assert "RUNNING CLEARANCE" in notes
-    assert "AXIAL RETENTION" in notes
+    assert "RELEASE HOLD" not in notes
+    assert "BORE 6.10-6.15 THRU" in notes
+    assert "MATING PIN" in notes
+    assert "RETAIN WITH" in notes
 
 
 def test_feature_requirements_do_not_use_ambiguous_unused_datums() -> None:
@@ -101,7 +101,8 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("crank-handle")
     assert spec["material"] == handle.MATERIAL == "Oak"
-    assert spec["material"] == spec["material_specification"]
+    assert "White oak" in spec["material_specification"]
+    assert "6-8% moisture" in spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1

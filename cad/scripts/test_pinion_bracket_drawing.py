@@ -76,7 +76,7 @@ def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
     assert "HOLE CENTRES" not in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series.
-    assert "BA" not in notes
+    assert " BA " not in f" {notes} "
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source

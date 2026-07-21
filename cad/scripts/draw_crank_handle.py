@@ -80,6 +80,11 @@ FRONT_KEEP = {
     "PeakStation": (0.150, 0.242),
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
+DIMENSION_CALLOUTS = {
+    "HandleLength": "+/-0.25 OVERALL",
+    "CollarLength": "+/-0.10 FROM COLLAR FACE",
+    "PeakStation": "+/-0.25 FROM COLLAR FACE",
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:

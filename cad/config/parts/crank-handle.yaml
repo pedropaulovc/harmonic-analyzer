@@ -1,8 +1,8 @@
 crank-handle:
   number: MHA-022
   material: Oak
-  material_specification: Oak
-  finish: stained and sealed
+  material_specification: White oak, clear straight-grain, 6-8% moisture content
+  finish: dark-walnut penetrating stain; three cured coats satin wiping polyurethane
   quantity: 1
   tolerance_class: visual_noncritical
   process: "turned (wood)"

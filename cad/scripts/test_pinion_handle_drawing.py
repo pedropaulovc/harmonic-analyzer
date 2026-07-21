@@ -52,12 +52,12 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_unresolved_handle_interfaces_are_an_explicit_release_hold() -> None:
+def test_handle_interfaces_are_fully_released_for_manufacture() -> None:
     notes = pinion_handle_spec.DRAWING_NOTES
-    assert "RELEASE HOLD - DO NOT MANUFACTURE" in notes
-    assert "CROSS-ROD CONSTRUCTION/BORE FIT" in notes
-    assert "HUB-TO-ARBOR TORQUE DRIVE AND AXIAL RETENTION" in notes
-    assert "PRESSED THROUGH" not in notes
+    assert "RELEASE HOLD" not in notes
+    assert "6.000-6.012" in notes
+    assert "ISO 8734" in notes
+    assert "PRESS" in notes
 
 
 def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
@@ -69,7 +69,7 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()
     )
     assert "8.010/8.025" in drawing.DIMENSION_CALLOUTS["TubeId"]
-    assert drawing.DIMENSION_CALLOUTS["TubeId"].count("\n") == 3
+    assert drawing.DIMENSION_CALLOUTS["TubeId"].count("\n") == 4
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

@@ -52,12 +52,11 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_unresolved_lever_drive_is_an_explicit_release_hold() -> None:
+def test_lever_drive_is_fully_released_for_manufacture() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
-    assert "RELEASE HOLD - DO NOT MANUFACTURE" in notes
-    assert "HUB-TO-LIFT-ROD TORQUE DRIVE" in notes
-    assert "AXIAL RETENTION" in notes
-    assert "SLIDING BORE ALONE CANNOT DRIVE THE CAMS" in notes
+    assert "RELEASE HOLD" not in notes
+    assert "ISO 8734" in notes
+    assert "THRU HUB AND LIFT ROD" in notes
 
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
@@ -66,9 +65,9 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_surface_finish(" not in source
     assert "6.360-6.375" in drawing.DIMENSION_CALLOUTS["HubBore"]
-    assert drawing.DIMENSION_CALLOUTS["HubBore"].count("\n") == 3
-    assert "RADIUS" in drawing.DIMENSION_CALLOUTS["RodRootR"]
-    assert "RADIUS" in drawing.DIMENSION_CALLOUTS["RodTipR"]
+    assert drawing.DIMENSION_CALLOUTS["HubBore"].count("\n") == 4
+    assert drawing.DIMENSION_CALLOUTS["RodRootR"] == "R2.00 AT HUB"
+    assert drawing.DIMENSION_CALLOUTS["RodTipR"] == "R3.00 AT TIP"
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
