@@ -258,17 +258,29 @@ async def build(adapter) -> dict[str, str]:
         "create_sketch bend profile",
         await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
     )
-    # The sweep profile rides a custom reference plane and is pierced onto the
-    # path; its dim structure isn't a plain origin circle, and its diameters
-    # are already the TubeDia/WallT-driven knobs (shared with the Leg profile).
-    # So name it but record no dims -- nothing extra to drive. Annular (OD +
-    # bore) like the leg, so the swept bend + arm stay hollow tube.
-    await define_circle(adapter, 0.0, 0.0, TUBE_R, "bend profile")
-    await define_circle(adapter, 0.0, 0.0, TUBE_IR, "bend profile bore")
+    # Annular (OD + bore) like the leg, so the swept bend + arm stay hollow
+    # tube -- and driven by the SAME TubeDia/WallT knobs as the leg (each
+    # sketch owns its dims; without its own drives, a WallT edit would update
+    # the leg bore but leave the bend/arm inner diameter behind). The drive
+    # jobs are collected but only applied for whichever profile the sweep
+    # actually consumed.
+    bend_prof = SketchDims()
+    await define_circle(
+        adapter, 0.0, 0.0, TUBE_R, "bend profile", dims=bend_prof,
+        names=("BendCx", "BendCz", "BendOD"),
+        drives=(None, None, '"TubeDia"'),
+    )
+    await define_circle(
+        adapter, 0.0, 0.0, TUBE_IR, "bend profile bore", dims=bend_prof,
+        names=("BendBoreCx", "BendBoreCz", "BendBoreDia"),
+        drives=(None, None, '"TubeDia" - 2 * "WallT"'),
+    )
     await ensure_fully_defined(adapter, "bend profile sketch")
     check("exit_sketch bend profile", await adapter.exit_sketch())
     name_last_feature(adapter, "BendProfile")
     res = await adapter.create_sweep(SweepParameters(path=path_name))
+    if res.is_success:
+        drive_jobs += bend_prof.apply(adapter, "BendProfile")
     if not res.is_success:
         _telemetry.debug(f"bend sweep failed ({res.error}); flipping profile plane")
         profile_plane = check(
@@ -283,16 +295,29 @@ async def build(adapter) -> dict[str, str]:
             "create_sketch bend profile (flipped)",
             await adapter.create_sketch(getattr(profile_plane, "name", profile_plane)),
         )
-        await define_circle(adapter, 0.0, 0.0, TUBE_R, "bend profile (flipped)")
+        bend_prof_flipped = SketchDims()
         await define_circle(
-            adapter, 0.0, 0.0, TUBE_IR, "bend profile bore (flipped)"
+            adapter, 0.0, 0.0, TUBE_R, "bend profile (flipped)",
+            dims=bend_prof_flipped,
+            names=("BendCx", "BendCz", "BendOD"),
+            drives=(None, None, '"TubeDia"'),
+        )
+        await define_circle(
+            adapter, 0.0, 0.0, TUBE_IR, "bend profile bore (flipped)",
+            dims=bend_prof_flipped,
+            names=("BendBoreCx", "BendBoreCz", "BendBoreDia"),
+            drives=(None, None, '"TubeDia" - 2 * "WallT"'),
         )
         await ensure_fully_defined(adapter, "bend profile sketch (flipped)")
         check("exit_sketch bend profile (flipped)", await adapter.exit_sketch())
         # Distinct name: if the primary sweep failed, the original "BendProfile"
         # sketch still exists (unconsumed), so reusing the name would collide.
+        # (Dim local names may repeat across sketches -- they scope to the
+        # owning feature -- so only the sketch name needs to differ.)
         name_last_feature(adapter, "BendProfileFlipped")
         res = await adapter.create_sweep(SweepParameters(path=path_name))
+        if res.is_success:
+            drive_jobs += bend_prof_flipped.apply(adapter, "BendProfileFlipped")
     check("sweep bend + arm", res)
     name_last_feature(adapter, "BendArmSweep")
     # Quarter torus with an annular cross-section: V = (arc/2pi) * 2pi*Rc*A

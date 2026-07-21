@@ -42,7 +42,11 @@ def test_view_scale_is_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 3)" in source
     assert "scale=(1, 4)" in source
-    assert "CreateDetailViewAt4" in source
+    # The lug detail view was intentionally dropped (see the "NO lug detail
+    # view" rationale in draw_gooseneck.py): assert no detail-view CALL exists,
+    # not the historical mention in the explanatory comment.
+    assert "CreateDetailViewAt4(" not in source
+    assert "NO lug detail view" in source
     assert gooseneck_spec.ELEVATION_VIEW_NOTE == "ELEVATION SCALE 1:3"
 
 

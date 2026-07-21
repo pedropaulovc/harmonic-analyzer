@@ -140,7 +140,10 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the clamp bore")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.071)
+    # 0.082 (was 0.071): machinist round 1 grew the notes block by two lines
+    # (~10.6 mm at ~5.3 mm/line) and its bottom crossed the sheet zone border
+    # by 9.3 mm -- raise the anchor so the block clears the border again.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.082)
     add_property_linked_note(adapter, "Isometric View Note", 0.322, 0.108)
 
     return await finalize_drawing(
