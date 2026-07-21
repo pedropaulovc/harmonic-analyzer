@@ -176,7 +176,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(flat_face_x - 0.018, hub_center[1] - 0.018),
         datum="B",
         label="lever flat end face",
-        entity_type="SILHOUETTE",
     )
     add_feature_control_frame(
         adapter,
@@ -197,7 +196,6 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.05",
         datums=("A",),
         label="lever flat-face perpendicularity",
-        entity_type="SILHOUETTE",
     )
     add_feature_control_frame(
         adapter,
