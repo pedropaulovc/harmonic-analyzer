@@ -64,11 +64,10 @@ END_CENTER = (0.065, 0.150)
 SIDE_CENTER = (0.190, 0.150)
 ISO_CENTER = (0.320, 0.180)
 
-_Z_MID = (SHANK_LEN - HEAD_H) / 2.0
-
-
 def _side_x(model_z: float) -> float:
-    return SIDE_CENTER[0] - (model_z - _Z_MID) * _S
+    # IView::Position locates the model origin (the head/shank junction), not
+    # the projected outline centre.
+    return SIDE_CENTER[0] - model_z * _S
 
 
 _HEAD_END_X = _side_x(-HEAD_H)  # head outer face (right)

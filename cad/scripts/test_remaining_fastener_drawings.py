@@ -151,3 +151,15 @@ def test_cone_pivot_does_not_hide_the_missing_threaded_tail_definition() -> None
     assert "THREADED-END LENGTH IS NOT DEFINED" in spec.DRAWING_NOTES
     assert "DO NOT RELEASE AS A MADE-PART DRAWING" in spec.DRAWING_NOTES
     assert "USE THE COMMERCIAL SHOULDER SCREW" in spec.DRAWING_NOTES
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    ("draw_bracket_screw", "draw_clamp_screw", "draw_fillister_screw"),
+)
+def test_profile_edge_picks_are_anchored_to_the_drawing_view_origin(
+    module_name: str,
+) -> None:
+    drawing = importlib.import_module(module_name)
+    assert drawing._JUNCTION_X == drawing.SIDE_CENTER[0]
+    assert drawing._HEAD_END_X > drawing._JUNCTION_X > drawing._SHANK_END_X

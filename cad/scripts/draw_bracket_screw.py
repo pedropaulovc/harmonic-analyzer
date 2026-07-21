@@ -59,16 +59,14 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # Built on the Front plane, axis +Z: head at z in [-HEAD_H, 0], shank at
 # z in [0, SHANK_LEN].  Head-end circle in the *Front view; profile (axis
 # HORIZONTAL) in the *Right view, which MIRRORS z (head at HIGH-x, shank tip
-# at LOW-x).
+# at LOW-x).  IView::Position locates the model origin -- the head/shank
+# junction here -- rather than the projected outline centre.
 END_CENTER = (0.070, 0.150)
 SIDE_CENTER = (0.185, 0.150)
 ISO_CENTER = (0.300, 0.175)
 
-_Z_MID = (SHANK_LEN - HEAD_H) / 2.0
-
-
 def _side_x(model_z: float) -> float:
-    return SIDE_CENTER[0] - (model_z - _Z_MID) * _S
+    return SIDE_CENTER[0] - model_z * _S
 
 
 _HEAD_END_X = _side_x(-HEAD_H)  # head outer face (right)
