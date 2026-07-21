@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the pivot ball mount."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -117,24 +118,14 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
     return seat_edge, bore_edge
 
 
-def _spherical_face(adapter: Any, view: Any) -> Any:
-    """Return the modeled ball face, independent of sheet pick coordinates."""
-    drawing_view = _early_bound(view, "IView")
-    spheres: list[Any] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_face in drawing_view.GetVisibleEntities2(component, 3) or []:
-            face = _early_bound(raw_face, "IFace2")
-            surface = face.GetSurface()
-            if surface is None:
-                continue
-            surface = _early_bound(surface, "ISurface")
-            if surface.IsSphere():
-                spheres.append(face)
-    if len(spheres) != 1:
-        raise RuntimeError(
-            f"front view must expose exactly one spherical ball face, found {len(spheres)}"
-        )
-    return spheres[0]
+def _ball_silhouette_xy(model_y: float) -> tuple[float, float]:
+    """Exact right-hand sphere outline at one model-space ordinate."""
+    radius = BALL_DIA / 2.0
+    dy = model_y - BALL_CENTER_H
+    if abs(dy) >= radius:
+        raise ValueError(f"ball silhouette ordinate {model_y:g} is outside the sphere")
+    model_x = math.sqrt(radius * radius - dy * dy)
+    return (FRONT_CENTER[0] + model_x * _S, _front_y(model_y))
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -191,16 +182,15 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Explicit arrowed feature callouts avoid the old R6.50 / DIA13 duplicate
     # and identify exactly which turned surface each size controls.
-    ball_face = _spherical_face(adapter, front)
+    ball_outline = _ball_silhouette_xy(30.0)
     add_attached_note(
         adapter,
         front,
         text="S<MOD-DIAM>13.00 +/-0.05 BALL",
-        edge_xy=(FRONT_CENTER[0] + BALL_DIA / 2.0 * _S * 0.75, _front_y(30.0)),
+        edge_xy=ball_outline,
         note_xy=(0.170, 0.202),
         label="spherical ball size",
-        entity_type="FACE",
-        entity=ball_face,
+        entity_type="SILHOUETTE",
     )
     add_attached_note(
         adapter,
@@ -263,14 +253,13 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + BALL_DIA / 2.0 * _S * 0.75, _front_y(30.0)),
+        edge_xy=ball_outline,
         frame_xy=(0.255, 0.202),
         characteristic="circular_runout",
         tolerance="0.05",
         datums=("B",),
         label="ball-to-stem runout",
-        entity_type="FACE",
-        entity=ball_face,
+        entity_type="SILHOUETTE",
     )
     add_feature_control_frame(
         adapter,
@@ -295,12 +284,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + BALL_DIA / 2.0 * _S * 0.75, _front_y(30.0)),
+        edge_xy=ball_outline,
         symbol_xy=(0.286, 0.178),
         roughness_ra="0.8",
         label="turned exterior finish before plate",
-        entity_type="FACE",
-        entity=ball_face,
+        entity_type="SILHOUETTE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.068)
