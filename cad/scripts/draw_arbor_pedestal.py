@@ -396,7 +396,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(2.5)),
-        symbol_xy=(0.040, _front_y(2.5) + 0.030),
+        symbol_xy=(0.040, _front_y(2.5)),
         datum="B",
         label="left foot side",
         entity=side_entity,
@@ -456,7 +456,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),  # bore right
-        symbol_xy=(0.205, _front_y(BORE_HEIGHT) + 0.002),
+        symbol_xy=(0.155, 0.225),
         roughness_ra="1.6",
         label="arbor bore finish",
         entity=bore_entity,

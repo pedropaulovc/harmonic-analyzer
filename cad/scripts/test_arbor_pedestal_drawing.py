@@ -124,5 +124,11 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("arbor-pedestal")
     assert "A48" in str(config["material_specification"])
     assert "A48" in str(config["material"])
-    assert config["finish"]
+    finish = str(config["finish"]).lower()
+    assert "sspc-sp 3" in finish
+    assert "black japan varnish" in finish
+    assert "2 coats" in finish
+    assert "25-50 um total dft" in finish
+    assert "mask arbor bore/foot seat" in finish
+    assert "after dimensional inspection" in finish
     assert int(config["quantity"]) == 1
