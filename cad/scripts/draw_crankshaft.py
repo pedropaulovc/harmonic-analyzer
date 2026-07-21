@@ -125,7 +125,7 @@ def _visible_shaft_face(adapter: Any, view: Any) -> Any:
 
 
 def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
-    """Return the modeled #9 circular rim visible in the side view."""
+    """Return a visible rim edge adjacent to the modeled #9 cylindrical face."""
     expected_radius_m = PIN_HOLE_DIA / 2000.0
     candidates: list[Any] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
@@ -136,18 +136,25 @@ def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
         ) or ()
         for edge in edges:
             edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            parameters = curve.CircleParams
-            if abs(float(parameters[6]) - expected_radius_m) <= 1e-6:
+            adjacent_faces = edge.GetTwoAdjacentFaces2() or ()
+            for face in adjacent_faces:
+                if face is None:
+                    continue
+                face = _early_bound(face, "IFace2")
+                surface = _early_bound(face.GetSurface(), "ISurface")
+                if not surface.IsCylinder():
+                    continue
+                parameters = surface.CylinderParams
+                if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
+                    continue
                 candidates.append(edge)
-    if len(candidates) != 1:
+                break
+    if not candidates:
         raise RuntimeError(
-            f"crankshaft side view has {len(candidates)} visible circular edges at "
-            f"radius {expected_radius_m:g} m; expected exactly one #9 hole rim"
+            f"crankshaft side view has no visible edge adjacent to the "
+            f"#9 cylindrical face at radius {expected_radius_m:g} m"
         )
-    return candidates[0]
+    return max(candidates, key=lambda edge: float(edge.GetLength()))
 
 
 async def build(adapter: Any) -> dict[str, str]:
