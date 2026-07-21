@@ -88,8 +88,9 @@ def test_transverse_axis_uses_basic_location_and_position_control() -> None:
     assert 'characteristic="position"' in source
     assert 'datums=("A", "B")' in source
     assert "diameter=True" in source
-    assert drawing.FRONT_KEEP["RodSpan"][0] >= 0.060
-    assert "frame_xy=(0.140, 0.263)" in source
+    assert drawing.FRONT_KEEP["RodSpan"][0] >= 0.100
+    assert drawing.FRONT_KEEP["TubeId"][0] >= 0.075
+    assert "frame_xy=(0.190, 0.255)" in source
 
 
 def test_crown_has_one_toleranced_form_control() -> None:
