@@ -202,6 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # body, on the Y=0 centreline), ~3 mm from the tab edges and clear of the tip.
     bar_pin_edge = _sheet_xy(BAR_PIN_X, _BAR_PIN_DIA / 2.0)
     spring_edge = _sheet_xy(LEVER_SPRING_X - _SPRING_HOLE_DIA / 2.0, 0.0)
+    spring_fcf_edge = _sheet_xy(LEVER_SPRING_X + _SPRING_HOLE_DIA / 2.0, 0.0)
     add_native_hole_callout(
         adapter,
         front,
@@ -254,8 +255,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=spring_edge,
-        frame_xy=(spring_edge[0] - 0.040, 0.174),
+        # The hole callout owns the 9-o'clock rim and routes up-left.  Attach
+        # the position frame at 3 o'clock and keep its whole leader to the
+        # right of the callout path.
+        edge_xy=spring_fcf_edge,
+        frame_xy=(spring_fcf_edge[0] + 0.020, 0.174),
         characteristic="position",
         tolerance="0.20",
         datums=("A",),

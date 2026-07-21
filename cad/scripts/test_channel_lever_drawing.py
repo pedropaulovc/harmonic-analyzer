@@ -61,10 +61,10 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count('characteristic="position"') == 2
     assert 'edge_xy=bar_pin_edge' in source
     assert 'label="bar-pin hole position"' in source
-    assert 'edge_xy=spring_edge' in source
+    assert 'edge_xy=spring_fcf_edge' in source
     assert 'label="spring-eye hole position"' in source
     assert "bar_pin_edge[0] - 0.045, 0.174" in source
-    assert "spring_edge[0] - 0.040, 0.174" in source
+    assert "spring_fcf_edge[0] + 0.020, 0.174" in source
     assert "add_surface_finish(" in source
     assert source.count("add_native_hole_callout(") == 2
 

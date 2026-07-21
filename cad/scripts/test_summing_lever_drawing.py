@@ -75,6 +75,8 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert source.count("add_native_hole_callout(") == 1
+    assert "knife_edge_datum = _top_xy" in source
+    assert 'label="knife-edge pivot axis"' in source
     assert "knife_edge = _top_xy" in source
     assert 'label="knife-edge ridge finish"' in source
     assert "anchor_bore_fcf_edge = _top_xy(TIP_X - ANCHOR_BORE_R, 0.0)" in source

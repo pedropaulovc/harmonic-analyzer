@@ -43,7 +43,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from summing_lever_spec import (
     ANCHOR_BORE_R,
     ANCHOR_R,
-    CYL_R,
     HEX_DEPTH,
     PLATE_L,
     PLATE_W,
@@ -166,17 +165,17 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor bore",
     )
 
-    # Datum A on the pivot cylinder axis (front circle, 9 o'clock), Ra on the
-    # actual top ridge of the +Z knife-edge trunnion, and a position FCF locating
-    # the summation anchor eye to A in the top plan.
-    pivot_left = _front_xy(-CYL_R, 0.0)
+    # Datum A is the actual knife-edge pivot ridge, not the merged cylinder
+    # silhouette hidden by the ribs in the front view.  Use the -Z ridge for
+    # the datum and the opposite +Z ridge for Ra so their leaders stay distinct.
+    knife_edge_datum = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
     add_datum_feature(
         adapter,
-        front,
-        edge_xy=pivot_left,
-        symbol_xy=(pivot_left[0] - 0.018, pivot_left[1]),
+        top,
+        edge_xy=knife_edge_datum,
+        symbol_xy=(knife_edge_datum[0] - 0.018, knife_edge_datum[1] - 0.012),
         datum="A",
-        label="pivot cylinder axis",
+        label="knife-edge pivot axis",
     )
     knife_edge = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
     add_surface_finish(
