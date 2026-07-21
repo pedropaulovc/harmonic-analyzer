@@ -187,12 +187,17 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="knife-edge ridge finish",
     )
-    anchor_outer_edge = _top_xy(TIP_X, ANCHOR_R)
+    # Use a separate point on the bore rim so the position-frame leader does
+    # not stack on the hole-callout leader at the bore's 12-o'clock point.
+    anchor_bore_fcf_edge = _top_xy(TIP_X - ANCHOR_BORE_R, 0.0)
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=anchor_outer_edge,
-        frame_xy=(anchor_outer_edge[0] - 0.010, anchor_outer_edge[1] + 0.026),
+        edge_xy=anchor_bore_fcf_edge,
+        frame_xy=(
+            anchor_bore_fcf_edge[0] - 0.010,
+            anchor_bore_fcf_edge[1] + 0.026,
+        ),
         characteristic="position",
         tolerance="0.30",
         datums=("A",),

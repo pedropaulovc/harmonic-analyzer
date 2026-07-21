@@ -51,6 +51,7 @@ def test_linked_notes_describe_the_form() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_surface_finish(" in source
+    assert 'entity_type="SILHOUETTE"' in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

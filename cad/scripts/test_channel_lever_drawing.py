@@ -57,8 +57,12 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="position"' in source
+    assert source.count("add_feature_control_frame(") == 2
+    assert source.count('characteristic="position"') == 2
+    assert 'edge_xy=bar_pin_edge' in source
+    assert 'label="bar-pin hole position"' in source
+    assert 'edge_xy=spring_edge' in source
+    assert 'label="spring-eye hole position"' in source
     assert "add_surface_finish(" in source
     assert source.count("add_native_hole_callout(") == 2
 

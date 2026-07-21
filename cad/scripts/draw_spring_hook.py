@@ -140,6 +140,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(shank_edge[0] + 0.016, shank_edge[1] + 0.010),
         roughness_ra="1.6",
         label="shank seating finish",
+        entity_type="SILHOUETTE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)

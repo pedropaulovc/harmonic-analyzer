@@ -218,7 +218,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Datum A on the fulcrum bore axis (9 o'clock), Ra on the bore (6 o'clock),
-    # position FCF tying the spring-eye hole to A.
+    # position FCFs tying both BASIC hole locations to A.
     fulcrum_left = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
     add_datum_feature(
         adapter,
@@ -236,6 +236,17 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(fulcrum_bottom[0] + 0.008, fulcrum_bottom[1] - 0.018),
         roughness_ra="1.6",
         label="fulcrum bore finish",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=bar_pin_edge,
+        frame_xy=(bar_pin_edge[0] - 0.010, 0.200),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A",),
+        diameter=True,
+        label="bar-pin hole position",
     )
     add_feature_control_frame(
         adapter,

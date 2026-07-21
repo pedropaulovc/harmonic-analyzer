@@ -77,6 +77,9 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count("add_native_hole_callout(") == 1
     assert "knife_edge = _top_xy" in source
     assert 'label="knife-edge ridge finish"' in source
+    assert "anchor_bore_fcf_edge = _top_xy(TIP_X - ANCHOR_BORE_R, 0.0)" in source
+    assert 'edge_xy=anchor_bore_fcf_edge' in source
+    assert "anchor_outer_edge" not in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
