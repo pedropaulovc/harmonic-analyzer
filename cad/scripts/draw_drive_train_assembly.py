@@ -168,7 +168,8 @@ def _show_bottom_balloon_components(adapter: Any, view: Any) -> None:
             ) or ""
 
         identities = {Path(str(path)).stem.casefold()}
-        identities.add(name.split("@", 1)[0].casefold())
+        drawing_name = name.split("@", 1)[0].replace("\\", "/")
+        identities.add(drawing_name.rsplit("/", 1)[-1].casefold())
         matched = {
             stem
             for stem in BOTTOM_VISIBILITY_STEMS

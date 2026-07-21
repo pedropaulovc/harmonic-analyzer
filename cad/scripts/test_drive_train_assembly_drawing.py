@@ -115,7 +115,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         "crank-drive-gear",
     }
     assert "RootDrawingComponent2(False)" in source
-    assert 'name.split("@", 1)[0].casefold()' in source
+    assert 'drawing_name.rsplit("/", 1)[-1].casefold()' in source
     assert 'identity.startswith(f"{stem}-")' in source
     assert "enumerated drawing components" in source
     assert "T006-T120" in drawing.ASSEMBLY_NOTES
@@ -129,3 +129,12 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
 def test_drawing_component_children_accepts_both_pywin32_shapes() -> None:
     assert drawing._drawing_component_children(_CallableChildren()) == ("a", "b")
     assert drawing._drawing_component_children(_MaterializedChildren()) == ("a", "b")
+
+
+def test_live_hierarchical_drawing_names_are_matched_by_leaf() -> None:
+    name = "drive-train-4/cone-gear-shaft-1"
+    drawing_name = name.split("@", 1)[0].replace("\\", "/")
+    identity = drawing_name.rsplit("/", 1)[-1].casefold()
+    stem = "cone-gear-shaft"
+    assert identity.startswith(f"{stem}-")
+    assert identity.removeprefix(f"{stem}-").isdigit()
