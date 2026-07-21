@@ -16,11 +16,13 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -36,6 +38,7 @@ from pivot_ball_mount_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -79,7 +82,6 @@ FRONT_KEEP = {
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "+0.00/-0.05 THRU",
-    "BallRise": "+/-0.05",
 }
 
 
@@ -116,6 +118,32 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
             f"no circular edge matches cross-bore at {BALL_CENTER_H:.3f} mm"
         )
     return seat_edge, bore_edge
+
+
+def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
+    """Return the visible cylindrical face for one turned diameter."""
+    drawing_view = _early_bound(view, "IView")
+    candidates: list[tuple[float, Any]] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        for raw_face in drawing_view.GetVisibleEntities2(component, 3) or []:
+            face = _early_bound(raw_face, "IFace2")
+            surface = face.GetSurface()
+            if surface is None:
+                continue
+            surface = _early_bound(surface, "ISurface")
+            if not surface.IsCylinder():
+                continue
+            candidates.append((float(surface.CylinderParams[6]) * 1000.0, face))
+    if not candidates:
+        raise RuntimeError("front view has no visible cylindrical faces")
+    target_radius = diameter_mm / 2.0
+    radius, face = min(candidates, key=lambda item: abs(item[0] - target_radius))
+    if abs(radius - target_radius) > 0.01:
+        raise RuntimeError(
+            f"no cylindrical face matches radius {target_radius:.4f} mm; "
+            f"nearest is {radius:.4f} mm"
+        )
+    return face
 
 
 def _ball_silhouette_xy(model_y: float) -> tuple[float, float]:
@@ -177,8 +205,27 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    front_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in front_annotations
+    }
+    rise_display = adapter._attempt(
+        lambda: front_by_name["BallRise"].GetSpecificAnnotation()
+    )
+    if rise_display is None:
+        raise RuntimeError("BallRise has no display dimension to box")
+    set_basic_dimension(adapter, rise_display, label="ball and cross-bore height")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the front view")
+
+    stem_face = _cylindrical_face(adapter, front, STEM_DIA)
+    add_view_centerline(
+        adapter,
+        front,
+        face_xy=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(12.0)),
+        label="turned stem axis",
+        entity=stem_face,
+    )
 
     # Explicit arrowed feature callouts avoid the old R6.50 / DIA13 duplicate
     # and identify exactly which turned surface each size controls.
@@ -232,12 +279,24 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.026, _front_y(10.0)),
         datum="B",
         label="stem axis",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
+        entity=stem_face,
     )
-    # The +/-0.05 center height controls axial location from A; the explicit
-    # note controls intersection with B. Parallelism controls bore attitude.
-    # A position FCF is deliberately not used: without a BASIC center height it
-    # would double-tolerance this location and leave its zone undefined.
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(12.0)),
+        frame_xy=(0.030, 0.158),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A",),
+        diameter=True,
+        label="datum-B axis perpendicularity",
+        entity_type="FACE",
+        entity=stem_face,
+    )
+    # The BASIC height and position zone locate the cross-bore axis from the
+    # seat plane and through the stem axis without a prose-only acceptance rule.
     add_feature_control_frame(
         adapter,
         front,
@@ -245,11 +304,11 @@ async def build(adapter: Any) -> dict[str, str]:
         # Route the bore-axis control into the open left field.  The ball-size,
         # runout and finish leaders all fan rightward from the sphere outline.
         frame_xy=(0.030, 0.205),
-        characteristic="parallelism",
+        characteristic="position",
         tolerance="0.05",
-        datums=("A",),
-        diameter=True,  # cylindrical zone -- the control is on the bore AXIS
-        label="cross-bore parallelism",
+        datums=("A", "B"),
+        diameter=True,
+        label="cross-bore true position",
         entity=bore_entity,
     )
     add_feature_control_frame(
@@ -260,6 +319,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="circular_runout",
         tolerance="0.05",
         datums=("B",),
+        quantity="SPHERE",
         label="ball-to-stem runout",
         entity_type="SILHOUETTE",
     )
@@ -271,6 +331,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="circular_runout",
         tolerance="0.05",
         datums=("B",),
+        quantity="PAD OD",
         label="pad-to-stem runout",
         entity_type="SILHOUETTE",
     )
