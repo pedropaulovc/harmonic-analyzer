@@ -177,13 +177,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        right,
-        # on the rim OD line, off the corner (round 1: the corner pick read as
-        # controlling either the OD or the side face; the exact mid-width pick
-        # finds no edge -- build 4 -- so aim 60% of the way out, still clearly
-        # on the OD face)
-        edge_xy=(RIGHT_CENTER[0] + RIGHT_HALF_RIM * 0.6, RIGHT_CENTER[1] + _RIM_R),
-        frame_xy=(RIGHT_CENTER[0] + 0.024, RIGHT_CENTER[1] + _RIM_R + 0.020),
+        front,
+        # The runout hangs on the FRONT view's Ø100 rim circle -- a real model
+        # edge. The side view's top run is a cylinder SILHOUETTE, not an EDGE:
+        # every non-corner pick there fails (builds 4-5), and the selectable
+        # corner read ambiguously (round 1). 30 deg off top so the pick clears
+        # the vertical centreline and the Ø100 leader.
+        edge_xy=(FRONT_CENTER[0] + _RIM_R * 0.5, FRONT_CENTER[1] + _RIM_R * 0.866),
+        frame_xy=(FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] + _RIM_R + 0.012),
         characteristic="circular_runout",
         tolerance="0.10",
         datums=("A",),
