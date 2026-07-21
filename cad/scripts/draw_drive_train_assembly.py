@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Any
 
 import _telemetry
@@ -105,6 +106,10 @@ BOM_COMPONENTS = {
 }
 BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 
+BOTTOM_VISIBILITY_STEMS = frozenset(
+    {"cone-tip-bushing", "cone-gear-shaft", "crank-drive-gear"}
+)
+
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",
@@ -125,6 +130,42 @@ BOTTOM_CENTER = (0.170, 0.078)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
 BOM_ANCHOR = (0.248, 0.265)
+
+
+@_telemetry.traced("drawing.show_bottom_balloon_components")
+def _show_bottom_balloon_components(adapter: Any, view: Any) -> None:
+    """Expose the enclosed component families in the auxiliary bottom view."""
+    root = adapter._attempt(lambda: view.RootDrawingComponent, default=None)
+    if root is None:
+        raise RuntimeError("drive-train bottom view has no root drawing component")
+
+    pending = list(adapter._attempt(lambda: root.GetChildren(), default=()) or ())
+    found: set[str] = set()
+    while pending:
+        drawing_component = pending.pop()
+        children = adapter._attempt(
+            lambda dc=drawing_component: dc.GetChildren(), default=()
+        ) or ()
+        pending.extend(children)
+        component = adapter._attempt(
+            lambda dc=drawing_component: dc.Component, default=None
+        )
+        if component is None:
+            continue
+        path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
+        stem = Path(str(path)).stem.casefold()
+        if stem not in BOTTOM_VISIBILITY_STEMS:
+            continue
+        drawing_component.Visible = True
+        found.add(stem)
+        _telemetry.event("drawing.component_visible", component=stem)
+
+    missing = sorted(BOTTOM_VISIBILITY_STEMS - found)
+    if missing:
+        raise RuntimeError(
+            f"drive-train bottom view is missing enclosed components: {missing}"
+        )
+    adapter.currentModel.EditRebuild3()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -183,6 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # enclosed in every exterior projection.  The auxiliary bottom view shows
     # hidden lines so those physical BOM items have balloonable geometry.
     set_hidden_lines_visible(adapter, bottom)
+    _show_bottom_balloon_components(adapter, bottom)
 
     insert_identified_bom_table(
         adapter,
