@@ -23,6 +23,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -40,6 +41,8 @@ from build_pinion_spring import (
     FOOT_END,
     FOOT_TAN,
     FOOT_Y,
+    HOLE_DIA,
+    HOLE_FROM_END,
     KINK_START,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -157,6 +160,17 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
+
+    hole_center_x = _front_x(FOOT_END[0] + HOLE_FROM_END) + (
+        TOP_CENTER[0] - FRONT_CENTER[0]
+    )
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=(hole_center_x + HOLE_DIA * SHEET_SCALE[0] / 2000.0, TOP_CENTER[1]),
+        callout_xy=(0.235, 0.135),
+        label="spring foot clearance hole",
+    )
 
     # Pick the rectangular screw-down foot face away from its hole so the
     # leader cannot attach to the cylindrical hole wall. Flatness needs no

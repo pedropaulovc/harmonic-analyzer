@@ -44,6 +44,7 @@ from _common import (
     extrude_at_offset,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -167,6 +168,12 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += barrel.apply(adapter, "BarrelProfile")
     extrude_at_offset(adapter, HUB_LEN - WALL_T, -HUB_LEN / 2.0 + WALL_T)
     name_last_feature(adapter, "Barrel")
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "Barrel", ["BoreDepth"])[0],
+            '"HubLen" - "WallT"',
+        )
+    ]
     expected = V_ANNULUS
     await volume_check(adapter, "barrel", expected, 0.005 * V_ANNULUS)
 
@@ -184,6 +191,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += wall.apply(adapter, "WallProfile")
     extrude_at_offset(adapter, WALL_T, -HUB_LEN / 2.0)
     name_last_feature(adapter, "Wall")
+    drive_jobs += [
+        (name_dimensions(adapter, "Wall", ["EndWall"])[0], '"WallT"')
+    ]
     expected += V_WALL
     await volume_check(adapter, "wall", expected, 0.005 * V_WALL)
 

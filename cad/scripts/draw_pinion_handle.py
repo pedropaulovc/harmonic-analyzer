@@ -41,6 +41,7 @@ from pinion_handle_spec import (
     GRIP_LEN,
     ROD_DIA,
     ROD_DOWN,
+    ROD_HOLE_DIA,
     ROD_UP,
     TUBE_ID,
     TUBE_LEN,
@@ -114,8 +115,9 @@ DIMENSION_CALLOUTS = {
         f"{ROD_DOWN:.2f} +/-0.10 A TO LOWER END"
     ),
     "RodDia": (
-        "PRESS ROD 6.020 MAX / 6.015 MIN\n"
-        "REAM BODY HOLE 6.010 MAX / 6.000 MIN THRU"
+        f"PRESS ROD {ROD_DIA + 0.0025:.3f} MAX / {ROD_DIA - 0.0025:.3f} MIN\n"
+        f"REAM BODY HOLE {ROD_HOLE_DIA + 0.005:.3f} MAX / "
+        f"{ROD_HOLE_DIA - 0.005:.3f} MIN THRU"
     ),
 }
 

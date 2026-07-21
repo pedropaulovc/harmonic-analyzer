@@ -13,3 +13,4 @@ BORE = 6.37  # nominal reamed running fit on the Ø6.35 lift rod
 BOSS_DIA = 3.2  # set-pin dome, proud of the OD on the heavy (thick) side
 BOSS_PROUD = 0.5  # boss height proud of the OD
 BOSS_Z = 1.7  # boss axis station from the front face
+TAP_DRILL_DIA = 2.05  # M2.5 x 0.45 coarse-thread tap drill

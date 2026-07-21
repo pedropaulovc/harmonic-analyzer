@@ -45,6 +45,7 @@ from pinion_cam_spec import (
     CAM_LEN,
     CAM_OD,
     ECC,
+    TAP_DRILL_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -198,6 +199,10 @@ async def build(adapter: Any) -> dict[str, str]:
         bottom_boss_center[0] + BOSS_DIA / 1000.0,
         bottom_boss_center[1],
     )
+    bottom_tap_right = (
+        bottom_boss_center[0] + TAP_DRILL_DIA / 1000.0,
+        bottom_boss_center[1],
+    )
     od_center = (FRONT_CENTER[0], _front_y(-ECC))
     od_bottom = (od_center[0], od_center[1] - CAM_R_SHEET)
     add_datum_feature(
@@ -248,11 +253,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         bottom,
-        # The M2.5 thread is a drawing-specified machining operation at the
-        # integral boss centre, so no pre-machining tap edge exists to select.
-        # Attach its separate axis requirement to the same real boss silhouette;
-        # the quantity compartment identifies the controlled derived axis.
-        edge_xy=bottom_boss_right,
+        edge_xy=bottom_tap_right,
         frame_xy=(0.315, 0.215),
         characteristic="position",
         tolerance="0.03",

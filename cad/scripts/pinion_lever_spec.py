@@ -25,14 +25,16 @@ from pinion_lever_geometry import (
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
+    "Barrel": {"BoreDepth"},
+    "Wall": {"EndWall"},
     "RodProfile": {"RodRootR", "RodTipR", "RodTipY"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
         "DATUM A IS FINAL REAMED BORE AXIS; DATUM B IS FLAT END FACE.",
-        "TURN HUB AND REAM BORE IN ONE SETUP. HUB LENGTH 10.00+/-0.10",
-        "  FROM B TO CROWN ROOT PLANE.",
+        "TURN HUB AND REAM BORE IN ONE SETUP. CYLINDRICAL HUB LENGTH IS",
+        "  THE BORE-DEPTH + END-WALL DIMENSION STACK FROM DATUM B.",
         f"OPPOSITE B: SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10; 1.50 REF HIGH.",
         "GRIP AXIS BASICALLY INTERSECTS A AT HUB MID-PLANE, 5.00 FROM B;",
         "  POSITION IS CONTROLLED BY THE ATTACHED <MOD-DIAM>0.05 | A | B FRAME.",

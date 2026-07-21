@@ -19,6 +19,7 @@ from pinion_cam_geometry import (
     CAM_LEN as CAM_LEN,
     CAM_OD as CAM_OD,
     ECC as ECC,
+    TAP_DRILL_DIA as TAP_DRILL_DIA,
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

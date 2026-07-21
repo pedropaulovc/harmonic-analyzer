@@ -82,9 +82,14 @@ FRONT_KEEP = {
     "RodRootR": (0.145, 0.132),
     "RodTipR": (0.120, 0.232),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+RIGHT_KEEP = {
+    "BoreDepth": (0.185, 0.128),
+    "EndWall": (0.205, 0.142),
+}
 DIMENSION_CALLOUTS = {
-    "HubBore": "NOMINAL REF ONLY\n8.00+0.10/-0.00 FULL-DIA\nFROM FLAT FACE; FLAT BOTTOM\n6.375 MAX / 6.360 MIN\nRa 1.6",
+    "HubBore": "NOMINAL REF ONLY\n6.375 MAX / 6.360 MIN\nRa 1.6",
+    "BoreDepth": "+0.10/-0.00 FULL-DIA BORE DEPTH FROM B; FLAT BOTTOM",
+    "EndWall": "+/-0.05 END WALL",
     "RodRootR": "RESULTING <MOD-DIAM>4.00 AT HUB",
     "RodTipR": "RESULTING <MOD-DIAM>6.00 AT TIP",
     "RodTipY": "+/-0.25 FROM HUB AXIS",
@@ -144,7 +149,12 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    )
+    set_dimension_callouts(
+        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 

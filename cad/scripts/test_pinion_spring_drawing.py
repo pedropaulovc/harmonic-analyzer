@@ -74,7 +74,8 @@ def test_feature_requirements_use_inspectable_datum_controls() -> None:
     assert "add_surface_finish(" not in source
     assert source.count('entity_type="FACE"') == 1
     assert "TOP VIEW SCALE 2:1" in source
-    assert "THRU" in pinion_spring_spec.DRAWING_NOTES
+    assert "SIZE PER NATIVE CALLOUT" in pinion_spring_spec.DRAWING_NOTES
+    assert source.count("add_native_hole_callout(") == 1
     assert "NO TWIST" not in pinion_spring_spec.DRAWING_NOTES
     assert 'quantity="SCREW-DOWN FOOT BROAD FACE"' in source
     assert abs(spring._BLADE_LEN - pinion_spring_spec.BLADE_STRAIGHT_LEN) < 1e-9

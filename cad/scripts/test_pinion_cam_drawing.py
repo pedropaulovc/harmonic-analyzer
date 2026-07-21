@@ -77,6 +77,9 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "M2.5 X 0.45-6H" in notes
     assert "ISO 4026" in notes
     assert "2.00 MIN FULL THREAD" in notes
+    source = Path(cam.__file__).read_text(encoding="utf-8")
+    assert 'name_last_feature(adapter, "M2.5TapDrill")' in source
+    assert "TAP_DRILL_DIA" in source
 
 
 def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:

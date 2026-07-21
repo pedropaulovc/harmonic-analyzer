@@ -17,6 +17,7 @@ from pinion_handle_geometry import (
     GRIP_LEN as GRIP_LEN,
     ROD_DIA as ROD_DIA,
     ROD_DOWN as ROD_DOWN,
+    ROD_HOLE_DIA as ROD_HOLE_DIA,
     ROD_SPAN as ROD_SPAN,
     ROD_UP as ROD_UP,
     TUBE_ID as TUBE_ID,

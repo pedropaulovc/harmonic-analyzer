@@ -5,7 +5,10 @@ from __future__ import annotations
 GRIP_DIA = 23.0
 GRIP_LEN = 14.0
 CAP_SAG = 2.0
-ROD_DIA = 6.0
+# The cross rod is a separate press-fit component in the saved multibody part.
+# Nominals sit at the centres of the released shaft/hole limit bands.
+ROD_DIA = 6.0175
+ROD_HOLE_DIA = 6.005
 ROD_DOWN = 42.0
 ROD_UP = 43.0
 TUBE_OD = 10.5

@@ -17,7 +17,7 @@ cap (sagitta 2) proud of z -7; blind wall z +7..+9; tube annulus z
 built LAST so nothing crosses an axis.
 
 Volume gate (mm^3): grip + cap (spherical-cap formula) + wall + annulus
-+ rod - rod/grip overlap (Simpson over circular segments).
+- reamed body hole + separate pressed rod.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -66,6 +66,7 @@ from pinion_handle_spec import (
     ISOMETRIC_VIEW_NOTE,
     ROD_DIA,
     ROD_DOWN,
+    ROD_HOLE_DIA,
     ROD_UP,
     TUBE_ID,
     TUBE_LEN,
@@ -86,6 +87,7 @@ _SAVED_DRAWING_PROPERTIES = (
 
 GRIP_R = GRIP_DIA / 2.0
 ROD_R = ROD_DIA / 2.0
+ROD_HOLE_R = ROD_HOLE_DIA / 2.0
 CAP_R = (GRIP_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 34.06 crown sphere radius
 
 V_GRIP = math.pi * GRIP_R**2 * GRIP_LEN
@@ -94,34 +96,12 @@ V_WALL = math.pi * (TUBE_OD / 2.0) ** 2 * WALL_T
 V_TUBE = math.pi * ((TUBE_OD / 2.0) ** 2 - (TUBE_ID / 2.0) ** 2) * TUBE_LEN
 V_ROD = math.pi * ROD_R**2 * (ROD_DOWN + ROD_UP)
 
-
-def _grip_overlap() -> float:
-    """Rod volume already inside the grip cylinder: Simpson over the rod's
-    y-span inside the grip radius of the disc-segment area |x| <= c(y)
-    (the rod's z-extent +-3 stays inside the grip's z -7..+7)."""
-    n = 2000
-    y0, y1 = -GRIP_R, GRIP_R
-    h = (y1 - y0) / n
-
-    def area(y: float) -> float:
-        c = math.sqrt(max(GRIP_R**2 - y * y, 0.0))
-        if c >= ROD_R:
-            return math.pi * ROD_R**2
-        return 2.0 * (
-            c * math.sqrt(ROD_R**2 - c * c) + ROD_R**2 * math.asin(c / ROD_R)
-        )
-
-    total = area(y0) + area(y1)
-    for i in range(1, n):
-        total += (4.0 if i % 2 else 2.0) * area(y0 + i * h)
-    return total * h / 3.0
-
-
-V_TOTAL = V_GRIP + V_CAP + V_WALL + V_TUBE + V_ROD - _grip_overlap()
+V_ROD_HOLE = math.pi * ROD_HOLE_R**2 * GRIP_DIA
+V_TOTAL = V_GRIP + V_CAP + V_WALL + V_TUBE - V_ROD_HOLE + V_ROD
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -131,6 +111,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "GripLen", f"{GRIP_LEN}mm")
     await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
     await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
+    await set_global(adapter, "RodHoleDia", f"{ROD_HOLE_DIA}mm")
     await set_global(adapter, "RodDown", f"{ROD_DOWN}mm")
     await set_global(adapter, "RodUp", f"{ROD_UP}mm")
     await set_global(adapter, "TubeOd", f"{TUBE_OD}mm")
@@ -259,7 +240,32 @@ async def build(adapter) -> dict[str, str]:
     expected += V_TUBE
     await volume_check(adapter, "tube", expected, 0.01 * V_TUBE)
 
-    # Cross rod LAST: Top-plane on-axis circle extruded +Y across both arms.
+    # Reamed cross-hole through the turned body.  The physical press fit is
+    # represented by overlapping bodies: this cut removes the hole from the
+    # turned body before the separate rod body is created below.
+    hole = SketchDims()
+    check("create_sketch rod hole", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, ROD_HOLE_R, "rod hole", dims=hole,
+        names=("RodHoleCx", "RodHoleCz", "RodHoleDia"),
+        drives=(None, None, '"RodHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "rod-hole sketch")
+    check("exit_sketch rod hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodHoleProfile")
+    drive_jobs += hole.apply(adapter, "RodHoleProfile")
+    check(
+        "cut rod hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=GRIP_DIA + 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "RodHole")
+    expected -= V_ROD_HOLE
+    await volume_check(adapter, "rod hole", expected, 0.01 * V_ROD_HOLE)
+
+    # Cross rod LAST: Top-plane on-axis circle extruded +Y across both arms as
+    # a separate body, matching the released two-piece press-fit construction.
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Top"))
     await define_circle(
@@ -271,7 +277,12 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch rod", await adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
     drive_jobs += rod.apply(adapter, "RodProfile")
-    extrude_at_offset(adapter, ROD_DOWN + ROD_UP, -ROD_DOWN)
+    extrude_at_offset(
+        adapter,
+        ROD_DOWN + ROD_UP,
+        -ROD_DOWN,
+        merge_result=False,
+    )
     name_last_feature(adapter, "Rod")
     drive_jobs += [
         (name_dimensions(adapter, "Rod", ["RodSpan"])[0], '"RodDown" + "RodUp"')

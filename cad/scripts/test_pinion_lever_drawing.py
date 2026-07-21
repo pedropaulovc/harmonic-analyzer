@@ -72,7 +72,9 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert 'datums=("A", "B")' in source
     assert "add_surface_finish(" not in source
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["HubBore"]
-    assert "8.00+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["HubBore"]
+    assert "+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDepth"]
+    assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
+    assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall"}
     assert "<MOD-DIAM>4.00" in drawing.DIMENSION_CALLOUTS["RodRootR"]
     assert "<MOD-DIAM>6.00" in drawing.DIMENSION_CALLOUTS["RodTipR"]
 

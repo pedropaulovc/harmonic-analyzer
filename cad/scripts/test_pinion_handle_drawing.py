@@ -25,10 +25,18 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    assert (drawing.TUBE_ID, drawing.ROD_UP, drawing.ROD_DOWN) == (
+    assert (
+        drawing.TUBE_ID,
+        drawing.ROD_UP,
+        drawing.ROD_DOWN,
+        drawing.ROD_DIA,
+        drawing.ROD_HOLE_DIA,
+    ) == (
         pinion_handle_spec.TUBE_ID,
         pinion_handle_spec.ROD_UP,
         pinion_handle_spec.ROD_DOWN,
+        pinion_handle_spec.ROD_DIA,
+        pinion_handle_spec.ROD_HOLE_DIA,
     )
 
 
@@ -60,6 +68,11 @@ def test_handle_interfaces_are_fully_released_for_manufacture() -> None:
     assert "PRESSED CROSS ROD" in notes
     assert "6.010 MAX / 6.000 MIN" in drawing.DIMENSION_CALLOUTS["RodDia"]
     assert "6.020 MAX / 6.015 MIN" in drawing.DIMENSION_CALLOUTS["RodDia"]
+    assert 6.015 <= pinion_handle_spec.ROD_DIA <= 6.020
+    assert 6.000 <= pinion_handle_spec.ROD_HOLE_DIA <= 6.010
+    source = Path(handle.__file__).read_text(encoding="utf-8")
+    assert "merge_result=False" in source
+    assert 'name_last_feature(adapter, "RodHole")' in source
 
 
 def test_unique_feature_dimensions_and_direct_bore_limits() -> None:

@@ -63,6 +63,7 @@ from pinion_cam_geometry import (
     CAM_LEN,
     CAM_OD,
     ECC,
+    TAP_DRILL_DIA,
 )
 from pinion_cam_spec import (
     DRAWING_DIMENSIONS,
@@ -114,6 +115,26 @@ def _boss_added() -> float:
 V_BOSS = _boss_added()  # ~17.5
 
 
+def _tap_drill_removed() -> float:
+    """Volume from the boss tip through to the existing rod bore."""
+    tap_r = TAP_DRILL_DIA / 2.0
+    n = 2000
+    h = 2.0 * tap_r / n
+
+    def f(x: float) -> float:
+        chord = 2.0 * math.sqrt(max(tap_r**2 - x * x, 0.0))
+        bore_wall_y = -math.sqrt(max(BORE_R**2 - x * x, 0.0))
+        return chord * (bore_wall_y - _BOSS_TIP_Y)
+
+    s = f(-tap_r) + f(tap_r)
+    s += 4.0 * sum(f(-tap_r + (2 * k - 1) * h) for k in range(1, n // 2 + 1))
+    s += 2.0 * sum(f(-tap_r + 2 * k * h) for k in range(1, n // 2))
+    return s * h / 3.0
+
+
+V_TAP_DRILL = _tap_drill_removed()
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -126,6 +147,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "Ecc", f"{ECC}mm")
     await set_global(adapter, "BoreDia", f"{BORE}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    await set_global(adapter, "TapDrillDia", f"{TAP_DRILL_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -190,6 +212,33 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, _BOSS_TOP_Y - _BOSS_TIP_Y, _BOSS_TIP_Y)
     name_last_feature(adapter, "SetPinBoss")
     volume = await volume_check(adapter, "set-pin boss", volume + V_BOSS, 0.1 * V_BOSS)
+
+    # M2.5 x 0.45 tap drill, cut from the boss tip into the existing rod bore.
+    # The drawing releases the final 6H thread and minimum full-thread length;
+    # this pilot geometry makes the machining operation part of the model too.
+    tap = SketchDims()
+    check("create_sketch tap drill", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, -BOSS_Z, TAP_DRILL_DIA / 2.0, "tap drill", dims=tap,
+        names=("TapCx", "TapCz", "TapDrillDia"),
+        drives=(None, None, '"TapDrillDia"'),
+    )
+    await ensure_fully_defined(adapter, "tap-drill sketch")
+    check("exit_sketch tap drill", await adapter.exit_sketch())
+    name_last_feature(adapter, "TapDrillProfile")
+    drive_jobs += tap.apply(adapter, "TapDrillProfile")
+    check(
+        "cut M2.5 tap drill to bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=-_BOSS_TIP_Y,
+                start_offset=_BOSS_TIP_Y,
+            )
+        ),
+    )
+    name_last_feature(adapter, "M2.5TapDrill")
+    volume -= V_TAP_DRILL
+    await volume_check(adapter, "M2.5 tap drill", volume, 0.05 * V_TAP_DRILL)
 
     # Named bore axis for the rod mate (Axis1).
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "cam bore axis")
