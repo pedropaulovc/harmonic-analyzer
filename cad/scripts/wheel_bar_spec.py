@@ -51,7 +51,7 @@ DRAWING_NOTES = "\n".join(
         f"1X PEN-HANGER {PEN_HANGER_HOLE_SIZE} {PEN_HANGER_HOLE_FIT.upper()} "
         f"CLEARANCE Ø{PEN_HANGER_HOLE_DIA:.3f} HOLE AT THE FREE END.",
         f"HOLE STATIONS FROM THE LEFT END: #6 AT {SCREW_HOLE_X - _LEFT_END:.1f}; "
-        f"#8 PAIR AT {CLAMP_HOLE_X[0] - _LEFT_END:.1f} + "
+        f"#8 PAIR AT {CLAMP_HOLE_X[0] - _LEFT_END:.1f} AND "
         f"{CLAMP_HOLE_X[1] - _LEFT_END:.1f}.",
     )
 )
