@@ -58,6 +58,8 @@ from lag_screw_spec import (
     HEAD_H,
     SHANK_DIA,
     SHANK_LEN,
+    SLOT_D,
+    SLOT_W,
 )
 
 PART_NAME = "lag-screw"
@@ -125,8 +127,8 @@ async def build(adapter) -> dict[str, str]:
         axis=FastenerAxis.Y,
         head_radius_mm=HEAD_DIA / 2.0,
         head_face_offset_mm=-HEAD_H,
-        width_mm=2.0,
-        depth_mm=2.0,
+        width_mm=SLOT_W,
+        depth_mm=SLOT_D,
         expected_volume_mm3=expected,
     )
     drive_jobs += slot_jobs

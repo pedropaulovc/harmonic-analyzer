@@ -30,6 +30,8 @@ from clamp_screw_spec import (
     HEAD_H,
     SHANK_DIA,
     SHANK_LEN,
+    SLOT_D,
+    SLOT_W,
 )
 
 PART_NAME = "clamp-screw"
@@ -45,6 +47,8 @@ async def build(adapter) -> dict[str, str]:
         head_h=HEAD_H,
         shank_dia=SHANK_DIA,
         shank_len=SHANK_LEN,
+        slot_width=SLOT_W,
+        slot_depth=SLOT_D,
         mark_dimensions=DRAWING_DIMENSIONS,
         drawing_properties={
             "Manufacturing Notes": DRAWING_NOTES,

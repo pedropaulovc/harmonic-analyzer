@@ -42,7 +42,7 @@ def test_lengths_are_inserted_from_named_model_dimensions() -> None:
 def test_made_part_note_states_standards_conformance() -> None:
     notes = spec.DRAWING_NOTES
     assert "ASME B1.1" in notes
-    assert "1.2 WIDE X 1.0 DEEP" in notes
+    assert "1.20 +/-0.10 WIDE X 1.00 +/-0.10 DEEP" in notes
     assert "COMMERCIAL" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
 

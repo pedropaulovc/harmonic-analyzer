@@ -18,6 +18,8 @@ _SPEC = fastener("fillister-screw")
 # Modeled head geometry (build_fillister_screw.py owns the same literals).
 HEAD_DIA = 5.5  # fillister head OD (low)
 HEAD_H = 2.2  # head height
+SLOT_W = 0.8
+SLOT_D = 0.7
 
 # Catalog-owned: the shank is the modeled thread MINOR diameter and the screw's
 # nominal (under-head) length.  Re-derived, never duplicated.
@@ -38,12 +40,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        f"{THREAD_DESIGNATION} FULL THREAD OVER {SHANK_LEN:g} UNDER-HEAD LENGTH; "
+        f"{THREAD_DESIGNATION} FULL THREAD OVER {SHANK_LEN:.2f} UNDER-HEAD LENGTH; "
         "THREAD FORM, RUNOUT, AND LIMITS PER ASME B1.1.",
         "THREAD GEOMETRY OMITTED IN VIEWS; CYLINDRICAL SHANK OUTLINE IS "
         "REFERENCE ONLY.",
-        "STRAIGHT DRIVER SLOT 0.8 WIDE X 0.7 DEEP, CENTERED, THROUGH HEAD "
-        "DIAMETER.",
+        f"STRAIGHT DRIVER SLOT {SLOT_W:.2f} +/-0.10 WIDE X {SLOT_D:.2f} "
+        "+/-0.10 DEEP, CENTERED, THROUGH HEAD DIAMETER.",
     )
 )
 END_VIEW_NOTE = "DRIVER-FACE VIEW"

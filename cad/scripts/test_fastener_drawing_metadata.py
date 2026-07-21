@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import re
+from pathlib import Path
 
 import _config
 
@@ -22,6 +23,15 @@ FASTENER_SPECS = {
     "slotted-screw": "slotted_screw_spec",
     "swing-stop-screw": "swing_stop_screw_spec",
     "thumb-screw": "thumb_screw_spec",
+}
+
+SLOTTED_MADE_PARTS = {
+    "bracket_screw_spec": "build_bracket_screw",
+    "clamp_screw_spec": "build_clamp_screw",
+    "fillister_screw_spec": "build_fillister_screw",
+    "foot_screw_spec": "build_foot_screw",
+    "lag_screw_spec": "build_lag_screw",
+    "slotted_screw_spec": "build_slotted_screw",
 }
 
 
@@ -77,3 +87,19 @@ def test_finish_field_does_not_repeat_template_edge_break_instruction() -> None:
         assert "DEBUR" not in finish, part_name
         assert "REMOVE BURR" not in finish, part_name
         assert "BREAK SHARP" not in finish, part_name
+
+
+def test_made_part_slot_callouts_use_the_same_contract_as_the_builder() -> None:
+    for spec_name, build_name in SLOTTED_MADE_PARTS.items():
+        spec = importlib.import_module(spec_name)
+        build = importlib.import_module(build_name)
+        source = Path(build.__file__).read_text(encoding="utf-8")
+
+        assert f"{spec.SLOT_W:.2f} +/-0.10 WIDE" in spec.DRAWING_NOTES
+        assert f"{spec.SLOT_D:.2f} +/-0.10 DEEP" in spec.DRAWING_NOTES
+        if build_name in {"build_bracket_screw", "build_clamp_screw"}:
+            assert "slot_width=SLOT_W" in source
+            assert "slot_depth=SLOT_D" in source
+            continue
+        assert "width_mm=SLOT_W" in source
+        assert "depth_mm=SLOT_D" in source

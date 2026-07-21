@@ -43,7 +43,7 @@ def test_lengths_are_inserted_from_named_model_dimensions() -> None:
 def test_made_part_note_states_standards_conformance() -> None:
     notes = spec.DRAWING_NOTES
     assert "ASME B1.1" in notes
-    assert "0.8 WIDE X 0.7 DEEP" in notes
+    assert "0.80 +/-0.10 WIDE X 0.70 +/-0.10 DEEP" in notes
     assert "COMMERCIAL" not in notes
     # Deburr/edge-break is a title-block note; repeating it here would duplicate.
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes

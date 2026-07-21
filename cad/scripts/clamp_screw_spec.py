@@ -15,6 +15,8 @@ _SPEC = fastener("clamp-screw")
 
 HEAD_DIA = 8.0  # large slotted head on the bar front (low)
 HEAD_H = 2.5
+SLOT_W = 1.2
+SLOT_D = 1.0
 
 SHANK_DIA = _SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
 SHANK_LEN = _SPEC.length_mm  # nominal under-head length
@@ -29,12 +31,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        f"{THREAD_DESIGNATION} FULL THREAD OVER {SHANK_LEN:g} UNDER-HEAD LENGTH; "
+        f"{THREAD_DESIGNATION} FULL THREAD OVER {SHANK_LEN:.2f} UNDER-HEAD LENGTH; "
         "THREAD FORM, RUNOUT, AND LIMITS PER ASME B1.1.",
         "THREAD GEOMETRY OMITTED IN VIEWS; CYLINDRICAL SHANK OUTLINE IS "
         "REFERENCE ONLY.",
-        "STRAIGHT DRIVER SLOT 1.2 WIDE X 1.0 DEEP, CENTERED, THROUGH HEAD "
-        "DIAMETER.",
+        f"STRAIGHT DRIVER SLOT {SLOT_W:.2f} +/-0.10 WIDE X {SLOT_D:.2f} "
+        "+/-0.10 DEEP, CENTERED, THROUGH HEAD DIAMETER.",
     )
 )
 END_VIEW_NOTE = "DRIVER-FACE VIEW"

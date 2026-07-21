@@ -47,6 +47,8 @@ async def build_flat_screw(
     head_h: float,
     shank_dia: float,
     shank_len: float,
+    slot_width: float,
+    slot_depth: float,
     mark_dimensions: Mapping[str, set[str]] | None = None,
     drawing_properties: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
@@ -106,8 +108,8 @@ async def build_flat_screw(
         axis=FastenerAxis.Z,
         head_radius_mm=head_dia / 2.0,
         head_face_offset_mm=-head_h,
-        width_mm=1.2,
-        depth_mm=min(1.0, head_h * 0.4),
+        width_mm=slot_width,
+        depth_mm=slot_depth,
         expected_volume_mm3=expected,
     )
     drive_jobs += slot_jobs

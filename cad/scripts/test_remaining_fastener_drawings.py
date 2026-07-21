@@ -141,8 +141,8 @@ def test_slotted_screw_slot_dimensions_live_in_the_pure_contract(
     )
     assert spec.SLOT_W > 0
     assert spec.SLOT_D > 0
-    assert f"{spec.SLOT_W:g} WIDE" in spec.DRAWING_NOTES
-    assert f"{spec.SLOT_D:g} DEEP" in spec.DRAWING_NOTES
+    assert f"{spec.SLOT_W:.2f} +/-0.10 WIDE" in spec.DRAWING_NOTES
+    assert f"{spec.SLOT_D:.2f} +/-0.10 DEEP" in spec.DRAWING_NOTES
     assert "SLOT_W," in build_source
     assert "SLOT_D," in build_source
 
