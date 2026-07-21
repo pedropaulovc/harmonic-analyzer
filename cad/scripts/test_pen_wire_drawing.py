@@ -27,7 +27,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_notes_describe_the_wire_and_chain() -> None:
     notes = pen_wire_spec.DRAWING_NOTES
     assert "CUT-WIRE BLANK" in notes
-    assert "STRAIGHTNESS" in notes
+    assert "END-FACE AXIAL VARIATION" in notes
+    assert "TITLE-BLOCK EDGE BREAK DOES NOT" in notes
+    assert "FLAT SURFACE PLATE; 0.50 MAX GAP" in notes
     assert "ASTM" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
