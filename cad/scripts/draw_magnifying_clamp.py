@@ -202,8 +202,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BLOCK_HEIGHT)),
-        frame_xy=(FRONT_CENTER[0] + 0.030, _front_y(BLOCK_HEIGHT) + 0.016),
+        # pick + frame right of the rod-bore hidden-line column: at the centred
+        # pick both blind reviews read the top-face parallelism as attached to
+        # the vertical bore
+        edge_xy=(FRONT_CENTER[0] + 0.038, _front_y(BLOCK_HEIGHT)),
+        frame_xy=(FRONT_CENTER[0] + 0.052, _front_y(BLOCK_HEIGHT) + 0.016),
         characteristic="parallelism",
         tolerance="0.10",
         datums=("A",),
