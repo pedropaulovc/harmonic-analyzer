@@ -15,7 +15,11 @@ captures (same sidecars), then composites/scores are refreshed.
 """
 
 import argparse
+import glob
 import json
+import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,8 +33,36 @@ import composite  # noqa: E402
 
 REPO = composite.REPO
 CAD_OUT = REPO / "cad" / "out"
-BLENDER = Path(r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe")
 WORKER = TOOLS / "blender_worker.py"
+# Resolved once in main(); blender_worker's render needs the >= 5.2 gpu API.
+BLENDER: str | None = None
+
+
+def resolve_blender(override: str | None = None) -> str:
+    """Path to a Blender >= 5.2 for the headless worker.
+
+    --blender / $HARMONIC_BLENDER win; else the highest >= 5.2 under the standard
+    Windows install dir; else `blender` on PATH (Linux/macOS). Discovery (not a
+    hard-coded version) is what lets the release's export stage refresh the gallery
+    on whichever Blender the seat has -- a pinned "Blender 5.1" path silently broke
+    it when that version was uninstalled."""
+    cand = override or os.environ.get("HARMONIC_BLENDER")
+    if cand:
+        if not Path(cand).exists():
+            raise SystemExit(f"Blender not found at {cand} (--blender / $HARMONIC_BLENDER)")
+        return cand
+    found = []
+    for exe in glob.glob(r"C:/Program Files/Blender Foundation/Blender */blender.exe"):
+        m = re.search(r"Blender (\d+)\.(\d+)", exe)
+        if m and (int(m.group(1)), int(m.group(2))) >= (5, 2):
+            found.append(((int(m.group(1)), int(m.group(2))), exe))
+    if found:
+        return max(found)[1]
+    which = shutil.which("blender")
+    if which:
+        return which
+    raise SystemExit(
+        "no Blender >= 5.2 found; install it or set $HARMONIC_BLENDER / pass --blender")
 
 
 STL_DIR = CAD_OUT / "stl"
@@ -140,7 +172,12 @@ def main() -> int:
     ap.add_argument("--skip-composites", action="store_true",
                     help="do not regenerate the gallery composites/scores")
     ap.add_argument("--probe-out", help="compute base framing per pair, write json, render nothing")
+    ap.add_argument("--blender", help="Blender >= 5.2 exe (default: $HARMONIC_BLENDER or the "
+                                      "highest installed)")
     args = ap.parse_args()
+    global BLENDER
+    BLENDER = resolve_blender(args.blender)
+    print(f"blender: {BLENDER}", file=sys.stderr)
     only = set(args.only.split(",")) if args.only else None
     out_root = Path(args.out_root) if args.out_root else None
     canvas = None
