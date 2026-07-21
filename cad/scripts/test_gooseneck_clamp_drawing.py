@@ -34,7 +34,9 @@ def test_notes_describe_the_post_bore_and_pinch_screw() -> None:
     assert "MACHINE ALL SIX OUTER FACES" in notes
     assert "FRONT FACE SHOWN IS SCREW-ENTRY FACE" in notes
     assert "3.0 MIN FULL THREAD" in notes
-    assert "UNDER-HEAD-LENGTH" in notes
+    assert "UNDER-HEAD" in notes
+    assert "NOTES GOVERN ALL SIZES" in notes
+    assert "PERPENDICULAR TO THE BOTTOM FACE" in notes
     assert "GRAY" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")

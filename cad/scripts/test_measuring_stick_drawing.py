@@ -31,7 +31,9 @@ def test_notes_cover_the_scale_and_graduations() -> None:
     assert "FINISHED BAR" in notes
     assert "11 FULL TICKS" in notes
     assert "HALF-DIVISION" in notes
-    assert "SQUARE-BOTTOM" in notes
+    assert "SQUARE BOTTOM" in notes
+    assert "NONCUMULATIVE" in notes
+    assert "STROKE WIDTH 0.30" in notes
     assert "ASME Y14.2 VERTICAL GOTHIC" in notes
     assert "DEPTH 0.20 +/-0.05" in notes
     assert "CDA" not in notes
