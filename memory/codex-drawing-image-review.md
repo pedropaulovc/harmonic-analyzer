@@ -21,3 +21,14 @@ codex exec --sandbox danger-full-access --skip-git-repo-check \
 - Prompt shape: "experienced machinist, NO other context, could you manufacture this part from this sheet alone? Report (1) blockers (2) ambiguities/contradictions (3) standards/readability (4) items to confirm."
 
 **How to apply:** triage findings into (a) cheap note-text fixes — do them; (b) view/layout changes (hidden-lines-visible view, dim repositioning) — do if one rebuild; (c) foundation-level (GD&T frames, title-block rows, watermark, decimal display) — file on the foundations PR instead. Stop after ~2 rounds ([[codex-review-diminishing-returns]]); the reviewer will always want a full production drawing package.
+
+**UPDATE 2026-07-21 — the broken-sandbox belt is GONE; isolate by PNG COPY.**
+On codex-cli 0.144.6 the default sandbox EXECUTES shell commands (the 0.142.x
+"orchestrator_helper_launch_failed" wall this note and
+[[drawing-fanout-orchestration]] leaned on is fixed), and an `-i` path inside
+the repo is a road back in: run exactly per the old recipe, codex read
+`_drawing_registry.py`, ran `git status`, and cited MHA numbers in a "blind"
+review. The reliable isolation is to **copy the PNG into the neutral mktemp dir
+and pass the COPY's path** — nothing in the invocation then references the repo.
+Keep `--ignore-user-config --ignore-rules`; drop any reliance on the sandbox
+failing.
