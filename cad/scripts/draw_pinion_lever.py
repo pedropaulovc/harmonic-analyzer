@@ -20,6 +20,8 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -31,7 +33,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_lever_spec import BORE, HUB_OD, ROD_LEN
+from pinion_lever_spec import BORE, HUB_LEN, HUB_OD, ROD_LEN
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -75,16 +77,15 @@ HUB_R_SHEET = HUB_OD * SHEET_SCALE[0] / 2000.0
 BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "HubOd": (0.028, 0.086),
-    "HubBore": (0.112, 0.083),
+    "HubOd": (0.028, 0.112),
+    "HubBore": (0.108, 0.105),
     "RodTipY": (0.044, 0.170),
-    "RodRootR": (0.120, 0.108),
+    "RodRootR": (0.145, 0.132),
     "RodTipR": (0.120, 0.232),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "HubOd": "TIR 0.05 TO FINAL\nREAMED BORE AXIS",
-    "HubBore": "8.00+0.10/-0.00 FULL-DIA\nFROM FLAT FACE\nFINAL REAM LIMITS\n6.375 MAX / 6.360 MIN\nRa 1.6; RELIEVE DRILL POINT",
+    "HubBore": "NOMINAL REF ONLY\n8.00+0.10/-0.00 FULL-DIA\nFROM FLAT FACE; FLAT BOTTOM\n6.375 MAX / 6.360 MIN\nRa 1.6",
     "RodRootR": "RESULTING <MOD-DIAM>4.00 AT HUB",
     "RodTipR": "RESULTING <MOD-DIAM>6.00 AT TIP",
     "RodTipY": "+/-0.25 FROM HUB AXIS",
@@ -148,7 +149,49 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
+    hub_center = (FRONT_CENTER[0], _front_y(0.0))
+    bore_top = (hub_center[0], hub_center[1] + BORE_R_SHEET)
+    hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
+    flat_face_x = RIGHT_CENTER[0] - HUB_LEN * SHEET_SCALE[0] / 2000.0
+    flat_face = (flat_face_x, hub_center[1])
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=bore_top,
+        symbol_xy=(hub_center[0] + 0.025, hub_center[1] + 0.030),
+        datum="A",
+        label="lever final bore axis",
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=flat_face,
+        symbol_xy=(flat_face_x - 0.018, hub_center[1] - 0.018),
+        datum="B",
+        label="lever flat end face",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=hub_right,
+        frame_xy=(0.145, 0.090),
+        characteristic="circular_runout",
+        tolerance="0.05",
+        datums=("A",),
+        label="lever hub OD runout",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=flat_face,
+        frame_xy=(0.205, 0.105),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A",),
+        label="lever flat-face perpendicularity",
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.045)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
 
     return await finalize_drawing(

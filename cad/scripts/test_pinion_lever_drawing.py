@@ -43,7 +43,7 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
     assert "SPHERICAL CROWN" in notes
-    assert "PERPENDICULAR 0.05" in notes
+    assert "DATUM A" in notes and "DATUM B" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "X.XX" not in notes
@@ -56,13 +56,13 @@ def test_lever_drive_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "AT ASSEMBLY" not in notes
     assert "LIFT ROD" not in notes
-    assert "INTERSECTS BORE AXIS" in notes
+    assert "GRIP AXIS INTERSECTS A" in notes
 
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
+    assert source.count("add_datum_feature(") == 2
+    assert source.count("add_feature_control_frame(") == 2
     assert "add_surface_finish(" not in source
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["HubBore"]
     assert "8.00+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["HubBore"]
