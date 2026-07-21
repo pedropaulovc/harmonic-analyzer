@@ -77,7 +77,7 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "1018" in str(config["material_specification"])
     assert "1018" in str(config["material"])
     assert "ASTM B733-22" in str(config["finish"])
-    assert "medium phosphorus (5-9% P)" in str(config["finish"])
+    assert "MP (5-9% P)" in str(config["finish"])
     assert "SC1" in str(config["finish"])
     assert "after plate" in str(config["finish"])
     assert int(config["quantity"]) == 4
