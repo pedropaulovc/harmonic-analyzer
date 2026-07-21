@@ -309,6 +309,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="output-fixture",
         script_name="draw_output_fixture.py",
     ),
+    DrawingSpec(
+        name="pen_frame",
+        part="pen_frame",
+        artifact_stem="pen-frame",
+        script_name="draw_pen_frame.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

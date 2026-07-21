@@ -3,3 +3,6 @@ pen-frame:
   material: Brass
   tolerance_class: machined_block
   process: "machined (brass)"
+  material_specification: "CDA 360 free-machining brass"
+  finish: "deburred; draw-filed; light satin"
+  quantity: 1
