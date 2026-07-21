@@ -87,7 +87,8 @@ def _shank_silhouette(adapter: Any, view: Any) -> Any:
             adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 4)) or ()
         )
         silhouette_count += len(silhouettes)
-        for silhouette in silhouettes:
+        for raw_silhouette in silhouettes:
+            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
             start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
             end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
             if start is None or end is None:
