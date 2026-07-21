@@ -27,7 +27,6 @@ from cone_tip_block_spec import BLOCK_HEIGHT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
-    remove_notes_matching,
 )
 
 
@@ -179,9 +178,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.020, 0.075, char_height=0.0025
     )
-    removed = remove_notes_matching(adapter, "Tapped Hole")
-    if removed != 2:
-        raise RuntimeError(f"expected 2 auto tapped-hole notes, removed {removed}")
 
     return await finalize_drawing(
         adapter,

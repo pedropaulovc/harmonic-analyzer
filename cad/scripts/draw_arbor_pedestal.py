@@ -331,6 +331,15 @@ async def build(adapter: Any) -> dict[str, str]:
         dimension_name(adapter, annotation): annotation
         for annotation in front_annotations
     }
+    # These two dimensions are true-profile coordinates for the straight
+    # flanks, not ordinary size tolerances: each flank runs from a BASIC foot
+    # top corner to the BASIC crown at its horizontal centreline.
+    for name in ("Width", "FootHt"):
+        annotation = front_by_name[name]
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"{name} has no display dimension to box")
+        set_basic_dimension(adapter, display, label=f"flank {name} coordinate")
     dome_annotation = front_by_name["DomeDia"]
     dome_display = adapter._attempt(lambda: dome_annotation.GetSpecificAnnotation())
     if dome_display is None:

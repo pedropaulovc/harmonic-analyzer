@@ -52,7 +52,7 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
 def test_notes_specify_part_requirements_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "MATING ARBOR LIMITS DIA 9.505-9.525" in notes
-    assert "STRAP 10.00 +/-0.10 THICK" in notes
+    assert "STRAP FAR FACE FLUSH WITH FOOT FAR FACE (10.00 REF THICK)" in notes
     assert "MATERIAL" not in notes
     assert "JAPANNED" not in notes
     assert "DATUM A" in notes
@@ -61,6 +61,7 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "MACHINE FROM CONTINUOUS-CAST STOCK" in notes
     assert "DATUM B IS LEFT FOOT SIDE FACE SHOWN" in notes
     assert "2X STRAIGHT FLANKS RUN FROM TOP CORNERS" in notes
+    assert "BOXED 24.00 X 5.00 FOOT" in notes
     assert "NO TANGENCY" in notes
     assert "BOXED 12.00 LOCATES BOTH BORE AND FLANGE-HOLE AXES" in notes
     assert "STRAP NEAR FACE 6.00 +/-0.10 FROM DATUM D" in notes
@@ -87,6 +88,7 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert "if result != 0:" in source
     assert 'label="flange-hole true position"' in source
     assert 'roughness_ra="1.6"' in source
+    assert 'for name in ("Width", "FootHt"):' in source
     common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
         encoding="utf-8"
     )
