@@ -38,13 +38,14 @@ def thread_control_notes(
     return (
         f"{thread_designation} PER ASME B1.1-2024.",
         "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
-        f"{underhead_length_mm:.2f} +/-0.20 UNDER-HEAD LENGTH; THREAD EXTENDS "
-        "ENTIRE LENGTH.",
+        f"{underhead_length_mm:.2f} +/-0.20 UNDER-HEAD LENGTH; FULL THREAD "
+        "EXTENT = ENTIRE LENGTH.",
         f"{min_full_form:.2f} MIN FULL-FORM THREAD.",
         "INCOMPLETE THREAD 2P MAX AT EACH END.",
         f"DISTAL START CHAMFER C{lead_chamfer:.2f} +/-0.05 X 45 DEG +/-1 DEG.",
         f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX; THREAD LIMITS APPLY "
         "AFTER FINISH.",
+        "DISTAL END FACE SQUARE TO THREAD AXIS WITHIN 1 DEG.",
         "THREAD GEOMETRY OMITTED IN VIEWS; SHANK OUTLINE REFERENCE ONLY.",
     )
 
@@ -55,10 +56,9 @@ def slotted_round_head_notes(
     """Return controls for a cylindrical head with a straight driver slot."""
     return (
         f"HEAD DIA {head_dia_mm:.2f} +/-0.10 X {head_height_mm:.2f} +/-0.10 HIGH.",
-        f"STRAIGHT SLOT {slot_width_mm:.2f} +/-0.10 WIDE X "
+        f"DRIVER SLOT {slot_width_mm:.2f} +/-0.10 WIDE X "
         f"{slot_depth_mm:.2f} +/-0.10 DEEP.",
-        "HEAD AXIS = AXIS OF HEAD OD SHOWN BY CENTERLINE.",
-        "SLOT FLAT BOTTOM; DEPTH FROM TOP; MIDPLANE OFFSET FROM HEAD AXIS "
+        "SLOT FLAT BOTTOM; DEPTH FROM TOP; MIDPLANE OFFSET FROM HEAD OD AXIS "
         "0.00 +/-0.05.",
     )
 

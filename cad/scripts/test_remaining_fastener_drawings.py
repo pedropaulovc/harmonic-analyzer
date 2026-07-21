@@ -164,7 +164,7 @@ def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter
     assert spec.DRAWING_DIMENSIONS == {}
     assert "FLAT-END PINCH SCREW; NO CONICAL POINT" in spec.DRAWING_NOTES
     assert "DISTAL START CHAMFER" in spec.DRAWING_NOTES
-    assert "MIDPLANE OFFSET FROM HEAD AXIS 0.00 +/-0.05" in spec.DRAWING_NOTES
+    assert "MIDPLANE OFFSET FROM HEAD OD AXIS 0.00 +/-0.05" in spec.DRAWING_NOTES
 
 
 @pytest.mark.parametrize("spec_name", ("hanger_screw_spec", "thumb_screw_spec"))
