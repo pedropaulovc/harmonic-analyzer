@@ -84,8 +84,8 @@ FRONT_KEEP = {
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "HubBore": "8.0 DEEP FROM FLAT FACE\nREAM 6.360-6.375\nRa 1.6",
-    "RodRootR": "RADIUS - <MOD-DIAM>4.00 AT HUB",
-    "RodTipR": "RADIUS - <MOD-DIAM>6.00 AT TIP",
+    "RodRootR": "RADIUS - Ø4.00 AT HUB",
+    "RodTipR": "RADIUS - Ø6.00 AT TIP",
 }
 
 

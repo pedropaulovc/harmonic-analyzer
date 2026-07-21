@@ -1,8 +1,8 @@
 crank-handle:
   number: MHA-022
-  material: Oak or close-grained hardwood grip; CDA 260 brass collar
-  material_specification: Oak or close-grained hardwood grip; CDA 260 brass collar
-  finish: wood sanded smooth, stained black and sealed; collar polished
+  material: Oak grip / CDA 260 brass collar
+  material_specification: Oak grip / CDA 260 brass collar
+  finish: wood stained/sealed; collar polished
   quantity: 1
   tolerance_class: visual_noncritical
   process: "turned (wood)"
