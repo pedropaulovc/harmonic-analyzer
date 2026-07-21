@@ -99,7 +99,6 @@ def _add_lug_detail(adapter: Any, front: Any) -> Any:
     draw.EditRebuild3()
     if detail is None:
         raise RuntimeError("failed to create the gooseneck lug detail view")
-    set_hidden_lines_removed(adapter, detail)
     return detail
 
 
