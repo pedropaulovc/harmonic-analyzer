@@ -2,7 +2,7 @@ pinion-cam-pin:
   number: MHA-100
   material: AISI 1018 cold-finished steel rod
   material_specification: AISI 1018 cold-finished steel rod
-  finish: smooth turned, deburred, oiled
+  finish: smooth turned, oiled
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance

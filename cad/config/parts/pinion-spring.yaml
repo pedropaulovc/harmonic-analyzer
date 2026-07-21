@@ -2,7 +2,7 @@ pinion-spring:
   number: MHA-099
   material: CDA 260 brass strip, half-hard
   material_specification: CDA 260 brass strip, half-hard
-  finish: bright, deburred
+  finish: bright
   quantity: 1
   tolerance_class: machined_block
   process: "bent strip (brass)"
