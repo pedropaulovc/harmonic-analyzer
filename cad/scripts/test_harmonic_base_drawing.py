@@ -39,7 +39,10 @@ def test_plate_geometry_is_single_sourced() -> None:
 
 def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     notes = harmonic_base_spec.DRAWING_NOTES
-    assert "GRAY IRON" in notes
+    assert "GRAY IRON" not in notes
+    assert "ASTM A48" not in notes
+    assert "GREEN ENAMEL" not in notes
+    assert "UOS" not in notes
     assert "REVEAL" in notes
     assert "TAPPED AT THE MODELLED" in notes
     assert "X.XX" not in notes
@@ -62,6 +65,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("harmonic-base")
+    assert config["material"] == "ASTM A48 Class 30 Gray Iron"
     assert "gray cast iron" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

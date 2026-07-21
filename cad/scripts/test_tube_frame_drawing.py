@@ -35,14 +35,16 @@ def test_tube_nominals_are_single_sourced() -> None:
 
 def test_notes_and_native_gdt() -> None:
     notes = tube_frame_spec.DRAWING_NOTES
-    assert "STEEL TUBE" in notes
-    assert "FACED SQUARE TO AXIS A" in notes
+    assert "STEEL TUBE" not in notes
+    assert "POLISH" not in notes
+    assert "UOS" not in notes
+    assert "FACED SQUARE TO THE TUBE AXIS" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert source.count("add_surface_finish(") == 1
+    assert source.count("add_datum_feature(") == 0
+    assert source.count("add_feature_control_frame(") == 0
+    assert source.count("add_surface_finish(") == 0
 
 
 def test_view_scales_are_explicit() -> None:
@@ -61,6 +63,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("tube-frame")
+    assert "DOM/CDS" in str(config["material"])
     assert "tube" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 4

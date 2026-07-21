@@ -36,37 +36,41 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     assert part.PIN_HOLE_HEIGHT is crankshaft_spec.PIN_HOLE_HEIGHT
     assert crankshaft_spec.PIN_HOLE_HEIGHT == 12.0
     notes = crankshaft_spec.DRAWING_NOTES
-    assert "#9" in notes
+    assert "#9" not in notes
     assert "TAPER PIN" in notes
-    # The cross-hole axial station (12 from the outboard end) is a reference in
-    # the notes, not a drawing dimension: the shaft's extreme end face is not a
-    # selectable coordinate EDGE pick, so the station cannot be dimensioned there.
-    assert "12 FROM" in notes and "OUTBOARD END" in notes
+    assert "FINISHED PILOT-HOLE CONDITION" in notes
+    assert "INTERSECTS THE SHAFT AXIS" in notes
+    assert "PART ACCEPTANCE:" not in notes
+    assert "CUSTOM TAPER PIN" in notes and "MHA-024" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Ø/THRU comes from the associative wizard callout; no manual edge dimension.
+    # Ø/THRU comes from the associative wizard callout; the model-owned nested
+    # sketch dimension supplies the station without a coordinate pick.
     assert source.count("add_native_hole_callout(") == 1
     assert source.count("add_edge_dimension(") == 0
+    assert source.count("set_basic_dimensions(") == 0
+    assert crankshaft_spec.DRAWING_DIMENSIONS["3DSketch1"] == {"PinHeight"}
 
 
 def test_linked_notes_define_remaining_operations() -> None:
     notes = crankshaft_spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS["ShaftDiaDim"] == "+0.00/-0.02"
-    assert "CENTRE MARKS" in notes
+    assert "AISI" not in notes
+    assert "ZINC" not in notes
+    assert "UOS" not in notes
+    assert "OUTSIDE THIS PART DRAWING" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
-    # Only the round bearing controls are placed natively (they pick the end
-    # view's circular edge); end-face squareness/finish live in the notes.
+def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert source.count("characteristic=\"cylindricity\"") == 1
+    assert source.count("add_datum_feature(") == 0
+    assert source.count("add_feature_control_frame(") == 0
     assert source.count("add_surface_finish(") == 1
-    assert "FACED SQUARE TO AXIS A" in crankshaft_spec.DRAWING_NOTES
+    assert "add_view_centerline(" in source
+    assert "BOTH END FACES SQUARE" in crankshaft_spec.DRAWING_NOTES
 
 
 def test_view_scales_are_explicit() -> None:
@@ -74,7 +78,7 @@ def test_view_scales_are_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(1, 1)") == 2
     assert "scale=(2, 1)" in source
-    assert crankshaft_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
+    assert crankshaft_spec.END_VIEW_NOTE == "CRANK-END VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
 
 
@@ -85,6 +89,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("crankshaft")
+    assert "1018" in str(config["material"])
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1

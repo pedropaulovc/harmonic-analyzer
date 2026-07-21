@@ -26,10 +26,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -142,36 +139,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, end_annotations, {"BoreDia": 2, "OuterDia": 1})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
-
-    end_circle = (
-        END_CENTER[0] + OUTER_DIA * END_VIEW_SCALE / 2000.0,
-        END_CENTER[1],
-    )
-    add_datum_feature(
-        adapter,
-        end,
-        edge_xy=end_circle,
-        symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.030),
-        datum="A",
-        label="tube axis",
-    )
-    add_feature_control_frame(
-        adapter,
-        end,
-        edge_xy=end_circle,
-        frame_xy=(END_CENTER[0] - 0.010, END_CENTER[1] + 0.048),
-        characteristic="cylindricity",
-        tolerance="0.05",
-        label="tube OD cylindricity",
-    )
-    add_surface_finish(
-        adapter,
-        end,
-        edge_xy=end_circle,
-        symbol_xy=(END_CENTER[0] + 0.030, END_CENTER[1] + 0.030),
-        roughness_ra="0.8",
-        label="tube OD polish",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.125)
     add_property_linked_note(adapter, "End View Note", 0.275, 0.162)

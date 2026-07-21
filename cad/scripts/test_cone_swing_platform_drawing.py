@@ -29,7 +29,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_pivot_notch_and_wedge() -> None:
     notes = cone_swing_platform_spec.DRAWING_NOTES
-    assert "STEEL PLATE" in notes
+    assert "STEEL PLATE" not in notes
+    assert "BLACK OXIDE" not in notes
+    assert "UOS" not in notes
     assert "PIVOT HOLE" in notes
     assert "LOCK NOTCH" in notes
     assert "X.XX" not in notes
@@ -52,6 +54,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("cone-swing-platform")
+    assert config["material"] == "AISI 1018 Steel Plate"
     assert "steel" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

@@ -17,22 +17,23 @@ PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
+    "3DSketch1": {"PinHeight"},
 }
-# The #9 cross-hole is NOT in the marked-dimension set: its Ø/THRU callout is
-# the associative native Hole Wizard callout and its station is a drawing-side
-# reference dimension (the placement dim lives on a wizard SUBfeature sketch,
-# which mark_dimensions_for_drawing's top-level feature walk cannot reach).
+# The cross-hole's Ø/THRU callout comes from the associative native Hole Wizard
+# annotation. Its axial station is the model's PinHeight dimension on the
+# wizard's nested 3DSketch1 subfeature; the drawing-mark walker reaches the
+# complete feature tree so that model-owned dimension can be imported.
 
 # Lines kept short (<~66 chars) so the left-anchored block stays clear of the
 # title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
-        "DEBURR; BREAK ENDS 0.15 MAX; CENTRE MARKS 1.0 DEEP MAX.",
-        "TURN OR CENTRELESS-GRIND FULL BEARING LENGTH; NO FLATS OR STEPS.",
-        "BOTH ENDS FACED SQUARE TO AXIS A WITHIN 0.05; END FACES 3.2 Ra.",
-        "CROSS-HOLE: #9 (4.978) DRILL THRU AT CRANK SEAT, 12 FROM",
-        "OUTBOARD END; TAPER-REAM AT ASSEMBLY WITH CRANK ARM FOR",
-        "NO. 2 TAPER PIN, 1:48, LARGE END OUTBOARD.",
+        "<MOD-DIAM>4.98 +0.10/0 THRU IS THE FINISHED PILOT-HOLE CONDITION",
+        "FOR THIS PART. HOLE AXIS SQUARE TO AND INTERSECTS THE SHAFT AXIS.",
+        "BOTH END FACES SQUARE TO THE SHAFT AXIS WITHIN 0.05.",
+        "MATCH-REAMING WITH THE CRANK ARM TO FIT CUSTOM TAPER PIN",
+        "MHA-024 IS AN ASSEMBLY OPERATION OUTSIDE THIS PART DRAWING.",
     )
 )
-END_VIEW_NOTE = "END VIEW SCALE 2:1"
+END_VIEW_NOTE = "CRANK-END VIEW SCALE 2:1"
+CRANK_END_NOTE = "CRANK / OUTBOARD END = LOWER END OF LENGTH VIEW"

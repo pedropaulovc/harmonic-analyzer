@@ -19,17 +19,40 @@ import _telemetry
 from _common import (
     apply_custom_properties,
     _dim_owner_feature,
-    _feature_by_name,
     _iter_features,
     _read_member,
 )
+
+
+def _iter_subfeatures(feature: Any):
+    """Yield a feature's complete subfeature tree in display order."""
+    subfeature = _read_member(feature, "GetFirstSubFeature")
+    for _ in range(5000):
+        if not subfeature:
+            return
+        yield subfeature
+        yield from _iter_subfeatures(subfeature)
+        subfeature = _read_member(subfeature, "GetNextSubFeature")
+
+
+def _iter_features_deep(adapter: Any):
+    for feature in _iter_features(adapter):
+        yield feature
+        yield from _iter_subfeatures(feature)
+
+
+def _feature_by_name_deep(adapter: Any, name: str) -> Any:
+    for feature in _iter_features_deep(adapter):
+        if str(_read_member(feature, "Name")) == name:
+            return feature
+    raise RuntimeError(f"feature {name!r} not found in the active document")
 
 
 def mark_dimensions_for_drawing(
     adapter: Any, feature_name: str, dimension_names: set[str]
 ) -> None:
     """Mark only this part's explicit manufacturing dimensions for insertion."""
-    feature = _feature_by_name(adapter, feature_name)
+    feature = _feature_by_name_deep(adapter, feature_name)
     marked: set[str] = set()
     display = _read_member(feature, "GetFirstDisplayDimension")
     for _ in range(1000):
@@ -55,7 +78,7 @@ def mark_dimensions_for_drawing(
 
 def clear_dimensions_for_drawing(adapter: Any) -> None:
     cleared = 0
-    for feature in _iter_features(adapter):
+    for feature in _iter_features_deep(adapter):
         display = _read_member(feature, "GetFirstDisplayDimension")
         for _ in range(1000):
             if not display:

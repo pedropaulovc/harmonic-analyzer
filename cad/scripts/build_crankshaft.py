@@ -52,6 +52,7 @@ from _holes import (
     wizard_hole_on_cylinder,
 )
 from crankshaft_spec import (
+    CRANK_END_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
@@ -200,6 +201,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
+            "Crank End Note": CRANK_END_NOTE,
             "Manufacturing Notes": DRAWING_NOTES,
             "End View Note": END_VIEW_NOTE,
         },

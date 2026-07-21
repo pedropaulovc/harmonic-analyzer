@@ -6,8 +6,8 @@ every shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The model's shaft axis runs along +Y (outboard/crank end at the origin), so
-the standard side views show the shaft VERTICAL: the circular end view is the
-``*Top`` orientation and the length view is ``*Front`` (outboard end at the
+the standard side views show the shaft VERTICAL: the crank-end face is the
+``*Bottom`` orientation and the length view is ``*Front`` (outboard end at the
 view bottom, the #9 cross-hole facing the viewer as a circle at station 12).
 
 Run with SolidWorks open::
@@ -25,8 +25,6 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -38,6 +36,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    add_view_centerline,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from crankshaft_spec import (
@@ -66,7 +65,7 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 END_VIEW_SCALE = 2.0
-# End view (the *Top orientation: looking down the shaft axis) at 2:1.
+# Crank-end view (the *Bottom orientation: looking along +Y) at 2:1.
 FRONT_CENTER = (0.060, 0.150)
 # Side view (the *Front orientation: shaft vertical, outboard end at the view
 # bottom) at 1:1 -- the 145 length spans sheet y 0.0775..0.2225.
@@ -90,6 +89,7 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1]),
+    "PinHeight": (0.128, 0.090),
 }
 DIMENSION_CALLOUTS = {"ShaftDiaDim": "+0.00/-0.02"}
 
@@ -108,6 +108,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Crank End Note",
             "Manufacturing Notes",
             "End View Note",
         ),
@@ -116,6 +117,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Crank End Note",
             "Manufacturing Notes",
             "End View Note",
         ),
@@ -135,7 +137,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Top", *FRONT_CENTER, scale=(2, 1))
+    front = place_view(adapter, str(SOURCE), "*Bottom", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Front", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, right, iso):
@@ -160,21 +162,16 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    end_circle = (
-        FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-        FRONT_CENTER[1],
+    add_view_centerline(
+        adapter,
+        right,
+        face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.035),
+        label="crankshaft bearing axis",
     )
+
     # The #9 tapered-pin cross-hole: the associative wizard callout carries the
-    # Ø/THRU specification. Its axial STATION (12 from the outboard end) is a
-    # reference in the notes, not a drawing dimension: the hole is a wizard
-    # subfeature (out of reach of the marked-dimension import) that is taper-
-    # reamed at assembly, and a coordinate EDGE pick on the shaft's extreme end
-    # face is not selectable through SelectByID2 (SolidWorks' own Depth
-    # dimension attaches to it, but a manual sheet-coordinate pick there is
-    # rejected regardless of offset -- probed live 2026-07-20). Only the round
-    # bearing controls below (datum A, cylindricity, Ra), which pick the end
-    # view's circular edge, are placed natively; end-face squareness/finish are
-    # notes, standard for a turned shaft.
+    # Ø/THRU specification. The axial station is the imported model-owned
+    # PinHeight dimension above and takes the title-block linear tolerance.
     add_native_hole_callout(
         adapter,
         right,
@@ -182,36 +179,20 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.205, 0.104),
         label="tapered-pin cross-hole",
     )
+    add_property_linked_note(adapter, "Crank End Note", 0.172, 0.078)
 
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=end_circle,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
-        datum="A",
-        label="crankshaft axis",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=end_circle,
-        frame_xy=(0.060, 0.196),
-        characteristic="cylindricity",
-        tolerance="0.01",
-        label="crankshaft bearing cylindricity",
-    )
+    shaft_face = (RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.035)
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=end_circle,
-        symbol_xy=(0.096, 0.196),
+        right,
+        edge_xy=shaft_face,
+        symbol_xy=(0.238, 0.194),
         roughness_ra="1.6",
         label="crankshaft bearing finish",
+        entity_type="FACE",
     )
-
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.056)
-    # Below the end view, clear of the datum-A / cylindricity / Ra cluster that
-    # sits above the circle (which its old y=0.192 anchor ran straight into).
+    # Identify the enlarged circular projection without relying on its position.
     add_property_linked_note(adapter, "End View Note", 0.018, 0.112)
 
     return await finalize_drawing(

@@ -38,7 +38,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     iter_views,
     new_drawing,
-    remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
@@ -49,6 +48,11 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 # free-standing layout element (the general-notes block, schedule cells). Tables
 # are enumerated separately via IView.GetTableAnnotations.
 _ANNOT_NOTE = 6
+# swInsertAnnotation_e flags used by the curated model-item import. Hole Wizard
+# placement dimensions live on an absorbed sketch and require their dedicated
+# flag; MarkedForDrawing alone does not make them importable.
+_INSERT_DIMS_MARKED = 0x8000
+_INSERT_HOLE_WIZARD_LOCATION_DIMS = 0x20000
 
 # swAnnotationType_e for the native GD&T symbols the recipes place at explicit
 # sheet coordinates (datum tags, feature-control frames, surface-finish symbols).
@@ -1150,7 +1154,7 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     result = adapter._attempt(
         lambda: ddoc.InsertModelAnnotations3(
             0,       # swImportModelItemsFromEntireModel
-            0x8000,  # swInsertDimensionsMarkedForDrawing
+            _INSERT_DIMS_MARKED | _INSERT_HOLE_WIZARD_LOCATION_DIMS,
             False,
             True,
             True,

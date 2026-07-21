@@ -26,7 +26,11 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_carry_the_pitch_rail_and_boss() -> None:
     notes = top_frame_spec.DRAWING_NOTES
-    assert "GRAY-IRON CASTING" in notes
+    assert "GRAY-IRON" not in notes
+    assert "ASTM A48" not in notes
+    assert "GREEN ENAMEL" not in notes
+    assert "UOS" not in notes
+    assert "SOLID-STOCK" in notes
     assert "394 X 224 PITCH" in notes
     assert "GOOSENECK BORE" in notes
     assert "X.XX" not in notes
@@ -49,6 +53,7 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("top-frame")
+    assert config["material"] == "ASTM A48 Class 30 Gray Iron"
     assert "gray cast iron" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1
