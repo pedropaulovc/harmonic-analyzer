@@ -2881,21 +2881,23 @@ def position_bom_balloon(
         f"magnetic_lines={magnetic_lines}"
     )
     note.LockPosition = False
-    actual_xy = (float("nan"), float("nan"))
+    info = note.GetBalloonInfo()
+    anchor = annotation.GetPosition()
+    if info is None or len(info) < 2 or anchor is None or len(anchor) < 2:
+        raise RuntimeError(f"{label}: item {item_number} has no position read-back")
+    actual_xy = (float(info[0]), float(info[1]))
+    delta = tuple(expected - actual for actual, expected in zip(actual_xy, position_xy))
+    target_anchor = (float(anchor[0]) + delta[0], float(anchor[1]) + delta[1])
+    # GetBalloonInfo can lag the note's new origin until the graphics pipeline
+    # redraws. Retry the SAME absolute anchor, never a cumulative delta against
+    # stale circle data, and redraw before judging each rendered-circle readback.
     for _attempt in range(3):
-        info = note.GetBalloonInfo()
-        anchor = annotation.GetPosition()
-        if info is None or len(info) < 2 or anchor is None or len(anchor) < 2:
-            raise RuntimeError(f"{label}: item {item_number} has no position read-back")
-        actual_xy = (float(info[0]), float(info[1]))
-        delta = tuple(expected - actual for actual, expected in zip(actual_xy, position_xy))
-        if all(abs(value) <= 1e-6 for value in delta):
-            break
-        if not annotation.SetPosition(
-            float(anchor[0]) + delta[0], float(anchor[1]) + delta[1], 0.0
-        ):
+        note.LockPosition = False
+        if not annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0):
             raise RuntimeError(f"{label}: failed to position item {item_number}")
+        note.LockPosition = True
         adapter.currentModel.EditRebuild3()
+        adapter.currentModel.GraphicsRedraw2()
         moved_anchor = annotation.GetPosition()
         moved_info = note.GetBalloonInfo()
         _telemetry.info(
@@ -2903,10 +2905,11 @@ def position_bom_balloon(
             f"anchor={tuple(float(value) for value in moved_anchor[:2]) if moved_anchor else None}, "
             f"circle={tuple(float(value) for value in moved_info[:2]) if moved_info else None}"
         )
-    # Auto-balloon layout is recomputed by EditRebuild3.  Anchor the converged
-    # circle correction so that rebuild cannot silently restore the ring slot.
-    note.LockPosition = True
-    adapter.currentModel.EditRebuild3()
+        if moved_info and all(
+            abs(float(moved_info[index]) - expected) <= 1e-6
+            for index, expected in enumerate(position_xy)
+        ):
+            break
     info = note.GetBalloonInfo()
     if info is None or len(info) < 2:
         raise RuntimeError(f"{label}: item {item_number} circle has no final read-back")

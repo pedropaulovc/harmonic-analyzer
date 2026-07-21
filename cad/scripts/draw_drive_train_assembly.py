@@ -27,6 +27,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -176,8 +177,12 @@ async def build(adapter: Any) -> dict[str, str]:
     bottom = place_view(
         adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=VIEW_SCALE
     )
-    for view in (front, right, iso, bottom):
+    for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    # The cone-tip bushing and the two coaxial crank/cone-drive items are fully
+    # enclosed in every exterior projection.  The auxiliary bottom view shows
+    # hidden lines so those physical BOM items have balloonable geometry.
+    set_hidden_lines_visible(adapter, bottom)
 
     insert_identified_bom_table(
         adapter,
