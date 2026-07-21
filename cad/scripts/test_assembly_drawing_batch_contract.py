@@ -92,6 +92,17 @@ def test_part_bom_numbers_come_from_the_part_registry() -> None:
         }, drawing.ARTIFACT_STEM
 
 
+def test_part_registry_numbers_are_globally_unique() -> None:
+    numbers = {
+        stem: record["number"]
+        for stem, record in _config.parts().items()
+    }
+    assert len(numbers) == len(set(numbers.values()))
+    assert numbers["lever-wire"] == "MHA-115"
+    assert numbers["pen-wire"] == "MHA-100"
+    assert numbers["pinion-cam-pin"] == "MHA-116"
+
+
 def test_top_level_bom_uses_released_subassembly_numbers() -> None:
     assert draw_harmonic_analyzer_assembly.BOM_PART_NUMBERS == {
         "frame": "MHA-A04",
