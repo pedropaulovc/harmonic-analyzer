@@ -486,7 +486,8 @@ def add_surface_finish(
     draw = adapter.currentModel
     if edge_entity is not None:
         draw.ClearSelection2(True)
-        selection_data = draw.SelectionManager.CreateSelectData()
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = selection_manager.CreateSelectData()
         selection_data.View = view
         selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
         if not selected:
