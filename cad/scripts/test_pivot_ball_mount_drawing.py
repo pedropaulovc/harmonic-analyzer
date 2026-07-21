@@ -75,6 +75,7 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert source.count('characteristic="circular_runout"') == 1
     assert 'characteristic="profile_surface"' in source
     assert 'quantity="STEM AXIS"' in source
+    assert "leader=False" in source
     assert 'label="stem diameter"' in source
     assert 'entity_type="SILHOUETTE"' in source
     assert source.count('entity_type="DIMENSION"') == 2

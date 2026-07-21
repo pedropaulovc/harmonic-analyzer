@@ -369,6 +369,7 @@ def add_feature_control_frame(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    leader: bool = True,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
@@ -460,11 +461,13 @@ def add_feature_control_frame(
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
-    # Bent leader: a straight leader runs at whatever angle the anchor-to-frame
-    # vector takes and can cut clean across a neighbouring view.
+    # Bent leaders keep ordinary feature attachments out of neighbouring views.
+    # A frame associated directly with a size dimension is conventionally
+    # stacked without a leader; the selected dimension remains its attachment.
+    leader_style = _LEADER_BENT if leader else 0
     leader_status = int(
         annotation.SetLeader3(
-            _LEADER_BENT,
+            leader_style,
             _LEADER_SIDE_SMART,
             True,  # smart arrowhead
             False,  # perpendicular (GTol-only; not wanted here)
@@ -480,12 +483,16 @@ def add_feature_control_frame(
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     draw.EditRebuild3()
+    expected_leaders = 1 if leader else 0
     if (
         int(annotation.GetAttachedEntityCount3()) != 1
         or not bool(gtol.IsAttached())
-        or int(gtol.GetLeaderCount()) != 1
+        or int(gtol.GetLeaderCount()) != expected_leaders
     ):
-        raise RuntimeError(f"feature-control frame lacks one attached leader ({label})")
+        raise RuntimeError(
+            f"feature-control frame attachment mismatch ({label}): "
+            f"leaders={gtol.GetLeaderCount()}, expected={expected_leaders}"
+        )
     draw.ClearSelection2(True)
     return gtol
 
