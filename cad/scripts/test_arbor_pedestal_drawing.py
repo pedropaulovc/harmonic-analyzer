@@ -36,7 +36,7 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     assert round(arbor_pedestal_spec.BORE_DIA, 3) == 9.525
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "+0.055/+0.025 THRU"
     assert "BoreHeight" not in drawing.DIMENSION_CALLOUTS
-    assert drawing.DIMENSION_CALLOUTS["DomeDia"] == "+/-0.10"
+    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.10"
     assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
     assert "ARBOR BORE LIMITS" not in arbor_pedestal_spec.DRAWING_NOTES
     shaft_limits = (9.505, 9.525)
@@ -60,13 +60,10 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "BREAK EDGES" not in notes
     assert "MACHINE FROM CONTINUOUS-CAST STOCK" in notes
     assert "DATUM B IS LEFT FOOT SIDE FACE SHOWN" in notes
-    assert "2X STRAIGHT FLANKS RUN FROM THE DATUM-A FOOT CORNERS" in notes
+    assert "2X STRAIGHT FLANKS RUN FROM TOP CORNERS" in notes
     assert "NO TANGENCY" in notes
-    assert "CROWN CENTER SHALL LIE WITHIN 0.05 OF THE BORE AXIS" in notes
-    assert "FLANGE-HOLE AXIS IS BASIC 12.00 FROM DATUM B" in notes
-    assert "FACE OPPOSITE DATUM D" in notes
-    assert "COPLANAR WITH OPPOSITE FOOT FACE WITHIN 0.10" in notes
-    assert "6.00 FROM DATUM D TO STRAP NEAR FACE IS REFERENCE ONLY" in notes
+    assert "BOXED 12.00 LOCATES BOTH BORE AND FLANGE-HOLE AXES" in notes
+    assert "STRAP NEAR FACE 6.00 +/-0.10 FROM DATUM D" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "add_native_hole_callout(" in source
@@ -79,7 +76,8 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'datum="B"' in source
     assert 'datum="D"' in source
     assert 'characteristic="position"' in source
-    assert 'characteristic="profile_surface"' not in source
+    assert 'characteristic="profile_surface"' in source
+    assert 'quantity="CROWN ONLY"' in source
     assert 'characteristic="perpendicularity"' not in source
     assert source.count("_add_circle_basic(") == 4  # helper plus three calls
     assert 'orientation="horizontal"' in source

@@ -38,6 +38,7 @@ from arbor_pedestal_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
     view_name,
 )
@@ -85,7 +86,7 @@ TOP_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "+0.055/+0.025 THRU",
-    "DomeDia": "+/-0.10",
+    "Depth": "+/-0.10",
 }
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
 # 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).
@@ -314,6 +315,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
+    front_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in front_annotations
+    }
+    dome_annotation = front_by_name["DomeDia"]
+    dome_display = adapter._attempt(lambda: dome_annotation.GetSpecificAnnotation())
+    if dome_display is None:
+        raise RuntimeError("DomeDia has no display dimension to box")
+    set_basic_dimension(adapter, dome_display, label="crown true-profile diameter")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the plan view")
 
@@ -322,7 +332,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # clamp-fit finish.
     _bore_r = BORE_DIA / 2.0 * _S
     foot_edge = (FRONT_CENTER[0] + 0.006, _front_y(0.0))
-    foot_entity, side_entity, bore_entity, _dome_entity = _front_entities(
+    foot_entity, side_entity, bore_entity, dome_entity = _front_entities(
         adapter, front
     )
     _add_circle_basic(
@@ -377,6 +387,21 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="arbor bore true position",
         entity=bore_entity,
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(
+            FRONT_CENTER[0] + TOP_RADIUS * _S * 0.70,
+            _front_y(BORE_HEIGHT + TOP_RADIUS * 0.70),
+        ),
+        frame_xy=(0.245, _front_y(BORE_HEIGHT) + 0.026),
+        characteristic="profile_surface",
+        tolerance="0.10",
+        datums=("A", "B"),
+        quantity="CROWN ONLY",
+        label="crown surface profile",
+        entity=dome_entity,
     )
     add_surface_finish(
         adapter,
