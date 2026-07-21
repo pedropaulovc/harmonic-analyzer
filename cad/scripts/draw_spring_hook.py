@@ -35,6 +35,7 @@ from spring_hook_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
+    view_name,
 )
 
 
@@ -72,17 +73,24 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 
 def _shank_silhouette(adapter: Any, view: Any) -> Any:
     """Return the longest visible straight silhouette of the shank."""
+    name = view_name(adapter, view)
+    if not adapter.currentModel.ActivateView(name):
+        raise RuntimeError(f"failed to activate spring-hook drawing view {name!r}")
     components = adapter._attempt(lambda: view.GetVisibleComponents()) or ()
     candidates: list[tuple[float, Any]] = []
+    silhouette_count = 0
+    endpoint_count = 0
     for component in components:
         silhouettes = (
             adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 4)) or ()
         )
+        silhouette_count += len(silhouettes)
         for silhouette in silhouettes:
             start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
             end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
             if start is None or end is None:
                 continue
+            endpoint_count += 1
             start_xyz = adapter._get_attr_or_call(start, "ArrayData")
             end_xyz = adapter._get_attr_or_call(end, "ArrayData")
             if not start_xyz or not end_xyz:
@@ -92,7 +100,11 @@ def _shank_silhouette(adapter: Any, view: Any) -> Any:
             ) ** 0.5
             candidates.append((length, silhouette))
     if not candidates:
-        raise RuntimeError("front view exposes no spring-hook silhouette edges")
+        raise RuntimeError(
+            "front view exposes no usable spring-hook silhouette edges: "
+            f"components={len(components)} silhouettes={silhouette_count} "
+            f"endpoint pairs={endpoint_count}"
+        )
     length, silhouette = max(candidates, key=lambda item: item[0])
     if length < SHANK_RISE / 2000.0:
         raise RuntimeError(
