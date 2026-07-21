@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import re
 
 import _config
 
@@ -49,12 +50,30 @@ def test_notes_are_complete_but_do_not_repeat_title_or_template_requirements() -
             "C36000",
             "BLACK OXIDE",
             "TURNED AND POLISHED",
+            "ALL DIMENSIONS",
+            "DRAWING UNITS",
+            "EDGE BREAK",
             "UNLESS OTHERWISE SPECIFIED",
             "GENERAL TOLERANCE",
             "MATERIAL:",
             "FINISH:",
+            "UNITS:",
+            " UOS",
             "DEBURR",
             "REMOVE BURRS",
             "BREAK SHARP",
         ):
             assert title_owned not in notes, (part_name, title_owned)
+
+        assert re.search(r"\b(?:MM|MILLIMET(?:ER|RE)S?)\b", notes) is None, (
+            part_name,
+            "unit suffix",
+        )
+
+
+def test_finish_field_does_not_repeat_template_edge_break_instruction() -> None:
+    for part_name in FASTENER_SPECS:
+        finish = str(_config.parts(part_name)["finish"]).upper()
+        assert "DEBUR" not in finish, part_name
+        assert "REMOVE BURR" not in finish, part_name
+        assert "BREAK SHARP" not in finish, part_name
