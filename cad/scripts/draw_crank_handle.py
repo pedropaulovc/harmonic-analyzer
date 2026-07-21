@@ -96,7 +96,7 @@ RIGHT_KEEP = {
     "PivotBoreDia": (0.360, 0.220),
 }
 DIMENSION_CALLOUTS = {
-    "HandleLength": "+/-0.25 OVERALL",
+    "HandleLength": "+0.00/-0.25 OVERALL",
     "PivotBoreDia": (
         "NOMINAL REF ONLY\n"
         "FINAL LIMITS 6.15 MAX / 6.10 MIN THRU"
@@ -150,6 +150,10 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
+    front.SetDisplayTangentEdges2(0)
+    if int(front.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide crank-handle tangent edges")
+    front.UpdateViewDisplayGeometry()
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -176,7 +180,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
 
-    collar_od_right = (RIGHT_CENTER[0] + COLLAR_R_SHEET, RIGHT_CENTER[1])
+    collar_od_top = (RIGHT_CENTER[0], RIGHT_CENTER[1] + COLLAR_R_SHEET)
     bore_top = (
         RIGHT_CENTER[0],
         RIGHT_CENTER[1] + PIVOT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -189,8 +193,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         right,
-        edge_xy=collar_od_right,
-        symbol_xy=(0.325, RIGHT_CENTER[1]),
+        edge_xy=collar_od_top,
+        symbol_xy=(RIGHT_CENTER[0], 0.245),
         datum="A",
         label="collar OD datum axis",
     )
@@ -201,6 +205,17 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.040, 0.198),
         datum="B",
         label="flat collar face",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=collar_face,
+        frame_xy=(0.020, 0.155),
+        characteristic="perpendicularity",
+        tolerance="0.10",
+        datums=("A",),
+        quantity="DATUM B FACE",
+        label="flat collar end perpendicularity",
     )
     add_feature_control_frame(
         adapter,

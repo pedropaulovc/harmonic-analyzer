@@ -40,7 +40,9 @@ def test_diameters_are_a_turning_schedule_not_marked_dims() -> None:
     assert marked == {"HandleLength", "CollarLength", "PeakStation", "PivotBoreDia"}
     notes = crank_handle_spec.DRAWING_NOTES
     assert "BASIC TRUE GRIP PROFILE" in notes
-    assert "ARCS TANGENT AT MAX ONLY" in notes
+    assert "ALL VALUES BASIC" in notes
+    assert f"R{crank_handle_spec.FRONT_PROFILE_R:.6f}" in notes
+    assert f"R{crank_handle_spec.REAR_PROFILE_R:.6f}" in notes
 
 
 def test_peak_station_uses_visible_construction_geometry() -> None:
@@ -86,8 +88,10 @@ def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     assert "NO BLEND, RADIUS, OR CHAMFER" in notes
     assert "FINAL BORE LIMITS APPLY FULL LENGTH" in notes
     assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
-    assert "BASIC 90.00" in notes
-    assert "ACTUAL BUTT FACE AT 90.00+/-0.25 TRIMS" in notes
+    assert "X90.00" in notes
+    assert "ACTUAL BUTT FACE AT 90.00+0.00/-0.25 TRIMS" in notes
+    assert "ACTUAL BUTT TRIM FACE" in notes
+    assert "GENERAL Ra 3.2" not in notes
     assert "PROFILE 0.50 | A | B APPLIES" in notes
     assert "NOMINAL REF ONLY" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "6.15 MAX / 6.10 MIN THRU" in drawing.DIMENSION_CALLOUTS[
@@ -98,7 +102,9 @@ def test_pivot_interface_is_fully_released_for_manufacture() -> None:
 def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 2
+    assert source.count("add_feature_control_frame(") == 3
+    assert 'characteristic="perpendicularity"' in source
+    assert 'quantity="DATUM B FACE"' in source
     assert 'characteristic="total_runout"' in source
     assert 'characteristic="profile_surface"' in source
     assert 'quantity="FULL BORE LENGTH"' in source
@@ -108,6 +114,7 @@ def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     assert drawing.RIGHT_KEEP["PivotBoreDia"] == (0.360, 0.220)
     assert "frame_xy=(0.350, 0.263)" in source
     assert "frame_xy=(0.180, 0.263)" in source
+    assert "SetDisplayTangentEdges2(0)" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

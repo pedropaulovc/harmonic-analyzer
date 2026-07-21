@@ -71,12 +71,14 @@ from crank_handle_spec import (  # noqa: E402
     COLLAR_LENGTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    FRONT_PROFILE_R,
     HANDLE_LENGTH,
     HANDLE_MAX_DIA,
     ISOMETRIC_VIEW_NOTE,
     NECK_R,
     PEAK_X,
     PIVOT_BORE_DIA,
+    REAR_PROFILE_R,
 )
 
 COLLAR_R = COLLAR_DIA / 2.0
@@ -100,10 +102,10 @@ _SAVED_DRAWING_PROPERTIES = (
 # For a chord that rises dh over run dx to a horizontal-tangent apex, the
 # radius is R = (dx^2 + dh^2) / (2 dh) and the centre is PEAK_R - R below.
 _dx_f, _dh_f = PEAK_X - COLLAR_LENGTH, PEAK_R - NECK_R
-FRONT_R = (_dx_f**2 + _dh_f**2) / (2.0 * _dh_f)
+FRONT_R = FRONT_PROFILE_R
 FRONT_CY = PEAK_R - FRONT_R
 _dx_r, _dh_r = HANDLE_LENGTH - PEAK_X, PEAK_R - CAP_R
-REAR_R = (_dx_r**2 + _dh_r**2) / (2.0 * _dh_r)
+REAR_R = REAR_PROFILE_R
 REAR_CY = PEAK_R - REAR_R
 # Both circles pass through the swell apex (their common top point) and share
 # x = PEAK_X centres -> they are internally tangent there (|ΔCY| == ΔR):
