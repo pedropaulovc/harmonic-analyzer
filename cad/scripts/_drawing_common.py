@@ -336,6 +336,10 @@ def add_datum_feature(
             adapter, view, entity_type, edge_xy, label=label, entity=entity
         )
     else:
+        ddoc = _early_bound(draw, "IDrawingDoc")
+        name = view_name(adapter, view)
+        if not ddoc.ActivateView(name):
+            raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
         draw.ClearSelection2(True)
         annotation = _sw_type_info.early_bound_or_flag(
             annotation, "IAnnotation", "Select3"
