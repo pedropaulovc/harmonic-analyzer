@@ -26,9 +26,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_the_yoke_and_set_screw() -> None:
     notes = pen_frame_spec.DRAWING_NOTES
-    assert "BRASS" in notes
-    assert "SET-SCREW" in notes
+    assert "#4-40 UNC-2B" in notes
     assert "WINDOW" in notes
+    assert "CDA" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -39,6 +39,8 @@ def test_view_scales_are_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(2, 1)" in source
     assert pen_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 2:1"
+    assert pen_frame_spec.RIGHT_VIEW_NOTE == "RIGHT-SIDE VIEW SCALE 2:1"
+    assert '"*Right"' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -48,6 +50,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("pen-frame")
+    assert config["material"] == "CDA 360 free-machining brass"
+    assert config["material"] == config["material_specification"]
     assert "brass" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

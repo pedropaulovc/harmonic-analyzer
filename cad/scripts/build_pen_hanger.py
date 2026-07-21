@@ -64,6 +64,7 @@ from pen_hanger_spec import (
     DRAWING_NOTES,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    TOP_VIEW_NOTE,
 )
 
 import _telemetry
@@ -272,6 +273,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Front View Note": FRONT_VIEW_NOTE,
+            "Top View Note": TOP_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

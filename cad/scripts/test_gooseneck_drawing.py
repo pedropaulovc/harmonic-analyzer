@@ -26,8 +26,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_the_chrome_tube_and_bend() -> None:
     notes = gooseneck_spec.DRAWING_NOTES
-    assert "CHROME" in notes
-    assert "BEND" in notes
+    assert "2.0 WALL" in notes
+    assert "SILVER-BRAZE" in notes
+    assert "CHROME" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -48,6 +49,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("gooseneck")
+    assert config["material"] == "Chrome-plated AISI 1010 steel tube"
+    assert config["material"] == config["material_specification"]
     assert "chrome" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

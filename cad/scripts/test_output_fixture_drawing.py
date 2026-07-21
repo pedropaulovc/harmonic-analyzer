@@ -29,9 +29,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_bore_and_cross_hole() -> None:
     notes = output_fixture_spec.DRAWING_NOTES
-    assert "BRASS COLLAR" in notes
+    assert "FINISHED COLLAR" in notes
     assert "ROD BORE" in notes
-    assert "CROSS HOLE" in notes
+    assert "CROSS-HOLE" in notes
+    assert "CDA" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -52,6 +53,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("output-fixture")
+    assert config["material"] == "CDA 360 free-cutting brass"
+    assert config["material"] == config["material_specification"]
     assert "brass" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

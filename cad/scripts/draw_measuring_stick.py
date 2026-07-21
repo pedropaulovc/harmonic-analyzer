@@ -105,7 +105,10 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    # Tick cuts are engraved into the back broad face, so the back view is the
+    # actual ruled face.  The old front view showed an untouched rectangle and
+    # forced the machinist to infer every graduation from prose.
+    front = place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)

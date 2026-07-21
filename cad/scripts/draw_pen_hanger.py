@@ -26,7 +26,6 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -38,7 +37,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_pen_hanger import (
     BLOCK_HALF,
-    SCREW_HOLE_XY,
     STRAP_BOT_X,
     STRAP_TOP_X,
     STRAP_TOP_Y,
@@ -76,6 +74,7 @@ _BBOX_CY = (_BBOX_Y[0] + _BBOX_Y[1]) / 2.0
 # thin front view).
 FRONT_CENTER = (0.075, 0.150)
 ISO_CENTER = (0.320, 0.170)
+TOP_CENTER = (0.205, 0.225)
 
 
 def _fx(model_x_mm: float) -> float:
@@ -113,6 +112,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Front View Note",
+            "Top View Note",
             "Isometric View Note",
         ),
         required=(
@@ -122,6 +122,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Front View Note",
+            "Top View Note",
             "Isometric View Note",
         ),
     )
@@ -140,30 +141,23 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, iso):
+    for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the hanger-screw hole")
 
-    # #6-32 tapped hanger-screw hole: it reads as a circle in the front view
-    # (axis along Z, normal to the sheet), so the native callout picks its rim.
-    hole_rim = (_fx(SCREW_HOLE_XY[0]) + 0.0025, _fy(SCREW_HOLE_XY[1]))
-    add_native_hole_callout(
-        adapter,
-        front,
-        edge_xy=hole_rim,
-        # RIGHT of the strap, under the auto "#6-32 Tapped Hole" label: anchored
-        # left of the view the multi-line callout text ran off the sheet frame
-        # (the audit cannot see callout extents -- only the render showed it).
-        callout_xy=(0.150, _fy(SCREW_HOLE_XY[1]) - 0.010),
-        label="pen-hanger screw hole",
-    )
+    # Do not add a native callout here: R2026x renders a through tapped Hole
+    # Wizard feature as the contradictory "thread depth 0.00".  The linked
+    # manufacturing note carries the complete #6-32 UNC-2B THRU requirement,
+    # while the center mark and modeled hole remain associative.
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.150)
     add_property_linked_note(adapter, "Front View Note", 0.030, 0.036)
+    add_property_linked_note(adapter, "Top View Note", 0.170, 0.195)
     add_property_linked_note(adapter, "Isometric View Note", 0.286, 0.104)
 
     return await finalize_drawing(

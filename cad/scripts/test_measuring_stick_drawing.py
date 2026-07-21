@@ -28,9 +28,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_cover_the_scale_and_graduations() -> None:
     notes = measuring_stick_spec.DRAWING_NOTES
-    assert "BRASS BAR" in notes
-    assert "0-10 SCALE" in notes
-    assert "0.5" in notes
+    assert "FINISHED BAR" in notes
+    assert "11 FULL TICKS" in notes
+    assert "HALF-DIVISION" in notes
+    assert "CDA" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -42,6 +43,7 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=(1, 1)" in source
     assert "scale=(1, 2)" in source
     assert measuring_stick_spec.FRONT_VIEW_NOTE == "RULED FACE SCALE 1:1"
+    assert '"*Back"' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -51,6 +53,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("measuring-stick")
+    assert config["material"] == "CDA 260 cartridge brass, half-hard"
+    assert config["material"] == config["material_specification"]
     assert "brass" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

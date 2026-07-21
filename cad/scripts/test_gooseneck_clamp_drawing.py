@@ -29,8 +29,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_the_post_bore_and_pinch_screw() -> None:
     notes = gooseneck_clamp_spec.DRAWING_NOTES
-    assert "GOOSENECK POST" in notes
-    assert "PINCH" in notes
+    assert "1/4-20 UNC-2B" in notes
+    assert "BORE" in notes
+    assert "GRAY" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -51,6 +52,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("gooseneck-clamp")
+    assert config["material"] == "ASTM A48 Class 30 gray cast iron"
+    assert config["material"] == config["material_specification"]
     assert "iron" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

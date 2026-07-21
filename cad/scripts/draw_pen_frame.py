@@ -30,6 +30,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -58,6 +59,7 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 2.0 sheet-mm per model-mm
 # real envelope so they clear the sheet border and the lower-left note block.
 FRONT_CENTER = (0.115, 0.165)
 ISO_CENTER = (0.325, 0.175)
+RIGHT_CENTER = (0.220, 0.165)
 
 FRONT_KEEP = {
     "OuterHeightDim": (
@@ -95,6 +97,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Front View Note",
+            "Right View Note",
             "Isometric View Note",
         ),
         required=(
@@ -104,6 +107,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Front View Note",
+            "Right View Note",
             "Isometric View Note",
         ),
     )
@@ -122,14 +126,19 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
+    # The right-side view makes the 10 mm depth and the upward set-screw axis
+    # explicit; hidden lines show the blind-to-window thread path.
+    set_hidden_lines_visible(adapter, right)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.090)
     add_property_linked_note(adapter, "Front View Note", 0.040, 0.036)
+    add_property_linked_note(adapter, "Right View Note", 0.184, 0.105)
     add_property_linked_note(adapter, "Isometric View Note", 0.288, 0.096)
 
     return await finalize_drawing(

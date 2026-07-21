@@ -26,8 +26,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_the_wire_and_chain() -> None:
     notes = pen_wire_spec.DRAWING_NOTES
-    assert "STEEL WIRE" in notes
-    assert "AMPLIFICATION" in notes
+    assert "CUT-WIRE BLANK" in notes
+    assert "STRAIGHTNESS" in notes
+    assert "ASTM" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -47,6 +48,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("pen-wire")
+    assert config["material"] == "ASTM A228 music-wire spring steel"
+    assert config["material"] == config["material_specification"]
     assert "wire" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

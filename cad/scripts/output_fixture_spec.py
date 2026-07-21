@@ -26,18 +26,20 @@ CROSS_HOLE_DIA = 2.261  # #4-40 tap drill (radial cross hole at mid-height)
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarDiaDim"},
     "RodBoreProfile": {"RodBoreDiaDim"},
-    "CrossHoleProfile": {"CrossHoleDiaDim", "CrossHeight"},
+    "CrossHoleProfile": {"CrossHoleDiaDim"},
 }
 
 # Lines kept short (<~66 chars) so the left-anchored block stays clear of the
 # title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
-        "1. BRASS COLLAR <MOD-DIAM>10 X 8 HIGH.",
-        "2. ROD BORE <MOD-DIAM>5.2 THRU, COAXIAL: A 0.2 SLIP FIT ON THE",
-        "   <MOD-DIAM>5 OUTPUT ROD; REAM FOR A SMOOTH SLIDE.",
-        "3. CROSS HOLE <MOD-DIAM>2.26 THRU AT MID-HEIGHT; TAP #4-40 UNC",
-        "   ONE WALL FOR THE CLAMP SCREW / LEVER-WIRE TIE.",
+        "1. FINISHED COLLAR <MOD-DIAM>10.00 +/-0.05 X 8.00 +/-0.05 HIGH.",
+        "2. ROD BORE <MOD-DIAM>5.20 +0.03/0.00 THRU; REAM. BORE + OD",
+        "   CONCENTRIC WITHIN 0.05 TIR.",
+        "3. RADIAL CROSS-HOLE AXIS 4.00 +/-0.05 FROM BOTTOM END.",
+        "   DRILL <MOD-DIAM>2.26 THRU BOTH WALLS; TAP NEAR WALL ONLY",
+        "   #4-40 UNC-2B THRU TO THE <MOD-DIAM>5.20 BORE.",
+        "4. BREAK BORE + CROSS-HOLE EDGES 0.10 MAX.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 3:1"

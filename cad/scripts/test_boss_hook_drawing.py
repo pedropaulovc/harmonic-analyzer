@@ -27,8 +27,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_notes_describe_the_wire_hook() -> None:
     notes = boss_hook_spec.DRAWING_NOTES
     assert "WIRE" in notes
-    assert "J-HOOK" in notes
-    assert "COUNTER-SPRING" in notes
+    assert "R3 +/-0.20" in notes
+    assert "OVALITY" in notes
+    assert "AISI" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -49,6 +50,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("boss-hook")
+    assert config["material"] == "AISI 1018 cold-drawn low-carbon steel wire"
+    assert config["material"] == config["material_specification"]
     assert "steel" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

@@ -26,9 +26,9 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_describe_the_strap_channel_and_screw() -> None:
     notes = pen_hanger_spec.DRAWING_NOTES
-    assert "STEEL STRAP" in notes
     assert "SQUARE CHANNEL" in notes
     assert "#6-32" in notes
+    assert "AISI" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -40,6 +40,9 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=(2, 1)" in source
     assert "scale=(1, 1)" in source
     assert pen_hanger_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 2:1"
+    assert pen_hanger_spec.TOP_VIEW_NOTE == "TOP VIEW SCALE 2:1"
+    assert '"*Top"' in source
+    assert "add_native_hole_callout" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -49,6 +52,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("pen-hanger")
+    assert config["material"] == "AISI 1018 cold-finished steel"
+    assert config["material"] == config["material_specification"]
     assert "steel" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 1

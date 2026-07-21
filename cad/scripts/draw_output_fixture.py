@@ -71,7 +71,6 @@ TOP_KEEP = {
 }
 FRONT_KEEP = {
     "CrossHoleDiaDim": (0.185, 0.110),
-    "CrossHeight": (0.066, 0.130),
 }
 
 
