@@ -233,9 +233,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="column outside diameter",
         entity=post_od_entity,
     )
-    journal_entity = _circular_edge(
-        adapter, front, radius_mm=BORE_DIA / 2.0, center_y_mm=BORE_HEIGHT
-    )
     add_feature_control_frame(
         adapter,
         front,
@@ -246,7 +243,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A", "B"),
         diameter=True,
         label="journal-bore true position",
-        entity=journal_entity,
     )
     add_datum_feature(
         adapter,
@@ -255,7 +251,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.145, _front_y(BORE_HEIGHT) + 0.012),
         datum="C",
         label="journal-bore clocking axis",
-        entity=journal_entity,
     )
     crank_r = CRANK_BORE_DIA / 2.0 * _S
     add_feature_control_frame(

@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
@@ -35,7 +36,6 @@ from cone_tip_adjuster_spec import (
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -110,32 +110,30 @@ def _circular_edge(
     return edge
 
 
-def _add_axis_datum_to_dimension(
-    adapter: Any,
-    annotation: Any,
-    *,
-    datum: str,
-    symbol_xy: tuple[float, float],
-) -> None:
-    """Attach a datum axis to the cylindrical feature-of-size dimension."""
-    draw = adapter.currentModel
-    draw.ClearSelection2(True)
-    annotation = _early_bound(annotation, "IAnnotation", "Select2")
-    if not annotation.Select2(False, 0):
-        raise RuntimeError("failed to select thread diameter dimension for datum A")
-    tag = draw.InsertDatumTag2()
-    if tag is None:
-        raise RuntimeError("failed to insert datum A on thread diameter dimension")
-    tag = _early_bound(tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel")
-    if not tag.SetLabel(datum):
-        raise RuntimeError(f"failed to label thread-axis datum {datum}")
-    tag_annotation = _early_bound(tag.GetAnnotation(), "IAnnotation", "SetPosition2")
-    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
-        raise RuntimeError(f"failed to position thread-axis datum {datum}")
-    if str(tag.GetLabel()) != datum:
-        raise RuntimeError(f"thread-axis datum {datum} did not persist")
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
+def _thread_cylindrical_face(adapter: Any, view: Any) -> Any:
+    """Return the visible modeled cylinder carrying the cosmetic thread."""
+    drawing_view = _early_bound(view, "IView")
+    candidates: list[tuple[float, Any]] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        for raw_face in drawing_view.GetVisibleEntities2(component, 3) or []:
+            face = _early_bound(raw_face, "IFace2")
+            surface = face.GetSurface()
+            if surface is None:
+                continue
+            surface = _early_bound(surface, "ISurface")
+            if not surface.IsCylinder():
+                continue
+            candidates.append((float(surface.CylinderParams[6]) * 1000.0, face))
+    if not candidates:
+        raise RuntimeError("front view has no visible cylindrical thread face")
+    target_radius = BODY_DIA / 2.0
+    radius, face = min(candidates, key=lambda item: abs(item[0] - target_radius))
+    if abs(radius - target_radius) > 0.01:
+        raise RuntimeError(
+            f"no cylindrical thread face matches radius {target_radius:.4f} mm; "
+            f"nearest is {radius:.4f} mm"
+        )
+    return face
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -208,20 +206,24 @@ async def build(adapter: Any) -> dict[str, str]:
         DIMENSION_CALLOUTS,
     )
     set_reference_dimensions(adapter, end_annotations, ("BodyDiaDim",))
-    end_by_name = {
-        dimension_name(adapter, annotation): annotation
-        for annotation in end_annotations
-    }
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the head end view")
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
-    _add_axis_datum_to_dimension(
+    thread_face = _thread_cylindrical_face(adapter, front)
+    add_datum_feature(
         adapter,
-        end_by_name["BodyDiaDim"],
+        front,
+        edge_xy=(
+            FRONT_CENTER[0] + BODY_DIA / 2.0 * SHEET_SCALE[0] / 1000.0,
+            FRONT_CENTER[1],
+        ),
+        symbol_xy=(FRONT_CENTER[0] + 0.055, FRONT_CENTER[1] + 0.025),
         datum="A",
-        symbol_xy=(END_CENTER[0] + 0.075, END_CENTER[1] + 0.028),
+        label="thread pitch-cylinder axis",
+        entity_type="FACE",
+        entity=thread_face,
     )
     cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
     add_feature_control_frame(
