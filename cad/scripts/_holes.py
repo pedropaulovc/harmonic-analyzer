@@ -598,9 +598,15 @@ def wizard_holes(
             f"hole wizard {label}: stored size {stored_size!r} "
             f"!= requested {spec.size!r}"
         )
+    # The post-create definition reads 0.0 for HoleDiameter on EVERY hole Type
+    # on this seat (diag_hole_wizard 2026-07-21: all 7 cases read 0.000 while
+    # the cut geometry was exact), so the ``expect_dia_mm`` tripwire would
+    # always trip on it. The populated knob for a thru hole is
+    # ThruHoleDiameter (the same property the clearance drift check reads) --
+    # fall back to it so the tripwire gates against the real table value.
     result = WizardHoleResult(
         name=str(feat.Name),
-        hole_dia_mm=_dim("HoleDiameter"),
+        hole_dia_mm=_dim("HoleDiameter") or _dim("ThruHoleDiameter"),
         depth_mm=_dim("HoleDepth"),
         cbore_dia_mm=_dim("CounterBoreDiameter"),
         cbore_depth_mm=_dim("CounterBoreDepth"),

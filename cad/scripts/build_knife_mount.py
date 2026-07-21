@@ -42,7 +42,6 @@ import sys
 from _common import (
     SketchDims,
     add_line_chain,
-    apply_color,
     apply_material,
     check,
     define_circle,
@@ -52,7 +51,6 @@ from _common import (
     force_rebuild,
     name_bore_axis,
     name_last_feature,
-    PANEL_BLACK,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -60,11 +58,21 @@ from _common import (
     volume_check,
 )
 from build_summing_lever import HEX_H, HEX_W
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from knife_mount_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 import _telemetry
 
 PART_NAME = "knife-mount"
-MATERIAL = "Gray Cast Iron"  # cast bearing bracket, painted dark (ch18 p.43)
+MATERIAL = "Brass"  # registry + DFM assessment; the old cast-iron constant was stale
 
 # --- knife-edge geometry (kept in sync with the lever's hex trunnion) -------
 RIDGE_Y = HEX_H / 2.0  # hex top vertex above the pivot/cylinder centreline (5.134)
@@ -218,8 +226,21 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
-    await apply_color(adapter, PANEL_BLACK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
+
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

@@ -1,5 +1,8 @@
 knife-mount:
   number: MHA-037
   material: Brass
+  material_specification: Brass
+  finish: machined
+  quantity: 2
   tolerance_class: machined_block
   process: "machined (brass)"

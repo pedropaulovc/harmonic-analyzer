@@ -106,7 +106,7 @@ COLUMN_Z = -112.0
 # the wheel/axle/wire/pen line is untouched by the clamp swap.
 from _clamp_arc import EAR_HOLE_Z as CLAMP_EAR_DX  # noqa: E402
 from column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
-from build_wheel_bar import (  # noqa: E402
+from wheel_bar_geom import (  # noqa: E402
     BAR_DEPTH as WHEEL_BAR_DEPTH,
     CLAMP_HOLE_X as BAR_CLAMP_HOLE_LOCAL_X,
 )
@@ -139,7 +139,7 @@ LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 # (along Z) -- it does NOT spin in the bracket collar (a loose Ø6.2/Ø6 guide).
 # The ridge is the summing sub's knife line; assert the lever part's local
 # KnifeAxis lands exactly on it, so a knife move fails loud here.
-from build_magnifying_lever import KNIFE_LOCAL_X, KNIFE_LOCAL_Y  # noqa: E402
+from magnifying_lever_geom import KNIFE_LOCAL_X, KNIFE_LOCAL_Y  # noqa: E402
 from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # The lever is placed Ry(180) (local +x -> machine -x), so the knife lands at
@@ -149,7 +149,7 @@ assert math.isclose(LEVER_X0 - KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), \
 assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), \
     "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
 CLAMP_X = 150.0  # sliding clamp default position (p.46/48 insets)
-from build_magnifying_clamp import (  # noqa: E402
+from magnifying_clamp_geom import (  # noqa: E402
     BLOCK_DEPTH as CLAMP_DEPTH,
     LEVER_BORE_Y as CLAMP_BORE_Y,
     ROD_BORE_X as CLAMP_ROD_DX,
@@ -187,13 +187,13 @@ WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
 # Endpoints + length live in build_lever_wire.py (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
 # layout move can never leave a floating wire.
-from build_lever_wire import (  # noqa: E402
+from lever_wire_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
     WIRE_DIA as HUB_WIRE_DIA,
     WIRE_END as HUB_WIRE_END,
     WIRE_START as HUB_WIRE_START,
 )
-from build_magnifying_wheel import HUB_DIA, SPOKE_AXIAL  # noqa: E402
+from magnifying_wheel_geom import HUB_DIA, SPOKE_AXIAL  # noqa: E402
 
 # Hook = tied through the cross hole, hanging under the collar's bottom face
 # (wire r + 0.25) on the front face of the vertical rod (Ø5 rod r 2.5 +

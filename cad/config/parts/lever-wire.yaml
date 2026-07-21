@@ -1,5 +1,8 @@
 lever-wire:
   number: MHA-099
   material: Plain Carbon Steel
+  material_specification: Plain Carbon Steel
+  finish: drawn wire
+  quantity: 1
   tolerance_class: machined_block
   process: "drawn steel wire"

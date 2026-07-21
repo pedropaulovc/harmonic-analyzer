@@ -1,5 +1,9 @@
 magnifying-wheel:
   number: MHA-045
   material: Gray Cast Iron
+  material_specification: Gray Cast Iron
+  finish: black paint; rim edge machined bright
+  quantity: 1
   tolerance_class: machined_block
+  fit_class: shaft_in_bushing
   process: "cast + machined"
