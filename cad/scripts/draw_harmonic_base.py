@@ -361,26 +361,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.055, 0.135),
-        characteristic="position",
-        tolerance="1.00",
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="4X E1-E4",
-        label="mounting-hole true position",
-        entity=hole_entities[0],
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.055, 0.205),
+        frame_xy=(0.170, 0.094),
         characteristic="position",
         tolerance="0.50",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="9X A1-D4",
-        label="top-seat true position",
-        entity=hole_entities[4],
+        quantity="13X A1-E4",
+        label="hole-pattern true position",
+        entity=hole_entities[2],
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.078)

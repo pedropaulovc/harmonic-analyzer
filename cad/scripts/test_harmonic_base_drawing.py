@@ -52,7 +52,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "ALL WALLS 2 DEG DRAFT" in notes
     assert "ALL FILLETS/CORNERS R3.00" in notes
     assert "MACHINING DATUM FACES A/B/C" in notes
-    assert "MACHINE A (UNDERSIDE), B (LONG-SIDE EDGE), C (LEFT END)" in notes
+    assert "MACHINE A (UNDERSIDE) FLAT 0.10" in notes
+    assert "B=LONG-SIDE EDGE; C=LEFT END" in notes
     assert "TOP PAD FLAT 0.10, PARALLEL 0.10 TO A" in notes
     assert "BLIND FROM TOP" in notes
     assert "A1-A4" not in notes
@@ -70,7 +71,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GetVisibleEntities2(c, 2)" in source
     assert "GetVisibleEntities2(c, 1)" in source
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
+    assert source.count("add_feature_control_frame(") == 1
+    assert 'quantity="13X A1-E4"' in source
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
