@@ -44,7 +44,12 @@ DRAWING_NOTES = "\n".join(
         "   30.6 ECCENTRIC CAM, 0.1 CLR/SIDE.",
         "2. ROD HANGS PLUMB; RING CENTRE TO",
         "   ROCKER PIN 147.67.",
-        "3. ROCKER PIN HOLE: #47 DRILL THRU.",
+        "3. RING 3.0 THICK; SHANK AND HEAD",
+        "   2.5 THICK.",
+        "4. HEAD 10.0 W x 10.5 HIGH, R5.0",
+        "   CROWN; 1.2 SHOULDER TAPER FROM",
+        "   8.0 SHANK. PIN C/L 2.40 BELOW CROWN.",
+        "5. ROCKER PIN HOLE: #47 DRILL THRU.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

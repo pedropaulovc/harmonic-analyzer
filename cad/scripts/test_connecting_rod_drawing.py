@@ -32,6 +32,12 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert connecting_rod_spec.CENTER_DISTANCE == rod.CENTER_DISTANCE
     assert connecting_rod_spec.RING_BORE_DIA == rod.RING_BORE_DIA
     assert connecting_rod_spec.SHANK_WIDTH == rod.SHANK_WIDTH
+    assert connecting_rod_spec.RING_THICKNESS == rod.RING_THICKNESS
+    assert connecting_rod_spec.SHANK_THICKNESS == rod.SHANK_THICKNESS
+    assert connecting_rod_spec.HEAD_WIDTH == rod.HEAD_WIDTH
+    assert connecting_rod_spec.HEAD_HEIGHT == rod.HEAD_HEIGHT
+    assert connecting_rod_spec.HEAD_CROWN_ABOVE_PIN == rod.HEAD_CROWN_ABOVE_PIN
+    assert connecting_rod_spec.HEAD_THICKNESS == rod.HEAD_THICKNESS
 
 
 def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
@@ -45,6 +51,10 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = connecting_rod_spec.DRAWING_NOTES
     assert "#47 DRILL" in notes
+    assert "RING 3.0 THICK" in notes
+    assert "SHANK AND HEAD\n   2.5 THICK" in notes
+    assert "HEAD 10.0 W x 10.5 HIGH, R5.0" in notes
+    assert "PIN C/L 2.40 BELOW CROWN" in notes
     assert "LINEAR +/-" not in notes
     assert "BA" not in notes
     assert "GRAY-IRON" not in notes

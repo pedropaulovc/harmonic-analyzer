@@ -44,16 +44,20 @@ def test_title_block_owns_material_finish_units_and_general_requirements() -> No
         "EDGE BREAK",
     )
     for part_name, module_name in CHANNEL_SPECS.items():
-        notes = importlib.import_module(module_name).DRAWING_NOTES.upper()
+        module = importlib.import_module(module_name)
+        sheet_notes = (module.DRAWING_NOTES, module.ISOMETRIC_VIEW_NOTE)
         config = _config.parts(part_name)
         assert config["material_specification"].strip(), part_name
         assert config["finish"].strip(), part_name
-        for duplicate in forbidden:
-            assert duplicate not in notes, (part_name, duplicate)
+        for note in sheet_notes:
+            for duplicate in forbidden:
+                assert duplicate not in note.upper(), (part_name, duplicate)
 
 
 def test_manufacturing_notes_have_no_placeholder_callouts() -> None:
     for part_name, module_name in CHANNEL_SPECS.items():
-        notes = importlib.import_module(module_name).DRAWING_NOTES.upper()
-        for placeholder in ("TBD", "TBC", "X.XX", "TO BE DETERMINED"):
-            assert placeholder not in notes, (part_name, placeholder)
+        module = importlib.import_module(module_name)
+        sheet_notes = (module.DRAWING_NOTES, module.ISOMETRIC_VIEW_NOTE)
+        for note in sheet_notes:
+            for placeholder in ("TBD", "TBC", "X.XX", "TO BE DETERMINED"):
+                assert placeholder not in note.upper(), (part_name, placeholder)

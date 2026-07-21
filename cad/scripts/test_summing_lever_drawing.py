@@ -32,6 +32,13 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert summing_lever_spec.CYL_R == lever.CYL_R
     assert summing_lever_spec.ANCHOR_R == lever.ANCHOR_R
     assert summing_lever_spec.PLATE_W == lever.PLATE_W
+    assert summing_lever_spec.PLATE_T == lever.PLATE_T
+    assert summing_lever_spec.HEX_W == lever.HEX_W
+    assert summing_lever_spec.HEX_H == lever.HEX_H
+    assert summing_lever_spec.HEX_DEPTH == lever.HEX_DEPTH
+    assert summing_lever_spec.HOLE_X == lever.HOLE_X
+    assert summing_lever_spec.HOLE_COUNT == lever.HOLE_COUNT
+    assert summing_lever_spec.CHANNEL_PITCH == lever.CHANNEL_PITCH
 
 
 def test_sheet_runs_at_1_to_2_with_1_to_4_isometric() -> None:
@@ -44,9 +51,15 @@ def test_sheet_runs_at_1_to_2_with_1_to_4_isometric() -> None:
 
 def test_linked_notes_describe_the_hung_lever() -> None:
     notes = summing_lever_spec.DRAWING_NOTES
-    assert "KNIFE-EDGE" in notes
+    assert "KNIFE EDGE" in notes
     assert "#47" in notes
-    assert "76.2 FROM PIVOT AXIS" in notes
+    assert "7.0565 PITCH" in notes
+    assert "4.60 FROM FREE PLATE EDGE" in notes
+    assert "END OFFSETS 9.90 AND 8.43" in notes
+    assert "76.20 FROM PIVOT AXIS" in notes
+    assert "19.05 THICK" in notes
+    assert "8.65 W x 10.27 HIGH" in notes
+    assert "21.72 LONG EACH END" in notes
     assert "LINEAR +/-" not in notes
     assert "GRAY-IRON" not in notes
     assert "GREEN ENAMEL" not in notes
@@ -72,4 +85,4 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     spec = _config.parts("summing-lever")
     assert spec["material_specification"] == "ASTM A48 Class 30 gray cast iron"
     assert spec["finish"] == "green enamel; knife edges + anchor bore machined"
-    assert int(spec["quantity"]) == 20
+    assert int(spec["quantity"]) == 1

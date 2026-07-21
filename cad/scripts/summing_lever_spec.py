@@ -39,6 +39,9 @@ CYL_DIA = 2.0 * CYL_R  # 25.4
 TIP_X = -SUM_H  # -76.20 summation tip / anchor X
 HOLE_Z_FIRST = CHANNEL_Z0 + HOLE_Z_OFFSET  # -66.3
 HOLE_Z_LAST = CHANNEL_Z0 + CHANNEL_PITCH * (HOLE_COUNT - 1) + HOLE_Z_OFFSET  # 67.77
+HOLE_EDGE_OFFSET = PLATE_W - HOLE_X  # 4.60 from the free +X plate edge
+HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # 9.90 from -Z end
+HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
 
 
 # --- Marked-dimension contract.  build_summing_lever marks exactly these. ---
@@ -50,14 +53,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        "1. FIRST-CLASS LEVER HUNG ON THE HEX",
-        "   KNIFE-EDGE TRUNNIONS (VERTEX UP).",
-        "2. +X ARM: COEFFICIENTS PLATE, 20 X #47",
-        "   HOLES AT 7.06 PITCH FOR THE",
-        "   SPRING HOOKS.",
-        "3. -X ARM: SUMMATION EYE, 3.0 BORE,",
-        "   76.2 FROM PIVOT AXIS (COUNTER-SPRING).",
-        "4. PIVOT CYLINDER 152.4 LONG; NO BORE.",
+        f"1. HEX TRUNNIONS {HEX_W:.2f} W x {HEX_H:.2f} HIGH,",
+        f"   {HEX_DEPTH:.2f} LONG EACH END; VERTEX UP IS",
+        "   THE KNIFE EDGE.",
+        f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK; {HOLE_COUNT} X",
+        f"   #47 HOLES AT {CHANNEL_PITCH:.4f} PITCH.",
+        f"3. HOLE ROW {HOLE_EDGE_OFFSET:.2f} FROM FREE PLATE EDGE;",
+        f"   END OFFSETS {HOLE_END_OFFSET_FIRST:.2f} AND {HOLE_END_OFFSET_LAST:.2f}.",
+        f"4. SUMMATION EYE {2.0 * ANCHOR_R:.2f} THICK,",
+        f"   {2.0 * ANCHOR_BORE_R:.1f} BORE, {SUM_H:.2f} FROM PIVOT AXIS.",
+        f"5. PIVOT CYLINDER {PLATE_L:.2f} LONG; NO BORE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
