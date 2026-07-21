@@ -234,7 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         bottom,
         edge_xy=bottom_boss_right,
-        symbol_xy=(0.290, 0.185),
+        symbol_xy=(0.245, 0.185),
         datum="D",
         label="cam boss OD axis",
     )
