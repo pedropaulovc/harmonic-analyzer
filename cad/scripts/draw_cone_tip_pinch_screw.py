@@ -20,7 +20,7 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (8.0, 1.0)
-END_KEEP = {"HeadDiaDim": (0.028, 0.176)}
+END_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Cone Tip Pinch Screw Manufacturing Drawing",

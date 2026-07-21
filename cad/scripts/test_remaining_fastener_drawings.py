@@ -156,6 +156,17 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert spec.END_VIEW_NOTE == "SHOULDER-END VIEW"
 
 
+def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter() -> None:
+    drawing = importlib.import_module("draw_cone_tip_pinch_screw")
+    spec = importlib.import_module("cone_tip_pinch_screw_spec")
+    assert drawing.END_KEEP == {}
+    assert drawing.RECIPE.side_center == (0.190, 0.190)
+    assert spec.DRAWING_DIMENSIONS == {}
+    assert "FLAT-END PINCH SCREW; NO CONICAL POINT" in spec.DRAWING_NOTES
+    assert "DISTAL START CHAMFER" in spec.DRAWING_NOTES
+    assert "MIDPLANE OFFSET FROM HEAD AXIS 0.00 +/-0.05" in spec.DRAWING_NOTES
+
+
 @pytest.mark.parametrize("spec_name", ("hanger_screw_spec", "thumb_screw_spec"))
 def test_long_reference_note_is_split_for_readable_rendering(spec_name: str) -> None:
     spec = importlib.import_module(spec_name)

@@ -24,12 +24,11 @@ SHANK_LEN = _SPEC.length_mm  # nominal under-head length
 THREAD = _SPEC.thread  # "#3-48"
 THREAD_DESIGNATION = f"{THREAD} UNC-2A"
 
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "HeadProfile": {"HeadDiaDim"},
-}
+DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
 DRAWING_NOTES = "\n".join(
     (
+        "APPLICATION NAME ONLY: FLAT-END PINCH SCREW; NO CONICAL POINT.",
         *thread_control_notes(
             thread=THREAD,
             thread_designation=THREAD_DESIGNATION,

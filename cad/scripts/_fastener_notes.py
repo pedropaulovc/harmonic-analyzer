@@ -40,10 +40,11 @@ def thread_control_notes(
         "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
         f"{underhead_length_mm:.2f} +/-0.20 UNDER-HEAD LENGTH; "
         f"{min_full_form:.2f} MIN FULL-FORM THREAD.",
-        f"INCOMPLETE THREAD 2P MAX EACH END; START C{lead_chamfer:.2f} X 45 DEG.",
+        "INCOMPLETE THREAD 2P MAX AT EACH END.",
+        f"DISTAL START CHAMFER C{lead_chamfer:.2f} +/-0.05 X 45 DEG +/-1 DEG.",
         f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX; THREAD LIMITS APPLY "
         "AFTER FINISH.",
-        "DATUM A = THREAD PITCH-DIAMETER AXIS; END FACE PERP 0.10 TO A.",
+        "DISTAL END FACE SQUARE TO THREAD PITCH-DIAMETER AXIS WITHIN 0.10 TIR.",
         "THREAD GEOMETRY OMITTED IN VIEWS; SHANK OUTLINE REFERENCE ONLY.",
     )
 
@@ -54,10 +55,12 @@ def slotted_round_head_notes(
     """Return controls for a cylindrical head with a straight driver slot."""
     return (
         f"HEAD DIA {head_dia_mm:.2f} +/-0.10 X {head_height_mm:.2f} +/-0.10 HIGH.",
-        "HEAD OD TOTAL RUNOUT 0.10 TO A; BEARING FACE PERP 0.10 TO A.",
+        "HEAD OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS.",
+        "BEARING FACE SQUARE TO THREAD PITCH-DIAMETER AXIS WITHIN 0.10 TIR.",
         f"STRAIGHT SLOT {slot_width_mm:.2f} +/-0.10 WIDE X "
         f"{slot_depth_mm:.2f} +/-0.10 DEEP.",
-        "SLOT FLAT BOTTOM; DEPTH FROM TOP; CENTER PLANE WITHIN 0.10 OF A.",
+        "SLOT FLAT BOTTOM; DEPTH FROM TOP; MIDPLANE OFFSET FROM HEAD AXIS "
+        "0.00 +/-0.05.",
     )
 
 
@@ -67,7 +70,8 @@ def hex_head_notes(*, across_flats_mm: float, head_height_mm: float) -> tuple[st
         f"CUSTOM REGULAR HEX HEAD {across_flats_mm:.2f} +/-0.10 ACROSS FLATS X "
         f"{head_height_mm:.2f} +/-0.10 HIGH.",
         "B18 HEAD DIMENSIONS DO NOT APPLY.",
-        "HEX CENTER WITHIN DIA 0.10 OF A; BEARING FACE PERPENDICULAR 0.10 TO A.",
+        "HEX AXIS OFFSET FROM THREAD PITCH-DIAMETER AXIS 0.00 +/-0.05.",
+        "BEARING FACE SQUARE TO THREAD PITCH-DIAMETER AXIS WITHIN 0.10 TIR.",
     )
 
 
@@ -80,8 +84,8 @@ def reeded_head_notes(
     return (
         f"{head_name} DIA {head_dia_mm:.2f} +/-0.10 X "
         f"{head_length_mm:.2f} +/-0.10 LONG.",
-        f"{head_name} OD TOTAL RUNOUT 0.10 TO A; BEARING FACE PERPENDICULAR "
-        "0.10 TO A.",
+        f"{head_name} OD TOTAL RUNOUT 0.10 RELATIVE TO THREAD PITCH-DIAMETER AXIS.",
+        "BEARING FACE SQUARE TO THREAD PITCH-DIAMETER AXIS WITHIN 0.10 TIR.",
         f"{groove_count}X R{groove_radius:.2f} +/-0.05 AXIAL GROOVES, EQUALLY SPACED.",
         f"GROOVE ROOT DIA {root_dia:.2f} +/-0.10; FULL {head_name} LENGTH.",
     )
