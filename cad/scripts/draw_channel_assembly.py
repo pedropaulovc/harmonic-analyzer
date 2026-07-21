@@ -177,6 +177,16 @@ async def build(adapter: Any) -> dict[str, str]:
         position_xy=(0.150, 0.066),
         label="channel item 4 crossing correction",
     )
+    # A rebuilt source assembly can change which generated DetailItem name
+    # carries each BOM identity. Item 2 currently auto-lands inside the table;
+    # route it by its stable item number into the open field below the table.
+    position_bom_balloon(
+        adapter,
+        balloons,
+        item_number="2",
+        position_xy=(0.255, 0.105),
+        label="channel item 2 table-overlap correction",
+    )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add channel assembly notes")
 
