@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import re
 from pathlib import Path
 
 import _config
-from _common import part_properties
+from _common import part_properties, save_part_and_images
 
 
 FASTENER_SPECS = {
@@ -44,6 +45,8 @@ def test_title_block_uses_the_exact_material_grade_and_finish() -> None:
 
 def test_flat_end_pinch_screw_uses_noncontradictory_title_block_identity() -> None:
     assert part_properties("cone-tip-pinch-screw")["Title"] == "Flat-End Pinch Screw"
+    source = inspect.getsource(save_part_and_images)
+    assert 'apply_summary_info(adapter, title=properties["Title"])' in source
 
 
 def test_notes_are_complete_but_do_not_repeat_title_or_template_requirements() -> None:

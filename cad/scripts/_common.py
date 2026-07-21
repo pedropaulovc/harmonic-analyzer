@@ -1053,8 +1053,12 @@ async def save_part_and_images(
     views = list(views)
     _prune_stale_part_views(png_dir, part_name, views)
     apply_block_tolerances(adapter)
-    apply_custom_properties(adapter, part_properties(part_name))
-    apply_summary_info(adapter, title=part_name)
+    properties = part_properties(part_name)
+    apply_custom_properties(adapter, properties)
+    # The drawing template's PART cell resolves the linked model's document
+    # summary Title, not its same-named custom property. Keep both identities
+    # sourced from part_properties so a registry title override cannot split.
+    apply_summary_info(adapter, title=properties["Title"])
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
     stl_path = (OUT_STL / f"{part_name}.STL").resolve()
