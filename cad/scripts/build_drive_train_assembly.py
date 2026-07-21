@@ -573,7 +573,7 @@ from build_pinion_arbor import (  # noqa: E402
     SHAFT_DIA as ARBOR_DIA,
     SHAFT_LEN as ARBOR_LEN,
 )
-from build_pinion_bracket import (  # noqa: E402
+from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,

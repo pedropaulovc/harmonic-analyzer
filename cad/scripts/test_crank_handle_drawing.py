@@ -37,10 +37,25 @@ def test_diameters_are_a_turning_schedule_not_marked_dims() -> None:
     # The pear arcs derive the diameters, so only the axial stations are marked;
     # the diameters live in the turning-schedule note.
     marked = set().union(*crank_handle_spec.DRAWING_DIMENSIONS.values())
-    assert marked == {"HandleLength", "CollarLength", "FrontArcCx"}
+    assert marked == {"HandleLength", "CollarLength", "PeakStation"}
     notes = crank_handle_spec.DRAWING_NOTES
     assert "TURNING SCHEDULE" in notes
     assert "SMOOTH PEAR CURVE" in notes
+
+
+def test_peak_station_uses_visible_construction_geometry() -> None:
+    build_source = Path(handle.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'profile.record("PeakStation",' in build_source
+    assert 'profile.record("FrontArcCx",' in build_source
+    assert '"PeakStation":' in drawing_source
+    assert '"FrontArcCx":' not in drawing_source
+    assert "peak station construction line" in build_source
+
+
+def test_solid_profile_does_not_request_hole_center_marks() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "auto_center_marks" not in source
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:

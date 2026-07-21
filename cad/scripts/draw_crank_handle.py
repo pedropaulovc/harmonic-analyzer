@@ -37,7 +37,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from crank_handle_spec import COLLAR_DIA, HANDLE_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -78,7 +77,7 @@ COLLAR_R_SHEET = COLLAR_R * SHEET_SCALE[0] / 1000.0
 FRONT_KEEP = {
     "HandleLength": (0.150, 0.128),
     "CollarLength": (0.070, 0.222),
-    "FrontArcCx": (0.150, 0.242),
+    "PeakStation": (0.150, 0.242),
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
@@ -132,8 +131,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to front view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.116)

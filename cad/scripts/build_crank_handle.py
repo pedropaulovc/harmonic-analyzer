@@ -169,6 +169,14 @@ async def build(adapter) -> dict[str, str]:
             PEAK_X, REAR_CY, HANDLE_LENGTH, CAP_R, PEAK_X, PEAK_R
         ),
     )
+    # Construction-only radial at the visible swell.  Its on-axis lower point
+    # carries the drawing's axial peak-station dimension; unlike the front arc
+    # centre (hundreds of millimetres below the profile), both witness points
+    # remain on the physical handle and import onto the sheet.
+    peak_station = check(
+        "peak station construction line",
+        await adapter.add_centerline(PEAK_X, 0.0, PEAK_X, PEAK_R),
+    )
     cap_face = check(
         "butt cap face",
         await adapter.add_line(HANDLE_LENGTH, CAP_R, HANDLE_LENGTH, 0.0),
@@ -179,7 +187,7 @@ async def build(adapter) -> dict[str, str]:
     )
     set_sketch_direct_db(adapter, False)
 
-    # 16-DOF profile. The centerline merged into the (0, 0) / (HANDLE_LENGTH,
+    # The profile centerline merged into the (0, 0) / (HANDLE_LENGTH,
     # 0) chain ends, so horizontal + a length dim on it pin the axis (as in
     # crank-pin). The collar face/top/step get h/v + linear dims; each arc
     # centre is anchored (radius then derives from a pinned point -- the neck
@@ -223,6 +231,21 @@ async def build(adapter) -> dict[str, str]:
                 await adapter.add_sketch_dimension(ent, None, "linear", value),
             )
             profile.record(name, drive)
+    check(
+        "peak station vertical",
+        await adapter.add_sketch_constraint(peak_station, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{peak_station}.start", PEAK_X, 0.0, "peak station"
+    )
+    profile.record("PeakStation", '"PeakX"')
+    check(
+        "peak radius construction dimension",
+        await adapter.add_sketch_dimension(
+            peak_station, None, "linear", PEAK_R
+        ),
+    )
+    profile.record("PeakRadius", '"HandleMaxDia" / 2')
     # Each arc centre is off-axis (PEAK_X != 0, *_CY < 0): anchor_point_to_origin
     # emits a horizontal then a vertical distance dim. The horizontal span is
     # PEAK_X (clean knob -> "PeakX"); the vertical span is the arc-centre depth

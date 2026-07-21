@@ -24,7 +24,7 @@ PEAK_X = 62.0  # axial station of the maximum diameter
 CAP_R = 3.5  # flat butt cap radius (Ø7)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "HandleProfile": {"HandleLength", "CollarLength", "FrontArcCx"},
+    "HandleProfile": {"HandleLength", "CollarLength", "PeakStation"},
 }
 
 DRAWING_NOTES = "\n".join(

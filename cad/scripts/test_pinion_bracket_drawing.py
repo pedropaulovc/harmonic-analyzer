@@ -5,8 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pinion_bracket_spec
+import pinion_bracket_geometry
 import draw_pinion_bracket as drawing
 import build_pinion_bracket as bracket
+from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -37,6 +39,15 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         pinion_bracket_spec.OVERALL_LENGTH,
         pinion_bracket_spec.R_END,
     )
+    assert pinion_bracket_spec.C2C == pinion_bracket_geometry.C2C
+
+
+def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
+    drive_train = Path(__file__).with_name("build_drive_train_assembly.py")
+    dependency_names = {Path(path).name for path in module_deps_of(drive_train)}
+    assert "pinion_bracket_geometry.py" in dependency_names
+    assert "build_pinion_bracket.py" not in dependency_names
+    assert "pinion_bracket_spec.py" not in dependency_names
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:

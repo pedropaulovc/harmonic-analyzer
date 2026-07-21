@@ -59,12 +59,9 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
-from pinion_bracket_spec import (
+from pinion_bracket_geometry import (
     ARBOR_BORE,
     C2C,
-    DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    ISOMETRIC_VIEW_NOTE,
     PIN_BORE,
     PIN_DROP,
     PIN_SEAT,
@@ -72,6 +69,11 @@ from pinion_bracket_spec import (
     R_END,
     THICKNESS,
     WIDTH,
+)
+from pinion_bracket_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
 )
 
 import _telemetry
