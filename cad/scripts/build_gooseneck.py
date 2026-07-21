@@ -76,7 +76,7 @@ from gooseneck_spec import (
 )
 
 PART_NAME = "gooseneck"
-MATERIAL = "Chrome Stainless Steel"  # polished chrome tube
+MATERIAL = "Plain Carbon Steel"
 
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 LEG_TOP = 125.0  # bend start = machine 1335 (derived: arm y - bend R)

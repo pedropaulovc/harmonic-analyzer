@@ -28,6 +28,8 @@ def test_notes_describe_the_chrome_tube_and_bend() -> None:
     notes = gooseneck_spec.DRAWING_NOTES
     assert "2.0 WALL" in notes
     assert "SILVER-BRAZE" in notes
+    assert "AISI 1018 STEEL" in notes
+    assert "JOINT PENETRATION" in notes
     assert "CHROME" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -40,6 +42,7 @@ def test_view_scale_is_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 3)" in source
     assert "scale=(1, 4)" in source
+    assert "CreateDetailViewAt4" in source
     assert gooseneck_spec.ELEVATION_VIEW_NOTE == "ELEVATION SCALE 1:3"
 
 
@@ -50,8 +53,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("gooseneck")
-    assert config["material"] == "Chrome-plated AISI 1010 tube"
+    assert config["material"] == "AISI 1010 seamless steel tube"
     assert config["material"] == config["material_specification"]
-    assert "chrome" in str(config["material_specification"]).lower()
-    assert config["finish"]
+    assert "chrome" not in str(config["material_specification"]).lower()
+    assert "ASTM B456 SC2" in str(config["finish"])
     assert int(config["quantity"]) == 1

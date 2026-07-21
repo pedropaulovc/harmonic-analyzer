@@ -1,8 +1,8 @@
 gooseneck:
   number: MHA-032
-  material: Chrome-plated AISI 1010 tube
-  material_specification: Chrome-plated AISI 1010 tube
-  finish: polished chrome
+  material: AISI 1010 seamless steel tube
+  material_specification: AISI 1010 seamless steel tube
+  finish: nickel-chromium plate complete assembly per ASTM B456 SC2 after brazing; polish Ra 0.8 max; dimensions apply before plating
   quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"

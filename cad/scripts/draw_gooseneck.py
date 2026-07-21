@@ -22,7 +22,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -34,7 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
 
 
 SPEC = DRAWINGS_BY_NAME["gooseneck"]
@@ -56,6 +56,9 @@ SHEET_SCALE = (1.0, 3.0)   # 1:3 whole sheet (~506 mm tall post)
 # sits far right; the notes fill the lower-left.
 FRONT_CENTER = (0.180, 0.150)
 ISO_CENTER = (0.350, 0.150)
+LUG_DETAIL_SOURCE = (0.145, 0.205)
+LUG_DETAIL_CENTER = (0.275, 0.190)
+LUG_DETAIL_RADIUS = 0.010
 
 # Per-view survivors of the marked-dimension import: the bend radius (R51) and
 # the horizontal arm run, both on the Front-plane sweep path (so both project to
@@ -64,6 +67,40 @@ FRONT_KEEP = {
     "BendRadius": (0.225, 0.212),
     "ArmRun": (0.150, 0.250),
 }
+
+
+def _add_lug_detail(adapter: Any, front: Any) -> Any:
+    """Create an enlarged detail of the lug/pin region from the elevation."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate the gooseneck elevation")
+    draw.ClearSelection2(True)
+    sketch = draw.SketchManager.CreateCircleByRadius(
+        LUG_DETAIL_SOURCE[0], LUG_DETAIL_SOURCE[1], 0.0, LUG_DETAIL_RADIUS
+    )
+    if sketch is None:
+        raise RuntimeError("failed to create the gooseneck lug detail circle")
+    detail = ddoc.CreateDetailViewAt4(
+        LUG_DETAIL_CENTER[0],
+        LUG_DETAIL_CENTER[1],
+        0.0,
+        0,      # swDetViewSTANDARD
+        2.0,
+        1.0,
+        "A",
+        1,      # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if detail is None:
+        raise RuntimeError("failed to create the gooseneck lug detail view")
+    set_hidden_lines_removed(adapter, detail)
+    return detail
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -112,6 +149,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
+    _add_lug_detail(adapter, front)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
