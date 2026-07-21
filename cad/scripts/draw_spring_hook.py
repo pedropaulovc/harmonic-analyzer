@@ -32,7 +32,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from spring_hook_spec import (
     ARM_HEIGHT,
     ROD_DIA,
-    SHANK_RISE,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
@@ -68,6 +67,14 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     return (
         FRONT_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
         FRONT_CENTER[1] + (my - _BBOX_CY) * _S / 1000.0,
+    )
+
+
+def _top_xy(mx: float, mz: float) -> tuple[float, float]:
+    """Sheet (x, y) of a model point in the bbox-centred top view (5:1)."""
+    return (
+        TOP_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
+        TOP_CENTER[1] + mz * _S / 1000.0,
     )
 
 
@@ -131,16 +138,17 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # Ra on the seating shank surface.
-    shank_edge = _sheet_xy(ROD_DIA / 2.0, SHANK_RISE / 2.0)
+    # Attach Ra to the visible 9-o'clock rim of the shank end in the top view.
+    # The leader denotes the adjacent cylindrical seating surface.
+    shank_edge = _top_xy(-ROD_DIA / 2.0, 0.0)
     add_surface_finish(
         adapter,
-        front,
+        top,
         edge_xy=shank_edge,
-        symbol_xy=(shank_edge[0] + 0.016, shank_edge[1] + 0.010),
+        symbol_xy=(shank_edge[0] - 0.016, shank_edge[1] + 0.010),
         roughness_ra="1.6",
         label="shank seating finish",
-        entity_type="SILHOUETTE",
+        entity_type="EDGE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
