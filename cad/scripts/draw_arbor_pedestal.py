@@ -63,7 +63,7 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # elevation on that midpoint. Third-angle: the 24x16 foot plan sits ABOVE the
 # elevation, the isometric off to the right.
 _PART_MID_Y = (BORE_HEIGHT + 10.0) / 2.0  # foot 0 .. dome top (bore + dome radius)
-FRONT_CENTER = (0.100, 0.145)
+FRONT_CENTER = (0.100, 0.160)
 TOP_CENTER = (0.100, 0.245)
 ISO_CENTER = (0.335, 0.150)
 
@@ -405,7 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=foot_edge,
-        frame_xy=(0.105, 0.070),
+        frame_xy=(0.105, 0.084),
         characteristic="flatness",
         tolerance="0.05",
         label="datum-A seat flatness",
@@ -415,7 +415,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(20.0)),
-        frame_xy=(0.020, 0.074),
+        frame_xy=(0.020, 0.090),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
