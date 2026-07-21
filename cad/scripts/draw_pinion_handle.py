@@ -202,6 +202,9 @@ async def build(adapter: Any) -> dict[str, str]:
     z_min = -GRIP_LEN / 2.0 - CAP_SAG
     z_max = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
     z_center = (z_min + z_max) / 2.0
+    top_rod_center_y = (
+        TOP_CENTER[1] - (0.0 - z_center) * SHEET_SCALE[0] / 1000.0
+    )
     flat_end_x = RIGHT_CENTER[0] - (z_max - z_center) * SHEET_SCALE[0] / 1000.0
     flat_end = (flat_end_x, bore_center[1])
     flat_end_face = (
@@ -259,7 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=(
             TOP_CENTER[0] + ROD_DIA * SHEET_SCALE[0] / 2000.0,
-            TOP_CENTER[1],
+            top_rod_center_y,
         ),
         frame_xy=(0.315, 0.155),
         characteristic="position",

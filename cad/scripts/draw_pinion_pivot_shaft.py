@@ -34,7 +34,12 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_pivot_shaft_spec import CAP_SAG, SHAFT_DIA as SHAFT_DIA, SHAFT_LEN
+from pinion_pivot_shaft_spec import (
+    CAP_RADIUS,
+    CAP_SAG,
+    SHAFT_DIA as SHAFT_DIA,
+    SHAFT_LEN,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -165,9 +170,13 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="pinion pivot cylindrical-body axis",
     )
+    crown_axial = CAP_SAG / 2.0
+    crown_radial = math.sqrt(
+        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
+    )
     right_crown = (
-        RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + CAP_SAG) / 1000.0,
-        RIGHT_CENTER[1],
+        RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + crown_axial) / 1000.0,
+        RIGHT_CENTER[1] + crown_radial / 1000.0,
     )
     add_feature_control_frame(
         adapter,
