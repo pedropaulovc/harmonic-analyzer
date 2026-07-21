@@ -36,11 +36,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
-    view_name,
 )
 from build_cone_swing_platform import NORTH_OVERHANG, PLATE_LEN, PLATE_T
 
@@ -74,29 +73,30 @@ TOP_KEEP = {
 
 def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
     """Draw the model X=0 cone axis through the plan view."""
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
+
+    def _sheet_xy(z_mm: float) -> tuple[float, float]:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([0.0, 0.0, z_mm / 1000.0])),
+            "IMathPoint",
+        )
+        mapped = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        values = tuple(float(value) for value in mapped.ArrayData)
+        return values[0], values[1]
+
+    north = _sheet_xy(NORTH_OVERHANG)
+    south = _sheet_xy(NORTH_OVERHANG - PLATE_LEN)
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    name = view_name(adapter, view)
-    if not drawing.ActivateView(name):
-        raise RuntimeError("failed to activate cone-platform plan for axis centerline")
     model = adapter.currentModel
-    if not model.Extension.SelectByID2(
-        name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError("failed to select cone-platform plan for axis centerline")
-    # IDrawingDoc.EditSketch is the documented way to open a drawing-view
-    # sketch. Activating the view alone does not make SketchManager creation
-    # methods legal.
-    drawing.EditSketch()
+    # IDrawingDoc.EditSheet explicitly makes subsequently created geometry
+    # sheet-owned. The endpoints are already transformed into sheet space, so
+    # this keeps the centerline coincident with the projected model axis.
+    drawing.EditSheet()
     sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
     centerline = sketch_manager.CreateCenterLine(
-        0.0,
-        NORTH_OVERHANG / 1000.0,
-        0.0,
-        0.0,
-        (NORTH_OVERHANG - PLATE_LEN) / 1000.0,
-        0.0,
+        north[0], north[1], 0.0, south[0], south[1], 0.0
     )
-    drawing.EditSheet()
     if centerline is None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)
