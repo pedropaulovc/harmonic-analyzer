@@ -21,6 +21,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimensions,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -170,6 +171,7 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *end_annotations, *cup_annotations],
         DIMENSION_CALLOUTS,
     )
+    set_reference_dimensions(adapter, front_annotations, ("BodyDiaDim",))
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the head end view")
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):

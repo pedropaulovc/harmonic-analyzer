@@ -79,6 +79,11 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert "for index in (1, 2):" in source
     assert "if result != 0:" in source
     assert 'roughness_ra="1.6"' in source
+    common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'display.SetText(_DIMENSION_TEXT_CALLOUT_BELOW, "")' in common_source
+    assert "BASIC dimension retained below-text" in common_source
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "CYLINDRICAL ZONE" not in notes
     assert "FINISH RA" not in notes

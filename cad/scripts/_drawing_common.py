@@ -47,6 +47,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 # free-standing layout element (the general-notes block, schedule cells). Tables
 # are enumerated separately via IView.GetTableAnnotations.
 _ANNOT_NOTE = 6
+_DIMENSION_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 _TEMPLATE_EDGE_NOTE_SNIPPET = "R.01 OR CHAMFER .01 MAX"
 _TEMPLATE_EDGE_NOTE = (
@@ -1455,7 +1456,7 @@ def set_dimension_callouts(
             display, "IDisplayDimension", "SetText"
         )
         adapter._attempt(
-            lambda d=display, s=text: d.SetText(4, s)  # swDimensionTextCalloutBelow
+            lambda d=display, s=text: d.SetText(_DIMENSION_TEXT_CALLOUT_BELOW, s)
         )
     if remaining:
         raise RuntimeError(
@@ -1632,8 +1633,18 @@ def add_edge_dimension(
 def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
     """Box a drawing-native locating dimension as BASIC and verify the result."""
     display = _sw_type_info.early_bound_or_flag(
-        dimension, "IDisplayDimension", "GetDimension"
+        dimension, "IDisplayDimension", "GetDimension", "SetText", "GetText"
     )
+    adapter._attempt(
+        lambda: display.SetText(_DIMENSION_TEXT_CALLOUT_BELOW, "")
+    )
+    below_text = adapter._attempt(
+        lambda: display.GetText(_DIMENSION_TEXT_CALLOUT_BELOW), default=""
+    )
+    if str(below_text or ""):
+        raise RuntimeError(
+            f"{label} BASIC dimension retained below-text {below_text!r}"
+        )
     model_dimension = _sw_type_info.early_bound_or_flag(
         display.GetDimension(), "IDimension", "SetToleranceType", "GetToleranceType"
     )
@@ -3061,18 +3072,15 @@ async def finalize_drawing(
             "save final drawing sheet scale",
             await adapter.save_file(str(outputs.slddrw)),
         )
-        # The PDF exported above predates this save, so the packaged PDF (and
-        # the PNG rendered from it below) would not match the persisted native
-        # drawing. Re-export while the just-saved doc is still fully loaded
-        # (codex review #361).
-        _telemetry.info("dirty-scale save: re-exporting PDF to match")
-        retry = save_drawing(
+        persisted_artifacts = save_drawing(
             adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
         )
-        if "pdf" not in retry:
+        if set(persisted_artifacts) != {"drawing", "pdf"}:
             raise RuntimeError(
-                "PDF re-export after dirty-scale save failed: " f"{retry!r}"
+                "persisted-scale drawing save/export incomplete: "
+                f"{persisted_artifacts!r}"
             )
+        artifacts.update(persisted_artifacts)
     if not sheet_scale_dirty:
         _telemetry.info("final drawing sheet scale already persisted; save skipped")
     drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
