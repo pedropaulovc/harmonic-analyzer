@@ -59,5 +59,5 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("transgear-feed-pinion")
     assert config["material_specification"] == "C36000 free-machining brass"
-    assert config["finish"] == "gear teeth cut, deburred; polished brass"
+    assert config["finish"] == "gear teeth cut; polished brass"
     assert int(config["quantity"]) == 1

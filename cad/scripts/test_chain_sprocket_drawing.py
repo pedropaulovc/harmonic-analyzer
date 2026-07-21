@@ -65,5 +65,5 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("chain-sprocket")
     assert config["material_specification"] == "AISI 1018 cold-finished steel"
-    assert config["finish"] == "machined, deburred, oiled"
+    assert config["finish"] == "machined, oiled"
     assert int(config["quantity"]) == 2

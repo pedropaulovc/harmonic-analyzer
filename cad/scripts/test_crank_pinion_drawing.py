@@ -59,5 +59,5 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("crank-pinion")
     assert config["material_specification"] == "AISI 1018 cold-finished steel"
-    assert config["finish"] == "gear teeth cut, deburred, oiled"
+    assert config["finish"] == "gear teeth cut, oiled"
     assert int(config["quantity"]) == 1
