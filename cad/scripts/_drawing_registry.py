@@ -423,6 +423,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="cone-swing-platform",
         script_name="draw_cone_swing_platform.py",
     ),
+    DrawingSpec(
+        name="fillister_screw",
+        part="fillister_screw",
+        artifact_stem="fillister-screw",
+        script_name="draw_fillister_screw.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

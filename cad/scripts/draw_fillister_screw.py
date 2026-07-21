@@ -1,0 +1,189 @@
+r"""Create the curated machinist drawing for the fillister-head machine screw.
+
+Uniform fastener slice: a side (profile) view carrying the head-height and
+under-head length as drawing-native linear dimensions, a head-end view carrying
+the two marked model diameters (the head OD and the shank/thread minor Ø with
+its UNC-2A designation), plus an isometric.  The thread designation and shank
+nominals come from the fastener catalog via ``fillister_screw_spec``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from typing import Any
+
+import _telemetry
+from _common import CAD_ROOT, check, run_build
+from _drawing_common import (
+    DrawingOutputs,
+    add_edge_dimension,
+    add_property_linked_note,
+    curate_view_dimensions,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    set_dimension_callouts,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
+    stamp_drawing_summary,
+)
+from _drawing_registry import DRAWINGS_BY_NAME
+from fillister_screw_spec import (
+    HEAD_DIA,
+    HEAD_H,
+    SHANK_DIA,
+    SHANK_LEN,
+    THREAD_DESIGNATION,
+)
+from solidworks_mcp.adapters.solidworks.drawing import place_view
+
+
+SPEC = DRAWINGS_BY_NAME["fillister_screw"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+SLDDRW = OUTPUTS.slddrw
+PDF = OUTPUTS.pdf
+PNG = OUTPUTS.png
+
+# A #4-40 x 4 mm screw is tiny; 8:1 draws the head OD (5.5) as ~44 mm and the
+# whole length (~6.2) as ~50 mm -- big enough to pick edges and read text.
+SHEET_SCALE = (8.0, 1.0)
+_S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
+
+# The screw is authored on the Front plane, axis along +Z: head at z in
+# [-HEAD_H, 0], shank at z in [0, SHANK_LEN].  The head-end circle projects in
+# the *Front view; the profile (axis horizontal) projects in the *Right view.
+END_CENTER = (0.070, 0.150)
+SIDE_CENTER = (0.185, 0.150)
+ISO_CENTER = (0.300, 0.170)
+
+# Side view (*Right): the screw lies horizontal and the projection MIRRORS the
+# model z axis -- the head (z in [-HEAD_H, 0]) renders at the HIGH-x (right) end,
+# the shank tip (z=+SHANK_LEN) at the LOW-x (left) end.  Map model z -> sheet x
+# with that flip, centred on the profile bounding box.
+_Z_MID = (SHANK_LEN - HEAD_H) / 2.0
+
+
+def _side_x(model_z: float) -> float:
+    return SIDE_CENTER[0] - (model_z - _Z_MID) * _S
+
+
+_HEAD_END_X = _side_x(-HEAD_H)  # head outer face (right)
+_JUNCTION_X = _side_x(0.0)  # head/shank step
+_SHANK_END_X = _side_x(SHANK_LEN)  # shank tip (left)
+# The head/shank step edge only exists OFF the axis (mid-height is continuous
+# shank), so pick the junction on the step annulus (between the shank and head
+# radii); the two end faces are full disks, pickable across their diameter.
+_STEP_Y = SIDE_CENTER[1] + (SHANK_DIA / 2.0 + HEAD_DIA / 2.0) / 2.0 * _S
+
+# Head-end view: the two concentric marked diameters, leadered clear to the left.
+END_KEEP = {
+    "HeadDia": (0.028, END_CENTER[1] + 0.024),
+    "ShankDia": (0.028, END_CENTER[1] - 0.024),
+}
+DIMENSION_CALLOUTS = {"ShankDia": THREAD_DESIGNATION}
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+
+    check("open fillister-screw source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
+    )
+    drawing_model, _sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Fillister Screw Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "fillister screw; slotted machine screw; brass",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(8, 1))
+    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(8, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(8, 1))
+    set_hidden_lines_removed(adapter, side)
+    set_hidden_lines_removed(adapter, iso)
+    # The driver slot and the head OD both read in the head-end view; keep the
+    # hidden edges so the slot and the head-behind-shank circle both show.
+    set_hidden_lines_visible(adapter, end)
+
+    end_annotations = curate_view_dimensions(
+        adapter, end, keep=END_KEEP, view_label="head-end"
+    )
+    set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
+
+    # Side-view lengths as drawing-native linears (the extrude depths carry no
+    # named display dim), picked on the profile's vertical silhouette faces.
+    add_edge_dimension(
+        adapter,
+        side,
+        p0=(_HEAD_END_X, _STEP_Y),
+        p1=(_JUNCTION_X, _STEP_Y),
+        text_xy=(0.5 * (_HEAD_END_X + _JUNCTION_X), SIDE_CENTER[1] + 0.034),
+        label="head height",
+    )
+    add_edge_dimension(
+        adapter,
+        side,
+        p0=(_JUNCTION_X, _STEP_Y),
+        p1=(_SHANK_END_X, SIDE_CENTER[1]),
+        text_xy=(0.5 * (_JUNCTION_X + _SHANK_END_X), SIDE_CENTER[1] - 0.034),
+        label="under-head length",
+    )
+
+    # 0.020: the note is left-aligned on its anchor, clearing the 12.7 mm zone
+    # margin / re-centred frame rule (~0.0126), which the layout audit enforces.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)
+    add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.210)
+
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title="Fillister Screw Manufacturing Drawing",
+        scale=SHEET_SCALE,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))

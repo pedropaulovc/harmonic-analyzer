@@ -12,7 +12,7 @@ local x = 0.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Mapping
 
 from _common import (
     SketchDims,
@@ -29,6 +29,11 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _fastener_slot import FastenerAxis, add_slotted_drive
 
 
@@ -41,6 +46,8 @@ async def build_flat_screw(
     head_h: float,
     shank_dia: float,
     shank_len: float,
+    mark_dimensions: Mapping[str, set[str]] | None = None,
+    drawing_properties: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
@@ -129,4 +136,12 @@ async def build_flat_screw(
 
     await apply_material(adapter, material)
     await report_mass_properties(adapter)
+    # Optional manufacturing-drawing hook: a caller shipping a curated print
+    # marks its diameters for insertion and stamps the title-block properties
+    # before the part is saved (the crank-pin / cone-lock-knob convention).
+    if mark_dimensions is not None or drawing_properties is not None:
+        clear_dimensions_for_drawing(adapter)
+        for feature_name, dimension_names in (mark_dimensions or {}).items():
+            mark_dimensions_for_drawing(adapter, feature_name, set(dimension_names))
+        apply_drawing_properties(adapter, part_name, dict(drawing_properties or {}))
     return await save_part_and_images(adapter, part_name)
