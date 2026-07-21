@@ -297,6 +297,12 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="summing-lever",
         script_name="draw_summing_lever.py",
     ),
+    DrawingSpec(
+        name="boss_hook",
+        part="boss_hook",
+        artifact_stem="boss-hook",
+        script_name="draw_boss_hook.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}
