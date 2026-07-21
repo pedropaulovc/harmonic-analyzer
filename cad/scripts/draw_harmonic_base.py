@@ -365,7 +365,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.50",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="13X A1-E4",
+        quantity="13X TABLED HOLES",
         label="hole-pattern true position",
         entity=hole_entities[2],
     )
