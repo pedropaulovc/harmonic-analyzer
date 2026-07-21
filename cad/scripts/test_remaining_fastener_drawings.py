@@ -229,5 +229,6 @@ def test_reeded_builder_uses_spec_groove_count(
     assert build.GROOVE_COUNT == spec.GROOVE_COUNT
     assert "groove_count=GROOVE_COUNT" in source
     assert "DATUM A = THREAD PITCH-DIAMETER AXIS." in spec.DRAWING_NOTES
-    assert "HEAD OD TOTAL RUNOUT 0.10 TO A" in spec.DRAWING_NOTES
+    head_name = "KNOB" if spec_name == "pen_set_screw_spec" else "HEAD"
+    assert f"{head_name} OD TOTAL RUNOUT 0.10 TO A" in spec.DRAWING_NOTES
     assert "BEARING FACE PERP 0.10 TO A" in spec.DRAWING_NOTES

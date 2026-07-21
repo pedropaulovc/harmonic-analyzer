@@ -84,7 +84,7 @@ def reeded_head_notes(
         f"{head_name} DIA {head_dia_mm:.2f} +/-0.10 X "
         f"{head_length_mm:.2f} +/-0.10 LONG.",
         "DATUM A = THREAD PITCH-DIAMETER AXIS.",
-        "HEAD OD TOTAL RUNOUT 0.10 TO A; BEARING FACE PERP 0.10 TO A.",
+        f"{head_name} OD TOTAL RUNOUT 0.10 TO A; BEARING FACE PERP 0.10 TO A.",
         f"{groove_count}X R{groove_radius:.2f} +/-0.05 AXIAL GROOVES, EQUALLY SPACED.",
         f"GROOVE ROOT DIA {root_dia:.2f} +/-0.10; FULL {head_name} LENGTH.",
     )

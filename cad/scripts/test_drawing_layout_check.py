@@ -12,6 +12,7 @@ print.
 
 from __future__ import annotations
 
+import math as _math
 from inspect import getsource
 from types import SimpleNamespace
 
@@ -34,6 +35,7 @@ from _drawing_layout_check import (
     find_overflows,
     find_overlaps,
 )
+
 
 # ASME B sheet used by every project drawing (meters).
 SHEET_W = 0.4318
@@ -1021,8 +1023,6 @@ def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
 
 
 # --- balloon ring separation (SolidWorks-free) -------------------------------
-
-import math as _math
 
 
 def test_push_apart_never_reorders_the_balloons():
