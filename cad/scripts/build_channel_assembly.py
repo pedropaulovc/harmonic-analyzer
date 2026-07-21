@@ -165,9 +165,13 @@ from solidworks_mcp.adapters.base import (
     ComponentLinearPatternParameters,
     CreateAxisParameters,
 )
-from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
+from cylinder_cam_spec import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
-# throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
+# throw is rescaled -- from the gear-import-free leaf (build_cylinder_gear reads
+# the same one), so this assembly's recipe (dodo._recipe_files via
+# module_deps_of) stays free of the _gear/build_cone_gear/gear_train.yaml
+# closure and a gear-geometry edit no longer forces a FULL channel re-mate.
+# A stale 5.08 hardcode (the pre-re-anchor throw) survived the
 # OD-62.2 re-anchor that moved ECCENTRICITY to 3.06, mislocating the ring 2.02 mm
 # south of the lobe -> the Ø30.8 bore dug into the Ø30.6 cam (20 x 171.67 mm^3).
 from build_connecting_rod import CENTER_DISTANCE as ROD_C2C  # ring centre ->

@@ -95,6 +95,7 @@ from _common import (
 )
 from _gear import build_fixed_gear, volume_check
 from build_cone_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
+from cylinder_cam_spec import ECCENTRICITY  # cam lobe throw (mm) -- leaf module, see below
 
 import _telemetry
 
@@ -106,10 +107,10 @@ FACE_WIDTH = 3.0  # DIMENSIONS.md ch13: 0.38 face/pitch x 7.5 axial pitch (scale
 CAM_DIAMETER = 30.6  # DIMENSIONS.md ch13: integral cam bearing diameter; the rod ring
 # bore Ø30.8 measured on the p.25 overlay (Ø29.83 at the gear-OD scale) confirms it (med)
 CAM_THICKNESS = 3.5  # DIMENSIONS.md ch13: axial-budget (7.0565 channel pitch, unchanged) (med)
-ECCENTRICITY = 8.64  # DIMENSIONS.md ch13: cam throw MEASURED from the ch14 end-view ROM
-# fit (2026-07-02): tip half-amplitude 9.458 mm over the 20-tip least-squares cos fit at
-# the channel-pitch scale, x r_pin/r_tipface = 127.37/139.5. Supersedes the scaled-0.6022
-# legacy 3.06 (the lobe also flips to +Y -- see the module docstring). (med)
+# ECCENTRICITY (the cam lobe throw + its derivation note) lives in the
+# gear-import-free leaf cylinder_cam_spec so build_channel_assembly can read it
+# without pulling this module's _gear/build_cone_gear closure into its recipe;
+# re-exported here for the part build (and any other importer).
 BORE_DIAMETER = 0.375 * IN  # 9.525 DIMENSIONS.md ch13: cam bore (legacy, med)
 NOTCH_DEPTH = 3.0  # DIMENSIONS.md ch13: alignment notch depth, text p.22 (high)
 # The notch is "just a slit" cut with a SAW between two teeth -- the p.23 photo
