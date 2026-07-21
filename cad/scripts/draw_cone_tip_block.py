@@ -272,11 +272,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=TOP_KEEP["Depth"],
-        symbol_xy=(0.175, TOP_CENTER[1]),
+        symbol_xy=TOP_KEEP["Depth"],
         datum="D",
         label="block-depth median plane",
         entity_type="DIMENSION",
         shoulder=True,
+        position_tolerance_m=0.001,
     )
     passage_entity = _circle_entity(
         adapter,
