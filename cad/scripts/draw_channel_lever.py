@@ -218,16 +218,41 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-eye hole",
     )
 
-    # Datum A on the fulcrum bore axis (9 o'clock), Ra on the bore (6 o'clock),
-    # position FCFs tying both BASIC hole locations to A.
+    # Complete datum reference frame: A is a broad machined face (primary), B
+    # is the functional fulcrum-bore axis (secondary), and C is the top narrow
+    # face (tertiary clocking).  The two BASIC hole locations reference A|B|C.
+    broad_face = (
+        RIGHT_CENTER[0] - LEVER_THICKNESS / 2000.0,
+        RIGHT_CENTER[1],
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=broad_face,
+        symbol_xy=(broad_face[0] - 0.015, broad_face[1] + 0.018),
+        datum="A",
+        label="broad machined face",
+    )
     fulcrum_left = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
     add_datum_feature(
         adapter,
         front,
         edge_xy=fulcrum_left,
         symbol_xy=(fulcrum_left[0] - 0.018, fulcrum_left[1]),
-        datum="A",
+        datum="B",
         label="fulcrum bore axis",
+    )
+    top_face = (
+        RIGHT_CENTER[0],
+        RIGHT_CENTER[1] + BAR_TALL / 2000.0,
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=top_face,
+        symbol_xy=(top_face[0] + 0.018, top_face[1] + 0.010),
+        datum="C",
+        label="top clocking face",
     )
     fulcrum_bottom = _sheet_xy(0.0, -PIVOT_HOLE_DIA / 2.0)
     add_surface_finish(
@@ -248,7 +273,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(bar_pin_edge[0] - 0.045, 0.174),
         characteristic="position",
         tolerance="0.20",
-        datums=("A",),
+        datums=("A", "B", "C"),
         diameter=True,
         label="bar-pin hole position",
     )
@@ -262,7 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(spring_fcf_edge[0] + 0.020, 0.174),
         characteristic="position",
         tolerance="0.20",
-        datums=("A",),
+        datums=("A", "B", "C"),
         diameter=True,
         label="spring-eye hole position",
     )

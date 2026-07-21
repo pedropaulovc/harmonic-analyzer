@@ -1,8 +1,8 @@
 channel-lever:
   number: MHA-009
-  material: Gray Cast Iron
+  material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
-  finish: green enamel; bore + holes masked
+  finish: RAL 6005 alkyd enamel, 40-60 um DFT; machined features masked
   quantity: 20
   tolerance_class: machined_block
   process: "cast + machined"
