@@ -4,5 +4,5 @@ gooseneck-clamp:
   tolerance_class: machined_block
   process: "cast + machined"
   material_specification: "ASTM A48 Class 30 gray iron"
-  finish: "green enamel; bore reamed, mating faces machined"
+  finish: "green enamel"
   quantity: 1

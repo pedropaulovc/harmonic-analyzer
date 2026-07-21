@@ -2,7 +2,7 @@ measuring-stick:
   number: MHA-046
   material: C26000 brass, half-hard
   material_specification: C26000 brass, half-hard
-  finish: polished; graduations engraved and black-filled
+  finish: polished
   quantity: 1
   tolerance_class: plate_profile
   process: "machined (brass)"

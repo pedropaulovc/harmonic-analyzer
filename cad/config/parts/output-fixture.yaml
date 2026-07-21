@@ -2,7 +2,7 @@ output-fixture:
   number: MHA-047
   material: C36000 free-cutting brass
   material_specification: C36000 free-cutting brass
-  finish: polished; bore reamed
+  finish: polished
   quantity: 1
   tolerance_class: machined_block
   process: "machined (brass)"
