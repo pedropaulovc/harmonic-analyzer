@@ -30,13 +30,13 @@ from _common import (
     SketchDims,
     apply_color,
     apply_material,
+    bbox_extent_check,
     check,
     define_centered_rectangle,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
-    measure_check,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -327,23 +327,12 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
 
-    # Verify the annotated footprint (ch. 6: 46 x 28 cm callouts = 18.1 x
-    # 11.0 in; legacy 18.0 x 11.0 kept). Side-face pairs fail to pick (the
-    # far faces are hidden in the active view and point picking is
-    # screen-projected) — measure the bottom plate's perimeter edges.
-    await measure_check(
-        adapter,
-        "base length (annotated 46 cm / 18 in)",
-        [{"entity_type": "EDGE", "point": [0.0, 0.0, BOTTOM_WIDTH / 2.0]}],
-        "length",
-        BOTTOM_LENGTH,
+    # Verify the annotated footprint without view-dependent screen picks.
+    await bbox_extent_check(
+        adapter, "base length (annotated 46 cm / 18 in)", "x", BOTTOM_LENGTH
     )
-    await measure_check(
-        adapter,
-        "base depth (annotated 28 cm / 11 in)",
-        [{"entity_type": "EDGE", "point": [BOTTOM_LENGTH / 2.0, 0.0, 0.0]}],
-        "length",
-        BOTTOM_WIDTH,
+    await bbox_extent_check(
+        adapter, "base depth (annotated 28 cm / 11 in)", "z", BOTTOM_WIDTH
     )
 
     await report_mass_properties(adapter)

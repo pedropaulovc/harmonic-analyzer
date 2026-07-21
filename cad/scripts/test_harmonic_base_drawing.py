@@ -35,6 +35,9 @@ def test_plate_geometry_is_single_sourced() -> None:
     assert part.TOP_THICKNESS is harmonic_base_spec.TOP_THICKNESS
     assert harmonic_base_spec.BOTTOM_LENGTH == 18.0 * 25.4
     assert harmonic_base_spec.TOP_LENGTH == 17.5 * 25.4
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert source.count("bbox_extent_check(") == 2
+    assert "measure_check(" not in source
 
 
 def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
