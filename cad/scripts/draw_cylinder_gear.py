@@ -194,7 +194,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        frame_xy=(FRONT_CENTER[0] + 0.040, RIGHT_CENTER[1] + half_od + 0.010),
+        frame_xy=(0.175, RIGHT_CENTER[1] + half_od + 0.010),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
