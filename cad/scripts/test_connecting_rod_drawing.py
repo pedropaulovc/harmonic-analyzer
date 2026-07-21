@@ -55,11 +55,11 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     # +0.10/0 dimension callout; notes never repeat a sheet dimension.
     assert "#47" not in notes
     assert "1X" in notes
-    assert "RING 3.00 THICK OVER ITS ANNULUS" in notes
+    assert "RING 3.00 THICK, STEP AT THE RING OD" in notes
     assert "SHANK AND HEAD 2.50" in notes
-    assert "CENTRED ON ONE MIDPLANE" in notes
+    assert "ONE MIDPLANE" in notes
     assert "0.10 MIN CLR/SIDE" in notes
-    assert "4.50 MIN AFTER" in notes
+    assert "RING WALL 4.50 MIN AFTER BORING" in notes
     assert "NO DRAFT REQUIRED" in notes
     assert "HANGS PLUMB" not in notes  # not an inspectable requirement
     assert "SHANK C/L" not in notes  # the 4.00 BASIC from datum B owns it

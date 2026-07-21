@@ -14,23 +14,22 @@ from __future__ import annotations
 # The strap-bore fit rides the Ø30.80 dimension callout (+0.10/0); the ring
 # centre-to-pin distance is a BASIC sheet dimension.  Notes carry only what the
 # sheet does not dimension natively, so no number appears in both places.
+# Kept to 12 display lines: the notes share the left column with the 170 mm
+# stepped-thickness view, so a taller block overlaps its outline (layout audit).
 DRAWING_NOTES = "\n".join(
     (
-        "1. STRAP BORE MACHINED; RUNS THE",
-        "   30.60 ECCENTRIC CAM, 0.10 MIN CLR/SIDE.",
-        "2. RING 3.00 THICK OVER ITS ANNULUS, STEP",
-        "   AT THE RING OD; SHANK AND HEAD 2.50;",
-        "   ALL CENTRED ON ONE MIDPLANE.",
-        "3. RING WALL 5.00 NOM; 4.50 MIN AFTER",
-        "   BORING.",
+        "1. STRAP BORE MACHINED; RUNS THE 30.60",
+        "   CAM, 0.10 MIN CLR/SIDE.",
+        "2. RING 3.00 THICK, STEP AT THE RING OD;",
+        "   SHANK AND HEAD 2.50; ONE MIDPLANE.",
+        "3. RING WALL 4.50 MIN AFTER BORING.",
         "4. HEAD 10.00 W x 10.50 HIGH, R5.00 CROWN;",
-        "   SHOULDERS RISE 1.20 WIDENING THE 8.00",
-        "   SHANK. PIN C/L 2.40 BELOW CROWN.",
+        "   SHOULDERS RISE 1.20 OFF THE 8.00 SHANK.",
+        "   PIN C/L 2.40 BELOW CROWN.",
         "5. ROCKER PIN HOLE 1X.",
-        "6. JUNCTION FILLETS R1.0 MAX, AS CAST OR",
-        "   MACHINED; NO DRAFT REQUIRED.",
+        "6. FILLETS R1.0 MAX; NO DRAFT REQUIRED.",
         "7. GENERAL Ra 3.2 APPLIES TO MACHINED",
-        "   SURFACES; UNSPECIFIED SURFACES AS CAST.",
+        "   SURFACES; OTHERS AS CAST.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
