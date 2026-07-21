@@ -26,7 +26,6 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_adjuster_spec import (
-    BODY_DIA,
     BODY_LEN,
     CHAMFER as CHAMFER,
     CUP_DIA,
@@ -36,6 +35,7 @@ from cone_tip_adjuster_spec import (
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -195,23 +195,25 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
-    # The datum-feature symbol identifies the cylindrical threaded feature;
-    # the linked manufacturing note explicitly establishes its pitch cylinder,
-    # rather than the model's interference-safe cosmetic-thread envelope, as A.
-    # A tag attached directly to the size dimension is not usable here: SW 2026
-    # pins the square tag inside the two-line thread callout even after an
-    # explicit SetPosition2 and shoulder request.
+    front_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in front_annotations
+    }
+    body_diameter_annotation = front_by_name.get("BodyDiaDim")
+    if body_diameter_annotation is None:
+        raise RuntimeError("thread diameter dimension has no display annotation")
+    # Attach A to the threaded feature-of-size dimension.  That is the
+    # conventional datum-axis indication for a thread and agrees with the note
+    # establishing A from the pitch cylinder; a tag on one silhouette instead
+    # reads as a tangent-plane datum.
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(
-            FRONT_CENTER[0] + BODY_DIA / 2.0 * SHEET_SCALE[0] / 1000.0,
-            FRONT_CENTER[1],
-        ),
-        symbol_xy=(0.145, 0.230),
+        symbol_xy=(0.180, 0.210),
         datum="A",
-        label="threaded cylindrical feature",
-        entity_type="SILHOUETTE",
+        label="thread pitch-cylinder axis",
+        annotation=body_diameter_annotation,
+        shoulder=True,
     )
     cup_edge = _circular_edge(cup, radius_mm=CUP_DIA / 2.0, center_y_mm=BODY_LEN)
     add_feature_control_frame(
