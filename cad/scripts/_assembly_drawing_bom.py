@@ -72,11 +72,19 @@ def insert_identified_bom_table(
         if "PART NUMBER" not in header:
             raise RuntimeError(f"{label} BOM has no PART NUMBER column: {header!r}")
         part_column = header.index("PART NUMBER")
+        item_column = header.index("ITEM NO.") if "ITEM NO." in header else None
+        source_rows: list[tuple[str, str]] = []
         remaining = {stem.lower(): number for stem, number in part_numbers.items()}
         for row in range(1, rows):
             stem = str(
                 table.DisplayedText2(row, part_column, False) or ""
             ).strip().lower()
+            item = (
+                str(table.DisplayedText2(row, item_column, False) or "").strip()
+                if item_column is not None
+                else str(row)
+            )
+            source_rows.append((item, stem))
             number = remaining.pop(stem, None)
             if number is None:
                 continue
@@ -96,6 +104,7 @@ def insert_identified_bom_table(
                 f"{label} BOM part numbers not applied (no matching row): "
                 f"{sorted(remaining)}"
             )
+        _telemetry.info(f"{label} BOM item identities: {source_rows}")
         adapter.currentModel.EditRebuild3()
     _telemetry.success(f"{label} BOM part numbers replaced with released MHA IDs")
     return table

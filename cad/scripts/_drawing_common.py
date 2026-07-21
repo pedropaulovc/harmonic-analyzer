@@ -2856,12 +2856,29 @@ def position_bom_balloon(
         raise RuntimeError(
             f"{label}: expected one balloon for item {item_number}, got {len(matches)}"
         )
-    note = _sw_type_info.early_bound_or_flag(matches[0], "INote", "GetAnnotation")
+    note = _sw_type_info.early_bound_or_flag(
+        matches[0],
+        "INote",
+        "GetAnnotation",
+        "IsStackedBalloon",
+        "IsStackedBalloonMaster",
+    )
     annotation = note.GetAnnotation()
     if annotation is None:
         raise RuntimeError(f"{label}: item {item_number} has no annotation")
     annotation = _sw_type_info.early_bound_or_flag(
         annotation, "IAnnotation", "GetPosition", "SetPosition"
+    )
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = ddoc.GetCurrentSheet()
+    magnetic_lines = int(
+        adapter._get_attr_or_call(sheet, "GetMagneticLinesCount") or 0
+    )
+    _telemetry.info(
+        f"{label}: item {item_number} placement diagnostics "
+        f"stacked={bool(note.IsStackedBalloon())}, "
+        f"stack_master={bool(note.IsStackedBalloonMaster())}, "
+        f"magnetic_lines={magnetic_lines}"
     )
     note.LockPosition = False
     actual_xy = (float("nan"), float("nan"))
@@ -2879,6 +2896,13 @@ def position_bom_balloon(
         ):
             raise RuntimeError(f"{label}: failed to position item {item_number}")
         adapter.currentModel.EditRebuild3()
+        moved_anchor = annotation.GetPosition()
+        moved_info = note.GetBalloonInfo()
+        _telemetry.info(
+            f"{label}: item {item_number} attempt {_attempt + 1} "
+            f"anchor={tuple(float(value) for value in moved_anchor[:2]) if moved_anchor else None}, "
+            f"circle={tuple(float(value) for value in moved_info[:2]) if moved_info else None}"
+        )
     # Auto-balloon layout is recomputed by EditRebuild3.  Anchor the converged
     # circle correction so that rebuild cannot silently restore the ring slot.
     note.LockPosition = True
