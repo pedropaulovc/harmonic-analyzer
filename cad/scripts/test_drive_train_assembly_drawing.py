@@ -107,8 +107,9 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert source.count("add_note(") == 1
     assert source.count("scale=VIEW_SCALE") == 4
     assert '"*Bottom"' in source
-    assert "_show_bottom_balloon_components(adapter, bottom)" in source
-    assert "drawing_component.Visible = True" in source
+    assert "_isolate_bottom_balloon_components(adapter, bottom)" in source
+    assert "drawing_component.Visible = bool(matched)" in source
+    assert "OUTER COMPONENTS HIDDEN" in source
     assert drawing.BOTTOM_VISIBILITY_STEMS == {
         "cone-tip-bushing",
         "cone-gear-shaft",

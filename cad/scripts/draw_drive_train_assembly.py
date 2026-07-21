@@ -117,6 +117,8 @@ ASSEMBLY_NOTES = "\n".join(
         "2. SHOWN: CONE PLATFORM ENGAGED; ALIGNMENT PINION DISENGAGED.",
         "3. ADJUST CONE-TIP END PLAY, THEN LOCK THE PINCH SCREW.",
         "4. VERIFY CRANK, CONE SWING, PINION SWING AND CAM SHAFT MOVE FREELY.",
+        "5. BOTTOM BALLOON VIEW: CONE-TIP BUSHING, CONE-GEAR SHAFT AND",
+        "   CRANK-DRIVE GEAR ONLY; OUTER COMPONENTS HIDDEN.",
     )
 )
 
@@ -139,9 +141,9 @@ def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
     return tuple(children or ())
 
 
-@_telemetry.traced("drawing.show_bottom_balloon_components")
-def _show_bottom_balloon_components(adapter: Any, view: Any) -> None:
-    """Expose the enclosed component families in the auxiliary bottom view."""
+@_telemetry.traced("drawing.isolate_bottom_balloon_components")
+def _isolate_bottom_balloon_components(adapter: Any, view: Any) -> None:
+    """Show only the three enclosed BOM families in the auxiliary bottom view."""
     root = adapter._attempt(
         lambda: view.RootDrawingComponent2(False), default=None
     )
@@ -182,9 +184,11 @@ def _show_bottom_balloon_components(adapter: Any, view: Any) -> None:
                 for identity in identities
             )
         }
+        if children:
+            continue
+        drawing_component.Visible = bool(matched)
         if not matched:
             continue
-        drawing_component.Visible = True
         found.update(matched)
         for stem in matched:
             _telemetry.event("drawing.component_visible", component=stem)
@@ -254,7 +258,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # enclosed in every exterior projection.  The auxiliary bottom view shows
     # hidden lines so those physical BOM items have balloonable geometry.
     set_hidden_lines_visible(adapter, bottom)
-    _show_bottom_balloon_components(adapter, bottom)
+    _isolate_bottom_balloon_components(adapter, bottom)
 
     insert_identified_bom_table(
         adapter,
