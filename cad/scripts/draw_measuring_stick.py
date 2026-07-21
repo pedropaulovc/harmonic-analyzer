@@ -17,6 +17,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -33,7 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["measuring_stick"]
@@ -61,6 +62,26 @@ FRONT_KEEP = {
     "BodyLength": (0.122, 0.234),
     "BodyWidth": (0.250, 0.215),
 }
+
+SCALE_LABEL_Y = 0.201
+SCALE_LABEL_X0 = FRONT_CENTER[0] - 0.040
+
+
+def _rotate_ruled_face(adapter: Any, view: Any) -> None:
+    """Orient tick zero at the left and the grooves from the lower edge."""
+    adapter._attempt(lambda: setattr(view, "Angle", math.pi))
+    applied = float(adapter._get_attr_or_call(view, "Angle") or 0.0)
+    if abs(abs(applied) - math.pi) > 1e-9:
+        raise RuntimeError(f"failed to rotate ruled-face view (reads {applied:g})")
+    adapter.currentModel.EditRebuild3()
+
+
+def _add_scale_labels(adapter: Any) -> None:
+    """Show the 0..10 numeral-to-tick association on the manufacturing view."""
+    for value in range(11):
+        x = SCALE_LABEL_X0 + value * 0.008
+        if add_note(adapter, str(value), x, SCALE_LABEL_Y) is None:
+            raise RuntimeError(f"failed to add measuring-stick scale label {value}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -110,13 +131,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # forced the machinist to infer every graduation from prose.
     front = place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    _rotate_ruled_face(adapter, front)
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    _add_scale_labels(adapter)
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
-    add_property_linked_note(adapter, "Front View Note", 0.040, 0.188)
+    add_property_linked_note(adapter, "Front View Note", 0.040, 0.184)
     add_property_linked_note(adapter, "Isometric View Note", 0.250, 0.092)
 
     return await finalize_drawing(

@@ -31,6 +31,9 @@ def test_notes_cover_the_scale_and_graduations() -> None:
     assert "FINISHED BAR" in notes
     assert "11 FULL TICKS" in notes
     assert "HALF-DIVISION" in notes
+    assert "SQUARE-BOTTOM" in notes
+    assert "ASME Y14.2 VERTICAL GOTHIC" in notes
+    assert "DEPTH 0.20 +/-0.05" in notes
     assert "CDA" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -44,6 +47,8 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=(1, 2)" in source
     assert measuring_stick_spec.FRONT_VIEW_NOTE == "RULED FACE SCALE 1:1"
     assert '"*Back"' in source
+    assert "_rotate_ruled_face(adapter, front)" in source
+    assert "_add_scale_labels(adapter)" in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
