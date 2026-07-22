@@ -87,7 +87,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert 'configuration_grouping="same-part"' in source
     assert source.count("add_auto_balloons_across_views(") == 1
     assert (
-        "adapter, (iso, front, right, bracket_detail), "
+        "adapter, (iso, front, bracket_detail, right), "
         "expected=len(BOM_COMPONENTS)" in source
     )
     assert source.count("add_note(") == 2
@@ -97,7 +97,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert source.count("isolate_drawing_view_components(") == 1
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert drawing.VIEW_SCALE == (1, 5)
-    assert drawing.ISO_VIEW_SCALE == (1, 7)
+    assert drawing.ISO_VIEW_SCALE == (1, 10)
     assert f"{_chain.LINK_COUNT}-LINK CHAIN" in drawing.ASSEMBLY_NOTES
     assert "T24 AND T12 SPROCKETS" in drawing.ASSEMBLY_NOTES
     assert all(

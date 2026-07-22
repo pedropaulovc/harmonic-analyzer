@@ -94,10 +94,14 @@ BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",
-        "1. HANG PLATEN GUIDE RAILS ON SUPPORT BAR; VERIFY FREE X TRAVEL.",
-        "2. LOCK 120T DISC COAXIAL WITH 12T FEED PINION ON THE STUD.",
-        "3. ROUTE ALTERNATING 56-LINK CHAIN AROUND T24 AND T12 SPROCKETS.",
-        "4. VERIFY CRANK ROTATION FEEDS THE PLATEN WITHOUT BINDING.",
+        "1. HANG PLATEN GUIDE RAILS ON SUPPORT BAR;",
+        "   VERIFY FREE X TRAVEL.",
+        "2. LOCK 120T DISC AND 12T FEED PINION COAXIAL",
+        "   ON THE STUD.",
+        "3. ROUTE ALTERNATING 56-LINK CHAIN AROUND",
+        "   T24 AND T12 SPROCKETS.",
+        "4. VERIFY CRANK ROTATION FEEDS THE PLATEN",
+        "   WITHOUT BINDING.",
     )
 )
 
@@ -105,8 +109,8 @@ ASSEMBLY_NOTES = "\n".join(
 # in the right field above the title-block keep-out.
 FRONT_CENTER = (0.070, 0.145)
 RIGHT_CENTER = (0.170, 0.170)
-ISO_CENTER = (0.225, 0.080)
-ISO_VIEW_SCALE = (1, 7)
+ISO_CENTER = (0.215, 0.115)
+ISO_VIEW_SCALE = (1, 10)
 BRACKET_DETAIL_CENTER = (0.100, 0.225)
 BRACKET_DETAIL_SCALE = (1, 3)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
@@ -174,8 +178,16 @@ async def build(adapter: Any) -> dict[str, str]:
     isolate_drawing_view_components(
         adapter,
         bracket_detail,
-        visible_stems=frozenset({"transgear-bracket", "bracket-screw"}),
-        label="paper-drive transgear bracket detail",
+        visible_stems=frozenset(
+            {
+                "transgear-bracket",
+                "bracket-screw",
+                "transgear-latch",
+                "transgear-feed-pinion",
+                "transgear-pinion",
+            }
+        ),
+        label="paper-drive transgear detail",
     )
 
     insert_identified_bom_table(
@@ -188,14 +200,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="paper-drive assembly",
     )
     # The pictorial exposes most component families, but its transgear cluster
-    # still hides eight BOM items. The isolated bracket detail exposes the two
-    # families concealed even across the three main projections.
+    # still hides eight BOM items. The isolated transgear detail exposes the
+    # five clustered families that are concealed or whose leaders cross in the
+    # three main projections.
     add_auto_balloons_across_views(
-        adapter, (iso, front, right, bracket_detail), expected=len(BOM_COMPONENTS),
+        adapter, (iso, front, bracket_detail, right), expected=len(BOM_COMPONENTS),
         label="paper-drive assembly balloons",
     )
-    if add_note(adapter, "TRANSGEAR BRACKET", 0.020, 0.260) is None:
-        raise RuntimeError("failed to label paper-drive transgear bracket detail")
+    if add_note(adapter, "TRANSGEAR DETAIL", 0.020, 0.260) is None:
+        raise RuntimeError("failed to label paper-drive transgear detail")
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
         raise RuntimeError("failed to add paper-drive assembly notes")
 
