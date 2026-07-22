@@ -178,9 +178,9 @@ async def build(adapter: Any) -> dict[str, str]:
         RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + crown_axial) / 1000.0,
         RIGHT_CENTER[1] + crown_radial / 2000.0,
     )
-    body_top = (
+    body_face = (
         RIGHT_CENTER[0],
-        RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0,
+        RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 4000.0,
     )
     add_feature_control_frame(
         adapter,
@@ -197,10 +197,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         right,
-        edge_xy=body_top,
+        edge_xy=body_face,
         symbol_xy=(0.155, 0.205),
         roughness_ra="1.6",
         label="pinion pivot bearing finish",
+        entity_type="FACE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
