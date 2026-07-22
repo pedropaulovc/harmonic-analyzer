@@ -47,8 +47,16 @@ DRAWING_NOTES = "\n".join(
         f"DRILL DIA {PINCH_CLEARANCE_DIA:.3f} +0.10/-0.00 FROM E FACE TO SLOT;",
         f"IN SAME SETUP TAP {PINCH_THREAD} UNC-2B THRU OPPOSITE JAW; APPLY",
         "POSITION FRAME TO BOTH COAXIAL FEATURES AS A SIMULTANEOUS REQT.",
-        "PINCH FEATURE MAY OPEN INTO TOP SLOT ONLY; NO BREAKTHROUGH INTO",
-        "ADJUSTER THREAD OUTSIDE SLOT; 0.25 MIN TOP LIGAMENT.",
+        "PINCH FEATURE MAY OPEN INTO TOP SLOT; 0.25 MIN TOP LIGAMENT.",
+        # Machinist round-2 disposition: the 53.20/47.65 axis stack leaves only
+        # a 0.11 nominal wall between the pinch passage and the adjuster
+        # thread crest (5.55 - 2.946/2 - 7.938/2), which the stated tolerances
+        # cannot hold as "no breakthrough" — but the passage can never reach
+        # below the crest band (0.57 nominal to the pitch cylinder), so a
+        # crest graze is dispositioned as acceptable instead of forbidden.
+        "PASSAGE-TO-ADJUSTER-THREAD-CREST WALL 0.11 NOM: LOCAL CREST GRAZE",
+        "BY PASSAGE IS PERMITTED; PASSAGE CANNOT CUT BELOW CREST BAND",
+        "WITHIN STATED TOLS (0.57 NOM TO PITCH CYL); THREAD MUST GAGE 2B.",
         "SLOT 1.20 +/-0.05 WIDE X 8.00 +/-0.10 DEEP THRU 12.00 DEPTH;",
         "BOTTOM R0.20 MAX; SLOT MEDIAN PLANE BASIC 0 TO DATUM B;",
         "POSITION TOLERANCE 0.10 TO B IS THE TOTAL MEDIAN-PLANE ZONE.",
