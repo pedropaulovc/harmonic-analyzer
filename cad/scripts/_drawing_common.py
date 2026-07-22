@@ -1443,9 +1443,11 @@ def set_dimension_text(
         display = _sw_type_info.early_bound_or_flag(
             display, "IDisplayDimension", "SetText", "GetText"
         )
-        if not display.SetText(0, text):  # swDimensionTextAll
-            raise RuntimeError(f"failed to replace dimension text for {name!r}")
-        if str(display.GetText(0) or "") != text:
+        # SetText is void.  With swDimensionTextAll it stores the replacement
+        # in the prefix compartment and suppresses the numeric value; GetText
+        # explicitly rejects swDimensionTextAll, so read back the prefix.
+        display.SetText(0, text)  # swDimensionTextAll
+        if str(display.GetText(1) or "") != text:  # swDimensionTextPrefix
             raise RuntimeError(f"dimension text did not persist for {name!r}")
     if remaining:
         raise RuntimeError(f"dimension text not applied: {sorted(remaining)}")
