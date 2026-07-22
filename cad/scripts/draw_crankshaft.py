@@ -129,6 +129,40 @@ def _visible_shaft_face(adapter: Any, view: Any) -> Any:
     return max(candidates, key=lambda candidate: candidate[0])[1]
 
 
+def _visible_shaft_silhouette(adapter: Any, view: Any) -> Any:
+    """Return the longest drawing-native silhouette of the turned shaft OD."""
+    candidates: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        silhouettes = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 4),
+            default=(),
+        ) or ()
+        for raw_silhouette in silhouettes:
+            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
+            start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
+            end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
+            if start is None or end is None:
+                continue
+            start_xyz = adapter._get_attr_or_call(start, "ArrayData")
+            end_xyz = adapter._get_attr_or_call(end, "ArrayData")
+            if not start_xyz or not end_xyz:
+                continue
+            length = sum(
+                (float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz)
+            ) ** 0.5
+            candidates.append((length, silhouette))
+    if not candidates:
+        raise RuntimeError("crankshaft side view has no usable silhouette edges")
+    length, silhouette = max(candidates, key=lambda candidate: candidate[0])
+    if length < SHAFT_LENGTH * 0.8 / 1000.0:
+        raise RuntimeError(
+            "could not identify the crankshaft OD silhouette: "
+            f"longest visible silhouette is only {length * 1000:g} mm"
+        )
+    return silhouette
+
+
 def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
     """Return a visible rim edge adjacent to the modeled #9 cylindrical face."""
     expected_radius_m = PIN_HOLE_DIA / 2000.0
@@ -261,6 +295,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     shaft_face = _visible_shaft_face(adapter, right)
+    shaft_silhouette = _visible_shaft_silhouette(adapter, right)
     add_view_centerline(
         adapter,
         right,
@@ -342,11 +377,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.205, 0.145),
         roughness_ra="1.6",
         label="crankshaft bearing finish",
-        edge_xy=(
-            RIGHT_CENTER[0] + SHAFT_DIA / 2000.0,
-            RIGHT_CENTER[1] + SHAFT_LENGTH / 4000.0,
-        ),
-        entity_type="SILHOUETTE",
+        edge_entity=shaft_silhouette,
         production_method="SHAFT OD",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)

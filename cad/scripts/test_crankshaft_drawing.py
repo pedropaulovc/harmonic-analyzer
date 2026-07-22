@@ -79,10 +79,9 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert '{"PinHeight": (0.132, 0.105)}' in source
     assert "GetVisibleEntities2(c, 3)" in source
     assert "face=shaft_face" in source
-    assert "RIGHT_CENTER[0] + SHAFT_DIA / 2000.0" in source
-    assert "RIGHT_CENTER[1] + SHAFT_LENGTH / 4000.0" in source
-    assert 'entity_type="SILHOUETTE"' in source
-    assert "edge_entity=shaft_face" not in source
+    assert "GetVisibleEntities2(c, 4)" in source
+    assert "shaft_silhouette = _visible_shaft_silhouette(adapter, right)" in source
+    assert "edge_entity=shaft_silhouette" in source
     assert 'production_method="SHAFT OD"' in source
     assert 'dimension_name(adapter, annotation) == "ShaftDiaDim"' in source
     assert "shaft_datum_edge = _visible_shaft_end_edges(adapter, front)[0][1]" in source
