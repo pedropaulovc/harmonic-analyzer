@@ -119,6 +119,8 @@ ID_ISO_CENTER = (0.180, 0.080)
 ISO_VIEW_SCALE = (1, 7)
 BRACKET_DETAIL_CENTER = (0.085, 0.230)
 BRACKET_DETAIL_SCALE = (1, 4)
+SCREW_DETAIL_CENTER = (0.035, 0.235)
+SCREW_DETAIL_SCALE = (1, 2)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
 BOM_ANCHOR = (0.248, 0.265)
@@ -209,11 +211,24 @@ async def build(adapter: Any) -> dict[str, str]:
         visible_stems=frozenset(
             {
                 "transgear-bracket",
-                "bracket-screw",
                 "transgear-latch",
             }
         ),
         label="paper-drive transgear detail",
+    )
+    screw_detail = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *SCREW_DETAIL_CENTER,
+        scale=SCREW_DETAIL_SCALE,
+    )
+    set_hidden_lines_removed(adapter, screw_detail)
+    isolate_drawing_view_components(
+        adapter,
+        screw_detail,
+        visible_stems=frozenset({"bracket-screw"}),
+        label="paper-drive bracket-screw detail",
     )
 
     insert_identified_bom_table(
@@ -226,15 +241,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="paper-drive assembly",
     )
     targeted_balloons = []
-    for stem, item_number, margin in (
-        ("transgear-bracket", "12", 0.008),
-        ("bracket-screw", "13", 0.045),
-        ("transgear-latch", "15", 0.014),
+    for detail_view, stem, item_number, margin in (
+        (bracket_detail, "transgear-bracket", "12", 0.008),
+        (screw_detail, "bracket-screw", "13", 0.014),
+        (bracket_detail, "transgear-latch", "15", 0.014),
     ):
         targeted_balloons.extend(
             add_component_bom_balloons(
                 adapter,
-                bracket_detail,
+                detail_view,
                 items=((stem, item_number),),
                 label=f"paper-drive item {item_number} balloon",
                 margin=margin,
