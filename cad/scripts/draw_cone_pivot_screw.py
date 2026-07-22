@@ -7,15 +7,25 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, run_build
+from _common import CAD_ROOT, _early_bound, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
     add_surface_finish,
+    curate_view_dimensions,
+    import_cosmetic_threads,
+    set_hidden_lines_removed,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
+from cone_pivot_screw_spec import (
+    SHOULDER_DIA,
+    SHOULDER_LEN,
+    THREAD_MAJOR_DIA,
+    UNDERHEAD_LEN,
+)
+from solidworks_mcp.adapters.solidworks.drawing import place_view, remove_notes_matching
 
 
 SPEC = DRAWINGS_BY_NAME["cone_pivot_screw"]
@@ -30,9 +40,13 @@ END_KEEP = {
     "ShoulderDiaDim": (0.028, 0.124),
 }
 SIDE_KEEP = {
-    "HeadHt": (0.190, 0.222),
-    "ShoulderLg": (0.165, 0.138),
+    "HeadHt": (0.190, 0.240),
+    "ShoulderLg": (0.165, 0.185),
     "ThreadLg": (0.238, 0.132),
+}
+SLOT_KEEP = {
+    "SlotWDim": (0.285, 0.242),
+    "SlotDepth": (0.325, 0.215),
 }
 SIDE_DIMENSION_CALLOUTS = {
     "ThreadLg": "1/4-20 UNC-2A",
@@ -40,15 +54,78 @@ SIDE_DIMENSION_CALLOUTS = {
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
+def _circular_edge(
+    adapter: Any,
+    view: Any,
+    *,
+    center_y_mm: float,
+    radius_mm: float,
+    label: str,
+) -> Any:
+    """Return the unique visible circular edge matching model-space geometry."""
+    view = _early_bound(view, "IView")
+    components = adapter._attempt(lambda: view.GetVisibleComponents()) or (None,)
+    matches: list[Any] = []
+    seen: list[tuple[float, float]] = []
+    edge_count = 0
+    for component in components:
+        edges = (
+            adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 1)) or ()
+        )
+        edge_count += len(edges)
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = curve.CircleParams or ()
+            if len(params) != 7:
+                continue
+            center_y = float(params[1]) * 1000.0
+            radius = float(params[6]) * 1000.0
+            seen.append((center_y, radius))
+            if abs(center_y - center_y_mm) <= 0.02 and abs(radius - radius_mm) <= 0.02:
+                matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one visible circular edge at y={center_y_mm:g} "
+            f"r={radius_mm:g} mm, found {len(matches)}; "
+            f"components={len(components)} edges={edge_count} circles={seen}"
+        )
+    return matches[0]
+
+
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
     """Add the native GD&T and finish controls required by the shoulder joint."""
-    # The innermost circle in the tail-end view is the thread-tail feature. Its
-    # native datum-feature tag establishes the derived pitch-diameter axis A.
+    right = place_view(adapter, str(SOURCE), "*Right", 0.285, 0.170, scale=SHEET_SCALE)
+    set_hidden_lines_removed(adapter, right)
+    curate_view_dimensions(adapter, right, keep=SLOT_KEEP, view_label="slot profile")
+
+    thread_seeds, thread_instances = import_cosmetic_threads(adapter, side)
+    if thread_instances != 1:
+        raise RuntimeError(
+            f"side view has {thread_seeds} cosmetic-thread seed(s) / "
+            f"{thread_instances} instance(s); expected 1"
+        )
+    removed_thread_notes = remove_notes_matching(adapter, "1/4-20")
+    _telemetry.info(
+        f"side view imported {thread_seeds} cosmetic-thread seed(s) as "
+        f"{thread_instances} instance(s); removed {removed_thread_notes} "
+        "automatic callout note(s)"
+    )
+
+    thread_end = _circular_edge(
+        adapter,
+        side,
+        center_y_mm=-UNDERHEAD_LEN,
+        radius_mm=THREAD_MAJOR_DIA / 2.0,
+        label="thread datum edge",
+    )
     add_datum_feature(
         adapter,
-        end,
-        edge_xy=(0.0853, 0.150),
-        symbol_xy=(0.108, 0.150),
+        side,
+        edge_entity=thread_end,
+        symbol_xy=(0.115, 0.130),
         datum="A",
         label="thread pitch-diameter datum feature",
         callout_below="1/4-20 THREAD",
@@ -81,14 +158,31 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
     )
     add_feature_control_frame(
         adapter,
-        end,
-        edge_xy=(0.070, 0.13020),
-        frame_xy=(0.108, 0.118),
+        side,
+        edge_entity=_circular_edge(
+            adapter,
+            side,
+            center_y_mm=-SHOULDER_LEN,
+            radius_mm=SHOULDER_DIA / 2.0,
+            label="shoulder end edge",
+        ),
+        frame_xy=(0.125, 0.170),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
         quantity="SHOULDER END FACE",
         label="shoulder end perpendicularity",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=(0.2898, 0.219),
+        frame_xy=(0.325, 0.245),
+        characteristic="position",
+        tolerance="0.10",
+        datums=("A",),
+        quantity="SLOT MEDIAN PLANE",
+        label="slot median-plane position",
     )
     add_surface_finish(
         adapter,
@@ -108,7 +202,7 @@ RECIPE = FastenerSheet(
     end_view="*Bottom",
     side_center=(0.190, 0.170),
     end_center=(0.070, 0.150),
-    iso_center=(0.310, 0.170),
+    iso_center=(0.370, 0.170),
     end_keep=END_KEEP,
     dimension_callouts=DIMENSION_CALLOUTS,
     side_keep=SIDE_KEEP,

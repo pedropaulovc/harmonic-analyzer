@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _fastener_catalog import fastener
 from _common import (
     SketchDims,
@@ -57,7 +58,7 @@ from cone_pivot_screw_spec import (
     SHOULDER_LEN,
     SLOT_D,
     SLOT_W,
-    THREAD_REF_DIA,
+    THREAD_MAJOR_DIA,
     THREAD_TAIL_LEN,
     UNDERHEAD_LEN,
 )
@@ -74,13 +75,17 @@ def _slot_strip_area(r: float, w: float) -> float:
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.solidworks.features import (
+        _flag_feature_methods,
+        _select_edges_geometric,
+    )
 
     check("create_part", await adapter.create_part())
     await set_global(adapter, "HeadDia", f"{HEAD_DIA}mm")
     await set_global(adapter, "HeadT", f"{HEAD_T}mm")
     await set_global(adapter, "ShoulderDia", f"{SHOULDER_DIA}mm")
     await set_global(adapter, "ShoulderLen", f"{SHOULDER_LEN}mm")
-    await set_global(adapter, "ThreadRefDia", f"{THREAD_REF_DIA}mm")
+    await set_global(adapter, "ThreadMajorDia", f"{THREAD_MAJOR_DIA}mm")
     await set_global(adapter, "ThreadLen", f"{THREAD_TAIL_LEN}mm")
     drive_jobs: list[tuple[str, str]] = []
 
@@ -123,9 +128,9 @@ async def build(adapter) -> dict[str, str]:
     thread = SketchDims()
     check("create_sketch thread tail", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, THREAD_REF_DIA / 2.0, "thread tail", dims=thread,
-        names=("ThreadCx", "ThreadCz", "ThreadRefDiaDim"),
-        drives=(None, None, '"ThreadRefDia"'),
+        adapter, 0.0, 0.0, THREAD_MAJOR_DIA / 2.0, "thread tail", dims=thread,
+        names=("ThreadCx", "ThreadCz", "ThreadMajorDiaDim"),
+        drives=(None, None, '"ThreadMajorDia"'),
     )
     await ensure_fully_defined(adapter, "thread-tail sketch")
     check("exit_sketch thread tail", await adapter.exit_sketch())
@@ -134,7 +139,7 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, THREAD_TAIL_LEN, -UNDERHEAD_LEN)
     name_last_feature(adapter, "ThreadTail")
     name_dimensions(adapter, "ThreadTail", ["ThreadLg"])
-    v_thread = math.pi * (THREAD_REF_DIA / 2.0) ** 2 * THREAD_TAIL_LEN
+    v_thread = math.pi * (THREAD_MAJOR_DIA / 2.0) ** 2 * THREAD_TAIL_LEN
     volume = await volume_check(
         adapter, "thread tail", volume + v_thread, 0.005 * v_thread
     )
@@ -159,6 +164,7 @@ async def build(adapter) -> dict[str, str]:
     check("cut slot", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLOT_D)))
     name_last_feature(adapter, "DriverSlot")
+    name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
     v_slot = _slot_strip_area(HEAD_DIA / 2.0, SLOT_W) * SLOT_D
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.02 * v_slot)
 
@@ -167,6 +173,29 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven screw (equations neutral)", volume, 0.02 * v_slot)
+
+    thread_edge_point = [THREAD_MAJOR_DIA / 2.0, -UNDERHEAD_LEN, 0.0]
+    if not _select_edges_geometric(adapter, [thread_edge_point], tol_mm=0.05):
+        raise RuntimeError(
+            f"cannot select external-thread start edge at {thread_edge_point}"
+        )
+    feature_manager = _flag_feature_methods(
+        adapter.currentModel.FeatureManager,
+        "IFeatureManager",
+        "InsertCosmeticThread3",
+    )
+    cosmetic_thread = feature_manager.InsertCosmeticThread3(
+        0,  # swCosmeticStandardType_e.swStandardAnsiInch
+        "",
+        SPEC.thread,
+        0.0,  # standard/size table owns the nominal diameter
+        0,  # swCosmeticEndConditions_e.swEndConditionBlind
+        THREAD_TAIL_LEN / 1000.0,
+        f"{SPEC.thread} UNC-2A",
+    )
+    if cosmetic_thread is None:
+        raise RuntimeError("InsertCosmeticThread3 rejected the selected tail edge")
+    _telemetry.success(f"cosmetic external thread {SPEC.thread} UNC-2A")
 
     pivot_axis = await name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis"
@@ -184,6 +213,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "Shoulder", "ShoulderLg", 0.00, 0.05
     )
     set_dimension_symmetric_tolerance(adapter, "ThreadTail", "ThreadLg", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "SlotProfile", "SlotWDim", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", 0.10)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

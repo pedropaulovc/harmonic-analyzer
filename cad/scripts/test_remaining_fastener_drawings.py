@@ -82,7 +82,11 @@ def test_registry_paths_and_marked_dimensions(case: Case) -> None:
     assert drawing.PDF.as_posix().endswith(f"/pdf/{case.part_name}.pdf")
     assert drawing.PNG.as_posix().endswith(f"/png/{case.part_name}_drawing.png")
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    kept = set(drawing.END_KEEP) | set(getattr(drawing, "SIDE_KEEP", {}))
+    kept = (
+        set(drawing.END_KEEP)
+        | set(getattr(drawing, "SIDE_KEEP", {}))
+        | set(getattr(drawing, "SLOT_KEEP", {}))
+    )
     assert kept == set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
@@ -140,8 +144,12 @@ def test_slotted_screw_slot_dimensions_live_in_the_pure_contract(
     )
     assert spec.SLOT_W > 0
     assert spec.SLOT_D > 0
-    assert f"{spec.SLOT_W:.2f} +/-0.10 WIDE" in spec.DRAWING_NOTES
-    assert f"{spec.SLOT_D:.2f} +/-0.10 DEEP" in spec.DRAWING_NOTES
+    if spec_name == "cone_pivot_screw_spec":
+        assert spec.DRAWING_DIMENSIONS["SlotProfile"] == {"SlotWDim"}
+        assert spec.DRAWING_DIMENSIONS["DriverSlot"] == {"SlotDepth"}
+    else:
+        assert f"{spec.SLOT_W:.2f} +/-0.10 WIDE" in spec.DRAWING_NOTES
+        assert f"{spec.SLOT_D:.2f} +/-0.10 DEEP" in spec.DRAWING_NOTES
     assert "SLOT_W," in build_source
     assert "SLOT_D," in build_source
 
@@ -158,6 +166,8 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     assert base.PIVOT_SEAT_SPEC.kind == "tapped"
     assert base.PIVOT_SEAT_SPEC.size == spec.THREAD
     assert base.PIVOT_SEAT_SPEC.thread_class == "2B"
+    assert spec.THREAD_MAJOR_DIA == pytest.approx(6.35)
+    assert spec.THREAD_TAP_DRILL_DIA == base.PIVOT_SCREW_HOLE_DIA
     assert base.PIVOT_HOLE_DEPTH - spec.THREAD_TAIL_LEN >= 1.5
     assert "DO NOT RELEASE" not in spec.DRAWING_NOTES
     assert "THREAD LENGTH 8.00" not in spec.DRAWING_NOTES
@@ -170,9 +180,9 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
         - spec.DISTAL_CHAMFER
         >= spec.MIN_FULL_FORM
     )
-    assert "SLOT CENTERPLANE OFFSET FROM DATUM A 0.00 +/-0.05" in (
-        spec.DRAWING_NOTES
-    )
+    assert "SLOT CENTERPLANE OFFSET" not in spec.DRAWING_NOTES
+    assert "SLOT FLOOR CORNERS R0.05-0.15" in spec.DRAWING_NOTES
+    assert "TITLE-BLOCK EDGE OVERRIDE" in spec.DRAWING_NOTES
     assert "MANDATORY UNDERHEAD FILLET R0.10-0.25" in spec.DRAWING_NOTES
     assert "MANDATORY DISTAL START CHAMFER 0.25-0.50 X 45°" in spec.DRAWING_NOTES
 
@@ -186,17 +196,23 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     ).read_text(encoding="utf-8")
     assert drawing.RECIPE.end_view == "*Bottom"
     assert drawing.RECIPE.side_center == (0.190, 0.170)
-    assert "INNER CIRCLE = DATUM A THREAD" in spec.END_VIEW_NOTE
+    assert "INNER CIRCLE = 1/4-20 THREAD MAJOR DIA" in spec.END_VIEW_NOTE
     assert "MIDDLE CIRCLE = GROUND SHOULDER OD" in spec.END_VIEW_NOTE
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShoulderLg", "ThreadLg"}
+    assert set(drawing.SLOT_KEEP) == {"SlotWDim", "SlotDepth"}
     assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"] == "1/4-20 UNC-2A"
     assert drawing.RECIPE.decorate is drawing._decorate
     assert drawing.RECIPE.side_centerline_face_xy == (0.190, 0.145)
     assert drawing_source.count("add_datum_feature(") == 1
-    assert drawing_source.count("add_feature_control_frame(") == 3
+    assert drawing_source.count("add_feature_control_frame(") == 4
     assert drawing_source.count("add_surface_finish(") == 1
-    assert build_source.count("set_dimension_symmetric_tolerance(") == 3
+    assert "import_cosmetic_threads(adapter, side)" in drawing_source
+    assert 'place_view(adapter, str(SOURCE), "*Right"' in drawing_source
+    assert 'quantity="SLOT MEDIAN PLANE"' in drawing_source
+    assert build_source.count("set_dimension_symmetric_tolerance(") == 5
     assert build_source.count("set_dimension_bilateral_tolerance(") == 2
+    assert "InsertCosmeticThread3(" in build_source
+    assert 'name_dimensions(adapter, "DriverSlot", ["SlotDepth"])' in build_source
     assert '_blank_ref_geometry(adapter, "HeadTop", "PLANE")' in build_source
     assert '_blank_ref_geometry(adapter, pivot_axis, "AXIS")' in build_source
 

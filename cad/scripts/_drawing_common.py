@@ -301,12 +301,51 @@ def _select_view_entity(
     return entity
 
 
+def _select_annotation_entity(
+    adapter: Any,
+    view: Any,
+    *,
+    edge_xy: tuple[float, float] | None,
+    edge_entity: Any | None,
+    entity: Any | None,
+    entity_type: str,
+    label: str,
+) -> Any:
+    """Select one drawing-view entity for a native attached annotation."""
+    supplied = sum(value is not None for value in (edge_xy, edge_entity, entity))
+    if supplied > 1:
+        raise ValueError(
+            f"{label} cannot specify more than one of edge_xy, edge_entity, or entity"
+        )
+    if entity is not None:
+        return _select_view_entity(
+            adapter, view, entity_type, None, label=label, entity=entity
+        )
+    if edge_entity is None:
+        if edge_xy is None:
+            raise ValueError(f"{label} requires edge_xy, edge_entity, or entity")
+        return _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
+
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection_manager.CreateSelectData()
+    selection_data.View = view
+    selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
+    if not selected:
+        selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
+    if not selected:
+        raise RuntimeError(f"failed to select {label} entity in drawing view")
+    return edge_entity
+
+
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
     view: Any,
     *,
     edge_xy: tuple[float, float] | None = None,
+    edge_entity: Any | None = None,
     symbol_xy: tuple[float, float],
     datum: str,
     label: str,
@@ -323,8 +362,14 @@ def add_datum_feature(
     """
     draw = adapter.currentModel
     if annotation is None:
-        _select_view_entity(
-            adapter, view, entity_type, edge_xy, label=label, entity=entity
+        _select_annotation_entity(
+            adapter,
+            view,
+            edge_xy=edge_xy,
+            edge_entity=edge_entity,
+            entity=entity,
+            entity_type=entity_type,
+            label=label,
         )
     else:
         ddoc = _early_bound(draw, "IDrawingDoc")
@@ -373,6 +418,7 @@ def add_feature_control_frame(
     view: Any,
     *,
     edge_xy: tuple[float, float] | None = None,
+    edge_entity: Any | None = None,
     frame_xy: tuple[float, float],
     characteristic: str,
     tolerance: str,
@@ -389,8 +435,14 @@ def add_feature_control_frame(
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
-    edge = _select_view_entity(
-        adapter, view, entity_type, edge_xy, label=label, entity=entity
+    edge = _select_annotation_entity(
+        adapter,
+        view,
+        edge_xy=edge_xy,
+        edge_entity=edge_entity,
+        entity=entity,
+        entity_type=entity_type,
+        label=label,
     )
     draw = adapter.currentModel
     gtol = draw.InsertGtol()
@@ -525,25 +577,16 @@ def add_surface_finish(
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
     """
+    _select_annotation_entity(
+        adapter,
+        view,
+        edge_xy=edge_xy,
+        edge_entity=edge_entity,
+        entity=entity,
+        entity_type=entity_type,
+        label=label,
+    )
     draw = adapter.currentModel
-    if edge_entity is not None:
-        draw.ClearSelection2(True)
-        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-        selection_data = selection_manager.CreateSelectData()
-        selection_data.View = view
-        selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
-        if not selected:
-            selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
-        if not selected:
-            raise RuntimeError(f"failed to select {label} edge entity in drawing view")
-    elif edge_xy is not None or entity is not None:
-        _select_view_entity(
-            adapter, view, entity_type, edge_xy, label=label, entity=entity
-        )
-    else:
-        raise ValueError(
-            f"surface finish {label} requires edge_xy, entity, or edge_entity"
-        )
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
         _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT

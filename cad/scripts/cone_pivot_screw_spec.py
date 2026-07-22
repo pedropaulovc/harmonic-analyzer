@@ -32,10 +32,10 @@ THREAD_LENGTH_TOL = 0.10
 THREAD_RUNOUT_PITCHES = 1.0
 DISTAL_CHAMFER = 0.50
 MIN_FULL_FORM = 6.00
-# Thread geometry is omitted.  The smaller tail cylinder is a reference
-# envelope at the mating tap-drill diameter, consistent with the repo's other
-# simplified threaded fasteners; the drawing thread callout controls the part.
-THREAD_REF_DIA = TAP_DRILL_MM[THREAD]
+# The part carries the external thread's major-diameter envelope plus a native
+# cosmetic thread.  The mating base hole remains authored at the tap drill.
+THREAD_MAJOR_DIA = 25.4 / 4.0
+THREAD_TAP_DRILL_DIA = TAP_DRILL_MM[THREAD]
 
 if THREAD_TAIL_LEN < SHOULDER_DIA:
     raise ValueError(
@@ -56,25 +56,24 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Head": {"HeadHt"},
     "Shoulder": {"ShoulderLg"},
     "ThreadTail": {"ThreadLg"},
+    "SlotProfile": {"SlotWDim"},
+    "DriverSlot": {"SlotDepth"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
-        f"{THREAD_DESIGNATION} PER ASME B1.1-2024; DATUM FEATURE A.",
-        "DATUM A IS THE AXIS DERIVED FROM THE EXTERNAL THREAD PITCH CYLINDER.",
+        f"{THREAD_DESIGNATION} PER ASME B1.1-2024; DATUM A IS THE AXIS "
+        "DERIVED FROM THE EXTERNAL THREAD PITCH CYLINDER.",
         f"{MIN_FULL_FORM:.2f} MIN FULL-FORM THREAD WITHIN DIMENSIONED THREAD LENGTH.",
         f"INCOMPLETE THREAD/RUNOUT AT SHOULDER {THREAD_RUNOUT_PITCHES:g}P MAX.",
-        "THREAD GEOMETRY OMITTED IN VIEWS.",
-        "SLOT CENTERPLANE OFFSET FROM DATUM A 0.00 +/-0.05.",
-        "GROUND SHOULDER SURFACE Ra 0.8 MAX.",
-        f"STRAIGHT DRIVER SLOT {SLOT_W:.2f} +/-0.10 WIDE X "
-        f"{SLOT_D:.2f} +/-0.10 DEEP, CENTERED.",
         "SLOT EXTENDS ACROSS FULL HEAD DIAMETER; OPEN AT BOTH SIDES.",
+        "SLOT FLOOR CORNERS R0.05-0.15.",
         "MANDATORY UNDERHEAD FILLET R0.10-0.25.",
         f"MANDATORY DISTAL START CHAMFER 0.25-{DISTAL_CHAMFER:.2f} X 45°.",
+        "TITLE-BLOCK EDGE OVERRIDE: 0.05-0.10; EXCEPT THREAD, GROUND OD, SLOT FLOOR.",
     )
 )
 END_VIEW_NOTE = (
-    "THREAD-END VIEW: INNER CIRCLE = DATUM A THREAD\n"
+    "THREAD-END VIEW: INNER CIRCLE = 1/4-20 THREAD MAJOR DIA\n"
     "MIDDLE CIRCLE = GROUND SHOULDER OD"
 )

@@ -55,10 +55,15 @@ def test_notes_are_complete_but_do_not_repeat_title_or_template_requirements() -
         notes = "\n".join((spec.DRAWING_NOTES, spec.END_VIEW_NOTE)).upper()
 
         assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES, part_name
-        assert (
+        thread_representation = (
             "THREAD GEOMETRY OMITTED IN VIEWS" in notes
             or "THREADED END BELOW IT IS NOT MODELED" in notes
-        ), part_name
+            or (
+                part_name == "cone-pivot-screw"
+                and "THREAD MAJOR DIA" in spec.END_VIEW_NOTE
+            )
+        )
+        assert thread_representation, part_name
         assert "HEAD" in notes or "KNOB" in notes, part_name
 
         for title_owned in (
