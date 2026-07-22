@@ -131,3 +131,4 @@ def test_manual_balloon_moves_are_locked_and_read_back() -> None:
     assert "for _attempt in range(3)" in helper
     assert "for correction in range(3)" in helper
     assert "corrected_anchor" in helper
+    assert helper.count("current_annotation = note.GetAnnotation()") == 2

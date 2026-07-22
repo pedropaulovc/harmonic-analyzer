@@ -2987,7 +2987,19 @@ def position_bom_balloon(
                 f"{label}: item {item_number} note vanished after positioning"
             )
         note = _sw_type_info.early_bound_or_flag(
-            current_note, "INote", "GetBalloonInfo"
+            current_note, "INote", "GetAnnotation", "GetBalloonInfo"
+        )
+        current_annotation = note.GetAnnotation()
+        if current_annotation is None:
+            raise RuntimeError(
+                f"{label}: item {item_number} annotation vanished after positioning"
+            )
+        annotation = _sw_type_info.early_bound_or_flag(
+            current_annotation,
+            "IAnnotation",
+            "GetPosition",
+            "GetSpecificAnnotation",
+            "SetPosition",
         )
         moved_anchor = annotation.GetPosition()
         moved_info = note.GetBalloonInfo()
@@ -3032,7 +3044,19 @@ def position_bom_balloon(
                 f"{label}: item {item_number} note vanished during correction"
             )
         note = _sw_type_info.early_bound_or_flag(
-            current_note, "INote", "GetBalloonInfo"
+            current_note, "INote", "GetAnnotation", "GetBalloonInfo"
+        )
+        current_annotation = note.GetAnnotation()
+        if current_annotation is None:
+            raise RuntimeError(
+                f"{label}: item {item_number} annotation vanished during correction"
+            )
+        annotation = _sw_type_info.early_bound_or_flag(
+            current_annotation,
+            "IAnnotation",
+            "GetPosition",
+            "GetSpecificAnnotation",
+            "SetPosition",
         )
         corrected_info = note.GetBalloonInfo()
         _telemetry.info(
