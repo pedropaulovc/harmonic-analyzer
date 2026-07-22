@@ -11,10 +11,12 @@ the custom properties ``build_drive_train_assembly.py`` stamps on the assembly
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
+import _config
 import _telemetry
 from _assembly_drawing_bom import (
     configured_part_numbers,
@@ -82,8 +84,8 @@ BOM_COMPONENTS = {
     "cylinder-gear-shaft": "CYLINDER DRUM ARBOR",
     "arbor-pedestal": "ARBOR PEDESTAL SUPPORT",
     "cone-swing-platform": "CONE SWING PLATFORM",
-    "cone-pivot-post": "CONE BIG-END JOURNAL POST",
-    "cone-tip-block": "CONE TIP JOURNAL BLOCK",
+    "cone-pivot-post": "CONE T120-END JOURNAL POST",
+    "cone-tip-block": "CONE T006-END JOURNAL BLOCK",
     "cone-tip-bushing": "CONE TIP SPACER BUSHING",
     "cone-tip-adjuster": "CONE TIP ENDPLAY ADJUSTER",
     "cone-tip-pinch-screw": "CONE TIP PINCH SCREW",
@@ -155,7 +157,8 @@ FRONT_DEFERRED_BALLOON_ITEMS = frozenset(
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",
-        "1. INSTALL CONE GEARS T006-T120 IN 6-TOOTH STEPS; T120 AT BIG END.",
+        "1. INSTALL ITEM 27 PER THE CONE-GEAR POSITION SCHEDULE ON SHEET 2;",
+        "   POSITION 01 AT ITEM 4/T120 END, POSITION 20 AT ITEM 5/T006 END.",
         "2. SHOWN: CONE PLATFORM ENGAGED; ALIGNMENT PINION DISENGAGED.",
         "3. ADJUST CONE-TIP SCREW TO REMOVE AXIAL PLAY WITHOUT BINDING;",
         "   VERIFY FREE SHAFT ROTATION, THEN TIGHTEN PINCH SCREW.",
@@ -167,7 +170,6 @@ ASSEMBLY_NOTES = "\n".join(
         "7. CAMS DOWN: SET ENGAGE LEVER 40 DEG EAST OF VERTICAL.",
         "8. INSTALL LEAF SPRING AT BACK STRAP ONLY; FRONT REMAINS SPRING-FREE.",
         "   PRELOAD FOR POSITIVE RETURN TO THE 2.00 MM DISENGAGED TIP GAP.",
-        "9. ROTATE CAM SHAFT ONE FULL TURN; FOLLOWERS SHALL NOT BIND OR LIFT OFF.",
     )
 )
 
@@ -180,6 +182,9 @@ GENERAL_NOTES_ORIGIN = (0.018, 0.085)
 # Sheet 2: one continuous 32-row parts list plus a small orientation view.
 BOM_ANCHOR = (0.018, 0.262)
 BOM_ISO_CENTER = (0.310, 0.165)
+CONE_SCHEDULE_ANCHOR = (0.155, 0.160)
+CONE_SCHEDULE_COLUMN_WIDTHS = (0.046, 0.032, 0.020)
+CONE_SCHEDULE_ROW_HEIGHT = 0.005
 
 # Sheet 3: large exterior views and exterior-only item balloons.
 EXTERIOR_FRONT_CENTER = (0.075, 0.155)
@@ -203,6 +208,12 @@ BOM_COLUMN_WIDTHS = {
     "QTY.": 0.012,
 }
 EXTERIOR_BALLOON_RING_MARGINS = (0.014, 0.014, 0.014)
+
+CONE_GEAR_SCHEDULE = tuple(
+    (position, f"T{int(channel['cone_teeth']):03d}", int(channel["cone_teeth"]))
+    for position, channel in enumerate(_config.channels(), start=1)
+)
+_CONE_GEAR_INSTANCE = re.compile(r"cone-gear-(\d+)\Z", re.IGNORECASE)
 
 
 @_telemetry.traced("drawing.format_drive_train_bom")
@@ -229,6 +240,136 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
     _telemetry.success(
         f"drive-train BOM formatted as one {len(BOM_COMPONENTS)}-item table"
     )
+
+
+@_telemetry.traced("drawing.verify_cone_gear_schedule")
+def _verify_cone_gear_schedule_components(
+    adapter: Any,
+    bom_table: Any,
+    bom_view: Any,
+) -> None:
+    """Prove BOM item 27 contains the 20 scheduled gear configurations."""
+    table = _sw_type_info.early_bound_or_flag(
+        bom_table, "ITableAnnotation", "DisplayedText2"
+    )
+    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    header = [
+        str(table.DisplayedText2(0, column, False) or "").strip().upper()
+        for column in range(columns)
+    ]
+    if "ITEM NO." not in header:
+        raise RuntimeError(f"drive-train BOM has no ITEM NO. column: {header!r}")
+    item_column = header.index("ITEM NO.")
+    matching_rows = [
+        row
+        for row in range(1, rows)
+        if str(table.DisplayedText2(row, item_column, False) or "").strip() == "27"
+    ]
+    if len(matching_rows) != 1:
+        raise RuntimeError(
+            f"drive-train BOM carries {len(matching_rows)} item-27 rows, expected 1"
+        )
+
+    bom = _sw_type_info.early_bound_or_flag(
+        bom_table, "IBomTableAnnotation", "GetComponents2"
+    )
+    configuration = str(
+        adapter._get_attr_or_call(bom_view, "ReferencedConfiguration") or "Default"
+    )
+    components = tuple(bom.GetComponents2(matching_rows[0], configuration) or ())
+    observed: list[tuple[int, str]] = []
+    for component in components:
+        component = _sw_type_info.early_bound_or_flag(component, "IComponent2")
+        raw_name = str(adapter._get_attr_or_call(component, "Name2") or "")
+        leaf = raw_name.replace("\\", "/").rsplit("/", 1)[-1]
+        match = _CONE_GEAR_INSTANCE.fullmatch(leaf)
+        if match is None:
+            raise RuntimeError(
+                f"drive-train BOM item 27 includes unexpected component {raw_name!r}"
+            )
+        referenced = str(
+            adapter._get_attr_or_call(component, "ReferencedConfiguration") or ""
+        )
+        observed.append((int(match.group(1)), referenced))
+
+    observed.sort()
+    expected = [(position, config) for position, config, _teeth in CONE_GEAR_SCHEDULE]
+    if observed != expected:
+        raise RuntimeError(
+            "drive-train cone-gear schedule differs from BOM item 27: "
+            f"observed={observed!r}, expected={expected!r}"
+        )
+    _telemetry.success("drive-train BOM item 27 matches all 20 scheduled configs")
+
+
+@_telemetry.traced("drawing.insert_cone_gear_schedule")
+def _insert_cone_gear_schedule(adapter: Any, bom_table: Any, bom_view: Any) -> Any:
+    """Insert and read-verify the item-27 configuration position schedule."""
+    _verify_cone_gear_schedule_components(adapter, bom_table, bom_view)
+    draw = adapter.currentModel
+    ddoc = _sw_type_info.early_bound_or_flag(
+        draw, "IDrawingDoc", "InsertTableAnnotation2"
+    )
+    contents = (
+        ("ITEM 27 / MHA-013 CONE-GEAR POSITIONS FROM T120 END", "", ""),
+        ("POSITION", "CONFIG", "TEETH"),
+        *tuple(
+            (f"{position:02d}", config, str(teeth))
+            for position, config, teeth in CONE_GEAR_SCHEDULE
+        ),
+    )
+    table = ddoc.InsertTableAnnotation2(
+        False,
+        CONE_SCHEDULE_ANCHOR[0],
+        CONE_SCHEDULE_ANCHOR[1],
+        1,
+        "",
+        len(contents),
+        3,
+    )
+    if table is None:
+        raise RuntimeError("failed to insert drive-train cone-gear schedule")
+    table = _sw_type_info.early_bound_or_flag(
+        table,
+        "ITableAnnotation",
+        "DisplayedText2",
+        "MergeCells",
+        "SetColumnWidth",
+        "SetRowHeight",
+        "SetText2",
+    )
+    if not table.MergeCells(0, 0, 0, 2):
+        raise RuntimeError("failed to merge drive-train cone schedule title row")
+    for row, values in enumerate(contents):
+        columns = (0,) if row == 0 else range(3)
+        for column in columns:
+            text = values[column]
+            table.SetText2(row, column, False, text)
+            applied = str(table.DisplayedText2(row, column, False) or "")
+            if applied != text:
+                raise RuntimeError(
+                    "drive-train cone schedule text did not persist: "
+                    f"row={row}, column={column}, {applied!r} != {text!r}"
+                )
+    for column, requested in enumerate(CONE_SCHEDULE_COLUMN_WIDTHS):
+        actual = float(table.SetColumnWidth(column, requested, 0))
+        if abs(actual - requested) > 0.0005:
+            raise RuntimeError(
+                f"drive-train cone schedule column {column} width "
+                f"{actual:.4f} m != {requested:.4f} m"
+            )
+    for row in range(len(contents)):
+        requested = 0.006 if row == 0 else CONE_SCHEDULE_ROW_HEIGHT
+        actual = float(table.SetRowHeight(row, requested, 0))
+        if abs(actual - requested) > 0.0005:
+            raise RuntimeError(
+                f"drive-train cone schedule row {row} height "
+                f"{actual:.4f} m != {requested:.4f} m"
+            )
+    draw.EditRebuild3()
+    _telemetry.success("drive-train 20-position cone-gear schedule inserted")
+    return table
 
 
 @_telemetry.traced("drawing.drive_train_balloons")
@@ -729,6 +870,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="drive-train assembly",
     )
     _format_drive_train_bom(adapter, bom_table)
+    _insert_cone_gear_schedule(adapter, bom_table, bom_iso)
     if add_note(
         adapter,
         "SHEET 2 OF 4 — PARTS LIST; ITEM NUMBERS APPLY TO SHEETS 3 AND 4",

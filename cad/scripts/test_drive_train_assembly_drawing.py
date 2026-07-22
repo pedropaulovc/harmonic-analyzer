@@ -103,6 +103,9 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("_add_drive_train_balloons(") == 2
     assert 'configuration_grouping="same-part"' in source
+    assert "_insert_cone_gear_schedule(adapter, bom_table, bom_iso)" in source
+    assert '"GetComponents2"' in source
+    assert '"InsertTableAnnotation2"' in source
     assert "expected_sheet_names=SHEET_NAMES" in source
     assert source.count("add_note(") == 5
     assert source.count("scale=VIEW_SCALE") == 9
@@ -177,12 +180,21 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert "enumerated drawing components" in source
     assert "HorizontalAutoSplit(" not in source
     assert sum(drawing.BOM_COLUMN_WIDTHS.values()) == 0.125
+    assert len(drawing.CONE_GEAR_SCHEDULE) == 20
+    assert drawing.CONE_GEAR_SCHEDULE[0] == (1, "T120", 120)
+    assert drawing.CONE_GEAR_SCHEDULE[-1] == (20, "T006", 6)
+    assert [row[2] for row in drawing.CONE_GEAR_SCHEDULE] == list(
+        range(120, 0, -6)
+    )
+    assert len({row[1] for row in drawing.CONE_GEAR_SCHEDULE}) == 20
+    assert sum(drawing.CONE_SCHEDULE_COLUMN_WIDTHS) == 0.098
     assert drawing.EXTERIOR_BALLOON_RING_MARGINS == (0.014, 0.014, 0.014)
     assert drawing.CONCEALED_BOTTOM_BALLOON_RING_MARGIN == 0.015
     assert drawing.CONCEALED_FRONT_BALLOON_RING_MARGIN == 0.025
     assert drawing.CONCEALED_BALLOON_CLEARANCE == 0.006
     assert "_swap_drive_train_balloon_slots" not in source
-    assert "T006-T120" in drawing.ASSEMBLY_NOTES
+    assert "POSITION 01 AT ITEM 4/T120 END" in drawing.ASSEMBLY_NOTES
+    assert "POSITION 20 AT ITEM 5/T006 END" in drawing.ASSEMBLY_NOTES
     assert "CONE PLATFORM ENGAGED" in drawing.ASSEMBLY_NOTES
     assert "REMOVE AXIAL PLAY WITHOUT BINDING" in drawing.ASSEMBLY_NOTES
     assert "VERIFY FREE SHAFT ROTATION" in drawing.ASSEMBLY_NOTES
