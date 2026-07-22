@@ -180,6 +180,8 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert "enumerated drawing components" in source
     assert "HorizontalAutoSplit(" not in source
     assert sum(drawing.BOM_COLUMN_WIDTHS.values()) == 0.125
+    assert drawing.BOM_COMPONENTS["cone-pivot-post"] == "T120 JOURNAL POST"
+    assert drawing.BOM_COMPONENTS["cone-tip-block"] == "T006 JOURNAL BLOCK"
     assert len(drawing.CONE_GEAR_SCHEDULE) == 20
     assert drawing.CONE_GEAR_SCHEDULE[0] == (1, "T120", 120)
     assert drawing.CONE_GEAR_SCHEDULE[-1] == (20, "T006", 6)

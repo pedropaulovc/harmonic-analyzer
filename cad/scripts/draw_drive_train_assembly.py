@@ -84,8 +84,8 @@ BOM_COMPONENTS = {
     "cylinder-gear-shaft": "CYLINDER DRUM ARBOR",
     "arbor-pedestal": "ARBOR PEDESTAL SUPPORT",
     "cone-swing-platform": "CONE SWING PLATFORM",
-    "cone-pivot-post": "CONE T120-END JOURNAL POST",
-    "cone-tip-block": "CONE T006-END JOURNAL BLOCK",
+    "cone-pivot-post": "T120 JOURNAL POST",
+    "cone-tip-block": "T006 JOURNAL BLOCK",
     "cone-tip-bushing": "CONE TIP SPACER BUSHING",
     "cone-tip-adjuster": "CONE TIP ENDPLAY ADJUSTER",
     "cone-tip-pinch-screw": "CONE TIP PINCH SCREW",
@@ -182,10 +182,8 @@ GENERAL_NOTES_ORIGIN = (0.018, 0.085)
 # Sheet 2: one continuous 32-row parts list plus a small orientation view.
 BOM_ANCHOR = (0.018, 0.262)
 BOM_ISO_CENTER = (0.310, 0.165)
-# SolidWorks' rebuilt table ink includes cell padding beyond the requested
-# row heights.  At y=0.160 the live 22-row schedule crossed the 12.7 mm
-# bottom zone boundary by 1.1 mm; lifting the top anchor 10 mm leaves an
-# 8.9 mm measured reserve without reducing the readable 2.5 mm text.
+# Keep the schedule's upper-left anchor high enough that its 22 requested
+# 6 mm rows retain generous clearance above the bottom drawing zone.
 CONE_SCHEDULE_ANCHOR = (0.155, 0.170)
 CONE_SCHEDULE_COLUMN_WIDTHS = (0.046, 0.032, 0.020)
 CONE_SCHEDULE_TEXT_HEIGHT = 0.0025
