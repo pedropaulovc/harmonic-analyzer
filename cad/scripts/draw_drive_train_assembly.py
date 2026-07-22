@@ -125,6 +125,7 @@ CONCEALED_BALLOON_ITEMS = {
 MANUAL_EXTERIOR_BALLOON_ITEMS = {
     "swing-stop-screw": "11",
     "alignment-pinion": "12",
+    "crank-pinion": "30",
 }
 FRONT_DEFERRED_BALLOON_STEMS = frozenset(
     {
