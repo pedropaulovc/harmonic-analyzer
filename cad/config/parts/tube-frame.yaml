@@ -1,5 +1,8 @@
 tube-frame:
   number: MHA-083
-  material: Plain Carbon Steel
+  material: ASTM A513 Type 5 SAE 1020 DOM tube, 1.000 x 0.120 in
+  material_specification: ASTM A513 Type 5 SAE 1020 DOM tube, 1.000 x 0.120 in
+  finish: OD polished Ra 1.6; corrosion-preventive oil after inspection; ends faced; ID as-procured
+  quantity: 4
   tolerance_class: plate_profile
   process: "machined (steel)"

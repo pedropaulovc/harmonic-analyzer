@@ -56,6 +56,18 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from top_frame_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FRONT_VIEW_NOTE,
+    INSPECTION_NOTES,
+    TOP_VIEW_NOTE,
+)
 
 PART_NAME = "top-frame"
 MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
@@ -317,6 +329,19 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Inspection Notes": INSPECTION_NOTES,
+            "Top View Note": TOP_VIEW_NOTE,
+            "Front View Note": FRONT_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

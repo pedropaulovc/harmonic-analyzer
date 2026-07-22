@@ -1,6 +1,9 @@
 crankshaft:
   number: MHA-026
-  material: Plain Carbon Steel
+  material: AISI 1018 cold-finished steel shafting
+  material_specification: AISI 1018 cold-finished steel shafting
+  finish: precision turned or ground, oiled
+  quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "machined (steel)"

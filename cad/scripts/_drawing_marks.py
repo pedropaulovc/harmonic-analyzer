@@ -19,93 +19,74 @@ import _telemetry
 from _common import (
     apply_custom_properties,
     _dim_owner_feature,
-    _feature_by_name,
     _iter_features,
     _read_member,
 )
 
 
-def _feature_tree(feature: Any) -> Any:
-    """Yield ``feature`` and every subfeature, depth-first.
+def _iter_subfeatures(feature: Any):
+    """Yield a feature's complete subfeature tree in display order."""
+    subfeature = _read_member(feature, "GetFirstSubFeature")
+    for _ in range(5000):
+        if not subfeature:
+            return
+        yield subfeature
+        yield from _iter_subfeatures(subfeature)
+        subfeature = _read_member(subfeature, "GetNextSubFeature")
 
-    Hole Wizard placement dimensions live on ``ProfileFeature`` subfeatures,
-    so both the mark AND the clear path must walk the same tree — a clear
-    that stops at top level leaves stale marks on child-feature dimensions.
-    """
-    stack = [feature]
-    while stack:
-        current = stack.pop()
-        yield current
-        child = _read_member(current, "GetFirstSubFeature")
-        children: list[Any] = []
-        for _ in range(1000):
-            if not child:
-                break
-            children.append(child)
-            child = _read_member(child, "GetNextSubFeature")
-        stack.extend(reversed(children))
+
+def _iter_features_deep(adapter: Any):
+    for feature in _iter_features(adapter):
+        yield feature
+        yield from _iter_subfeatures(feature)
+
+
+def _feature_by_name_deep(adapter: Any, name: str) -> Any:
+    for feature in _iter_features_deep(adapter):
+        if str(_read_member(feature, "Name")) == name:
+            return feature
+    raise RuntimeError(f"feature {name!r} not found in the active document")
 
 
 def mark_dimensions_for_drawing(
     adapter: Any, feature_name: str, dimension_names: set[str]
 ) -> None:
-    """Mark only this part's explicit manufacturing dimensions for insertion.
-
-    Hole Wizard placement dimensions belong to a ``ProfileFeature`` subfeature,
-    not to the top-level ``HoleWzd`` feature named by the part recipe.  Walk the
-    requested feature and its subfeature tree so those authored placement
-    dimensions remain usable as native drawing dimensions.  A requested name
-    must resolve exactly once within that tree; duplicate matches are rejected
-    instead of silently marking an arbitrary dimension.
-    """
-    feature = _feature_by_name(adapter, feature_name)
-    matches: dict[str, tuple[Any, str]] = {}
-    for current in _feature_tree(feature):
-        current_name = str(_read_member(current, "Name"))
-        display = _read_member(current, "GetFirstDisplayDimension")
-        for _ in range(1000):
-            if not display:
-                break
-            dimension = display.GetDimension2(0)
-            name = str(_read_member(dimension, "Name"))
-            owner = _dim_owner_feature(dimension)
-            if owner == current_name and name in dimension_names:
-                full_name = str(_read_member(dimension, "FullName"))
-                previous = matches.get(name)
-                if previous is not None and previous[1] != full_name:
-                    raise RuntimeError(
-                        f"{feature_name}: drawing dimension {name!r} is ambiguous: "
-                        f"{previous[1]!r}, {full_name!r}"
-                    )
-                matches[name] = (display, full_name)
-            display = current.GetNextDisplayDimension(display)
-
-    missing = dimension_names - matches.keys()
+    """Mark only this part's explicit manufacturing dimensions for insertion."""
+    feature = _feature_by_name_deep(adapter, feature_name)
+    marked: set[str] = set()
+    display = _read_member(feature, "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if not display:
+            break
+        dimension = display.GetDimension2(0)
+        name = str(_read_member(dimension, "Name"))
+        if _dim_owner_feature(dimension) == feature_name and name in dimension_names:
+            display.MarkedForDrawing = True
+            if not bool(_read_member(display, "MarkedForDrawing")):
+                raise RuntimeError(f"{name}@{feature_name}: mark-for-drawing failed")
+            marked.add(name)
+        display = feature.GetNextDisplayDimension(display)
+    missing = dimension_names - marked
     if missing:
         raise RuntimeError(
             f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
         )
-    for name, (display, full_name) in matches.items():
-        display.MarkedForDrawing = True
-        if not bool(_read_member(display, "MarkedForDrawing")):
-            raise RuntimeError(f"{full_name}: mark-for-drawing failed")
     _telemetry.success(
-        f"marked for drawing {feature_name}: {', '.join(sorted(matches))}"
+        f"marked for drawing {feature_name}: {', '.join(sorted(marked))}"
     )
 
 
 def clear_dimensions_for_drawing(adapter: Any) -> None:
     cleared = 0
-    for feature in _iter_features(adapter):
-        for current in _feature_tree(feature):
-            display = _read_member(current, "GetFirstDisplayDimension")
-            for _ in range(1000):
-                if not display:
-                    break
-                if bool(_read_member(display, "MarkedForDrawing")):
-                    display.MarkedForDrawing = False
-                    cleared += 1
-                display = current.GetNextDisplayDimension(display)
+    for feature in _iter_features_deep(adapter):
+        display = _read_member(feature, "GetFirstDisplayDimension")
+        for _ in range(1000):
+            if not display:
+                break
+            if bool(_read_member(display, "MarkedForDrawing")):
+                display.MarkedForDrawing = False
+                cleared += 1
+            display = feature.GetNextDisplayDimension(display)
     _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
 
 

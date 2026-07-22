@@ -30,13 +30,13 @@ from _common import (
     SketchDims,
     apply_color,
     apply_material,
+    bbox_extent_check,
     check,
     define_centered_rectangle,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
-    measure_check,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -44,20 +44,34 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
+from harmonic_base_spec import (
+    BOTTOM_LENGTH,
+    BOTTOM_THICKNESS,
+    BOTTOM_WIDTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    SIDE_VIEW_NOTE,
+    TOP_LENGTH,
+    TOP_THICKNESS,
+    TOP_WIDTH,
+)
 
 import _telemetry
 
 PART_NAME = "harmonic-base"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
+# Plate nominal geometry (BOTTOM_*/TOP_*) lives in harmonic_base_spec -- the
+# COM-free contract the drawing shares. DIMENSIONS.md ch6: 46 cm / 28 cm callouts
+# = 18.1 x 11.0 in (annotated); legacy 18.0 x 11.0 kept, top plate 0.25 in reveal
+# per side, thicknesses from the legacy HarmonicBase.cs (photo-verify M2 note).
 IN = 25.4
-BOTTOM_LENGTH = 18.0 * IN  # DIMENSIONS.md ch6: 46 cm callout = 18.1" (annotated)
-BOTTOM_WIDTH = 11.0 * IN  # DIMENSIONS.md ch6: 28 cm callout = 11.0" (annotated)
-BOTTOM_THICKNESS = 0.5 * IN  # legacy HarmonicBase.cs (photo-verify M2 note)
-TOP_LENGTH = 17.5 * IN  # legacy: 0.25" reveal per side
-TOP_WIDTH = 10.5 * IN
-TOP_THICKNESS = 1.5 * IN
 
 # Rocker-support hold-down holes (machine = part-local: frame.SLDASM places the
 # base unrotated at the origin). Four through-drilled O13 clearance holes laid out
@@ -101,7 +115,9 @@ STOP_SCREW_XZ = (-130.433, 9.735)  # past the DISENGAGED east taper edge. The
 # Disengage swing sweeps the plate EAST (machine -x); the first
 # derivation sat 19 inside the engaged plate -- interference-gate proven.
 # stop seat: #20 drill (O4.089, wizard) -- stop-screw O3.15 shank clearance
-SWING_HOLE_DEPTH = 6.0
+PIVOT_HOLE_DEPTH = 6.0
+STOP_SCREW_HOLE_DEPTH = 6.0
+STOP_SCREW_DRILL_DEPTH = 9.0
 
 # Alignment-pinion rig hold-downs (PR7 items 2/11/12), blind from the TOP face
 # like the swing hardware and in the SAME machine-handed convention: four
@@ -118,6 +134,7 @@ BLOCK_SCREW_XZ = (
 )
 # block seats: #8-32 tap drill -- the slotted screws thread into the base
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 18 shank - 16 block = 2 buried + 1.5 air
+BLOCK_SCREW_DRILL_DEPTH = 7.0
 FOOT_SCREW_XZ = (
     (20.467, 70.95),  # spring foot (build_pinion_spring hole: the west foot
     # crosses under the lift rod so its screw lands west of the moving rig)
@@ -127,19 +144,23 @@ FOOT_SCREW_XZ = (
 )
 # foot seats: #4-40 tap drill -- the foot screws thread into the base
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
+FOOT_SCREW_DRILL_DEPTH = 11.0
 
 # The four seat specs, hoisted to module level so the drive-train assembly can
 # import the TRUE wizard cut diameters for its clearance assertions (the old
 # hand-authored *_HOLE_DIA constants are derived from the specs now -- one
 # chokepoint, no drift).
 PIVOT_SEAT_SPEC = HoleSpec(
-    "drilled_letter", "F", end="blind", depth_mm=SWING_HOLE_DEPTH)
+    "drilled_letter", "F", end="blind", depth_mm=PIVOT_HOLE_DEPTH)
 STOP_SEAT_SPEC = HoleSpec(
-    "tapped", "#8-32", end="blind", depth_mm=SWING_HOLE_DEPTH)
+    "tapped", "#8-32", end="blind", depth_mm=STOP_SCREW_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": STOP_SCREW_HOLE_DEPTH})
 BLOCK_SEAT_SPEC = HoleSpec(
-    "tapped", "#8-32", end="blind", depth_mm=BLOCK_SCREW_HOLE_DEPTH)
+    "tapped", "#8-32", end="blind", depth_mm=BLOCK_SCREW_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": BLOCK_SCREW_HOLE_DEPTH})
 FOOT_SEAT_SPEC = HoleSpec(
-    "tapped", "#4-40", end="blind", depth_mm=FOOT_SCREW_HOLE_DEPTH)
+    "tapped", "#4-40", end="blind", depth_mm=FOOT_SCREW_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH})
 PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 6.528 (letter F)
 STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # #8-32 tap drill
 BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # #8-32 tap drill
@@ -271,18 +292,18 @@ async def build(adapter) -> dict[str, str]:
     # platform can swing. The stop, block and foot screws thread into tapped
     # base seats. A wizard blind hole ends in a 118-degree drill point, so the
     # analytic expectation is blind_hole_volume_mm3 (cylinder + point).
-    for tag, spec, xz, depth, label in (
+    for tag, spec, xz, label in (
         ("PivotSeat", PIVOT_SEAT_SPEC,
-         (PIVOT_SCREW_XZ,), SWING_HOLE_DEPTH,
+         (PIVOT_SCREW_XZ,),
          "cone-pivot screw seat (letter F)"),
         ("StopSeat", STOP_SEAT_SPEC,
-         (STOP_SCREW_XZ,), SWING_HOLE_DEPTH,
+         (STOP_SCREW_XZ,),
          "swing-stop tapped seat (#8-32)"),
         ("BlockScrewHoles", BLOCK_SEAT_SPEC,
-         BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DEPTH,
+         BLOCK_SCREW_XZ,
          "pinion-pivot-block tapped seats (#8-32)"),
         ("FootScrewHoles", FOOT_SEAT_SPEC,
-         FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DEPTH,
+         FOOT_SCREW_XZ,
          "foot-screw tapped seats (#4-40)"),
     ):
         dia = blind_cut_dia_mm(spec)
@@ -292,7 +313,7 @@ async def build(adapter) -> dict[str, str]:
             (0.0, 1.0, 0.0), label, name=tag,
         )
         after_cut = await _volume(adapter)
-        v_cut = len(xz) * blind_hole_volume_mm3(dia, depth)
+        v_cut = len(xz) * blind_hole_volume_mm3(dia, spec.depth_mm)
         if abs((after - after_cut) - v_cut) > 0.02 * v_cut:
             raise RuntimeError(
                 f"{tag} removed {after - after_cut:.1f}, expected {v_cut:.1f}")
@@ -313,26 +334,26 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
 
-    # Verify the annotated footprint (ch. 6: 46 x 28 cm callouts = 18.1 x
-    # 11.0 in; legacy 18.0 x 11.0 kept). Side-face pairs fail to pick (the
-    # far faces are hidden in the active view and point picking is
-    # screen-projected) — measure the bottom plate's perimeter edges.
-    await measure_check(
-        adapter,
-        "base length (annotated 46 cm / 18 in)",
-        [{"entity_type": "EDGE", "point": [0.0, 0.0, BOTTOM_WIDTH / 2.0]}],
-        "length",
-        BOTTOM_LENGTH,
+    # Verify the annotated footprint without view-dependent screen picks.
+    await bbox_extent_check(
+        adapter, "base length (annotated 46 cm / 18 in)", "x", BOTTOM_LENGTH
     )
-    await measure_check(
-        adapter,
-        "base depth (annotated 28 cm / 11 in)",
-        [{"entity_type": "EDGE", "point": [BOTTOM_LENGTH / 2.0, 0.0, 0.0]}],
-        "length",
-        BOTTOM_WIDTH,
+    await bbox_extent_check(
+        adapter, "base depth (annotated 28 cm / 11 in)", "z", BOTTOM_WIDTH
     )
 
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Side View Note": SIDE_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
