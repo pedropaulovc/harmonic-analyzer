@@ -124,7 +124,7 @@ def test_drive_train_has_six_named_and_numbered_sheets() -> None:
     assert "SEE SHEET 6" in drawing.GENERAL_POINTER_NOTE
 
 
-def test_sheet_three_identifies_three_disjoint_subsystems_deliberately() -> None:
+def test_sheet_three_identifies_four_disjoint_subsystems_deliberately() -> None:
     expected = (
         frozenset(
             {
@@ -147,6 +147,10 @@ def test_sheet_three_identifies_three_disjoint_subsystems_deliberately() -> None
                 "pinion-pivot-shaft",
                 "pinion-lift-rod",
                 "pinion-spring",
+            }
+        ),
+        frozenset(
+            {
                 "pinion-cam-pin",
                 "pinion-cam",
                 "pinion-lever",
@@ -171,8 +175,9 @@ def test_sheet_three_identifies_three_disjoint_subsystems_deliberately() -> None
     assert drawing.EXTERIOR_VIEW_STEMS == expected
     assert drawing.EXTERIOR_VIEW_LABELS == (
         "VIEW A — CONE PLATFORM / GEAR TRAIN",
-        "VIEW B — PINION ENGAGEMENT",
-        "VIEW C — CYLINDER / CRANK",
+        "VIEW B — PINION SUPPORT / STRAPS",
+        "VIEW C — PINION CAM / CONTROLS",
+        "VIEW D — CYLINDER / CRANK",
     )
     groups = expected
     assert not any(
