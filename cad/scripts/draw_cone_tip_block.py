@@ -22,6 +22,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_arc_endpoints_to_center,
     set_basic_dimension,
+    view_name,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -132,8 +133,12 @@ def _circle_entity(
     return edge
 
 
-def _foot_edge(adapter: Any, view: Any) -> Any:
-    """Return the real front-view bottom edge of the block's foot seat."""
+def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
+    """Return the real bottom edge of the block's foot seat in ``view``.
+
+    ``min_span_mm`` guards against picking a sliver edge: the foot spans
+    BLOCK_X (14.0) in the front view and BLOCK_Z (12.0) in the right view.
+    """
     drawing_view = _early_bound(view, "IView")
     candidates: list[tuple[float, float, Any]] = []
     for component in drawing_view.GetVisibleComponents() or []:
@@ -149,12 +154,14 @@ def _foot_edge(adapter: Any, view: Any) -> Any:
             p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
             if abs(p0[1]) > 0.01 or abs(p1[1]) > 0.01:
                 continue
-            span_x = abs(p1[0] - p0[0])
+            # The foot's bottom edges run along model X in the front view and
+            # along model Z in the right view — take the larger in-plane span.
+            span_x = max(abs(p1[0] - p0[0]), abs(p1[2] - p0[2]))
             candidates.append((span_x, min(p0[2], p1[2]), edge))
     if not candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     span_x, _z, edge = max(candidates, key=lambda item: item[0])
-    if span_x < 13.9:
+    if span_x < min_span_mm:
         raise RuntimeError(f"foot-seat edge span is only {span_x:.3f} mm")
     return edge
 
@@ -285,7 +292,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=TOP_KEEP["Depth"],
-        symbol_xy=TOP_KEEP["Depth"],
+        # Offset the tag box east of the dimension text so the D box does not
+        # sit ON the 12.00 text (eye-pass catch: box/arrow through the digits).
+        symbol_xy=(TOP_KEEP["Depth"][0] + 0.020, TOP_KEEP["Depth"][1]),
         datum="D",
         label="block-depth median plane",
         entity_type="DIMENSION",
@@ -336,17 +345,28 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=PINCH_HEIGHT,
         label="pinch clearance",
     )
-    pinch_height = add_edge_dimension(
-        adapter,
-        right,
-        p0=(RIGHT_CENTER[0], _front_y(0.0)),
-        p1=(
-            RIGHT_CENTER[0] - PINCH_CLEARANCE_DIA / 2.0 * _S,
-            _front_y(PINCH_HEIGHT),
-        ),
-        text_xy=(RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0)),
-        label="pinch-axis height",
+    # Entity-selected vertical dimension (the sheet-pick + arc-center recipe
+    # left the dimension DANGLING after the re-anchor — it rendered gray on the
+    # eye-pass; the arbor sheet's entity-selected circle basics do not).
+    base_edge = _foot_edge(adapter, right, min_span_mm=11.9)
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, right)):
+        raise RuntimeError("failed to activate right view for pinch-axis height")
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for append, raw_entity in ((False, base_edge), (True, pinch_entity)):
+        selection_data = selection_manager.CreateSelectData()
+        selection_data.View = right
+        entity = _early_bound(raw_entity, "IEntity")
+        if not entity.Select4(append, selection_data):
+            raise RuntimeError("failed to select pinch-axis height entity")
+    pinch_height = draw.AddVerticalDimension2(
+        RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0), 0.0
     )
+    draw.ClearSelection2(True)
+    if pinch_height is None:
+        raise RuntimeError("failed to create pinch-axis height dimension")
     set_arc_endpoints_to_center(adapter, pinch_height, label="pinch-axis height")
     set_basic_dimension(adapter, pinch_height, label="pinch-axis height")
     add_feature_control_frame(
