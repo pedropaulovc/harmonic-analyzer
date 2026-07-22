@@ -228,7 +228,7 @@ async def build(adapter: Any) -> dict[str, str]:
     targeted_balloons = []
     for stem, item_number, margin in (
         ("transgear-bracket", "12", 0.008),
-        ("bracket-screw", "13", 0.025),
+        ("bracket-screw", "13", 0.045),
         ("transgear-latch", "15", 0.014),
     ):
         targeted_balloons.extend(
