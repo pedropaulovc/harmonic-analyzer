@@ -205,6 +205,9 @@ def test_slotted_screw_slot_dimensions_live_in_the_pure_contract(
 
 def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     spec = importlib.import_module("cone_pivot_screw_spec")
+    build_source = Path(
+        importlib.import_module("build_cone_pivot_screw").__file__
+    ).read_text(encoding="utf-8")
     base = importlib.import_module("build_harmonic_base")
     drive = importlib.import_module("build_drive_train_assembly")
     platform = importlib.import_module("build_cone_swing_platform")
@@ -213,6 +216,7 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     assert spec.SHOULDER_DIA == pytest.approx(6.35)
     assert spec.THREAD == "#10-24"
     assert spec.THREAD_MAJOR_DIA == pytest.approx(4.826)
+    assert spec.THREAD_SOLID_DIA == pytest.approx(3.797)
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 24.0)
     assert (spec.SHOULDER_DIA - spec.THREAD_MAJOR_DIA) / 2.0 >= 0.75
     assert spec.PLATFORM_THICKNESS == platform.PLATE_T
@@ -222,9 +226,13 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     assert base.PIVOT_SEAT_SPEC.size == spec.THREAD
     assert base.PIVOT_SEAT_SPEC.thread_class == "2B"
     assert drive.PSCREW_THREAD == spec.THREAD
+    assert drive.PSCREW_THREAD_SOLID_DIA == spec.THREAD_SOLID_DIA
     assert drive.PSCREW_THREAD_TAP_DRILL_DIA == spec.THREAD_TAP_DRILL_DIA
     assert spec.THREAD_TAP_DRILL_DIA == pytest.approx(3.797)
-    assert spec.THREAD_TAP_DRILL_DIA == base.PIVOT_SCREW_HOLE_DIA
+    assert spec.THREAD_SOLID_DIA == spec.THREAD_TAP_DRILL_DIA
+    assert spec.THREAD_SOLID_DIA == base.PIVOT_SCREW_HOLE_DIA
+    assert "THREAD_SOLID_DIA / 2.0" in build_source
+    assert "THREAD_MAJOR_DIA / 2.0" not in build_source
     assert base.PIVOT_HOLE_DEPTH - spec.THREAD_TAIL_LEN >= 1.5
     assert "DO NOT RELEASE" not in spec.DRAWING_NOTES
     assert "THREAD LENGTH 8.00" not in spec.DRAWING_NOTES
@@ -253,7 +261,7 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     ).read_text(encoding="utf-8")
     assert drawing.RECIPE.end_view == "*Bottom"
     assert drawing.RECIPE.side_center == (0.190, 0.170)
-    assert f"INNER CIRCLE = {spec.THREAD} THREAD MAJOR DIA" in spec.END_VIEW_NOTE
+    assert f"INNER CIRCLE = {spec.THREAD} EXTERNAL THREAD" in spec.END_VIEW_NOTE
     assert "MIDDLE CIRCLE = GROUND SHOULDER OD" in spec.END_VIEW_NOTE
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShoulderLg", "ThreadLg"}
     assert set(drawing.SLOT_KEEP) == {"SlotWDim", "SlotDepth"}

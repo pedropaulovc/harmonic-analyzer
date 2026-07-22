@@ -24,7 +24,7 @@ from cone_pivot_screw_spec import (
     SHOULDER_LEN,
     THREAD,
     THREAD_DESIGNATION,
-    THREAD_MAJOR_DIA,
+    THREAD_SOLID_DIA,
     UNDERHEAD_LEN,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view, remove_notes_matching
@@ -120,7 +120,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         adapter,
         side,
         center_y_mm=-UNDERHEAD_LEN,
-        radius_mm=THREAD_MAJOR_DIA / 2.0,
+        radius_mm=THREAD_SOLID_DIA / 2.0,
         label="thread datum edge",
     )
     add_datum_feature(

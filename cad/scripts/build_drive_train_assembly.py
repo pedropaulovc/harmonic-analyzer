@@ -537,6 +537,7 @@ from build_cone_pivot_screw import (  # noqa: E402
 )
 from cone_pivot_screw_spec import (  # noqa: E402
     THREAD as PSCREW_THREAD,
+    THREAD_SOLID_DIA as PSCREW_THREAD_SOLID_DIA,
     THREAD_TAP_DRILL_DIA as PSCREW_THREAD_TAP_DRILL_DIA,
 )
 from build_swing_stop_screw import (  # noqa: E402
@@ -833,8 +834,10 @@ if BASE_PIVOT_SEAT_SPEC.size != PSCREW_THREAD:
     raise AssertionError("base pivot thread does not match the pivot screw")
 if BASE_PIVOT_SEAT_SPEC.thread_class != "2B":
     raise AssertionError("base pivot thread is not UNC-2B")
-if abs(BASE_PIVOT_HOLE_DIA - PSCREW_THREAD_TAP_DRILL_DIA) > 1e-9:
-    raise AssertionError("pivot screw mating hole does not match the tap drill")
+if abs(PSCREW_THREAD_SOLID_DIA - PSCREW_THREAD_TAP_DRILL_DIA) > 1e-9:
+    raise AssertionError("pivot screw solid envelope does not match the tap drill")
+if abs(BASE_PIVOT_HOLE_DIA - PSCREW_THREAD_SOLID_DIA) > 1e-9:
+    raise AssertionError("pivot screw solid envelope does not match the mating hole")
 if BASE_PIVOT_HOLE_DEPTH - PSCREW_THREAD_TAIL_LEN < 1.5:
     raise AssertionError("base pivot tap lacks blind-hole bottom clearance")
 # The pivot-screw head sits on the plate top at station PIVOT_STATION; the

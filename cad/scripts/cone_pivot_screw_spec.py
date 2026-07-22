@@ -32,10 +32,12 @@ THREAD_LENGTH_TOL = 0.10
 THREAD_RUNOUT_PITCHES = 1.0
 DISTAL_CHAMFER = 0.50
 MIN_FULL_FORM = 6.00
-# The part carries the external thread's major-diameter envelope plus a native
-# cosmetic thread.  The mating base hole remains authored at the tap drill.
+# The manufacturing contract remains the nominal external thread.  The CAD body
+# uses the matching tap-drill envelope so the simplified male/female solids do
+# not overlap; the native cosmetic thread and drawing carry the #10-24 form.
 THREAD_MAJOR_DIA = THREAD_MAJOR_MM[THREAD]
 THREAD_TAP_DRILL_DIA = TAP_DRILL_MM[THREAD]
+THREAD_SOLID_DIA = THREAD_TAP_DRILL_DIA
 
 if THREAD_TAIL_LEN < THREAD_MAJOR_DIA:
     raise ValueError(
@@ -43,6 +45,8 @@ if THREAD_TAIL_LEN < THREAD_MAJOR_DIA:
     )
 if THREAD_MAJOR_DIA >= SHOULDER_DIA:
     raise ValueError("cone pivot thread must leave a positive annular shoulder seat")
+if THREAD_SOLID_DIA >= THREAD_MAJOR_DIA:
+    raise ValueError("cone pivot solid thread envelope must remain below major diameter")
 if (
     THREAD_TAIL_LEN
     - THREAD_LENGTH_TOL
@@ -76,6 +80,6 @@ DRAWING_NOTES = "\n".join(
     )
 )
 END_VIEW_NOTE = (
-    f"THREAD-END VIEW: INNER CIRCLE = {THREAD} THREAD MAJOR DIA\n"
+    f"THREAD-END VIEW: INNER CIRCLE = {THREAD} EXTERNAL THREAD\n"
     "MIDDLE CIRCLE = GROUND SHOULDER OD"
 )
