@@ -3047,10 +3047,12 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     The project's hole tables are inserted top-left-anchored
     (``swBOMConfigurationAnchor_TopLeft``), so the anchor position (read off the
     table's underlying ``IAnnotation``) is the top-left corner and the box grows
-    right and DOWN from it.
+    right and DOWN from it.  A horizontally split table still reports the
+    source table's total ``RowCount``; ``GetSplitInformation`` identifies the
+    row range rendered by this piece, which is the only range its box may sum.
     """
     table = _sw_type_info.early_bound_or_flag(
-        table, "ITableAnnotation", "GetAnnotation"
+        table, "ITableAnnotation", "GetAnnotation", "GetSplitInformation"
     )
     inner = adapter._attempt(
         lambda: adapter._get_attr_or_call(table, "GetAnnotation")
@@ -3067,13 +3069,24 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
         return None
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    row_indices = range(rows)
+    split = adapter._attempt(lambda: table.GetSplitInformation())
+    if split and len(split) >= 5 and int(split[0]) == 1:
+        _direction, _index, count, range_start, range_end = (
+            int(value) for value in split[:5]
+        )
+        if count > 1 and 0 <= range_start <= range_end < rows:
+            visible = list(range(range_start, range_end + 1))
+            if range_start > 0:
+                visible.insert(0, 0)  # repeated heading on later pieces
+            row_indices = visible
     width = sum(
         float(adapter._attempt(lambda i=i: table.GetColumnWidth(i)) or 0.0)
         for i in range(columns)
     )
     height = sum(
         float(adapter._attempt(lambda i=i: table.GetRowHeight(i)) or 0.0)
-        for i in range(rows)
+        for i in row_indices
     )
     x, y = float(position[0]), float(position[1])
     return LayoutElement(name, "table", x, y - height, x + width, y)

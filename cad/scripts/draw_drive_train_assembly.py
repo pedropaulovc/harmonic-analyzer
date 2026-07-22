@@ -126,10 +126,10 @@ ASSEMBLY_NOTES = "\n".join(
 
 # The 32-row BOM is split into three compact sections across the sheet top;
 # four views and their balloons occupy the open field below it.
-FRONT_CENTER = (0.055, 0.135)
-RIGHT_CENTER = (0.150, 0.135)
-ISO_CENTER = (0.235, 0.135)
-BOTTOM_CENTER = (0.225, 0.085)
+FRONT_CENTER = (0.080, 0.135)
+RIGHT_CENTER = (0.185, 0.135)
+ISO_CENTER = (0.285, 0.145)
+BOTTOM_CENTER = (0.345, 0.095)
 BOM_ANCHOR = (0.020, 0.265)
 BOM_ROWS_PER_SECTION = 12
 BOM_COLUMN_WIDTHS = {
@@ -138,7 +138,7 @@ BOM_COLUMN_WIDTHS = {
     "DESCRIPTION": 0.074,
     "QTY.": 0.012,
 }
-BALLOON_RING_MARGINS = (0.030, 0.014, 0.014, 0.014)
+BALLOON_RING_MARGINS = (0.034, 0.014, 0.014, 0.014)
 
 
 @_telemetry.traced("drawing.format_drive_train_bom")

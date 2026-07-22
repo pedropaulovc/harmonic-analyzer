@@ -166,6 +166,50 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     ]
 
 
+def test_split_table_box_uses_only_the_rendered_row_range():
+    annotation = SimpleNamespace(GetPosition=lambda: [0.020, 0.265, 0.0])
+    table = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetSplitInformation=lambda: (1, 0, 3, 0, 11),
+        RowCount=33,
+        ColumnCount=4,
+        GetColumnWidth=lambda _index: 0.025,
+        GetRowHeight=lambda _index: 0.008,
+    )
+
+    element = drawing_common._table_element(
+        _FakeAdapter(SimpleNamespace()), table, "split-bom"
+    )
+
+    assert element is not None
+    assert (element.label, element.kind) == ("split-bom", "table")
+    assert (element.xmin, element.ymin, element.xmax, element.ymax) == pytest.approx(
+        (0.020, 0.169, 0.120, 0.265)
+    )
+
+
+def test_later_split_table_piece_includes_the_repeated_header_height():
+    annotation = SimpleNamespace(GetPosition=lambda: [0.145, 0.265, 0.0])
+    table = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetSplitInformation=lambda: (1, 1, 3, 12, 23),
+        RowCount=33,
+        ColumnCount=4,
+        GetColumnWidth=lambda _index: 0.025,
+        GetRowHeight=lambda index: 0.010 if index == 0 else 0.008,
+    )
+
+    element = drawing_common._table_element(
+        _FakeAdapter(SimpleNamespace()), table, "split-bom-2"
+    )
+
+    assert element is not None
+    assert (element.label, element.kind) == ("split-bom-2", "table")
+    assert (element.xmin, element.ymin, element.xmax, element.ymax) == pytest.approx(
+        (0.145, 0.159, 0.245, 0.265)
+    )
+
+
 def test_disjoint_layout_is_clean():
     elements = [
         _el("V1", 0.05, 0.18, 0.11, 0.23),
