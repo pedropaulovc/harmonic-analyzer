@@ -39,7 +39,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_cam_pin_spec import CAP_RADIUS, CAP_SAG, PIN_DIA as PIN_DIA, PIN_LEN
+from pinion_cam_pin_spec import (
+    CAP_RADIUS,
+    CAP_SAG,
+    PIN_DIA as PIN_DIA,
+    PIN_DIA_TOL,
+    PIN_LEN,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -74,7 +80,11 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
 }
 DIMENSION_CALLOUTS = {
-    "PinDia": "FINAL LIMITS\n4.020 MAX / 4.012 MIN\nRa 0.8",
+    "PinDia": (
+        "FINAL LIMITS\n"
+        f"{PIN_DIA + PIN_DIA_TOL:.3f} MAX / {PIN_DIA - PIN_DIA_TOL:.3f} MIN\n"
+        "Ra 0.8"
+    ),
     "Depth": "+/-0.05\nSEATED FLAT END TO CROWN ROOT",
 }
 

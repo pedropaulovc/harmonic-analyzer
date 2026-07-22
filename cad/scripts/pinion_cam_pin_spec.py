@@ -18,6 +18,11 @@ from pinion_cam_pin_geometry import (
     SEAT_LEN as SEAT_LEN,
 )
 
+# Symmetric final-size band about the PIN_DIA mid nominal (4.020 MAX /
+# 4.012 MIN press band); the drawing callout derives its limits from these
+# two constants so a retuned press fit can never ship stale limit text.
+PIN_DIA_TOL = 0.004
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia"},
     "Pin": {"Depth"},

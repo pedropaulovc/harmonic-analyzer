@@ -212,10 +212,15 @@ async def build(adapter: Any) -> dict[str, str]:
     z_min = -GRIP_LEN / 2.0 - CAP_SAG
     z_max = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
     z_center = (z_min + z_max) / 2.0
+    # Common-X picks: the Top view maps model Z (the axial station) onto sheet
+    # Y, so the B-to-hole-axis dimension must be VERTICAL between picks that
+    # share sheet X (codex #359: a horizontal dim here measured the rim's X
+    # offset, not the 19 mm station). The circular-rim pick snaps the
+    # dimension to the hole CENTER, i.e. the axis.
     cross_hole_rim = model_point_in_view(
         adapter,
         top,
-        (ROD_DIA / 2000.0, 0.0, 0.0),
+        (0.0, 0.0, ROD_DIA / 2000.0),
         label="handle cross-hole rim",
     )
     datum_b_edge = model_point_in_view(
@@ -231,7 +236,7 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=datum_b_edge,
         text_xy=(0.300, 0.145),
         label="datum B to body cross-hole axis",
-        orientation="horizontal",
+        orientation="vertical",
     )
     set_basic_dimension(
         adapter, cross_hole_station, label="datum B to body cross-hole axis"

@@ -226,7 +226,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="profile_surface",
         tolerance="0.05",
         datums=("A",),
-        quantity="LOWER R9 ARC",
+        quantity=f"LOWER R{R_END:.2f} ARC",
         label="lower end-arc profile",
     )
     add_feature_control_frame(
@@ -237,7 +237,7 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="profile_surface",
         tolerance="0.05",
         datums=("B",),
-        quantity="UPPER R9 ARC",
+        quantity=f"UPPER R{R_END:.2f} ARC",
         label="upper end-arc profile",
     )
 

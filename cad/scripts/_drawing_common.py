@@ -750,6 +750,7 @@ def create_section_view(
     return section
 
 
+@_telemetry.traced("drawing.model_point_projection", label_param="label")
 def model_point_in_view(
     adapter: Any,
     view: Any,
@@ -1604,6 +1605,7 @@ def set_dimension_text(
     adapter.currentModel.EditRebuild3()
 
 
+@_telemetry.traced("drawing.reference_dimension", label_param="label")
 def set_reference_dimension(
     adapter: Any,
     annotation: Any,
