@@ -55,6 +55,7 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
+PA_DEG = 14.5
 FACE_WIDTH = 10.8  # mm, re-derived 2026-07-14: fills the pivot-post
 # casting-face -> T120 span (0.32 wall / 0.30 T120-rim clearance; span-fit
 # assert in build_drive_train_assembly scans the T120's TRUE inclined-rim
@@ -92,7 +93,7 @@ async def build(adapter) -> dict[str, str]:
     # removable "gear on the crankshaft can be changed" stock member; the
     # crossing accommodation (helix + backlash) lives on the 64T.
     volume = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DP, root_relief=True,
+        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG, root_relief=True,
     )
 
     # On-axis bore (centre 0,0): define_circle emits only the diameter dim, so

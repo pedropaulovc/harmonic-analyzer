@@ -22,12 +22,11 @@ misregistration +-1.08 mm across the face vs <=0.70 available clearance
 -- the old build backed the crank off until the tips cleared entirely,
 the user-flagged air gap). The book photos (ch12 p.18/p.19) show the
 real pair deeply engaged, so the real 64T must carry the accommodation
-the crossing demands; this script cuts it as a LINEARIZED HELIX -- the
+the crossing demands; this script cuts it as a true swept helix -- the
 tooth gaps advance (z - face/2)*tan(incline)/R_pitch across the face
 (equivalently: gear helix angle = shaft angle, pinion straight = a
-textbook crossed-helical pair), approximated by stacked rotated slice
-cuts -- plus a backlash allowance (config) that also absorbs the
-cos(incline) normal-pitch shrink, and a deepened root floor (the mating
+textbook crossed-helical pair) -- plus transverse tooth thinning (config)
+that also absorbs the cos(incline) normal-pitch shrink, and a deepened root floor (the mating
 16T's tips need real dedendum). Study: crossed_mesh_study (analytic,
 2026-07-14); arbitrated against the live interference gate.
 
@@ -78,6 +77,7 @@ MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass trai
 
 TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
+PA_DEG = 14.5
 FACE_WIDTH = 10.0  # mm, p.20 -- wider than the 7 mm cone faces (low)
 # M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal
 # like the cone gears (true cone, p.20).
@@ -117,7 +117,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     volume = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DP,
+        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
         helix_deg=HELIX_DEG,
         backlash_mm=BACKLASH_MM, root_relief=True,
     )

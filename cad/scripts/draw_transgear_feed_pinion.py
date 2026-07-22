@@ -136,8 +136,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.030),
         datum="A",
         label="feed pinion bore axis",
-        entity=bore_edge,
         shoulder=True,
+        position_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,
@@ -149,11 +149,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="pinion face squareness to bore",
     )
-    bore_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - BORE_R)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_bottom,
         symbol_xy=(FRONT_CENTER[0] + 0.016, FRONT_CENTER[1] - 0.058),
         roughness_ra="1.6",
         label="feed pinion bore finish",

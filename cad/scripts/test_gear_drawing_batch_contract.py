@@ -45,6 +45,11 @@ DRAWING_MODULES = (
     draw_transgear_pinion,
 )
 
+CRANK_PAIR_MODULES = (
+    draw_crank_drive_gear,
+    draw_crank_pinion,
+)
+
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "ALL DIMENSIONS",
     "BREAK EDGES",
@@ -86,16 +91,36 @@ def test_notes_do_not_repeat_title_block_quantity() -> None:
         assert " REQUIRED" not in spec.DRAWING_NOTES.upper(), part_name
 
 
-def test_bore_annotations_use_exact_model_edge_identity() -> None:
+def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
     for module in DRAWING_MODULES:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "bore_edge = visible_circle_edge(" in source, module.__name__
-        assert source.count("entity=bore_edge") >= 2, module.__name__
+        if module in CRANK_PAIR_MODULES:
+            assert "edge_xy=bore_top" not in source, module.__name__
+            assert source.count("entity=bore_edge") == 2, module.__name__
+            assert source.count("leader_attach_xy=(") == 1, module.__name__
+            assert "position_tolerance_m=0.080" in source, module.__name__
+            assert "shoulder=True" in source, module.__name__
+            continue
+        assert "edge_xy=bore_top" in source, module.__name__
+        assert "edge_xy=bore_bottom" not in source, module.__name__
+        assert source.count("entity=bore_edge") == 1, module.__name__
+        expected_tolerance = (
+            "position_tolerance_m=0.008"
+            if module.__name__ == "draw_cylinder_gear"
+            else "position_tolerance_m=0.0001"
+        )
+        assert expected_tolerance in source, module.__name__
         assert "shoulder=True" in source, module.__name__
 
-
 def test_tooth_runout_is_stated_against_the_bore_axis_datum() -> None:
-    for part_name, spec in SHEETS:
+    for (part_name, spec), module in zip(SHEETS, DRAWING_MODULES, strict=True):
+        if module in CRANK_PAIR_MODULES:
+            source = Path(module.__file__).read_text(encoding="utf-8")
+            assert 'characteristic="circular_runout"' in source, part_name
+            assert 'datums=("A",)' in source, part_name
+            assert 'quantity="TOOTH TIPS"' in source, part_name
+            continue
         notes = spec.DRAWING_NOTES.upper()
         assert (
             "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, "

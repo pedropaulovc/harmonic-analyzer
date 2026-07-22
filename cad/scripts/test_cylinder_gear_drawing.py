@@ -83,6 +83,8 @@ def test_running_bore_limits_match_the_shaft_fit_policy() -> None:
 def test_native_gdt_controls_bore_datum_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
+    assert "datum_radial = math.sqrt(0.5)" in source
+    assert "position_tolerance_m=0.008" in source
     assert source.count("add_feature_control_frame(") == 1
     assert 'characteristic="perpendicularity"' in source
     assert source.count("add_surface_finish(") == 1

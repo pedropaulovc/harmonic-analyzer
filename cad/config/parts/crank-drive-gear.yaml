@@ -1,7 +1,7 @@
 crank-drive-gear:
   number: MHA-021
-  material: Plain Carbon Steel
-  material_specification: AISI 1018 cold-finished steel
+  material: SAE 1018 CF bar, ASTM A108-24
+  material_specification: SAE 1018 CF bar, ASTM A108-24
   finish: gear teeth cut, oiled
   quantity: 1
   tolerance_class: machined_block
