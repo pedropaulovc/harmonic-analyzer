@@ -73,7 +73,7 @@ from arbor_pedestal_spec import (
     STRAP_T,
     TOP_RADIUS,
 )
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _holes import HoleSpec, wizard_holes
 
 PART_NAME = "arbor-pedestal"
 MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
@@ -88,8 +88,8 @@ MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 # hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange):
 # #4 clearance NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim).
 SCREW_HOLE_SPEC = HoleSpec("clearance", SCREW_THREAD)
-SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.264, single-sourced from the spec's
-# resolver call (same HoleSpec) so the modeled hole and the masking note agree;
+SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.2512, the seat-proven cut (see the
+# spec's pin rationale); the post-create assert below keeps model, note and
 # drive-train assembly's foot-screw clearance assert (build_drive_train_assembly)
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
 
@@ -266,15 +266,20 @@ async def build(adapter) -> dict[str, str]:
     # z SCREW_Z), drilled from the foot bottom (y=0) -- the fillister screw
     # bolts the casting to the base. The foot bottom is a clean rectangle (the
     # strap/dome/bore are all above it), so find_planar_face resolves cleanly.
-    screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
     screw_cut = wizard_holes(
         adapter, SCREW_HOLE_SPEC,
         [[0.0, 0.0, SCREW_Z]],
         (0.0, -1.0, 0.0), "flange hold-down hole (#4 clearance)", name="ScrewHole",
         placement_dims=[((None, None), ("ScrewZ", '"ScrewZ"'))],
     )
+    if abs(screw_cut.hole_dia_mm - SCREW_CLEARANCE_DIA) > 0.005:
+        raise RuntimeError(
+            f"flange hold-down hole cut Ø{screw_cut.hole_dia_mm:.4f} != spec "
+            f"SCREW_CLEARANCE_DIA Ø{SCREW_CLEARANCE_DIA} -- the seat's wizard "
+            "table moved; realign the spec pin (and the sheet masking note)"
+        )
     drive_jobs += screw_cut.placement_drive_jobs
-    v_hole = math.pi * (screw_dia / 2.0) ** 2 * FOOT_HEIGHT
+    v_hole = math.pi * (SCREW_CLEARANCE_DIA / 2.0) ** 2 * FOOT_HEIGHT
     volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
     v_final = volume
 

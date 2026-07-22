@@ -330,7 +330,9 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="datum-B axis perpendicularity",
         entity_type="DIMENSION",
-        leader_attach_xy=STEM_DIM_TEXT,
+        # No leader_attach_xy: an explicit attach point forces a leader whose
+        # arrow lands mid-text; without it SolidWorks docks the frame against
+        # the dimension it controls (the pivot-post sheet's clean pattern).
     )
     # The BASIC height and position zone locate the cross-bore axis from the
     # seat plane and through the stem axis without a prose-only acceptance rule.

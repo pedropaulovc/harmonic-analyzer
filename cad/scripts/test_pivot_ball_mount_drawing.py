@@ -77,7 +77,9 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert "STEM_DIM_TEXT = (0.180, _front_y(12.0))" in source
     assert "frame_xy=(0.180, _front_y(12.0) - 0.014)" in source
     assert 'characteristic="profile_surface"' in source
-    assert "leader_attach_xy=STEM_DIM_TEXT" in source
+    # The stem FCF must NOT force a leader (leader_attach_xy) — the arrow
+    # would land mid-text; docking against the dimension is the house pattern.
+    assert "leader_attach_xy=STEM_DIM_TEXT" not in source
     assert 'label="stem diameter"' in source
     assert 'entity_type="SILHOUETTE"' in source
     assert source.count('entity_type="DIMENSION"') == 1

@@ -22,12 +22,15 @@ DOME_DIA = 2.0 * TOP_RADIUS  # 20.0: the round head around the clamp bore
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525: the 3/8 in cylinder-arbor journal
 BORE_HEIGHT = 54.0  # arbor axis above the foot seat (drive height)
 SCREW_THREAD = "#4"  # flange hold-down clearance hole
-# The #4 NORMAL clearance the wizard actually cuts — sourced from the same
-# resolver the builder feeds wizard_holes, so the masking note can never
-# disagree with the modeled hole (3.251).
-from _holes import HoleSpec as _HoleSpec, blind_cut_dia_mm as _blind_cut_dia_mm
-
-SCREW_CLEARANCE_DIA = _blind_cut_dia_mm(_HoleSpec("clearance", SCREW_THREAD))
+# The #4 NORMAL clearance the wizard ACTUALLY cuts on this seat: the created
+# feature's ThruHoleDiameter reads 3.2512 (build log "1x #4 clearance
+# (Ø3.251)"; the screw-hole volume gate's +0.3 mm^3 offset was exactly this
+# hole). _holes.CLEARANCE_MM pins 3.264 for ("#4", "normal") — a
+# wizard-database dump this seat no longer matches — so resolver-sourcing
+# would print a masking note (3.26) contradicting the sheet's own native hole
+# callout (3.25). build_arbor_pedestal asserts the created hole matches this
+# pin to 0.005 mm, failing loud if the seat's wizard table ever moves again.
+SCREW_CLEARANCE_DIA = 3.2512
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},
