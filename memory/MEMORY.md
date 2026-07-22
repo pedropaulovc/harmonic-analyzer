@@ -115,3 +115,4 @@
 - [meshprobe usage](meshprobe-usage.md) — needs Blender >= 5.2 via --blender (gpu.init); glTF must be METRES; view-orbit requires --projection-json (DX 100mm recipe inside); high_key + white bg for SW PBR metals; .meshprobe/ session state is gitignored
 - [ch30 p002 refit roadmap](ch30-p002-refit-roadmap.md) — staged front-view refit: wheel +10.7 done (#340); reducer group (support-bar+rack-pinion+transgears) down 42.9 mm next per pose-studio deltas; then platen/rack lowered + resized smaller (owns the final rack mesh)
 - [watch-pr quota budget](watch-pr-quota-budget.md) — N concurrent watch-pr monitors burn 5000/h REST in ~40 min; use one aggregated GraphQL poller for multi-PR sessions
+- [Resumed agent lost bg handles](resumed-agent-lost-bg-handles.md) — transcript-resumed subagents lose background-task handles and sleep forever on phantom notifications; OS-verify (process list + log mtimes) and wake with evidence
