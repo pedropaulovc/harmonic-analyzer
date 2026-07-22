@@ -65,6 +65,7 @@ from top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FRONT_VIEW_NOTE,
+    INSPECTION_NOTES,
     TOP_VIEW_NOTE,
 )
 
@@ -336,6 +337,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
+            "Inspection Notes": INSPECTION_NOTES,
             "Top View Note": TOP_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
         },

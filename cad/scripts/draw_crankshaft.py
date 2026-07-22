@@ -268,16 +268,18 @@ async def build(adapter: Any) -> dict[str, str]:
         face=shaft_face,
     )
 
-    shaft_dia_annotation = next(
-        (
-            annotation
-            for annotation in front_annotations
-            if dimension_name(adapter, annotation) == "ShaftDiaDim"
-        ),
-        None,
-    )
-    if shaft_dia_annotation is None:
+    if not any(
+        dimension_name(adapter, annotation) == "ShaftDiaDim"
+        for annotation in front_annotations
+    ):
         raise RuntimeError("crankshaft end view is missing ShaftDiaDim annotation")
+    # Establish datum A from the cylindrical OD itself.  A datum tag associated
+    # with the diameter display dimension renders correctly but reports its
+    # primitive geometry in the dimension's model coordinate frame, which makes
+    # the sheet-space layout audit read a false off-sheet leader.  The visible
+    # circular rim is the same cylindrical datum feature and reports truthful
+    # sheet-space tag geometry.
+    shaft_datum_edge = _visible_shaft_end_edges(adapter, front)[0][1]
     right_end_edges = _visible_shaft_end_edges(adapter, right)
     crank_end_edge = right_end_edges[0][1]
     far_end_edge = right_end_edges[-1][1]
@@ -287,7 +289,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.027, FRONT_CENTER[1]),
         datum="A",
         label="shaft OD datum axis",
-        annotation=shaft_dia_annotation,
+        entity=shaft_datum_edge,
         shoulder=True,
     )
     add_datum_feature(
@@ -324,7 +326,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        frame_xy=(0.150, 0.055),
+        frame_xy=(0.100, 0.055),
         characteristic="position",
         tolerance="0.20",
         datums=("A", "B"),

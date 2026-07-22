@@ -26,6 +26,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_notes_carry_the_pitch_rail_and_boss() -> None:
     notes = top_frame_spec.DRAWING_NOTES
+    inspection = top_frame_spec.INSPECTION_NOTES
     assert "GRAY-IRON" not in notes
     assert "ASTM A48" not in notes
     assert "GREEN ENAMEL" not in notes
@@ -41,14 +42,16 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "394.00 X 224.00" in notes
     assert "25.50 +0.05/0" in notes
     assert "POSITION <MOD-DIAM>0.20 A|B|C" in notes
-    assert "MAX-MIN RADIAL WALL THICKNESS" in notes
-    assert "SHALL NOT EXCEED 0.10" in notes
-    assert "FIT LEAST-SQUARES CYLINDERS" in notes
-    assert "AXIS OFFSET 0.05 MAX" in notes
-    assert "8 EQUALLY SPACED AXIAL SECTIONS" in notes
-    assert "GREATEST AXIS" in notes and "SEPARATION AT EITHER END PLANE" in notes
-    assert "ALL 64 OD POINTS" in notes
-    assert "ADDITIONAL" in notes and "NATIVE SIZE AND POSITION CONTROLS" in notes
+    assert "MAX-MIN RADIAL WALL THICKNESS" in inspection
+    assert "SHALL NOT EXCEED 0.10" in inspection
+    assert "SEE INSPECTION NOTES" in notes
+    assert "FIT LEAST-SQUARES CYLINDERS" in inspection
+    assert "AXIS OFFSET 0.05 MAX" in inspection
+    assert "8 EQUALLY SPACED AXIAL SECTIONS" in inspection
+    assert "GREATEST AXIS" in inspection
+    assert "SEPARATION AT EITHER END PLANE" in inspection
+    assert "64 OD POINTS" in inspection
+    assert "ADDITIONAL" in inspection and "NATIVE SIZE/POSITION CONTROLS" in inspection
     assert "DIMENSIONS/GD&T APPLY BEFORE COATING" in notes
     assert "TIR" not in notes
     assert "GOOSENECK BORE" in notes
@@ -65,6 +68,7 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'add_property_linked_note(adapter, "Inspection Notes", 0.270, 0.255)' in source
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 3
     assert 'symbol_xy=DATUM_C_SYMBOL_XY, datum="C"' in source

@@ -191,6 +191,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Inspection Notes",
             "Top View Note",
             "Front View Note",
         ),
@@ -200,6 +201,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Inspection Notes",
             "Top View Note",
             "Front View Note",
         ),
@@ -274,6 +276,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
+    add_property_linked_note(adapter, "Inspection Notes", 0.270, 0.255)
     add_property_linked_note(adapter, "Top View Note", 0.280, 0.200)
     add_property_linked_note(adapter, "Front View Note", 0.300, 0.095)
 
