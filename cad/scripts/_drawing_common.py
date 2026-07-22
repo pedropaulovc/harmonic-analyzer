@@ -523,7 +523,11 @@ def add_feature_control_frame(
         "SetLeaderAttachmentPointAtIndex",
         "GetLeaderPointsAtIndex",
     )
-    if int(annotation.GetAttachedEntityCount3()) != 1:
+    # A GTol inserted from a selected display dimension reports its association
+    # through IGtol.IsAttached/GetLeaderCount, not through the annotation's
+    # model-entity array.  Ordinary edge/silhouette attachments use both.
+    expected_entities = 0 if entity_type == "DIMENSION" else 1
+    if expected_entities == 1 and int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
@@ -550,13 +554,14 @@ def add_feature_control_frame(
         raise RuntimeError(f"failed to position feature-control-frame leader ({label})")
     draw.EditRebuild3()
     if (
-        int(annotation.GetAttachedEntityCount3()) != 1
+        int(annotation.GetAttachedEntityCount3()) != expected_entities
         or not bool(gtol.IsAttached())
         or int(gtol.GetLeaderCount()) != 1
     ):
         raise RuntimeError(
             f"feature-control frame attachment mismatch ({label}): "
-            f"entities={annotation.GetAttachedEntityCount3()}, expected=1; "
+            f"entities={annotation.GetAttachedEntityCount3()}, "
+            f"expected={expected_entities}; "
             f"leaders={gtol.GetLeaderCount()}, expected=1"
         )
     if leader_attach_xy is not None:
