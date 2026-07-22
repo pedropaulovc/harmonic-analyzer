@@ -101,10 +101,16 @@ def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("add_auto_balloons_across_views(") == 1
-    assert "adapter, (iso, front, right)" in source
+    assert "adapter, (iso, front)" in source
     assert drawing.SHEET_SCALE == (1.0, 4.0)
-    assert source.count("scale=VIEW_SCALE") == 3
-    assert source.count("add_note(") == 1
+    assert drawing.SHEET_NAMES == (
+        "GENERAL ASSEMBLY",
+        "PARTS LIST AND ITEM IDENTIFICATION",
+    )
+    assert source.count("scale=VIEW_SCALE") == 5
+    assert source.count("add_note(") == 3
+    assert "create_blank_drawing_sheets" in source
+    assert "expected_sheet_names=SHEET_NAMES" in source
     assert "LEVER-WIRE TERMINATIONS" in drawing.ASSEMBLY_NOTES
     assert "WHEEL HUB/RIM" in drawing.ASSEMBLY_NOTES
     assert all(

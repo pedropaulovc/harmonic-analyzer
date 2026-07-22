@@ -200,11 +200,17 @@ def test_unresolved_assembly_inputs_are_release_holds_not_guessed_details() -> N
 def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
     for drawing in ORDINARY_SHEETS:
         source = Path(drawing.__file__).read_text(encoding="utf-8")
-        expected_views = 8 if drawing is draw_paper_drive_assembly else 3
+        expected_views = {
+            draw_paper_drive_assembly: 8,
+            draw_magnifier_assembly: 5,
+        }.get(drawing, 3)
         assert source.count("place_view(") == expected_views, drawing.ARTIFACT_STEM
         if drawing is draw_frame_assembly:
             assert "for view in (general_front, general_right):" in source
             assert "set_hidden_lines_removed(adapter, iso)" in source
+        elif drawing is draw_magnifier_assembly:
+            assert "for view in (general_front, general_right, general_iso):" in source
+            assert "for view in (iso, front):" in source
         else:
             assert "for view in (front, right, iso):" in source, (
                 drawing.ARTIFACT_STEM

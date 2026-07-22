@@ -17,10 +17,11 @@ from _assembly_drawing_bom import (
     configured_part_numbers,
     insert_identified_bom_table,
 )
-from _common import check, run_build
+from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons_across_views,
+    create_blank_drawing_sheets,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -50,6 +51,7 @@ PNG = OUTPUTS.png
 # borders and the title block; refined against the render.
 SHEET_SCALE = (1.0, 4.0)
 VIEW_SCALE = (1, 4)
+SHEET_NAMES = ("GENERAL ASSEMBLY", "PARTS LIST AND ITEM IDENTIFICATION")
 
 # One BOM row per UNIQUE top-level component of build_magnifier_assembly.py.
 # The two column-clamp arcs are separate parts; the clamp-screw is a native
@@ -82,10 +84,14 @@ ASSEMBLY_NOTES = "\n".join(
     )
 )
 
-# Pen's proven three-view + BOM layout, valid at the pen-sized 1:4 views.
-FRONT_CENTER = (0.070, 0.150)
-RIGHT_CENTER = (0.150, 0.150)
-ISO_CENTER = (0.225, 0.140)
+# The general sheet retains the proven three-view arrangement. The item sheet
+# moves the pictorial and the one orthographic needed to expose the concealed
+# clamp screw into the left field, leaving the full-height BOM alone at right.
+GENERAL_FRONT_CENTER = (0.070, 0.150)
+GENERAL_RIGHT_CENTER = (0.150, 0.150)
+GENERAL_ISO_CENTER = (0.225, 0.140)
+ID_ISO_CENTER = (0.085, 0.140)
+ID_FRONT_CENTER = (0.190, 0.140)
 BOM_ANCHOR = (0.248, 0.265)
 
 
@@ -115,6 +121,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(adapter, scale=SHEET_SCALE)
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="magnifier drawing")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -127,18 +134,35 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(
-        adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate magnifier general assembly sheet")
+    general_front = place_view(
+        adapter, str(SOURCE), "*Front", *GENERAL_FRONT_CENTER, scale=VIEW_SCALE
     )
-    right = place_view(
-        adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
+    general_right = place_view(
+        adapter, str(SOURCE), "*Right", *GENERAL_RIGHT_CENTER, scale=VIEW_SCALE
     )
-    iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
+    general_iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *GENERAL_ISO_CENTER, scale=VIEW_SCALE
     )
-    for view in (front, right, iso):
+    for view in (general_front, general_right, general_iso):
         set_hidden_lines_removed(adapter, view)
+    if add_note(adapter, "SHEET 1 OF 2 — GENERAL ASSEMBLY", 0.018, 0.255) is None:
+        raise RuntimeError("failed to add magnifier general assembly heading")
+    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.040) is None:
+        raise RuntimeError("failed to add magnifier assembly notes")
 
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate magnifier parts-list sheet")
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *ID_ISO_CENTER, scale=VIEW_SCALE
+    )
+    front = place_view(
+        adapter, str(SOURCE), "*Front", *ID_FRONT_CENTER, scale=VIEW_SCALE
+    )
+    for view in (iso, front):
+        set_hidden_lines_removed(adapter, view)
     insert_identified_bom_table(
         adapter,
         front,
@@ -152,17 +176,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # BOM identity set across the orthographic views instead of weakening the
     # required 13-item coverage.
     add_auto_balloons_across_views(
-        adapter, (iso, front, right), expected=len(BOM_COMPONENTS),
+        adapter, (iso, front), expected=len(BOM_COMPONENTS),
         label="magnifier assembly balloons",
     )
-    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
-        raise RuntimeError("failed to add magnifier assembly notes")
+    if add_note(adapter, "SHEET 2 OF 2\nITEM IDENTIFICATION", 0.018, 0.255) is None:
+        raise RuntimeError("failed to add magnifier identification heading")
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Magnifier Assembly Drawing",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

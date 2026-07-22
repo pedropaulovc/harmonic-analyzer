@@ -165,7 +165,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, iso, expected=len(BOM_COMPONENTS),
         label="frame assembly balloons",
     )
-    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.018, 0.255) is None:
+    if add_note(adapter, "SHEET 2 OF 2\nITEM IDENTIFICATION", 0.018, 0.255) is None:
         raise RuntimeError("failed to add frame identification heading")
 
     return await finalize_drawing(

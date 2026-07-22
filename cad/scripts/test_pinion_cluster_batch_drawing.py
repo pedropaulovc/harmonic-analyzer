@@ -214,6 +214,14 @@ def test_drive_train_allows_only_the_two_modeled_cam_pin_press_fits() -> None:
     }
     assert 0.40 < set(allowed.values()).pop() < 0.45
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
+    assert _interference_contracts.allowed_interference_pairs(
+        "harmonic-analyzer"
+    ) == {
+        frozenset((
+            "frame-1/harmonic-base-1",
+            "drive-train-1/cone-pivot-screw-1",
+        )): 0.10,
+    }
 
     scripts = Path(_assembly.__file__).parent
     build_source = (scripts / "build_drive_train_assembly.py").read_text(
@@ -222,7 +230,11 @@ def test_drive_train_allows_only_the_two_modeled_cam_pin_press_fits() -> None:
     verify_source = (scripts / "verify.py").read_text(encoding="utf-8")
     assembly_source = (scripts / "_assembly.py").read_text(encoding="utf-8")
     refresh_source = (scripts / "refresh_assembly.py").read_text(encoding="utf-8")
+    top_build_source = (scripts / "build_harmonic_analyzer_assembly.py").read_text(
+        encoding="utf-8"
+    )
     assert "allowed_pairs=allowed_interference_pairs(ASM_NAME)" in build_source
+    assert "allowed_pairs=allowed_interference_pairs(ASM_NAME)" in top_build_source
     assert "allowed_pairs=allowed_interference_pairs(name)" in verify_source
     # The refresh gate gets the allowance from its ENTRYPOINT: the lookup lives
     # in refresh_assembly.py (outside every assembly's recipe closure) and is

@@ -103,6 +103,9 @@ def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("add_auto_balloons_across_views(") == 1
+    assert source.count("add_component_bom_balloons(") == 1
+    assert 'items=(("pivot-bushing", "4"), ("connecting-rod", "7"))' in source
+    assert "existing_balloons=targeted_balloons" in source
     assert "position_bom_balloon" not in source
     assert "adapter, (front, right, iso)" in source
     assert drawing.SHEET_SCALE == (1.0, 7.0)

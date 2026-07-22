@@ -59,6 +59,7 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _transforms import IDENTITY
+from _interference_contracts import allowed_interference_pairs
 
 import _telemetry
 
@@ -127,7 +128,10 @@ async def build(adapter) -> dict[str, str]:
                           STICK_EULER, STICK_ROWS)
 
     assert_components_fully_defined(adapter)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
 
     # Title-block identity for the top assembly drawing
     # (draw_harmonic_analyzer_assembly.py): assembly_title_properties supplies
