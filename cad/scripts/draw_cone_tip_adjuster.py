@@ -144,7 +144,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Tip Adjuster Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone tip adjuster; 5/16-18 slotted set screw; black oxide",
+            3: f"cone tip adjuster; {THREAD} slotted set screw; black oxide",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

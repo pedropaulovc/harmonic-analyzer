@@ -16,6 +16,11 @@ BLOCK_DIA = 24.0  # round column outside diameter
 BLOCK_HEIGHT = 100.5  # column height, foot (platform seat) to top
 BORE_DIA = 9.550  # 9.545..9.555 finished bore over shaft max 9.525
 BORE_HEIGHT = 47.65  # journal-bore axis above the foot
+# Mating cone-shaft OD limits in the journal fit (the cone_gear_shaft datum-A
+# seat that rides this bore) -- a distinct feature from CRANK_SHAFT_MAX_DIA
+# despite the shared 3/8" nominal.
+JOURNAL_SHAFT_MAX_DIA = 9.525  # upper limit
+JOURNAL_SHAFT_MIN_DIA = JOURNAL_SHAFT_MAX_DIA - 0.02  # 9.505: lower limit (0.02 band)
 CRANK_SHAFT_MAX_DIA = 9.525
 CRANK_BORE_DIA = CRANK_SHAFT_MAX_DIA + 0.5  # 10.025: 0.25 radial clearance
 CRANK_BORE_HEIGHT = 85.835  # crank-bore axis above the foot
@@ -68,7 +73,7 @@ DRAWING_NOTES = "\n".join(
         f"JOURNAL BORE LIMITS DIA {BORE_DIA - 0.005:.3f}-{BORE_DIA + 0.005:.3f}; "
         "FINISH RA 1.6;",
         f"AXIS BASICALLY INTERSECTS DATUM AXIS B AT BOXED {BORE_HEIGHT:.2f} ABOVE A.",
-        "MATING SHAFT LIMITS DIA 9.505-9.525.",
+        f"MATING SHAFT LIMITS DIA {JOURNAL_SHAFT_MIN_DIA:.3f}-{JOURNAL_SHAFT_MAX_DIA:.3f}.",
         "JOURNAL IS LOWER CIRCLE; CRANK BORE IS UPPER ELLIPSE IN FRONT VIEW.",
     )
 )
