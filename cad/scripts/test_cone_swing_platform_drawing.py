@@ -40,7 +40,11 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "7.35 +/-0.10 DEG NORTH" in notes
     assert "FULL-R CLOSED END (R4.000 REF)" in notes
     assert "VIRTUAL-SHARP INTERSECTIONS" in notes
-    assert "NORMAL TO PARALLEL NORTH/SOUTH ENDS" in notes
+    assert "DATUM B IS THE" in notes
+    assert "PIVOT-HOLE AXIS" in notes
+    assert "DATUM C IS THE NORTH END PLANE" in notes
+    assert "CENTRELINE THROUGH B NORMAL TO C" in notes
+    assert "ALL-AROUND PLAN PROFILE IS CONTROLLED 0.25 TO A|B|C" in notes
     assert "OPEN THROUGH EDGE" in notes
     assert "NE R10.00, NW R8.00, SW R10.00, SE R12.00" in notes
     assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
@@ -61,6 +65,13 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "drawing.EditSheet()" in source
     assert "drawing.EditSketch()" not in source
     assert "_visible_broad_face_edges(adapter, end)" in source
+    assert "_visible_plan_controls(adapter, top)" in source
+    assert 'datum="B"' in source and "entity=pivot_edge" in source
+    assert 'datum="C"' in source and "entity=north_edge" in source
+    assert 'characteristic="profile_surface"' in source
+    assert 'datums=("A", "B", "C")' in source
+    assert 'quantity="ALL-AROUND PLAN PROFILE"' in source
+    assert "all_around=True" in source
     assert 'characteristic="flatness"' in source
     assert 'characteristic="parallelism"' in source
     assert '{"PlateLenDim": "+/-0.25"}' in source
@@ -88,6 +99,7 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("cone-swing-platform")
     assert config["material"] == config["material_specification"]
     assert "steel" in str(config["material_specification"]).lower()
+    assert "5/16 in minimum stock" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "mil-dtl-13924 class 1" in finish
     assert "oil seal" in finish

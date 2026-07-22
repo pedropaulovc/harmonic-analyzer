@@ -4,10 +4,11 @@ The SLDPRT remains authoritative.  This recipe supplies only the platform's
 views, the wedge envelope dimensions, and the machining notes; every shared
 sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
 
-The platform is a black-oxide 1/4 in steel plate: an asymmetric wedge (214 long,
-21.5 -> 57 wide) with a Ø6.76 pivot hole at the narrow tip, an open lock notch
-through the west edge, and rounded plan corners. The sheet and both views run
-1:3 so the plan dimensions remain inside the zone border.
+The platform is machined from black-oxide 5/16 in minimum steel stock to a
+6.35 mm finished plate: an asymmetric wedge (214 long, 21.5 -> 57 wide) with a
+Ø6.76 pivot hole at the narrow tip, an open lock notch through the west edge,
+and rounded plan corners. The sheet and both views run 1:3 so the plan
+dimensions remain inside the zone border.
 
 Run with SolidWorks open::
 
@@ -42,7 +43,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 from _holes import blind_cut_dia_mm
-from build_cone_swing_platform import PIVOT_HOLE_SPEC, PLATE_T
+from build_cone_swing_platform import NORTH_OVERHANG, PIVOT_HOLE_SPEC, PLATE_T
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -174,6 +175,46 @@ def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
     return min(bottom, key=lambda item: item[0])[1], min(top, key=lambda item: item[0])[1]
 
 
+def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
+    """Return the pivot rim, north datum edge, and a long profile edge."""
+    expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
+    pivot_edges: list[Any] = []
+    north_edges: list[Any] = []
+    profile_edges: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+        ) or ()
+        for raw_edge in edges:
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if curve.IsCircle():
+                values = tuple(float(value) for value in curve.CircleParams)
+                if abs(values[6] - expected_radius_m) <= 1e-6:
+                    pivot_edges.append(edge)
+                continue
+            if not curve.IsLine():
+                continue
+            values = tuple(float(value) for value in curve.LineParams)
+            if abs(values[2] - NORTH_OVERHANG / 1000.0) <= 2e-6 and abs(values[3]) >= 0.99:
+                north_edges.append(edge)
+            start = adapter._attempt(lambda e=edge: e.GetStartVertex(), default=None)
+            end = adapter._attempt(lambda e=edge: e.GetEndVertex(), default=None)
+            if start is None or end is None:
+                continue
+            p0 = tuple(float(value) for value in _early_bound(start, "IVertex").GetPoint())
+            p1 = tuple(float(value) for value in _early_bound(end, "IVertex").GetPoint())
+            length = sum((a - b) ** 2 for a, b in zip(p0, p1, strict=True)) ** 0.5
+            if abs(values[3]) < 0.99:
+                profile_edges.append((length, edge))
+    if not pivot_edges or not north_edges or not profile_edges:
+        raise RuntimeError(
+            "cone-platform plan view is missing pivot/north/profile datum controls"
+        )
+    return pivot_edges[0], north_edges[0], max(profile_edges, key=lambda item: item[0])[1]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -229,6 +270,38 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pivot hole")
     _add_cone_axis_centerline(adapter, top)
+
+    pivot_edge, north_edge, profile_edge = _visible_plan_controls(adapter, top)
+    add_datum_feature(
+        adapter,
+        top,
+        symbol_xy=(0.145, 0.200),
+        datum="B",
+        label="pivot-hole datum axis",
+        entity=pivot_edge,
+        shoulder=True,
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        symbol_xy=(0.145, 0.185),
+        datum="C",
+        label="north-end datum plane",
+        entity=north_edge,
+        shoulder=True,
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.215, 0.245),
+        characteristic="profile_surface",
+        tolerance="0.25",
+        datums=("A", "B", "C"),
+        quantity="ALL-AROUND PLAN PROFILE",
+        label="plan-profile control",
+        entity=profile_edge,
+        all_around=True,
+    )
 
     datum_a_edge, opposite_face_edge = _visible_broad_face_edges(adapter, end)
     add_datum_feature(
