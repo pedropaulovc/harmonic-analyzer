@@ -86,7 +86,6 @@ from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
-    FRONT_STUB,
     SECTIONS,
 )
 
