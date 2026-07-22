@@ -10,6 +10,17 @@ the offline drawing test.
 
 from __future__ import annotations
 
+from rocker_arm_spec import (
+    ARM_DEPTH,
+    BOT_ARC_LEN,
+    CENTER_Y,
+    PIVOT_MID_Y,
+    R_BOTTOM,
+    R_TOP,
+    TIP_FACE,
+    TOP_ARC_LEN,
+)
+
 # True free-text instructions only; geometry / datum structure / roughness live
 # in native dimensions / datum tags / FCFs / surface symbols.  Hole sizes ride
 # their native callouts (Ø6.50 dim, Ø1.99 THRU ALL) -- the notes state process,
@@ -29,13 +40,14 @@ DRAWING_NOTES = "\n".join(
         "   END ONLY (1X), THE END SHOWN.",
         "2. STRAP 2.50 THICK; ALL HOLES THRU",
         "   THE THICKNESS.",
-        "3. TOP EDGE R800.00, BOTTOM EDGE R816.00,",
+        f"3. TOP EDGE R{R_TOP:.2f}, BOTTOM EDGE R{R_BOTTOM:.2f},",
         "   CONCENTRIC; COMMON CENTRE ON THE",
-        "   MIRROR AXIS, 808.00 FROM THE PIVOT",
-        "   AXIS (STRAP DEPTH 16.00 REF).",
-        "4. ARC LENGTHS 292.10 TOP / 266.70 BOTTOM",
-        "   TAPER THE ENDS.",
-        "5. EACH TIP: 5.59 FACE PERP TO TOP EDGE.",
+        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.2f} FROM THE PIVOT",
+        f"   AXIS (STRAP DEPTH {ARM_DEPTH:.2f} REF).",
+        f"4. ARC LENGTHS {TOP_ARC_LEN:.2f} TOP / {BOT_ARC_LEN:.2f} BOTTOM",
+        "   DEFINE THE ARC ENDPOINTS.",
+        f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
+        "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
         "6. PIVOT HOLE: REAM +0.03/0, Ra 1.6.",
     )
 )
