@@ -2,7 +2,7 @@ harmonic-base:
   number: MHA-035
   material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
-  finish: SSPC-SP3;ALKYD PRIMER/GREEN ENAMEL;75-125um DFT
+  finish: SSPC-SP3;ALKYD PRIMER 25-40um;RAL6000 ALKYD ENAMEL 50-85um;75-125um TOTAL DFT
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock"

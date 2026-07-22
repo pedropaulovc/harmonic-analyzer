@@ -1,7 +1,7 @@
 cone-swing-platform:
   number: MHA-091
-  material: AISI 1018 steel plate, 5/16 in minimum stock
-  material_specification: AISI 1018 steel plate, 5/16 in minimum stock
+  material: ASTM A830/A830M Gr 1018 HR steel plate; 5/16 in minimum stock
+  material_specification: ASTM A830/A830M Gr 1018 HR steel plate; 5/16 in minimum stock
   finish: MIL-DTL-13924 Class 1 black oxide with oil seal; all surfaces
   quantity: 1
   tolerance_class: machined_block

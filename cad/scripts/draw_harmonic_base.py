@@ -350,7 +350,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         side,
-        symbol_xy=(0.255, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
+        # Keep the native datum triangle directly on the visible underside
+        # edge.  The former far-left position produced a long leader that read
+        # like an unattached free-standing tag at print scale.
+        symbol_xy=(0.310, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
         datum="A",
         label="machined underside datum",
         entity=datum_a_edge,

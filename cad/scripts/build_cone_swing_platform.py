@@ -281,6 +281,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, PIVOT_HOLE_SPEC,
         [[0.0, 0.0, 0.0]],
         (0.0, -1.0, 0.0), "pivot screw hole (1/4 clearance)", name="PivotHole",
+        dia_tolerance_mm=(0.0, 0.10),
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = await volume_check(adapter, "pivot hole", volume - v_hole, 0.01 * v_hole)

@@ -56,7 +56,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "NEAR LEFT END 6.35 +/-0.10 FROM C" in notes
     assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
     assert "PLAN RIMS AT E1-E4 ARE THE DIA 13.00 THRU FEATURES" in notes
-    assert "C'BORE AXIS OFFSET FROM ASSOCIATED DIA 13.00 AXIS: 0.05 MAX" in notes
+    assert "FIT LEAST-SQUARES CYLINDER AXES TO THE FULL" in notes
+    assert "SEPARATION AT C'BORE MOUTH AND BOTTOM PLANES: 0.05 MAX" in notes
     assert "PROCESS DATA" not in notes
     assert "B1 IS UNTHREADED" in notes
     assert "A1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
@@ -119,8 +120,9 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "gray cast iron" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "sspc-sp3" in finish
-    assert "alkyd primer/green enamel" in finish
-    assert "75-125um dft" in finish
+    assert "alkyd primer 25-40um" in finish
+    assert "ral6000 alkyd enamel 50-85um" in finish
+    assert "75-125um total dft" in finish
     assert "mask" not in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1

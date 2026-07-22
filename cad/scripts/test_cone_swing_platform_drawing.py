@@ -56,7 +56,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "_add_cone_axis_centerline(adapter, top)" in source
+    assert "pivot_center = _add_cone_axis_centerline(adapter, top)" in source
     assert "view.ModelToViewTransform" in source
     assert "view.GetVisibleEntities2" in source
     assert "blind_cut_dia_mm(PIVOT_HOLE_SPEC)" in source
@@ -71,8 +71,9 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert 'label="pivot-hole size"' in source and "edge=pivot_edge" in source
     assert 'datum="B"' in source
     assert 'label="pivot-hole cylindrical datum feature"' in source
-    assert "symbol_xy=(0.085, 0.159)" in source
+    assert "symbol_xy=(pivot_center[0] + 0.010, pivot_center[1])" in source
     assert "entity=pivot_edge" in source
+    assert "shoulder=True" in source
     assert "annotation=pivot_callout.GetAnnotation()" not in source
     assert 'datum="C"' in source and "entity=north_edge" in source
     assert "symbol_xy=(0.100, 0.135)" in source
@@ -115,9 +116,13 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-swing-platform")
     assert config["material"] == config["material_specification"]
-    assert "steel" in str(config["material_specification"]).lower()
+    assert "astm a830/a830m gr 1018 hr steel plate" in str(
+        config["material_specification"]
+    ).lower()
     assert "5/16 in minimum stock" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "mil-dtl-13924 class 1" in finish
     assert "oil seal" in finish
     assert int(config["quantity"]) == 1
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "dia_tolerance_mm=(0.0, 0.10)" in part_source

@@ -74,7 +74,7 @@ TOP_KEEP = {
 }
 
 
-def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
+def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     """Draw the plan-view cone axis through the modeled pivot-hole center."""
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
@@ -144,6 +144,7 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
+    return pivot
 
 
 def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -271,7 +272,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, top_annotations, {"PlateLenDim": "+/-0.25"})
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pivot hole")
-    _add_cone_axis_centerline(adapter, top)
+    pivot_center = _add_cone_axis_centerline(adapter, top)
 
     pivot_edge, north_edge, straight_side_edge = _visible_plan_controls(adapter, top)
     add_native_hole_callout(
@@ -289,10 +290,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.085, 0.159),
+        # Place the native tag one short radial leader from the projected hole
+        # rim.  The former distant tag visually merged with the overall-length
+        # extension line and could be read as a planar datum.
+        symbol_xy=(pivot_center[0] + 0.010, pivot_center[1]),
         datum="B",
         label="pivot-hole cylindrical datum feature",
         entity=pivot_edge,
+        shoulder=True,
     )
     add_datum_feature(
         adapter,
