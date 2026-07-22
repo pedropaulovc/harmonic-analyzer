@@ -20,11 +20,23 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (6.0, 1.0)
-END_KEEP = {"HeadDiaDim": (0.028, 0.176), "ShankDiaDim": (0.028, 0.124)}
+END_KEEP = {
+    "HeadDiaDim": (0.028, 0.176),
+    "ShoulderDiaDim": (0.028, 0.124),
+}
+SIDE_KEEP = {
+    "HeadHt": (0.190, 0.222),
+    "ShoulderLg": (0.165, 0.138),
+    "ThreadLg": (0.215, 0.120),
+}
+SIDE_DIMENSION_CALLOUTS = {
+    "ShoulderLg": "GROUND SHOULDER",
+    "ThreadLg": "1/4-20 UNC-2A FULL THREAD",
+}
 DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Cone Pivot Screw Manufacturing Drawing",
-    keywords="cone pivot screw; slotted shoulder screw; commercial fastener",
+    keywords="cone pivot screw; slotted shoulder screw; made fastener",
     scale=SHEET_SCALE,
     side_view="*Front",
     # Look from the threaded tail so the controlled ground shoulder is visible
@@ -35,6 +47,8 @@ RECIPE = FastenerSheet(
     iso_center=(0.310, 0.170),
     end_keep=END_KEEP,
     dimension_callouts=DIMENSION_CALLOUTS,
+    side_keep=SIDE_KEEP,
+    side_dimension_callouts=SIDE_DIMENSION_CALLOUTS,
 )
 
 

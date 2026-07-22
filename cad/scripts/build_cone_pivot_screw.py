@@ -1,14 +1,13 @@
 r"""Reproduction script: cone platform pivot screw (item 2, p.18 "pivot").
 
-The slotted shoulder screw the swing platform rotates ON: head seats on
-the plate top at the pivot, O6.35 shoulder drops through the plate's
-O6.5 clearance hole into the harmonic base's pivot hole (the base part
-carries the matching hole; agreement asserted in the drive-train
-assembly). The plate swings about this shank -- it is the physical p1
-pivot pin.
+The slotted shoulder screw the swing platform rotates on.  Its ground shoulder
+is 0.25 mm longer than the plate thickness, so tightening the threaded tail
+against the base leaves running axial clearance instead of clamping the plate.
+The distinct 1/4-20 UNC-2A tail engages the base's blind UNC-2B seat.
 
-Stacked extrudes from the head seat (origin, Top plane): head up, shank
-down; one rectangular cut across the head top forms the driver slot.
+Stacked extrudes from the under-head datum (origin, Top plane): head up,
+shoulder and thread tail down; one rectangular cut across the head top forms
+the driver slot.
 
 Run (SolidWorks already open)::
 
@@ -30,7 +29,9 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    extrude_at_offset,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -50,10 +51,13 @@ from cone_pivot_screw_spec import (
     END_VIEW_NOTE,
     HEAD_DIA,
     HEAD_T,
-    SHANK_DIA,
-    SHANK_LEN,
+    SHOULDER_DIA,
+    SHOULDER_LEN,
     SLOT_D,
     SLOT_W,
+    THREAD_REF_DIA,
+    THREAD_TAIL_LEN,
+    UNDERHEAD_LEN,
 )
 
 PART_NAME = "cone-pivot-screw"
@@ -72,8 +76,10 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
     await set_global(adapter, "HeadDia", f"{HEAD_DIA}mm")
     await set_global(adapter, "HeadT", f"{HEAD_T}mm")
-    await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
-    await set_global(adapter, "ShankLen", f"{SHANK_LEN}mm")
+    await set_global(adapter, "ShoulderDia", f"{SHOULDER_DIA}mm")
+    await set_global(adapter, "ShoulderLen", f"{SHOULDER_LEN}mm")
+    await set_global(adapter, "ThreadRefDia", f"{THREAD_REF_DIA}mm")
+    await set_global(adapter, "ThreadLen", f"{THREAD_TAIL_LEN}mm")
     drive_jobs: list[tuple[str, str]] = []
 
     head = SketchDims()
@@ -89,24 +95,47 @@ async def build(adapter) -> dict[str, str]:
     check("extrude head",
           await adapter.create_extrusion(ExtrusionParameters(depth=HEAD_T)))
     name_last_feature(adapter, "Head")
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_T
     volume = await volume_check(adapter, "head", v, 0.005 * v)
 
-    shank = SketchDims()
-    check("create_sketch shank", await adapter.create_sketch("Top"))
+    shoulder = SketchDims()
+    check("create_sketch shoulder", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, SHANK_DIA / 2.0, "shank", dims=shank,
-        names=("ShankCx", "ShankCz", "ShankDiaDim"), drives=(None, None, '"ShankDia"'),
+        adapter, 0.0, 0.0, SHOULDER_DIA / 2.0, "shoulder", dims=shoulder,
+        names=("ShoulderCx", "ShoulderCz", "ShoulderDiaDim"),
+        drives=(None, None, '"ShoulderDia"'),
     )
-    await ensure_fully_defined(adapter, "shank sketch")
-    check("exit_sketch shank", await adapter.exit_sketch())
-    name_last_feature(adapter, "ShankProfile")
-    drive_jobs += shank.apply(adapter, "ShankProfile")
-    check("extrude shank (down)", await adapter.create_extrusion(
-        ExtrusionParameters(depth=SHANK_LEN, reverse_direction=True)))
-    name_last_feature(adapter, "Shank")
-    v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
-    volume = await volume_check(adapter, "shank", volume + v_shank, 0.005 * v_shank)
+    await ensure_fully_defined(adapter, "shoulder sketch")
+    check("exit_sketch shoulder", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShoulderProfile")
+    drive_jobs += shoulder.apply(adapter, "ShoulderProfile")
+    extrude_at_offset(adapter, SHOULDER_LEN, -SHOULDER_LEN)
+    name_last_feature(adapter, "Shoulder")
+    name_dimensions(adapter, "Shoulder", ["ShoulderLg"])
+    v_shoulder = math.pi * (SHOULDER_DIA / 2.0) ** 2 * SHOULDER_LEN
+    volume = await volume_check(
+        adapter, "shoulder", volume + v_shoulder, 0.005 * v_shoulder
+    )
+
+    thread = SketchDims()
+    check("create_sketch thread tail", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, THREAD_REF_DIA / 2.0, "thread tail", dims=thread,
+        names=("ThreadCx", "ThreadCz", "ThreadRefDiaDim"),
+        drives=(None, None, '"ThreadRefDia"'),
+    )
+    await ensure_fully_defined(adapter, "thread-tail sketch")
+    check("exit_sketch thread tail", await adapter.exit_sketch())
+    name_last_feature(adapter, "ThreadTailProfile")
+    drive_jobs += thread.apply(adapter, "ThreadTailProfile")
+    extrude_at_offset(adapter, THREAD_TAIL_LEN, -UNDERHEAD_LEN)
+    name_last_feature(adapter, "ThreadTail")
+    name_dimensions(adapter, "ThreadTail", ["ThreadLg"])
+    v_thread = math.pi * (THREAD_REF_DIA / 2.0) ** 2 * THREAD_TAIL_LEN
+    volume = await volume_check(
+        adapter, "thread tail", volume + v_thread, 0.005 * v_thread
+    )
 
     # Driver slot: rect cut from the head top, SLOT_D deep.
     check("create_plane HeadTop", await adapter.create_plane(

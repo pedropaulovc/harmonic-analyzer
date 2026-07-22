@@ -35,6 +35,7 @@ THREAD_DESIGNATION = f"{THREAD} UNC-2A"  # external screw thread, class 2A
 # its end diameters natively).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia"},
+    "ShankProfile": {"ShankDia"},
     "Head": {"HeadHt"},
     "Shank": {"ShankLg"},
 }

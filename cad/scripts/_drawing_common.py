@@ -357,6 +357,58 @@ def add_datum_feature(
     return tag
 
 
+@_telemetry.traced("drawing.dimension_datum_feature", label_param="label")
+def add_datum_feature_to_dimension(
+    adapter: Any,
+    annotations: Iterable[Any],
+    *,
+    dimension: str,
+    symbol_xy: tuple[float, float],
+    datum: str,
+    label: str,
+) -> Any:
+    """Attach a native datum-feature symbol to a named size dimension.
+
+    A thread-derived datum axis must be identified from the thread size
+    callout, not from the schematic thread-outline silhouette.  Selecting the
+    display dimension before ``InsertDatumTag2`` makes the datum symbol part of
+    that callout's extension rather than a tag on model geometry.
+    """
+    draw = adapter.currentModel
+    target = None
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "Select2"
+        )
+        if dimension_name(adapter, annotation) == dimension:
+            target = annotation
+            break
+    if target is None:
+        raise RuntimeError(f"datum source dimension is missing: {dimension!r}")
+
+    draw.ClearSelection2(True)
+    if not target.Select2(False, 0):
+        raise RuntimeError(f"failed to select datum source dimension {dimension!r}")
+    tag = draw.InsertDatumTag2()
+    if tag is None:
+        raise RuntimeError(f"failed to insert datum {datum} ({label})")
+    tag = _sw_type_info.early_bound_or_flag(
+        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel"
+    )
+    if not tag.SetLabel(datum):
+        raise RuntimeError(f"failed to label datum feature {datum} ({label})")
+    annotation = _sw_type_info.early_bound_or_flag(
+        tag.GetAnnotation(), "IAnnotation", "SetPosition2"
+    )
+    if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+        raise RuntimeError(f"failed to position datum {datum} ({label})")
+    if str(tag.GetLabel()) != datum:
+        raise RuntimeError(f"datum feature label did not persist ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return tag
+
+
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
 def add_feature_control_frame(
     adapter: Any,
@@ -1363,6 +1415,40 @@ def set_dimension_callouts(
         raise RuntimeError(
             f"dimension callouts not applied: {sorted(remaining)}"
         )
+    adapter.currentModel.EditRebuild3()
+
+
+def set_dimension_text(
+    adapter: Any, annotations: Iterable[Any], replacement: dict[str, str]
+) -> None:
+    """Replace the entire displayed text of named model dimensions.
+
+    This is for associative size callouts whose model parameter is only the
+    view carrier.  In particular, a schematic thread-minor cylinder must read
+    as its thread designation rather than masquerading as a manufactured
+    plain-diameter feature.
+    """
+    remaining = dict(replacement)
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        text = remaining.pop(name, None)
+        if text is None:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        if not display.SetText(0, text):  # swDimensionTextAll
+            raise RuntimeError(f"failed to replace dimension text for {name!r}")
+        if str(display.GetText(0) or "") != text:
+            raise RuntimeError(f"dimension text did not persist for {name!r}")
+    if remaining:
+        raise RuntimeError(f"dimension text not applied: {sorted(remaining)}")
     adapter.currentModel.EditRebuild3()
 
 

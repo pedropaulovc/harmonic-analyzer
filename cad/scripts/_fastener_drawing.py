@@ -34,6 +34,8 @@ class FastenerSheet:
     iso_center: tuple[float, float]
     end_keep: Mapping[str, tuple[float, float]]
     dimension_callouts: Mapping[str, str]
+    side_keep: Mapping[str, tuple[float, float]] | None = None
+    side_dimension_callouts: Mapping[str, str] | None = None
     note_xy: tuple[float, float] = (0.020, 0.115)
     end_note_xy: tuple[float, float] = (0.050, 0.220)
     side_centerline_face_xy: tuple[float, float] | None = None
@@ -133,6 +135,16 @@ async def build_fastener_sheet(
         adapter, end, keep=recipe.end_keep, view_label="head-end"
     )
     set_dimension_callouts(adapter, end_annotations, recipe.dimension_callouts)
+
+    if recipe.side_keep:
+        side_annotations = curate_view_dimensions(
+            adapter, side, keep=dict(recipe.side_keep), view_label="side"
+        )
+        set_dimension_callouts(
+            adapter,
+            side_annotations,
+            dict(recipe.side_dimension_callouts or {}),
+        )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *recipe.note_xy)
     add_property_linked_note(adapter, "End View Note", *recipe.end_note_xy)

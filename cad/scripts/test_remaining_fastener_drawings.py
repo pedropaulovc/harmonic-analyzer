@@ -29,7 +29,7 @@ CASES = (
         "draw_cone_pivot_screw",
         "cone_pivot_screw_spec",
         "build_cone_pivot_screw",
-        "ShankDiaDim",
+        "ShoulderDiaDim",
     ),
     Case(
         "cone-tip-pinch-screw",
@@ -94,16 +94,21 @@ def test_catalog_thread_and_dimension_callout_are_not_invented(case: Case) -> No
     catalog = fastener(case.part_name)
 
     assert spec.THREAD == catalog.thread
-    assert spec.SHANK_DIA == catalog.model_diameter_mm
-    assert spec.SHANK_LEN == catalog.length_mm
-    assert part.SHANK_DIA == spec.SHANK_DIA
-    assert part.SHANK_LEN == spec.SHANK_LEN
     assert spec.THREAD_DESIGNATION == f"{catalog.thread} UNC-2A"
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS == {}
     if case.part_name == "cone-pivot-screw":
+        assert spec.SHOULDER_DIA == catalog.model_diameter_mm
+        assert spec.UNDERHEAD_LEN == catalog.length_mm
+        assert part.SHOULDER_DIA == spec.SHOULDER_DIA
+        assert part.SHOULDER_LEN == spec.SHOULDER_LEN
+        assert part.THREAD_TAIL_LEN == spec.THREAD_TAIL_LEN
         assert "GROUND" in spec.DRAWING_NOTES
         return
+    assert spec.SHANK_DIA == catalog.model_diameter_mm
+    assert spec.SHANK_LEN == catalog.length_mm
+    assert part.SHANK_DIA == spec.SHANK_DIA
+    assert part.SHANK_LEN == spec.SHANK_LEN
     assert "REFERENCE ONLY" in spec.DRAWING_NOTES
     assert "FULL THREAD" in spec.DRAWING_NOTES
     assert "END FACE SQUARE TO THREAD AXIS" in spec.DRAWING_NOTES
@@ -141,11 +146,21 @@ def test_slotted_screw_slot_dimensions_live_in_the_pure_contract(
     assert "SLOT_D," in build_source
 
 
-def test_cone_pivot_does_not_hide_the_missing_threaded_tail_definition() -> None:
+def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     spec = importlib.import_module("cone_pivot_screw_spec")
-    assert "THREADED-END LENGTH IS NOT DEFINED" in spec.DRAWING_NOTES
-    assert "DO NOT RELEASE AS A MADE-PART DRAWING" in spec.DRAWING_NOTES
-    assert "USE THE COMMERCIAL SHOULDER SCREW" in spec.DRAWING_NOTES
+    base = importlib.import_module("build_harmonic_base")
+    platform = importlib.import_module("build_cone_swing_platform")
+
+    assert spec.SHOULDER_LEN == spec.PLATFORM_THICKNESS + spec.AXIAL_CLEARANCE
+    assert spec.PLATFORM_THICKNESS == platform.PLATE_T
+    assert platform.PIVOT_HOLE_DIA > spec.SHOULDER_DIA
+    assert spec.THREAD_TAIL_LEN >= spec.SHOULDER_DIA
+    assert base.PIVOT_SEAT_SPEC.kind == "tapped"
+    assert base.PIVOT_SEAT_SPEC.size == spec.THREAD
+    assert base.PIVOT_SEAT_SPEC.thread_class == "2B"
+    assert base.PIVOT_HOLE_DEPTH - spec.THREAD_TAIL_LEN >= 1.5
+    assert "DO NOT RELEASE" not in spec.DRAWING_NOTES
+    assert f"{spec.THREAD_TAIL_LEN:.2f} MIN FULL THREAD" in spec.DRAWING_NOTES
 
 
 def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
@@ -154,6 +169,8 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert drawing.RECIPE.end_view == "*Bottom"
     assert drawing.RECIPE.side_center == (0.190, 0.170)
     assert spec.END_VIEW_NOTE == "SHOULDER-END VIEW"
+    assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShoulderLg", "ThreadLg"}
+    assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"].endswith("FULL THREAD")
 
 
 def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter() -> None:

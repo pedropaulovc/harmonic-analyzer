@@ -17,7 +17,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
+    add_datum_feature_to_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
@@ -25,6 +25,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_dimension_text,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -63,6 +64,7 @@ SIDE_DIMENSION_CALLOUTS = {"ShankLg": "UNDERHEAD LENGTH"}
 SIDE_KEEP = {
     "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.034),
     "ShankLg": (SIDE_CENTER[0] - 0.024, SIDE_CENTER[1] - 0.034),
+    "ShankDia": (SIDE_CENTER[0] - 0.050, SIDE_CENTER[1] + 0.016),
 }
 
 
@@ -125,20 +127,21 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, side, keep=SIDE_KEEP, view_label="side"
     )
     set_dimension_callouts(adapter, side_annotations, SIDE_DIMENSION_CALLOUTS)
+    set_dimension_text(
+        adapter, side_annotations, {"ShankDia": "#4-40 UNC-2A"}
+    )
 
     # The threaded shank establishes datum axis A. Native feature-control
     # frames make the head relationship directly inspectable; the linked notes
     # retain only size/process requirements and point the distal squareness to
     # its FCF.
-    shank_top = (SIDE_CENTER[0] - 0.009, SIDE_CENTER[1] + 0.008)
-    add_datum_feature(
+    add_datum_feature_to_dimension(
         adapter,
-        side,
-        edge_xy=shank_top,
-        symbol_xy=(shank_top[0], SIDE_CENTER[1] + 0.045),
+        side_annotations,
+        dimension="ShankDia",
+        symbol_xy=(SIDE_CENTER[0] - 0.050, SIDE_CENTER[1] + 0.045),
         datum="A",
         label="thread pitch-diameter datum axis",
-        entity_type="SILHOUETTE",
     )
     add_feature_control_frame(
         adapter,
