@@ -118,6 +118,7 @@ FRONT_DEFERRED_BALLOON_STEMS = frozenset(
         "pinion-pivot-shaft",
         "pinion-lever",
         "foot-screw",
+        "crankshaft",
         "crank-pinion",
     }
 )
