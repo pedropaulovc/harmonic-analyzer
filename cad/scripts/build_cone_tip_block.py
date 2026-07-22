@@ -65,6 +65,7 @@ from cone_tip_block_spec import (
     PINCH_HEIGHT,
     PINCH_THREAD,
     SHAFT_PASSAGE_DIA,
+    SLIT_DEPTH,
     SLIT_W,
 )
 from _holes import (
@@ -94,7 +95,6 @@ ADJUSTER_BORE_SPEC = HoleSpec(
     "tapped", ADJUSTER_THREAD, end="blind", depth_mm=ADJUSTER_BORE_DEPTH)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)  # 6.528 tap drill
 SHAFT_PASSAGE_RADIUS = SHAFT_PASSAGE_DIA / 2.0
-SLIT_DEPTH = 8.0  # top face down past the bore line (55.0 -> 47.0)
 # Pinch screw cross-bore, along local X: native #3-48 TAPPED hole -- the Ø1.7
 # cone-tip-pinch-screw threads in (build_cone_tip_pinch_screw SHANK_DIA = 1.7 =
 # 1.994 - 0.3; the drive-train assembly asserts bore - shank in [0.15, 0.45],

@@ -215,7 +215,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         cup,
-        edge_xy=(CUP_CENTER[0] + 0.004, CUP_CENTER[1]),
         frame_xy=(CUP_CENTER[0] + 0.050, CUP_CENTER[1] + 0.032),
         characteristic="position",
         tolerance="0.05",

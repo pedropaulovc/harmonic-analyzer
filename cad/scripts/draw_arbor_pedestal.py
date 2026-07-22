@@ -363,7 +363,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=foot_edge,
         symbol_xy=(FRONT_CENTER[0] + 0.050, _front_y(0.0) + 0.010),
         datum="A",
         label="foot seat face",
@@ -372,7 +371,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(2.5)),
         # Keep the tag on the inboard side of the datum edge.  Its short
         # rightward leader stays clear of the datum-B perpendicularity frame.
         symbol_xy=(0.086, _front_y(2.5)),
@@ -383,7 +381,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=foot_edge,
         frame_xy=(0.185, 0.080),
         characteristic="flatness",
         tolerance="0.05",
@@ -393,7 +390,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] - FOOT_WIDTH / 2.0 * _S, _front_y(20.0)),
         frame_xy=(0.020, 0.105),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -407,10 +403,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(
-            FRONT_CENTER[0] - _bore_r * 0.7,
-            _front_y(BORE_HEIGHT) - _bore_r * 0.7,
-        ),
         frame_xy=(0.020, _front_y(BORE_HEIGHT) + 0.006),
         characteristic="position",
         tolerance="0.10",
@@ -422,7 +414,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + 11.0 * _S, _front_y(45.0)),
         frame_xy=(0.245, _front_y(BORE_HEIGHT) + 0.014),
         characteristic="profile_surface",
         tolerance="0.10",
@@ -434,7 +425,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),  # bore right
         symbol_xy=(0.155, 0.225),
         roughness_ra="1.6",
         label="arbor bore finish",
@@ -476,7 +466,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] + FOOT_DEPTH / 2.0 * _S),
         symbol_xy=(0.145, 0.260),
         datum="D",
         label="exposed flange edge",
@@ -485,7 +474,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] + FOOT_DEPTH / 2.0 * _S),
         frame_xy=(0.020, 0.235),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -505,7 +493,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0] + SCREW_CLEARANCE_DIA / 2.0 * _S, TOP_CENTER[1]),
         frame_xy=(0.300, 0.250),
         characteristic="position",
         tolerance="0.20",
@@ -517,24 +504,22 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0], TOP_CENTER[1]),
         frame_xy=(0.245, 0.242),
         characteristic="profile_surface",
         tolerance="0.10",
         datums=("A", "B", "D"),
-        quantity="STRAP NEAR FACE @ BASIC 6.00",
+        quantity=f"STRAP NEAR FACE @ BASIC {FOOT_DEPTH - STRAP_T:.2f}",
         label="strap near-face profile",
         entity=strap_near_entity,
     )
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] - FOOT_DEPTH / 2.0 * _S),
         frame_xy=(0.300, 0.220),
         characteristic="profile_surface",
         tolerance="0.10",
         datums=("A", "B", "D"),
-        quantity="FOOT + STRAP FAR FACES @ BASIC 16.00",
+        quantity=f"FOOT + STRAP FAR FACES @ BASIC {FOOT_DEPTH:.2f}",
         label="coplanar far-face profile",
         entity=far_face_entity,
     )

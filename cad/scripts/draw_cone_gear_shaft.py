@@ -225,7 +225,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         side,
-        edge_xy=pivot_top,
         symbol_xy=(0.215, 0.252),
         datum="A",
         label="pivot journal datum feature",
@@ -235,7 +234,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         end,
-        edge_xy=pivot_circle,
         frame_xy=(0.150, 0.142),
         characteristic="cylindricity",
         tolerance="0.01",
@@ -259,7 +257,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        edge_xy=pivot_top,
         symbol_xy=(0.230, 0.242),
         roughness_ra="1.6",
         label="pivot journal finish",
@@ -270,7 +267,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        edge_xy=(tip_top[0] + 0.010, tip_top[1]),
         symbol_xy=(0.102, 0.240),
         roughness_ra="1.6",
         label="tip journal finish",

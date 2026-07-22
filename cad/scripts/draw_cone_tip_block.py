@@ -255,7 +255,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=foot_edge,
         symbol_xy=(FRONT_CENTER[0] + 0.024, _front_y(0.0) - 0.010),
         datum="A",
         label="foot seat face",
@@ -313,10 +312,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(
-            FRONT_CENTER[0] + SHAFT_PASSAGE_DIA / 2.0 * _S,
-            _front_y(ADJUSTER_AXIS_HEIGHT),
-        ),
         frame_xy=(0.150, _front_y(ADJUSTER_AXIS_HEIGHT) - 0.022),
         characteristic="position",
         tolerance="0.05",
@@ -376,10 +371,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(
-            RIGHT_CENTER[0] + PINCH_CLEARANCE_DIA / 2.0 * _S,
-            _front_y(PINCH_HEIGHT),
-        ),
         frame_xy=(0.245, _front_y(PINCH_HEIGHT) - 0.030),
         characteristic="position",
         tolerance="0.05",

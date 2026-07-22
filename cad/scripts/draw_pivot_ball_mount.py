@@ -300,7 +300,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=seat_edge,
         symbol_xy=(FRONT_CENTER[0] + 0.024, _front_y(0.0) - 0.010),
         datum="A",
         label="seat face",
@@ -341,7 +340,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BALL_CENTER_H) + _bore_r),  # bore top
         # Keep this leader wholly to the right of the bore.  SolidWorks retains
         # a long native association leader on the stem-axis control below; a
         # left-side bore leader necessarily intersects that diagonal.
@@ -380,7 +378,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BALL_CENTER_H)),  # bore right
         symbol_xy=(0.152, _front_y(BALL_CENTER_H) - 0.026),
         roughness_ra="1.6",
         label="cross-bore finish",

@@ -23,6 +23,7 @@ PINCH_THREAD = "#3-48"  # cross-bore tapped hole that squeezes the top slit
 PINCH_HEIGHT = 53.2
 PINCH_CLEARANCE_DIA = 2.946
 SLIT_W = 1.2  # top clamp slit width
+SLIT_DEPTH = 8.0  # slit cut down from the top face (BLOCK_HEIGHT 55.0 -> 47.0)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Width", "Depth"},

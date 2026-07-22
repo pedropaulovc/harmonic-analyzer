@@ -347,7 +347,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=foot_edge,
         symbol_xy=(foot_edge[0], _front_y(0.0) - 0.010),
         datum="A",
         label="foot seat face",
@@ -356,7 +355,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=foot_edge,
         frame_xy=(0.145, _front_y(0.0) + 0.015),
         characteristic="flatness",
         tolerance="0.05",
@@ -373,7 +371,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0], TOP_CENTER[1] - BLOCK_DIA / 2.0 * _S),
         symbol_xy=(TOP_CENTER[0] + 0.026, TOP_CENTER[1] - 0.020),
         datum="B",
         label="column outside diameter",
@@ -443,7 +440,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=crank_xy,
         frame_xy=(0.170, _front_y(CRANK_BORE_HEIGHT) + 0.010),
         characteristic="position",
         tolerance="0.10",
