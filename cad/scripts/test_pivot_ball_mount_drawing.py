@@ -78,10 +78,11 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert "frame_xy=(0.180, _front_y(12.0) - 0.022)" in source
     assert 'characteristic="profile_surface"' in source
     assert 'quantity="STEM AXIS"' in source
-    assert "leader=False" in source
+    assert "leader=False" not in source
     assert 'label="stem diameter"' in source
     assert 'entity_type="SILHOUETTE"' in source
-    assert source.count('entity_type="DIMENSION"') == 2
+    assert source.count('entity_type="DIMENSION"') == 1
+    assert "FRONT_CENTER[0] + STEM_DIA / 2.0 * _S" in source
     assert "symbol_xy=STEM_DIM_TEXT" in source
     assert "position_tolerance_m=0.0005" in source
     assert "set_basic_dimension(" in source

@@ -321,7 +321,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=STEM_DIM_TEXT,
+        edge_xy=(
+            FRONT_CENTER[0] + STEM_DIA / 2.0 * _S,
+            _front_y(12.0),
+        ),
         frame_xy=(0.180, _front_y(12.0) - 0.022),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -329,8 +332,7 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         quantity="STEM AXIS",
         label="datum-B axis perpendicularity",
-        entity_type="DIMENSION",
-        leader=False,
+        entity_type="SILHOUETTE",
     )
     # The BASIC height and position zone locate the cross-bore axis from the
     # seat plane and through the stem axis without a prose-only acceptance rule.
