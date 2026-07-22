@@ -91,6 +91,8 @@ def test_hole_states_are_annotated() -> None:
     assert "THRU" in callouts["ArborBoreDia"]
     assert "FLAT BOTTOM" in callouts["PinSeatDia"]
     assert "4.00 +0.10/-0.00 DEEP" in callouts["PinSeatDia"]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "{PIN_SEAT:.2f} +0.10/-0.00 DEEP" in source
 
 
 def test_blind_seat_depth_uses_the_marked_drawing_name() -> None:

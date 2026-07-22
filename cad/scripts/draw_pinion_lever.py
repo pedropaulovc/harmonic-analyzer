@@ -46,6 +46,8 @@ from pinion_lever_spec import (
     HUB_OD,
     ROD_LEN,
     ROD_ROOT_DIA,
+    ROD_TIP_DIA,
+    ROD_Y0,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -254,9 +256,9 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         text=(
             "STRAIGHT CONICAL GRIP PROFILE\n"
-            "<MOD-DIAM>4.00+/-0.05 AT BASIC 3.50\n"
+            f"<MOD-DIAM>{ROD_ROOT_DIA:.2f}+/-0.05 AT BASIC {ROD_Y0:.2f}\n"
             "FROM HUB AXIS\n"
-            "<MOD-DIAM>6.00+/-0.05 AT TIP"
+            f"<MOD-DIAM>{ROD_TIP_DIA:.2f}+/-0.05 AT TIP"
         ),
         entity_xy=grip_edge,
         note_xy=(0.078, 0.235),
@@ -274,8 +276,8 @@ async def build(adapter: Any) -> dict[str, str]:
         section,
         text=(
             f"SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10\n"
-            "10.00+/-0.10 B TO CROWN ROOT PLANE\n"
-            "11.50 REF B TO APEX"
+            f"{HUB_LEN:.2f}+/-0.10 B TO CROWN ROOT PLANE\n"
+            f"{HUB_LEN + CAP_SAG:.2f} REF B TO APEX"
         ),
         entity_xy=crown_edge,
         note_xy=(0.245, 0.155),
@@ -295,8 +297,8 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.025)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.138)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.210, 0.255)
+    add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.138)
 
     return await finalize_drawing(
         adapter,

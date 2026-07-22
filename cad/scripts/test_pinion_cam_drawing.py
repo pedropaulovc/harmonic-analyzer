@@ -100,6 +100,7 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert "BOSS END VIEW SCALE 2:1" in source
     assert "A TO BOSS / TAP AXIS" in drawing.DIMENSION_CALLOUTS["BossCz"]
     assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert "{CAM_OD:.2f} OD" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

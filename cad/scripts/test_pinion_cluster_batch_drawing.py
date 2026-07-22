@@ -5,7 +5,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
+import _assembly
 import _config
+import _interference_contracts
 import crank_handle_spec
 import pinion_bracket_spec
 import pinion_cam_pin_spec
@@ -102,3 +106,117 @@ def test_drive_train_does_not_duplicate_bracket_geometry_constants() -> None:
     )
     for name in ("STRAP_T", "STRAP_R_END", "STRAP_C2C"):
         assert re.search(rf"^\s*{name}\s*=", source, re.MULTILINE) is None
+
+
+def test_make_critical_free_text_is_formatted_from_geometry_constants() -> None:
+    source_tokens = {
+        crank_handle_spec: (
+            "{2.0 * NECK_R:.2f}",
+            "{HANDLE_MAX_DIA:.2f}",
+            "{2.0 * CAP_R:.2f}",
+        ),
+        pinion_cam_spec: ("{ECC:.2f}", "{CAM_OD:.2f}"),
+        pinion_cam_pin_spec: ("{CAP_SAG:.2f}",),
+        pinion_handle_spec: (
+            "{CAP_SAG:.2f}",
+            "{GRIP_LEN / 2.0 + WALL_T + TUBE_LEN:.2f}",
+        ),
+        pinion_lever_spec: ("{HUB_LEN:.2f}", "{HUB_LEN / 2.0:.2f}"),
+        pinion_pivot_shaft_spec: ("{CAP_SAG:.2f}",),
+        pinion_spring_spec: (
+            "{FLAT_LEN:.2f}",
+            "{90.0 - BLADE_TILT_DEG + KINK_DEG:.2f}",
+            "{HOLE_FROM_END:.2f}",
+        ),
+        pinion_bracket_spec: ("{R_END:.2f}",),
+    }
+    for module, tokens in source_tokens.items():
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        for token in tokens:
+            assert token in source, f"{Path(module.__file__).name}: {token}"
+
+
+class _InterferenceComponent:
+    def __init__(self, name: str) -> None:
+        self.Name2 = name
+        self.ReferencedConfiguration = ""
+
+
+class _Interference:
+    def __init__(self, names: tuple[str, str], volume_mm3: float) -> None:
+        self.Components = [_InterferenceComponent(name) for name in names]
+        self.Volume = volume_mm3 / 1e9
+
+
+class _InterferenceManager:
+    def __init__(self, interference: _Interference) -> None:
+        self._interference = interference
+
+    def GetInterferences(self) -> list[_Interference]:
+        return [self._interference]
+
+    def Done(self) -> None:
+        pass
+
+
+class _InterferenceAssembly:
+    def __init__(self, interference: _Interference) -> None:
+        self.InterferenceDetectionManager = _InterferenceManager(interference)
+
+    def ToolsCheckInterference(self) -> None:
+        pass
+
+
+class _InterferenceAdapter:
+    def __init__(self, interference: _Interference) -> None:
+        self.currentModel = _InterferenceAssembly(interference)
+
+    @staticmethod
+    def _attempt(action, *, default=None):
+        try:
+            return action()
+        except Exception:
+            return default
+
+
+def test_intentional_fit_allowance_is_pair_and_volume_bounded(monkeypatch) -> None:
+    pair = ("pinion-bracket-1", "pinion-cam-pin-1")
+    monkeypatch.setattr(_assembly, "_early_bound", lambda obj, *_args: obj)
+
+    adapter = _InterferenceAdapter(_Interference(pair, 0.37))
+    _assembly.check_no_interference(
+        adapter,
+        allowed_pairs={frozenset(pair): 0.45},
+    )
+
+    with pytest.raises(RuntimeError, match="0.46 mm\\^3"):
+        _assembly.check_no_interference(
+            _InterferenceAdapter(_Interference(pair, 0.46)),
+            allowed_pairs={frozenset(pair): 0.45},
+        )
+
+    with pytest.raises(RuntimeError, match="pinion-cam-pin-2"):
+        _assembly.check_no_interference(
+            _InterferenceAdapter(
+                _Interference(("pinion-bracket-1", "pinion-cam-pin-2"), 0.37)
+            ),
+            allowed_pairs={frozenset(pair): 0.45},
+        )
+
+
+def test_drive_train_allows_only_the_two_modeled_cam_pin_press_fits() -> None:
+    allowed = _interference_contracts.allowed_interference_pairs("drive-train")
+    assert set(allowed) == {
+        frozenset(("pinion-bracket-1", "pinion-cam-pin-1")),
+        frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
+    }
+    assert 0.40 < set(allowed.values()).pop() < 0.45
+    assert _interference_contracts.allowed_interference_pairs("channel") == {}
+
+    scripts = Path(_assembly.__file__).parent
+    build_source = (scripts / "build_drive_train_assembly.py").read_text(
+        encoding="utf-8"
+    )
+    verify_source = (scripts / "verify.py").read_text(encoding="utf-8")
+    assert "allowed_pairs=allowed_interference_pairs(ASM_NAME)" in build_source
+    assert "allowed_pairs=allowed_interference_pairs(name)" in verify_source

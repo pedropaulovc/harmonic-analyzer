@@ -38,6 +38,7 @@ from pinion_bracket_spec import (
     ARBOR_BORE,
     C2C as C2C,
     OVERALL_LENGTH,
+    PIN_SEAT,
     PIVOT_BORE,
     R_END,
     THICKNESS,
@@ -113,7 +114,7 @@ DIMENSION_CALLOUTS = {
     "Depth": "+/-0.05 ONE STRAP THICKNESS",
     "PinSeatDia": (
         "NOMINAL REF\nH7: 4.012 MAX / 4.000 MIN\nBLIND; FLAT BOTTOM\n"
-        "4.00 +0.10/-0.00 DEEP\nDRILL FROM LEFT EDGE SHOWN"
+        f"{PIN_SEAT:.2f} +0.10/-0.00 DEEP\nDRILL FROM LEFT EDGE SHOWN"
     ),
     "PinSeatCz": "+/-0.05 FROM EITHER BROAD FACE",
 }

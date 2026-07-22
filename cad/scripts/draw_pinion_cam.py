@@ -106,7 +106,7 @@ DIMENSION_CALLOUTS = {
     "CollarCy": "+/-0.05 BOTH END FACES",
     "Depth": "+/-0.05",
     "BossDia": (
-        f"+/-0.05\nPROJECTION {BOSS_PROUD:.2f}+/-0.05\nBEYOND DIA 9.20 OD"
+        f"+/-0.05\nPROJECTION {BOSS_PROUD:.2f}+/-0.05\nBEYOND DIA {CAM_OD:.2f} OD"
     ),
     "BossCz": "A TO BOSS / TAP AXIS",
 }

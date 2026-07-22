@@ -183,6 +183,7 @@ from _assembly import (
     suspend_automatic_assembly_rebuilds,
     write_dof_manifest,
 )
+from _interference_contracts import allowed_interference_pairs
 
 # CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
 # folds it into THIS assembly's recipe/cache key -- intended.
@@ -2983,7 +2984,10 @@ async def build(adapter) -> dict[str, str]:
         required_stems=("crankshaft", "cone-swing-platform",
                         "pinion-bracket", "pinion-lift-rod"))
     write_dof_manifest(ASM_NAME)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

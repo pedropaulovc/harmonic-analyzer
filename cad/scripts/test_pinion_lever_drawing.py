@@ -79,8 +79,11 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDepth"]
     assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
     assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall"}
-    assert "<MOD-DIAM>4.00" in source
-    assert "<MOD-DIAM>6.00" in source
+    assert "<MOD-DIAM>{ROD_ROOT_DIA:.2f}" in source
+    assert "<MOD-DIAM>{ROD_TIP_DIA:.2f}" in source
+    assert "{ROD_Y0:.2f}" in source
+    assert "{HUB_LEN:.2f}+/-0.10" in source
+    assert "{HUB_LEN + CAP_SAG:.2f} REF" in source
     assert "create_section_view(" in source
     assert source.count("model_point_in_view(") == 2
     assert "ModelToViewTransform" in common_source
