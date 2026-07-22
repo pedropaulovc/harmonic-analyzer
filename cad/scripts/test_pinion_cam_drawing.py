@@ -54,9 +54,9 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
 def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Trimetric"' in source
-    assert "scale=(2, 1)" in source  # the trimetric override
-    assert pinion_cam_spec.ISOMETRIC_VIEW_NOTE == "TRIMETRIC VIEW SCALE 2:1"
+    assert '"*Isometric"' in source
+    assert "scale=(2, 1)" in source  # the isometric override
+    assert pinion_cam_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 

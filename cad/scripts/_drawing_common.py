@@ -1604,6 +1604,36 @@ def set_dimension_text(
     adapter.currentModel.EditRebuild3()
 
 
+def set_reference_dimension(
+    adapter: Any,
+    annotation: Any,
+    *,
+    label: str,
+    diameter: bool = False,
+) -> Any:
+    """Parenthesize one displayed nominal as an ASME reference dimension."""
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetSpecificAnnotation"
+    )
+    display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+    if display is None:
+        raise RuntimeError(f"{label} has no display dimension")
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "SetText", "GetText"
+    )
+    prefix_text = "(<MOD-DIAM>" if diameter else "("
+    display.SetText(1, prefix_text)  # swDimensionTextPrefix
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    prefix = str(display.GetText(1) or "")
+    suffix = str(display.GetText(2) or "")
+    if (prefix, suffix) != (prefix_text, ")"):
+        raise RuntimeError(
+            f"failed to parenthesize {label}: prefix={prefix!r}, suffix={suffix!r}"
+        )
+    adapter.currentModel.EditRebuild3()
+    return display
+
+
 def set_dimension_precision(
     adapter: Any, annotations: Iterable[Any], precision: dict[str, int]
 ) -> None:

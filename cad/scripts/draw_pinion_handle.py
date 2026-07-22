@@ -23,15 +23,20 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
+    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
+    model_point_in_view,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_basic_dimension,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -112,7 +117,8 @@ DIMENSION_CALLOUTS = {
     ),
     "RodSpan": "+/-0.10 OAL",
     "RodDia": (
-        f"PRESS ROD {ROD_DIA + 0.0025:.3f} MAX / {ROD_DIA - 0.0025:.3f} MIN\n"
+        "PRESS ROD NOMINAL REFERENCE\n"
+        f"FINAL ROD LIMITS {ROD_DIA + 0.0025:.3f} MAX / {ROD_DIA - 0.0025:.3f} MIN\n"
         f"REAM BODY HOLE {ROD_HOLE_DIA + 0.005:.3f} MAX / "
         f"{ROD_HOLE_DIA - 0.005:.3f} MIN THRU"
     ),
@@ -183,6 +189,13 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *right_annotations, *top_annotations],
         DIMENSION_CALLOUTS,
     )
+    top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
+    set_reference_dimension(
+        adapter,
+        top_by_name["RodDia"],
+        label="handle press-rod nominal diameter",
+        diameter=True,
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
@@ -199,6 +212,30 @@ async def build(adapter: Any) -> dict[str, str]:
     z_min = -GRIP_LEN / 2.0 - CAP_SAG
     z_max = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
     z_center = (z_min + z_max) / 2.0
+    cross_hole_rim = model_point_in_view(
+        adapter,
+        top,
+        (ROD_DIA / 2000.0, 0.0, 0.0),
+        label="handle cross-hole rim",
+    )
+    datum_b_edge = model_point_in_view(
+        adapter,
+        top,
+        (0.0, TUBE_OD / 2000.0, z_max / 1000.0),
+        label="handle datum-B end edge",
+    )
+    cross_hole_station = add_edge_dimension(
+        adapter,
+        top,
+        p0=cross_hole_rim,
+        p1=datum_b_edge,
+        text_xy=(0.300, 0.145),
+        label="datum B to body cross-hole axis",
+        orientation="horizontal",
+    )
+    set_basic_dimension(
+        adapter, cross_hole_station, label="datum B to body cross-hole axis"
+    )
     top_rod_center_y = (
         TOP_CENTER[1] - (0.0 - z_center) * SHEET_SCALE[0] / 1000.0
     )

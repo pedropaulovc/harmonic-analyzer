@@ -21,10 +21,13 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
+    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
     add_view_centerline,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -32,6 +35,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -70,7 +74,7 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
 }
 DIMENSION_CALLOUTS = {
-    "PinDia": "NOMINAL REF ONLY\nFINAL LIMITS\n4.020 MAX / 4.012 MIN\nRa 0.8",
+    "PinDia": "FINAL LIMITS\n4.020 MAX / 4.012 MIN\nRa 0.8",
     "Depth": "+/-0.05\nSEATED FLAT END TO CROWN ROOT",
 }
 
@@ -132,6 +136,13 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, front_annotations, {"PinDia": 3})
+    front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
+    set_reference_dimension(
+        adapter,
+        front_by_name["PinDia"],
+        label="cam-pin nominal diameter",
+        diameter=True,
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
@@ -140,6 +151,32 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
         label="pinion cam-pin shank axis centerline",
+    )
+    end_radius = PIN_DIA * END_VIEW_SCALE / 2000.0
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),
+        symbol_xy=(0.105, 0.228),
+        datum="A",
+        label="cam-pin cylindrical-shank datum axis",
+    )
+    seated_flat_face = model_point_in_view(
+        adapter,
+        right,
+        (0.0, PIN_DIA / 2000.0, 0.0),
+        label="cam-pin seated flat end",
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=seated_flat_face,
+        frame_xy=(0.220, 0.210),
+        characteristic="flatness",
+        tolerance="0.05",
+        quantity="SEATED END",
+        label="cam-pin seated-end flatness",
+        entity_type="SILHOUETTE",
     )
     crown_axial = CAP_SAG / 2.0
     crown_radial = math.sqrt(
@@ -162,8 +199,22 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.245, 0.235),
         characteristic="profile_surface",
         tolerance="0.05",
+        datums=("A",),
         quantity="OUTER CROWN",
         label="pinion cam-pin crown profile",
+        entity_type="SILHOUETTE",
+    )
+    add_attached_note(
+        adapter,
+        right,
+        text=(
+            f"OUTER CROWN SR{CAP_RADIUS:.2f}+/-0.05\n"
+            f"{CAP_SAG:.2f}+/-0.05 AXIAL HEIGHT\n"
+            "CROWN ROOT PLANE TO APEX"
+        ),
+        entity_xy=outer_crown_face,
+        note_xy=(0.250, 0.175),
+        label="cam-pin crown size and height",
         entity_type="SILHOUETTE",
     )
 

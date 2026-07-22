@@ -11,6 +11,8 @@ import _assembly
 import _config
 import _interference_contracts
 import crank_handle_spec
+import draw_pinion_cam_pin
+import draw_pinion_handle
 import pinion_bracket_spec
 import pinion_cam_pin_spec
 import pinion_cam_spec
@@ -116,11 +118,11 @@ def test_make_critical_free_text_is_formatted_from_geometry_constants() -> None:
             "{2.0 * CAP_R:.2f}",
         ),
         pinion_cam_spec: ("{ECC:.2f}", "{CAM_OD:.2f}"),
-        pinion_cam_pin_spec: ("{CAP_SAG:.2f}",),
+        draw_pinion_cam_pin: ("{CAP_SAG:.2f}",),
         pinion_handle_spec: (
             "{CAP_SAG:.2f}",
-            "{GRIP_LEN / 2.0 + WALL_T + TUBE_LEN:.2f}",
         ),
+        draw_pinion_handle: ("z_max / 1000.0",),
         pinion_lever_spec: ("{HUB_LEN:.2f}", "{HUB_LEN / 2.0:.2f}"),
         pinion_pivot_shaft_spec: ("{CAP_SAG:.2f}",),
         pinion_spring_spec: (

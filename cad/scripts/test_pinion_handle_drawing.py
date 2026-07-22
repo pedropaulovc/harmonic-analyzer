@@ -102,7 +102,7 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
 
 def test_transverse_axis_uses_basic_location_and_position_control() -> None:
     notes = pinion_handle_spec.DRAWING_NOTES
-    assert "BASIC 19.00 FROM DATUM B" in notes
+    assert "BOXED BASIC DIMENSION" in notes
     assert "POSITION IS CONTROLLED" in notes
     assert "MID-LENGTH WITHIN" not in notes
     assert "INTERSECTS A WITHIN" not in notes
@@ -110,6 +110,9 @@ def test_transverse_axis_uses_basic_location_and_position_control() -> None:
     assert 'characteristic="position"' in source
     assert 'datums=("A", "B")' in source
     assert "diameter=True" in source
+    assert "add_edge_dimension(" in source
+    assert "set_basic_dimension(" in source
+    assert "set_reference_dimension(" in source
     assert drawing.FRONT_KEEP["RodSpan"] == (0.115, 0.245)
     assert drawing.FRONT_KEEP["TubeId"][0] >= 0.075
     assert "frame_xy=(0.315, 0.155)" in source
