@@ -48,6 +48,8 @@ from pinion_handle_spec import (
     ROD_DIA,
     ROD_DOWN,
     ROD_HOLE_DIA,
+    ROD_HOLE_REAM_BAND,
+    ROD_PRESS_BAND,
     ROD_UP,
     TUBE_ID,
     TUBE_LEN,
@@ -121,9 +123,8 @@ DIMENSION_CALLOUTS = {
     "RodSpan": "+/-0.10 OAL",
     "RodDia": (
         "PRESS ROD NOMINAL REFERENCE\n"
-        f"FINAL ROD LIMITS {ROD_DIA + 0.0025:.3f} MAX / {ROD_DIA - 0.0025:.3f} MIN\n"
-        f"REAM BODY HOLE {ROD_HOLE_DIA + 0.005:.3f} MAX / "
-        f"{ROD_HOLE_DIA - 0.005:.3f} MIN THRU"
+        f"FINAL ROD LIMITS {fit_limits(ROD_DIA, ROD_PRESS_BAND)}\n"
+        f"REAM BODY HOLE {fit_limits(ROD_HOLE_DIA, ROD_HOLE_REAM_BAND)} THRU"
     ),
 }
 

@@ -26,6 +26,14 @@ from pinion_handle_geometry import (
     WALL_T as WALL_T,
 )
 
+# Press/ream bands peculiar to this part (per _fit_limits.py's contract, a
+# part-specific band lives beside the nominal it tolerances, not in the shared
+# fit-class table).  Symmetric about each nominal; rendered through
+# :func:`fit_limits` so a nominal retune can never leave the released MAX/MIN
+# text stale (codex #359).
+ROD_PRESS_BAND = (0.0025, -0.0025)  # turned cross-rod OD tolerance
+ROD_HOLE_REAM_BAND = (0.005, -0.005)  # body cross-hole ream tolerance
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripProfile": {"GripDia"},
     "Grip": {"GripLen"},
