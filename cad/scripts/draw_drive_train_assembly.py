@@ -112,6 +112,9 @@ BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 BOTTOM_VISIBILITY_STEMS = frozenset(
     {"cone-tip-bushing", "cone-gear-shaft", "crank-drive-gear"}
 )
+FRONT_DEFERRED_BALLOON_STEMS = frozenset(
+    {"swing-stop-screw", "pinion-lever", "foot-screw", "crank-pinion"}
+)
 
 ASSEMBLY_NOTES = "\n".join(
     (
@@ -209,9 +212,20 @@ def _add_drive_train_balloons(
         zip(views, BALLOON_RING_MARGINS, strict=True), start=1
     ):
         view_label = f"{label} view {index}"
-        balloons = _create_auto_balloons(
-            adapter, view, label=view_label, allow_empty=True
-        )
+        deferred_components: tuple[Any, ...] = ()
+        if index == 1:
+            deferred_components = _hide_selected_balloon_components(
+                adapter, view, FRONT_DEFERRED_BALLOON_STEMS
+            )
+        try:
+            balloons = _create_auto_balloons(
+                adapter, view, label=view_label, allow_empty=True
+            )
+        finally:
+            for component in deferred_components:
+                component.Visible = True
+            if deferred_components:
+                adapter.currentModel.EditRebuild3()
         if not balloons:
             continue
         _spread_balloons(adapter, view, balloons, margin=margin)
@@ -241,6 +255,71 @@ def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
     return tuple(children or ())
 
 
+def _drawing_component_matches(
+    adapter: Any, drawing_component: Any, stems: frozenset[str]
+) -> set[str]:
+    """Return configured stems represented by one leaf drawing component."""
+    name = str(drawing_component.Name or "")
+    component = adapter._attempt(
+        lambda dc=drawing_component: dc.Component, default=None
+    )
+    path = ""
+    if component is not None:
+        path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
+
+    identities = {Path(str(path)).stem.casefold()}
+    drawing_name = name.split("@", 1)[0].replace("\\", "/")
+    identities.add(drawing_name.rsplit("/", 1)[-1].casefold())
+    return {
+        stem
+        for stem in stems
+        if any(
+            identity == stem
+            or (
+                identity.startswith(f"{stem}-")
+                and identity.removeprefix(f"{stem}-").isdigit()
+            )
+            for identity in identities
+        )
+    }
+
+
+@_telemetry.traced("drawing.defer_front_balloon_components")
+def _hide_selected_balloon_components(
+    adapter: Any, view: Any, stems: frozenset[str]
+) -> tuple[Any, ...]:
+    """Temporarily hide four front-view items so later views own their balloons."""
+    root = adapter._attempt(
+        lambda: view.RootDrawingComponent2(False), default=None
+    )
+    if root is None:
+        raise RuntimeError("drive-train front view has no root drawing component")
+
+    pending = list(_drawing_component_children(root))
+    found: set[str] = set()
+    hidden: list[Any] = []
+    while pending:
+        drawing_component = pending.pop()
+        children = _drawing_component_children(drawing_component)
+        pending.extend(children)
+        if children:
+            continue
+        matched = _drawing_component_matches(adapter, drawing_component, stems)
+        if not matched:
+            continue
+        drawing_component.Visible = False
+        hidden.append(drawing_component)
+        found.update(matched)
+
+    missing = sorted(stems - found)
+    if missing:
+        raise RuntimeError(
+            f"drive-train front view cannot defer missing components: {missing}"
+        )
+    adapter.currentModel.EditRebuild3()
+    return tuple(hidden)
+
+
 @_telemetry.traced("drawing.isolate_bottom_balloon_components")
 def _isolate_bottom_balloon_components(adapter: Any, view: Any) -> None:
     """Show only the three enclosed BOM families in the auxiliary bottom view."""
@@ -258,32 +337,10 @@ def _isolate_bottom_balloon_components(adapter: Any, view: Any) -> None:
         children = _drawing_component_children(drawing_component)
         pending.extend(children)
 
-        name = str(drawing_component.Name or "")
-        enumerated.append(name)
-        component = adapter._attempt(
-            lambda dc=drawing_component: dc.Component, default=None
+        enumerated.append(str(drawing_component.Name or ""))
+        matched = _drawing_component_matches(
+            adapter, drawing_component, BOTTOM_VISIBILITY_STEMS
         )
-        path = ""
-        if component is not None:
-            path = adapter._attempt(
-                lambda c=component: c.GetPathName(), default=""
-            ) or ""
-
-        identities = {Path(str(path)).stem.casefold()}
-        drawing_name = name.split("@", 1)[0].replace("\\", "/")
-        identities.add(drawing_name.rsplit("/", 1)[-1].casefold())
-        matched = {
-            stem
-            for stem in BOTTOM_VISIBILITY_STEMS
-            if any(
-                identity == stem
-                or (
-                    identity.startswith(f"{stem}-")
-                    and identity.removeprefix(f"{stem}-").isdigit()
-                )
-                for identity in identities
-            )
-        }
         if children:
             continue
         drawing_component.Visible = bool(matched)

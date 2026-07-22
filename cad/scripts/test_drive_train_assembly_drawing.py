@@ -115,6 +115,14 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         "cone-gear-shaft",
         "crank-drive-gear",
     }
+    assert drawing.FRONT_DEFERRED_BALLOON_STEMS == {
+        "swing-stop-screw",
+        "pinion-lever",
+        "foot-screw",
+        "crank-pinion",
+    }
+    assert "_hide_selected_balloon_components(" in source
+    assert "component.Visible = True" in source
     assert "RootDrawingComponent2(False)" in source
     assert 'drawing_name.rsplit("/", 1)[-1].casefold()' in source
     assert 'identity.startswith(f"{stem}-")' in source
