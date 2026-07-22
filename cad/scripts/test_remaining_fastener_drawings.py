@@ -129,6 +129,11 @@ def test_title_block_properties_are_complete(case: Case) -> None:
     assert int(config["quantity"]) >= 1
 
 
+def test_assembly_fastener_quantities_are_pinned() -> None:
+    assert int(_config.parts("foot-screw")["quantity"]) == 3
+    assert int(_config.parts("fillister-screw")["quantity"]) == 22
+
+
 @pytest.mark.parametrize(
     ("spec_name", "build_name"),
     (

@@ -1,11 +1,9 @@
-r"""Reproduction script: fillister screw (book ch. 20/22; 6 used).
+r"""Reproduction script: fillister screw (book ch. 20/22; 22 used).
 
-The small brass machine screw used twice over: 4x holding the platen
-paper-clip strips through their existing O3 end holes into O3 platen
-sockets (ch. 22 p. 55 -- the platen's "fastener holes deferred to
-assembly" promise, resolved in the M6.10 fasteners pass), and 2x
-fastening the magnifying-lever bracket's flange up into the summing
-lever's coefficients plate (ch. 20 p. 47 "mounting screws omitted").
+The small brass machine screw is used throughout the paper-drive platen:
+4x holding its paper-clip strips, 10x holding the two guide rails, and 8x
+holding the four guide-lock plates.  The assembly authors one or more seeds
+for each group and expands them with native component patterns.
 The cylindrical head carries its native 0.8 mm driver slot; thread geometry
 is not modeled.
 

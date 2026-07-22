@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping
 
+import _telemetry
 from _common import check
 from _drawing_common import (
     DrawingOutputs,
@@ -43,6 +44,7 @@ class FastenerSheet:
     decorate: Callable[[Any, Any, Any, Any], None] | None = None
 
 
+@_telemetry.traced("drawing.fastener_sheet")
 async def build_fastener_sheet(
     adapter: Any,
     *,
