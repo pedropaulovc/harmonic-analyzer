@@ -123,11 +123,15 @@ CONCEALED_BALLOON_ITEMS = {
     if stem in BOTTOM_VISIBILITY_STEMS
 }
 MANUAL_EXTERIOR_BALLOON_ITEMS = {
+    "cone-tip-adjuster": "7",
+    "cone-tip-pinch-screw": "8",
     "swing-stop-screw": "11",
     "alignment-pinion": "12",
     "crank-pinion": "30",
 }
 MANUAL_EXTERIOR_VIEW_ORDER = {
+    "cone-tip-adjuster": (2, 1, 0),
+    "cone-tip-pinch-screw": (1, 2, 0),
     "swing-stop-screw": (1, 2, 0),
     "alignment-pinion": (2, 1, 0),
     "crank-pinion": (1, 2, 0),
