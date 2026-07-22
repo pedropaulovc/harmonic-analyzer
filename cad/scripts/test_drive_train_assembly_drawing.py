@@ -130,6 +130,7 @@ def test_sheet_two_parts_list_fits_the_drawing_zone() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert drawing.BOM_ANCHOR == (0.018, 0.264)
     assert drawing.BOM_ROW_HEIGHT == 0.0075
+    assert "for row in range(1, rows):" in source
     assert "table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)" in source
 
 

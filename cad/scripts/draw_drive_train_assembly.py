@@ -497,7 +497,10 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
         raise RuntimeError(
             f"drive-train BOM has {rows} rows, expected {len(BOM_COMPONENTS) + 1}"
         )
-    for row in range(rows):
+    # SolidWorks enforces a 10.2 mm minimum on the header row.  Keep that native
+    # height and compact only the 32 data rows; 10.2 + 32(7.5) = 250.2 mm,
+    # inside the 251.3 mm available below the 264 mm top anchor.
+    for row in range(1, rows):
         actual = float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0))
         if abs(actual - BOM_ROW_HEIGHT) > 0.0005:
             raise RuntimeError(
