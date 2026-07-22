@@ -74,6 +74,9 @@ BOM_COMPONENTS = {
 }
 BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 
+# TODO(https://github.com/pedropaulovc/harmonic-analyzer/issues/374):
+# Replace these release holds after the wire terminations, grooved hub, and
+# installable wheel retention are modeled and released on the part drawings.
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",

@@ -71,6 +71,9 @@ BOM_COMPONENTS = {
 }
 BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 
+# TODO(https://github.com/pedropaulovc/harmonic-analyzer/issues/373):
+# Replace these release holds after the knife seats and crossbar fasteners are
+# modeled, added to the BOM, and released on the affected part drawings.
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",
