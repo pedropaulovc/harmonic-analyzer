@@ -56,8 +56,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "NEAR LEFT END 6.35 +/-0.10 FROM C" in notes
     assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
     assert "PLAN RIMS AT E1-E4 ARE THE DIA 13.00 THRU FEATURES" in notes
-    assert "FIT LEAST-SQUARES CYLINDER AXES TO THE FULL" in notes
-    assert "SEPARATION AT C'BORE MOUTH AND BOTTOM PLANES: 0.05 MAX" in notes
+    assert "LEAST-SQUARES CYLINDER FITS OVER" in notes
+    assert "SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX" in notes
     assert "PROCESS DATA" not in notes
     assert "B1 IS UNTHREADED" in notes
     assert "A1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
@@ -70,6 +70,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert '"Manufacturing Notes", 0.016, 0.078' in source
     assert 'add_property_linked_note(adapter, "Side View Note", 0.235, 0.088)' in source
     assert "insert_hole_table(" in source
     assert "_visible_hole_table_entities(adapter, top)" in source
