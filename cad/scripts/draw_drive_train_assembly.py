@@ -227,8 +227,9 @@ GENERAL_ISO_CENTER = (0.335, 0.165)
 GENERAL_POINTER_ORIGIN = (0.018, 0.070)
 
 # Sheet 2: one continuous 32-row parts list plus a small orientation view.
-BOM_ANCHOR = (0.018, 0.264)
+BOM_ANCHOR = (0.018, 0.266)
 BOM_ROW_HEIGHT = 0.0075
+BOM_MAX_ROW_HEIGHT = 0.0103
 BOM_ISO_CENTER = (0.310, 0.165)
 
 # Sheets 3 and 6: four isolated subsystem views replace the black, overlapping gear
@@ -497,20 +498,23 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
         raise RuntimeError(
             f"drive-train BOM has {rows} rows, expected {len(BOM_COMPONENTS) + 1}"
         )
-    # SolidWorks enforces a 10.2 mm minimum on the header row.  Keep that native
-    # height and compact only the 32 data rows; 10.2 + 32(7.5) = 250.2 mm,
-    # inside the 251.3 mm available below the 264 mm top anchor.
-    for row in range(1, rows):
+    # SolidWorks enforces a 10.2 mm minimum on the header and any wrapped row.
+    # Request 7.5 mm throughout, then verify the native readback stays within
+    # that measured range; the layout audit below remains the fit authority.
+    actual_heights: list[float] = []
+    for row in range(rows):
         actual = float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0))
-        if abs(actual - BOM_ROW_HEIGHT) > 0.0005:
+        actual_heights.append(actual)
+        if actual < BOM_ROW_HEIGHT - 0.0005 or actual > BOM_MAX_ROW_HEIGHT:
             raise RuntimeError(
                 f"drive-train BOM row {row} height {actual:.4f} m "
-                f"does not match requested {BOM_ROW_HEIGHT:.4f} m"
+                f"outside {BOM_ROW_HEIGHT:.4f}-{BOM_MAX_ROW_HEIGHT:.4f} m"
             )
 
     adapter.currentModel.EditRebuild3()
     _telemetry.success(
-        f"drive-train BOM formatted as one {len(BOM_COMPONENTS)}-item table"
+        f"drive-train BOM formatted as one {len(BOM_COMPONENTS)}-item table "
+        f"({sum(actual_heights) * 1000.0:.1f} mm high)"
     )
 
 
