@@ -293,7 +293,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Place the native tag one short radial leader from the projected hole
         # rim.  The former distant tag visually merged with the overall-length
         # extension line and could be read as a planar datum.
-        symbol_xy=(pivot_center[0] + 0.010, pivot_center[1]),
+        symbol_xy=(pivot_center[0] - 0.010, pivot_center[1]),
         datum="B",
         label="pivot-hole cylindrical datum feature",
         entity=pivot_edge,

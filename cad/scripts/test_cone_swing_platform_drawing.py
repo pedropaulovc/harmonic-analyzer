@@ -71,7 +71,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert 'label="pivot-hole size"' in source and "edge=pivot_edge" in source
     assert 'datum="B"' in source
     assert 'label="pivot-hole cylindrical datum feature"' in source
-    assert "symbol_xy=(pivot_center[0] + 0.010, pivot_center[1])" in source
+    assert "symbol_xy=(pivot_center[0] - 0.010, pivot_center[1])" in source
     assert "entity=pivot_edge" in source
     assert "shoulder=True" in source
     assert "annotation=pivot_callout.GetAnnotation()" not in source
