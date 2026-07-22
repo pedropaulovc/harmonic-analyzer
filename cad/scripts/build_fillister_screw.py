@@ -1,11 +1,9 @@
-r"""Reproduction script: fillister screw (book ch. 20/22; 6 used).
+r"""Reproduction script: fillister screw (book ch. 20/22; 22 used).
 
-The small brass machine screw used twice over: 4x holding the platen
-paper-clip strips through their existing O3 end holes into O3 platen
-sockets (ch. 22 p. 55 -- the platen's "fastener holes deferred to
-assembly" promise, resolved in the M6.10 fasteners pass), and 2x
-fastening the magnifying-lever bracket's flange up into the summing
-lever's coefficients plate (ch. 20 p. 47 "mounting screws omitted").
+The small brass machine screw is used throughout the paper-drive platen:
+4x holding its paper-clip strips, 10x holding the two guide rails, and 8x
+holding the four guide-lock plates.  The assembly authors one or more seeds
+for each group and expands them with native component patterns.
 The cylindrical head carries its native 0.8 mm driver slot; thread geometry
 is not modeled.
 
@@ -37,6 +35,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -45,16 +44,27 @@ from _common import (
     volume_check,
 )
 from _fastener_slot import FastenerAxis, add_slotted_drive
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
+)
+from fillister_screw_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    HEAD_DIA,
+    HEAD_H,
+    SHANK_DIA,
+    SHANK_LEN,
+    SLOT_D,
+    SLOT_W,
+)
 
 PART_NAME = "fillister-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # bright screws on the brass clips
-
-HEAD_DIA = 5.5  # fillister head (low)
-HEAD_H = 2.2
-SHANK_DIA = SPEC.model_diameter_mm  # #4-40 modeled thread minor diameter
-# (threads #4-40 into the platen sockets / flange; rides the clips' O3 clearance)
-SHANK_LEN = SPEC.length_mm  # clip 1.2 + 2.8 platen socket; = flange thickness 4
 
 
 async def build(adapter) -> dict[str, str]:
@@ -86,6 +96,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += head_dims.apply(adapter, "HeadProfile")
     extrude_at_offset(adapter, HEAD_H, -HEAD_H)
     name_last_feature(adapter, "Head")
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v_head = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_H
     expected = v_head
     await volume_check(adapter, "head", expected, 0.005 * v_head)
@@ -104,6 +115,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += shank_dims.apply(adapter, "ShankProfile")
     extrude_at_offset(adapter, SHANK_LEN, 0.0)
     name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
     v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
@@ -113,8 +125,8 @@ async def build(adapter) -> dict[str, str]:
         axis=FastenerAxis.Z,
         head_radius_mm=HEAD_DIA / 2.0,
         head_face_offset_mm=-HEAD_H,
-        width_mm=0.8,
-        depth_mm=0.7,
+        width_mm=SLOT_W,
+        depth_mm=SLOT_D,
         expected_volume_mm3=expected,
     )
     drive_jobs += slot_jobs
@@ -129,6 +141,20 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_symmetric_tolerance(adapter, "HeadProfile", "HeadDia", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "Head", "HeadHt", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "Shank", "ShankLg", 0.20)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

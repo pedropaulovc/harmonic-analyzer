@@ -229,6 +229,7 @@ _GTOL_SYMBOLS = {
     "profile_surface": "GTOL-SPROF",
     "perpendicularity": "GTOL-PERP",
     "straightness": "GTOL-STRAIGHT",
+    "total_runout": "GTOL-TRUN",
 }
 
 
@@ -312,12 +313,51 @@ def _select_view_entity(
     return entity
 
 
+def _select_annotation_entity(
+    adapter: Any,
+    view: Any,
+    *,
+    edge_xy: tuple[float, float] | None,
+    edge_entity: Any | None,
+    entity: Any | None,
+    entity_type: str,
+    label: str,
+) -> Any:
+    """Select one drawing-view entity for a native attached annotation."""
+    supplied = sum(value is not None for value in (edge_xy, edge_entity, entity))
+    if supplied > 1:
+        raise ValueError(
+            f"{label} cannot specify more than one of edge_xy, edge_entity, or entity"
+        )
+    if entity is not None:
+        return _select_view_entity(
+            adapter, view, entity_type, None, label=label, entity=entity
+        )
+    if edge_entity is None:
+        if edge_xy is None:
+            raise ValueError(f"{label} requires edge_xy, edge_entity, or entity")
+        return _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
+
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection_manager.CreateSelectData()
+    selection_data.View = view
+    selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
+    if not selected:
+        selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
+    if not selected:
+        raise RuntimeError(f"failed to select {label} entity in drawing view")
+    return edge_entity
+
+
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
     view: Any,
     *,
     edge_xy: tuple[float, float] | None = None,
+    edge_entity: Any | None = None,
     symbol_xy: tuple[float, float],
     datum: str,
     label: str,
@@ -326,6 +366,7 @@ def add_datum_feature(
     annotation: Any | None = None,
     shoulder: bool = False,
     position_tolerance_m: float = 1e-6,
+    callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
@@ -334,10 +375,14 @@ def add_datum_feature(
     """
     draw = adapter.currentModel
     if annotation is None:
-        if edge_xy is None:
-            raise ValueError(f"{label}: edge_xy is required without an annotation")
-        _select_view_entity(
-            adapter, view, entity_type, edge_xy, label=label, entity=entity
+        _select_annotation_entity(
+            adapter,
+            view,
+            edge_xy=edge_xy,
+            edge_entity=edge_entity,
+            entity=entity,
+            entity_type=entity_type,
+            label=label,
         )
     else:
         ddoc = _early_bound(draw, "IDrawingDoc")
@@ -376,7 +421,13 @@ def add_datum_feature(
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
     tag = _sw_type_info.early_bound_or_flag(
-        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel", "Shoulder"
+        tag,
+        "IDatumTag",
+        "SetLabel",
+        "GetAnnotation",
+        "GetLabel",
+        "SetText",
+        "Shoulder",
     )
     if not tag.SetLabel(datum):
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
@@ -405,6 +456,8 @@ def add_datum_feature(
         )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
+    if callout_below and not tag.SetText(4, callout_below):
+        raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return tag
@@ -416,6 +469,7 @@ def add_feature_control_frame(
     view: Any,
     *,
     edge_xy: tuple[float, float] | None = None,
+    edge_entity: Any | None = None,
     frame_xy: tuple[float, float],
     characteristic: str,
     tolerance: str,
@@ -434,8 +488,14 @@ def add_feature_control_frame(
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
     draw = adapter.currentModel
-    edge = _select_view_entity(
-        adapter, view, entity_type, edge_xy, label=label, entity=entity
+    edge = _select_annotation_entity(
+        adapter,
+        view,
+        edge_xy=edge_xy,
+        edge_entity=edge_entity,
+        entity=entity,
+        entity_type=entity_type,
+        label=label,
     )
     gtol = draw.InsertGtol()
     if gtol is None:
@@ -610,25 +670,16 @@ def add_surface_finish(
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
     """
+    _select_annotation_entity(
+        adapter,
+        view,
+        edge_xy=edge_xy,
+        edge_entity=edge_entity,
+        entity=entity,
+        entity_type=entity_type,
+        label=label,
+    )
     draw = adapter.currentModel
-    if edge_entity is not None:
-        draw.ClearSelection2(True)
-        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-        selection_data = selection_manager.CreateSelectData()
-        selection_data.View = view
-        selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
-        if not selected:
-            selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
-        if not selected:
-            raise RuntimeError(f"failed to select {label} edge entity in drawing view")
-    elif entity is not None or edge_xy is not None:
-        _select_view_entity(
-            adapter, view, entity_type, edge_xy, label=label, entity=entity
-        )
-    else:
-        raise ValueError(
-            f"surface finish {label} requires edge_xy, entity, or edge_entity"
-        )
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
         _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
@@ -1590,6 +1641,42 @@ def set_dimension_callouts(
         raise RuntimeError(
             f"dimension callouts not applied: {sorted(remaining)}"
         )
+    adapter.currentModel.EditRebuild3()
+
+
+def set_dimension_text(
+    adapter: Any, annotations: Iterable[Any], replacement: dict[str, str]
+) -> None:
+    """Replace the entire displayed text of named model dimensions.
+
+    This is for associative size callouts whose model parameter is only the
+    view carrier.  In particular, a schematic thread-minor cylinder must read
+    as its thread designation rather than masquerading as a manufactured
+    plain-diameter feature.
+    """
+    remaining = dict(replacement)
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        text = remaining.pop(name, None)
+        if text is None:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        # SetText is void.  With swDimensionTextAll it stores the replacement
+        # in the prefix compartment and suppresses the numeric value; GetText
+        # explicitly rejects swDimensionTextAll, so read back the prefix.
+        display.SetText(0, text)  # swDimensionTextAll
+        if str(display.GetText(1) or "") != text:  # swDimensionTextPrefix
+            raise RuntimeError(f"dimension text did not persist for {name!r}")
+    if remaining:
+        raise RuntimeError(f"dimension text not applied: {sorted(remaining)}")
     adapter.currentModel.EditRebuild3()
 
 

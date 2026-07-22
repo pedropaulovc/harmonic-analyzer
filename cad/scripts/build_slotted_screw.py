@@ -36,6 +36,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -44,17 +45,26 @@ from _common import (
     volume_check,
 )
 from _fastener_slot import FastenerAxis, add_slotted_drive
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from slotted_screw_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    HEAD_DIA,
+    HEAD_H,
+    SHANK_DIA,
+    SHANK_LEN,
+    SLOT_D,
+    SLOT_W,
+)
 
 PART_NAME = "slotted-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
-
-HEAD_DIA = 8.0  # p.69 close-up, scaled vs the 5-thick strap edge (low)
-HEAD_H = 2.5
-SHANK_DIA = SPEC.model_diameter_mm  # #8-32 modeled thread minor diameter
-# (rides the Ø4.2 block holes as clearance, threads #8-32 into the base)
-SHANK_LEN = SPEC.length_mm  # through the 16-tall block + 2 engagement into the base
-# (thread depth unmodeled, the pedestal-bolt precedent)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -86,6 +96,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += head_dims.apply(adapter, "HeadProfile")
     extrude_at_offset(adapter, HEAD_H, 0.0)
     name_last_feature(adapter, "Head")
+    # Name the extrude DEPTH dim so the drawing inserts it as the head-height
+    # model dimension (the depth is the first display dim of a blind boss).
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v_head = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_H
     expected = v_head
     await volume_check(adapter, "head", expected, 0.005 * v_head)
@@ -104,6 +117,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += shank_dims.apply(adapter, "ShankProfile")
     extrude_at_offset(adapter, SHANK_LEN, -SHANK_LEN)
     name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
     v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
@@ -113,8 +127,8 @@ async def build(adapter) -> dict[str, str]:
         axis=FastenerAxis.Y,
         head_radius_mm=HEAD_DIA / 2.0,
         head_face_offset_mm=HEAD_H,
-        width_mm=1.2,
-        depth_mm=1.0,
+        width_mm=SLOT_W,
+        depth_mm=SLOT_D,
         expected_volume_mm3=expected,
     )
     drive_jobs += slot_jobs
@@ -142,6 +156,17 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

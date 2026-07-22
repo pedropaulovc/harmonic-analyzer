@@ -1053,8 +1053,12 @@ async def save_part_and_images(
     views = list(views)
     _prune_stale_part_views(png_dir, part_name, views)
     apply_block_tolerances(adapter)
-    apply_custom_properties(adapter, part_properties(part_name))
-    apply_summary_info(adapter, title=part_name)
+    properties = part_properties(part_name)
+    apply_custom_properties(adapter, properties)
+    # The drawing template's PART cell resolves the linked model's document
+    # summary Title, not its same-named custom property. Keep both identities
+    # sourced from part_properties so a registry title override cannot split.
+    apply_summary_info(adapter, title=properties["Title"])
     check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
 
     stl_path = (OUT_STL / f"{part_name}.STL").resolve()
@@ -1130,8 +1134,9 @@ def part_properties(part_name: str) -> dict[str, str]:
 
     Pulls Number/Revision/Material/Tolerance Class/Fit Class/Process/Confidence
     from ``cad/config/parts.yaml`` (merged over its defaults) and stamps a
-    reproducible Generator (git sha). Title is the part name. Parts absent from
-    the registry get the minimal set (Title + Generator) and are flagged by the
+    reproducible Generator (git sha). ``title`` may override the internal
+    artifact name for a clearer manufacturing identity; parts absent from the
+    registry get the minimal set (Title + Generator) and are flagged by the
     verify.py tolerance audit.
     """
     import _config
@@ -1158,6 +1163,7 @@ def part_properties(part_name: str) -> dict[str, str]:
         reg = _config.parts(registry_name)
     except KeyError:
         return props
+    props["Title"] = str(reg.get("title") or part_name)
     field_map = {
         "Number": "number", "Revision": "revision", "Material": "material",
         "Tolerance Class": "tolerance_class", "Fit Class": "fit_class",

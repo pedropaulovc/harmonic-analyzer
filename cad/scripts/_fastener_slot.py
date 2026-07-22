@@ -86,6 +86,16 @@ async def add_slotted_drive(
         ),
     )
     name_last_feature(adapter, "DriverSlot")
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "DriverFace", "PLANE", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot select DriverFace plane for blanking")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
     removed = slot_strip_area(head_radius_mm, width_mm) * depth_mm
     remaining = expected_volume_mm3 - removed
     await volume_check(adapter, "slotted driver", remaining, max(0.05 * removed, 0.1))

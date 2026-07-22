@@ -1,6 +1,9 @@
 thumb-screw:
   number: MHA-075
-  material: Brass
+  material: UNS C36000 per ASTM B16/B16M-24
+  material_specification: UNS C36000 per ASTM B16/B16M-24
+  finish: uncoated, bright
+  quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: "machined (brass)"

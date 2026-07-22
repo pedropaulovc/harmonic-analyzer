@@ -26,6 +26,7 @@ still resolves in the table fails loud instead of cutting the wrong drill).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import _telemetry
 from _common import _early_bound
@@ -67,6 +68,11 @@ TAP_DRILL_MM = {          # taps cut the tap-drill diameter (TAP_DRILL column)
     "#2-56": 1.778, "#3-48": 1.994, "#4-40": 2.261, "#6-32": 2.705,
     "#8-32": 3.454, "#10-24": 3.797, "1/4-20": 5.105, "5/16-18": 6.528,
     "9/16-12": 12.304,
+}
+THREAD_MAJOR_MM = {       # basic external-thread major diameters (ASME B1.1)
+    "#2-56": 2.184, "#3-48": 2.515, "#4-40": 2.845, "#6-32": 3.505,
+    "#8-32": 4.166, "#10-24": 4.826, "1/4-20": 6.350, "5/16-18": 7.938,
+    "9/16-12": 14.288,
 }
 CLEARANCE_MM = {          # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
     ("#2", "close"): 2.388, ("#2", "normal"): 2.591, ("#2", "loose"): 2.946,

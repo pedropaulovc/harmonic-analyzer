@@ -152,7 +152,7 @@ expect(DT, "cone-tip-pinch-screw-1",
         _ptp[2] + (d.TIP_BLOCK_X / 2.0) * d.SIN_I],
        d.ROT_PINCH_WEST, "cone-tip-pinch-screw")
 expect(DT, "cone-lock-knob-1", [d.KNOB_X, d.Y_BASE_TOP + d.PLAT_T, d.KNOB_Z], IDENTITY, "cone-lock-knob")
-expect(DT, "cone-pivot-screw-1", [_ppv[0], d.Y_BASE_TOP + d.PLAT_T, _ppv[2]], IDENTITY, "cone-pivot-screw")
+expect(DT, "cone-pivot-screw-1", [_ppv[0], d.Y_BASE_TOP + d.PSCREW_SHOULDER_LEN, _ppv[2]], IDENTITY, "cone-pivot-screw")
 expect(DT, "swing-stop-screw-1", [d.STOP_X, d.Y_BASE_TOP, d.STOP_Z], IDENTITY, "swing-stop-screw")
 expect(DT, "alignment-pinion-1", [d.APINION_X, d.APINION_Y, d.APINION_Z_FRONT], IDENTITY, "alignment-pinion")
 _strap = compose_rows(ROT_Y_180, d.rot_z_rows(d.STRAP_LEAN_DEG))
