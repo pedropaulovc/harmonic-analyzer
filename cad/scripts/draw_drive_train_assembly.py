@@ -138,8 +138,6 @@ BOM_COLUMN_WIDTHS = {
     "DESCRIPTION": 0.074,
     "QTY.": 0.012,
 }
-BOM_HEADER_HEIGHT = 0.006
-BOM_ROW_HEIGHT = 0.005
 BALLOON_RING_MARGINS = (0.030, 0.014, 0.014, 0.014)
 
 
@@ -147,7 +145,6 @@ BALLOON_RING_MARGINS = (0.030, 0.014, 0.014, 0.014)
 def _format_drive_train_bom(adapter: Any, table: Any) -> None:
     """Fit the 32-item BOM as three readable sections across the sheet top."""
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
-    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
     header = [
         str(table.DisplayedText2(0, column, False) or "").strip().upper()
         for column in range(columns)
@@ -162,15 +159,6 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
             raise RuntimeError(
                 f"drive-train BOM column {title!r} width {actual:.4f} m "
                 f"does not match requested {requested:.4f} m"
-            )
-
-    for row in range(rows):
-        requested = BOM_HEADER_HEIGHT if row == 0 else BOM_ROW_HEIGHT
-        actual = float(table.SetRowHeight(row, requested, 0))
-        if actual > requested + 0.0005:
-            raise RuntimeError(
-                f"drive-train BOM row {row} height {actual:.4f} m exceeds "
-                f"requested {requested:.4f} m"
             )
 
     split_tables = table.HorizontalAutoSplit(
