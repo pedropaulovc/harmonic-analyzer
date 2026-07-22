@@ -184,7 +184,8 @@ BOM_ANCHOR = (0.018, 0.262)
 BOM_ISO_CENTER = (0.310, 0.165)
 CONE_SCHEDULE_ANCHOR = (0.155, 0.160)
 CONE_SCHEDULE_COLUMN_WIDTHS = (0.046, 0.032, 0.020)
-CONE_SCHEDULE_ROW_HEIGHT = 0.005
+CONE_SCHEDULE_TEXT_HEIGHT = 0.0025
+CONE_SCHEDULE_ROW_HEIGHT = 0.006
 
 # Sheet 3: large exterior views and exterior-only item balloons.
 EXTERIOR_FRONT_CENTER = (0.075, 0.155)
@@ -335,10 +336,25 @@ def _insert_cone_gear_schedule(adapter: Any, bom_table: Any, bom_view: Any) -> A
         "ITableAnnotation",
         "DisplayedText2",
         "MergeCells",
+        "GetTextFormat",
         "SetColumnWidth",
         "SetRowHeight",
         "SetText2",
+        "SetTextFormat",
     )
+    text_format = table.GetTextFormat()
+    if text_format is None:
+        raise RuntimeError("drive-train cone schedule has no text format")
+    text_format = _sw_type_info.early_bound_or_flag(text_format, "ITextFormat")
+    text_format.CharHeight = CONE_SCHEDULE_TEXT_HEIGHT
+    if not table.SetTextFormat(False, text_format):
+        raise RuntimeError("failed to set drive-train cone schedule text format")
+    applied_height = float(table.GetTextFormat().CharHeight)
+    if abs(applied_height - CONE_SCHEDULE_TEXT_HEIGHT) > 0.0001:
+        raise RuntimeError(
+            "drive-train cone schedule text height did not persist: "
+            f"{applied_height:.4f} m != {CONE_SCHEDULE_TEXT_HEIGHT:.4f} m"
+        )
     if not table.MergeCells(0, 0, 0, 2):
         raise RuntimeError("failed to merge drive-train cone schedule title row")
     for row, values in enumerate(contents):
@@ -360,7 +376,7 @@ def _insert_cone_gear_schedule(adapter: Any, bom_table: Any, bom_view: Any) -> A
                 f"{actual:.4f} m != {requested:.4f} m"
             )
     for row in range(len(contents)):
-        requested = 0.006 if row == 0 else CONE_SCHEDULE_ROW_HEIGHT
+        requested = CONE_SCHEDULE_ROW_HEIGHT
         actual = float(table.SetRowHeight(row, requested, 0))
         if abs(actual - requested) > 0.0005:
             raise RuntimeError(

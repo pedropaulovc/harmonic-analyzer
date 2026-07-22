@@ -188,6 +188,8 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     )
     assert len({row[1] for row in drawing.CONE_GEAR_SCHEDULE}) == 20
     assert sum(drawing.CONE_SCHEDULE_COLUMN_WIDTHS) == 0.098
+    assert drawing.CONE_SCHEDULE_TEXT_HEIGHT == 0.0025
+    assert drawing.CONE_SCHEDULE_ROW_HEIGHT == 0.006
     assert drawing.EXTERIOR_BALLOON_RING_MARGINS == (0.014, 0.014, 0.014)
     assert drawing.CONCEALED_BOTTOM_BALLOON_RING_MARGIN == 0.015
     assert drawing.CONCEALED_FRONT_BALLOON_RING_MARGIN == 0.025
