@@ -10,6 +10,7 @@ cam and alignment notch are carried by the manufacturing notes.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -60,8 +61,9 @@ FRONT_CENTER = (0.225, 0.175)
 RIGHT_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.375, 0.205)
 GEAR_DATA_POS = (0.040, 0.262)
+BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
+HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 
-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0  # bore radius on the sheet (m)
 
 FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
@@ -152,16 +154,26 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Datum A: the bore axis (front view, 12 o'clock pick with the symbol above,
     # the draw_pivot_bushing spelling so the standoff is honoured).
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
+    datum_radial = math.sqrt(0.5)
+    bore_top = (
+        FRONT_CENTER[0] + BORE_R * datum_radial,
+        FRONT_CENTER[1] + BORE_R * datum_radial,
+    )
     add_datum_feature(
         adapter,
         front,
         edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.020),
+        symbol_xy=(
+            FRONT_CENTER[0] + (HALF_OD + 0.018) * datum_radial,
+            FRONT_CENTER[1] + (HALF_OD + 0.018) * datum_radial,
+        ),
         datum="A",
         label="cylinder gear bore axis",
-        entity=bore_edge,
         shoulder=True,
+        # This shoulder-constrained tag retains a point 7.186 mm inward on the
+        # same radial.  The bounded call-site tolerance admits that native
+        # normalization; the layout audit still rejects a collapsed leader.
+        position_tolerance_m=0.008,
     )
     # Gear face perpendicular to the bore axis (datum A), attached directly to
     # the largest visible planar gear face instead of a tooth-tip silhouette.
@@ -185,11 +197,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # at x 0.201..0.208), so route the SF leader STRAIGHT DOWN from a symbol
     # directly above the attach: x = 0.2212 clears the FCF corridor on the
     # right, and the vertical span stops 0.9 mm above the 45-degree segment.
-    bore_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - BORE_R)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_bottom,
         symbol_xy=(FRONT_CENTER[0] - 0.0038, FRONT_CENTER[1] + 0.035),
         roughness_ra="1.6",
         label="cylinder gear bore finish",

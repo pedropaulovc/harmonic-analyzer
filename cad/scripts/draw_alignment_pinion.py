@@ -17,7 +17,6 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
@@ -144,8 +143,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.025),
         datum="A",
         label="drum bore axis",
-        entity=bore_edge,
         shoulder=True,
+        position_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,
@@ -157,11 +156,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="drum end squareness to bore",
     )
-    bore_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - BORE_R)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_bottom,
         symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.050),
         roughness_ra="1.6",
         label="drum bore finish",

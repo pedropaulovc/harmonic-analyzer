@@ -92,8 +92,8 @@ the pinion stands PROUD of the pivot post's casting face (img06: no
 relief pocket in the casting -- the pinion's face fills the static
 casting-to-T120 span, ~0.55 clearance each side, spanning ~96% of the
 64T row; the span-fit assert below keeps it off both neighbours). The
-pair engages at 69% of working depth: MESH16_C2C =
-R64 + R16 + slack 0.60, the deepest zero-collision pose over a full
+pair engages at 87% of working depth: MESH16_C2C =
+R64 + R16 + slack 0.25, the deepest zero-collision pose over a full
 crank-pitch phase sweep (diagnostics/crossed_mesh_study.py). The
 perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i) north
 of its centre (alpha = the contact azimuth from the in-plane

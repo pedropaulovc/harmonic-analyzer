@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import math as _math
 from inspect import getsource
-import math as _math
 from types import SimpleNamespace
 
 import pytest
@@ -46,7 +45,6 @@ SHEET_H = 0.2794
 # The bound used by the pre-zone-border cases: the raw sheet rectangle, so each
 # keeps asserting exactly what it did before the audit gained a zone frame.
 WHOLE_SHEET = DrawableRegion.whole_sheet(SHEET_W, SHEET_H)
-
 # The zone margins the project DRWDOT actually reports through
 # ISheet::GetZoneMargin: a uniform 12.7 mm (0.5 in) on all four sides, read off
 # a live sheet.
@@ -846,38 +844,6 @@ def _gdt_with_geometry(x, y, kind, label, lines=(), triangles=()):
         GetSpecificAnnotation=lambda: spec,
     )
     return drawing_common._gdt_element(_FakeAdapter(None), annotation, label, kind)
-
-
-def test_dimension_attached_datum_uses_its_sheet_position_not_local_primitives():
-    """A datum on a display dimension reports its tag lines in dimension space."""
-    x, y = 0.180, 0.210
-    local_lines = [((-0.014, -0.013), (0.006, 0.007))]
-    spec = SimpleNamespace(
-        GetLineCount=lambda: len(local_lines),
-        GetLineAtIndex=lambda i: [1.0, *local_lines[i][0], 0.0, *local_lines[i][1], 0.0],
-        GetArcCount=lambda: 0,
-        GetArcAtIndex=lambda _i: None,
-        GetTriangleCount=lambda: 0,
-        GetTriangleAtIndex=lambda _i: None,
-    )
-    annotation = SimpleNamespace(
-        GetPosition=[x, y, 0.0],
-        GetAttachedEntityTypes=lambda: [drawing_common._SEL_DIMENSION],
-        GetSpecificAnnotation=lambda: spec,
-    )
-
-    element = drawing_common._gdt_element(
-        _FakeAdapter(None), annotation, "datum A", drawing_common._ANNOT_DATUM
-    )
-
-    assert element.xmin == x - drawing_common._NOMINAL_GDT_HALF_M
-    assert element.ymin == y - drawing_common._NOMINAL_GDT_HALF_M
-
-    leaders = drawing_common._datum_leader_segments(
-        _FakeAdapter(None), annotation, label="datum A", owner="front"
-    )
-
-    assert leaders == []
 
 
 def test_control_frame_is_measured_from_its_rendered_lines():

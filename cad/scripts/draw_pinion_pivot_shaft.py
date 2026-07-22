@@ -152,7 +152,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
     end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
-    end_circle = (FRONT_CENTER[0] + end_radius, FRONT_CENTER[1])
+    end_top = (FRONT_CENTER[0], FRONT_CENTER[1] + end_radius)
     end_upper = (
         FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
         FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
@@ -169,10 +169,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=end_circle,
-        symbol_xy=(0.035, 0.222),
+        edge_xy=end_top,
+        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
         datum="A",
         label="pinion pivot cylindrical-body axis",
+        position_tolerance_m=0.0001,
     )
     crown_axial = CAP_SAG / 2.0
     crown_radial = math.sqrt(

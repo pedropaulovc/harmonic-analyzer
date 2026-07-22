@@ -129,8 +129,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
         datum="A",
         label="cone gear bore axis",
-        entity=bore_edge,
         shoulder=True,
+        position_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,
@@ -142,11 +142,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="gear face squareness to bore",
     )
-    bore_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - BORE_R)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_bottom,
         symbol_xy=(FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] - 0.052),
         roughness_ra="1.6",
         label="cone gear bore finish",

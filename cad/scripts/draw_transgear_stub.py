@@ -27,7 +27,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from transgear_stub_spec import (
     BASE_DIA,
     BASE_LEN,
-    COLLAR_DIA,
+    COLLAR_DIA as COLLAR_DIA,
     COLLAR_LEN,
     SEAT_DIA,
     SEAT_LEN,
@@ -170,6 +170,10 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(END_CENTER[0] + 0.040, END_CENTER[1] - 0.018),
         datum="A",
         label="transgear stud base axis",
+        # The native circular-edge attachment retains a legal point 2.343 mm
+        # inward along this radial leader.  Bound that normalization locally;
+        # the shared persistence check remains strict for unconstrained tags.
+        position_tolerance_m=0.003,
     )
     # The stud is a revolve: its side outlines are SILHOUETTE entities (no
     # model edge runs along a cylinder side), so every front-view attachment

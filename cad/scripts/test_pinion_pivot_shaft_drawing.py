@@ -64,6 +64,9 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 def test_direct_limits_and_native_cylindricity_control_the_body() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
+    assert "edge_xy=end_top" in source
+    assert "symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)" in source
+    assert "position_tolerance_m=0.0001" in source
     assert source.count("add_feature_control_frame(") == 2
     assert 'characteristic="profile_surface"' in source
     assert 'quantity="BOTH CROWNS"' in source

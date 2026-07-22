@@ -136,8 +136,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.038),
         datum="A",
         label="transgear pinion bore axis",
-        entity=bore_edge,
         shoulder=True,
+        position_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,
@@ -149,11 +149,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="pinion face squareness to bore",
     )
-    bore_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - BORE_R)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_bottom,
         symbol_xy=(FRONT_CENTER[0] + 0.018, FRONT_CENTER[1] - 0.062),
         roughness_ra="1.6",
         label="transgear pinion bore finish",
