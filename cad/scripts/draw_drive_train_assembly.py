@@ -142,7 +142,7 @@ ASSEMBLY_NOTES = "\n".join(
 # The 32-row BOM is split into three compact sections across the sheet top;
 # four views and their balloons occupy the open field below it.
 FRONT_CENTER = (0.080, 0.135)
-RIGHT_CENTER = (0.200, 0.135)
+RIGHT_CENTER = (0.208, 0.135)
 ISO_CENTER = (0.310, 0.145)
 BOTTOM_CENTER = (0.365, 0.105)
 BOM_ANCHOR = (0.020, 0.265)
@@ -288,7 +288,7 @@ def _drawing_component_matches(
 
 @_telemetry.traced("drawing.defer_front_balloons")
 def _defer_front_balloons(adapter: Any, balloons: list[Any]) -> list[Any]:
-    """Delete four crowded front balloons so later views can own those items."""
+    """Delete crowded front balloons so later views can own those items."""
     draw = adapter.currentModel
     draw.ClearSelection2(True)
     kept: list[Any] = []
