@@ -68,29 +68,33 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from cone_pivot_post_spec import CRANK_BORE_DIA, DRAWING_DIMENSIONS, DRAWING_NOTES
+from cone_pivot_post_spec import (
+    BLOCK_DIA,
+    BLOCK_HEIGHT,
+    BORE_DIA,
+    BORE_HEIGHT,
+    CRANK_BORE_DIA,
+    CRANK_BORE_HEIGHT,
+    CRANK_BORE_OFFSET,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    INCLINE_DEG,
+)
 
 PART_NAME = "cone-pivot-post"
 MATERIAL = "Gray Cast Iron"  # ONE green casting: big-end journal + crank pedestal
 
-BLOCK_DIA = 24.0  # round green column, p.18 top-down
-BLOCK_HEIGHT = 100.5  # crank bore at 86.19 + 14.31 of material above (the old
-# separate pedestal read ~110 above the BASE top = ~103.65 above the plate;
-# this column ends just past the crank bore, video-plausible)
-BORE_DIA = 9.550  # finished 9.545..9.555 over shaft max 9.525
-BORE_HEIGHT = 47.65  # + platform PLATE_T 6.35 = drive height 54 above base top
-# (asserted in the assembly)
-
+# Geometry comes from cone_pivot_post_spec — the drawing's single source of the
+# marked dimensions — so a spec correction rebuilds the SLDPRT from the same
+# values the print annotates. Derivation notes live with the spec constants.
+#
 # Crank bore: same 3/8" as the crankshaft (ch. 11), running along MACHINE z
 # once placed. The column rides the plate at Ry(+INCLINE), so the AUTHORED
 # plan direction is (-sin I, +cos I) -- the direction that rotation maps to
 # machine z (see the bore feature's comment); it passes CRANK_BORE_DX east
 # of the column axis (ppost.x - X_CRANK, asserted in the assembly).
-INCLINE_DEG = 12.5182
-CRANK_BORE_Y = 85.835  # Y_CRANK 142.985 - Y_BASE_TOP 50.8 - PLATE_T 6.35
-# (2026-07-14 crank-mesh rederive: crank dropped onto the engaged c2c, then
-# 0.355 deeper when the smooth swept helix re-tightened the slack to 0.25)
-CRANK_BORE_DX = 0.95  # east offset: ppost.x -121.85 - X_CRANK -122.8
+CRANK_BORE_Y = CRANK_BORE_HEIGHT  # Y_CRANK 142.985 - Y_BASE_TOP 50.8 - PLATE_T 6.35
+CRANK_BORE_DX = CRANK_BORE_OFFSET  # east offset: ppost.x -121.85 - X_CRANK -122.8
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0

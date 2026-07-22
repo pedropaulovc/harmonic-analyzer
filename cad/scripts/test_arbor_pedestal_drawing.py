@@ -67,7 +67,7 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "BOXED 6.00/16.00 LOCATE STRAP NEAR/FAR FACES FROM D" in notes
     assert "DIMENSIONS AND GD&T APPLY BEFORE COATING" in notes
     assert "MASK ARBOR BORE" in notes
-    assert "DIA 3.26\nHOLE" in notes
+    assert "DIA 3.25\nHOLE" in notes
     assert "FOOT SEAT A, LEFT SIDE B" in notes
     assert "PROFILE-CONTROLLED SURFACES" in notes
     assert "25-50 um" not in notes
@@ -94,8 +94,7 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert source.count("_add_circle_basic(") == 4  # helper plus three calls
     assert 'orientation="horizontal"' in source
     assert 'orientation="vertical"' in source
-    assert "for index in (1, 2):" in source
-    assert "if result != 0:" in source
+    assert "set_arc_endpoints_to_center(" in source
     assert 'label="flange-hole true position"' in source
     assert 'roughness_ra="1.6"' in source
     assert 'for name in ("Width", "FootHt"):' in source

@@ -19,6 +19,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
     set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
@@ -211,6 +212,7 @@ def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> 
     return min(candidates, key=lambda item: item[0])[1]
 
 
+@_telemetry.traced("drawing.circle_basic", label_param="label")
 def _add_circle_basic(
     adapter: Any,
     view: Any,
@@ -242,28 +244,7 @@ def _add_circle_basic(
     draw.ClearSelection2(True)
     if display is None:
         raise RuntimeError(f"failed to create {label} dimension")
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension(), "IDimension")
-    arc_end_set = False
-    for index in (1, 2):
-        if int(dimension.GetArcEndCondition(index)) == 0:
-            continue
-        result = int(
-            dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
-        )
-        if result != 0:
-            raise RuntimeError(
-                f"failed to set {label} endpoint {index} to arc center "
-                f"(SolidWorks result {result})"
-            )
-        draw.GraphicsRedraw2()
-        if int(dimension.GetArcEndCondition(index)) != 1:
-            raise RuntimeError(
-                f"{label} did not retain center arc condition"
-            )
-        arc_end_set = True
-    if not arc_end_set:
-        raise RuntimeError(f"{label} has no circular endpoint")
+    set_arc_endpoints_to_center(adapter, display, label=label)
     return set_basic_dimension(adapter, display, label=label)
 
 

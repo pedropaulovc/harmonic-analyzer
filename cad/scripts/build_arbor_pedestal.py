@@ -60,28 +60,36 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from arbor_pedestal_spec import DRAWING_DIMENSIONS, DRAWING_NOTES
+from arbor_pedestal_spec import (
+    BORE_DIA,
+    BORE_HEIGHT,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FOOT_DEPTH,
+    FOOT_HEIGHT,
+    FOOT_WIDTH,
+    SCREW_THREAD,
+    STRAP_T,
+    TOP_RADIUS,
+)
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 
 PART_NAME = "arbor-pedestal"
 MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 
-FOOT_WIDTH = 24.0  # X; the rocker-support foot rail sits 0.25 east -- keep
-FOOT_DEPTH = 16.0  # Z; front face -98.5 clears the portal south plate by 0.5
-FOOT_HEIGHT = 5.0  # the low flange under the strap (photo-scaled, low)
-STRAP_T = 10.0  # Z; thin strap FLUSH with the foot's +Z face (L, not T):
-# band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8. Keeps the
-# arbor's 7.5 engagement from the north face; the -Z flange carries the screw
-# Foot-screw shank O2.9 pass-through (build_foot_screw, the flange hold-down;
-# its 8.0 shank reaches 3.0 into the base past this 5.0 flange): #4 clearance
-# NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim).
-SCREW_HOLE_SPEC = HoleSpec("clearance", "#4")
+# Geometry comes from arbor_pedestal_spec — the drawing's single source of the
+# marked dimensions — so a spec correction rebuilds the SLDPRT from the same
+# values the print annotates (foot envelope, strap, dome, journal bore).
+#
+# STRAP_T: band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8.
+# Keeps the arbor's 7.5 engagement from the north face; the -Z flange carries
+# the screw. Foot-screw shank O2.9 pass-through (build_foot_screw, the flange
+# hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange):
+# #4 clearance NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim).
+SCREW_HOLE_SPEC = HoleSpec("clearance", SCREW_THREAD)
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)  # 3.251; re-exposed for the
 # drive-train assembly's foot-screw clearance assert (build_drive_train_assembly)
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
-TOP_RADIUS = 10.0  # dome radius = strap half-width at the top (24 -> 20 taper)
-BORE_DIA = 0.375 * IN  # 9.525: arbor diameter (ch. 13, legacy, med)
-BORE_HEIGHT = 54.0  # ch30 GT: drive height above base top (was 76)
 
 BORE_RADIUS = BORE_DIA / 2.0
 

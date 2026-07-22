@@ -54,10 +54,18 @@ from _drawing_marks import (
 )
 from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
+    ADJUSTER_DEPTH,
+    ADJUSTER_THREAD,
+    BLOCK_HEIGHT,
+    BLOCK_X,
+    BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     PINCH_CLEARANCE_DIA,
+    PINCH_HEIGHT,
+    PINCH_THREAD,
     SHAFT_PASSAGE_DIA,
+    SLIT_W,
 )
 from _holes import (
     DRILL_POINT_H,
@@ -70,9 +78,10 @@ from _holes import (
 PART_NAME = "cone-tip-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it rides
 
-BLOCK_X = 14.0  # plan width across the shaft (low)
-BLOCK_Z = 12.0  # plan depth along the shaft (low)
-BLOCK_HEIGHT = 55.0  # bore at 47.65 + headroom for the pinch cross-bore (low)
+# Geometry envelope comes from cone_tip_block_spec — the drawing's single
+# source of the marked dimensions — so a spec correction rebuilds the SLDPRT
+# from the same values the print annotates (BLOCK_X/BLOCK_Z/BLOCK_HEIGHT,
+# threads, pinch height, slit width).
 # --- adjuster + pinch lock (item 5, v4_t00471 / 7:49) ------------------------
 # Adjuster interface: native 5/16-18 blind TAPPED hole from the NORTH face --
 # the Ø6.2 cone-tip-adjuster threads in. NOTE: the old bore was Ø7.9
@@ -80,24 +89,23 @@ BLOCK_HEIGHT = 55.0  # bore at 47.65 + headroom for the pinch cross-bore (low)
 # 6.528 (per fastener policy we take the true tap-drill, NOT an override to the
 # artefact Ø). ADJUSTER_BORE_DIA is the tap-drill, used by the slit + interlock
 # geometry below (NOT imported by the assembly, so the shrink is self-contained).
-ADJUSTER_BORE_DEPTH = 8.0  # from the NORTH face
+ADJUSTER_BORE_DEPTH = ADJUSTER_DEPTH  # from the NORTH face
 ADJUSTER_BORE_SPEC = HoleSpec(
-    "tapped", "5/16-18", end="blind", depth_mm=ADJUSTER_BORE_DEPTH)
+    "tapped", ADJUSTER_THREAD, end="blind", depth_mm=ADJUSTER_BORE_DEPTH)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)  # 6.528 tap drill
 SHAFT_PASSAGE_RADIUS = SHAFT_PASSAGE_DIA / 2.0
-SLIT_W = 1.2  # top slit width (the clamp flexure)
 SLIT_DEPTH = 8.0  # top face down past the bore line (55.0 -> 47.0)
 # Pinch screw cross-bore, along local X: native #3-48 TAPPED hole -- the Ø1.7
 # cone-tip-pinch-screw threads in (build_cone_tip_pinch_screw SHANK_DIA = 1.7 =
 # 1.994 - 0.3; the drive-train assembly asserts bore - shank in [0.15, 0.45],
 # which needs this Ø1.994 tap-drill, not the old Ø2.4). PINCH_BORE_DIA is
 # imported by the assembly as TIP_PINCH_BORE_DIA.
-PINCH_BORE_SPEC = HoleSpec("tapped", "#3-48")
+PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD)
 PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)  # 1.994 tap drill
 PINCH_CLEARANCE_SPEC = HoleSpec(
     "clearance", "#3", end="blind", depth_mm=(BLOCK_X - SLIT_W) / 2.0
 )
-PINCH_BORE_Y = 53.2  # between the counterbore top and the block top
+PINCH_BORE_Y = PINCH_HEIGHT  # between the counterbore top and the block top
 
 # The pinch cross-bore must land wholly in the material band between the
 # adjuster counterbore's top and the block top, and the slit must cross it.

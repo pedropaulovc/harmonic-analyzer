@@ -1711,6 +1711,41 @@ def add_edge_dimension(
     return dimension
 
 
+@_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
+def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.
+
+    A line-to-circle dimension keeps SolidWorks' default tangent/min-max arc
+    condition, so the value locates the rim instead of the axis — off by the
+    hole radius. Verify each flipped endpoint sticks; fail loud when the
+    dimension has no circular endpoint at all.
+    """
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "GetDimension"
+    )
+    model_dimension = _early_bound(display.GetDimension(), "IDimension")
+    draw = adapter.currentModel
+    arc_end_set = False
+    for index in (1, 2):
+        if int(model_dimension.GetArcEndCondition(index)) == 0:
+            continue
+        result = int(
+            model_dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
+        )
+        if result != 0:
+            raise RuntimeError(
+                f"failed to set {label} endpoint {index} to arc center "
+                f"(SolidWorks result {result})"
+            )
+        draw.GraphicsRedraw2()
+        if int(model_dimension.GetArcEndCondition(index)) != 1:
+            raise RuntimeError(f"{label} did not retain center arc condition")
+        arc_end_set = True
+    if not arc_end_set:
+        raise RuntimeError(f"{label} has no circular endpoint")
+    return dimension
+
+
 def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
     """Box a drawing-native locating dimension as BASIC and verify the result."""
     display = _sw_type_info.early_bound_or_flag(

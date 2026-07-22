@@ -215,6 +215,7 @@ def _add_basic_value(adapter: Any, value: float, x: float, y: float) -> Any:
     return note
 
 
+@_telemetry.traced("drawing.crank_axis_table")
 def _add_crank_axis_table(adapter: Any) -> None:
     """Add a conventional two-point BASIC coordinate definition."""
     _add_table_note(

@@ -87,6 +87,7 @@ DIMENSION_CALLOUTS = {
 STEM_DIM_TEXT = (0.180, _front_y(12.0))
 
 
+@_telemetry.traced("drawing.stem_dimension_format")
 def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
     """Render the drawing-native stem width as a toleranced diameter."""
     display = _early_bound(

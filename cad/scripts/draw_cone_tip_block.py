@@ -20,6 +20,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
+    set_arc_endpoints_to_center,
     set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -346,6 +347,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0)),
         label="pinch-axis height",
     )
+    set_arc_endpoints_to_center(adapter, pinch_height, label="pinch-axis height")
     set_basic_dimension(adapter, pinch_height, label="pinch-axis height")
     add_feature_control_frame(
         adapter,
