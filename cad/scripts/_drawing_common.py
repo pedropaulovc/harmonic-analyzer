@@ -694,18 +694,19 @@ def create_section_view(
 ) -> Any:
     """Create a full, unaligned section from one straight cutting-plane line.
 
-    The coordinates are drawing-sheet meters.  ``CreateLine2`` leaves the new
-    sketch segment selected, which is the documented precondition for
+    The coordinates are drawing-sheet meters.  ``ISketchManager.CreateLine``
+    leaves the new sketch segment selected, which is the documented precondition for
     ``CreateSectionViewAt5``.  The section is deliberately unaligned so a part
     recipe can place and scale it independently of the parent view.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
     name = view_name(adapter, parent_view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate section parent view {name!r} ({label})")
     draw.ClearSelection2(True)
-    segment = ddoc.CreateLine2(
+    segment = sketch_manager.CreateLine(
         float(line_start[0]),
         float(line_start[1]),
         0.0,

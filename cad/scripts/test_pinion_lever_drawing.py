@@ -7,6 +7,7 @@ from pathlib import Path
 import pinion_lever_spec
 import draw_pinion_lever as drawing
 import build_pinion_lever as lever
+import _drawing_common
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -64,6 +65,7 @@ def test_lever_drive_is_fully_released_for_manufacture() -> None:
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
     assert source.count("add_feature_control_frame(") == 4
     assert source.count('entity_type="SILHOUETTE"') == 4
@@ -77,6 +79,9 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "<MOD-DIAM>4.00" in source
     assert "<MOD-DIAM>6.00" in source
     assert "create_section_view(" in source
+    assert 'sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")' in common_source
+    assert "segment = sketch_manager.CreateLine(" in common_source
+    assert "segment = ddoc.CreateLine2(" not in common_source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
