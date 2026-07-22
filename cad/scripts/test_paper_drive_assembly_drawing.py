@@ -93,6 +93,9 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert source.count("scale=ISO_VIEW_SCALE") == 1
     assert source.count("isolate_drawing_view_components(") == 1
     assert source.count("add_component_bom_balloons(") == 1
+    assert '("transgear-bracket", "12", 0.008)' in source
+    assert '("bracket-screw", "13", 0.025)' in source
+    assert '("transgear-latch", "15", 0.014)' in source
     assert "existing_balloons=targeted_balloons" in source
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert drawing.VIEW_SCALE == (1, 5)

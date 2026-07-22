@@ -225,17 +225,21 @@ async def build(adapter: Any) -> dict[str, str]:
         configuration_grouping="same-part",
         label="paper-drive assembly",
     )
-    targeted_balloons = add_component_bom_balloons(
-        adapter,
-        bracket_detail,
-        items=(
-            ("transgear-bracket", "12"),
-            ("bracket-screw", "13"),
-            ("transgear-latch", "15"),
-        ),
-        label="paper-drive transgear balloons",
-        margin=0.022,
-    )
+    targeted_balloons = []
+    for stem, item_number, margin in (
+        ("transgear-bracket", "12", 0.008),
+        ("bracket-screw", "13", 0.025),
+        ("transgear-latch", "15", 0.014),
+    ):
+        targeted_balloons.extend(
+            add_component_bom_balloons(
+                adapter,
+                bracket_detail,
+                items=((stem, item_number),),
+                label=f"paper-drive item {item_number} balloon",
+                margin=margin,
+            )
+        )
     # The pictorial exposes most component families. Seed exact transgear
     # balloons first, then validate the union supplied by the main views.
     add_auto_balloons_across_views(
