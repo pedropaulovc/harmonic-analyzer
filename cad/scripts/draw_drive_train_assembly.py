@@ -335,10 +335,10 @@ GEAR_SETUP_VIEW_STEMS = (
     frozenset({"cylinder-gear-shaft", "cylinder-gear"}),
 )
 GEAR_SETUP_VIEW_LABELS = (
-    "ITEMS 25/27 — CONE STACK — SCALE 1:5",
-    "ITEMS 1/28 — DRUM STACK — SCALE 1:5",
+    "ITEMS 25/27\nCONE STACK — SCALE 1:5",
+    "ITEMS 1/28\nDRUM STACK — SCALE 1:5",
 )
-GEAR_SETUP_VIEW_LABEL_ORIGINS = ((0.280, 0.125), (0.345, 0.125))
+GEAR_SETUP_VIEW_LABEL_ORIGINS = ((0.285, 0.125), (0.350, 0.125))
 
 # Sheet 7: a large parked/disengaged reference view plus scan-friendly setup
 # and functional-acceptance tables.  The saved assembly does not claim to show
