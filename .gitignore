@@ -361,6 +361,9 @@ cad/out/inspection/
 # committed — the release on GitHub is the snapshot.
 download/
 
+# Local scratch exports and review conversions.
+tmp/
+
 # Generated verify.py reports + doit gate stamps (rebuild with `doit build`)
 cad/out/reports/
 # Per-task build/verify logs teed by dodo.py:_run (shipped in a release bundle)
