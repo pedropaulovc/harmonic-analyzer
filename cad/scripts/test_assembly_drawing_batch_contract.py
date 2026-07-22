@@ -178,20 +178,28 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
 
 def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
     source = Path(draw_drive_train_assembly.__file__).read_text(encoding="utf-8")
-    assert source.count("place_view(") == 10
-    assert "for view in exterior_views:" in source
-    assert "set_hidden_lines_removed(adapter, view)" in source
-    assert '"*Bottom"' in source
-    assert "set_hidden_lines_visible(adapter, concealed_bottom)" in source
-    assert "set_hidden_lines_visible(adapter, concealed_front)" in source
-    assert source.count("_isolate_balloon_components(") == 3
-    assert source.count("insert_identified_bom_table(") == 1
+    assert draw_drive_train_assembly.SHEET_NAMES == (
+        "GENERAL ASSEMBLY",
+        "PARTS LIST",
+        "EXTERIOR ITEM IDENTIFICATION",
+        "CONCEALED ITEM IDENTIFICATION",
+        "GEAR-TRAIN SETUP",
+        "PINION SETUP AND ACCEPTANCE",
+    )
+    assert set().union(
+        *draw_drive_train_assembly.EXTERIOR_VIEW_STEMS
+    ) == set(draw_drive_train_assembly.BOM_COMPONENTS) - set(
+        draw_drive_train_assembly.CONCEALED_BALLOON_ITEMS
+    )
+    assert len(draw_drive_train_assembly.GEAR_PAIR_ROWS) == 20
+    assert draw_drive_train_assembly.PINION_PARAMETER_ROWS
+    assert draw_drive_train_assembly.ACCEPTANCE_ROWS
+    assert "_add_component_balloons(" in source
+    assert "_isolate_balloon_components(" in source
+    assert "insert_identified_bom_table(" in source
     assert "part_numbers=BOM_PART_NUMBERS" in source
-    assert source.count("_add_drive_train_balloons(") == 2
-    assert "expected_items=exterior_items" in source
-    assert "manual_items=MANUAL_EXTERIOR_BALLOON_ITEMS" in source
     assert "HorizontalAutoSplit(" not in source
     assert "_format_drive_train_bom(adapter, bom_table)" in source
     assert "_create_drive_train_sheets(adapter)" in source
     assert "expected_sheet_names=SHEET_NAMES" in source
-    assert source.count("ddoc.ActivateSheet(SHEET_NAMES[") == 5
+    assert "SETUP_IDENTIFICATION_VIEW_SCALE" not in source

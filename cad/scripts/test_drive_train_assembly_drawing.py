@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
+import math
 from pathlib import Path
 
 import _config
@@ -27,6 +29,12 @@ def _load_dodo():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def _normalized_table_text(rows: tuple[tuple[str, ...], ...]) -> str:
+    return " ".join(" ".join(row) for row in rows).replace("–", "-").replace(
+        "°", " DEG"
+    )
 
 
 def test_registry_row_resolves_the_assembly_source() -> None:
@@ -98,158 +106,209 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
     assert source.count('"Finish": "SEE COMPONENT DRAWINGS"') == 1
 
 
-def test_drawing_places_bom_balloons_and_specific_notes() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assembly_notes = drawing.ASSEMBLY_NOTES
-    normalized_notes = " ".join(assembly_notes.split())
-    assert source.count("insert_identified_bom_table(") == 1
-    assert source.count("_add_drive_train_balloons(") == 2
-    assert 'configuration_grouping="same-part"' in source
-    assert "_insert_cone_gear_schedule(adapter, bom_table, bom_iso)" in source
-    assert '"GetComponents2"' in source
-    assert '"InsertTableAnnotation2"' in source
-    assert "expected_sheet_names=SHEET_NAMES" in source
-    assert source.count("add_note(") == 7
-    assert source.count("scale=VIEW_SCALE") == 9
-    assert source.count("scale=VIEW_SCALE,") == 2
-    assert '"*Bottom"' in source
-    assert '"*Front"' in source
-    assert source.count("_isolate_balloon_components(") == 3
-    assert "drawing_component.Visible = bool(matched)" in source
+def test_drive_train_has_six_named_and_numbered_sheets() -> None:
+    build_source = inspect.getsource(drawing.build)
     assert drawing.SHEET_NAMES == (
         "GENERAL ASSEMBLY",
         "PARTS LIST",
         "EXTERIOR ITEM IDENTIFICATION",
         "CONCEALED ITEM IDENTIFICATION",
-        "SETUP AND ACCEPTANCE",
+        "GEAR-TRAIN SETUP",
+        "PINION SETUP AND ACCEPTANCE",
     )
-    assert source.count(" OF 5") == 5
-    assert " OF 4" not in source
-    assert "ActivateSheet(SHEET_NAMES[4])" in source
-    assert drawing.BOTTOM_VISIBILITY_STEMS == {
-        "cone-tip-bushing",
-        "cone-gear-shaft",
-        "crank-drive-gear",
-    }
-    assert drawing.CONCEALED_BOTTOM_STEMS == {
-        "cone-tip-bushing",
-        "cone-gear-shaft",
-    }
-    assert drawing.CONCEALED_FRONT_STEMS == {"crank-drive-gear"}
-    assert (
-        drawing.CONCEALED_BOTTOM_STEMS | drawing.CONCEALED_FRONT_STEMS
-        == drawing.BOTTOM_VISIBILITY_STEMS
+    for index, name in enumerate(drawing.SHEET_NAMES):
+        assert f"ActivateSheet(SHEET_NAMES[{index}])" in build_source
+        assert f"SHEET {index + 1} OF 6 — {name}" in build_source
+    assert "expected_sheet_names=SHEET_NAMES" in build_source
+    assert "SEE SHEET 5" in drawing.GENERAL_POINTER_NOTE
+    assert "SEE SHEET 6" in drawing.GENERAL_POINTER_NOTE
+
+
+def test_sheet_three_identifies_three_disjoint_subsystems_deliberately() -> None:
+    expected = (
+        frozenset(
+            {
+                "cone-swing-platform",
+                "cone-pivot-post",
+                "cone-tip-block",
+                "cone-tip-adjuster",
+                "cone-tip-pinch-screw",
+                "cone-lock-knob",
+                "cone-pivot-screw",
+                "swing-stop-screw",
+                "cone-gear",
+            }
+        ),
+        frozenset(
+            {
+                "alignment-pinion",
+                "pinion-bracket",
+                "pinion-pivot-block",
+                "pinion-pivot-shaft",
+                "pinion-lift-rod",
+                "pinion-spring",
+                "pinion-cam-pin",
+                "pinion-cam",
+                "pinion-lever",
+                "pinion-handle",
+                "pinion-arbor",
+                "slotted-screw",
+                "foot-screw",
+            }
+        ),
+        frozenset(
+            {
+                "cylinder-gear-shaft",
+                "arbor-pedestal",
+                "cylinder-gear",
+                "crankshaft",
+                "crank-pinion",
+                "crank-arm",
+                "crank-handle",
+            }
+        ),
     )
-    assert drawing.CONCEALED_BALLOON_ITEMS == {
-        "cone-tip-bushing": "6",
-        "cone-gear-shaft": "25",
-        "crank-drive-gear": "26",
-    }
-    assert drawing.MANUAL_EXTERIOR_BALLOON_ITEMS == {
-        "cone-tip-adjuster": "7",
-        "cone-tip-pinch-screw": "8",
-        "swing-stop-screw": "11",
-        "alignment-pinion": "12",
-        "crank-pinion": "30",
-    }
-    assert drawing.MANUAL_EXTERIOR_VIEW_ORDER == {
-        "cone-tip-adjuster": (2, 1, 0),
-        "cone-tip-pinch-screw": (0, 2, 1),
-        "swing-stop-screw": (1, 2, 0),
-        "alignment-pinion": (2, 1, 0),
-        "crank-pinion": (1, 2, 0),
-    }
-    assert drawing.FRONT_DEFERRED_BALLOON_STEMS == {
-        "swing-stop-screw",
-        "pinion-pivot-shaft",
-        "pinion-lever",
-        "foot-screw",
-        "crankshaft",
-        "crank-pinion",
-    }
-    assert drawing.FRONT_DEFERRED_BALLOON_ITEMS == {
-        "11",
-        "15",
-        "20",
-        "24",
-        "29",
-        "30",
-    }
-    assert "_defer_front_balloons(adapter, balloons)" in source
-    assert '"IModelDocExtension", "DeleteSelection2"' in source
-    assert "RootDrawingComponent2(False)" in source
-    assert "GetVisibleEntities2(c, 1)" in source
-    assert "selected_view.SelectEntity(selected_edge, False)" in source
-    assert '"IModelDocExtension",\n        "CreateBalloonOptions",\n        "InsertBOMBalloon2"' in source
-    assert 'drawing_name.rsplit("/", 1)[-1].casefold()' in source
-    assert 'identity.startswith(f"{stem}-")' in source
-    assert "enumerated drawing components" in source
-    assert "HorizontalAutoSplit(" not in source
-    assert sum(drawing.BOM_COLUMN_WIDTHS.values()) == 0.125
-    assert drawing.BOM_COMPONENTS["cone-pivot-post"] == "T120 JOURNAL POST"
-    assert drawing.BOM_COMPONENTS["cone-tip-block"] == "T006 JOURNAL BLOCK"
-    assert len(drawing.CONE_GEAR_SCHEDULE) == 20
-    assert drawing.CONE_GEAR_SCHEDULE[0] == (1, "T120", 120)
-    assert drawing.CONE_GEAR_SCHEDULE[-1] == (20, "T006", 6)
-    assert [row[2] for row in drawing.CONE_GEAR_SCHEDULE] == list(
-        range(120, 0, -6)
+    assert drawing.EXTERIOR_VIEW_STEMS == expected
+    assert drawing.EXTERIOR_VIEW_LABELS == (
+        "VIEW A — CONE PLATFORM / GEAR TRAIN",
+        "VIEW B — PINION ENGAGEMENT",
+        "VIEW C — CYLINDER / CRANK",
     )
-    assert len({row[1] for row in drawing.CONE_GEAR_SCHEDULE}) == 20
-    assert drawing.CONE_SCHEDULE_ANCHOR == (0.155, 0.170)
-    assert sum(drawing.CONE_SCHEDULE_COLUMN_WIDTHS) == 0.098
-    assert drawing.CONE_SCHEDULE_TEXT_HEIGHT == 0.0025
-    assert drawing.CONE_SCHEDULE_ROW_HEIGHT == 0.006
-    assert drawing.EXTERIOR_BALLOON_RING_MARGINS == (0.014, 0.014, 0.014)
-    assert drawing.PINION_PIVOT_SHAFT_BALLOON_POSITION == (0.199, 0.120)
-    assert 'item_number="15"' in source
-    assert 'label="drive-train item 15 leader routing"' in source
-    assert "position_tolerance_m=0.0015" in source
-    assert drawing.CONCEALED_BOTTOM_BALLOON_RING_MARGIN == 0.015
-    assert drawing.CONCEALED_FRONT_BALLOON_RING_MARGIN == 0.025
-    assert drawing.CONCEALED_BALLOON_CLEARANCE == 0.006
-    assert drawing.CONCEALED_HEADING_ORIGIN == (0.060, 0.255)
-    assert drawing.SETUP_HEADING_ORIGIN == (0.060, 0.255)
-    assert drawing.SETUP_IDENTIFICATION_VIEW_CENTER == (0.365, 0.215)
-    assert drawing.SETUP_IDENTIFICATION_VIEW_SCALE == (1, 8)
-    assert drawing.SETUP_NOTE_ORIGINS == (
-        (0.018, 0.230),
-        (0.158, 0.230),
-        (0.300, 0.145),
+    groups = expected
+    assert not any(
+        left & right
+        for i, left in enumerate(groups)
+        for right in groups[i + 1 :]
     )
-    assert drawing.SETUP_NOTE_TEXT_HEIGHT == 0.0025
-    assert len(drawing.SETUP_NOTE_COLUMNS) == 3
-    assert "_swap_drive_train_balloon_slots" not in source
-    assert drawing.GENERAL_POINTER_NOTE == (
-        "SETUP, ORIENTATION, BACKLASH, AND FINAL ACCEPTANCE: SEE SHEET 5."
+    assert set().union(*groups) == set(drawing.BOM_COMPONENTS) - set(
+        drawing.CONCEALED_BALLOON_ITEMS
     )
-    assert "MACHINE FRONT = PAPER/OUTPUT SIDE (-Z)" in assembly_notes
-    assert "EAST = VIEWER RIGHT (-X)" in assembly_notes
-    assert '"T120 END" = ITEM 4 / ITEM 27 T120 END' in assembly_notes
-    assert '"T006 END" = ITEM 5 / ITEM 27 T006 END' in assembly_notes
-    assert "40.55 + j(6.889) MM" in assembly_notes
-    assert "22.90 + j(7.0566) MM" in assembly_notes
-    assert "2.00 MM CLEARANCE" in assembly_notes
-    assert "41.30 MM C-C" in assembly_notes
-    assert "12.38 DEG" in assembly_notes
-    assert "0.25 MM AXIAL CLEARANCE" in assembly_notes
-    assert "7.00 MM" in assembly_notes
-    assert "0.10-0.25 MM MINIMUM SURFACE" in assembly_notes
-    assert "40 DEG" in assembly_notes
-    assert "MACHINE-BACK ITEM 13" in assembly_notes
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    build_source = inspect.getsource(drawing.build)
+    assert "_create_auto_balloons(" not in build_source
+    assert "_add_component_balloons(" in build_source
+    assert "_create_component_balloon(" in source
+    assert "_spread_balloons(" in source
+    assert "EXTERIOR_VIEW_STEMS" in build_source
+    assert "_isolate_balloon_components(" in build_source
+    assert "position_bom_balloon(" not in source
+
+
+def test_sheet_five_has_an_explicit_twenty_pair_station_contract() -> None:
+    assert len(drawing.GEAR_PAIR_ROWS) == 20
+    assert len({row[0] for row in drawing.GEAR_PAIR_ROWS}) == 20
+    assert len({row[1] for row in drawing.GEAR_PAIR_ROWS}) == 20
+    for index, row in enumerate(drawing.GEAR_PAIR_ROWS):
+        pair, config, reference, ratio, cone_center, cylinder_center = row
+        teeth = 120 - 6 * index
+        assert pair == f"{index + 1:02d}"
+        assert config == f"T{120 - 6 * index:03d}"
+        assert reference == "T120"
+        assert ratio == f"{teeth}:120"
+        assert math.isclose(
+            float(cone_center), 40.55 + 6.888787817 * index, abs_tol=5e-4
+        )
+        assert math.isclose(
+            float(cylinder_center), 22.90 + 7.056542133 * index, abs_tol=5e-4
+        )
+
+    requirements = _normalized_table_text(drawing.GEAR_REQUIREMENT_ROWS)
+    assert "ITEM 27" in requirements
+    assert "ITEM 25" in requirements
+    assert "SOLDER" in requirements
+    assert "NO KEY" in requirements
+    assert "ITEM 28" in requirements
+    assert "FREE ON ITEM 1" in requirements
+    assert "ITEM 1" in requirements
+    assert "0.05-0.20 MM" in requirements
+    assert "BACKLASH" in requirements
+
+    build_source = inspect.getsource(drawing.build)
+    assert "_insert_cone_gear_schedule(" in build_source
+    assert "_insert_gear_requirements_table(" in build_source
+
+
+def test_sheet_six_uses_state_and_acceptance_tables_with_a_parked_view() -> None:
+    parameters = drawing.PINION_PARAMETER_ROWS
+    acceptance = drawing.ACCEPTANCE_ROWS
+    assert len(parameters) == 8
+    assert len(acceptance) == 4
+    assert all(len(row) == 4 for row in parameters)
+    assert all(len(row) == 2 for row in acceptance)
+    parameter_text = _normalized_table_text(parameters)
+    acceptance_text = _normalized_table_text(acceptance)
+    for required in (
+        "2.00 MM",
+        "41.30 MM",
+        "12.38 DEG",
+        "0.25 MM",
+        "7.00 MM",
+        "0.10-0.25 MM",
+        "40 DEG",
+    ):
+        assert required in parameter_text
+    for required in (
+        "ITEM 29",
+        "ITEM 21",
+        "ITEM 17",
+        "ITEM 3",
+    ):
+        assert required in acceptance_text
+    assert "NO AXIAL PLAY" not in acceptance_text
+
+    build_source = inspect.getsource(drawing.build)
+    assert "_insert_pinion_parameter_table(" in build_source
+    assert "_insert_acceptance_table(" in build_source
+    assert "PARK / DISENGAGED — SHOWN POSITION" in build_source
+
+
+def test_setup_views_do_not_hide_an_unlabelled_scale_exception() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "SETUP_IDENTIFICATION_VIEW_SCALE" not in source
+    assert "(1, 8)" not in source
+
+
+def test_assembly_notes_preserve_the_source_backed_manufacturing_contract() -> None:
+    assert isinstance(drawing.ASSEMBLY_NOTES, str)
+    assembly_notes = drawing.ASSEMBLY_NOTES
+    normalized_notes = " ".join(assembly_notes.split())
+    assert assembly_notes.splitlines()[0] == "ASSEMBLY NOTES"
+    for required in (
+        "MACHINE FRONT = PAPER/OUTPUT SIDE (-Z)",
+        "EAST = VIEWER RIGHT (-X)",
+        '"T120 END" = ITEM 4 / ITEM 27 T120 END',
+        '"T006 END" = ITEM 5 / ITEM 27 T006 END',
+        "40.55 + j(6.889) MM",
+        "22.90 + j(7.0565) MM",
+        "2.00 MM CLEARANCE",
+        "41.30 MM C-C",
+        "12.38 DEG",
+        "0.25 MM AXIAL CLEARANCE",
+        "7.00 MM",
+        "0.10-0.25 MM MINIMUM SURFACE",
+        "40 DEG",
+        "MACHINE-BACK ITEM 13",
+        "FINAL FUNCTIONAL ACCEPTANCE",
+    ):
+        assert required in assembly_notes
     assert (
         "SET 0.05-0.20 MM TANGENTIAL BACKLASH AT EACH ITEM 27/28 "
         "PITCH-CIRCLE MESH"
     ) in normalized_notes
-    assert "FINAL FUNCTIONAL ACCEPTANCE" in assembly_notes
-    assert "ITEM 29 ONE REVOLUTION" in assembly_notes
-    assert "ITEM 21 ONE" in assembly_notes
-    assert "ITEM 17 SHALL RETURN ITEM 12 TO 2.00 MM GAP" in assembly_notes
-    assert "ITEM 3 SHALL SWING FREELY TO CONTACT" in assembly_notes
-    assert "RECHECK ITEM 25 FOR FREE" in assembly_notes
     assert "CAM SHAFT ONE FULL TURN" not in assembly_notes
     assert "0.05-0.10" not in assembly_notes
+
+    rendered_text = " ".join(
+        (
+            assembly_notes,
+            *(" ".join(row) for row in drawing.GEAR_REQUIREMENT_ROWS),
+            *(" ".join(row) for row in drawing.PINION_PARAMETER_ROWS),
+            *(" ".join(row) for row in drawing.ACCEPTANCE_ROWS),
+        )
+    ).upper()
     assert all(
-        token not in assembly_notes
+        token not in rendered_text
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
     )
 

@@ -26,11 +26,9 @@ from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
     _balloon_item_number,
-    _create_auto_balloons,
     _spread_balloons,
     finalize_drawing,
     new_project_drawing,
-    position_bom_balloon,
     read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -59,9 +57,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Five sheets let the ~300 mm-wide mechanism use a readable 1:3 scale without
+# Six sheets let the ~300 mm-wide mechanism use a readable 1:3 scale without
 # forcing its 32-row BOM, exterior balloons, concealed-item identification, and
-# functional setup notes into one field.  All views use the sheet scale so the
+# functional setup data into one field.  All views use the sheet scale so the
 # title block remains truthful without per-view scale exceptions.
 SHEET_SCALE = (1.0, 3.0)
 VIEW_SCALE = (1, 3)
@@ -70,7 +68,8 @@ SHEET_NAMES = (
     "PARTS LIST",
     "EXTERIOR ITEM IDENTIFICATION",
     "CONCEALED ITEM IDENTIFICATION",
-    "SETUP AND ACCEPTANCE",
+    "GEAR-TRAIN SETUP",
+    "PINION SETUP AND ACCEPTANCE",
 )
 
 # One BOM row per UNIQUE top-level component of build_drive_train_assembly.py.
@@ -126,38 +125,9 @@ CONCEALED_BALLOON_ITEMS = {
     for index, stem in enumerate(BOM_COMPONENTS, start=1)
     if stem in BOTTOM_VISIBILITY_STEMS
 }
-MANUAL_EXTERIOR_BALLOON_ITEMS = {
-    "cone-tip-adjuster": "7",
-    "cone-tip-pinch-screw": "8",
-    "swing-stop-screw": "11",
-    "alignment-pinion": "12",
-    "crank-pinion": "30",
-}
-MANUAL_EXTERIOR_VIEW_ORDER = {
-    "cone-tip-adjuster": (2, 1, 0),
-    "cone-tip-pinch-screw": (0, 2, 1),
-    "swing-stop-screw": (1, 2, 0),
-    "alignment-pinion": (2, 1, 0),
-    "crank-pinion": (1, 2, 0),
-}
-FRONT_DEFERRED_BALLOON_STEMS = frozenset(
-    {
-        "swing-stop-screw",
-        "pinion-pivot-shaft",
-        "pinion-lever",
-        "foot-screw",
-        "crankshaft",
-        "crank-pinion",
-    }
-)
-FRONT_DEFERRED_BALLOON_ITEMS = frozenset(
-    str(index)
-    for index, stem in enumerate(BOM_COMPONENTS, start=1)
-    if stem in FRONT_DEFERRED_BALLOON_STEMS
-)
-
 GENERAL_POINTER_NOTE = (
-    "SETUP, ORIENTATION, BACKLASH, AND FINAL ACCEPTANCE: SEE SHEET 5."
+    "GEAR-TRAIN SETUP: SEE SHEET 5. PINION SETUP AND FINAL ACCEPTANCE: "
+    "SEE SHEET 6."
 )
 
 # Sheet 5 holds the source-backed assembly contract in three short columns.
@@ -183,7 +153,7 @@ _SETUP_NOTE_LINES = (
         "   ITEM 25 AXIS; SOLDER EACH GEAR TO SHAFT; NO KEY.",
         "4. INSTALL ITEM 28 CYLINDER DRUM GEARS FREE TO",
         "   ROTATE ON ITEM 1 CYLINDER DRUM ARBOR. SET ITEM 28",
-        "   TOOTHED-DISC MIDPLANES 22.90 + j(7.0566) MM",
+        "   TOOTHED-DISC MIDPLANES 22.90 + j(7.0565) MM",
         "   FROM ITEM 1 MACHINE-FRONT END, j = 0...19.",
         "   TOOTHED DISC FACES MACHINE FRONT; CAM FACES",
         "   MACHINE BACK. PHASE ALL ITEM 28 INDEX NOTCHES ALIKE.",
@@ -258,36 +228,121 @@ GENERAL_POINTER_ORIGIN = (0.018, 0.070)
 # Sheet 2: one continuous 32-row parts list plus a small orientation view.
 BOM_ANCHOR = (0.018, 0.262)
 BOM_ISO_CENTER = (0.310, 0.165)
-# Keep the schedule's upper-left anchor high enough that its 22 requested
-# 6 mm rows retain generous clearance above the bottom drawing zone.
-CONE_SCHEDULE_ANCHOR = (0.155, 0.170)
-CONE_SCHEDULE_COLUMN_WIDTHS = (0.046, 0.032, 0.020)
-CONE_SCHEDULE_TEXT_HEIGHT = 0.0025
-CONE_SCHEDULE_ROW_HEIGHT = 0.006
 
-# Sheet 3: large exterior views and exterior-only item balloons.
-EXTERIOR_FRONT_CENTER = (0.075, 0.155)
-EXTERIOR_RIGHT_CENTER = (0.220, 0.155)
-EXTERIOR_ISO_CENTER = (0.345, 0.155)
+# Sheet 3: three isolated subsystem views replace the black, overlapping gear
+# bands in the former full-assembly identification views.  Every exterior BOM
+# family appears in exactly one group and gets one deliberately attached balloon.
+EXTERIOR_VIEW_CENTERS = ((0.078, 0.150), (0.215, 0.150), (0.350, 0.150))
+EXTERIOR_VIEW_NAMES = ("*Isometric", "*Front", "*Isometric")
+EXTERIOR_VIEW_LABELS = (
+    "VIEW A — CONE PLATFORM / GEAR TRAIN",
+    "VIEW B — PINION ENGAGEMENT",
+    "VIEW C — CYLINDER / CRANK",
+)
+EXTERIOR_VIEW_LABEL_ORIGINS = ((0.030, 0.235), (0.170, 0.235), (0.310, 0.235))
+EXTERIOR_VIEW_STEMS = (
+    frozenset(
+        {
+            "cone-swing-platform",
+            "cone-pivot-post",
+            "cone-tip-block",
+            "cone-tip-adjuster",
+            "cone-tip-pinch-screw",
+            "cone-lock-knob",
+            "cone-pivot-screw",
+            "swing-stop-screw",
+            "cone-gear",
+        }
+    ),
+    frozenset(
+        {
+            "alignment-pinion",
+            "pinion-bracket",
+            "pinion-pivot-block",
+            "pinion-pivot-shaft",
+            "pinion-lift-rod",
+            "pinion-spring",
+            "pinion-cam-pin",
+            "pinion-cam",
+            "pinion-lever",
+            "pinion-handle",
+            "pinion-arbor",
+            "slotted-screw",
+            "foot-screw",
+        }
+    ),
+    frozenset(
+        {
+            "cylinder-gear-shaft",
+            "arbor-pedestal",
+            "cylinder-gear",
+            "crankshaft",
+            "crank-pinion",
+            "crank-arm",
+            "crank-handle",
+        }
+    ),
+)
 
-# Sheet 4: two isolated views keep the coaxial concealed items readable.  The
-# bushing and shaft share the underside view; the crank gear gets a separate
-# front view because its projected attachment lies on top of the shaft callout.
+# Sheet 4: selected context makes the three concealed families comprehensible
+# without duplicating their exterior balloons.
 CONCEALED_BOTTOM_CENTER = (0.115, 0.135)
 CONCEALED_FRONT_CENTER = (0.285, 0.155)
+CONCEALED_BOTTOM_VISIBLE_STEMS = frozenset(
+    {
+        "cone-pivot-post",
+        "cone-tip-block",
+        "cone-tip-bushing",
+        "cone-tip-adjuster",
+        "cone-tip-pinch-screw",
+        "cone-gear-shaft",
+    }
+)
+CONCEALED_FRONT_VISIBLE_STEMS = frozenset(
+    {"cone-gear-shaft", "crank-drive-gear", "crankshaft", "crank-pinion"}
+)
 CONCEALED_BOTTOM_STEMS = frozenset({"cone-tip-bushing", "cone-gear-shaft"})
 CONCEALED_FRONT_STEMS = frozenset({"crank-drive-gear"})
 CONCEALED_BOTTOM_BALLOON_RING_MARGIN = 0.015
 CONCEALED_FRONT_BALLOON_RING_MARGIN = 0.025
 CONCEALED_BALLOON_CLEARANCE = 0.006
 CONCEALED_HEADING_ORIGIN = (0.060, 0.255)
+CONCEALED_VIEW_LABEL_ORIGINS = ((0.045, 0.225), (0.245, 0.225))
 
-# Sheet 5: three text columns, clear of the zone frame and title block.
-SETUP_NOTE_ORIGINS = ((0.018, 0.230), (0.158, 0.230), (0.300, 0.145))
+# Sheet 5: one row is one physical item-27/item-28 mesh pair.  The station
+# values are the evaluated source laws from the numbered assembly notes.
+CONE_SCHEDULE_ANCHOR = (0.018, 0.232)
+CONE_SCHEDULE_COLUMN_WIDTHS = (0.016, 0.025, 0.025, 0.028, 0.075, 0.075)
+CONE_SCHEDULE_TEXT_HEIGHT = 0.0025
+CONE_SCHEDULE_ROW_HEIGHT = 0.006
+GEAR_REQUIREMENTS_ANCHOR = (0.275, 0.232)
+GEAR_REQUIREMENTS_COLUMN_WIDTHS = (0.028, 0.072, 0.040)
+GEAR_REQUIREMENTS_ROW_HEIGHT = 0.012
+GEAR_SETUP_VIEW_CENTERS = ((0.315, 0.120), (0.385, 0.120))
+GEAR_SETUP_VIEW_STEMS = (
+    frozenset({"cone-gear-shaft", "cone-gear"}),
+    frozenset({"cylinder-gear-shaft", "cylinder-gear"}),
+)
+GEAR_SETUP_VIEW_LABELS = (
+    "ITEMS 25/27 — CONE-GEAR STATIONS",
+    "ITEMS 1/28 — CYLINDER-GEAR STATIONS",
+)
+GEAR_SETUP_VIEW_LABEL_ORIGINS = ((0.270, 0.150), (0.350, 0.150))
+
+# Sheet 6: a large parked/disengaged reference view plus scan-friendly setup
+# and functional-acceptance tables.  The saved assembly does not claim to show
+# the engaged pose.
+PINION_SETUP_VIEW_CENTER = (0.095, 0.165)
+PINION_SETUP_VIEW_STEMS = EXTERIOR_VIEW_STEMS[1]
+PINION_SETUP_VIEW_LABEL_ORIGIN = (0.030, 0.235)
+PINION_PARAMETER_TABLE_ANCHOR = (0.175, 0.232)
+PINION_PARAMETER_COLUMN_WIDTHS = (0.048, 0.058, 0.050, 0.075)
+PINION_PARAMETER_ROW_HEIGHT = 0.010
+ACCEPTANCE_TABLE_ANCHOR = (0.175, 0.120)
+ACCEPTANCE_COLUMN_WIDTHS = (0.075, 0.156)
+ACCEPTANCE_ROW_HEIGHT = 0.009
+SETUP_HEADING_ORIGIN = (0.018, 0.262)
 SETUP_NOTE_TEXT_HEIGHT = 0.0025
-SETUP_HEADING_ORIGIN = (0.060, 0.255)
-SETUP_IDENTIFICATION_VIEW_CENTER = (0.365, 0.215)
-SETUP_IDENTIFICATION_VIEW_SCALE = (1, 8)
 BOM_COLUMN_WIDTHS = {
     "ITEM NO.": 0.014,
     "PART NUMBER": 0.025,
@@ -295,11 +350,111 @@ BOM_COLUMN_WIDTHS = {
     "QTY.": 0.012,
 }
 EXTERIOR_BALLOON_RING_MARGINS = (0.014, 0.014, 0.014)
-PINION_PIVOT_SHAFT_BALLOON_POSITION = (0.199, 0.120)
 
 CONE_GEAR_SCHEDULE = tuple(
     (position, f"T{int(channel['cone_teeth']):03d}", int(channel["cone_teeth"]))
     for position, channel in enumerate(_config.channels(), start=1)
+)
+GEAR_PAIR_ROWS = tuple(
+    (
+        f"{position:02d}",
+        config,
+        "T120",
+        f"{teeth}:120",
+        f"{40.550 + (position - 1) * 6.888787817:.3f}",
+        f"{22.900 + (position - 1) * 7.056542133:.3f}",
+    )
+    for position, config, teeth in CONE_GEAR_SCHEDULE
+)
+GEAR_REQUIREMENT_ROWS = (
+    (
+        "ORIENTATION",
+        "MACHINE FRONT = PAPER/OUTPUT SIDE (-Z); BACK = +Z. FRONT-VIEW EAST = RIGHT (-X); WEST = LEFT (+X).",
+        "APPLIES TO ALL SETUP FEATURES",
+    ),
+    (
+        "ITEM 27",
+        "T120 AT ITEM 4 END; T006 AT ITEM 5 END. FACES SQUARE. SOLDER TO ITEM 25; NO KEY.",
+        "VERIFY SEQUENCE AND TABLE STATIONS",
+    ),
+    (
+        "ITEM 28",
+        "FREE ON ITEM 1. TOOTHED FACES FRONT; CAM FACES BACK. ALIGN ALL INDEX NOTCHES.",
+        "WITH ITEM 3 DISENGAGED, HAND-SPIN EACH ITEM 28",
+    ),
+    (
+        "PAIR 01–20",
+        "ITEM 27 AND ITEM 28 IN THE SAME ROW FORM ONE MESH PAIR.",
+        "0.05–0.20 MM TANGENTIAL BACKLASH",
+    ),
+)
+PINION_PARAMETER_ROWS = (
+    (
+        "ORIENTATION",
+        "FRONT = PAPER SIDE (-Z); BACK = +Z",
+        "EAST = -X; WEST = +X",
+        "FRONT-VIEW DIRECTIONS",
+    ),
+    (
+        "ITEM 12/28 RELATION",
+        "2.00 MM GAP; AXES LEVEL",
+        "41.30 MM C-C",
+        "PARK: TOOTH-TIP ENVELOPES ON AXIS LINE; ENGAGED: ITEM 22-ITEM 1 AXES",
+    ),
+    (
+        "ITEM 13 PARK ANGLE",
+        "12.38° WEST OF +Y; STRAPS PARALLEL",
+        "—",
+        "ITEM 15-22 AXIS-CENTER LINE TO +Y",
+    ),
+    (
+        "ITEM 12 END CLEARANCE",
+        "0.25 MM EACH END",
+        "SAME",
+        "ITEM 12 END FACE TO ITEM 13 INNER FACE",
+    ),
+    (
+        "ITEM 18 STATION",
+        "7.00 MM FROM ITEM 19 MACHINE-FRONT FACE",
+        "SAME",
+        "ITEM 18 C/L FROM ITEM 19 MACHINE-FRONT FACE",
+    ),
+    (
+        "ITEM 18/19 PARK",
+        "0.10–0.25 MM MIN; CAMS PHASED ALIKE; ECCENTRIC AND BOSS DOWN",
+        "FUNCTIONAL LIFT",
+        "SHORTEST NORMAL GAP",
+    ),
+    (
+        "ITEM 20 ANGLE",
+        "40° EAST OF +Y; ECCENTRICS DOWN",
+        "OPERATE TO 41.30 MM C-C",
+        "ITEM 20 ROD C/L TO +Y",
+    ),
+    (
+        "ITEM 17",
+        "MACHINE-BACK STRAP ONLY",
+        "ON RELEASE: RETURNS BOTH STRAPS",
+        "VISUAL / FUNCTION",
+    ),
+)
+ACCEPTANCE_ROWS = (
+    (
+        "A. ENGAGE ITEM 3; TIGHTEN ITEM 9; ROTATE ITEM 29 ONE REV.",
+        "ITEMS 30/26 AND ALL 27/28 PAIRS ROLL WITHOUT BINDING; EACH 28 FREE ON 1.",
+    ),
+    (
+        "B. DISENGAGE ITEM 12; ROTATE ITEM 21 ONE REV.",
+        "ITEMS 12/22 TURN FREELY WITHOUT CONTACTING ITEM 28.",
+    ),
+    (
+        "C. OPERATE ITEM 20 TO 41.30 MM C-C; RELEASE.",
+        "BOTH STRAPS MOVE TOGETHER; ITEM 17 RETURNS ITEM 12 TO 2.00 MM GAP.",
+    ),
+    (
+        "D. LOOSEN ITEM 9; SWING ITEM 3 TO ITEM 11; RETURN; RETIGHTEN.",
+        "ITEM 3 SWINGS FREELY TO THE STOP AND CAN BE MANUALLY RETURNED.",
+    ),
 )
 _CONE_GEAR_INSTANCE = re.compile(r"cone-gear-(\d+)\Z", re.IGNORECASE)
 
@@ -391,33 +546,36 @@ def _verify_cone_gear_schedule_components(
     _telemetry.success("drive-train BOM item 27 matches all 20 scheduled configs")
 
 
-@_telemetry.traced("drawing.insert_cone_gear_schedule")
-def _insert_cone_gear_schedule(adapter: Any, bom_table: Any, bom_view: Any) -> Any:
-    """Insert and read-verify the item-27 configuration position schedule."""
-    _verify_cone_gear_schedule_components(adapter, bom_table, bom_view)
+def _insert_plain_table(
+    adapter: Any,
+    contents: tuple[tuple[str, ...], ...],
+    *,
+    anchor: tuple[float, float],
+    column_widths: tuple[float, ...],
+    row_height: float,
+    label: str,
+) -> Any:
+    """Insert one title-merged table and read-verify its persisted formatting."""
+    if not contents or len(contents[0]) != len(column_widths):
+        raise ValueError(f"{label}: table shape and column widths differ")
+    columns = len(column_widths)
+    if any(len(row) != columns for row in contents):
+        raise ValueError(f"{label}: inconsistent table row widths")
     draw = adapter.currentModel
     ddoc = _sw_type_info.early_bound_or_flag(
         draw, "IDrawingDoc", "InsertTableAnnotation2"
     )
-    contents = (
-        ("ITEM 27 / MHA-013 CONE-GEAR POSITIONS FROM T120 END", "", ""),
-        ("POSITION", "CONFIG", "TEETH"),
-        *tuple(
-            (f"{position:02d}", config, str(teeth))
-            for position, config, teeth in CONE_GEAR_SCHEDULE
-        ),
-    )
     table = ddoc.InsertTableAnnotation2(
         False,
-        CONE_SCHEDULE_ANCHOR[0],
-        CONE_SCHEDULE_ANCHOR[1],
+        anchor[0],
+        anchor[1],
         1,
         "",
         len(contents),
-        3,
+        columns,
     )
     if table is None:
-        raise RuntimeError("failed to insert drive-train cone-gear schedule")
+        raise RuntimeError(f"failed to insert {label}")
     table = _sw_type_info.early_bound_or_flag(
         table,
         "ITableAnnotation",
@@ -431,175 +589,128 @@ def _insert_cone_gear_schedule(adapter: Any, bom_table: Any, bom_view: Any) -> A
     )
     text_format = table.GetTextFormat()
     if text_format is None:
-        raise RuntimeError("drive-train cone schedule has no text format")
+        raise RuntimeError(f"{label}: table has no text format")
     text_format = _sw_type_info.early_bound_or_flag(text_format, "ITextFormat")
     text_format.CharHeight = CONE_SCHEDULE_TEXT_HEIGHT
     if not table.SetTextFormat(False, text_format):
-        raise RuntimeError("failed to set drive-train cone schedule text format")
+        raise RuntimeError(f"{label}: failed to set text format")
     applied_height = float(table.GetTextFormat().CharHeight)
     if abs(applied_height - CONE_SCHEDULE_TEXT_HEIGHT) > 0.0001:
         raise RuntimeError(
-            "drive-train cone schedule text height did not persist: "
+            f"{label}: text height did not persist: "
             f"{applied_height:.4f} m != {CONE_SCHEDULE_TEXT_HEIGHT:.4f} m"
         )
-    if not table.MergeCells(0, 0, 0, 2):
-        raise RuntimeError("failed to merge drive-train cone schedule title row")
+    if not table.MergeCells(0, 0, 0, columns - 1):
+        raise RuntimeError(f"{label}: failed to merge title row")
     for row, values in enumerate(contents):
-        columns = (0,) if row == 0 else range(3)
-        for column in columns:
+        populated_columns = (0,) if row == 0 else range(columns)
+        for column in populated_columns:
             text = values[column]
             table.SetText2(row, column, False, text)
             applied = str(table.DisplayedText2(row, column, False) or "")
             if applied != text:
                 raise RuntimeError(
-                    "drive-train cone schedule text did not persist: "
+                    f"{label}: text did not persist: "
                     f"row={row}, column={column}, {applied!r} != {text!r}"
                 )
-    for column, requested in enumerate(CONE_SCHEDULE_COLUMN_WIDTHS):
+    for column, requested in enumerate(column_widths):
         actual = float(table.SetColumnWidth(column, requested, 0))
         if abs(actual - requested) > 0.0005:
             raise RuntimeError(
-                f"drive-train cone schedule column {column} width "
+                f"{label}: column {column} width "
                 f"{actual:.4f} m != {requested:.4f} m"
             )
     for row in range(len(contents)):
-        requested = CONE_SCHEDULE_ROW_HEIGHT
-        actual = float(table.SetRowHeight(row, requested, 0))
-        if abs(actual - requested) > 0.0005:
+        actual = float(table.SetRowHeight(row, row_height, 0))
+        if abs(actual - row_height) > 0.0005:
             raise RuntimeError(
-                f"drive-train cone schedule row {row} height "
-                f"{actual:.4f} m != {requested:.4f} m"
+                f"{label}: row {row} height "
+                f"{actual:.4f} m != {row_height:.4f} m"
             )
     draw.EditRebuild3()
-    _telemetry.success("drive-train 20-position cone-gear schedule inserted")
+    _telemetry.success(f"{label}: {len(contents) - 2} data rows inserted")
     return table
 
 
-@_telemetry.traced("drawing.drive_train_balloons")
-def _add_drive_train_balloons(
-    adapter: Any,
-    views: tuple[Any, ...],
-    *,
-    expected_items: frozenset[str],
-    manual_items: dict[str, str],
-    label: str,
-) -> list[Any]:
-    """Balloon the exterior item set across the three large exterior views."""
-    if len(views) != len(EXTERIOR_BALLOON_RING_MARGINS):
-        raise ValueError("drive-train view and balloon-margin counts differ")
-    all_balloons: list[Any] = []
-    item_numbers: set[str] = set()
-    view_balloons: list[list[Any]] = []
-    for index, (view, margin) in enumerate(
-        zip(views, EXTERIOR_BALLOON_RING_MARGINS, strict=True), start=1
-    ):
-        view_label = f"{label} view {index}"
-        balloons = _create_auto_balloons(
-            adapter, view, label=view_label, allow_empty=True
-        )
-        if index == 1:
-            balloons = _defer_front_balloons(adapter, balloons)
-        balloons, _removed = _delete_balloon_items(
-            adapter,
-            balloons,
-            frozenset(CONCEALED_BALLOON_ITEMS.values())
-            | frozenset(manual_items.values()),
-            label=f"{view_label} dedicated-sheet deferral",
-        )
-        view_balloons.append(balloons)
-        if not balloons:
-            continue
-        _spread_balloons(adapter, view, balloons, margin=margin)
-        for note in balloons:
-            item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
-        all_balloons.extend(balloons)
-
-    for stem, item in manual_items.items():
-        view_order = MANUAL_EXTERIOR_VIEW_ORDER[stem]
-        preferred_views = tuple(views[index] for index in view_order)
-        note, owner_view = _create_component_balloon(
-            adapter, preferred_views, stem=stem, expected_item=item
-        )
-        owner_index = next(
-            index for index, candidate in enumerate(views) if candidate is owner_view
-        )
-        view_balloons[owner_index].append(note)
-        _spread_balloons(
-            adapter,
-            owner_view,
-            view_balloons[owner_index],
-            margin=EXTERIOR_BALLOON_RING_MARGINS[owner_index],
-        )
-        item_numbers.add(item)
-        all_balloons.append(note)
-
-    # On the right-side view, item 15's leader runs from its component at
-    # (0.1526, 0.1351) to its balloon near (0.1989, 0.1424), crossing item 24
-    # at (0.1694, 0.1378). Keep that balloon below the measured intersection
-    # while retaining its X and component attachment. The shared helper verifies
-    # the rendered circle itself; the sheet gate then verifies both leaders.
-    position_bom_balloon(
+@_telemetry.traced("drawing.insert_cone_gear_schedule")
+def _insert_cone_gear_schedule(adapter: Any, bom_table: Any, bom_view: Any) -> Any:
+    """Insert and read-verify the explicit item-27/item-28 mesh schedule."""
+    _verify_cone_gear_schedule_components(adapter, bom_table, bom_view)
+    contents = (
+        (
+            "MESH PAIRS — ITEM 27 AND ITEM 28 IN EACH ROW MATE AT THE SAME POSITION",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ),
+        (
+            "PAIR",
+            "ITEM 27",
+            "ITEM 28",
+            "TOOTH RATIO 27:28",
+            "ITEM 27 C/L FROM ITEM 25 MACHINE-FRONT END, MM",
+            "ITEM 28 DISC C/L FROM ITEM 1 MACHINE-FRONT END, MM",
+        ),
+        *GEAR_PAIR_ROWS,
+    )
+    return _insert_plain_table(
         adapter,
-        all_balloons,
-        item_number="15",
-        position_xy=PINION_PIVOT_SHAFT_BALLOON_POSITION,
-        label="drive-train item 15 leader routing",
-        position_tolerance_m=0.0015,
+        contents,
+        anchor=CONE_SCHEDULE_ANCHOR,
+        column_widths=CONE_SCHEDULE_COLUMN_WIDTHS,
+        row_height=CONE_SCHEDULE_ROW_HEIGHT,
+        label="drive-train mesh-pair schedule",
     )
 
-    missing = sorted(expected_items - item_numbers, key=int)
-    unexpected = sorted(item_numbers - expected_items, key=int)
-    if missing or unexpected:
-        raise RuntimeError(
-            f"{label}: balloon item coverage mismatch; missing={missing}, "
-            f"unexpected={unexpected}, seen={sorted(item_numbers)}"
-        )
-    adapter.currentModel.EditRebuild3()
-    _telemetry.success(
-        f"{label}: {len(all_balloons)} balloons cover "
-        f"{len(expected_items)} exterior BOM items"
+
+def _insert_gear_requirements_table(adapter: Any) -> Any:
+    contents = (
+        ("GEAR-TRAIN COMMON REQUIREMENTS", "", ""),
+        ("ITEMS", "REQUIREMENT", "ACCEPTANCE"),
+        *GEAR_REQUIREMENT_ROWS,
     )
-    return all_balloons
+    return _insert_plain_table(
+        adapter,
+        contents,
+        anchor=GEAR_REQUIREMENTS_ANCHOR,
+        column_widths=GEAR_REQUIREMENTS_COLUMN_WIDTHS,
+        row_height=GEAR_REQUIREMENTS_ROW_HEIGHT,
+        label="drive-train gear requirements",
+    )
 
 
-@_telemetry.traced("drawing.delete_balloon_items")
-def _delete_balloon_items(
-    adapter: Any,
-    balloons: list[Any],
-    items: frozenset[str],
-    *,
-    label: str,
-) -> tuple[list[Any], set[str]]:
-    """Delete selected item balloons so another view or sheet can own them."""
-    draw = adapter.currentModel
-    draw.ClearSelection2(True)
-    kept: list[Any] = []
-    selected_items: set[str] = set()
-    for note in balloons:
-        item = _balloon_item_number(adapter, note, label=label)
-        if item not in items:
-            kept.append(note)
-            continue
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
-        annotation = note.GetAnnotation()
-        if annotation is None:
-            raise RuntimeError(f"{label}: item {item} has no annotation")
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "Select2"
-        )
-        if not annotation.Select2(bool(selected_items), 0):
-            raise RuntimeError(f"{label}: failed to select item {item}")
-        selected_items.add(item)
+def _insert_pinion_parameter_table(adapter: Any) -> Any:
+    contents = (
+        ("PINION SETUP PARAMETERS", "", "", ""),
+        ("PARAMETER", "PARK / DISENGAGED", "ENGAGED", "INSPECTION"),
+        *PINION_PARAMETER_ROWS,
+    )
+    return _insert_plain_table(
+        adapter,
+        contents,
+        anchor=PINION_PARAMETER_TABLE_ANCHOR,
+        column_widths=PINION_PARAMETER_COLUMN_WIDTHS,
+        row_height=PINION_PARAMETER_ROW_HEIGHT,
+        label="drive-train pinion parameters",
+    )
 
-    if selected_items:
-        extension = _sw_type_info.early_bound_or_flag(
-            draw.Extension, "IModelDocExtension", "DeleteSelection2"
-        )
-        if not extension.DeleteSelection2(0):
-            raise RuntimeError(f"{label}: failed to delete deferred balloons")
-        draw.ClearSelection2(True)
-        draw.EditRebuild3()
-    return kept, selected_items
+
+def _insert_acceptance_table(adapter: Any) -> Any:
+    contents = (
+        ("FINAL FUNCTIONAL ACCEPTANCE", ""),
+        ("TEST / ACTION", "PASS CONDITION"),
+        *ACCEPTANCE_ROWS,
+    )
+    return _insert_plain_table(
+        adapter,
+        contents,
+        anchor=ACCEPTANCE_TABLE_ANCHOR,
+        column_widths=ACCEPTANCE_COLUMN_WIDTHS,
+        row_height=ACCEPTANCE_ROW_HEIGHT,
+        label="drive-train functional acceptance",
+    )
 
 
 def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
@@ -659,44 +770,6 @@ def _drawing_component_matches(
             for identity in identities
         )
     }
-
-
-@_telemetry.traced("drawing.defer_front_balloons")
-def _defer_front_balloons(adapter: Any, balloons: list[Any]) -> list[Any]:
-    """Delete crowded front balloons so later views can own those items."""
-    draw = adapter.currentModel
-    draw.ClearSelection2(True)
-    kept: list[Any] = []
-    selected_items: set[str] = set()
-    for note in balloons:
-        item = _balloon_item_number(
-            adapter, note, label="drive-train front balloon deferral"
-        )
-        if item not in FRONT_DEFERRED_BALLOON_ITEMS:
-            kept.append(note)
-            continue
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
-        annotation = note.GetAnnotation()
-        if annotation is None:
-            raise RuntimeError(f"drive-train front balloon item {item} has no annotation")
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "Select2"
-        )
-        if not annotation.Select2(bool(selected_items), 0):
-            raise RuntimeError(f"failed to select front balloon item {item} for deferral")
-        selected_items.add(item)
-
-    if selected_items != FRONT_DEFERRED_BALLOON_ITEMS:
-        missing = sorted(FRONT_DEFERRED_BALLOON_ITEMS - selected_items, key=int)
-        raise RuntimeError(f"drive-train front balloons cannot defer missing items: {missing}")
-    extension = _sw_type_info.early_bound_or_flag(
-        draw.Extension, "IModelDocExtension", "DeleteSelection2"
-    )
-    if not extension.DeleteSelection2(0):
-        raise RuntimeError("failed to delete deferred drive-train front balloons")
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    return kept
 
 
 @_telemetry.traced("drawing.component_balloon", label_param="stem")
@@ -824,9 +897,69 @@ def _isolate_balloon_components(
     adapter.currentModel.EditRebuild3()
 
 
+@_telemetry.traced("drawing.grouped_component_balloons")
+def _add_component_balloons(
+    adapter: Any,
+    views: tuple[Any, ...],
+    groups: tuple[frozenset[str], ...],
+) -> list[Any]:
+    """Attach one validated BOM balloon per exterior family in isolated views."""
+    if len(views) != len(groups):
+        raise ValueError("drive-train grouped view and component counts differ")
+
+    expected_stems = frozenset(BOM_COMPONENTS) - BOTTOM_VISIBILITY_STEMS
+    observed_stems = frozenset().union(*groups)
+    if observed_stems != expected_stems:
+        raise RuntimeError(
+            "drive-train exterior group coverage mismatch: "
+            f"missing={sorted(expected_stems - observed_stems)}, "
+            f"unexpected={sorted(observed_stems - expected_stems)}"
+        )
+    duplicates = [
+        stem for stem in observed_stems if sum(stem in group for group in groups) != 1
+    ]
+    if duplicates:
+        raise RuntimeError(
+            f"drive-train exterior families appear in multiple groups: {duplicates}"
+        )
+
+    item_by_stem = {
+        stem: str(index) for index, stem in enumerate(BOM_COMPONENTS, start=1)
+    }
+    all_balloons: list[Any] = []
+    for index, (view, stems) in enumerate(zip(views, groups, strict=True), start=1):
+        view_balloons: list[Any] = []
+        for stem in BOM_COMPONENTS:
+            if stem not in stems:
+                continue
+            note, owner_view = _create_component_balloon(
+                adapter,
+                (view,),
+                stem=stem,
+                expected_item=item_by_stem[stem],
+            )
+            if owner_view is not view:
+                raise RuntimeError(
+                    f"drive-train exterior group {index}: {stem} balloon changed views"
+                )
+            view_balloons.append(note)
+        _spread_balloons(
+            adapter,
+            view,
+            view_balloons,
+            margin=EXTERIOR_BALLOON_RING_MARGINS[index - 1],
+        )
+        all_balloons.extend(view_balloons)
+        _telemetry.success(
+            f"drive-train exterior group {index}: "
+            f"{len(view_balloons)} deliberately attached balloons"
+        )
+    return all_balloons
+
+
 @_telemetry.traced("drawing.create_drive_train_sheets")
 def _create_drive_train_sheets(adapter: Any) -> None:
-    """Duplicate the still-blank project sheet into the five-sheet package."""
+    """Duplicate the still-blank project sheet into the six-sheet package."""
     draw = adapter.currentModel
     ddoc = _sw_type_info.early_bound_or_flag(
         draw,
@@ -988,7 +1121,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (general_front, general_right, general_iso):
         set_hidden_lines_removed(adapter, view)
     if add_note(
-        adapter, "SHEET 1 OF 5 — GENERAL ASSEMBLY", 0.018, 0.255
+        adapter, "SHEET 1 OF 6 — GENERAL ASSEMBLY", 0.018, 0.255
     ) is None:
         raise RuntimeError("failed to add general-assembly heading")
     if add_note(adapter, GENERAL_POINTER_NOTE, *GENERAL_POINTER_ORIGIN) is None:
@@ -1010,10 +1143,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="drive-train assembly",
     )
     _format_drive_train_bom(adapter, bom_table)
-    _insert_cone_gear_schedule(adapter, bom_table, bom_iso)
     if add_note(
         adapter,
-        "SHEET 2 OF 5 — PARTS LIST; ITEM NUMBERS APPLY TO SHEETS 3-5",
+        "SHEET 2 OF 6 — PARTS LIST; ITEM NUMBERS APPLY TO SHEETS 3-6",
         0.170,
         0.255,
     ) is None:
@@ -1021,33 +1153,29 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("failed to activate exterior-identification sheet")
-    exterior_front = place_view(
-        adapter, str(SOURCE), "*Front", *EXTERIOR_FRONT_CENTER, scale=VIEW_SCALE
+    exterior_views = tuple(
+        place_view(adapter, str(SOURCE), name, *center, scale=VIEW_SCALE)
+        for name, center in zip(
+            EXTERIOR_VIEW_NAMES, EXTERIOR_VIEW_CENTERS, strict=True
+        )
     )
-    exterior_right = place_view(
-        adapter, str(SOURCE), "*Right", *EXTERIOR_RIGHT_CENTER, scale=VIEW_SCALE
-    )
-    exterior_iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *EXTERIOR_ISO_CENTER, scale=VIEW_SCALE
-    )
-    exterior_views = (exterior_front, exterior_right, exterior_iso)
-    for view in exterior_views:
+    for index, (view, stems) in enumerate(
+        zip(exterior_views, EXTERIOR_VIEW_STEMS, strict=True), start=1
+    ):
         set_hidden_lines_removed(adapter, view)
-    exterior_items = frozenset(
-        str(index)
-        for index in range(1, len(BOM_COMPONENTS) + 1)
-        if str(index) not in CONCEALED_BALLOON_ITEMS.values()
-    )
-    _add_drive_train_balloons(
-        adapter,
-        exterior_views,
-        expected_items=exterior_items,
-        manual_items=MANUAL_EXTERIOR_BALLOON_ITEMS,
-        label="drive-train exterior balloons",
-    )
+        _isolate_balloon_components(
+            adapter, view, visible_stems=stems, label=f"exterior group {index}"
+        )
+    _add_component_balloons(adapter, exterior_views, EXTERIOR_VIEW_STEMS)
+    for label, origin in zip(
+        EXTERIOR_VIEW_LABELS, EXTERIOR_VIEW_LABEL_ORIGINS, strict=True
+    ):
+        if add_note(adapter, label, *origin) is None:
+            raise RuntimeError("failed to add exterior subsystem-view label")
     if add_note(
         adapter,
-        "SHEET 3 OF 5 — EXTERIOR ITEM IDENTIFICATION; HIDDEN LINES REMOVED",
+        "SHEET 3 OF 6 — EXTERIOR ITEM IDENTIFICATION; "
+        "SELECTED SUBSYSTEMS SHOWN; HIDDEN LINES REMOVED",
         0.018,
         0.255,
     ) is None:
@@ -1066,7 +1194,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _isolate_balloon_components(
         adapter,
         concealed_bottom,
-        visible_stems=CONCEALED_BOTTOM_STEMS,
+        visible_stems=CONCEALED_BOTTOM_VISIBLE_STEMS,
         label="bottom",
     )
     bottom_balloons: list[Any] = []
@@ -1095,7 +1223,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _isolate_balloon_components(
         adapter,
         concealed_front,
-        visible_stems=CONCEALED_FRONT_STEMS,
+        visible_stems=CONCEALED_FRONT_VISIBLE_STEMS,
         label="front",
     )
     front_balloons: list[Any] = []
@@ -1112,37 +1240,83 @@ async def build(adapter: Any) -> dict[str, str]:
         margin=CONCEALED_FRONT_BALLOON_RING_MARGIN,
         clearance=CONCEALED_BALLOON_CLEARANCE,
     )
+    concealed_labels = (
+        "VIEW A — CONE JOURNAL / ENDPLAY STACK, BOTTOM VIEW",
+        "VIEW B — CRANK MESH / SHAFT RELATIONSHIP, FRONT VIEW",
+    )
+    for label, origin in zip(
+        concealed_labels, CONCEALED_VIEW_LABEL_ORIGINS, strict=True
+    ):
+        if add_note(adapter, label, *origin) is None:
+            raise RuntimeError("failed to add concealed relationship-view label")
     if add_note(
         adapter,
-        "SHEET 4 OF 5 — CONCEALED ITEM IDENTIFICATION\n"
-        "LEFT: ITEMS 6 AND 25, BOTTOM VIEW; RIGHT: ITEM 26, FRONT VIEW\n"
-        "OUTER COMPONENTS HIDDEN; HIDDEN LINES VISIBLE",
+        "SHEET 4 OF 6 — CONCEALED ITEM IDENTIFICATION; "
+        "SELECTED COMPONENTS SHOWN; HIDDEN LINES VISIBLE",
         *CONCEALED_HEADING_ORIGIN,
     ) is None:
         raise RuntimeError("failed to add concealed-identification heading")
 
     if not ddoc.ActivateSheet(SHEET_NAMES[4]):
-        raise RuntimeError("failed to activate setup-and-acceptance sheet")
-    place_view(
+        raise RuntimeError("failed to activate gear-train setup sheet")
+    _insert_cone_gear_schedule(adapter, bom_table, bom_iso)
+    _insert_gear_requirements_table(adapter)
+    for index, (center, stems, label, origin) in enumerate(
+        zip(
+            GEAR_SETUP_VIEW_CENTERS,
+            GEAR_SETUP_VIEW_STEMS,
+            GEAR_SETUP_VIEW_LABELS,
+            GEAR_SETUP_VIEW_LABEL_ORIGINS,
+            strict=True,
+        ),
+        start=1,
+    ):
+        view = place_view(
+            adapter, str(SOURCE), "*Right", *center, scale=VIEW_SCALE
+        )
+        set_hidden_lines_removed(adapter, view)
+        _isolate_balloon_components(
+            adapter, view, visible_stems=stems, label=f"gear setup {index}"
+        )
+        if add_note(adapter, label, *origin) is None:
+            raise RuntimeError("failed to add gear setup view label")
+    if add_note(
+        adapter,
+        "SHEET 5 OF 6 — GEAR-TRAIN SETUP",
+        *SETUP_HEADING_ORIGIN,
+    ) is None:
+        raise RuntimeError("failed to add gear-train setup heading")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[5]):
+        raise RuntimeError("failed to activate pinion setup-and-acceptance sheet")
+    pinion_setup = place_view(
         adapter,
         str(SOURCE),
-        "*Isometric",
-        *SETUP_IDENTIFICATION_VIEW_CENTER,
-        scale=SETUP_IDENTIFICATION_VIEW_SCALE,
+        "*Front",
+        *PINION_SETUP_VIEW_CENTER,
+        scale=VIEW_SCALE,
+    )
+    set_hidden_lines_removed(adapter, pinion_setup)
+    _isolate_balloon_components(
+        adapter,
+        pinion_setup,
+        visible_stems=PINION_SETUP_VIEW_STEMS,
+        label="pinion parked reference",
     )
     if add_note(
         adapter,
-        "SHEET 5 OF 5 — SETUP AND ACCEPTANCE",
+        "PARK / DISENGAGED — SHOWN POSITION; ITEMS 12–24; NOT AN ENGAGED VIEW",
+        *PINION_SETUP_VIEW_LABEL_ORIGIN,
+    ) is None:
+        raise RuntimeError("failed to add pinion reference-view label")
+    _insert_pinion_parameter_table(adapter)
+    _insert_acceptance_table(adapter)
+    if add_note(
+        adapter,
+        "SHEET 6 OF 6 — PINION SETUP AND ACCEPTANCE",
         *SETUP_HEADING_ORIGIN,
     ) is None:
-        raise RuntimeError("failed to add setup-and-acceptance heading")
-    for column, (notes, origin) in enumerate(
-        zip(SETUP_NOTE_COLUMNS, SETUP_NOTE_ORIGINS, strict=True), start=1
-    ):
-        note = add_note(adapter, notes, *origin)
-        if note is None:
-            raise RuntimeError("failed to add setup-and-acceptance notes")
-        _set_note_text_height(adapter, note, label=f"setup note column {column}")
+        raise RuntimeError("failed to add pinion setup-and-acceptance heading")
 
     return await finalize_drawing(
         adapter,
