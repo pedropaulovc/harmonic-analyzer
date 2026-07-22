@@ -27,6 +27,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -176,11 +177,11 @@ def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
-    """Return the pivot rim, north datum edge, and a long profile edge."""
+    """Return the pivot rim, north datum edge, and a long straight side."""
     expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
     pivot_edges: list[Any] = []
     north_edges: list[Any] = []
-    profile_edges: list[tuple[float, Any]] = []
+    straight_side_edges: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = adapter._attempt(
@@ -207,12 +208,13 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
             p1 = tuple(float(value) for value in _early_bound(end, "IVertex").GetPoint())
             length = sum((a - b) ** 2 for a, b in zip(p0, p1, strict=True)) ** 0.5
             if abs(values[3]) < 0.99:
-                profile_edges.append((length, edge))
-    if not pivot_edges or not north_edges or not profile_edges:
+                straight_side_edges.append((length, edge))
+    if not pivot_edges or not north_edges or len(straight_side_edges) < 2:
         raise RuntimeError(
-            "cone-platform plan view is missing pivot/north/profile datum controls"
+            "cone-platform plan view is missing pivot/north/straight-side controls"
         )
-    return pivot_edges[0], north_edges[0], max(profile_edges, key=lambda item: item[0])[1]
+    straight_side_edges.sort(key=lambda item: item[0], reverse=True)
+    return pivot_edges[0], north_edges[0], straight_side_edges[0][1]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -271,14 +273,21 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the pivot hole")
     _add_cone_axis_centerline(adapter, top)
 
-    pivot_edge, north_edge, profile_edge = _visible_plan_controls(adapter, top)
+    pivot_edge, north_edge, straight_side_edge = _visible_plan_controls(adapter, top)
+    pivot_callout = add_native_hole_callout(
+        adapter,
+        top,
+        callout_xy=(0.155, 0.165),
+        label="pivot-hole size",
+        edge=pivot_edge,
+    )
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.145, 0.200),
+        symbol_xy=(0.225, 0.165),
         datum="B",
-        label="pivot-hole datum axis",
-        entity=pivot_edge,
+        label="pivot-hole size datum axis",
+        annotation=pivot_callout.GetAnnotation(),
         shoulder=True,
     )
     add_datum_feature(
@@ -293,14 +302,24 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.215, 0.245),
-        characteristic="profile_surface",
+        frame_xy=(0.195, 0.245),
+        characteristic="straightness",
         tolerance="0.25",
-        datums=("A", "B", "C"),
-        quantity="ALL-AROUND PLAN PROFILE",
-        label="plan-profile control",
-        entity=profile_edge,
-        all_around=True,
+        quantity="2X LONG STRAIGHT PLAN EDGES",
+        label="long-side straightness",
+        entity=straight_side_edge,
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.175, 0.135),
+        characteristic="perpendicularity",
+        tolerance="0.10",
+        datums=("A",),
+        diameter=True,
+        quantity="PIVOT-HOLE AXIS",
+        label="pivot-hole-axis perpendicularity",
+        entity=pivot_edge,
     )
 
     datum_a_edge, opposite_face_edge = _visible_broad_face_edges(adapter, end)

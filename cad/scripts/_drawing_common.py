@@ -226,6 +226,7 @@ _GTOL_SYMBOLS = {
     "position": "GTOL-POSI",
     "profile_surface": "GTOL-SPROF",
     "perpendicularity": "GTOL-PERP",
+    "straightness": "GTOL-STRAIGHT",
 }
 
 
