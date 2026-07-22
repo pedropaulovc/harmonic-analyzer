@@ -342,8 +342,11 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.205, 0.145),
         roughness_ra="1.6",
         label="crankshaft bearing finish",
-        entity_type="FACE",
-        edge_entity=shaft_face,
+        edge_xy=(
+            RIGHT_CENTER[0] + SHAFT_DIA / 2000.0,
+            RIGHT_CENTER[1] + SHAFT_LENGTH / 4000.0,
+        ),
+        entity_type="SILHOUETTE",
         production_method="SHAFT OD",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)
