@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import _config
+import _assembly_drawing_bom
 import draw_channel_assembly
 import draw_drive_train_assembly
 import draw_frame_assembly
@@ -13,7 +14,7 @@ import draw_harmonic_analyzer_assembly
 import draw_magnifier_assembly
 import draw_paper_drive_assembly
 import draw_summing_assembly
-from _drawing_common import _bom_identity_map
+from _drawing_common import _bom_identity_map, _set_bom_cell_text
 
 
 SHEETS = (
@@ -48,6 +49,46 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "UNITS:",
     " UOS",
 )
+
+
+def test_grouped_bom_cell_writes_retry_through_hidden_rows() -> None:
+    class GroupedTable:
+        def __init__(self) -> None:
+            self.calls: list[tuple[int, int, bool, str]] = []
+            self.value = ""
+
+        def SetText2(
+            self, row: int, column: int, include_hidden: bool, text: str
+        ) -> None:
+            self.calls.append((row, column, include_hidden, text))
+            if include_hidden:
+                self.value = text
+
+        def DisplayedText2(
+            self, row: int, column: int, include_hidden: bool
+        ) -> str:
+            return self.value
+
+    for column, value, label in (
+        (2, "CHAIN SPROCKET, T12/T18/T24; 1 EACH", "DESCRIPTION"),
+        (1, "MHA-086", "PART NUMBER"),
+    ):
+        table = GroupedTable()
+        _set_bom_cell_text(table, 4, column, value, label=label)
+        assert table.value == value
+        assert table.calls == [
+            (4, column, False, value),
+            (4, column, True, value),
+        ]
+
+    common_source = Path(_set_bom_cell_text.__code__.co_filename).read_text(
+        encoding="utf-8"
+    )
+    identified_source = Path(_assembly_drawing_bom.__file__).read_text(
+        encoding="utf-8"
+    )
+    assert "label=f\"{label} BOM description\"" in common_source
+    assert "label=f\"{label} BOM part number\"" in identified_source
 
 
 def test_bom_identity_map_accepts_stems_and_released_number_aliases() -> None:

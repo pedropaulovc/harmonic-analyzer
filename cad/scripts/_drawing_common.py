@@ -2537,14 +2537,13 @@ def insert_bom_table(
                 raise RuntimeError(
                     f"{label} BOM description cell {row} is not editable"
                 )
-            table.SetText2(row, description_column, False, text)
-            applied = str(
-                table.DisplayedText2(row, description_column, False) or ""
+            _set_bom_cell_text(
+                table,
+                row,
+                description_column,
+                text,
+                label=f"{label} BOM description",
             )
-            if applied != text:
-                raise RuntimeError(
-                    f"{label} BOM description did not persist: {applied!r} != {text!r}"
-                )
         if remaining:
             raise RuntimeError(
                 f"{label} BOM descriptions not applied (no matching row): "
@@ -2555,6 +2554,30 @@ def insert_bom_table(
         f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
     )
     return table
+
+
+def _set_bom_cell_text(
+    table: Any,
+    row: int,
+    column: int,
+    text: str,
+    *,
+    label: str,
+) -> None:
+    """Write and verify a BOM cell, including grouped configuration rows.
+
+    A same-part BOM exposes one aggregate row over hidden configuration rows.
+    SolidWorks silently discards a visible-only ``SetText2`` on that aggregate,
+    so retry with ``IncludeHidden=True`` before failing the readback contract.
+    """
+    table.SetText2(row, column, False, text)
+    applied = str(table.DisplayedText2(row, column, False) or "")
+    if applied == text:
+        return
+    table.SetText2(row, column, True, text)
+    applied = str(table.DisplayedText2(row, column, False) or "")
+    if applied != text:
+        raise RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")
 
 
 def _min_angular_gap(ring_radius: float, balloon_radius: float, *, clearance: float) -> float:

@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 import _config
 import _telemetry
-from _drawing_common import insert_bom_table
+from _drawing_common import _set_bom_cell_text, insert_bom_table
 
 
 _PART_NUMBER = re.compile(r"MHA-(?:\d{3}|A\d{2})\Z")
@@ -97,15 +97,13 @@ def insert_identified_bom_table(
                 continue
             if not table.IsCellTextEditable(row, part_column):
                 raise RuntimeError(f"{label} BOM part-number cell {row} is not editable")
-            table.SetText2(row, part_column, False, number)
-            applied = str(
-                table.DisplayedText2(row, part_column, False) or ""
-            ).strip()
-            if applied != number:
-                raise RuntimeError(
-                    f"{label} BOM part number did not persist: "
-                    f"{applied!r} != {number!r}"
-                )
+            _set_bom_cell_text(
+                table,
+                row,
+                part_column,
+                number,
+                label=f"{label} BOM part number",
+            )
         if remaining:
             raise RuntimeError(
                 f"{label} BOM part numbers not applied (no matching row): "
