@@ -139,8 +139,7 @@ BOM_COLUMN_WIDTHS = {
     "DESCRIPTION": 0.074,
     "QTY.": 0.012,
 }
-BALLOON_RING_MARGINS = (0.034, 0.014, 0.014, 0.014)
-BALLOON_SLOT_SWAPS = (("5", "11"), ("8", "30"), ("14", "24"), ("20", "21"))
+BALLOON_RING_MARGINS = (0.036, 0.014, 0.014, 0.014)
 
 
 @_telemetry.traced("drawing.format_drive_train_bom")
@@ -197,43 +196,6 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
     )
 
 
-def _swap_drive_train_balloon_slots(adapter: Any, balloons: list[Any]) -> None:
-    """Swap four inverted front-view slot pairs without changing occupied slots."""
-    by_item = {
-        _balloon_item_number(adapter, note, label="drive-train balloon slot swap"): note
-        for note in balloons
-    }
-    for first, second in BALLOON_SLOT_SWAPS:
-        if first not in by_item or second not in by_item:
-            raise RuntimeError(
-                f"drive-train balloon slot pair {first}/{second} is missing"
-            )
-        annotations = []
-        anchors = []
-        for item in (first, second):
-            note = _sw_type_info.early_bound_or_flag(
-                by_item[item], "INote", "GetAnnotation"
-            )
-            annotation = note.GetAnnotation()
-            if annotation is None:
-                raise RuntimeError(f"drive-train balloon item {item} has no annotation")
-            annotation = _sw_type_info.early_bound_or_flag(
-                annotation, "IAnnotation", "GetPosition", "SetPosition"
-            )
-            anchor = annotation.GetPosition()
-            if not anchor or len(anchor) < 2:
-                raise RuntimeError(f"drive-train balloon item {item} has no anchor")
-            annotations.append(annotation)
-            anchors.append((float(anchor[0]), float(anchor[1])))
-        for item, annotation, target in (
-            (first, annotations[0], anchors[1]),
-            (second, annotations[1], anchors[0]),
-        ):
-            if not annotation.SetPosition(target[0], target[1], 0.0):
-                raise RuntimeError(f"failed to swap drive-train balloon item {item}")
-    adapter.currentModel.EditRebuild3()
-
-
 @_telemetry.traced("drawing.drive_train_balloons")
 def _add_drive_train_balloons(
     adapter: Any, views: tuple[Any, ...], *, expected: int, label: str
@@ -253,8 +215,6 @@ def _add_drive_train_balloons(
         if not balloons:
             continue
         _spread_balloons(adapter, view, balloons, margin=margin)
-        if index == 1:
-            _swap_drive_train_balloon_slots(adapter, balloons)
         for note in balloons:
             item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
         all_balloons.extend(balloons)
