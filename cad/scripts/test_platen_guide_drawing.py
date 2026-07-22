@@ -138,6 +138,20 @@ def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:
     assert metadata.title == "Drawing"
 
 
+def test_pdf_metadata_preserves_multisheet_packages(tmp_path: Path) -> None:
+    from pypdf import PdfReader, PdfWriter
+
+    pdf = tmp_path / "drawing.pdf"
+    writer = PdfWriter()
+    for _sheet in range(4):
+        writer.add_blank_page(width=1224, height=792)
+    writer.write(pdf)
+    sanitize_pdf_metadata(pdf, title="Four-Sheet Drawing", expected_pages=4)
+    reader = PdfReader(pdf)
+    assert len(reader.pages) == 4
+    assert reader.metadata.title == "Four-Sheet Drawing"
+
+
 def test_drawing_registry_is_unique_and_extensible() -> None:
     assert len({spec.name for spec in DRAWINGS}) == len(DRAWINGS)
     assert len({spec.part for spec in DRAWINGS}) == len(DRAWINGS)

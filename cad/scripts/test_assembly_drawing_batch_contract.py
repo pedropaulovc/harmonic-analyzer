@@ -176,17 +176,21 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
         assert balloon_calls == 1, drawing.ARTIFACT_STEM
 
 
-def test_drive_train_adds_an_isolated_bottom_view_for_enclosed_bom_items() -> None:
+def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
     source = Path(draw_drive_train_assembly.__file__).read_text(encoding="utf-8")
-    assert source.count("place_view(") == 4
-    assert "for view in (front, right, iso):" in source
+    assert source.count("place_view(") == 8
+    assert "for view in exterior_views:" in source
     assert "set_hidden_lines_removed(adapter, view)" in source
     assert '"*Bottom"' in source
-    assert "set_hidden_lines_visible(adapter, bottom)" in source
-    assert "_isolate_bottom_balloon_components(adapter, bottom)" in source
+    assert "set_hidden_lines_visible(adapter, concealed_bottom)" in source
+    assert "_isolate_bottom_balloon_components(adapter, concealed_bottom)" in source
     assert source.count("insert_identified_bom_table(") == 1
     assert "part_numbers=BOM_PART_NUMBERS" in source
     assert source.count("_add_drive_train_balloons(") == 2
-    assert "adapter, (front, right, iso, bottom)" in source
-    assert "HorizontalAutoSplit(" in source
+    assert "expected_items=exterior_items" in source
+    assert "manual_items=MANUAL_EXTERIOR_BALLOON_ITEMS" in source
+    assert "HorizontalAutoSplit(" not in source
     assert "_format_drive_train_bom(adapter, bom_table)" in source
+    assert "_create_drive_train_sheets(adapter)" in source
+    assert "expected_sheet_names=SHEET_NAMES" in source
+    assert source.count("ddoc.ActivateSheet(SHEET_NAMES[") == 4

@@ -35,7 +35,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    iter_views,
+    place_view,
+    view_name,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
@@ -50,19 +56,18 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The drive-train is the machine's WIDEST subassembly but not its tallest: its
-# dominant extent is the Z depth -- the crank outboard end (machine z ~-175, plus
-# the hanging arm/handle) to the cone-integrator tip end (cone_station(199) ~z
-# +106, north arbor pedestal +97.5) -- a ~300 mm span shown horizontally in the
-# RIGHT view. In X it runs the crank axis (-122.8) to the alignment-pinion drum
-# (~+1), ~125 mm; in Y only ~50.8 (base top) to ~148 (crankshaft axis + gear
-# tips), ~100 mm. So the governing on-sheet dimension is the right view's ~300
-# mm depth: 1:5 shrinks it to ~60 mm, and the ~125 mm-wide front view to ~25 mm,
-# which clears summing's view centers (a larger 1:3 would render the right view
-# ~100 mm and collide the front/right views). 1:5 also keeps the whole assembly-
-# drawing batch (summing, frame) on one scale.
-SHEET_SCALE = (1.0, 5.0)
-VIEW_SCALE = (1, 5)
+# Four sheets let the ~300 mm-wide mechanism use a readable 1:3 scale without
+# forcing its 32-row BOM, exterior balloons, concealed-item identification, and
+# functional setup notes into one field.  All views use the sheet scale so the
+# title block remains truthful without per-view scale exceptions.
+SHEET_SCALE = (1.0, 3.0)
+VIEW_SCALE = (1, 3)
+SHEET_NAMES = (
+    "GENERAL ASSEMBLY",
+    "PARTS LIST",
+    "EXTERIOR ITEM IDENTIFICATION",
+    "CONCEALED ITEM IDENTIFICATION",
+)
 
 # One BOM row per UNIQUE top-level component of build_drive_train_assembly.py.
 # Stems placed more than once collapse to a single QTY row under the standard
@@ -112,11 +117,14 @@ BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 BOTTOM_VISIBILITY_STEMS = frozenset(
     {"cone-tip-bushing", "cone-gear-shaft", "crank-drive-gear"}
 )
-BOTTOM_MANUAL_BALLOON_STEMS = frozenset({"crank-drive-gear"})
-BOTTOM_MANUAL_BALLOON_ITEMS = {
+CONCEALED_BALLOON_ITEMS = {
     stem: str(index)
     for index, stem in enumerate(BOM_COMPONENTS, start=1)
-    if stem in BOTTOM_MANUAL_BALLOON_STEMS
+    if stem in BOTTOM_VISIBILITY_STEMS
+}
+MANUAL_EXTERIOR_BALLOON_ITEMS = {
+    "swing-stop-screw": "11",
+    "alignment-pinion": "12",
 }
 FRONT_DEFERRED_BALLOON_STEMS = frozenset(
     {
@@ -139,33 +147,49 @@ ASSEMBLY_NOTES = "\n".join(
         "ASSEMBLY NOTES",
         "1. INSTALL CONE GEARS T006-T120 IN 6-TOOTH STEPS; T120 AT BIG END.",
         "2. SHOWN: CONE PLATFORM ENGAGED; ALIGNMENT PINION DISENGAGED.",
-        "3. ADJUST CONE-TIP END PLAY, THEN LOCK THE PINCH SCREW.",
-        "4. VERIFY CRANK, CONE SWING, PINION SWING AND CAM SHAFT MOVE FREELY.",
-        "5. BOTTOM BALLOON VIEW: CONE-TIP BUSHING, CONE-GEAR SHAFT AND",
-        "   CRANK-DRIVE GEAR ONLY; OUTER COMPONENTS HIDDEN.",
+        "3. ADJUST CONE-TIP END PLAY TO 0.05-0.10 MM; LOCK PINCH SCREW.",
+        "   VERIFY CONE SHAFT ROTATES FREELY AFTER LOCKING.",
+        "4. PINION DISENGAGED: 2.00 MM TIP GAP; ENGAGED C-C: 41.30 MM.",
+        "5. SET STRAPS 12.38 DEG WEST OF VERTICAL AT PARK; 0.25 MM AXIAL",
+        "   CLEARANCE EACH SIDE OF PINION DRUM.",
+        "6. PHASE BOTH CAMS IDENTICALLY, ECCENTRIC AND SET-PIN BOSS DOWN AT",
+        "   PARK; FOLLOWER PLANE 7.00 MM FROM CAM FRONT; AIR 0.10-0.25 MM.",
+        "7. CAMS DOWN: SET ENGAGE LEVER 40 DEG EAST OF VERTICAL.",
+        "8. INSTALL LEAF SPRING AT BACK STRAP ONLY; FRONT REMAINS SPRING-FREE.",
+        "   PRELOAD FOR POSITIVE RETURN TO THE 2.00 MM DISENGAGED TIP GAP.",
+        "9. ROTATE CAM SHAFT ONE FULL TURN; FOLLOWERS SHALL NOT BIND OR LIFT OFF.",
     )
 )
 
-# The 32-row BOM is split into three compact sections across the sheet top;
-# four views and their balloons occupy the open field below it.
-FRONT_CENTER = (0.080, 0.135)
-RIGHT_CENTER = (0.208, 0.135)
-ISO_CENTER = (0.310, 0.145)
-BOTTOM_CENTER = (0.365, 0.105)
-BOM_ANCHOR = (0.020, 0.265)
-BOM_ROWS_PER_SECTION = 12
+# Sheet 1: uncluttered assembly views and setup/inspection notes.
+GENERAL_FRONT_CENTER = (0.060, 0.165)
+GENERAL_RIGHT_CENTER = (0.190, 0.165)
+GENERAL_ISO_CENTER = (0.335, 0.165)
+GENERAL_NOTES_ORIGIN = (0.018, 0.070)
+
+# Sheet 2: one continuous 32-row parts list plus a small orientation view.
+BOM_ANCHOR = (0.018, 0.255)
+BOM_ISO_CENTER = (0.310, 0.165)
+
+# Sheet 3: large exterior views and exterior-only item balloons.
+EXTERIOR_FRONT_CENTER = (0.060, 0.155)
+EXTERIOR_RIGHT_CENTER = (0.205, 0.155)
+EXTERIOR_ISO_CENTER = (0.350, 0.155)
+
+# Sheet 4: isolated underside view of the three otherwise enclosed BOM items.
+CONCEALED_BOTTOM_CENTER = (0.150, 0.165)
 BOM_COLUMN_WIDTHS = {
     "ITEM NO.": 0.014,
     "PART NUMBER": 0.025,
     "DESCRIPTION": 0.074,
     "QTY.": 0.012,
 }
-BALLOON_RING_MARGINS = (0.036, 0.014, 0.014, 0.014)
+EXTERIOR_BALLOON_RING_MARGINS = (0.026, 0.020, 0.020)
 
 
 @_telemetry.traced("drawing.format_drive_train_bom")
 def _format_drive_train_bom(adapter: Any, table: Any) -> None:
-    """Fit the 32-item BOM as three readable sections across the sheet top."""
+    """Fit the 32-item BOM as one readable table on its dedicated sheet."""
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
     header = [
         str(table.DisplayedText2(0, column, False) or "").strip().upper()
@@ -183,52 +207,29 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
                 f"does not match requested {requested:.4f} m"
             )
 
-    split_tables = table.HorizontalAutoSplit(
-        BOM_ROWS_PER_SECTION,
-        0,  # swHorizontalAutoSplitApply_ThisTimeOnly
-        0,  # swHorizontalAutoSplitPlacementOfSplitTable_NextToLastSplit
-    )
-    if not split_tables:
-        raise RuntimeError("drive-train BOM did not split into sheet-width sections")
-    pieces = tuple(split_tables)
-    if len(pieces) not in (2, 3):
-        raise RuntimeError(
-            f"drive-train BOM returned {len(pieces)} split-table objects, expected 3"
-        )
-    for index, raw_piece in enumerate((table, *pieces)):
-        piece = _sw_type_info.early_bound_or_flag(
-            raw_piece, "ITableAnnotation", "GetAnnotation", "GetSplitInformation"
-        )
-        split_info = adapter._attempt(
-            lambda p=piece: p.GetSplitInformation(0, 0, 0, 0)
-        )
-        annotation = adapter._attempt(lambda p=piece: p.GetAnnotation())
-        position = adapter._attempt(
-            lambda a=annotation: adapter._get_attr_or_call(a, "GetPosition")
-        )
-        _telemetry.info(
-            f"drive-train BOM split object {index}: "
-            f"info={split_info!r}, position={position!r}"
-        )
     adapter.currentModel.EditRebuild3()
     _telemetry.success(
-        f"drive-train BOM split at {BOM_ROWS_PER_SECTION} rows; "
-        f"HorizontalAutoSplit returned {len(pieces)} objects"
+        f"drive-train BOM formatted as one {len(BOM_COMPONENTS)}-item table"
     )
 
 
 @_telemetry.traced("drawing.drive_train_balloons")
 def _add_drive_train_balloons(
-    adapter: Any, views: tuple[Any, ...], *, expected: int, label: str
+    adapter: Any,
+    views: tuple[Any, ...],
+    *,
+    expected_items: frozenset[str],
+    manual_items: dict[str, str],
+    label: str,
 ) -> list[Any]:
-    """Cover the BOM across four views with a larger front-view balloon ring."""
-    if len(views) != len(BALLOON_RING_MARGINS):
+    """Balloon the exterior item set across the three large exterior views."""
+    if len(views) != len(EXTERIOR_BALLOON_RING_MARGINS):
         raise ValueError("drive-train view and balloon-margin counts differ")
     all_balloons: list[Any] = []
     item_numbers: set[str] = set()
     view_balloons: list[list[Any]] = []
     for index, (view, margin) in enumerate(
-        zip(views, BALLOON_RING_MARGINS, strict=True), start=1
+        zip(views, EXTERIOR_BALLOON_RING_MARGINS, strict=True), start=1
     ):
         view_label = f"{label} view {index}"
         balloons = _create_auto_balloons(
@@ -236,6 +237,13 @@ def _add_drive_train_balloons(
         )
         if index == 1:
             balloons = _defer_front_balloons(adapter, balloons)
+        balloons, _removed = _delete_balloon_items(
+            adapter,
+            balloons,
+            frozenset(CONCEALED_BALLOON_ITEMS.values())
+            | frozenset(manual_items.values()),
+            label=f"{view_label} dedicated-sheet deferral",
+        )
         view_balloons.append(balloons)
         if not balloons:
             continue
@@ -244,9 +252,7 @@ def _add_drive_train_balloons(
             item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
         all_balloons.extend(balloons)
 
-    for stem, item in BOTTOM_MANUAL_BALLOON_ITEMS.items():
-        if item in item_numbers:
-            continue
+    for stem, item in manual_items.items():
         note, owner_view = _create_component_balloon(
             adapter, views, stem=stem, expected_item=item
         )
@@ -258,14 +264,13 @@ def _add_drive_train_balloons(
             adapter,
             owner_view,
             view_balloons[owner_index],
-            margin=BALLOON_RING_MARGINS[owner_index],
+            margin=EXTERIOR_BALLOON_RING_MARGINS[owner_index],
         )
         item_numbers.add(item)
         all_balloons.append(note)
 
-    expected_numbers = {str(item) for item in range(1, expected + 1)}
-    missing = sorted(expected_numbers - item_numbers, key=int)
-    unexpected = sorted(item_numbers - expected_numbers)
+    missing = sorted(expected_items - item_numbers, key=int)
+    unexpected = sorted(item_numbers - expected_items, key=int)
     if missing or unexpected:
         raise RuntimeError(
             f"{label}: balloon item coverage mismatch; missing={missing}, "
@@ -273,9 +278,50 @@ def _add_drive_train_balloons(
         )
     adapter.currentModel.EditRebuild3()
     _telemetry.success(
-        f"{label}: {len(all_balloons)} balloons cover all {expected} BOM items"
+        f"{label}: {len(all_balloons)} balloons cover "
+        f"{len(expected_items)} exterior BOM items"
     )
     return all_balloons
+
+
+@_telemetry.traced("drawing.delete_balloon_items")
+def _delete_balloon_items(
+    adapter: Any,
+    balloons: list[Any],
+    items: frozenset[str],
+    *,
+    label: str,
+) -> tuple[list[Any], set[str]]:
+    """Delete selected item balloons so another view or sheet can own them."""
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    kept: list[Any] = []
+    selected_items: set[str] = set()
+    for note in balloons:
+        item = _balloon_item_number(adapter, note, label=label)
+        if item not in items:
+            kept.append(note)
+            continue
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+        annotation = note.GetAnnotation()
+        if annotation is None:
+            raise RuntimeError(f"{label}: item {item} has no annotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "Select2"
+        )
+        if not annotation.Select2(bool(selected_items), 0):
+            raise RuntimeError(f"{label}: failed to select item {item}")
+        selected_items.add(item)
+
+    if selected_items:
+        extension = _sw_type_info.early_bound_or_flag(
+            draw.Extension, "IModelDocExtension", "DeleteSelection2"
+        )
+        if not extension.DeleteSelection2(0):
+            raise RuntimeError(f"{label}: failed to delete deferred balloons")
+        draw.ClearSelection2(True)
+        draw.EditRebuild3()
+    return kept, selected_items
 
 
 def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
@@ -473,6 +519,88 @@ def _isolate_bottom_balloon_components(adapter: Any, view: Any) -> None:
     adapter.currentModel.EditRebuild3()
 
 
+@_telemetry.traced("drawing.create_drive_train_sheets")
+def _create_drive_train_sheets(adapter: Any) -> None:
+    """Duplicate the still-blank project sheet into the four-sheet package."""
+    draw = adapter.currentModel
+    ddoc = _sw_type_info.early_bound_or_flag(
+        draw,
+        "IDrawingDoc",
+        "ActivateSheet",
+        "GetCurrentSheet",
+        "GetSheetNames",
+        "PasteSheet",
+    )
+    sheet = ddoc.GetCurrentSheet()
+    if sheet is None:
+        raise RuntimeError("drive-train drawing template has no initial sheet")
+    initial_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if len(initial_names) != 1:
+        raise RuntimeError(
+            f"drive-train drawing template has {len(initial_names)} sheets, expected 1"
+        )
+    if next(iter_views(adapter), None) is not None:
+        raise RuntimeError("drive-train drawing template initial sheet is not blank")
+    sheet.SetName(SHEET_NAMES[0])
+    renamed = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+    if renamed != SHEET_NAMES[0]:
+        raise RuntimeError(
+            f"failed to rename initial drive-train sheet: {renamed!r}"
+        )
+
+    for previous_name, new_name in zip(SHEET_NAMES[:-1], SHEET_NAMES[1:], strict=True):
+        if not ddoc.ActivateSheet(previous_name):
+            raise RuntimeError(
+                f"failed to activate blank drive-train sheet {previous_name!r}"
+            )
+        draw.ClearSelection2(True)
+        selected = draw.Extension.SelectByID2(
+            previous_name,
+            "SHEET",
+            0.0,
+            0.0,
+            0.0,
+            False,
+            0,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(
+                f"failed to select blank drive-train sheet {previous_name!r}"
+            )
+        draw.EditCopy()
+        # swInsertOption_MoveToEnd=2, swRenameOption_No=2. Copying the current
+        # blank sheet preserves the hand-made project sheet format and title
+        # block without copying any model views or property-view state.
+        if not ddoc.PasteSheet(2, 2):
+            raise RuntimeError(
+                f"failed to duplicate blank drive-train sheet {previous_name!r}"
+            )
+        sheet = ddoc.GetCurrentSheet()
+        if sheet is None:
+            raise RuntimeError("pasted drive-train sheet has no ISheet")
+        sheet.SetName(new_name)
+        renamed = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+        if renamed != new_name:
+            raise RuntimeError(
+                f"failed to rename pasted drive-train sheet: {renamed!r}"
+            )
+
+    actual = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if actual != SHEET_NAMES:
+        raise RuntimeError(f"drive-train sheet order mismatch: {actual!r}")
+    for name in SHEET_NAMES:
+        if not ddoc.ActivateSheet(name):
+            raise RuntimeError(f"failed to activate drive-train sheet {name!r}")
+        current = ddoc.GetCurrentSheet()
+        current_name = str(adapter._get_attr_or_call(current, "GetName") or "")
+        if current_name != name:
+            raise RuntimeError(
+                f"drive-train activated sheet {current_name!r}, expected {name!r}"
+            )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
@@ -499,6 +627,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(adapter, scale=SHEET_SCALE)
+    _create_drive_train_sheets(adapter)
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -511,29 +640,39 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(
-        adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE
+    ddoc = _sw_type_info.early_bound_or_flag(
+        drawing_model, "IDrawingDoc", "ActivateSheet"
     )
-    right = place_view(
-        adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
-    )
-    iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
-    )
-    bottom = place_view(
-        adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=VIEW_SCALE
-    )
-    for view in (front, right, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The cone-tip bushing and the two coaxial crank/cone-drive items are fully
-    # enclosed in every exterior projection.  The auxiliary bottom view shows
-    # hidden lines so those physical BOM items have balloonable geometry.
-    set_hidden_lines_visible(adapter, bottom)
-    _isolate_bottom_balloon_components(adapter, bottom)
 
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate general-assembly sheet")
+    general_front = place_view(
+        adapter, str(SOURCE), "*Front", *GENERAL_FRONT_CENTER, scale=VIEW_SCALE
+    )
+    general_right = place_view(
+        adapter, str(SOURCE), "*Right", *GENERAL_RIGHT_CENTER, scale=VIEW_SCALE
+    )
+    general_iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *GENERAL_ISO_CENTER, scale=VIEW_SCALE
+    )
+    for view in (general_front, general_right, general_iso):
+        set_hidden_lines_removed(adapter, view)
+    if add_note(
+        adapter, "SHEET 1 OF 4 — GENERAL ASSEMBLY", 0.018, 0.255
+    ) is None:
+        raise RuntimeError("failed to add general-assembly heading")
+    if add_note(adapter, ASSEMBLY_NOTES, *GENERAL_NOTES_ORIGIN) is None:
+        raise RuntimeError("failed to add drive-train assembly notes")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate drive-train parts-list sheet")
+    bom_iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *BOM_ISO_CENTER, scale=VIEW_SCALE
+    )
+    set_hidden_lines_removed(adapter, bom_iso)
     bom_table = insert_identified_bom_table(
         adapter,
-        front,
+        bom_iso,
         anchor_xy=BOM_ANCHOR,
         descriptions=BOM_COMPONENTS,
         part_numbers=BOM_PART_NUMBERS,
@@ -541,22 +680,84 @@ async def build(adapter: Any) -> dict[str, str]:
         label="drive-train assembly",
     )
     _format_drive_train_bom(adapter, bom_table)
-    # The lower platform and fastener families are occluded in the front/right
-    # pair and behind the gear ladders in the pictorial.  The bottom projection
-    # exposes those remaining BOM identities rather than accepting an
-    # incomplete balloon set.
-    _add_drive_train_balloons(
-        adapter, (front, right, iso, bottom), expected=len(BOM_COMPONENTS),
-        label="drive-train assembly balloons",
+    if add_note(
+        adapter,
+        "SHEET 2 OF 4 — PARTS LIST; ITEM NUMBERS APPLY TO SHEETS 3 AND 4",
+        0.170,
+        0.255,
+    ) is None:
+        raise RuntimeError("failed to add drive-train parts-list heading")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[2]):
+        raise RuntimeError("failed to activate exterior-identification sheet")
+    exterior_front = place_view(
+        adapter, str(SOURCE), "*Front", *EXTERIOR_FRONT_CENTER, scale=VIEW_SCALE
     )
-    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
-        raise RuntimeError("failed to add drive-train assembly notes")
+    exterior_right = place_view(
+        adapter, str(SOURCE), "*Right", *EXTERIOR_RIGHT_CENTER, scale=VIEW_SCALE
+    )
+    exterior_iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *EXTERIOR_ISO_CENTER, scale=VIEW_SCALE
+    )
+    exterior_views = (exterior_front, exterior_right, exterior_iso)
+    for view in exterior_views:
+        set_hidden_lines_removed(adapter, view)
+    exterior_items = frozenset(
+        str(index)
+        for index in range(1, len(BOM_COMPONENTS) + 1)
+        if str(index) not in CONCEALED_BALLOON_ITEMS.values()
+    )
+    _add_drive_train_balloons(
+        adapter,
+        exterior_views,
+        expected_items=exterior_items,
+        manual_items=MANUAL_EXTERIOR_BALLOON_ITEMS,
+        label="drive-train exterior balloons",
+    )
+    if add_note(
+        adapter,
+        "SHEET 3 OF 4 — EXTERIOR ITEM IDENTIFICATION; HIDDEN LINES REMOVED",
+        0.018,
+        0.255,
+    ) is None:
+        raise RuntimeError("failed to add exterior-identification heading")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[3]):
+        raise RuntimeError("failed to activate concealed-identification sheet")
+    concealed_bottom = place_view(
+        adapter,
+        str(SOURCE),
+        "*Bottom",
+        *CONCEALED_BOTTOM_CENTER,
+        scale=VIEW_SCALE,
+    )
+    set_hidden_lines_visible(adapter, concealed_bottom)
+    _isolate_bottom_balloon_components(adapter, concealed_bottom)
+    concealed_balloons: list[Any] = []
+    for stem, item in CONCEALED_BALLOON_ITEMS.items():
+        note, _owner_view = _create_component_balloon(
+            adapter, (concealed_bottom,), stem=stem, expected_item=item
+        )
+        concealed_balloons.append(note)
+    _spread_balloons(
+        adapter, concealed_bottom, concealed_balloons, margin=0.025
+    )
+    if add_note(
+        adapter,
+        "SHEET 4 OF 4 — CONCEALED ITEM IDENTIFICATION\n"
+        "OUTER COMPONENTS HIDDEN; HIDDEN LINES VISIBLE\n"
+        "ITEMS 6, 25 AND 26 ONLY",
+        0.255,
+        0.225,
+    ) is None:
+        raise RuntimeError("failed to add concealed-identification heading")
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Drive-Train Assembly Drawing",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

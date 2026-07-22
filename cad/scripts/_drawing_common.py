@@ -1440,7 +1440,7 @@ def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
 def assert_asme_b_sheet(
     adapter: Any, sheet: Any, *, phase: str, scale: tuple[float, float] = (1.0, 1.0)
 ) -> None:
-    properties = list(adapter._get_attr_or_call(sheet, "GetProperties") or [])
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
     if len(properties) < 7:
         raise RuntimeError(f"{phase}: incomplete drawing sheet properties {properties!r}")
     if properties[2:4] != [float(scale[0]), float(scale[1])]:
@@ -1470,33 +1470,68 @@ async def reopen_drawing(adapter: Any, path: Path) -> tuple[Any, Any]:
     return reopened, sheet
 
 
-def render_pdf_png(pdf: Path, png: Path) -> None:
+def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
+    """Render a drawing PDF to its preview PNG.
+
+    Single-sheet drawings retain the historical one-page 300 dpi preview.
+    Multi-sheet drawings use the registered preview path for a 2x2 contact
+    sheet, keeping the doit/cache/release artifact contract to one PNG. Exact
+    page images for a review can be rendered from the packaged vector PDF.
+    """
     import pypdfium2 as pdfium
+    from PIL import Image
 
     document = pdfium.PdfDocument(str(pdf))
-    if len(document) != 1:
-        raise RuntimeError(f"drawing PDF has {len(document)} pages, expected 1")
-    page = document[0]
-    image = page.render(scale=ASME_B_DPI / 72.0).to_pil()
-    page.close()
-    document.close()
-    if image.size == (ASME_B_PNG_SIZE[0], ASME_B_PNG_SIZE[1] + 1):
-        image = image.crop((0, 0, *ASME_B_PNG_SIZE))
-    png.parent.mkdir(parents=True, exist_ok=True)
-    image.save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
-    if image.size != ASME_B_PNG_SIZE:
+    if len(document) != expected_pages:
         raise RuntimeError(
-            f"ASME B PNG is {image.size}, expected {ASME_B_PNG_SIZE}"
+            f"drawing PDF has {len(document)} pages, expected {expected_pages}"
         )
+    images: list[Any] = []
+    for index in range(expected_pages):
+        page = document[index]
+        image = page.render(scale=ASME_B_DPI / 72.0).to_pil()
+        page.close()
+        if image.size == (ASME_B_PNG_SIZE[0], ASME_B_PNG_SIZE[1] + 1):
+            image = image.crop((0, 0, *ASME_B_PNG_SIZE))
+        if image.size != ASME_B_PNG_SIZE:
+            document.close()
+            raise RuntimeError(
+                f"ASME B PNG page {index + 1} is {image.size}, "
+                f"expected {ASME_B_PNG_SIZE}"
+            )
+        images.append(image)
+    document.close()
+    png.parent.mkdir(parents=True, exist_ok=True)
+    if expected_pages == 1:
+        images[0].save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
+        return
+
+    if expected_pages > 4:
+        raise RuntimeError(
+            f"multi-sheet contact preview supports at most 4 pages, got {expected_pages}"
+        )
+    cell_size = (ASME_B_PNG_SIZE[0] // 2, ASME_B_PNG_SIZE[1] // 2)
+    contact = Image.new("RGB", ASME_B_PNG_SIZE, "white")
+    for index, image in enumerate(images):
+        cell = image.resize(cell_size, Image.Resampling.LANCZOS)
+        contact.paste(
+            cell,
+            ((index % 2) * cell_size[0], (index // 2) * cell_size[1]),
+        )
+    contact.save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
 
 
-def sanitize_pdf_metadata(pdf: Path, *, title: str) -> None:
+def sanitize_pdf_metadata(
+    pdf: Path, *, title: str, expected_pages: int = 1
+) -> None:
     """Replace seat/user PDF metadata while preserving the vector page."""
     from pypdf import PdfReader, PdfWriter
 
     reader = PdfReader(pdf)
-    if len(reader.pages) != 1:
-        raise RuntimeError(f"drawing PDF has {len(reader.pages)} pages, expected 1")
+    if len(reader.pages) != expected_pages:
+        raise RuntimeError(
+            f"drawing PDF has {len(reader.pages)} pages, expected {expected_pages}"
+        )
     writer = PdfWriter()
     writer.clone_document_from_reader(reader)
     metadata = {
@@ -3734,6 +3769,7 @@ async def finalize_drawing(
     scale: tuple[float, float] = (1.0, 1.0),
     redundant_note_substrings: Sequence[str] = (),
     expected_redundant_notes: int = 0,
+    expected_sheet_names: tuple[str, ...] | None = None,
 ) -> dict[str, str]:
     """Save, reopen-validate, and export the finished drawing (SLDDRW/PDF/PNG).
 
@@ -3745,52 +3781,58 @@ async def finalize_drawing(
     ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
     drawing_model.EditRebuild3()
-    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-    if sheet is None:
-        raise RuntimeError("finished drawing has no current sheet")
-    sheet_name = adapter._get_attr_or_call(sheet, "GetName")
-    if not sheet_name or not ddoc.ActivateSheet(sheet_name):
-        raise RuntimeError("failed to activate drawing sheet for export")
-
-    if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
-        raise RuntimeError("failed to set final drawing sheet scale")
-    assert_asme_b_sheet(adapter, sheet, phase="before save", scale=scale)
-
-    # Point the sheet's $PRPSHEET property links at the FIRST drawing view's
-    # model, by the view's REAL name -- setting it earlier (before views exist)
-    # is silently ignored by SolidWorks. Every project drawing is single-model,
-    # so the first view is always the right source. Done AFTER the final
-    # SetScale: the property put rebuilds the sheet under the hood, and a
-    # SetScale on the pre-put handle returns False. Re-fetch the handle after.
-    first_view = next(iter_views(adapter), None)
-    if first_view is None:
-        raise RuntimeError("finished drawing has no views to link sheet properties to")
-    first_name = view_name(adapter, first_view)
-    sheet.CustomPropertyView = first_name
-    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-    linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
-    if linked != first_name:
+    sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if not sheet_names:
+        raise RuntimeError("finished drawing has no sheets")
+    if expected_sheet_names is not None and sheet_names != expected_sheet_names:
         raise RuntimeError(
-            f"CustomPropertyView did not take: {linked!r} != {first_name!r}")
+            f"drawing sheet contract mismatch: {sheet_names!r} != "
+            f"{expected_sheet_names!r}"
+        )
 
-    # The template's title block reads the general-tolerance cells from the
-    # linked model via $PRPSHEET -- a stale source part (built before
-    # part_properties stamped the TOL_* set) would save a drawing with BLANK
-    # tolerance cells and no error. Validate here, the chokepoint every recipe
-    # passes through, against the model the sheet is now actually linked to,
-    # rather than trusting each recipe's read_required_properties list
-    # (Codex P2 #289).
-    linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
-    if linked_model is None:
-        raise RuntimeError(
-            f"view {first_name!r} has no referenced document to validate")
-    linked_model = _sw_type_info.early_bound_or_flag(
-        linked_model, "IModelDoc2", "GetCustomInfoValue")
-    read_required_properties(
-        linked_model,
-        TITLE_BLOCK_TOLERANCE_PROPERTIES,
-        required=TITLE_BLOCK_TOLERANCE_PROPERTIES,
-    )
+    # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
+    # real view after all views exist, validate the linked model's title-block
+    # tolerance properties, and hold every sheet to the same ASME B contract.
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        if sheet is None:
+            raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+        if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+            raise RuntimeError(
+                f"failed to set final drawing sheet {sheet_name!r} scale"
+            )
+        assert_asme_b_sheet(
+            adapter, sheet, phase=f"before save {sheet_name}", scale=scale
+        )
+        first_view = next(iter_views(adapter), None)
+        if first_view is None:
+            raise RuntimeError(
+                f"drawing sheet {sheet_name!r} has no view for property links"
+            )
+        first_name = view_name(adapter, first_view)
+        sheet.CustomPropertyView = first_name
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
+        if linked != first_name:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} CustomPropertyView did not take: "
+                f"{linked!r} != {first_name!r}"
+            )
+        linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
+        if linked_model is None:
+            raise RuntimeError(
+                f"view {first_name!r} has no referenced document to validate"
+            )
+        linked_model = _sw_type_info.early_bound_or_flag(
+            linked_model, "IModelDoc2", "GetCustomInfoValue"
+        )
+        read_required_properties(
+            linked_model,
+            TITLE_BLOCK_TOLERANCE_PROPERTIES,
+            required=TITLE_BLOCK_TOLERANCE_PROPERTIES,
+        )
 
     # The title block's UNIT cell links $PRP:"UNIT_DISPLAY" (a DRAWING-doc
     # property, unlike the $PRPSHEET part-property links), so the declared unit
@@ -3800,10 +3842,19 @@ async def finalize_drawing(
     from _common import apply_custom_properties
     apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
-    removed_notes = sum(
-        remove_notes_matching(adapter, substring)
-        for substring in redundant_note_substrings
-    )
+    # Cleanup and audit each active sheet independently; annotations and layout
+    # coordinates are sheet-scoped, so different pages must not be conflated.
+    removed_notes = 0
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(
+                f"failed to activate drawing sheet {sheet_name!r} for layout audit"
+            )
+        removed_notes += sum(
+            remove_notes_matching(adapter, substring)
+            for substring in redundant_note_substrings
+        )
+        check_drawing_layout(adapter, stem=f"{outputs.slddrw.stem}:{sheet_name}")
     if removed_notes != expected_redundant_notes:
         raise RuntimeError(
             f"final drawing removed {removed_notes} redundant notes, "
@@ -3812,11 +3863,6 @@ async def finalize_drawing(
         )
     if removed_notes:
         _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
-
-    # The layout is now complete -- audit element collisions / sheet overflow on
-    # the finished sheet before the first save, so a broken layout never reaches
-    # the saved SLDDRW / PDF / PNG.
-    check_drawing_layout(adapter, stem=outputs.slddrw.stem)
 
     # Export the PDF while the just-authored drawing is still fully loaded.
     # A large drawing can reopen view-only even when its referenced views report
@@ -3827,9 +3873,25 @@ async def finalize_drawing(
     )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
-    drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
-    if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
-        raise RuntimeError("failed to persist reopened drawing sheet scale")
+    drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    reopened_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if reopened_names != sheet_names:
+        raise RuntimeError(
+            f"reopened drawing sheets changed: {reopened_names!r} != {sheet_names!r}"
+        )
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(
+                f"failed to activate reopened drawing sheet {sheet_name!r}"
+            )
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        if sheet is None or not sheet.SetScale(
+            float(scale[0]), float(scale[1]), False, False
+        ):
+            raise RuntimeError(
+                f"failed to persist reopened drawing sheet {sheet_name!r} scale"
+            )
     sheet_scale_dirty = bool(
         adapter._get_attr_or_call(drawing_model, "GetSaveFlag")
     )
@@ -3852,10 +3914,44 @@ async def finalize_drawing(
             )
     if not sheet_scale_dirty:
         _telemetry.info("final drawing sheet scale already persisted; save skipped")
-    drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
-    assert_asme_b_sheet(adapter, sheet, phase="post-save reopen", scale=scale)
-    sanitize_pdf_metadata(outputs.pdf, title=pdf_title)
-    render_pdf_png(outputs.pdf, outputs.png)
+    drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    final_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if final_names != sheet_names:
+        raise RuntimeError(
+            f"final drawing sheets changed: {final_names!r} != {sheet_names!r}"
+        )
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(
+                f"failed to activate final drawing sheet {sheet_name!r}"
+            )
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        if sheet is None:
+            raise RuntimeError(f"final drawing sheet {sheet_name!r} has no ISheet")
+        assert_asme_b_sheet(
+            adapter, sheet, phase=f"post-save reopen {sheet_name}", scale=scale
+        )
+        first_view = next(iter_views(adapter), None)
+        if first_view is None:
+            raise RuntimeError(
+                f"final drawing sheet {sheet_name!r} has no property-link view"
+            )
+        expected_property_view = view_name(adapter, first_view)
+        persisted_property_view = str(
+            adapter._get_attr_or_call(sheet, "CustomPropertyView") or ""
+        )
+        if persisted_property_view != expected_property_view:
+            raise RuntimeError(
+                f"final sheet {sheet_name!r} property link changed: "
+                f"{persisted_property_view!r} != {expected_property_view!r}"
+            )
+    if not ddoc.ActivateSheet(sheet_names[0]):
+        raise RuntimeError("failed to restore first drawing sheet after validation")
+    sanitize_pdf_metadata(
+        outputs.pdf, title=pdf_title, expected_pages=len(sheet_names)
+    )
+    render_pdf_png(outputs.pdf, outputs.png, expected_pages=len(sheet_names))
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")

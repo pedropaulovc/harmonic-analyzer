@@ -103,20 +103,33 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("_add_drive_train_balloons(") == 2
     assert 'configuration_grouping="same-part"' in source
-    assert "adapter, (front, right, iso, bottom)" in source
-    assert source.count("add_note(") == 1
-    assert source.count("scale=VIEW_SCALE") == 4
+    assert "expected_sheet_names=SHEET_NAMES" in source
+    assert source.count("add_note(") == 5
+    assert source.count("scale=VIEW_SCALE") == 8
+    assert source.count("scale=VIEW_SCALE,") == 1
     assert '"*Bottom"' in source
-    assert "_isolate_bottom_balloon_components(adapter, bottom)" in source
+    assert "_isolate_bottom_balloon_components(adapter, concealed_bottom)" in source
     assert "drawing_component.Visible = bool(matched)" in source
-    assert "OUTER COMPONENTS HIDDEN" in source
+    assert drawing.SHEET_NAMES == (
+        "GENERAL ASSEMBLY",
+        "PARTS LIST",
+        "EXTERIOR ITEM IDENTIFICATION",
+        "CONCEALED ITEM IDENTIFICATION",
+    )
     assert drawing.BOTTOM_VISIBILITY_STEMS == {
         "cone-tip-bushing",
         "cone-gear-shaft",
         "crank-drive-gear",
     }
-    assert drawing.BOTTOM_MANUAL_BALLOON_STEMS == {"crank-drive-gear"}
-    assert drawing.BOTTOM_MANUAL_BALLOON_ITEMS == {"crank-drive-gear": "26"}
+    assert drawing.CONCEALED_BALLOON_ITEMS == {
+        "cone-tip-bushing": "6",
+        "cone-gear-shaft": "25",
+        "crank-drive-gear": "26",
+    }
+    assert drawing.MANUAL_EXTERIOR_BALLOON_ITEMS == {
+        "swing-stop-screw": "11",
+        "alignment-pinion": "12",
+    }
     assert drawing.FRONT_DEFERRED_BALLOON_STEMS == {
         "swing-stop-screw",
         "pinion-pivot-shaft",
@@ -142,13 +155,17 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert 'drawing_name.rsplit("/", 1)[-1].casefold()' in source
     assert 'identity.startswith(f"{stem}-")' in source
     assert "enumerated drawing components" in source
-    assert "HorizontalAutoSplit(" in source
-    assert drawing.BOM_ROWS_PER_SECTION == 12
+    assert "HorizontalAutoSplit(" not in source
     assert sum(drawing.BOM_COLUMN_WIDTHS.values()) == 0.125
-    assert drawing.BALLOON_RING_MARGINS == (0.036, 0.014, 0.014, 0.014)
+    assert drawing.EXTERIOR_BALLOON_RING_MARGINS == (0.026, 0.020, 0.020)
     assert "_swap_drive_train_balloon_slots" not in source
     assert "T006-T120" in drawing.ASSEMBLY_NOTES
     assert "CONE PLATFORM ENGAGED" in drawing.ASSEMBLY_NOTES
+    assert "0.05-0.10 MM" in drawing.ASSEMBLY_NOTES
+    assert "2.00 MM TIP GAP" in drawing.ASSEMBLY_NOTES
+    assert "0.10-0.25 MM" in drawing.ASSEMBLY_NOTES
+    assert "BACK STRAP ONLY" in drawing.ASSEMBLY_NOTES
+    assert "FRONT REMAINS SPRING-FREE" in drawing.ASSEMBLY_NOTES
     assert all(
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
