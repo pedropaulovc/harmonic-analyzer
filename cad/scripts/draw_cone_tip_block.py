@@ -29,12 +29,15 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     BLOCK_HEIGHT,
+    BLOCK_X,
     BLOCK_Z,
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
     SHAFT_PASSAGE_DIA,
+    SLIT_W,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -262,6 +265,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_datum_feature(
         adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + BLOCK_X / 2.0 * _S, _front_y(20.0)),
+        symbol_xy=(FRONT_CENTER[0] + BLOCK_X / 2.0 * _S + 0.018, _front_y(20.0)),
+        datum="E",
+        label="positive-X pinch-entry face",
+        position_tolerance_m=0.020,
+    )
+    add_datum_feature(
+        adapter,
         top,
         edge_xy=(TOP_CENTER[0], TOP_CENTER[1] + BLOCK_Z / 2.0 * _S),
         symbol_xy=(0.065, TOP_CENTER[1] + BLOCK_Z / 2.0 * _S),
@@ -298,9 +310,23 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.05",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="THREAD + PASSAGE COMMON AXIS",
+        quantity="2 COAXIAL FEATURES; SIM REQT",
         label="adjuster common-axis true position",
         entity=passage_entity,
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(
+            FRONT_CENTER[0] + SLIT_W / 2.0 * _S,
+            _front_y(BLOCK_HEIGHT - 4.0),
+        ),
+        frame_xy=(0.145, 0.225),
+        characteristic="position",
+        tolerance="0.10",
+        datums=("B",),
+        quantity="SLOT MEDIAN PLANE; BASIC 0 TO B",
+        label="slot median-plane position",
     )
     pinch_entity = _circle_entity(
         adapter,
@@ -328,15 +354,16 @@ async def build(adapter: Any) -> dict[str, str]:
             RIGHT_CENTER[0] + PINCH_CLEARANCE_DIA / 2.0 * _S,
             _front_y(PINCH_HEIGHT),
         ),
-        frame_xy=(0.245, _front_y(PINCH_HEIGHT) - 0.018),
+        frame_xy=(0.245, _front_y(PINCH_HEIGHT) - 0.030),
         characteristic="position",
         tolerance="0.05",
-        datums=("A", "D"),
+        datums=("A", "D", "E"),
         diameter=True,
-        quantity="CLEARANCE + THREAD COMMON AXIS",
+        quantity="2 COAXIAL FEATURES; SIM REQT",
         label="pinch common-axis true position",
         entity=pinch_entity,
     )
+    add_note(adapter, "PINCH ENTRY FACE E (+X)", 0.180, 0.225)
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.020, 0.075, char_height=0.0025
     )

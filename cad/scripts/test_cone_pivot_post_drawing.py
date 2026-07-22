@@ -42,14 +42,19 @@ def test_marked_dimensions_cover_the_column_and_journal() -> None:
 
 def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     notes = cone_pivot_post_spec.DRAWING_NOTES
-    axis = cone_pivot_post_spec.CRANK_AXIS_BASIC_NOTE
     assert "9.545-9.555" in notes
     assert "FINISH RA 1.6" in notes
-    assert "BASIC CRANK-BORE AXIS DEFINITION" in axis
-    assert "INTERSECTION OF DATUM A AND DATUM AXIS B" in axis
-    assert "+Z PARALLEL C, DOWN IN UPPER PLAN" in axis
-    assert "LINE = (-0.927, 85.835, -0.206)" in axis
-    assert "+ t(-0.21675, 0, +0.97623)" in axis
+    assert cone_pivot_post_spec.CRANK_AXIS_ORIENTATION_NOTE == (
+        "O = A/B INTERSECTION; +Y ALONG B AWAY FROM A\n"
+        "+X RIGHT; +Z PARALLEL C, DOWN IN UPPER PLAN"
+    )
+    assert tuple(
+        (point, *(round(value, 3) for value in coordinates))
+        for point, *coordinates in cone_pivot_post_spec.CRANK_AXIS_POINTS
+    ) == (
+        ("P", -0.927, 85.835, -0.206),
+        ("Q", -22.602, 85.835, 97.417),
+    )
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     assert "MACHINE FROM CONTINUOUS-CAST ROUND STOCK" in notes
@@ -57,13 +62,16 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert 'text="CRANK BORE <MOD-DIAM>10.025 +/-0.025 THRU"' in source
     assert "note.SetBalloon(4, 0)" in source
+    assert "UPPER PLAN (+X RIGHT, +Z DOWN)" in source
+    assert "AXIS = LINE THROUGH P AND Q" in source
+    assert "CRANK_AXIS_POINTS" in source
 
 
 def test_datum_and_notes_control_the_journal_bore() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
     assert "add_datum_feature_to_annotation(" not in source
-    assert source.count("add_feature_control_frame(") == 2
+    assert source.count("add_feature_control_frame(") == 5
     assert "post_od_entity = _circular_edge(" in source
     assert 'label="column outside diameter",\n        entity=post_od_entity' in source
     assert "position_tolerance_m=0.016" in source
@@ -73,7 +81,11 @@ def test_datum_and_notes_control_the_journal_bore() -> None:
     assert 'datums=("A", "B")' in source
     assert 'datums=("A", "B", "C")' in source
     assert 'diameter=True' in source
-    assert "CRANK_AXIS_BASIC_NOTE" in source
+    assert 'characteristic="flatness"' in source
+    assert 'characteristic="cylindricity"' in source
+    assert 'characteristic="perpendicularity"' in source
+    assert 'quantity="DATUM B AXIS"' in source
+    assert drawing.DIMENSION_CALLOUTS["BlockDia"] == "+/-0.05"
     assert "add_surface_finish(" not in source
     assert "B IS COLUMN OD" in cone_pivot_post_spec.DRAWING_NOTES
     assert "C IS JOURNAL-BORE AXIS" in cone_pivot_post_spec.DRAWING_NOTES
@@ -95,6 +107,8 @@ def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("cone-pivot-post")
     assert "A48" in str(config["material_specification"])
     assert "A48" in str(config["material"])
-    assert config["finish"]
-    assert "datum b od" in str(config["finish"]).lower()
+    assert "RAL 6005" in str(config["finish"])
+    assert "SSPC-SP 3" in str(config["finish"])
+    assert "50-75 um DFT" in str(config["finish"])
+    assert "B OD" in str(config["finish"])
     assert int(config["quantity"]) == 1

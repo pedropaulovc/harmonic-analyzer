@@ -2,7 +2,7 @@ cone-pivot-post:
   number: MHA-016
   material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
-  finish: green enamel; datum B OD, both bores + foot seat masked
+  finish: RAL 6005 alkyd enamel, SSPC-SP 3, 50-75 um DFT; mask A, B OD and bores
   quantity: 1
   tolerance_class: machined_block
   process: "machined from continuous-cast stock"

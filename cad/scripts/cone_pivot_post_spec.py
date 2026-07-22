@@ -33,23 +33,28 @@ CRANK_AXIS_POINT_X = -CRANK_BORE_OFFSET * _CRANK_COS
 CRANK_AXIS_POINT_Z = -CRANK_BORE_OFFSET * _CRANK_SIN
 CRANK_AXIS_DIRECTION_X = -_CRANK_SIN
 CRANK_AXIS_DIRECTION_Z = _CRANK_COS
-
-CRANK_AXIS_BASIC_NOTE = "\n".join(
+CRANK_AXIS_SECOND_POINT_DISTANCE = 100.0
+CRANK_AXIS_POINTS = (
+    ("P", CRANK_AXIS_POINT_X, CRANK_BORE_HEIGHT, CRANK_AXIS_POINT_Z),
     (
-        "BASIC CRANK-BORE AXIS DEFINITION (mm)",
-        "O = INTERSECTION OF DATUM A AND DATUM AXIS B",
-        "+Y ALONG B AWAY FROM A; +Z PARALLEL C, DOWN IN UPPER PLAN",
-        "+X RIGHT IN UPPER PLAN",
-        f"LINE = ({CRANK_AXIS_POINT_X:.3f}, {CRANK_BORE_HEIGHT:.3f}, "
-        f"{CRANK_AXIS_POINT_Z:.3f})",
-        f"     + t({CRANK_AXIS_DIRECTION_X:.5f}, 0, "
-        f"+{CRANK_AXIS_DIRECTION_Z:.5f})",
+        "Q",
+        CRANK_AXIS_POINT_X
+        + CRANK_AXIS_SECOND_POINT_DISTANCE * CRANK_AXIS_DIRECTION_X,
+        CRANK_BORE_HEIGHT,
+        CRANK_AXIS_POINT_Z
+        + CRANK_AXIS_SECOND_POINT_DISTANCE * CRANK_AXIS_DIRECTION_Z,
+    ),
+)
+CRANK_AXIS_ORIENTATION_NOTE = "\n".join(
+    (
+        "O = A/B INTERSECTION; +Y ALONG B AWAY FROM A",
+        "+X RIGHT; +Z PARALLEL C, DOWN IN UPPER PLAN",
     )
 )
 
 # The oblique, offset crank bore is a running-clearance feature on a cast column.
-# Its size is an arrowed feature callout and its theoretical axis is the boxed
-# point-vector definition above, controlled by a native position frame.
+# Its size is an arrowed feature callout and its theoretical axis is the BASIC
+# two-point coordinate table above, controlled by a native position frame.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"BlockDia"},
     "Block": {"BlockHt"},

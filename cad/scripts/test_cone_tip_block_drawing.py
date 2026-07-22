@@ -60,6 +60,9 @@ def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     assert "SLOT" in notes
     assert "CLEARANCE" in notes
     assert "OPPOSITE JAW" in notes
+    assert "E IS +X PINCH-ENTRY FACE" in notes
+    assert "SIMULTANEOUS REQUIREMENT" in notes
+    assert "TOTAL MEDIAN-PLANE ZONE" in notes
     assert "DIA 2.946 +0.10/-0.00" in notes
     assert "MATERIAL" not in notes
     assert "OXIDE" not in notes
@@ -83,13 +86,16 @@ def test_datum_and_position_controls_are_present() -> None:
     assert 'symbol_xy=TOP_KEEP["Depth"]' in source
     assert 'datum="C"' in source
     assert 'datum="D"' in source
+    assert 'datum="E"' in source
     assert "shoulder=True" in source
-    assert source.count('characteristic="position"') == 2
+    assert source.count('characteristic="position"') == 3
     assert source.count("set_basic_dimension(") == 2
     assert 'label="pinch-axis height"' in source
     assert "CYLINDRICAL ZONE" not in cone_tip_block_spec.DRAWING_NOTES
     assert "CONCENTRIC" not in cone_tip_block_spec.DRAWING_NOTES
-    assert "COMMON AXIS" in cone_tip_block_spec.DRAWING_NOTES
+    assert 'quantity="2 COAXIAL FEATURES; SIM REQT"' in source
+    assert 'quantity="SLOT MEDIAN PLANE; BASIC 0 TO B"' in source
+    assert 'datums=("A", "D", "E")' in source
 
 
 def test_view_scales_are_explicit() -> None:

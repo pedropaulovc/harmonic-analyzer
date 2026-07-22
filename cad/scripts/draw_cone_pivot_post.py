@@ -33,7 +33,8 @@ from cone_pivot_post_spec import (
     BORE_HEIGHT,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
-    CRANK_AXIS_BASIC_NOTE,
+    CRANK_AXIS_ORIENTATION_NOTE,
+    CRANK_AXIS_POINTS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -81,6 +82,7 @@ TOP_KEEP = {
     "BlockDia": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
+    "BlockDia": "+/-0.05",
     "BoreDia": "+0.005/-0.005 THRU",
 }
 # 3/8 in = 9.525 exactly; the sheet default of 2 decimals prints 9.53, a false
@@ -162,16 +164,37 @@ def _crank_bore_edge(
     return candidates[0], (FRONT_CENTER[0], _front_y(CRANK_BORE_HEIGHT))
 
 
-def _add_basic_crank_axis_note(adapter: Any) -> Any:
-    """Add and verify the boxed exact datum-coordinate definition."""
-    note = add_note(
-        adapter,
-        CRANK_AXIS_BASIC_NOTE,
-        0.220,
-        0.265,
+def _format_table_note(note: Any, *, label: str) -> Any:
+    """Apply the compact coordinate-table text size to a native note."""
+    note = _early_bound(note, "INote", "GetAnnotation")
+    annotation = _early_bound(
+        note.GetAnnotation(), "IAnnotation", "GetTextFormat", "SetTextFormat"
     )
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} has no text format")
+    text_format.CharHeight = 0.0025
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size {label}")
+    return note
+
+
+def _add_table_note(adapter: Any, text: str, x: float, y: float, *, label: str) -> Any:
+    note = add_note(adapter, text, x, y)
     if note is None:
-        raise RuntimeError("failed to add the basic crank-axis definition")
+        raise RuntimeError(f"failed to add {label}")
+    return _format_table_note(note, label=label)
+
+
+def _add_basic_value(adapter: Any, value: float, x: float, y: float) -> Any:
+    """Add one individually boxed BASIC coordinate value."""
+    note = _add_table_note(
+        adapter,
+        f"{value:.3f}",
+        x,
+        y,
+        label="crank-axis BASIC coordinate",
+    )
     note = _early_bound(
         note,
         "INote",
@@ -179,30 +202,62 @@ def _add_basic_crank_axis_note(adapter: Any) -> Any:
         "HasBalloon",
         "GetBalloonStyle",
         "GetBalloonSize",
-        "GetAnnotation",
     )
-    # swBS_Box=4 and swBF_Tightest=0.  This produces the rectangular frame
-    # used by ASME-style BASIC dimensions; verify the COM write rather than
-    # trusting the method's success return alone.
+    # swBS_Box=4 and swBF_Tightest=0 produce an ASME-style BASIC frame.
     if not note.SetBalloon(4, 0):
-        raise RuntimeError("SolidWorks rejected the basic crank-axis box")
+        raise RuntimeError("SolidWorks rejected a BASIC crank-axis coordinate")
     if (
         not note.HasBalloon()
         or int(note.GetBalloonStyle()) != 4
         or int(note.GetBalloonSize()) != 0
     ):
-        raise RuntimeError("basic crank-axis box did not persist")
-    annotation = _early_bound(
-        note.GetAnnotation(), "IAnnotation", "GetTextFormat", "SetTextFormat"
-    )
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError("basic crank-axis note has no text format")
-    text_format.CharHeight = 0.0025
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError("failed to size the basic crank-axis definition")
-    adapter.currentModel.EditRebuild3()
+        raise RuntimeError("BASIC crank-axis coordinate box did not persist")
     return note
+
+
+def _add_crank_axis_table(adapter: Any) -> None:
+    """Add a conventional two-point BASIC coordinate definition."""
+    _add_table_note(
+        adapter,
+        "CRANK-BORE AXIS COORDINATES (mm)",
+        0.220,
+        0.265,
+        label="crank-axis table heading",
+    )
+    _add_table_note(
+        adapter,
+        CRANK_AXIS_ORIENTATION_NOTE,
+        0.220,
+        0.256,
+        label="crank-axis coordinate orientation",
+    )
+    _add_table_note(
+        adapter,
+        "POINT        X               Y               Z",
+        0.220,
+        0.241,
+        label="crank-axis coordinate columns",
+    )
+    for row_y, (point, x_value, y_value, z_value) in zip(
+        (0.232, 0.221), CRANK_AXIS_POINTS, strict=True
+    ):
+        _add_table_note(
+            adapter, point, 0.220, row_y, label=f"crank-axis point {point}"
+        )
+        for column_x, value in zip(
+            (0.248, 0.290, 0.332),
+            (x_value, y_value, z_value),
+            strict=True,
+        ):
+            _add_basic_value(adapter, value, column_x, row_y)
+    _add_table_note(
+        adapter,
+        "AXIS = LINE THROUGH P AND Q",
+        0.220,
+        0.209,
+        label="crank-axis table definition",
+    )
+    adapter.currentModel.EditRebuild3()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -297,6 +352,16 @@ async def build(adapter: Any) -> dict[str, str]:
         label="foot seat face",
         entity=foot_entity,
     )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=foot_edge,
+        frame_xy=(0.145, _front_y(0.0) + 0.015),
+        characteristic="flatness",
+        tolerance="0.05",
+        label="datum-A seat flatness",
+        entity=foot_entity,
+    )
     post_od_entity = _circular_edge(
         adapter, top, radius_mm=BLOCK_DIA / 2.0, center_y_mm=BLOCK_HEIGHT
     )
@@ -313,6 +378,34 @@ async def build(adapter: Any) -> dict[str, str]:
         label="column outside diameter",
         entity=post_od_entity,
         position_tolerance_m=0.016,
+    )
+    post_side_xy = (
+        FRONT_CENTER[0] + BLOCK_DIA / 2.0 * _S,
+        _front_y(70.0),
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=post_side_xy,
+        frame_xy=(0.220, 0.125),
+        characteristic="cylindricity",
+        tolerance="0.05",
+        quantity="DATUM B OD",
+        label="datum-B outside-diameter form",
+        entity_type="SILHOUETTE",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=post_side_xy,
+        frame_xy=(0.220, 0.105),
+        characteristic="perpendicularity",
+        tolerance="0.05",
+        datums=("A",),
+        diameter=True,
+        quantity="DATUM B AXIS",
+        label="datum-B axis perpendicularity",
+        entity_type="SILHOUETTE",
     )
     add_feature_control_frame(
         adapter,
@@ -359,7 +452,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank-bore true position",
         entity=crank_entity,
     )
-    _add_basic_crank_axis_note(adapter)
+    _add_table_note(
+        adapter,
+        "UPPER PLAN (+X RIGHT, +Z DOWN)",
+        0.065,
+        0.265,
+        label="upper-plan view label",
+    )
+    _add_crank_axis_table(adapter)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
 
     return await finalize_drawing(
