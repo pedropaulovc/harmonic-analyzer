@@ -425,16 +425,25 @@ def add_feature_control_frame(
     entity_type: str = "EDGE",
     entity: Any | None = None,
     leader: bool = True,
+    attachment: Literal["entity", "dimension_stack"] = "entity",
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
-    edge = _select_view_entity(
-        adapter, view, entity_type, edge_xy, label=label, entity=entity
-    )
     draw = adapter.currentModel
+    edge = None
+    if attachment == "entity":
+        edge = _select_view_entity(
+            adapter, view, entity_type, edge_xy, label=label, entity=entity
+        )
+    elif attachment == "dimension_stack":
+        if leader:
+            raise ValueError(f"{label}: a dimension stack cannot have a leader")
+        draw.ClearSelection2(True)
+    else:
+        raise ValueError(f"{label}: unknown GTol attachment {attachment!r}")
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
@@ -521,7 +530,7 @@ def add_feature_control_frame(
         "SetPosition2",
         "SetLeader3",
     )
-    if int(annotation.GetAttachedEntityCount3()) != 1:
+    if attachment == "entity" and int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
@@ -552,15 +561,18 @@ def add_feature_control_frame(
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
     draw.EditRebuild3()
+    expected_entities = 1 if attachment == "entity" else 0
     expected_leaders = 1 if leader else 0
     if (
-        int(annotation.GetAttachedEntityCount3()) != 1
+        int(annotation.GetAttachedEntityCount3()) != expected_entities
         or bool(gtol.IsAttached()) != leader
         or int(gtol.GetLeaderCount()) != expected_leaders
     ):
         raise RuntimeError(
             f"feature-control frame attachment mismatch ({label}): "
-            f"leaders={gtol.GetLeaderCount()}, expected={expected_leaders}"
+            f"entities={annotation.GetAttachedEntityCount3()}, "
+            f"expected={expected_entities}; leaders={gtol.GetLeaderCount()}, "
+            f"expected={expected_leaders}"
         )
     draw.ClearSelection2(True)
     return gtol
