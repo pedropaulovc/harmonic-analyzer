@@ -30,6 +30,7 @@ from _common import (
     log,
     set_isometric_view,
 )
+from _interference_contracts import allowed_interference_pairs
 
 # The sprockets the chain seats on (the mounted T24 + crank T12 removables).
 # A chain link touching one of these is intended MESH, not a fault: the chain
@@ -3153,7 +3154,10 @@ async def refresh_assembly(
         # state. Reuse it across the read-only gates instead of paying two more
         # whole-model ForceRebuild3 calls (issue #326).
         assert_manifest_dof_state(adapter, asm_name, resolve=False)
-        check_no_interference(adapter)
+        check_no_interference(
+            adapter,
+            allowed_pairs=allowed_interference_pairs(asm_name),
+        )
         assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)
     else:
         # No-op reload: the per-config rebuild-fault check above already ran

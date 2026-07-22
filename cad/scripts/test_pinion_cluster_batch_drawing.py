@@ -218,5 +218,7 @@ def test_drive_train_allows_only_the_two_modeled_cam_pin_press_fits() -> None:
         encoding="utf-8"
     )
     verify_source = (scripts / "verify.py").read_text(encoding="utf-8")
+    assembly_source = (scripts / "_assembly.py").read_text(encoding="utf-8")
     assert "allowed_pairs=allowed_interference_pairs(ASM_NAME)" in build_source
     assert "allowed_pairs=allowed_interference_pairs(name)" in verify_source
+    assert "allowed_pairs=allowed_interference_pairs(asm_name)" in assembly_source
