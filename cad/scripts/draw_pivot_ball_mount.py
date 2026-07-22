@@ -139,9 +139,9 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
         raise RuntimeError("front view has no circular model edges")
     seat_radius, seat_height, seat_edge = min(
         circles,
-        key=lambda item: abs(item[0] - BALL_DIA / 2.0) + abs(item[1]),
+        key=lambda item: abs(item[0] - BASE_DIA / 2.0) + abs(item[1]),
     )
-    if abs(seat_radius - BALL_DIA / 2.0) > 0.01 or abs(seat_height) > 0.01:
+    if abs(seat_radius - BASE_DIA / 2.0) > 0.01 or abs(seat_height) > 0.01:
         raise RuntimeError("no circular edge matches the seat face")
     radius, height, bore_edge = min(
         circles,

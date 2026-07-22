@@ -1186,20 +1186,23 @@ def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
         # mirrored one (which flips the projection convention on the sheet).
         definition = candidates[0]
         instance_count = int(definition.GetInstanceCount())
-        if instance_count < 1:
-            raise RuntimeError(
-                "third-angle projection block is defined but has no placed "
-                "instance — the title-block symbol was deleted or never inserted"
-            )
-        for raw_instance in definition.GetInstances() or ():
-            instance = _early_bound(raw_instance, "ISketchBlockInstance")
-            angle = float(instance.Angle) % math.tau
-            if min(angle, math.tau - angle) > math.radians(0.5):
+        with _telemetry.span(
+            "drawing.projection_symbol_scan", instances=instance_count
+        ):
+            if instance_count < 1:
                 raise RuntimeError(
-                    "placed third-angle projection block instance is rotated "
-                    f"(angle={angle:.4f} rad) — a rotated or mirrored symbol "
-                    "misreads the projection convention on the sheet"
+                    "third-angle projection block is defined but has no placed "
+                    "instance — the title-block symbol was deleted or never inserted"
                 )
+            for raw_instance in definition.GetInstances() or ():
+                instance = _early_bound(raw_instance, "ISketchBlockInstance")
+                angle = float(instance.Angle) % math.tau
+                if min(angle, math.tau - angle) > math.radians(0.5):
+                    raise RuntimeError(
+                        "placed third-angle projection block instance is rotated "
+                        f"(angle={angle:.4f} rad) — a rotated or mirrored symbol "
+                        "misreads the projection convention on the sheet"
+                    )
         _telemetry.event(
             "drawing.projection_symbol_verified",
             convention="third-angle",
