@@ -2306,6 +2306,31 @@ def _activate_and_select_view(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
+def _bom_identity_map(
+    expected_components: Sequence[str], identity_aliases: dict[str, str] | None
+) -> dict[str, str]:
+    """Map every accepted BOM identity to one normalized component stem."""
+    expected = {component.strip().lower() for component in expected_components}
+    if len(expected) != len(expected_components):
+        raise ValueError("BOM expected-component identities are not unique")
+    identities = {component: component for component in expected}
+    for alias, component in (identity_aliases or {}).items():
+        normalized_alias = alias.strip().lower()
+        normalized_component = component.strip().lower()
+        if normalized_component not in expected:
+            raise ValueError(
+                f"BOM identity alias {alias!r} targets unknown component {component!r}"
+            )
+        existing = identities.get(normalized_alias)
+        if existing is not None and existing != normalized_component:
+            raise ValueError(
+                f"BOM identity alias {alias!r} maps to both "
+                f"{existing!r} and {normalized_component!r}"
+            )
+        identities[normalized_alias] = normalized_component
+    return identities
+
+
 @_telemetry.traced("drawing.bom_table", label_param="label")
 def insert_bom_table(
     adapter: Any,
@@ -2314,6 +2339,7 @@ def insert_bom_table(
     anchor_xy: tuple[float, float],
     expected_components: Sequence[str],
     descriptions: dict[str, str] | None = None,
+    identity_aliases: dict[str, str] | None = None,
     configuration_grouping: Literal["separate", "same-part"] = "separate",
     label: str,
 ) -> Any:
@@ -2324,6 +2350,8 @@ def insert_bom_table(
     template, anchored top-left at ``anchor_xy`` (sheet meters). Validated hard:
     one data row per ``expected_components`` entry and every expected part
     number present, so a BOM that silently dropped a component can never ship.
+    ``identity_aliases`` maps alternate displayed identities (such as released
+    part numbers) back to the expected component stems.
     ``descriptions`` maps a part number to its DESCRIPTION cell text (written
     per cell and read-verified) — the components carry no Description custom
     property, and a blank column reads as an unreleased sheet. Returns the
@@ -2413,18 +2441,26 @@ def insert_bom_table(
             f"{label} BOM table is {rows}x{columns}, expected {expected_rows} rows: "
             f"{contents!r}"
         )
-    flattened = {cell.strip().lower() for row in contents[1:] for cell in row}
+    identities = _bom_identity_map(expected_components, identity_aliases)
+    header = [cell.strip().upper() for cell in contents[0]]
+    part_column = header.index("PART NUMBER") if "PART NUMBER" in header else None
+    if part_column is None:
+        observed = {cell.strip().lower() for row in contents[1:] for cell in row}
+    else:
+        observed = {
+            identities.get(row[part_column].strip().lower(), row[part_column].strip().lower())
+            for row in contents[1:]
+        }
     missing = sorted(
         component
         for component in expected_components
-        if component.strip().lower() not in flattened
+        if component.strip().lower() not in observed
     )
     if missing:
         raise RuntimeError(
             f"{label} BOM table is missing components {missing}: {contents!r}"
         )
     if descriptions:
-        header = [cell.strip().upper() for cell in contents[0]]
         if "DESCRIPTION" not in header or "PART NUMBER" not in header:
             raise RuntimeError(
                 f"{label} BOM header carries no DESCRIPTION/PART NUMBER: {header!r}"
@@ -2437,7 +2473,7 @@ def insert_bom_table(
                 adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
                 or ""
             ).strip().lower()
-            text = remaining.pop(part, None)
+            text = remaining.pop(identities.get(part, part), None)
             if text is None:
                 continue
             if not table.IsCellTextEditable(row, description_column):

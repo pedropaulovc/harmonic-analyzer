@@ -13,6 +13,7 @@ import draw_harmonic_analyzer_assembly
 import draw_magnifier_assembly
 import draw_paper_drive_assembly
 import draw_summing_assembly
+from _drawing_common import _bom_identity_map
 
 
 SHEETS = (
@@ -47,6 +48,17 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "UNITS:",
     " UOS",
 )
+
+
+def test_bom_identity_map_accepts_stems_and_released_number_aliases() -> None:
+    identities = _bom_identity_map(
+        ("cone-gear", "pinion-cam-pin"),
+        {"MHA-013": "cone-gear", "MHA-116": "pinion-cam-pin"},
+    )
+    assert identities["cone-gear"] == "cone-gear"
+    assert identities["mha-013"] == "cone-gear"
+    assert identities["pinion-cam-pin"] == "pinion-cam-pin"
+    assert identities["mha-116"] == "pinion-cam-pin"
 
 
 def test_assembly_notes_do_not_repeat_title_block_metadata() -> None:

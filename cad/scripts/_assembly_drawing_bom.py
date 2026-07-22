@@ -58,6 +58,7 @@ def insert_identified_bom_table(
         anchor_xy=anchor_xy,
         expected_components=components,
         descriptions=dict(descriptions),
+        identity_aliases={number: stem for stem, number in part_numbers.items()},
         configuration_grouping=configuration_grouping,
         label=label,
     )
@@ -75,8 +76,11 @@ def insert_identified_bom_table(
         item_column = header.index("ITEM NO.") if "ITEM NO." in header else None
         source_rows: list[tuple[str, str]] = []
         remaining = {stem.lower(): number for stem, number in part_numbers.items()}
+        stems_by_number = {
+            number.lower(): stem.lower() for stem, number in part_numbers.items()
+        }
         for row in range(1, rows):
-            stem = str(
+            identity = str(
                 table.DisplayedText2(row, part_column, False) or ""
             ).strip().lower()
             item = (
@@ -84,9 +88,12 @@ def insert_identified_bom_table(
                 if item_column is not None
                 else str(row)
             )
+            stem = stems_by_number.get(identity, identity)
             source_rows.append((item, stem))
             number = remaining.pop(stem, None)
             if number is None:
+                continue
+            if identity == number.lower():
                 continue
             if not table.IsCellTextEditable(row, part_column):
                 raise RuntimeError(f"{label} BOM part-number cell {row} is not editable")
