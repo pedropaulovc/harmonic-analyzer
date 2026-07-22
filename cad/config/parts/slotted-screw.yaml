@@ -1,5 +1,9 @@
 slotted-screw:
   number: MHA-101
-  material: Plain Carbon Steel
+  material: 12L14 (UNS G12144) per ASTM A108-24
+  material_specification: 12L14 (UNS G12144) per ASTM A108-24
+  finish: uncoated, bright
+  quantity: 4
   tolerance_class: machined_block
+  fit_class: fastener_clearance
   process: "machined (steel)"

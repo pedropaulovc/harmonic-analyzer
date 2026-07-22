@@ -97,6 +97,7 @@ NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
 # (build_cone_pivot_screw). 1/4 clearance CLOSE fit (Ø6.756, the wizard twin of
 # the old Ø6.5 artefact dim).
 PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
+PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 # side of the sketch plane); must exceed 2x any extent crossed
@@ -276,7 +277,7 @@ async def build(adapter) -> dict[str, str]:
     # plate bottom (y=0) while the plate is still a plain trapezoidal slab
     # (before the lock notch/fillets explode the face count). The plate swings
     # ON the Ø6.35 pivot-screw shoulder, so a close 1/4 clearance (Ø6.756).
-    pivot_dia = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
+    pivot_dia = PIVOT_HOLE_DIA
     wizard_holes(
         adapter, PIVOT_HOLE_SPEC,
         [[0.0, 0.0, 0.0]],

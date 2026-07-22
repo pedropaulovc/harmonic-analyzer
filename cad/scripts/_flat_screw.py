@@ -12,7 +12,7 @@ local x = 0.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Mapping
 
 from _common import (
     SketchDims,
@@ -23,11 +23,17 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     save_part_and_images,
     set_global,
     volume_check,
+)
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
 )
 from _fastener_slot import FastenerAxis, add_slotted_drive
 
@@ -41,6 +47,10 @@ async def build_flat_screw(
     head_h: float,
     shank_dia: float,
     shank_len: float,
+    slot_width: float,
+    slot_depth: float,
+    mark_dimensions: Mapping[str, set[str]] | None = None,
+    drawing_properties: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
@@ -69,6 +79,7 @@ async def build_flat_screw(
     drive_jobs += head_dims.apply(adapter, "HeadProfile")
     extrude_at_offset(adapter, head_h, -head_h)
     name_last_feature(adapter, "Head")
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v_head = math.pi * (head_dia / 2.0) ** 2 * head_h
     expected = v_head
     await volume_check(adapter, "head", expected, 0.005 * v_head)
@@ -87,6 +98,7 @@ async def build_flat_screw(
     drive_jobs += shank_dims.apply(adapter, "ShankProfile")
     extrude_at_offset(adapter, shank_len, 0.0)
     name_last_feature(adapter, "Shank")
+    name_dimensions(adapter, "Shank", ["ShankLg"])
     v_shank = math.pi * (shank_dia / 2.0) ** 2 * shank_len
     expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
@@ -96,8 +108,8 @@ async def build_flat_screw(
         axis=FastenerAxis.Z,
         head_radius_mm=head_dia / 2.0,
         head_face_offset_mm=-head_h,
-        width_mm=1.2,
-        depth_mm=min(1.0, head_h * 0.4),
+        width_mm=slot_width,
+        depth_mm=slot_depth,
         expected_volume_mm3=expected,
     )
     drive_jobs += slot_jobs
@@ -129,4 +141,12 @@ async def build_flat_screw(
 
     await apply_material(adapter, material)
     await report_mass_properties(adapter)
+    # Optional manufacturing-drawing hook: a caller shipping a curated print
+    # marks its diameters for insertion and stamps the title-block properties
+    # before the part is saved (the crank-pin / cone-lock-knob convention).
+    if mark_dimensions is not None or drawing_properties is not None:
+        clear_dimensions_for_drawing(adapter)
+        for feature_name, dimension_names in (mark_dimensions or {}).items():
+            mark_dimensions_for_drawing(adapter, feature_name, set(dimension_names))
+        apply_drawing_properties(adapter, part_name, dict(drawing_properties or {}))
     return await save_part_and_images(adapter, part_name)

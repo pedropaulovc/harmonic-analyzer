@@ -518,6 +518,7 @@ from build_cone_swing_platform import (  # noqa: E402
     NOTCH_EXIT_TRAVEL as PLAT_NOTCH_EXIT,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
+    PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
     SLOT_E_X as PLAT_SLOT_E_X,
     SLOT_E_Z as PLAT_SLOT_E_Z,
     SLOT_R as PLAT_SLOT_R,
@@ -530,7 +531,14 @@ from build_cone_lock_knob import (  # noqa: E402
 )
 from build_cone_pivot_screw import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
-    SHANK_DIA as PSCREW_SHANK_DIA,
+    SHOULDER_DIA as PSCREW_SHOULDER_DIA,
+    SHOULDER_LEN as PSCREW_SHOULDER_LEN,
+    THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
+)
+from cone_pivot_screw_spec import (  # noqa: E402
+    THREAD as PSCREW_THREAD,
+    THREAD_SOLID_DIA as PSCREW_THREAD_SOLID_DIA,
+    THREAD_TAP_DRILL_DIA as PSCREW_THREAD_TAP_DRILL_DIA,
 )
 from build_swing_stop_screw import (  # noqa: E402
     SHANK_DIA as STOP_SHANK_DIA,
@@ -543,6 +551,8 @@ from build_harmonic_base import (  # noqa: E402
     FOOT_SCREW_HOLE_DIA as BASE_FOOT_HOLE_DIA,
     FOOT_SCREW_XZ as BASE_FOOT_XZ,
     PIVOT_SCREW_HOLE_DIA as BASE_PIVOT_HOLE_DIA,
+    PIVOT_HOLE_DEPTH as BASE_PIVOT_HOLE_DEPTH,
+    PIVOT_SEAT_SPEC as BASE_PIVOT_SEAT_SPEC,
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
     STOP_SCREW_HOLE_DIA as BASE_STOP_HOLE_DIA,
     STOP_SCREW_XZ as BASE_STOP_XZ,
@@ -814,8 +824,22 @@ if (abs(BASE_PIVOT_XZ[0] - _PPIVOT[0]) > 0.05
     raise AssertionError(
         f"harmonic-base pivot-screw hole {BASE_PIVOT_XZ} != machine swing pivot "
         f"({_PPIVOT[0]:.3f}, {_PPIVOT[2]:.3f})")
-if BASE_PIVOT_HOLE_DIA < PSCREW_SHANK_DIA:
-    raise AssertionError("base pivot hole under the pivot-screw shoulder dia")
+if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
+    raise AssertionError("platform pivot hole does not clear the screw shoulder")
+if abs(PSCREW_SHOULDER_LEN - PLAT_T - 0.25) > 1e-9:
+    raise AssertionError("pivot screw no longer provides 0.25 axial plate clearance")
+if BASE_PIVOT_SEAT_SPEC.kind != "tapped":
+    raise AssertionError("base pivot seat is not tapped")
+if BASE_PIVOT_SEAT_SPEC.size != PSCREW_THREAD:
+    raise AssertionError("base pivot thread does not match the pivot screw")
+if BASE_PIVOT_SEAT_SPEC.thread_class != "2B":
+    raise AssertionError("base pivot thread is not UNC-2B")
+if abs(PSCREW_THREAD_SOLID_DIA - PSCREW_THREAD_TAP_DRILL_DIA) > 1e-9:
+    raise AssertionError("pivot screw solid envelope does not match the tap drill")
+if abs(BASE_PIVOT_HOLE_DIA - PSCREW_THREAD_SOLID_DIA) > 1e-9:
+    raise AssertionError("pivot screw solid envelope does not match the mating hole")
+if BASE_PIVOT_HOLE_DEPTH - PSCREW_THREAD_TAIL_LEN < 1.5:
+    raise AssertionError("base pivot tap lacks blind-hole bottom clearance")
 # The pivot-screw head sits on the plate top at station PIVOT_STATION; the
 # tip block (also on the plate) ends at station 191 -- the head radius must
 # clear its north face (the first O12 head clipped the corner 13.5 mm^3).
@@ -1684,13 +1708,14 @@ async def build(adapter) -> dict[str, str]:
         ground=False, label="cone-lock-knob (platform clamp, engaged end)",
     )
     await _lock_static(adapter, lock_knob, arbor)
-    # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC
-    # like the knob -- head seated on the plate top at the swing pivot, its
-    # shoulder dropping through the plate's clearance hole into the base's
-    # pivot hole. The plate rotates ABOUT it; the screw never moves.
+    # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC.
+    # Its shoulder bottoms on the base top, placing the head 0.25 above the
+    # plate and leaving the plate free to swing; the threaded tail enters the
+    # matching blind #10-24 UNC-2B seat.
     pivot_screw = await place_component(
         adapter, "cone-pivot-screw",
-        [ppivot[0], Y_BASE_TOP + PLAT_T, ppivot[2]], [0.0, 0.0, 0.0], IDENTITY,
+        [ppivot[0], Y_BASE_TOP + PSCREW_SHOULDER_LEN, ppivot[2]],
+        [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="cone-pivot-screw (p1 pivot pin)",
     )
     await _lock_static(adapter, pivot_screw, arbor)

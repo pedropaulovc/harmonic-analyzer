@@ -61,6 +61,10 @@ from harmonic_base_spec import (
     TOP_THICKNESS,
     TOP_WIDTH,
 )
+from cone_pivot_screw_spec import (
+    THREAD as PIVOT_THREAD,
+    THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
+)
 
 import _telemetry
 
@@ -102,7 +106,8 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # gate proven: holes at the wrong x left both screws in solid base, 190.0 +
 # 75.4 mm^3, exactly the two embedded shank volumes.)
 PIVOT_SCREW_XZ = (-79.69, 103.29)
-# pivot seat: letter-F drill (O6.528, wizard) -- O6.35 shoulder clearance
+# pivot seat: blind #10-24 UNC-2B tap.  The screw's ground shoulder stops on
+# the base top; only its distinct threaded tail enters this seat.
 STOP_SCREW_XZ = (-130.433, 9.735)  # past the DISENGAGED east taper edge. The
 # centre sits one stop-screw shank RADIUS outside the swung edge, so the
 # US-customary shank resize (O4.0 -> 3.15, #8-32 tap-drill - 0.3) moved it
@@ -115,7 +120,8 @@ STOP_SCREW_XZ = (-130.433, 9.735)  # past the DISENGAGED east taper edge. The
 # Disengage swing sweeps the plate EAST (machine -x); the first
 # derivation sat 19 inside the engaged plate -- interference-gate proven.
 # stop seat: #20 drill (O4.089, wizard) -- stop-screw O3.15 shank clearance
-PIVOT_HOLE_DEPTH = 6.0
+PIVOT_THREAD_BOTTOM_CLEARANCE = 2.0
+PIVOT_HOLE_DEPTH = PIVOT_THREAD_ENGAGEMENT + PIVOT_THREAD_BOTTOM_CLEARANCE
 STOP_SCREW_HOLE_DEPTH = 6.0
 STOP_SCREW_DRILL_DEPTH = 9.0
 
@@ -151,7 +157,9 @@ FOOT_SCREW_DRILL_DEPTH = 11.0
 # hand-authored *_HOLE_DIA constants are derived from the specs now -- one
 # chokepoint, no drift).
 PIVOT_SEAT_SPEC = HoleSpec(
-    "drilled_letter", "F", end="blind", depth_mm=PIVOT_HOLE_DEPTH)
+    "tapped", PIVOT_THREAD, end="blind", depth_mm=PIVOT_HOLE_DEPTH,
+    thread_class="2B",
+)
 STOP_SEAT_SPEC = HoleSpec(
     "tapped", "#8-32", end="blind", depth_mm=STOP_SCREW_DRILL_DEPTH,
     overrides_mm={"ThreadDepth": STOP_SCREW_HOLE_DEPTH})
@@ -161,7 +169,7 @@ BLOCK_SEAT_SPEC = HoleSpec(
 FOOT_SEAT_SPEC = HoleSpec(
     "tapped", "#4-40", end="blind", depth_mm=FOOT_SCREW_DRILL_DEPTH,
     overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH})
-PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 6.528 (letter F)
+PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 3.797 tap drill
 STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # #8-32 tap drill
 BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # #8-32 tap drill
 FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)  # #4-40 tap drill
@@ -288,14 +296,14 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # Cone swing hardware + alignment-pinion rig seats: native Hole Wizard
-    # blind holes from the top face. The pivot remains a clearance seat so the
-    # platform can swing. The stop, block and foot screws thread into tapped
-    # base seats. A wizard blind hole ends in a 118-degree drill point, so the
+    # blind holes from the top face. The pivot, stop, block and foot screws all
+    # thread into their matching tapped base seats; the platform itself swings
+    # on the pivot screw's shoulder. A wizard blind hole ends in a 118-degree drill point, so the
     # analytic expectation is blind_hole_volume_mm3 (cylinder + point).
     for tag, spec, xz, label in (
         ("PivotSeat", PIVOT_SEAT_SPEC,
          (PIVOT_SCREW_XZ,),
-         "cone-pivot screw seat (letter F)"),
+         f"cone-pivot screw tapped seat ({PIVOT_THREAD} UNC-2B)"),
         ("StopSeat", STOP_SEAT_SPEC,
          (STOP_SCREW_XZ,),
          "swing-stop tapped seat (#8-32)"),

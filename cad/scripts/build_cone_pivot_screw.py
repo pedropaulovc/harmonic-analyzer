@@ -1,14 +1,13 @@
 r"""Reproduction script: cone platform pivot screw (item 2, p.18 "pivot").
 
-The slotted shoulder screw the swing platform rotates ON: head seats on
-the plate top at the pivot, O6.35 shoulder drops through the plate's
-O6.5 clearance hole into the harmonic base's pivot hole (the base part
-carries the matching hole; agreement asserted in the drive-train
-assembly). The plate swings about this shank -- it is the physical p1
-pivot pin.
+The slotted shoulder screw the swing platform rotates on.  Its ground shoulder
+is 0.25 mm longer than the plate thickness, so tightening the threaded tail
+against the base leaves running axial clearance instead of clamping the plate.
+The distinct #10-24 UNC-2A tail engages the base's blind UNC-2B seat.
 
-Stacked extrudes from the head seat (origin, Top plane): head up, shank
-down; one rectangular cut across the head top forms the driver slot.
+Stacked extrudes from the under-head datum (origin, Top plane): head up,
+shoulder and thread tail down; one rectangular cut across the head top forms
+the driver slot.
 
 Run (SolidWorks already open)::
 
@@ -20,6 +19,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _fastener_catalog import fastener
 from _common import (
     SketchDims,
@@ -30,7 +30,9 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    extrude_at_offset,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -39,19 +41,64 @@ from _common import (
     volume_check,
 )
 
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from cone_pivot_screw_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    HEAD_DIA,
+    HEAD_T,
+    SHOULDER_DIA,
+    SHOULDER_LEN,
+    SLOT_D,
+    SLOT_W,
+    THREAD_SOLID_DIA,
+    THREAD_TAIL_LEN,
+    UNDERHEAD_LEN,
+)
+
 PART_NAME = "cone-pivot-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # bright steel screw (v4 stills)
 
-HEAD_DIA = 9.5  # covers the plate's O6.5 hole; r 4.75 clears the tip block's
-# north face 0.25 (pivot station 196 - block north 191 -- assembly-asserted;
-# the first O12 cut clipped the block corner 13.5 mm^3)
-HEAD_T = 3.0
-SLOT_W = 1.6  # driver slot width
-SLOT_D = 1.2  # driver slot depth into the head top
-SHANK_DIA = SPEC.model_diameter_mm  # shoulder: the plate's O6.5 hole rides it
-SHANK_LEN = SPEC.length_mm  # plate 6.35 + 6.0 engaged into the base's pivot hole
+_DRAWING_REQUIRED_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "End View Note",
+)
 
+
+async def _assert_saved_drawing_properties(adapter, part_path: str) -> None:
+    """Round-trip the saved part and prove its make-critical properties persisted."""
+    closed = adapter._attempt(
+        lambda: adapter.swApp.CloseAllDocuments(True), default=False
+    )
+    if not closed:
+        raise RuntimeError("failed to close saved cone pivot screw before validation")
+    adapter.currentModel = None
+    _telemetry.success("closed cone pivot screw without saving for disk validation")
+
+    check("reopen saved cone pivot screw", await adapter.open_model(part_path))
+    model = adapter.currentModel
+    missing = [
+        name
+        for name in _DRAWING_REQUIRED_PROPERTIES
+        if not str(model.GetCustomInfoValue("", name) or "")
+    ]
+    if missing:
+        raise RuntimeError(
+            f"saved cone pivot screw properties are missing after reopen: {missing}"
+        )
+    _telemetry.success("saved cone pivot screw drawing properties persisted")
 
 def _slot_strip_area(r: float, w: float) -> float:
     """Plan area of a width-w strip across a radius-r circle (exact)."""
@@ -61,12 +108,18 @@ def _slot_strip_area(r: float, w: float) -> float:
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.solidworks.features import (
+        _flag_feature_methods,
+        _select_edges_geometric,
+    )
 
     check("create_part", await adapter.create_part())
     await set_global(adapter, "HeadDia", f"{HEAD_DIA}mm")
     await set_global(adapter, "HeadT", f"{HEAD_T}mm")
-    await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
-    await set_global(adapter, "ShankLen", f"{SHANK_LEN}mm")
+    await set_global(adapter, "ShoulderDia", f"{SHOULDER_DIA}mm")
+    await set_global(adapter, "ShoulderLen", f"{SHOULDER_LEN}mm")
+    await set_global(adapter, "ThreadSolidDia", f"{THREAD_SOLID_DIA}mm")
+    await set_global(adapter, "ThreadLen", f"{THREAD_TAIL_LEN}mm")
     drive_jobs: list[tuple[str, str]] = []
 
     head = SketchDims()
@@ -82,24 +135,47 @@ async def build(adapter) -> dict[str, str]:
     check("extrude head",
           await adapter.create_extrusion(ExtrusionParameters(depth=HEAD_T)))
     name_last_feature(adapter, "Head")
+    name_dimensions(adapter, "Head", ["HeadHt"])
     v = math.pi * (HEAD_DIA / 2.0) ** 2 * HEAD_T
     volume = await volume_check(adapter, "head", v, 0.005 * v)
 
-    shank = SketchDims()
-    check("create_sketch shank", await adapter.create_sketch("Top"))
+    shoulder = SketchDims()
+    check("create_sketch shoulder", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, SHANK_DIA / 2.0, "shank", dims=shank,
-        names=("ShankCx", "ShankCz", "ShankDiaDim"), drives=(None, None, '"ShankDia"'),
+        adapter, 0.0, 0.0, SHOULDER_DIA / 2.0, "shoulder", dims=shoulder,
+        names=("ShoulderCx", "ShoulderCz", "ShoulderDiaDim"),
+        drives=(None, None, '"ShoulderDia"'),
     )
-    await ensure_fully_defined(adapter, "shank sketch")
-    check("exit_sketch shank", await adapter.exit_sketch())
-    name_last_feature(adapter, "ShankProfile")
-    drive_jobs += shank.apply(adapter, "ShankProfile")
-    check("extrude shank (down)", await adapter.create_extrusion(
-        ExtrusionParameters(depth=SHANK_LEN, reverse_direction=True)))
-    name_last_feature(adapter, "Shank")
-    v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
-    volume = await volume_check(adapter, "shank", volume + v_shank, 0.005 * v_shank)
+    await ensure_fully_defined(adapter, "shoulder sketch")
+    check("exit_sketch shoulder", await adapter.exit_sketch())
+    name_last_feature(adapter, "ShoulderProfile")
+    drive_jobs += shoulder.apply(adapter, "ShoulderProfile")
+    extrude_at_offset(adapter, SHOULDER_LEN, -SHOULDER_LEN)
+    name_last_feature(adapter, "Shoulder")
+    name_dimensions(adapter, "Shoulder", ["ShoulderLg"])
+    v_shoulder = math.pi * (SHOULDER_DIA / 2.0) ** 2 * SHOULDER_LEN
+    volume = await volume_check(
+        adapter, "shoulder", volume + v_shoulder, 0.005 * v_shoulder
+    )
+
+    thread = SketchDims()
+    check("create_sketch thread tail", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, THREAD_SOLID_DIA / 2.0, "thread tail", dims=thread,
+        names=("ThreadCx", "ThreadCz", "ThreadSolidDiaDim"),
+        drives=(None, None, '"ThreadSolidDia"'),
+    )
+    await ensure_fully_defined(adapter, "thread-tail sketch")
+    check("exit_sketch thread tail", await adapter.exit_sketch())
+    name_last_feature(adapter, "ThreadTailProfile")
+    drive_jobs += thread.apply(adapter, "ThreadTailProfile")
+    extrude_at_offset(adapter, THREAD_TAIL_LEN, -UNDERHEAD_LEN)
+    name_last_feature(adapter, "ThreadTail")
+    name_dimensions(adapter, "ThreadTail", ["ThreadLg"])
+    v_thread = math.pi * (THREAD_SOLID_DIA / 2.0) ** 2 * THREAD_TAIL_LEN
+    volume = await volume_check(
+        adapter, "thread tail", volume + v_thread, 0.005 * v_thread
+    )
 
     # Driver slot: rect cut from the head top, SLOT_D deep.
     check("create_plane HeadTop", await adapter.create_plane(
@@ -121,6 +197,7 @@ async def build(adapter) -> dict[str, str]:
     check("cut slot", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLOT_D)))
     name_last_feature(adapter, "DriverSlot")
+    name_dimensions(adapter, "DriverSlot", ["SlotDepth"])
     v_slot = _slot_strip_area(HEAD_DIA / 2.0, SLOT_W) * SLOT_D
     volume = await volume_check(adapter, "slot", volume - v_slot, 0.02 * v_slot)
 
@@ -130,10 +207,75 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven screw (equations neutral)", volume, 0.02 * v_slot)
 
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis")
+    thread_edge_point = [THREAD_SOLID_DIA / 2.0, -UNDERHEAD_LEN, 0.0]
+    if not _select_edges_geometric(adapter, [thread_edge_point], tol_mm=0.05):
+        raise RuntimeError(
+            f"cannot select external-thread start edge at {thread_edge_point}"
+        )
+    feature_manager = _flag_feature_methods(
+        adapter.currentModel.FeatureManager,
+        "IFeatureManager",
+        "InsertCosmeticThread3",
+    )
+    cosmetic_thread = feature_manager.InsertCosmeticThread3(
+        0,  # swCosmeticStandardType_e.swStandardAnsiInch
+        "",
+        SPEC.thread,
+        0.0,  # standard/size table owns the nominal diameter
+        0,  # swCosmeticEndConditions_e.swEndConditionBlind
+        THREAD_TAIL_LEN / 1000.0,
+        f"{SPEC.thread} UNC-2A",
+    )
+    if cosmetic_thread is None:
+        raise RuntimeError("InsertCosmeticThread3 rejected the selected tail edge")
+    _telemetry.success(f"cosmetic external thread {SPEC.thread} UNC-2A")
+
+    pivot_axis = await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis"
+    )
+    _blank_ref_geometry(adapter, "HeadTop", "PLANE")
+    _blank_ref_geometry(adapter, pivot_axis, "AXIS")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    set_dimension_symmetric_tolerance(adapter, "HeadProfile", "HeadDiaDim", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "Head", "HeadHt", 0.10)
+    set_dimension_bilateral_tolerance(
+        adapter, "ShoulderProfile", "ShoulderDiaDim", -0.05, -0.02
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Shoulder", "ShoulderLg", 0.00, 0.05
+    )
+    set_dimension_symmetric_tolerance(adapter, "ThreadTail", "ThreadLg", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "SlotProfile", "SlotWDim", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", 0.10)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    await _assert_saved_drawing_properties(adapter, artefacts["part"])
+    return artefacts
+
+
+def _blank_ref_geometry(adapter, name: str, kind: str) -> None:
+    """Keep the slot construction plane and mating axis out of saved renders."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        name, kind, 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
 
 
 if __name__ == "__main__":
