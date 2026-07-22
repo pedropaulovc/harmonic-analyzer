@@ -3806,6 +3806,43 @@ async def finalize_drawing(
         assert_asme_b_sheet(
             adapter, sheet, phase=f"before save {sheet_name}", scale=scale
         )
+        properties = list(
+            adapter._get_attr_or_call(sheet, "GetProperties2") or []
+        )
+        if len(properties) < 8:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
+            )
+        if bool(properties[7]):
+            # PasteSheet preserves the source sheet's "same as sheet specified
+            # in Document Properties" flag. In that mode SolidWorks silently
+            # ignores a per-sheet CustomPropertyView assignment and returns the
+            # literal UI label instead of a view name. Clear the mode through
+            # the current ISheet API while preserving every other property.
+            sheet.SetProperties2(
+                int(properties[0]),
+                int(properties[1]),
+                float(properties[2]),
+                float(properties[3]),
+                bool(properties[4]),
+                float(properties[5]),
+                float(properties[6]),
+                False,
+            )
+            sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+            properties = list(
+                adapter._get_attr_or_call(sheet, "GetProperties2") or []
+            )
+            if len(properties) < 8 or bool(properties[7]):
+                raise RuntimeError(
+                    f"failed to enable explicit property source on {sheet_name!r}"
+                )
+            assert_asme_b_sheet(
+                adapter,
+                sheet,
+                phase=f"explicit property source {sheet_name}",
+                scale=scale,
+            )
         first_view = next(iter_views(adapter), None)
         if first_view is None:
             raise RuntimeError(
