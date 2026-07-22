@@ -148,16 +148,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven foot screw (equations neutral)", expected, 0.005 * v_shank
     )
 
-    from solidworks_mcp.adapters.base import CreateAxisParameters
-
-    check(
-        "create_axis ScrewAxis (Front ∩ Right)",
-        await adapter.create_axis(
-            CreateAxisParameters(mode="two_planes", planes=["Front Plane", "Right Plane"])
-        ),
-    )
-    name_last_feature(adapter, "ScrewAxis")
-
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)

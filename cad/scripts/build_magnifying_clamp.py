@@ -34,7 +34,6 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
-    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -197,12 +196,6 @@ async def build(adapter) -> dict[str, str]:
     v_screw = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * BLOCK_HEIGHT
     v_final = v_block - v_lever - v_rod - v_screw
     await volume_check(adapter, "y-bores", v_final, 80.0)
-
-    # Named lever-bore axis (local Z through (0, LEVER_BORE_Y)) so the clamp
-    # rides the magnifying rod as a concentric slider in the M6 assembly.
-    await name_bore_axis(
-        adapter, "Top Plane", LEVER_BORE_Y, "Right Plane", 0.0, "lever bore axis"
-    )
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built

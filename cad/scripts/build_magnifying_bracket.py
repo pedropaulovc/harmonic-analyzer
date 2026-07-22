@@ -38,7 +38,6 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
-    name_bore_axis,
     name_last_feature,
     extrude_at_offset,
     report_mass_properties,
@@ -303,10 +302,6 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven magnifying-bracket (equations neutral)", expected, 0.005 * expected
     )
-
-    # Named collar axis (local X through the origin) so the magnifying lever
-    # rides this bore as a revolute in the M6 mated-DOF assembly.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "collar axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
