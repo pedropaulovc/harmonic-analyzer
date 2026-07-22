@@ -105,13 +105,24 @@ def test_assembly_stamps_title_block_properties() -> None:
 def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
-    assert source.count("add_auto_balloons(") == 1
+    assert source.count("add_component_bom_balloons(") == 3
+    balloon_items = (
+        drawing.FRONT_BALLOON_ITEMS
+        + drawing.RIGHT_BALLOON_ITEMS
+        + drawing.ISO_BALLOON_ITEMS
+    )
+    assert {item for _stem, item in balloon_items} == {
+        str(item) for item in range(1, len(drawing.BOM_COMPONENTS) + 1)
+    }
+    assert len(balloon_items) == len(drawing.BOM_COMPONENTS)
     assert drawing.SHEET_SCALE == (1.0, 8.0)
     assert source.count("scale=VIEW_SCALE") == 3
     assert source.count("add_note(") == 1
     assert "MHA-A01 THROUGH MHA-A07" in drawing.ASSEMBLY_NOTES
-    assert "GENERAL-ARRANGEMENT REFERENCE ONLY" in drawing.ASSEMBLY_NOTES
-    assert drawing.ASSEMBLY_NOTES.count("RELEASE HOLD") == 2
+    assert "INSTALL IN ORDER" in drawing.ASSEMBLY_NOTES
+    assert "ALIGN ASSEMBLY ORIGINS" in drawing.ASSEMBLY_NOTES
+    assert "ADD NO TOP-LEVEL FASTENERS" in drawing.ASSEMBLY_NOTES
+    assert "RELEASE HOLD" not in drawing.ASSEMBLY_NOTES
     assert all(
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")

@@ -193,8 +193,10 @@ def test_unresolved_assembly_inputs_are_release_holds_not_guessed_details() -> N
     assert "LEVER-WIRE TERMINATIONS" in draw_magnifier_assembly.ASSEMBLY_NOTES
     assert "WHEEL HUB/RIM" in draw_magnifier_assembly.ASSEMBLY_NOTES
     top_notes = draw_harmonic_analyzer_assembly.ASSEMBLY_NOTES
-    assert "GENERAL-ARRANGEMENT REFERENCE ONLY" in top_notes
-    assert "LOCATING FEATURES AND FASTENERS" in top_notes
+    assert "INSTALL IN ORDER" in top_notes
+    assert "ALIGN ASSEMBLY ORIGINS" in top_notes
+    assert "ADD NO TOP-LEVEL FASTENERS" in top_notes
+    assert "RELEASE HOLD" not in top_notes
 
 
 def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
@@ -222,10 +224,15 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
             drawing.ARTIFACT_STEM
         )
         assert "part_numbers=BOM_PART_NUMBERS" in source, drawing.ARTIFACT_STEM
-        balloon_calls = source.count("add_auto_balloons(") + source.count(
-            "add_auto_balloons_across_views("
-        )
-        assert balloon_calls == 1, drawing.ARTIFACT_STEM
+        if drawing is draw_harmonic_analyzer_assembly:
+            balloon_calls = source.count("add_component_bom_balloons(")
+            expected_balloon_calls = 3
+        else:
+            balloon_calls = source.count("add_auto_balloons(") + source.count(
+                "add_auto_balloons_across_views("
+            )
+            expected_balloon_calls = 1
+        assert balloon_calls == expected_balloon_calls, drawing.ARTIFACT_STEM
 
 
 def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:

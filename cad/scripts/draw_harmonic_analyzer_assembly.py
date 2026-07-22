@@ -2,7 +2,7 @@ r"""Create the curated assembly drawing for the complete machine (top level).
 
 Front / right / isometric views of ``cad/out/sldasm/harmonic-analyzer.SLDASM``
 plus a TOP-LEVEL parts BOM (the seven subassemblies + the loose measuring
-stick) and item-number balloons on the isometric, on the shared ASME B
+stick) and item-number balloons across the three views, on the shared ASME B
 template. Top-level-only BOM is the shipped pen precedent: the subassemblies
 each carry their own assembly drawing (MHA-A0x), so the machine sheet lists
 them as single line items rather than exploding every part.
@@ -22,7 +22,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_auto_balloons_across_views,
+    add_component_bom_balloons,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -76,15 +76,33 @@ BOM_PART_NUMBERS = {
     "paper-drive": "MHA-A06",
     **configured_part_numbers(("measuring-stick",)),
 }
+FRONT_BALLOON_ITEMS = (
+    ("harmonic-base", "1"),
+    ("rocker-arm", "3"),
+    ("top-crossbar", "4"),
+    ("magnifying-wheel", "5"),
+    ("pen-rod", "6"),
+)
+RIGHT_BALLOON_ITEMS = (("support-bar", "7"),)
+ISO_BALLOON_ITEMS = (
+    ("crankshaft", "2"),
+    ("measuring-stick", "8"),
+)
 
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",
         "1. BUILD SUBASSEMBLIES PER MHA-A01 THROUGH MHA-A07.",
-        "2. THE SAVED POSE IS A GENERAL-ARRANGEMENT REFERENCE ONLY.",
-        "3. RELEASE HOLD - SUBASSEMBLY LOCATING FEATURES AND FASTENERS NOT DEFINED.",
-        "4. RELEASE HOLD - INSTALLATION SEQUENCE NOT DEFINED ON THIS SHEET.",
-        "5. VERIFY ALL SAVED OPERATIONAL DEGREES OF FREEDOM MOVE WITHOUT BINDING.",
+        "2. INSTALL IN ORDER: A04 FRAME, A03 DRIVE, A02 CHANNEL, A07 SUMMING,",
+        "   A05 MAGNIFIER, A01 PEN, THEN A06 PAPER DRIVE.",
+        "3. ALL ASSEMBLIES USE A04 MACHINE COORDINATES; ALIGN ASSEMBLY ORIGINS",
+        "   AND FRONT, TOP, AND RIGHT REFERENCE PLANES BEFORE RETENTION.",
+        "4. RETAIN WITH PARTS IN THE REFERENCED BOMS: A03 BASE FASTENERS;",
+        "   A02 PIVOT BALL MOUNTS/SHAFTS; A07 CROSSBAR SEATS/COLUMN CLAMP;",
+        "   A05 COLUMN CLAMPS; A01 HANGER CLAMP; A06 COLUMN CLAMPS/CHAIN.",
+        "5. CONNECT A02 RODS TO A03 CAMS AND A02 SPRINGS TO A07 HOOKS; SEAT",
+        "   A05 LEVER ON A07 KNIFE EDGE; CONNECT A01 TO A05; CHAIN A06 TO A03.",
+        "6. ADD NO TOP-LEVEL FASTENERS. VERIFY ALL FREE MOTIONS WITHOUT BINDING.",
     )
 )
 
@@ -154,12 +172,21 @@ async def build(adapter: Any) -> dict[str, str]:
         part_numbers=BOM_PART_NUMBERS,
         label="harmonic-analyzer assembly",
     )
-    # The pictorial exposes the loose stick and three exterior subassemblies,
-    # but the frame conceals the remaining top-level identities. Complete and
-    # validate the eight-item BOM set across all three projections.
-    add_auto_balloons_across_views(
-        adapter, (iso, front, right), expected=len(BOM_COMPONENTS),
-        label="harmonic-analyzer assembly balloons",
+    # AutoBalloon5 returns a changing visible subset for this nested top-level
+    # assembly. Bind one checked representative leaf from every top-level row,
+    # and distribute the eight balloons across projections so their leaders
+    # remain traceable at the general-arrangement scale.
+    add_component_bom_balloons(
+        adapter, front, items=FRONT_BALLOON_ITEMS,
+        label="harmonic-analyzer assembly front balloons",
+    )
+    add_component_bom_balloons(
+        adapter, right, items=RIGHT_BALLOON_ITEMS,
+        label="harmonic-analyzer assembly right balloons",
+    )
+    add_component_bom_balloons(
+        adapter, iso, items=ISO_BALLOON_ITEMS,
+        label="harmonic-analyzer assembly isometric balloons",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
         raise RuntimeError("failed to add harmonic-analyzer assembly notes")
