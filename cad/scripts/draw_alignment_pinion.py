@@ -25,6 +25,8 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -63,6 +65,14 @@ RIGHT_END_X = RIGHT_CENTER[0] + HALF_FACE
 FRONT_KEEP = {
     "ArborBoreDia": (FRONT_CENTER[0] - 0.050, FRONT_CENTER[1] - 0.030),
 }
+DIMENSION_CALLOUTS = {
+    # Light press under the MHA-102 arbor's Ø8.00 +0.00/-0.02 journal: bore
+    # 7.96..7.98 vs shaft 7.98..8.00 guarantees 0.00..0.04 interference. Also
+    # settles which tolerance-block row governs (neither .XX +/-0.51 nor
+    # DRILLED +0.10/0 -- the callout's own limits do).
+    "ArborBoreDia": "THRU - REAM\n-0.02/-0.04 (PRESS)",
+}
+DIMENSION_PRECISION = {"ArborBoreDia": 2}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -111,7 +121,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
