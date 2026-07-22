@@ -173,9 +173,9 @@ BOM_ANCHOR = (0.018, 0.262)
 BOM_ISO_CENTER = (0.310, 0.165)
 
 # Sheet 3: large exterior views and exterior-only item balloons.
-EXTERIOR_FRONT_CENTER = (0.060, 0.155)
-EXTERIOR_RIGHT_CENTER = (0.205, 0.155)
-EXTERIOR_ISO_CENTER = (0.350, 0.155)
+EXTERIOR_FRONT_CENTER = (0.085, 0.155)
+EXTERIOR_RIGHT_CENTER = (0.225, 0.155)
+EXTERIOR_ISO_CENTER = (0.360, 0.155)
 
 # Sheet 4: isolated underside view of the three otherwise enclosed BOM items.
 CONCEALED_BOTTOM_CENTER = (0.150, 0.165)
@@ -185,7 +185,7 @@ BOM_COLUMN_WIDTHS = {
     "DESCRIPTION": 0.074,
     "QTY.": 0.012,
 }
-EXTERIOR_BALLOON_RING_MARGINS = (0.026, 0.020, 0.020)
+EXTERIOR_BALLOON_RING_MARGINS = (0.014, 0.014, 0.014)
 
 
 @_telemetry.traced("drawing.format_drive_train_bom")
