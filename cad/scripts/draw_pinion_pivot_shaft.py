@@ -78,7 +78,7 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
 DIMENSION_CALLOUTS = {
-    "ShaftDia": "NOMINAL REF ONLY\nFINAL LIMITS\n6.350 MAX / 6.330 MIN",
+    "ShaftDia": "NOMINAL REF ONLY\nFINAL LIMITS\n<MOD-DIAM>6.350 MAX / <MOD-DIAM>6.330 MIN",
     "Depth": "+/-0.25 CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
 }
 
@@ -189,7 +189,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.245, 0.228),
         characteristic="profile_surface",
         tolerance="0.05",
-        datums=("A",),
+        datums=(),
         quantity="BOTH CROWNS",
         label="pinion pivot crown profile",
         entity_type="FACE",

@@ -260,7 +260,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text=(
             f"SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10\n"
             f"{HUB_LEN:.2f} REF B TO CROWN ROOT PLANE\n"
-            f"{CAP_SAG:.2f}+/-0.10 AXIAL HEIGHT ROOT TO APEX"
+            f"({CAP_SAG:.2f}) REF AXIAL HEIGHT ROOT TO APEX"
         ),
         entity_xy=crown_face,
         note_xy=(0.300, 0.240),

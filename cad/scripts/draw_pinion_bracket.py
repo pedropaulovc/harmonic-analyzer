@@ -116,7 +116,9 @@ DIMENSION_CALLOUTS = {
     "Depth": "+/-0.05 ONE STRAP THICKNESS",
     "PinSeatDia": (
         "NOMINAL REF\nH7: 4.012 MAX / 4.000 MIN\nBLIND; FLAT BOTTOM\n"
-        f"{PIN_SEAT:.2f} +0.10/-0.00 DEEP\nDRILL FROM LEFT EDGE SHOWN"
+        f"{PIN_SEAT:.2f} +0.10/-0.00 FULL-DIAMETER DEPTH\n"
+        "ALONG HOLE AXIS TO FLAT BOTTOM\nENTRY ON THE STRAIGHT EDGE FACE\n"
+        "NEAREST THE PIVOT BORE"
     ),
     "PinSeatCz": "+/-0.05 FROM DATUM C",
 }
@@ -221,22 +223,22 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(_front_x(0.0), _front_y(-R_END)),
         frame_xy=(0.048, 0.082),
-        characteristic="circular_runout",
+        characteristic="profile_surface",
         tolerance="0.05",
         datums=("A",),
         quantity="LOWER R9 ARC",
-        label="lower end-arc runout",
+        label="lower end-arc profile",
     )
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=(_front_x(0.0), _front_y(C2C + R_END)),
         frame_xy=(0.060, 0.224),
-        characteristic="circular_runout",
+        characteristic="profile_surface",
         tolerance="0.05",
         datums=("B",),
         quantity="UPPER R9 ARC",
-        label="upper end-arc runout",
+        label="upper end-arc profile",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)

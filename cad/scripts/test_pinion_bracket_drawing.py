@@ -90,9 +90,10 @@ def test_hole_states_are_annotated() -> None:
     assert "THRU - REAM" in callouts["PivotBoreDia"]
     assert "THRU" in callouts["ArborBoreDia"]
     assert "FLAT BOTTOM" in callouts["PinSeatDia"]
-    assert "4.00 +0.10/-0.00 DEEP" in callouts["PinSeatDia"]
+    assert "4.00 +0.10/-0.00 FULL-DIAMETER DEPTH" in callouts["PinSeatDia"]
+    assert "ENTRY ON THE STRAIGHT EDGE FACE" in callouts["PinSeatDia"]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "{PIN_SEAT:.2f} +0.10/-0.00 DEEP" in source
+    assert "{PIN_SEAT:.2f} +0.10/-0.00 FULL-DIAMETER DEPTH" in source
 
 
 def test_blind_seat_depth_uses_the_marked_drawing_name() -> None:
@@ -104,7 +105,7 @@ def test_datum_scheme_fully_defines_functional_relationships() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 2
-    assert source.count('characteristic="circular_runout"') == 2
+    assert source.count('characteristic="profile_surface"') == 2
     assert 'datums=("A",)' in source
     assert 'datums=("B",)' in source
     assert "add_surface_finish(" not in source

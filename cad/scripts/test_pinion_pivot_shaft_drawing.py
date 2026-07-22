@@ -44,12 +44,15 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_pivot_shaft_spec.DRAWING_NOTES
     assert "SPHERICAL CROWN" in notes
     assert "DERIVED AXIS" in notes
-    assert "PROFILE 0.05 TO DATUM A" in notes
+    assert "PROFILE 0.05, FORM ONLY (NO DATUM)" in notes
     assert "EXEMPT FROM TITLE-BLOCK EDGE-BREAK" in notes
-    assert "1.20 REF AXIAL HEIGHT" in notes
+    assert "(1.20) REF AXIAL HEIGHT" in notes
     assert "1.20+/-0.05" not in notes
     assert "194.40 OVERALL" not in notes
-    assert "6.350 MAX / 6.330 MIN" in drawing.DIMENSION_CALLOUTS["ShaftDia"]
+    assert (
+        "<MOD-DIAM>6.350 MAX / <MOD-DIAM>6.330 MIN"
+        in drawing.DIMENSION_CALLOUTS["ShaftDia"]
+    )
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert " BA " not in f" {notes} "

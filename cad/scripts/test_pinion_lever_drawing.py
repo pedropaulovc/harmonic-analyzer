@@ -88,7 +88,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "<MOD-DIAM>{ROD_TIP_DIA:.2f}" in source
     assert "GRIP_HALF_ANGLE_DEG" in source
     assert "{HUB_LEN:.2f} REF" in source
-    assert "{CAP_SAG:.2f}+/-0.10 AXIAL HEIGHT" in source
+    assert "({CAP_SAG:.2f}) REF AXIAL HEIGHT" in source
     assert "create_section_view(" not in source
     assert 'place_view(adapter, str(SOURCE), "*Right"' in source
     assert "set_hidden_lines_visible(adapter, side)" in source

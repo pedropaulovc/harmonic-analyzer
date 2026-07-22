@@ -107,7 +107,7 @@ RIGHT_KEEP = {
     "TubeLen": (0.165, 0.118),
 }
 TOP_KEEP = {
-    "RodDia": (0.300, 0.078),
+    "RodDia": (0.300, 0.092),
 }
 DIMENSION_CALLOUTS = {
     "TubeId": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n8.025 MAX / 8.010 MIN\nRa 1.6",

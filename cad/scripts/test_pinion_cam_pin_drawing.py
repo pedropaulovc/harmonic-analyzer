@@ -43,7 +43,7 @@ def test_sheet_runs_at_4_to_1_with_8_to_1_end_view() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_pin_spec.DRAWING_NOTES
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "{CAP_SAG:.2f}+/-0.05 AXIAL HEIGHT" in source
+    assert "({CAP_SAG:.2f}) REF AXIAL HEIGHT" in source
     assert "SPHERICAL" in notes
     assert "LINEAR +/-" not in notes
     assert " BA " not in f" {notes} "
@@ -61,7 +61,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "NOMINAL REF ONLY" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "set_reference_dimension(" in source
     assert 'characteristic="flatness"' in source
-    assert 'datums=("A",)' in source
+    assert "datums=()," in source  # crown profile is FORM ONLY (machinist round 1)
     assert "NO CHAMFER" in pinion_cam_pin_spec.DRAWING_NOTES
     assert "ISO 286-2" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "SEATED FLAT END TO CROWN ROOT" in drawing.DIMENSION_CALLOUTS["Depth"]

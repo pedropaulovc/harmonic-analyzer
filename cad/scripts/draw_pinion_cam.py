@@ -199,6 +199,10 @@ async def build(adapter: Any) -> dict[str, str]:
         bottom_boss_center[0] + BOSS_DIA / 1000.0,
         bottom_boss_center[1],
     )
+    bottom_boss_left = (
+        bottom_boss_center[0] - BOSS_DIA / 1000.0,
+        bottom_boss_center[1],
+    )
     bottom_tap_right = (
         bottom_boss_center[0] + TAP_DRILL_DIA / 1000.0,
         bottom_boss_center[1],
@@ -230,11 +234,14 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="cam OD datum axis",
     )
+    # Datum D attaches on the boss's LEFT flank, opposite the two position
+    # frames on the right, so its leader unambiguously lands on the boss OD
+    # rather than the tap/axis region (machinist round 1).
     add_datum_feature(
         adapter,
         bottom,
-        edge_xy=bottom_boss_right,
-        symbol_xy=(0.245, 0.185),
+        edge_xy=bottom_boss_left,
+        symbol_xy=(0.192, 0.170),
         datum="D",
         label="cam boss OD axis",
     )

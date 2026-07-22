@@ -199,7 +199,7 @@ async def build(adapter: Any) -> dict[str, str]:
         frame_xy=(0.245, 0.235),
         characteristic="profile_surface",
         tolerance="0.05",
-        datums=("A",),
+        datums=(),
         quantity="OUTER CROWN",
         label="pinion cam-pin crown profile",
         entity_type="SILHOUETTE",
@@ -209,7 +209,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         text=(
             f"OUTER CROWN SR{CAP_RADIUS:.2f}+/-0.05\n"
-            f"{CAP_SAG:.2f}+/-0.05 AXIAL HEIGHT\n"
+            f"({CAP_SAG:.2f}) REF AXIAL HEIGHT\n"
             "CROWN ROOT PLANE TO APEX"
         ),
         entity_xy=outer_crown_face,
