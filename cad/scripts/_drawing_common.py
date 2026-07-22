@@ -2670,7 +2670,12 @@ def _push_apart_on_ring(
 
 
 def _spread_balloons(
-    adapter: Any, view: Any, balloons: list[Any], *, margin: float = 0.014
+    adapter: Any,
+    view: Any,
+    balloons: list[Any],
+    *,
+    margin: float = 0.014,
+    clearance: float = _BALLOON_CLEARANCE_M,
 ) -> None:
     """Re-ring auto-balloons evenly around ``view`` (the layout audit fails loud).
 
@@ -2784,7 +2789,7 @@ def _spread_balloons(
     # and had been in the generated binding all along. The claim was never tested
     # and the sheet carried the defect for it.)
     gap = _min_angular_gap(
-        min(radius_x, radius_y), max(radii), clearance=_BALLOON_CLEARANCE_M
+        min(radius_x, radius_y), max(radii), clearance=clearance
     )
     angles = _push_apart_on_ring([theta for theta, _ in items], min_gap=gap)
     for angle, (_theta, annotation) in zip(angles, items):

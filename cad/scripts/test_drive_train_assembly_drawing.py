@@ -169,6 +169,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert sum(drawing.BOM_COLUMN_WIDTHS.values()) == 0.125
     assert drawing.EXTERIOR_BALLOON_RING_MARGINS == (0.014, 0.014, 0.014)
     assert drawing.CONCEALED_BALLOON_RING_MARGIN == 0.035
+    assert drawing.CONCEALED_BALLOON_CLEARANCE == 0.006
     assert "_swap_drive_train_balloon_slots" not in source
     assert "T006-T120" in drawing.ASSEMBLY_NOTES
     assert "CONE PLATFORM ENGAGED" in drawing.ASSEMBLY_NOTES
