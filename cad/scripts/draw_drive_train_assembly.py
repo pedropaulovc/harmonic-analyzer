@@ -350,6 +350,7 @@ BOM_COLUMN_WIDTHS = {
     "QTY.": 0.012,
 }
 EXTERIOR_BALLOON_RING_MARGINS = (0.020, 0.014, 0.014)
+EXTERIOR_BALLOON_CLEARANCES = (0.002, 0.004, 0.002)
 
 CONE_GEAR_SCHEDULE = tuple(
     (position, f"T{int(channel['cone_teeth']):03d}", int(channel["cone_teeth"]))
@@ -948,6 +949,7 @@ def _add_component_balloons(
             view,
             view_balloons,
             margin=EXTERIOR_BALLOON_RING_MARGINS[index - 1],
+            clearance=EXTERIOR_BALLOON_CLEARANCES[index - 1],
         )
         all_balloons.extend(view_balloons)
         _telemetry.success(
