@@ -131,6 +131,11 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         "alignment-pinion": "12",
         "crank-pinion": "30",
     }
+    assert drawing.MANUAL_EXTERIOR_VIEW_ORDER == {
+        "swing-stop-screw": (1, 2, 0),
+        "alignment-pinion": (2, 1, 0),
+        "crank-pinion": (1, 2, 0),
+    }
     assert drawing.FRONT_DEFERRED_BALLOON_STEMS == {
         "swing-stop-screw",
         "pinion-pivot-shaft",

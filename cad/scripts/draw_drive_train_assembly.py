@@ -127,6 +127,11 @@ MANUAL_EXTERIOR_BALLOON_ITEMS = {
     "alignment-pinion": "12",
     "crank-pinion": "30",
 }
+MANUAL_EXTERIOR_VIEW_ORDER = {
+    "swing-stop-screw": (1, 2, 0),
+    "alignment-pinion": (2, 1, 0),
+    "crank-pinion": (1, 2, 0),
+}
 FRONT_DEFERRED_BALLOON_STEMS = frozenset(
     {
         "swing-stop-screw",
@@ -173,9 +178,9 @@ BOM_ANCHOR = (0.018, 0.262)
 BOM_ISO_CENTER = (0.310, 0.165)
 
 # Sheet 3: large exterior views and exterior-only item balloons.
-EXTERIOR_FRONT_CENTER = (0.085, 0.155)
-EXTERIOR_RIGHT_CENTER = (0.225, 0.155)
-EXTERIOR_ISO_CENTER = (0.360, 0.155)
+EXTERIOR_FRONT_CENTER = (0.075, 0.155)
+EXTERIOR_RIGHT_CENTER = (0.220, 0.155)
+EXTERIOR_ISO_CENTER = (0.345, 0.155)
 
 # Sheet 4: isolated underside view of the three otherwise enclosed BOM items.
 CONCEALED_BOTTOM_CENTER = (0.150, 0.165)
@@ -254,8 +259,10 @@ def _add_drive_train_balloons(
         all_balloons.extend(balloons)
 
     for stem, item in manual_items.items():
+        view_order = MANUAL_EXTERIOR_VIEW_ORDER[stem]
+        preferred_views = tuple(views[index] for index in view_order)
         note, owner_view = _create_component_balloon(
-            adapter, views, stem=stem, expected_item=item
+            adapter, preferred_views, stem=stem, expected_item=item
         )
         owner_index = next(
             index for index, candidate in enumerate(views) if candidate is owner_view
