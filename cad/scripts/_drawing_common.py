@@ -2969,8 +2969,10 @@ def position_bom_balloon(
     delta = tuple(expected - actual for actual, expected in zip(actual_xy, position_xy))
     target_anchor = (float(anchor[0]) + delta[0], float(anchor[1]) + delta[1])
     # GetBalloonInfo can lag the note's new origin until the graphics pipeline
-    # redraws. Retry the SAME absolute anchor, never a cumulative delta against
-    # stale circle data, and redraw before judging each rendered-circle readback.
+    # redraws. Retry the same absolute anchor first and redraw before judging the
+    # rendered-circle readback. If the circle then repeats at a stable residual,
+    # its offset from the annotation anchor changed with the leader angle; apply
+    # bounded residual corrections from the newly read anchor and circle.
     for _attempt in range(3):
         note.LockPosition = False
         moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
@@ -2999,6 +3001,44 @@ def position_bom_balloon(
             for index, expected in enumerate(position_xy)
         ):
             break
+    for correction in range(3):
+        moved_anchor = annotation.GetPosition()
+        moved_info = note.GetBalloonInfo()
+        if moved_anchor is None or moved_info is None:
+            raise RuntimeError(
+                f"{label}: item {item_number} has no residual-correction read-back"
+            )
+        residual = tuple(
+            expected - float(moved_info[index])
+            for index, expected in enumerate(position_xy)
+        )
+        if all(abs(value) <= 1e-6 for value in residual):
+            break
+        corrected_anchor = (
+            float(moved_anchor[0]) + residual[0],
+            float(moved_anchor[1]) + residual[1],
+        )
+        note.LockPosition = False
+        if not annotation.SetPosition(*corrected_anchor, 0.0):
+            raise RuntimeError(
+                f"{label}: failed to correct item {item_number} circle residual"
+            )
+        note.LockPosition = True
+        adapter.currentModel.EditRebuild3()
+        adapter.currentModel.GraphicsRedraw2()
+        current_note = annotation.GetSpecificAnnotation()
+        if current_note is None:
+            raise RuntimeError(
+                f"{label}: item {item_number} note vanished during correction"
+            )
+        note = _sw_type_info.early_bound_or_flag(
+            current_note, "INote", "GetBalloonInfo"
+        )
+        corrected_info = note.GetBalloonInfo()
+        _telemetry.info(
+            f"{label}: item {item_number} residual correction {correction + 1} "
+            f"circle={tuple(float(value) for value in corrected_info[:2]) if corrected_info else None}"
+        )
     info = note.GetBalloonInfo()
     if info is None or len(info) < 2:
         raise RuntimeError(f"{label}: item {item_number} circle has no final read-back")
