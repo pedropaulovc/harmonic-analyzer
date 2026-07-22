@@ -168,6 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
         anchor_xy=BOM_ANCHOR,
         descriptions=BOM_COMPONENTS,
         part_numbers=BOM_PART_NUMBERS,
+        configuration_grouping="same-part",
         label="paper-drive assembly",
     )
     # Balloon the ISOMETRIC view: the pictorial keeps every component visible,

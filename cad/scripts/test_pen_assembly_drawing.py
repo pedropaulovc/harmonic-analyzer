@@ -84,7 +84,8 @@ def test_assembly_stamps_title_block_properties() -> None:
     )
     assert "apply_custom_properties" in source
     assert "SEE PARTS LIST" in source
-    assert "part_properties(ASM_NAME)" in source  # carries the required TOL_* cells
+    assert "assembly_title_properties(ASM_NAME)" in source
+    assert "part_properties(ASM_NAME)" not in source
 
 
 def test_drawing_places_bom_and_balloons() -> None:

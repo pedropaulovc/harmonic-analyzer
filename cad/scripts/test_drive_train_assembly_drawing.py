@@ -100,7 +100,8 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
         encoding="utf-8"
     )
     assert '"MHA-A03"' in source
-    assert "part_properties(ASM_NAME)" in source
+    assert "assembly_title_properties(ASM_NAME)" in source
+    assert "part_properties(ASM_NAME)" not in source
     assert source.count('"Material": "SEE COMPONENT DRAWINGS"') == 1
     assert source.count('"Material Specification": "SEE COMPONENT DRAWINGS"') == 1
     assert source.count('"Finish": "SEE COMPONENT DRAWINGS"') == 1

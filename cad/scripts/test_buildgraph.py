@@ -27,7 +27,9 @@ from _buildgraph import (  # noqa: E402
     references_of,
     script_for,
     stamps_part_properties,
+    stamps_title_block_properties,
 )
+from _assembly import assembly_title_properties  # noqa: E402
 
 
 def _helper_names(stem_script: str) -> set[str]:
@@ -283,18 +285,38 @@ def test_module_deps_follow_non_helper_siblings():
     assert "channels.yaml" in cfg, cfg
 
 
-def test_stamps_part_properties_only_genuine_stampers():
-    """Every released assembly drawing now has source-owned title-block data.
+def test_part_and_title_property_stampers_are_distinct():
+    """Assembly identity must not masquerade as in-script part generation."""
+    title_stampers = {
+        stem for stem in ASSEMBLY_ORDER
+        if stamps_title_block_properties(script_for(stem))
+    }
+    part_stampers = {
+        stem for stem in ASSEMBLY_ORDER
+        if stamps_part_properties(script_for(stem))
+    }
+    assert title_stampers == set(ASSEMBLY_ORDER)
+    assert part_stampers == {"channel"}
 
-    Each assembly builder stamps its own Number/Revision/material-deferment and
-    title-block tolerance properties before saving, so the function-level call
-    graph must classify every assembly recipe as a genuine stamper. Channel
-    additionally stamps its stretched spring parts through ``build_spring``.
-    """
-    for stem in ASSEMBLY_ORDER:
-        assert stamps_part_properties(script_for(stem)), f"{stem} must be a stamper"
-    # a part build script genuinely stamps its own properties (sanity on the graph).
-    assert stamps_part_properties(SCRIPTS_DIR / "build_fillister_screw.py")
+    leaf = SCRIPTS_DIR / "build_fillister_screw.py"
+    assert stamps_part_properties(leaf)
+    assert stamps_title_block_properties(leaf)
+
+
+def test_assembly_title_properties_never_read_part_registry_fields():
+    props = assembly_title_properties("frame")
+    assert set(props) == {
+        "Title",
+        "Generator",
+        "TOL_LIN_XX",
+        "TOL_LIN_XXX",
+        "TOL_ANG",
+        "TOL_SURFACE",
+        "TOL_HOLE_MINUS",
+        "TOL_HOLE_PLUS",
+    }
+    assert props["Title"] == "frame"
+    assert props["Generator"].startswith("harmonic-analyzer @ ")
 
 
 def _run() -> int:

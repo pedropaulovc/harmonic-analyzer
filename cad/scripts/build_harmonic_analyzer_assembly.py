@@ -45,12 +45,12 @@ from _common import (
     apply_custom_properties,
     apply_summary_info,
     check,
-    part_properties,
     run_build,
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     _discard_copy_source,
+    assembly_title_properties,
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
@@ -130,14 +130,14 @@ async def build(adapter) -> dict[str, str]:
     check_no_interference(adapter)
 
     # Title-block identity for the top assembly drawing
-    # (draw_harmonic_analyzer_assembly.py): part_properties supplies
-    # Title/Generator plus the TOL_* general-tolerance cells finalize_drawing
+    # (draw_harmonic_analyzer_assembly.py): assembly_title_properties supplies
+    # Title/Generator and the TOL_* general-tolerance cells finalize_drawing
     # hard-requires; material/finish defer to each released component drawing
     # because the top-level BOM has no material/finish columns.
     apply_custom_properties(
         adapter,
         {
-            **part_properties(ASM_NAME),
+            **assembly_title_properties(ASM_NAME),
             # MHA-A## = assembly-drawing ids (A08 = the top machine assembly).
             "Number": "MHA-A08",
             "Revision": "A",

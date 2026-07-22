@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from enum import StrEnum
 from typing import Any
 
+import _config
 import _telemetry
 from _common import (
     DEFAULT_VIEWS,
@@ -23,6 +24,7 @@ from _common import (
     _CHAIN_LINK_PREFIXES,
     _FEATURE_ERROR,
     _MATE_TOL_MM,
+    _git_sha,
     _early_bound,
     _read_member,
     active_configuration_name,
@@ -30,6 +32,29 @@ from _common import (
     log,
     set_isometric_view,
 )
+def assembly_title_properties(assembly_name: str) -> dict[str, str]:
+    """Return title-block properties for an assembly document.
+
+    Assembly drawings need their own identity and general-tolerance cells, but
+    they do not own a row in the part registry.  Keeping this path separate from
+    ``_common.part_properties`` prevents assembly-title stamping from being
+    mistaken for in-script part generation by the build graph.
+    """
+    return {
+        "Title": assembly_name,
+        "Generator": f"harmonic-analyzer @ {_git_sha()}",
+        "TOL_LIN_XX": str(_config.title_block("linear_2pl")["display"]),
+        "TOL_LIN_XXX": str(_config.title_block("linear_3pl")["display"]),
+        "TOL_ANG": str(_config.title_block("angular")["display"]),
+        "TOL_SURFACE": str(_config.title_block("surface")["display"]),
+        "TOL_HOLE_MINUS": str(
+            _config.title_block("drilled_hole")["display_minus"]
+        ),
+        "TOL_HOLE_PLUS": str(
+            _config.title_block("drilled_hole")["display_plus"]
+        ),
+    }
+
 # The sprockets the chain seats on (the mounted T24 + crank T12 removables).
 # A chain link touching one of these is intended MESH, not a fault: the chain
 # rides the pitch circle so the links overlap the teeth in the shared z-plane

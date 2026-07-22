@@ -127,11 +127,11 @@ from _common import (
     apply_summary_info,
     check,
     log,
-    part_properties,
     run_build,
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
     bore_axis_ref,
@@ -1741,13 +1741,13 @@ async def build(adapter) -> dict[str, str]:
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Title-block identity for the assembly drawing (draw_channel_assembly.py):
-    # part_properties supplies Title/Generator plus the TOL_* general-tolerance
-    # cells finalize_drawing hard-requires; material/finish defer to each
+    # assembly_title_properties supplies the Title/Generator and TOL_* cells
+    # finalize_drawing requires without consulting the part registry;
     # released component drawing (the BOM has no material/finish columns).
     apply_custom_properties(
         adapter,
         {
-            **part_properties(ASM_NAME),
+            **assembly_title_properties(ASM_NAME),
             # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
             # (a longer number overflows the DWG. NO. title-block cell).
             "Number": "MHA-A02",

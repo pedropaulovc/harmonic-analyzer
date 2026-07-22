@@ -89,7 +89,8 @@ def test_assembly_stamps_title_block_properties() -> None:
     )
     assert "apply_custom_properties" in source
     assert "SEE COMPONENT DRAWINGS" in source
-    assert "part_properties(ASM_NAME)" in source
+    assert "assembly_title_properties(ASM_NAME)" in source
+    assert "part_properties(ASM_NAME)" not in source
     assert '"MHA-A05"' in source
     assert source.count('"Material": "SEE COMPONENT DRAWINGS"') == 1
     assert source.count('"Material Specification": "SEE COMPONENT DRAWINGS"') == 1

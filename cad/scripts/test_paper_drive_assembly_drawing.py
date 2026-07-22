@@ -74,7 +74,8 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
         encoding="utf-8"
     )
     assert '"MHA-A06"' in source
-    assert "part_properties(ASM_NAME)" in source
+    assert "assembly_title_properties(ASM_NAME)" in source
+    assert "part_properties(ASM_NAME)" not in source
     assert source.count('"Material": "SEE COMPONENT DRAWINGS"') == 1
     assert source.count('"Material Specification": "SEE COMPONENT DRAWINGS"') == 1
     assert source.count('"Finish": "SEE COMPONENT DRAWINGS"') == 1
@@ -83,6 +84,7 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
 def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
+    assert 'configuration_grouping="same-part"' in source
     assert source.count("add_auto_balloons(") == 1
     assert source.count("add_note(") == 1
     assert source.count("scale=VIEW_SCALE") == 3
