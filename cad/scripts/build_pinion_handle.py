@@ -17,7 +17,7 @@ cap (sagitta 2) proud of z -7; blind wall z +7..+9; tube annulus z
 built LAST so nothing crosses an axis.
 
 Volume gate (mm^3): grip + cap (spherical-cap formula) + wall + annulus
-+ rod - rod/grip overlap (Simpson over circular segments).
+- reamed body hole + separate pressed rod.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -42,6 +42,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -50,23 +51,43 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from pinion_handle_spec import (
+    CAP_SAG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    GRIP_DIA,
+    GRIP_LEN,
+    ISOMETRIC_VIEW_NOTE,
+    ROD_DIA,
+    ROD_DOWN,
+    ROD_HOLE_DIA,
+    ROD_UP,
+    TUBE_ID,
+    TUBE_LEN,
+    TUBE_OD,
+    WALL_T,
+)
 
 PART_NAME = "pinion-handle"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.67)
-
-GRIP_DIA = 23.0  # grip cylinder, img07 (was the Ø24 ball) (med)
-GRIP_LEN = 14.0  # along the arbor, z -7..+7 (med)
-CAP_SAG = 2.0  # domed south face (img07's rounded cap)
-ROD_DIA = 6.0  # cross rod, same stock as the lever root (high)
-ROD_DOWN = 42.0  # arm, img07 centre-to-tip (was 35) (med)
-ROD_UP = 43.0  # arm, img07 (the old p002 68 is retired) (med)
-TUBE_OD = 10.5  # blind cap hub over the arbor stub, img07 (med)
-TUBE_ID = 8.0  # = the arbor stub Ø8 (build_alignment_pinion STUB_DIA, must match)
-TUBE_LEN = 10.0  # stub seat depth (z +9..+19)
-WALL_T = 2.0  # blind wall between grip and tube (z +7..+9)
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 GRIP_R = GRIP_DIA / 2.0
 ROD_R = ROD_DIA / 2.0
+ROD_HOLE_R = ROD_HOLE_DIA / 2.0
 CAP_R = (GRIP_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 34.06 crown sphere radius
 
 V_GRIP = math.pi * GRIP_R**2 * GRIP_LEN
@@ -76,20 +97,19 @@ V_TUBE = math.pi * ((TUBE_OD / 2.0) ** 2 - (TUBE_ID / 2.0) ** 2) * TUBE_LEN
 V_ROD = math.pi * ROD_R**2 * (ROD_DOWN + ROD_UP)
 
 
-def _grip_overlap() -> float:
-    """Rod volume already inside the grip cylinder: Simpson over the rod's
-    y-span inside the grip radius of the disc-segment area |x| <= c(y)
-    (the rod's z-extent +-3 stays inside the grip's z -7..+7)."""
+def _grip_intersection(radius: float) -> float:
+    """Volume where a Y-axis cylinder of ``radius`` crosses the grip."""
     n = 2000
     y0, y1 = -GRIP_R, GRIP_R
     h = (y1 - y0) / n
 
     def area(y: float) -> float:
-        c = math.sqrt(max(GRIP_R**2 - y * y, 0.0))
-        if c >= ROD_R:
-            return math.pi * ROD_R**2
+        chord_half = math.sqrt(max(GRIP_R**2 - y * y, 0.0))
+        if chord_half >= radius:
+            return math.pi * radius**2
         return 2.0 * (
-            c * math.sqrt(ROD_R**2 - c * c) + ROD_R**2 * math.asin(c / ROD_R)
+            chord_half * math.sqrt(radius**2 - chord_half**2)
+            + radius**2 * math.asin(chord_half / radius)
         )
 
     total = area(y0) + area(y1)
@@ -98,11 +118,12 @@ def _grip_overlap() -> float:
     return total * h / 3.0
 
 
-V_TOTAL = V_GRIP + V_CAP + V_WALL + V_TUBE + V_ROD - _grip_overlap()
+V_ROD_HOLE = _grip_intersection(ROD_HOLE_R)
+V_TOTAL = V_GRIP + V_CAP + V_WALL + V_TUBE - V_ROD_HOLE + V_ROD
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -112,6 +133,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "GripLen", f"{GRIP_LEN}mm")
     await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
     await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
+    await set_global(adapter, "RodHoleDia", f"{ROD_HOLE_DIA}mm")
     await set_global(adapter, "RodDown", f"{ROD_DOWN}mm")
     await set_global(adapter, "RodUp", f"{ROD_UP}mm")
     await set_global(adapter, "TubeOd", f"{TUBE_OD}mm")
@@ -135,6 +157,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += grip.apply(adapter, "GripProfile")
     extrude_at_offset(adapter, GRIP_LEN, -GRIP_LEN / 2.0)
     name_last_feature(adapter, "Grip")
+    drive_jobs += [(name_dimensions(adapter, "Grip", ["GripLen"])[0], '"GripLen"')]
     expected = V_GRIP
     await volume_check(adapter, "grip", expected, 0.005 * V_GRIP)
 
@@ -235,10 +258,36 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += tube.apply(adapter, "TubeProfile")
     extrude_at_offset(adapter, TUBE_LEN, GRIP_LEN / 2.0 + WALL_T)
     name_last_feature(adapter, "Tube")
+    drive_jobs += [(name_dimensions(adapter, "Tube", ["TubeLen"])[0], '"TubeLen"')]
     expected += V_TUBE
     await volume_check(adapter, "tube", expected, 0.01 * V_TUBE)
 
-    # Cross rod LAST: Top-plane on-axis circle extruded +Y across both arms.
+    # Reamed cross-hole through the turned body.  The physical press fit is
+    # represented by overlapping bodies: this cut removes the hole from the
+    # turned body before the separate rod body is created below.
+    hole = SketchDims()
+    check("create_sketch rod hole", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, ROD_HOLE_R, "rod hole", dims=hole,
+        names=("RodHoleCx", "RodHoleCz", "RodHoleDia"),
+        drives=(None, None, '"RodHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "rod-hole sketch")
+    check("exit_sketch rod hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodHoleProfile")
+    drive_jobs += hole.apply(adapter, "RodHoleProfile")
+    check(
+        "cut rod hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=GRIP_DIA + 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "RodHole")
+    expected -= V_ROD_HOLE
+    await volume_check(adapter, "rod hole", expected, 0.01 * V_ROD_HOLE)
+
+    # Cross rod LAST: Top-plane on-axis circle extruded +Y across both arms as
+    # a separate body, matching the released two-piece press-fit construction.
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Top"))
     await define_circle(
@@ -250,8 +299,16 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch rod", await adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
     drive_jobs += rod.apply(adapter, "RodProfile")
-    extrude_at_offset(adapter, ROD_DOWN + ROD_UP, -ROD_DOWN)
+    extrude_at_offset(
+        adapter,
+        ROD_DOWN + ROD_UP,
+        -ROD_DOWN,
+        merge_result=False,
+    )
     name_last_feature(adapter, "Rod")
+    drive_jobs += [
+        (name_dimensions(adapter, "Rod", ["RodSpan"])[0], '"RodDown" + "RodUp"')
+    ]
     await volume_check(adapter, "handle", V_TOTAL, 0.01 * V_ROD)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
@@ -262,10 +319,26 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven handle (equations neutral)", V_TOTAL, 0.01 * V_ROD)
 
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

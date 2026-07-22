@@ -1,11 +1,11 @@
 r"""Reproduction script: pinion engage lever (book ch. 25).
 
 The tapered rod that turns the lift rod (build_pinion_lift_rod.py) to
-swing the pinion into mesh: a cylindrical clamp HUB at the root grips
+swing the pinion into mesh: a cylindrical HUB at the root seats over
 the lift rod's front end (p.69 ``page002_img07``: a short fat cylinder
 with a slightly domed south cap -- NOT a ball, PR7 review item), the
-rod reaches up-and-out with a visible taper (Ø6 at the root thinning
-to ~Ø4 at the tip; the 86 length and taper both re-derived from img07
+rod reaches up-and-out with a visible taper (Ø4 at the root growing
+to ~Ø6 at the tip; the 86 length and taper both re-derived from img07
 against the annotated 6 mm rod). Standing up = disengaged, folded flat
 = engaged; the model carries the DISENGAGED rest pose.
 
@@ -44,6 +44,7 @@ from _common import (
     extrude_at_offset,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -52,21 +53,37 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from pinion_lever_spec import (
+    BORE,
+    CAP_SAG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    HUB_LEN,
+    HUB_OD,
+    ISOMETRIC_VIEW_NOTE,
+    ROD_LEN,
+    ROD_ROOT_DIA,
+    ROD_TIP_DIA,
+    ROD_Y0,
+    WALL_T,
+)
 
 PART_NAME = "pinion-lever"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
-
-ROD_ROOT_DIA = 4.0  # the rod is THINNER at the clamp hub (img07 re-read,
-# user review 2026-07-05: the first PR7 taper ran the wrong way)
-ROD_TIP_DIA = 6.0  # p.68 "6 mm" annotation reads at the fat grip end (high)
-ROD_LEN = 86.0  # hub centre to tip -- img07 @ 9.37 px/mm (med; the old 98
-# came from img08's perspective-inflated read, the old 72 from p002)
-HUB_OD = 13.0  # clamp hub cylinder, img07 (med)
-HUB_LEN = 10.0  # along the lift rod (z -5..+5)
-BORE = 6.35  # grips the Ø6.35 lift rod (derived)
-WALL_T = 2.0  # blind wall behind the bore (south end)
-CAP_SAG = 1.5  # domed south cap (img07's rounded face)
-ROD_Y0 = 3.5  # rod base above the hub centre: buried under the OD 6.5
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 ROD_ROOT_R = ROD_ROOT_DIA / 2.0
 ROD_TIP_R = ROD_TIP_DIA / 2.0
@@ -151,6 +168,12 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += barrel.apply(adapter, "BarrelProfile")
     extrude_at_offset(adapter, HUB_LEN - WALL_T, -HUB_LEN / 2.0 + WALL_T)
     name_last_feature(adapter, "Barrel")
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "Barrel", ["BoreDepth"])[0],
+            '"HubLen" - "WallT"',
+        )
+    ]
     expected = V_ANNULUS
     await volume_check(adapter, "barrel", expected, 0.005 * V_ANNULUS)
 
@@ -168,6 +191,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += wall.apply(adapter, "WallProfile")
     extrude_at_offset(adapter, WALL_T, -HUB_LEN / 2.0)
     name_last_feature(adapter, "Wall")
+    drive_jobs += [
+        (name_dimensions(adapter, "Wall", ["EndWall"])[0], '"WallT"')
+    ]
     expected += V_WALL
     await volume_check(adapter, "wall", expected, 0.005 * V_WALL)
 
@@ -302,10 +328,26 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven lever (equations neutral)", V_TOTAL, 0.01 * V_FRUSTUM)
 
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":
