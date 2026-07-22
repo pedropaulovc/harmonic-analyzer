@@ -48,7 +48,8 @@ def test_view_scales_are_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(2, 1)" in source
     assert "scale=(1, 1)" in source
-    assert gooseneck_clamp_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
+    assert gooseneck_clamp_spec.ISOMETRIC_VIEW_NOTE.startswith("ISOMETRIC VIEW SCALE 1:1")
+    assert "NOTE-4 SCREW HEAD" in gooseneck_clamp_spec.ISOMETRIC_VIEW_NOTE
 
 
 def test_part_stamps_make_critical_properties() -> None:
