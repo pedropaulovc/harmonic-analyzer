@@ -134,7 +134,7 @@ def test_shared_template_edge_break_is_metric_and_not_duplicated() -> None:
         "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
     )
     common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
-    assert "_replace_template_edge_break_note(adapter, ddoc)" in common_source
+    assert "_normalize_metric_edge_break_note(adapter, ddoc)" in common_source
     assert "REMOVE BURRS" not in pinion_bracket_spec.DRAWING_NOTES
 
 
@@ -160,4 +160,4 @@ def test_drawing_exports_pdf_before_view_only_reopen() -> None:
     )
     dirty_branch = common_source.index("if sheet_scale_dirty:", first_reopen)
     assert dirty_branch < persisted_pdf_export < second_reopen
-    assert "persisted-scale drawing save/export incomplete" in common_source
+    assert "PDF re-export after dirty-scale save failed" in common_source
