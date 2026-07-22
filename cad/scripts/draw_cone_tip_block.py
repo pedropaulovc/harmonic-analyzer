@@ -278,7 +278,11 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + BLOCK_X / 2.0 * _S + 0.018, _front_y(20.0)),
         datum="E",
         label="positive-X pinch-entry face",
-        position_tolerance_m=0.020,
+        # The tag is offset 18 mm off the +X edge (symbol_xy) to clear the
+        # crowded lane; keep the accepted placement error well below that gap so
+        # a SolidWorks snap-back onto the edge is caught rather than silently
+        # passing (a 20 mm tolerance admitted the full 18 mm collapse).
+        position_tolerance_m=0.010,
     )
     add_datum_feature(
         adapter,

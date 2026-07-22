@@ -60,7 +60,10 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     assert "MACHINE FROM CONTINUOUS-CAST ROUND STOCK" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert 'text="CRANK BORE <MOD-DIAM>10.025 +/-0.025 THRU"' in source
+    # The bore diameter is formatted from the model-owned CRANK_BORE_DIA
+    # constant (10.025), not a hard literal, so a spec change cannot ship a
+    # stale callout on the regenerated print.
+    assert 'text=f"CRANK BORE <MOD-DIAM>{CRANK_BORE_DIA:.3f} +/-0.025 THRU"' in source
     assert "note.SetBalloon(4, 0)" in source
     assert "UPPER PLAN (+X RIGHT, +Z DOWN)" in source
     assert "AXIS = LINE THROUGH P AND Q" in source

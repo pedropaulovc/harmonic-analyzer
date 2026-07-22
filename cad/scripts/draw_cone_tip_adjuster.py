@@ -30,6 +30,7 @@ from cone_tip_adjuster_spec import (
     BODY_DIA,
     BODY_LEN,
     CHAMFER as CHAMFER,
+    CUP_DEPTH,
     CUP_DIA,
     SLOT_W,
     THREAD,
@@ -76,7 +77,7 @@ DIMENSION_CALLOUTS = {
     "BodyDiaDim": f"{THREAD} UNC-2A",
     "BodyLenDim": "+/-0.10",
     "SlotWDim": "+/-0.10",
-    "CupDiaDim": "+0.05/-0.00 X 6.00 +/-0.10 DEEP",
+    "CupDiaDim": f"+0.05/-0.00 X {CUP_DEPTH:.2f} +/-0.10 DEEP",
 }
 
 

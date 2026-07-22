@@ -434,7 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         front,
-        text="CRANK BORE <MOD-DIAM>10.025 +/-0.025 THRU",
+        text=f"CRANK BORE <MOD-DIAM>{CRANK_BORE_DIA:.3f} +/-0.025 THRU",
         edge_xy=crank_xy,
         note_xy=(0.145, _front_y(CRANK_BORE_HEIGHT) + 0.025),
         label="crank-bore size",
