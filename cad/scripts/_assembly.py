@@ -30,8 +30,6 @@ from _common import (
     log,
     set_isometric_view,
 )
-from _interference_contracts import allowed_interference_pairs
-
 # The sprockets the chain seats on (the mounted T24 + crank T12 removables).
 # A chain link touching one of these is intended MESH, not a fault: the chain
 # rides the pitch circle so the links overlap the teeth in the shared z-plane
@@ -3032,7 +3030,10 @@ def save_assembly_in_place(
     log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, "
         f"warn={warn})")
 async def refresh_assembly(
-    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+    adapter: Any,
+    asm_name: str,
+    views: Iterable[str] = DEFAULT_VIEWS,
+    allowed_pairs: Mapping[frozenset[str], float] | None = None,
 ) -> dict[str, str]:
     """Reload an assembly's parts in place -- the cheap incremental rebuild.
 
@@ -3154,10 +3155,12 @@ async def refresh_assembly(
         # state. Reuse it across the read-only gates instead of paying two more
         # whole-model ForceRebuild3 calls (issue #326).
         assert_manifest_dof_state(adapter, asm_name, resolve=False)
-        check_no_interference(
-            adapter,
-            allowed_pairs=allowed_interference_pairs(asm_name),
-        )
+        # allowed_pairs is threaded in by the refresh ENTRYPOINT
+        # (refresh_assembly.py) rather than looked up here: importing
+        # _interference_contracts in this common helper would fold the press-fit
+        # contract module (and the pinion geometry constants it pulls in) into
+        # every assembly script's recipe closure (codex #359).
+        check_no_interference(adapter, allowed_pairs=allowed_pairs)
         assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)
     else:
         # No-op reload: the per-config rebuild-fault check above already ran

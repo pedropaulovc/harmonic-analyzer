@@ -37,7 +37,15 @@ def main() -> int:
     asm_name = sys.argv[1].removesuffix(".SLDASM").replace("_", "-")
 
     async def build(adapter):
-        artefacts = await refresh_assembly(adapter, asm_name)
+        # The press-fit allowance lookup lives HERE (the entrypoint dodo invokes,
+        # outside every assembly's recipe closure) so _interference_contracts and
+        # its pinion geometry imports invalidate only the builders that import
+        # them directly (codex #359).
+        from _interference_contracts import allowed_interference_pairs
+
+        artefacts = await refresh_assembly(
+            adapter, asm_name, allowed_pairs=allowed_interference_pairs(asm_name)
+        )
         if asm_name == "harmonic-analyzer":
             # The top assembly's eight-views gallery + parts-only BOM are not part
             # of the generic refresh tail; regenerate them on the still-open doc so
