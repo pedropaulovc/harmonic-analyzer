@@ -86,7 +86,7 @@ def test_datum_and_notes_control_the_journal_bore() -> None:
     assert 'characteristic="perpendicularity"' in source
     assert 'edge_xy=TOP_KEEP["BlockDia"]' in source
     assert 'entity_type="DIMENSION"' in source
-    assert "leader=False" in source
+    assert "leader=False" not in source
     assert drawing.DIMENSION_CALLOUTS["BlockDia"] == "+/-0.05"
     assert "add_surface_finish(" not in source
     assert "B IS COLUMN OD" in cone_pivot_post_spec.DRAWING_NOTES

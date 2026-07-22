@@ -405,7 +405,6 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="datum-B axis perpendicularity",
         entity_type="DIMENSION",
-        leader=False,
     )
     add_feature_control_frame(
         adapter,
