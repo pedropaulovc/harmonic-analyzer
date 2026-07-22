@@ -232,14 +232,14 @@ BOM_ISO_CENTER = (0.310, 0.165)
 # Sheet 3: three isolated subsystem views replace the black, overlapping gear
 # bands in the former full-assembly identification views.  Every exterior BOM
 # family appears in exactly one group and gets one deliberately attached balloon.
-EXTERIOR_VIEW_CENTERS = ((0.078, 0.150), (0.215, 0.150), (0.350, 0.150))
+EXTERIOR_VIEW_CENTERS = ((0.105, 0.150), (0.220, 0.150), (0.335, 0.150))
 EXTERIOR_VIEW_NAMES = ("*Isometric", "*Isometric", "*Isometric")
 EXTERIOR_VIEW_LABELS = (
     "VIEW A — CONE PLATFORM / GEAR TRAIN",
     "VIEW B — PINION ENGAGEMENT",
     "VIEW C — CYLINDER / CRANK",
 )
-EXTERIOR_VIEW_LABEL_ORIGINS = ((0.030, 0.235), (0.170, 0.235), (0.310, 0.235))
+EXTERIOR_VIEW_LABEL_ORIGINS = ((0.055, 0.235), (0.175, 0.235), (0.295, 0.235))
 EXTERIOR_VIEW_STEMS = (
     frozenset(
         {
@@ -349,7 +349,7 @@ BOM_COLUMN_WIDTHS = {
     "DESCRIPTION": 0.074,
     "QTY.": 0.012,
 }
-EXTERIOR_BALLOON_RING_MARGINS = (0.014, 0.014, 0.014)
+EXTERIOR_BALLOON_RING_MARGINS = (0.020, 0.014, 0.014)
 
 CONE_GEAR_SCHEDULE = tuple(
     (position, f"T{int(channel['cone_teeth']):03d}", int(channel["cone_teeth"]))
