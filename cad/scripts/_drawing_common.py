@@ -519,10 +519,12 @@ def add_feature_control_frame(
         "GetLeaderPointsAtIndex",
     )
     # A GTol inserted from a selected display dimension reports its association
-    # through IGtol.IsAttached/GetLeaderCount, not through the annotation's
-    # model-entity array.  Ordinary edge/silhouette attachments use both.
-    expected_entities = 0 if entity_type == "DIMENSION" else 1
-    if expected_entities == 1 and int(annotation.GetAttachedEntityCount3()) != 1:
+    # through IGtol.IsAttached/GetLeaderCount; whether the dimension ALSO lands
+    # in the annotation's model-entity array is flow-dependent (0 on the
+    # pre-merge insertion order, 1 on the current one), so accept either.
+    # Ordinary edge/silhouette attachments must register exactly one entity.
+    expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}
+    if entity_type != "DIMENSION" and int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
@@ -549,14 +551,15 @@ def add_feature_control_frame(
         raise RuntimeError(f"failed to position feature-control-frame leader ({label})")
     draw.EditRebuild3()
     if (
-        int(annotation.GetAttachedEntityCount3()) != expected_entities
+        int(annotation.GetAttachedEntityCount3()) not in expected_entities
         or not bool(gtol.IsAttached())
         or int(gtol.GetLeaderCount()) != 1
     ):
         raise RuntimeError(
             f"feature-control frame attachment mismatch ({label}): "
             f"entities={annotation.GetAttachedEntityCount3()}, "
-            f"expected={expected_entities}; "
+            f"expected in {sorted(expected_entities)}; "
+            f"attached={bool(gtol.IsAttached())}; "
             f"leaders={gtol.GetLeaderCount()}, expected=1"
         )
     if leader_attach_xy is not None:
