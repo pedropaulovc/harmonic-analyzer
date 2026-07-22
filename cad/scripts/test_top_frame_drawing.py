@@ -27,6 +27,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_notes_carry_the_pitch_rail_and_boss() -> None:
     notes = top_frame_spec.DRAWING_NOTES
     inspection = top_frame_spec.INSPECTION_NOTES
+    inspection_flat = " ".join(inspection.split())
     assert "GRAY-IRON" not in notes
     assert "ASTM A48" not in notes
     assert "GREEN ENAMEL" not in notes
@@ -42,16 +43,17 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "394.00 X 224.00" in notes
     assert "25.50 +0.05/0" in notes
     assert "POSITION <MOD-DIAM>0.20 A|B|C" in notes
-    assert "MAX-MIN RADIAL WALL THICKNESS" in inspection
-    assert "SHALL NOT EXCEED 0.10" in inspection
+    assert "MAX-MIN RADIAL WALL THICKNESS" in inspection_flat
+    assert "SHALL NOT EXCEED 0.10" in inspection_flat
     assert "SEE INSPECTION NOTES" in notes
-    assert "FIT LEAST-SQUARES CYLINDERS" in inspection
-    assert "AXIS OFFSET 0.05 MAX" in inspection
-    assert "8 EQUALLY SPACED AXIAL SECTIONS" in inspection
-    assert "GREATEST AXIS" in inspection
-    assert "SEPARATION AT EITHER END PLANE" in inspection
-    assert "64 OD POINTS" in inspection
-    assert "ADDITIONAL" in inspection and "NATIVE SIZE/POSITION CONTROLS" in inspection
+    assert "FIT LEAST-SQUARES CYLINDERS" in inspection_flat
+    assert "AXIS OFFSET 0.05 MAX" in inspection_flat
+    assert "8 EQUALLY SPACED AXIAL SECTIONS" in inspection_flat
+    assert "GREATEST AXIS" in inspection_flat
+    assert "SEPARATION AT EITHER END PLANE" in inspection_flat
+    assert "64 OD POINTS" in inspection_flat
+    assert "ADDITIONAL" in inspection_flat
+    assert "NATIVE SIZE/POSITION CONTROLS" in inspection_flat
     assert "DIMENSIONS/GD&T APPLY BEFORE COATING" in notes
     assert "TIR" not in notes
     assert "GOOSENECK BORE" in notes
