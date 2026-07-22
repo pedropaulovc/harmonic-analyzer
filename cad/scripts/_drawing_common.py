@@ -1249,6 +1249,86 @@ def new_project_drawing(
     return draw, sheet
 
 
+def create_blank_drawing_sheets(
+    adapter: Any, sheet_names: Sequence[str], *, label: str
+) -> None:
+    """Rename the initial blank sheet and duplicate it into a checked package."""
+    if not sheet_names or len(sheet_names) != len(set(sheet_names)):
+        raise ValueError(f"{label}: sheet names must be nonempty and unique")
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    sheet = ddoc.GetCurrentSheet()
+    if sheet is None:
+        raise RuntimeError(f"{label}: drawing template has no initial sheet")
+    initial_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if len(initial_names) != 1:
+        raise RuntimeError(
+            f"{label}: drawing template has {len(initial_names)} sheets, expected 1"
+        )
+    if next(iter_views(adapter), None) is not None:
+        raise RuntimeError(f"{label}: initial drawing sheet is not blank")
+    sheet.SetName(sheet_names[0])
+    renamed = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+    if renamed != sheet_names[0]:
+        raise RuntimeError(f"{label}: failed to rename initial sheet: {renamed!r}")
+
+    for previous_name, new_name in zip(sheet_names[:-1], sheet_names[1:], strict=True):
+        pasted_name = ""
+        for attempt in range(1, 4):
+            if not ddoc.ActivateSheet(previous_name):
+                raise RuntimeError(f"{label}: failed to activate {previous_name!r}")
+            before_names = tuple(
+                adapter._get_attr_or_call(ddoc, "GetSheetNames") or ()
+            )
+            draw.ClearSelection2(True)
+            if not draw.Extension.SelectByID2(
+                previous_name,
+                "SHEET",
+                0.0,
+                0.0,
+                0.0,
+                False,
+                0,
+                null_callout(),
+                0,
+            ):
+                raise RuntimeError(f"{label}: failed to select {previous_name!r}")
+            draw.EditCopy()
+            returned = bool(ddoc.PasteSheet(2, 2))
+            after_names = tuple(
+                adapter._get_attr_or_call(ddoc, "GetSheetNames") or ()
+            )
+            added = tuple(name for name in after_names if name not in before_names)
+            if len(after_names) == len(before_names) + 1 and len(added) == 1:
+                pasted_name = added[0]
+                if not returned:
+                    _telemetry.warn(
+                        f"{label}: PasteSheet returned false but created "
+                        f"{pasted_name!r}"
+                    )
+                break
+            _telemetry.warn(
+                f"{label}: PasteSheet attempt {attempt}/3 created no sheet "
+                f"(returned={returned!r}, before={before_names!r}, "
+                f"after={after_names!r})"
+            )
+        if not pasted_name:
+            raise RuntimeError(f"{label}: failed to duplicate {previous_name!r}")
+        if not ddoc.ActivateSheet(pasted_name):
+            raise RuntimeError(f"{label}: failed to activate {pasted_name!r}")
+        sheet = ddoc.GetCurrentSheet()
+        if sheet is None:
+            raise RuntimeError(f"{label}: pasted sheet has no ISheet")
+        sheet.SetName(new_name)
+        renamed = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+        if renamed != new_name:
+            raise RuntimeError(f"{label}: failed to rename sheet: {renamed!r}")
+
+    actual = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if actual != tuple(sheet_names):
+        raise RuntimeError(f"{label}: sheet order mismatch: {actual!r}")
+
+
 def _projection_symbol_centers(
     circle_specs: list[tuple[float, float]],
     line_x_pairs: list[tuple[float, float]],

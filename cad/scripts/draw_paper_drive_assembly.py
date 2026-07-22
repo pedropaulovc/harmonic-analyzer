@@ -19,11 +19,12 @@ from _assembly_drawing_bom import (
     configured_part_numbers,
     insert_identified_bom_table,
 )
-from _common import check, run_build
+from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_component_bom_balloons,
     add_auto_balloons_across_views,
+    create_blank_drawing_sheets,
     finalize_drawing,
     isolate_drawing_view_components,
     new_project_drawing,
@@ -57,6 +58,7 @@ PNG = OUTPUTS.png
 # orthographic views inside their own fields while remaining readable.
 SHEET_SCALE = (1.0, 5.0)
 VIEW_SCALE = (1, 5)
+SHEET_NAMES = ("GENERAL ASSEMBLY", "PARTS LIST AND ITEM IDENTIFICATION")
 
 # One BOM row per UNIQUE top-level component of build_paper_drive_assembly.py.
 # The clamp-/fillister-/bracket-screw seeds and BOTH roller-chain link stems
@@ -108,11 +110,14 @@ ASSEMBLY_NOTES = "\n".join(
 
 # The 1:5 orthographic fields retain 80 mm between centres; the isometric stays
 # in the right field above the title-block keep-out.
-FRONT_CENTER = (0.070, 0.145)
-RIGHT_CENTER = (0.170, 0.170)
-ISO_CENTER = (0.210, 0.105)
-ISO_VIEW_SCALE = (1, 9)
-BRACKET_DETAIL_CENTER = (0.100, 0.230)
+GENERAL_FRONT_CENTER = (0.080, 0.150)
+GENERAL_RIGHT_CENTER = (0.200, 0.150)
+GENERAL_ISO_CENTER = (0.320, 0.145)
+ID_FRONT_CENTER = (0.070, 0.145)
+ID_RIGHT_CENTER = (0.170, 0.200)
+ID_ISO_CENTER = (0.180, 0.070)
+ISO_VIEW_SCALE = (1, 7)
+BRACKET_DETAIL_CENTER = (0.085, 0.230)
 BRACKET_DETAIL_SCALE = (1, 4)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
@@ -145,6 +150,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(adapter, scale=SHEET_SCALE)
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="paper-drive drawing")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -157,14 +163,35 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate paper-drive general assembly sheet")
+    general_front = place_view(
+        adapter, str(SOURCE), "*Front", *GENERAL_FRONT_CENTER, scale=VIEW_SCALE
+    )
+    general_right = place_view(
+        adapter, str(SOURCE), "*Right", *GENERAL_RIGHT_CENTER, scale=VIEW_SCALE
+    )
+    general_iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *GENERAL_ISO_CENTER, scale=VIEW_SCALE
+    )
+    for view in (general_front, general_right, general_iso):
+        set_hidden_lines_removed(adapter, view)
+    if add_note(adapter, "SHEET 1 OF 2 — GENERAL ASSEMBLY", 0.018, 0.255) is None:
+        raise RuntimeError("failed to add paper-drive general assembly heading")
+    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
+        raise RuntimeError("failed to add paper-drive assembly notes")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate paper-drive parts-list sheet")
     front = place_view(
-        adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE
+        adapter, str(SOURCE), "*Front", *ID_FRONT_CENTER, scale=VIEW_SCALE
     )
     right = place_view(
-        adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
+        adapter, str(SOURCE), "*Right", *ID_RIGHT_CENTER, scale=VIEW_SCALE
     )
     iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
+        adapter, str(SOURCE), "*Isometric", *ID_ISO_CENTER, scale=ISO_VIEW_SCALE
     )
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -219,14 +246,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if add_note(adapter, "TRANSGEAR DETAIL", 0.020, 0.260) is None:
         raise RuntimeError("failed to label paper-drive transgear detail")
-    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
-        raise RuntimeError("failed to add paper-drive assembly notes")
+    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.120, 0.255) is None:
+        raise RuntimeError("failed to add paper-drive identification heading")
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Paper-Drive Assembly Drawing",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
     )
 
 
