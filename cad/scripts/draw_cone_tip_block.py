@@ -329,7 +329,9 @@ async def build(adapter: Any) -> dict[str, str]:
             FRONT_CENTER[0] + SLIT_W / 2.0 * _S,
             _front_y(BLOCK_HEIGHT - 4.0),
         ),
-        frame_xy=(0.170, 0.255),
+        # Below the y=0.245 row so the leader down to the slit edge never
+        # crosses the datum-D tag leader east of the plan-view depth text.
+        frame_xy=(0.170, 0.239),
         characteristic="position",
         tolerance="0.10",
         datums=("B",),
