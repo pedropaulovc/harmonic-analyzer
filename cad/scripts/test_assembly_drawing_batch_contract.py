@@ -178,7 +178,7 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
 
 def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
     source = Path(draw_drive_train_assembly.__file__).read_text(encoding="utf-8")
-    assert source.count("place_view(") == 9
+    assert source.count("place_view(") == 10
     assert "for view in exterior_views:" in source
     assert "set_hidden_lines_removed(adapter, view)" in source
     assert '"*Bottom"' in source

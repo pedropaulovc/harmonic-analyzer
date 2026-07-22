@@ -285,6 +285,8 @@ CONCEALED_HEADING_ORIGIN = (0.060, 0.255)
 # Sheet 5: three text columns, clear of the zone frame and title block.
 SETUP_NOTE_ORIGINS = ((0.018, 0.070), (0.158, 0.070), (0.300, 0.095))
 SETUP_HEADING_ORIGIN = (0.060, 0.255)
+SETUP_IDENTIFICATION_VIEW_CENTER = (0.365, 0.215)
+SETUP_IDENTIFICATION_VIEW_SCALE = (1, 8)
 BOM_COLUMN_WIDTHS = {
     "ITEM NO.": 0.014,
     "PART NUMBER": 0.025,
@@ -1097,6 +1099,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not ddoc.ActivateSheet(SHEET_NAMES[4]):
         raise RuntimeError("failed to activate setup-and-acceptance sheet")
+    place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *SETUP_IDENTIFICATION_VIEW_CENTER,
+        scale=SETUP_IDENTIFICATION_VIEW_SCALE,
+    )
     if add_note(
         adapter,
         "SHEET 5 OF 5 — SETUP AND ACCEPTANCE",
