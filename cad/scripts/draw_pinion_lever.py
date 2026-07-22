@@ -3,7 +3,7 @@ r"""Create the curated machinist drawing for the pinion engage lever.
 A clamp hub (Ø13 OD, Ø6.3675 bore) with a tapered grip rod (Ø4 at the hub to Ø6
 at the tip) rising 86 mm out of it.  The rod-revolve and hub sketches both live
 on the Front plane, so every marked dimension imports into the FRONT view; the
-longitudinal section controls the blind bore, end wall, and spherical crown.
+right-side view controls the blind bore, end wall, and spherical crown.
 
 Run with SolidWorks open::
 
@@ -25,7 +25,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     add_view_centerline,
-    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
@@ -49,6 +48,7 @@ from pinion_lever_spec import (
     ROD_Y0,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -95,8 +95,8 @@ FRONT_KEEP = {
     "RodTipY": (0.044, 0.170),
 }
 RIGHT_KEEP = {
-    "BoreDepth": (0.225, 0.145),
-    "EndWall": (0.235, 0.165),
+    "BoreDepth": (0.245, 0.105),
+    "EndWall": (0.235, 0.190),
 }
 DIMENSION_CALLOUTS = {
     "HubBore": "NOMINAL REF\n6.360 MIN / 6.375 MAX\nRa 1.6",
@@ -151,23 +151,14 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_visible(adapter, front)
     hub_center = (FRONT_CENTER[0], _front_y(0.0))
-    section = create_section_view(
-        adapter,
-        front,
-        line_start=(FRONT_CENTER[0], hub_center[1] - 0.011),
-        line_end=(FRONT_CENTER[0], hub_center[1] + 0.018),
-        view_xy=SECTION_CENTER,
-        section_label="A",
-        scale=(1, 1),
-        label="lever longitudinal hub section",
-    )
-    set_hidden_lines_removed(adapter, section)
+    side = place_view(adapter, str(SOURCE), "*Right", *SECTION_CENTER, scale=(1, 1))
+    set_hidden_lines_visible(adapter, side)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     right_annotations = curate_view_dimensions(
-        adapter, section, keep=RIGHT_KEEP, view_label="section"
+        adapter, side, keep=RIGHT_KEEP, view_label="side"
     )
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
@@ -178,12 +169,11 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_top = (hub_center[0], hub_center[1] + BORE_R_SHEET)
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
     z_max = HUB_LEN / 2.0
-    flat_face_radius = (BORE + HUB_OD) / 4.0
-    flat_face = model_point_in_view(
+    flat_edge = model_point_in_view(
         adapter,
-        section,
-        (0.0, flat_face_radius / 1000.0, z_max / 1000.0),
-        label="lever flat end face",
+        side,
+        (0.0, HUB_OD / 2000.0, z_max / 1000.0),
+        label="lever flat end-face outline",
     )
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
     add_datum_feature(
@@ -196,12 +186,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_datum_feature(
         adapter,
-        section,
-        edge_xy=flat_face,
-        symbol_xy=(flat_face[0] - 0.025, flat_face[1]),
+        side,
+        edge_xy=flat_edge,
+        symbol_xy=(flat_edge[0] - 0.025, flat_edge[1]),
         datum="B",
         label="lever flat end face",
-        entity_type="FACE",
+        entity_type="SILHOUETTE",
     )
     add_feature_control_frame(
         adapter,
@@ -215,25 +205,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        section,
-        edge_xy=flat_face,
+        side,
+        edge_xy=flat_edge,
         frame_xy=(0.235, 0.150),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
         label="lever flat-face perpendicularity",
-        entity_type="FACE",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=grip_edge,
-        frame_xy=(0.115, 0.255),
-        characteristic="profile_surface",
-        tolerance="0.10",
-        datums=("A", "B"),
-        quantity="GRIP PROFILE",
-        label="lever grip profile",
         entity_type="SILHOUETTE",
     )
     add_view_centerline(
@@ -246,10 +224,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         text=(
-            "STRAIGHT CONICAL GRIP PROFILE\n"
-            f"<MOD-DIAM>{ROD_ROOT_DIA:.2f}+/-0.05 AT BASIC {ROD_Y0:.2f}\n"
-            "FROM HUB AXIS\n"
-            f"<MOD-DIAM>{ROD_TIP_DIA:.2f}+/-0.05 AT TIP"
+            "STRAIGHT CONICAL GRIP\n"
+            f"<MOD-DIAM>{ROD_ROOT_DIA:.2f}+/-0.05 AT {ROD_Y0:.2f}+/-0.10\n"
+            f"FROM HUB AXIS; <MOD-DIAM>{ROD_TIP_DIA:.2f}+/-0.05 AT TIP\n"
+            "TIP FACE FLAT; SQUARE TO A WITHIN 0.10 TIR"
         ),
         entity_xy=grip_edge,
         note_xy=(0.078, 0.235),
@@ -258,16 +236,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     crown_edge = model_point_in_view(
         adapter,
-        section,
+        side,
         (0.0, HUB_OD / 2000.0, -HUB_LEN / 2000.0),
         label="lever spherical crown root",
     )
     add_attached_note(
         adapter,
-        section,
+        side,
         text=(
             f"SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10\n"
-            f"{HUB_LEN:.2f}+/-0.10 B TO CROWN ROOT PLANE\n"
+            f"{HUB_LEN:.2f} REF B TO CROWN ROOT PLANE\n"
             f"{HUB_LEN + CAP_SAG:.2f} REF B TO APEX"
         ),
         entity_xy=crown_edge,
@@ -277,18 +255,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        section,
+        side,
         edge_xy=crown_edge,
         frame_xy=(0.315, 0.205),
-        characteristic="profile_surface",
-        tolerance="0.10",
-        datums=("A", "B"),
+        characteristic="circular_runout",
+        tolerance="0.05",
+        datums=("A",),
         quantity="CROWN",
         label="lever crown profile",
         entity_type="SILHOUETTE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_note(adapter, "RIGHT-SIDE VIEW - HIDDEN LINES SHOWN", 0.155, 0.095)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.085)
 
     return await finalize_drawing(

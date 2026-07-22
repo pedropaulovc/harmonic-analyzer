@@ -54,11 +54,13 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" in source
+    assert "add_feature_control_frame(" in source
     assert "add_surface_finish(" not in source
     assert "4.020 MAX / 4.012 MIN" in drawing.DIMENSION_CALLOUTS["PinDia"]
-    assert "ISO 286-2" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert "NOMINAL REF ONLY" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert "ISO 286-2" not in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert "EXEMPT FROM TITLE-BLOCK EDGE-BREAK" in pinion_cam_pin_spec.DRAWING_NOTES
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

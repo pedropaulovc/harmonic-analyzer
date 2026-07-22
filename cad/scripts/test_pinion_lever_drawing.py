@@ -45,7 +45,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "SPHERICAL CROWN" in source
-    assert 'quantity="GRIP PROFILE"' in source
+    assert "TIP FACE FLAT; SQUARE TO A" in source
     assert "GRIP PROFILE; BASIC AXIS" not in source
     assert "BLIND BORE BOTTOM" in notes
     assert "DATUM A" in notes and "DATUM B" in notes
@@ -62,19 +62,19 @@ def test_lever_drive_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "AT ASSEMBLY" not in notes
     assert "LIFT ROD" not in notes
-    assert "GRIP AXIS: BASIC 5.00 FROM B" in normalized
-    assert "BASIC 90 DEG TO A" in normalized
+    assert "GRIP AXIS: 5.00+/-0.10 FROM B" in normalized
+    assert "90+/-0.5 DEG TO A" in normalized
+    assert "EXEMPT FROM THE TITLE-BLOCK EDGE-BREAK" in normalized
 
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 4
-    assert source.count('entity_type="SILHOUETTE"') == 4
-    assert source.count('entity_type="FACE"') == 2
-    assert 'characteristic="profile_surface"' in source
-    assert 'datums=("A", "B")' in source
+    assert source.count("add_feature_control_frame(") == 3
+    assert source.count('entity_type="SILHOUETTE"') == 5
+    assert source.count('entity_type="FACE"') == 0
+    assert 'characteristic="circular_runout"' in source
     assert "add_surface_finish(" not in source
     assert "6.360 MIN / 6.375 MAX" in drawing.DIMENSION_CALLOUTS["HubBore"]
     assert "Ra 1.6" in drawing.DIMENSION_CALLOUTS["HubBore"]
@@ -84,13 +84,14 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "<MOD-DIAM>{ROD_ROOT_DIA:.2f}" in source
     assert "<MOD-DIAM>{ROD_TIP_DIA:.2f}" in source
     assert "{ROD_Y0:.2f}" in source
-    assert "{HUB_LEN:.2f}+/-0.10" in source
+    assert "{HUB_LEN:.2f} REF" in source
     assert "{HUB_LEN + CAP_SAG:.2f} REF" in source
-    assert "create_section_view(" in source
+    assert "create_section_view(" not in source
+    assert 'place_view(adapter, str(SOURCE), "*Right"' in source
+    assert "set_hidden_lines_visible(adapter, side)" in source
     assert source.count("model_point_in_view(") == 2
     assert "ModelToViewTransform" in common_source
-    assert "flat_face_radius = (BORE + HUB_OD) / 4.0" in source
-    assert "(0.0, flat_face_radius / 1000.0, z_max / 1000.0)" in source
+    assert "(0.0, HUB_OD / 2000.0, z_max / 1000.0)" in source
     assert "section_hub_y" not in source
     assert 'sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")' in common_source
     assert "segment = sketch_manager.CreateLine(" in common_source

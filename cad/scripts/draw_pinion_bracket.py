@@ -23,6 +23,8 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -116,7 +118,7 @@ DIMENSION_CALLOUTS = {
         "NOMINAL REF\nH7: 4.012 MAX / 4.000 MIN\nBLIND; FLAT BOTTOM\n"
         f"{PIN_SEAT:.2f} +0.10/-0.00 DEEP\nDRILL FROM LEFT EDGE SHOWN"
     ),
-    "PinSeatCz": "+/-0.05 FROM EITHER BROAD FACE",
+    "PinSeatCz": "+/-0.05 FROM DATUM C",
 }
 
 
@@ -187,6 +189,55 @@ async def build(adapter: Any) -> dict[str, str]:
     for view, label in ((front, "front"), (right, "right")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
+
+    pivot_bore_edge = (_front_x(0.0), _front_y(0.0) - PIVOT_R_SHEET)
+    arbor_bore_edge = (_front_x(0.0), _front_y(C2C) + ARBOR_R_SHEET)
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=pivot_bore_edge,
+        symbol_xy=(pivot_bore_edge[0] + 0.026, pivot_bore_edge[1] - 0.009),
+        datum="A",
+        label="pivot bore axis",
+    )
+    add_datum_feature(
+        adapter,
+        front,
+        edge_xy=arbor_bore_edge,
+        symbol_xy=(arbor_bore_edge[0] + 0.020, arbor_bore_edge[1] + 0.017),
+        datum="B",
+        label="arbor bore axis",
+    )
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=(RIGHT_CENTER[0] - HALF_THICK_SHEET, RIGHT_CENTER[1]),
+        symbol_xy=(RIGHT_CENTER[0] - HALF_THICK_SHEET - 0.020, RIGHT_CENTER[1]),
+        datum="C",
+        label="left broad face",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(_front_x(0.0), _front_y(-R_END)),
+        frame_xy=(0.048, 0.082),
+        characteristic="circular_runout",
+        tolerance="0.05",
+        datums=("A",),
+        quantity="LOWER R9 ARC",
+        label="lower end-arc runout",
+    )
+    add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=(_front_x(0.0), _front_y(C2C + R_END)),
+        frame_xy=(0.060, 0.224),
+        characteristic="circular_runout",
+        tolerance="0.05",
+        datums=("B",),
+        quantity="UPPER R9 ARC",
+        label="upper end-arc runout",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.178)

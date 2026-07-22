@@ -100,13 +100,18 @@ def test_blind_seat_depth_uses_the_marked_drawing_name() -> None:
     assert 'name_dimensions(adapter, "PinSeat", ["PinSeatDepth"])' in source
 
 
-def test_direct_limits_replace_ambiguous_datum_scheme() -> None:
+def test_datum_scheme_fully_defines_functional_relationships() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" not in source
-    assert "add_feature_control_frame(" not in source
+    assert source.count("add_datum_feature(") == 3
+    assert source.count("add_feature_control_frame(") == 2
+    assert source.count('characteristic="circular_runout"') == 2
+    assert 'datums=("A",)' in source
+    assert 'datums=("B",)' in source
     assert "add_surface_finish(" not in source
     assert drawing.DIMENSION_CALLOUTS["ArborBoreCz"] == "+/-0.10"
-    assert "BROAD FACE" in drawing.DIMENSION_CALLOUTS["PinSeatCz"]
+    assert drawing.DIMENSION_CALLOUTS["PinSeatCz"] == "+/-0.05 FROM DATUM C"
+    assert "CONCENTRIC" not in pinion_bracket_spec.DRAWING_NOTES
+    assert "TIR" not in pinion_bracket_spec.DRAWING_NOTES
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
