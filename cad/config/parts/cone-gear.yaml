@@ -1,6 +1,14 @@
 cone-gear:
   number: MHA-013
   material: Brass
+  material_specification: C36000 free-machining brass
+  # The four cone-tip gears (T006-T024) are a harder high-zinc yellow metal in
+  # the source machine (dimensions.yaml ch.12 p.21: Muntz metal / manganese
+  # bronze, chosen because the finest teeth wear most). Manufacturing spec for
+  # them; the title-block material above covers T030-T120 only.
+  material_tip_specification: C67500 manganese bronze
+  finish: gear teeth cut; polished brass
+  quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
   process: "gear cutting (hob/shaper)"

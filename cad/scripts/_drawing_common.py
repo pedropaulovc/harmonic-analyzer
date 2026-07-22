@@ -264,9 +264,10 @@ def _select_view_entity(
     adapter: Any,
     view: Any,
     entity_type: str,
-    xy: tuple[float, float],
+    xy: tuple[float, float] | None,
     *,
     label: str,
+    entity: Any | None = None,
 ) -> Any:
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -274,7 +275,13 @@ def _select_view_entity(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
     draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
+    if entity is not None:
+        selected = view.SelectEntity(entity, False)
+        if not selected:
+            raise RuntimeError(f"failed to select {label} {entity_type.lower()}")
+    elif xy is None:
+        raise ValueError(f"{label} requires either a sheet pick or an entity")
+    elif not draw.Extension.SelectByID2(
         "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(
@@ -293,27 +300,33 @@ def add_datum_feature(
     adapter: Any,
     view: Any,
     *,
-    edge_xy: tuple[float, float],
+    edge_xy: tuple[float, float] | None = None,
     symbol_xy: tuple[float, float],
     datum: str,
     label: str,
     entity_type: str = "EDGE",
+    entity: Any | None = None,
+    shoulder: bool = False,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
-    _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
+    _select_view_entity(
+        adapter, view, entity_type, edge_xy, label=label, entity=entity
+    )
     draw = adapter.currentModel
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
     tag = _sw_type_info.early_bound_or_flag(
-        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel"
+        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel", "Shoulder"
     )
     if not tag.SetLabel(datum):
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
+    if shoulder:
+        tag.Shoulder = True
     annotation = _sw_type_info.early_bound_or_flag(
         tag.GetAnnotation(), "IAnnotation", "SetPosition2"
     )
@@ -351,7 +364,7 @@ def add_feature_control_frame(
     adapter: Any,
     view: Any,
     *,
-    edge_xy: tuple[float, float],
+    edge_xy: tuple[float, float] | None = None,
     frame_xy: tuple[float, float],
     characteristic: str,
     tolerance: str,
@@ -361,13 +374,16 @@ def add_feature_control_frame(
     all_around: bool = False,
     label: str,
     entity_type: str = "EDGE",
+    entity: Any | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
-    edge = _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
+    edge = _select_view_entity(
+        adapter, view, entity_type, edge_xy, label=label, entity=entity
+    )
     draw = adapter.currentModel
     gtol = draw.InsertGtol()
     if gtol is None:
@@ -491,6 +507,7 @@ def add_surface_finish(
     roughness_ra: str,
     label: str,
     entity_type: str = "EDGE",
+    entity: Any | None = None,
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
 
@@ -510,10 +527,14 @@ def add_surface_finish(
             selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
         if not selected:
             raise RuntimeError(f"failed to select {label} edge entity in drawing view")
-    elif edge_xy is not None:
-        _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
+    elif edge_xy is not None or entity is not None:
+        _select_view_entity(
+            adapter, view, entity_type, edge_xy, label=label, entity=entity
+        )
     else:
-        raise ValueError(f"surface finish {label} requires edge_xy or edge_entity")
+        raise ValueError(
+            f"surface finish {label} requires edge_xy, entity, or edge_entity"
+        )
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
         _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT

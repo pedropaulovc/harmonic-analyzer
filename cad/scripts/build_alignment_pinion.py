@@ -48,7 +48,13 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _gear import build_fixed_gear
+from alignment_pinion_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, GEAR_DATA
 from build_cone_gear import DP  # DP = train diametral_pitch (machine.yaml)
 
 PART_NAME = "alignment-pinion"
@@ -125,6 +131,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+
+    # Mark the arbor bore as the manufacturing model dimension and stamp the
+    # title-block + gear-data properties the curated drawing requires.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 
