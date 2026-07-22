@@ -174,5 +174,7 @@ def test_drive_train_adds_an_isolated_bottom_view_for_enclosed_bom_items() -> No
     assert "_isolate_bottom_balloon_components(adapter, bottom)" in source
     assert source.count("insert_identified_bom_table(") == 1
     assert "part_numbers=BOM_PART_NUMBERS" in source
-    assert source.count("add_auto_balloons_across_views(") == 1
+    assert source.count("_add_drive_train_balloons(") == 2
     assert "adapter, (front, right, iso, bottom)" in source
+    assert "HorizontalAutoSplit(" in source
+    assert "_format_drive_train_bom(adapter, bom_table)" in source

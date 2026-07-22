@@ -101,7 +101,7 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
 def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
-    assert source.count("add_auto_balloons_across_views(") == 1
+    assert source.count("_add_drive_train_balloons(") == 2
     assert 'configuration_grouping="same-part"' in source
     assert "adapter, (front, right, iso, bottom)" in source
     assert source.count("add_note(") == 1
@@ -119,6 +119,10 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert 'drawing_name.rsplit("/", 1)[-1].casefold()' in source
     assert 'identity.startswith(f"{stem}-")' in source
     assert "enumerated drawing components" in source
+    assert "HorizontalAutoSplit(" in source
+    assert drawing.BOM_ROWS_PER_SECTION == 12
+    assert sum(drawing.BOM_COLUMN_WIDTHS.values()) == 0.125
+    assert drawing.BALLOON_RING_MARGINS == (0.030, 0.014, 0.014, 0.014)
     assert "T006-T120" in drawing.ASSEMBLY_NOTES
     assert "CONE PLATFORM ENGAGED" in drawing.ASSEMBLY_NOTES
     assert all(

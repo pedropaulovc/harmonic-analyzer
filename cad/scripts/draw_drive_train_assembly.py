@@ -23,7 +23,9 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_auto_balloons_across_views,
+    _balloon_item_number,
+    _create_auto_balloons,
+    _spread_balloons,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -122,16 +124,109 @@ ASSEMBLY_NOTES = "\n".join(
     )
 )
 
-# Three-view centers carried over from summing/pen: front and right left-shifted
-# to open the right-view/iso gap, iso to the right of them, BOM anchored top-
-# right above the title block. The ~30-row BOM grows DOWNWARD from the anchor.
-FRONT_CENTER = (0.060, 0.150)
-RIGHT_CENTER = (0.130, 0.150)
-ISO_CENTER = (0.225, 0.140)
-BOTTOM_CENTER = (0.170, 0.078)
-# Top-left BOM anchor, top-right of the sheet above the title block, bounded by
-# the sheet ZONE band (0.2667); refined against the render.
-BOM_ANCHOR = (0.248, 0.265)
+# The 32-row BOM is split into three compact sections across the sheet top;
+# four views and their balloons occupy the open field below it.
+FRONT_CENTER = (0.055, 0.135)
+RIGHT_CENTER = (0.150, 0.135)
+ISO_CENTER = (0.235, 0.135)
+BOTTOM_CENTER = (0.225, 0.085)
+BOM_ANCHOR = (0.020, 0.265)
+BOM_ROWS_PER_SECTION = 12
+BOM_COLUMN_WIDTHS = {
+    "ITEM NO.": 0.014,
+    "PART NUMBER": 0.025,
+    "DESCRIPTION": 0.074,
+    "QTY.": 0.012,
+}
+BOM_HEADER_HEIGHT = 0.006
+BOM_ROW_HEIGHT = 0.005
+BALLOON_RING_MARGINS = (0.030, 0.014, 0.014, 0.014)
+
+
+@_telemetry.traced("drawing.format_drive_train_bom")
+def _format_drive_train_bom(adapter: Any, table: Any) -> None:
+    """Fit the 32-item BOM as three readable sections across the sheet top."""
+    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    header = [
+        str(table.DisplayedText2(0, column, False) or "").strip().upper()
+        for column in range(columns)
+    ]
+    if set(header) != set(BOM_COLUMN_WIDTHS):
+        raise RuntimeError(f"unexpected drive-train BOM columns: {header!r}")
+
+    for column, title in enumerate(header):
+        requested = BOM_COLUMN_WIDTHS[title]
+        actual = float(table.SetColumnWidth(column, requested, 0))
+        if abs(actual - requested) > 0.0005:
+            raise RuntimeError(
+                f"drive-train BOM column {title!r} width {actual:.4f} m "
+                f"does not match requested {requested:.4f} m"
+            )
+
+    for row in range(rows):
+        requested = BOM_HEADER_HEIGHT if row == 0 else BOM_ROW_HEIGHT
+        actual = float(table.SetRowHeight(row, requested, 0))
+        if actual > requested + 0.0005:
+            raise RuntimeError(
+                f"drive-train BOM row {row} height {actual:.4f} m exceeds "
+                f"requested {requested:.4f} m"
+            )
+
+    split_tables = table.HorizontalAutoSplit(
+        BOM_ROWS_PER_SECTION,
+        0,  # swHorizontalAutoSplitApply_ThisTimeOnly
+        0,  # swHorizontalAutoSplitPlacementOfSplitTable_NextToLastSplit
+    )
+    if not split_tables:
+        raise RuntimeError("drive-train BOM did not split into sheet-width sections")
+    pieces = tuple(split_tables)
+    if len(pieces) not in (2, 3):
+        raise RuntimeError(
+            f"drive-train BOM returned {len(pieces)} split-table objects, expected 3"
+        )
+    adapter.currentModel.EditRebuild3()
+    _telemetry.success(
+        f"drive-train BOM split at {BOM_ROWS_PER_SECTION} rows into 3 sections"
+    )
+
+
+@_telemetry.traced("drawing.drive_train_balloons")
+def _add_drive_train_balloons(
+    adapter: Any, views: tuple[Any, ...], *, expected: int, label: str
+) -> list[Any]:
+    """Cover the BOM across four views with a larger front-view balloon ring."""
+    if len(views) != len(BALLOON_RING_MARGINS):
+        raise ValueError("drive-train view and balloon-margin counts differ")
+    all_balloons: list[Any] = []
+    item_numbers: set[str] = set()
+    for index, (view, margin) in enumerate(
+        zip(views, BALLOON_RING_MARGINS, strict=True), start=1
+    ):
+        view_label = f"{label} view {index}"
+        balloons = _create_auto_balloons(
+            adapter, view, label=view_label, allow_empty=True
+        )
+        if not balloons:
+            continue
+        _spread_balloons(adapter, view, balloons, margin=margin)
+        for note in balloons:
+            item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
+        all_balloons.extend(balloons)
+
+    expected_numbers = {str(item) for item in range(1, expected + 1)}
+    missing = sorted(expected_numbers - item_numbers, key=int)
+    unexpected = sorted(item_numbers - expected_numbers)
+    if missing or unexpected:
+        raise RuntimeError(
+            f"{label}: balloon item coverage mismatch; missing={missing}, "
+            f"unexpected={unexpected}, seen={sorted(item_numbers)}"
+        )
+    adapter.currentModel.EditRebuild3()
+    _telemetry.success(
+        f"{label}: {len(all_balloons)} balloons cover all {expected} BOM items"
+    )
+    return all_balloons
 
 
 def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
@@ -260,7 +355,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, bottom)
     _isolate_bottom_balloon_components(adapter, bottom)
 
-    insert_identified_bom_table(
+    bom_table = insert_identified_bom_table(
         adapter,
         front,
         anchor_xy=BOM_ANCHOR,
@@ -269,11 +364,12 @@ async def build(adapter: Any) -> dict[str, str]:
         configuration_grouping="same-part",
         label="drive-train assembly",
     )
+    _format_drive_train_bom(adapter, bom_table)
     # The lower platform and fastener families are occluded in the front/right
     # pair and behind the gear ladders in the pictorial.  The bottom projection
     # exposes those remaining BOM identities rather than accepting an
     # incomplete balloon set.
-    add_auto_balloons_across_views(
+    _add_drive_train_balloons(
         adapter, (front, right, iso, bottom), expected=len(BOM_COMPONENTS),
         label="drive-train assembly balloons",
     )
