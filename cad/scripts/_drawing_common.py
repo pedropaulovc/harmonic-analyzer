@@ -22,7 +22,6 @@ from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
     LayoutElement,
-    LeaderCrossing,
     LeaderSegment,
     audit_layout,
     format_findings,
@@ -38,7 +37,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     iter_views,
     new_drawing,
-    remove_notes_matching,
+    remove_notes_matching as remove_notes_matching,
     save_drawing,
     set_units_mm,
     view_name,
@@ -49,6 +48,11 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 # free-standing layout element (the general-notes block, schedule cells). Tables
 # are enumerated separately via IView.GetTableAnnotations.
 _ANNOT_NOTE = 6
+# swInsertAnnotation_e flags used by the curated model-item import. Hole Wizard
+# placement dimensions live on an absorbed sketch and require their dedicated
+# flag; MarkedForDrawing alone does not make them importable.
+_INSERT_DIMS_MARKED = 0x8000
+_INSERT_HOLE_WIZARD_LOCATION_DIMS = 0x20000
 
 # swAnnotationType_e for the native GD&T symbols the recipes place at explicit
 # sheet coordinates (datum tags, feature-control frames, surface-finish symbols).
@@ -120,7 +124,7 @@ _OLD_EDGE_BREAK_NOTE = (
     "REMOVE BURRS AND BREAK SHARP EDGES R.01 OR CHAMFER .01 MAX"
 )
 _METRIC_EDGE_BREAK_NOTE = (
-    "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
+    "REMOVE BURRS; BREAK SHARP EDGES R0.25 MAX OR 0.25 MAX X 45 DEG"
 )
 
 # swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
@@ -222,6 +226,7 @@ _GTOL_SYMBOLS = {
     "position": "GTOL-POSI",
     "profile_surface": "GTOL-SPROF",
     "perpendicularity": "GTOL-PERP",
+    "straightness": "GTOL-STRAIGHT",
 }
 
 
@@ -307,16 +312,29 @@ def add_datum_feature(
     entity_type: str = "EDGE",
     entity: Any | None = None,
     shoulder: bool = False,
+    annotation: Any | None = None,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
-    _select_view_entity(
-        adapter, view, entity_type, edge_xy, label=label, entity=entity
-    )
     draw = adapter.currentModel
+    if annotation is None:
+        _select_view_entity(
+            adapter, view, entity_type, edge_xy, label=label, entity=entity
+        )
+    else:
+        ddoc = _early_bound(draw, "IDrawingDoc")
+        name = view_name(adapter, view)
+        if not ddoc.ActivateView(name):
+            raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+        draw.ClearSelection2(True)
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "Select2"
+        )
+        if not annotation.Select2(False, 0):
+            raise RuntimeError(f"failed to select {label} dimension annotation")
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
@@ -337,26 +355,6 @@ def add_datum_feature(
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return tag
-
-
-@_telemetry.traced("drawing.centerline", label_param="label")
-def add_view_centerline(
-    adapter: Any,
-    view: Any,
-    *,
-    face_xy: tuple[float, float],
-    label: str,
-) -> Any:
-    """Insert the axis centerline of a cylindrical face seen side-on in a view."""
-    _select_view_entity(adapter, view, "FACE", face_xy, label=label)
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    centerline = ddoc.InsertCenterLine2()
-    if centerline is None:
-        raise RuntimeError(f"failed to insert centerline ({label})")
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    return centerline
 
 
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
@@ -508,6 +506,7 @@ def add_surface_finish(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    production_method: str = "",
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
 
@@ -558,10 +557,16 @@ def add_surface_finish(
     )
     if not symbol.SetText(8, f"Ra {roughness_ra}"):  # current-profile roughness value
         raise RuntimeError(f"failed to set Ra {roughness_ra} ({label})")
+    if production_method and not symbol.SetText(2, production_method):
+        raise RuntimeError(
+            f"failed to set surface target {production_method!r} ({label})"
+        )
     if int(symbol.GetSymbol()) != 1:
         raise RuntimeError(f"surface-finish symbol type did not persist ({label})")
     if str(symbol.GetText(8) or "").strip() != f"Ra {roughness_ra}":
         raise RuntimeError(f"surface-finish roughness did not persist ({label})")
+    if production_method and str(symbol.GetText(2) or "").strip() != production_method:
+        raise RuntimeError(f"surface target did not persist ({label})")
     annotation = _sw_type_info.early_bound_or_flag(
         symbol.GetAnnotation(), "IAnnotation", "SetPosition2", "SetLeader3"
     )
@@ -592,8 +597,9 @@ def add_view_centerline(
     adapter: Any,
     view: Any,
     *,
-    face_xy: tuple[float, float],
+    face_xy: tuple[float, float] | None = None,
     label: str,
+    face: Any | None = None,
 ) -> Any:
     """Insert the axis centerline of a cylindrical face shown in ``view``.
 
@@ -605,7 +611,9 @@ def add_view_centerline(
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    _select_view_entity(adapter, view, "FACE", face_xy, label=label)
+    _select_view_entity(
+        adapter, view, "FACE", face_xy, label=label, entity=face
+    )
     centerline = adapter._attempt(lambda: ddoc.InsertCenterLine2())
     if centerline is None:
         raise RuntimeError(f"failed to insert view centerline ({label})")
@@ -683,9 +691,10 @@ def add_native_hole_callout(
     adapter: Any,
     view: Any,
     *,
-    edge_xy: tuple[float, float],
+    edge_xy: tuple[float, float] | None = None,
     callout_xy: tuple[float, float],
     label: str,
+    edge: Any | None = None,
 ) -> Any:
     """Insert an associative Hole Wizard callout on a selected drawing edge.
 
@@ -697,7 +706,9 @@ def add_native_hole_callout(
     True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
     callout still prints the bare nominal.
     """
-    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label)
+    _select_view_entity(
+        adapter, view, "EDGE", edge_xy, label=label, entity=edge
+    )
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     display = ddoc.AddHoleCallout2(callout_xy[0], callout_xy[1], 0.0)
@@ -866,6 +877,7 @@ def new_project_drawing(
         height=ASME_B_HEIGHT_M,
     )
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    _assert_third_angle_projection_symbol(draw, ddoc)
     # A hand-saved template can be saved while in Edit Sheet Format mode (it
     # was, the day the title block was drawn) -- a drawing created from it then
     # opens with the FORMAT layer active, where every pick lands on the sheet
@@ -894,6 +906,97 @@ def new_project_drawing(
     draw.ForceRebuild3(False)
     draw.EditRebuild3()
     return draw, sheet
+
+
+def _projection_symbol_centers(
+    circle_specs: list[tuple[float, float]],
+    line_x_pairs: list[tuple[float, float]],
+) -> tuple[float, float]:
+    """Return ``(frustum_x, circle_x)`` for the standard projection symbol."""
+    if len(circle_specs) != 2:
+        raise RuntimeError(
+            f"projection symbol must contain two concentric circles, got {len(circle_specs)}"
+        )
+    circle_xs = [center_x for center_x, _radius in circle_specs]
+    if max(circle_xs) - min(circle_xs) > 1e-9:
+        raise RuntimeError(f"projection-symbol circles are not concentric: {circle_xs}")
+    circle_x = sum(circle_xs) / len(circle_xs)
+    outer_radius = max(radius for _center_x, radius in circle_specs)
+    frustum_lines = [
+        pair
+        for pair in line_x_pairs
+        if max(abs(pair[0] - circle_x), abs(pair[1] - circle_x))
+        > outer_radius * 1.5
+    ]
+    if len(frustum_lines) != 6:
+        raise RuntimeError(
+            "projection symbol must contain four circle-group entities and six "
+            f"frustum entities; found {len(line_x_pairs) - len(frustum_lines) + 2} "
+            f"and {len(frustum_lines)}"
+        )
+    frustum_xs = [x for pair in frustum_lines for x in pair]
+    frustum_x = (min(frustum_xs) + max(frustum_xs)) / 2.0
+    return frustum_x, circle_x
+
+
+def _assert_third_angle_order(frustum_x: float, circle_x: float) -> None:
+    if circle_x <= frustum_x:
+        raise RuntimeError(
+            "project template carries a first-angle projection symbol: "
+            f"circle_x={circle_x:.6f} is not right of frustum_x={frustum_x:.6f}"
+        )
+
+
+def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
+    """Fail every drawing at creation if the template carries first-angle ink."""
+    ddoc.EditTemplate()
+    try:
+        manager = _early_bound(draw.SketchManager, "ISketchManager")
+        definitions = manager.GetSketchBlockDefinitions() or ()
+        candidates = [
+            _early_bound(definition, "ISketchBlockDefinition")
+            for definition in definitions
+            if Path(str(_early_bound(definition, "ISketchBlockDefinition").FileName))
+            .name.lower()
+            == "third-angle-projection.sldblk"
+        ]
+        if len(candidates) != 1:
+            raise RuntimeError(
+                "project template must contain exactly one third-angle projection "
+                f"block definition, got {len(candidates)}"
+            )
+        sketch = _early_bound(candidates[0].GetSketch(), "ISketch")
+        circle_specs: list[tuple[float, float]] = []
+        line_x_pairs: list[tuple[float, float]] = []
+        for raw_segment in sketch.GetSketchSegments() or ():
+            segment = _early_bound(raw_segment, "ISketchSegment")
+            kind = int(segment.GetType())
+            if kind == 0:
+                line = _early_bound(raw_segment, "ISketchLine")
+                line_x_pairs.append(
+                    (
+                        float(_early_bound(line.GetStartPoint2(), "ISketchPoint").X),
+                        float(_early_bound(line.GetEndPoint2(), "ISketchPoint").X),
+                    )
+                )
+                continue
+            if kind != 1:
+                continue
+            arc = _early_bound(raw_segment, "ISketchArc")
+            if not bool(arc.IsCircle()):
+                continue
+            center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+            circle_specs.append((float(center.X), float(arc.GetRadius())))
+        frustum_x, circle_x = _projection_symbol_centers(circle_specs, line_x_pairs)
+        _assert_third_angle_order(frustum_x, circle_x)
+        _telemetry.event(
+            "drawing.projection_symbol_verified",
+            convention="third-angle",
+            frustum_x=frustum_x,
+            circle_x=circle_x,
+        )
+    finally:
+        ddoc.EditSheet()
 
 
 @_telemetry.traced("drawing.normalize_edge_break")
@@ -1150,7 +1253,7 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     result = adapter._attempt(
         lambda: ddoc.InsertModelAnnotations3(
             0,       # swImportModelItemsFromEntireModel
-            0x8000,  # swInsertDimensionsMarkedForDrawing
+            _INSERT_DIMS_MARKED | _INSERT_HOLE_WIZARD_LOCATION_DIMS,
             False,
             True,
             True,
@@ -1318,6 +1421,35 @@ def set_dimension_precision(
     adapter.currentModel.EditRebuild3()
 
 
+def offset_dimension_text(
+    adapter: Any,
+    annotations: Iterable[Any],
+    positions: dict[str, tuple[float, float]],
+) -> None:
+    """Move named linear-dimension text off its dimension line with a leader."""
+    remaining = dict(positions)
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation", "SetPosition2"
+        )
+        name = dimension_name(adapter, annotation)
+        position = remaining.pop(name, None)
+        if position is None:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "OffsetText"
+        )
+        display.OffsetText = True
+        if not annotation.SetPosition2(position[0], position[1], 0.0):
+            raise RuntimeError(f"failed to offset dimension text {name!r}")
+    if remaining:
+        raise RuntimeError(f"dimension text not offset: {sorted(remaining)}")
+    adapter.currentModel.EditRebuild3()
+
+
 def add_edge_dimension(
     adapter: Any,
     view: Any,
@@ -1387,6 +1519,27 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
     return dimension
 
 
+def set_basic_dimensions(
+    adapter: Any, annotations: Iterable[Any], names: Iterable[str]
+) -> None:
+    """Box named imported model dimensions as BASIC location dimensions."""
+    remaining = set(names)
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        set_basic_dimension(adapter, display, label=name)
+        remaining.remove(name)
+    if remaining:
+        raise RuntimeError(f"dimensions not made BASIC: {sorted(remaining)}")
+
+
 def hole_table_template(adapter: Any) -> Path:
     executable = adapter._attempt(
         lambda: adapter.swApp.GetExecutablePath(), default=None
@@ -1411,6 +1564,8 @@ def insert_hole_table(
     *,
     datum_xy: tuple[float, float],
     hole_points: Sequence[tuple[float, float]],
+    datum_entity: Any | None = None,
+    hole_entities: Sequence[Any] | None = None,
     anchor_xy: tuple[float, float],
     basic_locations: bool = True,
     label: str,
@@ -1418,8 +1573,12 @@ def insert_hole_table(
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
 
     ``datum_xy`` picks the origin VERTEX and each ``hole_points`` entry picks a
-    hole EDGE, all in sheet meters.  The table lands with its top-left corner at
-    ``anchor_xy`` and is validated (row/column count + header) before returning.
+    hole EDGE, all in sheet meters.  Callers that can identify drawing-context
+    entities topologically may additionally supply ``datum_entity`` and
+    ``hole_entities``; those are selected directly with the same hole-table
+    marks and the coordinates remain the count/diagnostic contract.  The table
+    lands with its top-left corner at ``anchor_xy`` and is validated before
+    returning.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -1427,15 +1586,43 @@ def insert_hole_table(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate hole-table view {name!r}")
     draw.ClearSelection2(True)
-    datum = draw.Extension.SelectByID2(
-        "", "VERTEX", datum_xy[0], datum_xy[1], 0.0, False, 1, null_callout(), 0
-    )
+    if hole_entities is not None and len(hole_entities) != len(hole_points):
+        raise ValueError(
+            f"{label} supplied {len(hole_entities)} hole entities for "
+            f"{len(hole_points)} hole points"
+        )
+
+    def _select_entity(entity: Any, *, append: bool, mark: int) -> bool:
+        selection_manager = _early_bound(
+            draw.SelectionManager, "ISelectionMgr", "CreateSelectData"
+        )
+        selection_data = _early_bound(
+            selection_manager.CreateSelectData(), "ISelectData"
+        )
+        selection_data.Mark = mark
+        selectable = _early_bound(entity, "IEntity")
+        return bool(selectable.Select4(append, selection_data))
+
+    if datum_entity is not None:
+        datum = _select_entity(datum_entity, append=False, mark=1)
+    else:
+        datum = draw.Extension.SelectByID2(
+            "", "VERTEX", datum_xy[0], datum_xy[1], 0.0, False, 1, null_callout(), 0
+        )
     if not datum:
         raise RuntimeError(f"failed to select {label} hole-table datum vertex")
-    for x, y in hole_points:
-        selected = draw.Extension.SelectByID2(
-            "", "EDGE", x, y, 0.0, True, 2, null_callout(), 0
-        )
+    selections = (
+        zip(hole_points, hole_entities, strict=True)
+        if hole_entities is not None
+        else ((point, None) for point in hole_points)
+    )
+    for (x, y), entity in selections:
+        if entity is not None:
+            selected = _select_entity(entity, append=True, mark=2)
+        else:
+            selected = draw.Extension.SelectByID2(
+                "", "EDGE", x, y, 0.0, True, 2, null_callout(), 0
+            )
         if not selected:
             raise RuntimeError(
                 f"failed to select {label} hole-table edge at sheet ({x:g}, {y:g})"
@@ -2056,8 +2243,10 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     if note is None:
         return None
     note = _sw_type_info.early_bound_or_flag(
-        note, "INote", "GetExtent", "IsBomBalloon", "GetBalloonInfo"
+        note, "INote", "GetExtent", "GetText", "IsBomBalloon", "GetBalloonInfo"
     )
+    text = str(adapter._attempt(lambda: note.GetText(), default="") or "")
+    diagnostic_name = f"{name} {text!r}" if text else name
     # A BOM balloon's GetExtent includes its LEADER -- the box spans from the
     # balloon circle to the pointed-at component (same leader-polluted-box dead
     # end as GD&T symbols), so neighboring balloons' boxes always intersect near
@@ -2077,7 +2266,7 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
         # (probed on pen-assembly), so it boxed the balloon off-centre.
         cx, cy, half = float(info[0]), float(info[1]), float(info[6])
         return LayoutElement(
-            name, "note", cx - half, cy - half, cx + half, cy + half,
+            diagnostic_name, "note", cx - half, cy - half, cx + half, cy + half,
             scope=CollisionScope.NON_VIEW,
         )
     extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
@@ -2085,7 +2274,7 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
         return None
     x0, y0, _z0, x1, y1, _z1 = (float(v) for v in extent)
     return LayoutElement(
-        name,
+        diagnostic_name,
         "note",
         min(x0, x1),
         min(y0, y1),
@@ -2685,7 +2874,7 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     the balloon's rendered radius, which INote::GetBalloonInfo had all along (see
     :func:`_spread_balloons`). The ratchet was deleted with the defect.
     """
-    with _telemetry.span("drawing.layout_audit") as span:
+    with _telemetry.span("drawing.layout_audit"):
         elements, leaders, region = collect_layout_elements(adapter)
         overlaps, overflows, crossings = audit_layout(
             elements, region, leaders=leaders
@@ -2711,6 +2900,8 @@ async def finalize_drawing(
     *,
     pdf_title: str,
     scale: tuple[float, float] = (1.0, 1.0),
+    redundant_note_substrings: Sequence[str] = (),
+    expected_redundant_notes: int = 0,
 ) -> dict[str, str]:
     """Save, reopen-validate, and export the finished drawing (SLDDRW/PDF/PNG).
 
@@ -2776,6 +2967,19 @@ async def finalize_drawing(
     # read as inch values and get machined at the wrong scale (Codex P1).
     from _common import apply_custom_properties
     apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
+
+    removed_notes = sum(
+        remove_notes_matching(adapter, substring)
+        for substring in redundant_note_substrings
+    )
+    if removed_notes != expected_redundant_notes:
+        raise RuntimeError(
+            f"final drawing removed {removed_notes} redundant notes, "
+            f"expected {expected_redundant_notes}: "
+            f"{tuple(redundant_note_substrings)!r}"
+        )
+    if removed_notes:
+        _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
 
     # The layout is now complete -- audit element collisions / sheet overflow on
     # the finished sheet before the first save, so a broken layout never reaches
