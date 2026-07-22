@@ -22,6 +22,8 @@ from _fastener_drawing import FastenerSheet, build_fastener_sheet
 from cone_pivot_screw_spec import (
     SHOULDER_DIA,
     SHOULDER_LEN,
+    THREAD,
+    THREAD_DESIGNATION,
     THREAD_MAJOR_DIA,
     UNDERHEAD_LEN,
 )
@@ -49,7 +51,7 @@ SLOT_KEEP = {
     "SlotDepth": (0.325, 0.215),
 }
 SIDE_DIMENSION_CALLOUTS = {
-    "ThreadLg": "1/4-20 UNC-2A",
+    "ThreadLg": THREAD_DESIGNATION,
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
@@ -107,7 +109,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
             f"side view has {thread_seeds} cosmetic-thread seed(s) / "
             f"{thread_instances} instance(s); expected 1"
         )
-    removed_thread_notes = remove_notes_matching(adapter, "1/4-20")
+    removed_thread_notes = remove_notes_matching(adapter, THREAD)
     _telemetry.info(
         f"side view imported {thread_seeds} cosmetic-thread seed(s) as "
         f"{thread_instances} instance(s); removed {removed_thread_notes} "
@@ -128,7 +130,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         symbol_xy=(0.115, 0.130),
         datum="A",
         label="thread pitch-diameter datum feature",
-        callout_below="1/4-20 THREAD",
+        callout_below=f"{THREAD} THREAD",
     )
     for edge_xy, frame_xy, below_text, label in (
         ((0.070, 0.16980), (0.108, 0.182), "SHOULDER OD", "shoulder total runout"),

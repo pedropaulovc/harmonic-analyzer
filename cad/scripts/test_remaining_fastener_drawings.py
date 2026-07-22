@@ -163,6 +163,7 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     platform = importlib.import_module("build_cone_swing_platform")
 
     assert spec.SHOULDER_LEN == spec.PLATFORM_THICKNESS + spec.AXIAL_CLEARANCE
+    assert spec.SHOULDER_DIA == pytest.approx(6.35)
     assert spec.PLATFORM_THICKNESS == platform.PLATE_T
     assert platform.PIVOT_HOLE_DIA > spec.SHOULDER_DIA
     assert spec.THREAD_TAIL_LEN >= spec.SHOULDER_DIA
@@ -201,11 +202,12 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     ).read_text(encoding="utf-8")
     assert drawing.RECIPE.end_view == "*Bottom"
     assert drawing.RECIPE.side_center == (0.190, 0.170)
-    assert "INNER CIRCLE = 1/4-20 THREAD MAJOR DIA" in spec.END_VIEW_NOTE
+    assert f"INNER CIRCLE = {spec.THREAD} THREAD MAJOR DIA" in spec.END_VIEW_NOTE
     assert "MIDDLE CIRCLE = GROUND SHOULDER OD" in spec.END_VIEW_NOTE
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShoulderLg", "ThreadLg"}
     assert set(drawing.SLOT_KEEP) == {"SlotWDim", "SlotDepth"}
-    assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"] == "1/4-20 UNC-2A"
+    assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"] == spec.THREAD_DESIGNATION
+    assert '"1/4-20' not in drawing_source
     assert drawing.RECIPE.decorate is drawing._decorate
     assert drawing.RECIPE.side_centerline_face_xy == (0.190, 0.145)
     assert drawing_source.count("add_datum_feature(") == 1
