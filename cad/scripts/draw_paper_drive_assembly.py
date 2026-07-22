@@ -22,7 +22,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_auto_balloons,
+    add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -171,11 +171,10 @@ async def build(adapter: Any) -> dict[str, str]:
         configuration_grouping="same-part",
         label="paper-drive assembly",
     )
-    # Balloon the ISOMETRIC view: the pictorial keeps every component visible,
-    # while the orthographic projections stack the transgear cluster and chain
-    # over the platen under hidden-lines-removed.
-    add_auto_balloons(
-        adapter, iso, expected=len(BOM_COMPONENTS),
+    # The pictorial exposes most component families, but its transgear cluster
+    # still hides eight BOM items. Cover the union of all three projections.
+    add_auto_balloons_across_views(
+        adapter, (iso, front, right), expected=len(BOM_COMPONENTS),
         label="paper-drive assembly balloons",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
