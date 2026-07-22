@@ -298,34 +298,6 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven ring (equations neutral)", v_final, 0.005 * v_boss_extra + 50.0)
 
-    # RingTop datum: a reference plane on the ring's TOP face (Y = +RingHeight/2 from
-    # the mid-plane origin). frame.SLDASM mates it COINCIDENT to a column's TopEnd so
-    # the ring caps the columns at the flush joint -- a physical seat, no distance mate.
-    from solidworks_mcp.adapters.base import CreatePlaneParameters
-
-    check(
-        "create_plane RingTop (Top Plane, +RingHeight/2)",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Top Plane", offset=RING_HEIGHT / 2.0
-            )
-        ),
-    )
-    name_last_feature(adapter, "RingTop")
-    # The plane remains selectable for the frame assembly mate while hidden in
-    # part/assembly renders; shown reference geometry was visibly crossing the
-    # otherwise clean isometric output.
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-
-    model = adapter.currentModel
-    model.ClearSelection2(True)
-    if not model.Extension.SelectByID2(
-        "RingTop", "PLANE", 0, 0, 0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError("cannot select RingTop to hide reference geometry")
-    model.BlankRefGeom()
-    model.ClearSelection2(True)
-
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
     await report_mass_properties(adapter)
