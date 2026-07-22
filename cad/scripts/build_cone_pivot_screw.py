@@ -67,6 +67,39 @@ PART_NAME = "cone-pivot-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material  # bright steel screw (v4 stills)
 
+_DRAWING_REQUIRED_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "End View Note",
+)
+
+
+async def _assert_saved_drawing_properties(adapter, part_path: str) -> None:
+    """Round-trip the saved part and prove its make-critical properties persisted."""
+    closed = adapter._attempt(
+        lambda: adapter.swApp.CloseAllDocuments(True), default=False
+    )
+    if not closed:
+        raise RuntimeError("failed to close saved cone pivot screw before validation")
+    adapter.currentModel = None
+    _telemetry.success("closed cone pivot screw without saving for disk validation")
+
+    check("reopen saved cone pivot screw", await adapter.open_model(part_path))
+    model = adapter.currentModel
+    missing = [
+        name
+        for name in _DRAWING_REQUIRED_PROPERTIES
+        if not str(model.GetCustomInfoValue("", name) or "")
+    ]
+    if missing:
+        raise RuntimeError(
+            f"saved cone pivot screw properties are missing after reopen: {missing}"
+        )
+    _telemetry.success("saved cone pivot screw drawing properties persisted")
+
 def _slot_strip_area(r: float, w: float) -> float:
     """Plan area of a width-w strip across a radius-r circle (exact)."""
     h = w / 2.0
@@ -226,7 +259,9 @@ async def build(adapter) -> dict[str, str]:
             "End View Note": END_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    await _assert_saved_drawing_properties(adapter, artefacts["part"])
+    return artefacts
 
 
 def _blank_ref_geometry(adapter, name: str, kind: str) -> None:

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -215,6 +217,67 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert 'name_dimensions(adapter, "DriverSlot", ["SlotDepth"])' in build_source
     assert '_blank_ref_geometry(adapter, "HeadTop", "PLANE")' in build_source
     assert '_blank_ref_geometry(adapter, pivot_axis, "AXIS")' in build_source
+    assert "artefacts = await save_part_and_images" in build_source
+    assert 'await _assert_saved_drawing_properties(adapter, artefacts["part"])' in (
+        build_source
+    )
+
+
+class _SavedPropertyModel:
+    def __init__(self, properties: dict[str, str]) -> None:
+        self.properties = properties
+
+    def GetCustomInfoValue(self, _configuration: str, name: str) -> str:
+        return self.properties.get(name, "")
+
+
+class _SavedPropertyAdapter:
+    def __init__(self, properties: dict[str, str]) -> None:
+        self.properties = properties
+        self.currentModel = object()
+        self.closed: list[bool] = []
+        self.opened: list[str] = []
+        self.swApp = SimpleNamespace(CloseAllDocuments=self._close_all)
+
+    def _close_all(self, include_unsaved: bool) -> bool:
+        self.closed.append(include_unsaved)
+        return True
+
+    def _attempt(self, operation, default=None):
+        try:
+            return operation()
+        except Exception:  # pragma: no cover - mirrors the adapter boundary
+            return default
+
+    async def open_model(self, path: str):
+        self.opened.append(path)
+        self.currentModel = _SavedPropertyModel(self.properties)
+        return SimpleNamespace(is_success=True, error=None, data=None)
+
+
+def test_cone_pivot_producer_reopens_saved_part_and_requires_drawing_properties() -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    properties = {
+        name: f"persisted {name}" for name in build._DRAWING_REQUIRED_PROPERTIES
+    }
+    adapter = _SavedPropertyAdapter(properties)
+
+    asyncio.run(build._assert_saved_drawing_properties(adapter, "exact.SLDPRT"))
+
+    assert adapter.closed == [True]
+    assert adapter.opened == ["exact.SLDPRT"]
+
+
+def test_cone_pivot_producer_rejects_missing_persisted_drawing_property() -> None:
+    build = importlib.import_module("build_cone_pivot_screw")
+    properties = {
+        name: f"persisted {name}" for name in build._DRAWING_REQUIRED_PROPERTIES
+    }
+    properties.pop("Manufacturing Notes")
+    adapter = _SavedPropertyAdapter(properties)
+
+    with pytest.raises(RuntimeError, match="Manufacturing Notes"):
+        asyncio.run(build._assert_saved_drawing_properties(adapter, "exact.SLDPRT"))
 
 
 def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter() -> None:
