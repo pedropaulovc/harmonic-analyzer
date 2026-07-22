@@ -48,6 +48,8 @@ def test_linked_notes_define_remaining_turned_part_operations() -> None:
 def test_native_gdt_controls_bushing_functional_surfaces() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
+    assert "edge_xy=bore_top" in source
+    assert source.count("position_tolerance_m=0.0001") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"circular_runout\"" in source
     assert "characteristic=\"parallelism\"" in source
@@ -67,6 +69,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("lever-bushing")
-    assert "brass" in str(config["material_specification"]).lower()
+    material = "UNS C36000 H02 per ASTM B16/B16M-24"
+    assert config["material"] == material
+    assert config["material_specification"] == material
     assert config["finish"]
     assert int(config["quantity"]) == 19
