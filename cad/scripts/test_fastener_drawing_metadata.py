@@ -9,6 +9,7 @@ from pathlib import Path
 
 import _config
 from _common import part_properties, save_part_and_images
+from _drawing_registry import DRAWINGS_BY_NAME
 
 
 FASTENER_SPECS = {
@@ -91,6 +92,28 @@ def test_notes_are_complete_but_do_not_repeat_title_or_template_requirements() -
             part_name,
             "unit suffix",
         )
+
+
+def test_end_face_fcf_notes_reference_an_fcf_placed_on_the_sheet() -> None:
+    for part_name, module_name in FASTENER_SPECS.items():
+        spec = importlib.import_module(module_name)
+        if "CONTROL PER FCF" not in spec.DRAWING_NOTES:
+            continue
+        drawing = DRAWINGS_BY_NAME[part_name.replace("-", "_")]
+        source = drawing.script.read_text(encoding="utf-8")
+        assert "add_feature_control_frame(" in source, part_name
+
+
+def test_shared_thread_notes_directly_control_the_distal_end() -> None:
+    direct_control = (
+        "DISTAL END FACE PERPENDICULAR 0.05 TO THREAD PITCH-DIAMETER AXIS."
+    )
+    for part_name, module_name in FASTENER_SPECS.items():
+        if part_name == "cone-pivot-screw":
+            continue
+        notes = importlib.import_module(module_name).DRAWING_NOTES
+        assert direct_control in notes, part_name
+        assert "CONTROL PER FCF" not in notes, part_name
 
 
 def test_finish_field_does_not_repeat_template_edge_break_instruction() -> None:

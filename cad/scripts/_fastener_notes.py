@@ -28,11 +28,11 @@ def thread_control_notes(
     thread: str,
     thread_designation: str,
     underhead_length_mm: float,
-    end_face_control: Literal["fcf", "direct"] = "fcf",
+    end_face_control: Literal["direct", "fcf"] = "direct",
     length_control: Literal["dimension", "note"] = "dimension",
 ) -> tuple[str, ...]:
     """Return the common, measurable external-thread manufacturing contract."""
-    if end_face_control not in ("fcf", "direct"):
+    if end_face_control not in ("direct", "fcf"):
         raise ValueError(f"unsupported end-face control style: {end_face_control!r}")
     if length_control not in ("dimension", "note"):
         raise ValueError(f"unsupported length control style: {length_control!r}")
@@ -45,12 +45,12 @@ def thread_control_notes(
         )
     lead_chamfer = min(0.50, max(0.25, pitch / 2.0))
     underhead_radius = min(0.25, max(0.10, pitch / 4.0))
-    end_face_note = "DISTAL END FACE SQUARE TO THREAD AXIS; CONTROL PER FCF."
-    if end_face_control == "direct":
-        end_face_note = (
-            "DISTAL END FACE PERPENDICULAR 0.05 TO THREAD "
-            "PITCH-DIAMETER AXIS."
-        )
+    end_face_note = (
+        "DISTAL END FACE PERPENDICULAR 0.05 TO THREAD "
+        "PITCH-DIAMETER AXIS."
+    )
+    if end_face_control == "fcf":
+        end_face_note = "DISTAL END FACE SQUARE TO THREAD AXIS; CONTROL PER FCF."
     length_note = ()
     if length_control == "note":
         length_note = (f"UNDERHEAD LENGTH {underhead_length_mm:.2f}.",)
