@@ -283,7 +283,8 @@ CONCEALED_BALLOON_CLEARANCE = 0.006
 CONCEALED_HEADING_ORIGIN = (0.060, 0.255)
 
 # Sheet 5: three text columns, clear of the zone frame and title block.
-SETUP_NOTE_ORIGINS = ((0.018, 0.070), (0.158, 0.070), (0.300, 0.095))
+SETUP_NOTE_ORIGINS = ((0.018, 0.230), (0.158, 0.230), (0.300, 0.145))
+SETUP_NOTE_TEXT_HEIGHT = 0.0025
 SETUP_HEADING_ORIGIN = (0.060, 0.255)
 SETUP_IDENTIFICATION_VIEW_CENTER = (0.365, 0.215)
 SETUP_IDENTIFICATION_VIEW_SCALE = (1, 8)
@@ -606,6 +607,29 @@ def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
     member = drawing_component.GetChildren
     children = member() if callable(member) else member
     return tuple(children or ())
+
+
+def _set_note_text_height(adapter: Any, note: Any, *, label: str) -> None:
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: note has no annotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetTextFormat", "SetTextFormat"
+    )
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label}: note has no text format")
+    text_format = _sw_type_info.early_bound_or_flag(text_format, "ITextFormat")
+    text_format.CharHeight = SETUP_NOTE_TEXT_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"{label}: failed to set note text height")
+    applied = annotation.GetTextFormat(0)
+    if (
+        applied is None
+        or abs(float(applied.CharHeight) - SETUP_NOTE_TEXT_HEIGHT) > 1e-5
+    ):
+        raise RuntimeError(f"{label}: note text height did not persist")
 
 
 def _drawing_component_matches(
@@ -1112,9 +1136,13 @@ async def build(adapter: Any) -> dict[str, str]:
         *SETUP_HEADING_ORIGIN,
     ) is None:
         raise RuntimeError("failed to add setup-and-acceptance heading")
-    for notes, origin in zip(SETUP_NOTE_COLUMNS, SETUP_NOTE_ORIGINS, strict=True):
-        if add_note(adapter, notes, *origin) is None:
+    for column, (notes, origin) in enumerate(
+        zip(SETUP_NOTE_COLUMNS, SETUP_NOTE_ORIGINS, strict=True), start=1
+    ):
+        note = add_note(adapter, notes, *origin)
+        if note is None:
             raise RuntimeError("failed to add setup-and-acceptance notes")
+        _set_note_text_height(adapter, note, label=f"setup note column {column}")
 
     return await finalize_drawing(
         adapter,

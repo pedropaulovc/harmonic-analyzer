@@ -3637,8 +3637,9 @@ def collect_layout_elements(
     Also returned: every annotation's LEADER geometry (for the crossing audit)
     and the sheet's :class:`DrawableRegion`, queried from its zone margins.
 
-    Notes owned by the SHEET view are the sheet-format frame + zone labels (at
-    the sheet edges by design) and are excluded.
+    Notes owned by the drawing SHEET are included. Notes owned by the drawing
+    TEMPLATE are the sheet-format frame, zone labels, and title block; those are
+    excluded while the title block remains covered by its explicit keep-out.
     """
     drawing_model = adapter.currentModel
     ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -3731,12 +3732,35 @@ def collect_layout_elements(
         for table in _iter_tables(adapter, view):
             tables[table.label] = table
 
-    # Hole tables anchor to the SHEET view, not a drawing view -- scan it for
-    # tables only (its notes are the sheet-format frame + title block).
+    # Hole tables and free drawing notes anchor to the SHEET view, not a drawing
+    # view. Template-owned notes are the sheet-format frame + title block and
+    # must remain excluded; IAnnotation.OwnerType distinguishes the two without
+    # relying on generated annotation names or positions.
     sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
     if sheet_view is not None:
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
+        for element, annotation in _iter_view_annotations(adapter, sheet_view):
+            owner_type = int(
+                adapter._attempt(
+                    lambda a=annotation: adapter._get_attr_or_call(a, "OwnerType"),
+                    default=-1,
+                )
+                or -1
+            )
+            if owner_type != 1:  # swAnnotationOwner_DrawingSheet
+                continue
+            element = replace(element, owner="sheet")
+            elements.append(element)
+            leaders.extend(
+                _leader_segments_of(
+                    adapter,
+                    annotation,
+                    label=element.label,
+                    kind=element.kind,
+                    owner="sheet",
+                )
+            )
 
     elements.extend(tables.values())
     # Reserve the checked-in title block as a keep-out: any element overlapping

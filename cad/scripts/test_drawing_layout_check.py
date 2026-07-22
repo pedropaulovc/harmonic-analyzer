@@ -166,6 +166,51 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     ]
 
 
+def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
+    def annotation(name, owner_type, extent):
+        note = SimpleNamespace(GetExtent=extent, IsBomBalloon=lambda: False)
+        return SimpleNamespace(
+            GetLeaderCount=0,
+            GetSpecificAnnotation=note,
+            GetType=drawing_common._ANNOT_NOTE,
+            GetName=name,
+            OwnerType=owner_type,
+        )
+
+    drawing_note = annotation(
+        "setup-notes", 1, [0.02, 0.08, 0.0, 0.12, 0.20, 0.0]
+    )
+    template_note = annotation(
+        "zone-label", 2, [0.00, 0.00, 0.0, 0.01, 0.01, 0.0]
+    )
+    sheet_view = SimpleNamespace(
+        GetNextView=None,
+        GetAnnotations=lambda: [drawing_note, template_note],
+        GetTableAnnotations=[],
+    )
+    zone = {
+        0: ZONE_MARGINS["top"],
+        1: ZONE_MARGINS["bottom"],
+        2: ZONE_MARGINS["right"],
+        3: ZONE_MARGINS["left"],
+    }
+    sheet = SimpleNamespace(
+        GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H],
+        GetZoneMargin=lambda code: zone[code],
+    )
+    model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
+
+    elements, leaders, _region = drawing_common.collect_layout_elements(
+        _FakeAdapter(model)
+    )
+
+    assert leaders == []
+    assert [(element.label, element.kind) for element in elements] == [
+        ("setup-notes", "note"),
+        ("title-block", "titleblock"),
+    ]
+
+
 def test_split_table_box_uses_only_the_rendered_row_range():
     annotation = SimpleNamespace(GetPosition=lambda: [0.020, 0.265, 0.0])
     table = SimpleNamespace(

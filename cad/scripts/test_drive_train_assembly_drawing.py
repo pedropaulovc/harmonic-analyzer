@@ -212,10 +212,11 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert drawing.SETUP_IDENTIFICATION_VIEW_CENTER == (0.365, 0.215)
     assert drawing.SETUP_IDENTIFICATION_VIEW_SCALE == (1, 8)
     assert drawing.SETUP_NOTE_ORIGINS == (
-        (0.018, 0.070),
-        (0.158, 0.070),
-        (0.300, 0.095),
+        (0.018, 0.230),
+        (0.158, 0.230),
+        (0.300, 0.145),
     )
+    assert drawing.SETUP_NOTE_TEXT_HEIGHT == 0.0025
     assert len(drawing.SETUP_NOTE_COLUMNS) == 3
     assert "_swap_drive_train_balloon_slots" not in source
     assert drawing.GENERAL_POINTER_NOTE == (
