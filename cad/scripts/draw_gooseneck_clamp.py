@@ -68,10 +68,12 @@ ISO_CENTER = (0.345, 0.150)
 
 # Per-view survivors of the marked-dimension import.  BlockProfile's Width/Height
 # live on the Front sketch -> the front view; BoreProfile's BoreDia lives on the
-# Top sketch -> the top view.  Width below the front, Height to its left, the
-# bore Ø leadered to the upper-right of the top view.
+# Top sketch -> the top view.  Width ABOVE the front (below it the label landed
+# at y=0.080, interleaving with the notes block raised for the border fix --
+# audit-blind because the note is view-owned), Height to its left, the bore Ø
+# leadered to the upper-right of the top view.
 FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], FRONT_CENTER[1] - BLOCK_HEIGHT / 2.0 * _M - 0.011),
+    "Width": (FRONT_CENTER[0], FRONT_CENTER[1] + BLOCK_HEIGHT / 2.0 * _M + 0.011),
     "Height": (FRONT_CENTER[0] - BLOCK_HALF_X * _M - 0.014, FRONT_CENTER[1]),
 }
 TOP_KEEP = {
@@ -134,9 +136,10 @@ async def build(adapter: Any) -> dict[str, str]:
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    # The bore is a single-decimal 16.5 slip fit on the Ø16 post; two decimals
-    # would read as false precision.
-    set_dimension_precision(adapter, top_annotations, {"BoreDia": 1})
+    # Two decimals so the view reads Ø16.50, matching note 2's governing
+    # Ø16.50 +0.05/0.00 (machinist round 2: a 16.5-vs-16.50 pair reads as two
+    # different callouts for the same bore).
+    set_dimension_precision(adapter, top_annotations, {"BoreDia": 2})
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the clamp bore")
 

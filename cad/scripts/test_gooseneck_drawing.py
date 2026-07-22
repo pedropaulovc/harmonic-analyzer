@@ -29,7 +29,7 @@ def test_notes_describe_the_chrome_tube_and_bend() -> None:
     assert "2.0 WALL" in notes
     assert "SILVER-BRAZE" in notes
     assert "AISI 1018" in notes
-    assert "JOINT PENETRATION" in notes
+    assert "FAYING-SURFACE PENETRATION" in notes
     assert "CHROME" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
