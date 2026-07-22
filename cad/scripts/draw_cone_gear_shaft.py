@@ -109,6 +109,7 @@ def _outer_end_edge(adapter: Any, view: Any) -> Any:
     return circles[-1][1]
 
 
+@_telemetry.traced("drawing.cylindrical_face_scan")
 def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """Return the visible cylindrical face for one shaft diameter."""
     drawing_view = _early_bound(view, "IView")

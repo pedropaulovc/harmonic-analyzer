@@ -662,7 +662,7 @@ from build_cone_tip_pinch_screw import (  # noqa: E402
     SHANK_DIA as PINCH_SHANK_DIA,
     SHANK_LEN as PINCH_SHANK_LEN,
 )
-from build_cone_gear_shaft import (  # noqa: E402
+from cone_gear_shaft_spec import (  # noqa: E402
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
 )

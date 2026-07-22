@@ -135,4 +135,6 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "2 coats" in finish
     assert "25-50um dft" in finish
     assert "mask" not in finish
-    assert int(config["quantity"]) == 1
+    # Two identical castings: the south pedestal plus the north one rotated
+    # 180 about Y (build_drive_train_assembly places both).
+    assert int(config["quantity"]) == 2

@@ -3,7 +3,7 @@ arbor-pedestal:
   material: ASTM A48 Class 30 gray cast iron
   material_specification: ASTM A48 Class 30 gray cast iron
   finish: SSPC-SP3;BLACK JAPAN VARNISH,2 COATS,25-50um DFT
-  quantity: 1
+  quantity: 2
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "machined from continuous-cast stock"
