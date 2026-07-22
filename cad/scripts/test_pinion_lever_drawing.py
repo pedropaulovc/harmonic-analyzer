@@ -81,6 +81,8 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "create_section_view(" in source
     assert source.count("model_point_in_view(") == 2
     assert "ModelToViewTransform" in common_source
+    assert "flat_face_radius = (BORE + HUB_OD) / 4.0" in source
+    assert "(0.0, flat_face_radius / 1000.0, z_max / 1000.0)" in source
     assert "section_hub_y" not in source
     assert 'sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")' in common_source
     assert "segment = sketch_manager.CreateLine(" in common_source

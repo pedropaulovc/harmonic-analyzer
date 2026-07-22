@@ -177,10 +177,11 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_top = (hub_center[0], hub_center[1] + BORE_R_SHEET)
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
     z_max = HUB_LEN / 2.0
+    flat_face_radius = (BORE + HUB_OD) / 4.0
     flat_face = model_point_in_view(
         adapter,
         section,
-        (0.0, 0.0, z_max / 1000.0),
+        (0.0, flat_face_radius / 1000.0, z_max / 1000.0),
         label="lever flat end face",
     )
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
