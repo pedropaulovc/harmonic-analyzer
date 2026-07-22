@@ -169,7 +169,7 @@ GENERAL_ISO_CENTER = (0.335, 0.165)
 GENERAL_NOTES_ORIGIN = (0.018, 0.070)
 
 # Sheet 2: one continuous 32-row parts list plus a small orientation view.
-BOM_ANCHOR = (0.018, 0.255)
+BOM_ANCHOR = (0.018, 0.262)
 BOM_ISO_CENTER = (0.310, 0.165)
 
 # Sheet 3: large exterior views and exterior-only item balloons.
