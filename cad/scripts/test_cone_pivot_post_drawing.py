@@ -65,6 +65,8 @@ def test_notes_specify_both_bores_and_the_oblique_crank_bore() -> None:
     assert "UPPER PLAN (+X RIGHT, +Z DOWN)" in source
     assert "AXIS = LINE THROUGH P AND Q" in source
     assert "CRANK_AXIS_POINTS" in source
+    assert '("POINT", "X", "Y", "Z")' in source
+    assert "(0.220, 0.248, 0.290, 0.332)" in source
 
 
 def test_datum_and_notes_control_the_journal_bore() -> None:

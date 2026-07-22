@@ -231,13 +231,18 @@ def _add_crank_axis_table(adapter: Any) -> None:
         0.256,
         label="crank-axis coordinate orientation",
     )
-    _add_table_note(
-        adapter,
-        "POINT        X               Y               Z",
-        0.220,
-        0.241,
-        label="crank-axis coordinate columns",
-    )
+    for column, column_x in zip(
+        ("POINT", "X", "Y", "Z"),
+        (0.220, 0.248, 0.290, 0.332),
+        strict=True,
+    ):
+        _add_table_note(
+            adapter,
+            column,
+            column_x,
+            0.241,
+            label=f"crank-axis coordinate column {column}",
+        )
     for row_y, (point, x_value, y_value, z_value) in zip(
         (0.232, 0.221), CRANK_AXIS_POINTS, strict=True
     ):
