@@ -24,9 +24,15 @@ def _thread_pitch_mm(thread: str) -> float:
 
 
 def thread_control_notes(
-    *, thread: str, thread_designation: str, underhead_length_mm: float
+    *,
+    thread: str,
+    thread_designation: str,
+    underhead_length_mm: float,
+    end_face_control: Literal["fcf", "direct"] = "fcf",
 ) -> tuple[str, ...]:
     """Return the common, measurable external-thread manufacturing contract."""
+    if end_face_control not in ("fcf", "direct"):
+        raise ValueError(f"unsupported end-face control style: {end_face_control!r}")
     pitch = _thread_pitch_mm(thread)
     min_full_form = underhead_length_mm - 4.0 * pitch
     if min_full_form <= 0.0:
@@ -36,6 +42,12 @@ def thread_control_notes(
         )
     lead_chamfer = min(0.50, max(0.25, pitch / 2.0))
     underhead_radius = min(0.25, max(0.10, pitch / 4.0))
+    end_face_note = "DISTAL END FACE SQUARE TO THREAD AXIS; CONTROL PER FCF."
+    if end_face_control == "direct":
+        end_face_note = (
+            "DISTAL END FACE PERPENDICULAR 0.05 TO THREAD "
+            "PITCH-DIAMETER AXIS."
+        )
     return (
         f"{thread_designation} PER ASME B1.1-2024.",
         "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
@@ -47,7 +59,7 @@ def thread_control_notes(
         f"UNDERHEAD FILLET R{underhead_radius:.2f} MAX, TANGENT TO SHANK AND "
         "BEARING FACE.",
         "THREAD LIMITS APPLY AFTER FINISH.",
-        "DISTAL END FACE SQUARE TO THREAD AXIS; CONTROL PER FCF.",
+        end_face_note,
         "THREAD GEOMETRY OMITTED IN VIEWS; SHANK OUTLINE REFERENCE ONLY.",
     )
 

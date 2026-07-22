@@ -27,7 +27,7 @@ END_KEEP = {
 SIDE_KEEP = {
     "HeadHt": (0.190, 0.222),
     "ShoulderLg": (0.165, 0.138),
-    "ThreadLg": (0.215, 0.120),
+    "ThreadLg": (0.238, 0.132),
 }
 SIDE_DIMENSION_CALLOUTS = {
     "ShoulderLg": "GROUND SHOULDER",
@@ -49,6 +49,7 @@ RECIPE = FastenerSheet(
     dimension_callouts=DIMENSION_CALLOUTS,
     side_keep=SIDE_KEEP,
     side_dimension_callouts=SIDE_DIMENSION_CALLOUTS,
+    note_xy=(0.020, 0.105),
 )
 
 

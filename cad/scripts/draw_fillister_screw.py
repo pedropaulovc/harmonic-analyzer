@@ -17,8 +17,6 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature_to_dimension,
-    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -129,50 +127,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, side_annotations, SIDE_DIMENSION_CALLOUTS)
     set_dimension_text(
         adapter, side_annotations, {"ShankDia": "#4-40 UNC-2A"}
-    )
-
-    # The threaded shank establishes datum axis A. Native feature-control
-    # frames make the head relationship directly inspectable; the linked notes
-    # retain only size/process requirements and point the distal squareness to
-    # its FCF.
-    add_datum_feature_to_dimension(
-        adapter,
-        side_annotations,
-        dimension="ShankDia",
-        symbol_xy=(SIDE_CENTER[0] - 0.050, SIDE_CENTER[1] + 0.045),
-        datum="A",
-        label="thread pitch-diameter datum axis",
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=(SIDE_CENTER[0] + 0.016, SIDE_CENTER[1] + 0.022),
-        frame_xy=(SIDE_CENTER[0] + 0.040, SIDE_CENTER[1] + 0.050),
-        characteristic="circular_runout",
-        tolerance="0.10",
-        datums=("A",),
-        label="head OD circular runout",
-        entity_type="SILHOUETTE",
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=(SIDE_CENTER[0] + 0.007, SIDE_CENTER[1] + 0.015),
-        frame_xy=(SIDE_CENTER[0] + 0.040, SIDE_CENTER[1] + 0.023),
-        characteristic="perpendicularity",
-        tolerance="0.10",
-        datums=("A",),
-        label="bearing-face perpendicularity",
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=(SIDE_CENTER[0] - 0.025, SIDE_CENTER[1]),
-        frame_xy=(SIDE_CENTER[0] - 0.080, SIDE_CENTER[1] - 0.012),
-        characteristic="perpendicularity",
-        tolerance="0.05",
-        datums=("A",),
-        label="distal-end perpendicularity",
     )
 
     # 0.020: the note is left-aligned on its anchor, clearing the 12.7 mm zone

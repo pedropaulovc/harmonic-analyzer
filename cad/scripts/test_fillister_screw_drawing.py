@@ -35,8 +35,10 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert drawing.DIMENSION_CALLOUTS == {}
     assert drawing.SIDE_DIMENSION_CALLOUTS == {"ShankLg": "UNDERHEAD LENGTH"}
     assert "FULL THREAD" in spec.DRAWING_NOTES
-    assert "HEAD OD TOTAL RUNOUT" not in spec.DRAWING_NOTES
-    assert "BEARING FACE PERPENDICULAR" not in spec.DRAWING_NOTES
+    assert "HEAD OD TOTAL RUNOUT 0.10 TIR" in spec.DRAWING_NOTES
+    assert "HEAD BEARING FACE PERPENDICULAR 0.10" in spec.DRAWING_NOTES
+    assert "DISTAL END FACE PERPENDICULAR 0.05" in spec.DRAWING_NOTES
+    assert "CONTROL PER FCF" not in spec.DRAWING_NOTES
 
 
 def test_lengths_are_inserted_from_named_model_dimensions() -> None:
@@ -44,9 +46,8 @@ def test_lengths_are_inserted_from_named_model_dimensions() -> None:
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert part_source.count("set_dimension_symmetric_tolerance(") == 3
-    assert "add_datum_feature_to_dimension" in drawing_source
     assert '"ShankDia": "#4-40 UNC-2A"' in drawing_source
-    assert drawing_source.count("add_feature_control_frame(") == 3
+    assert "add_feature_control_frame(" not in drawing_source
 
 
 def test_made_part_note_states_standards_conformance() -> None:

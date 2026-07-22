@@ -46,6 +46,7 @@ DRAWING_NOTES = "\n".join(
             thread=THREAD,
             thread_designation=THREAD_DESIGNATION,
             underhead_length_mm=SHANK_LEN,
+            end_face_control="direct",
         ),
         *slotted_round_head_notes(
             head_dia_mm=HEAD_DIA,
@@ -55,8 +56,8 @@ DRAWING_NOTES = "\n".join(
             axis_control_style="native",
             size_control_style="dimensions",
         ),
-        "DATUM FEATURE A IS THE #4-40 UNC-2A THREAD.",
-        "DATUM AXIS A IS THE PITCH-CYLINDER AXIS.",
+        "HEAD OD TOTAL RUNOUT 0.10 TIR TO #4-40 THREAD PITCH-DIAMETER AXIS.",
+        "HEAD BEARING FACE PERPENDICULAR 0.10 TO #4-40 THREAD PITCH-DIAMETER AXIS.",
         "CUSTOM CYLINDRICAL SLOTTED HEAD; B18.6.3 HEAD DIMENSIONS DO NOT APPLY.",
         "ALL UNSPECIFIED HEAD EDGES PER TITLE BLOCK.",
     )
