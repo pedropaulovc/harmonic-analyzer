@@ -72,6 +72,7 @@ def test_native_gdt_and_finish_present() -> None:
     # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
     # face; the rod-pin position frame references all three.
     assert source.count("add_datum_feature(") == 3
+    assert source.count("position_tolerance_m=0.0001") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert 'datums=("A", "B", "C")' in source
     assert 'characteristic="position"' in source

@@ -214,6 +214,11 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(pivot_left[0] - 0.020, pivot_left[1]),
         datum="A",
         label="pivot bore axis",
+        # SolidWorks snaps this circular bore attachment to its nearest legal
+        # anchor.  The live readback is 0.0109 mm from the requested point;
+        # allow that native normalization while retaining the shared strict
+        # persistence check for freely positioned annotations.
+        position_tolerance_m=0.0001,
     )
     pivot_bottom = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
     add_surface_finish(
