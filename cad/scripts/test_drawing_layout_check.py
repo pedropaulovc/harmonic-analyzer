@@ -183,9 +183,17 @@ def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
     template_note = annotation(
         "zone-label", 2, [0.00, 0.00, 0.0, 0.01, 0.01, 0.0]
     )
+    sheet_gdt = SimpleNamespace(
+        GetLeaderCount=0,
+        GetSpecificAnnotation=SimpleNamespace(GetPosition=[-0.02, 0.0, 0.0]),
+        GetType=drawing_common._ANNOT_GTOL,
+        GetName="template-gdt",
+        GetPosition=[-0.02, 0.0, 0.0],
+        OwnerType=1,
+    )
     sheet_view = SimpleNamespace(
         GetNextView=None,
-        GetAnnotations=lambda: [drawing_note, template_note],
+        GetAnnotations=lambda: [drawing_note, template_note, sheet_gdt],
         GetTableAnnotations=[],
     )
     zone = {

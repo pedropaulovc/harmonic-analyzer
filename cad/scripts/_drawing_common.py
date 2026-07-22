@@ -3741,6 +3741,8 @@ def collect_layout_elements(
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
         for element, annotation in _iter_view_annotations(adapter, sheet_view):
+            if element.kind != "note":
+                continue
             owner_type = int(
                 adapter._attempt(
                     lambda a=annotation: adapter._get_attr_or_call(a, "OwnerType"),
