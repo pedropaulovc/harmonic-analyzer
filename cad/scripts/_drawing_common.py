@@ -1470,13 +1470,25 @@ async def reopen_drawing(adapter: Any, path: Path) -> tuple[Any, Any]:
     return reopened, sheet
 
 
+def _contact_preview_grid(page_count: int) -> tuple[int, int]:
+    """Return the contact-preview column/row count for a multi-sheet drawing."""
+    if page_count < 2:
+        raise ValueError(f"contact preview requires at least 2 pages, got {page_count}")
+    if page_count <= 4:
+        return (2, 2)
+    columns = math.ceil(math.sqrt(page_count))
+    return (columns, math.ceil(page_count / columns))
+
+
 def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
     """Render a drawing PDF to its preview PNG.
 
     Single-sheet drawings retain the historical one-page 300 dpi preview.
-    Multi-sheet drawings use the registered preview path for a 2x2 contact
-    sheet, keeping the doit/cache/release artifact contract to one PNG. Exact
-    page images for a review can be rendered from the packaged vector PDF.
+    Multi-sheet drawings use the registered preview path for a contact sheet,
+    keeping the doit/cache/release artifact contract to one PNG. The historical
+    2x2 layout is retained through four pages; larger drawings use the smallest
+    near-square grid that fits every page. Exact page images for a review can be
+    rendered from the packaged vector PDF.
     """
     import pypdfium2 as pdfium
     from PIL import Image
@@ -1506,17 +1518,27 @@ def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
         images[0].save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
         return
 
-    if expected_pages > 4:
-        raise RuntimeError(
-            f"multi-sheet contact preview supports at most 4 pages, got {expected_pages}"
-        )
-    cell_size = (ASME_B_PNG_SIZE[0] // 2, ASME_B_PNG_SIZE[1] // 2)
+    columns, rows = _contact_preview_grid(expected_pages)
+    cell_size = (ASME_B_PNG_SIZE[0] // columns, ASME_B_PNG_SIZE[1] // rows)
+    scale = min(
+        cell_size[0] / ASME_B_PNG_SIZE[0],
+        cell_size[1] / ASME_B_PNG_SIZE[1],
+    )
+    preview_size = (
+        round(ASME_B_PNG_SIZE[0] * scale),
+        round(ASME_B_PNG_SIZE[1] * scale),
+    )
     contact = Image.new("RGB", ASME_B_PNG_SIZE, "white")
     for index, image in enumerate(images):
-        cell = image.resize(cell_size, Image.Resampling.LANCZOS)
+        cell = image.resize(preview_size, Image.Resampling.LANCZOS)
+        column = index % columns
+        row = index // columns
         contact.paste(
             cell,
-            ((index % 2) * cell_size[0], (index // 2) * cell_size[1]),
+            (
+                column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2,
+                row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2,
+            ),
         )
     contact.save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
 

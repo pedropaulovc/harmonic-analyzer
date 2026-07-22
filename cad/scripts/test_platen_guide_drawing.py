@@ -8,17 +8,21 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 import _drawing_common as common
 import cut_release
 import draw_platen_guide as drawing
 import build_platen_guide as guide
+import _drawing_common as drawing_common
 from _drawing_registry import DRAWINGS, PROJECT_DRWDOT
 from _drawing_common import (
     _assert_third_angle_order,
+    _contact_preview_grid,
     _gtol_frame_xml,
     _projection_symbol_centers,
     property_link,
+    render_pdf_png,
     sanitize_pdf_metadata,
 )
 from _holes import CLEARANCE_MM, TAP_DRILL_MM
@@ -31,6 +35,58 @@ def test_platen_guide_native_front_is_hole_entry_face() -> None:
     assert "UpdateStandardViews" not in source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"*Front", 0.190, FRONT_VIEW_Y_M' in source
+
+
+def test_contact_preview_grid_preserves_legacy_layout_and_scales() -> None:
+    assert [_contact_preview_grid(pages) for pages in (2, 3, 4)] == [
+        (2, 2),
+        (2, 2),
+        (2, 2),
+    ]
+    assert [_contact_preview_grid(pages) for pages in (5, 6)] == [(3, 2), (3, 2)]
+    assert [_contact_preview_grid(pages) for pages in (7, 8, 9)] == [
+        (3, 3),
+        (3, 3),
+        (3, 3),
+    ]
+    assert _contact_preview_grid(10) == (4, 3)
+    with pytest.raises(ValueError, match="at least 2 pages"):
+        _contact_preview_grid(1)
+
+
+def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pdf = tmp_path / "five-pages.pdf"
+    png = tmp_path / "contact.png"
+    colors = [
+        (220, 20, 20),
+        (20, 180, 20),
+        (20, 20, 220),
+        (220, 180, 20),
+        (180, 20, 180),
+    ]
+    Image.init()
+    pages = [Image.new("RGB", (1224, 792), color) for color in colors]
+    pages[0].save(
+        pdf,
+        save_all=True,
+        append_images=pages[1:],
+        resolution=72,
+    )
+    monkeypatch.setattr(drawing_common, "ASME_B_DPI", 30)
+    monkeypatch.setattr(drawing_common, "ASME_B_PNG_SIZE", (510, 330))
+
+    render_pdf_png(pdf, png, expected_pages=5)
+
+    with Image.open(png) as preview:
+        assert preview.size == (510, 330)
+        assert preview.info["dpi"] == pytest.approx((30, 30), abs=0.1)
+        centers = ((85, 82), (255, 82), (425, 82), (85, 247), (255, 247))
+        for center, color in zip(centers, colors, strict=True):
+            assert preview.getpixel(center) == pytest.approx(color, abs=2)
+        assert preview.getpixel((425, 247)) == (255, 255, 255)
+        assert preview.getpixel((85, 10)) == (255, 255, 255)
 
 
 def test_drawing_hole_sizes_follow_unc_policy() -> None:
