@@ -347,27 +347,28 @@ async def build(adapter: Any) -> dict[str, str]:
     # Entity-selected vertical dimension (the sheet-pick + arc-center recipe
     # left the dimension DANGLING after the re-anchor — it rendered gray on the
     # eye-pass; the arbor sheet's entity-selected circle basics do not).
-    base_edge = _foot_edge(adapter, right, min_span_mm=11.9)
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, right)):
-        raise RuntimeError("failed to activate right view for pinch-axis height")
-    draw.ClearSelection2(True)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    for append, raw_entity in ((False, base_edge), (True, pinch_entity)):
-        selection_data = selection_manager.CreateSelectData()
-        selection_data.View = right
-        entity = _early_bound(raw_entity, "IEntity")
-        if not entity.Select4(append, selection_data):
-            raise RuntimeError("failed to select pinch-axis height entity")
-    pinch_height = draw.AddVerticalDimension2(
-        RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0), 0.0
-    )
-    draw.ClearSelection2(True)
-    if pinch_height is None:
-        raise RuntimeError("failed to create pinch-axis height dimension")
-    set_arc_endpoints_to_center(adapter, pinch_height, label="pinch-axis height")
-    set_basic_dimension(adapter, pinch_height, label="pinch-axis height")
+    with _telemetry.span("drawing.pinch_axis_height"):
+        base_edge = _foot_edge(adapter, right, min_span_mm=11.9)
+        draw = adapter.currentModel
+        drawing = _early_bound(draw, "IDrawingDoc")
+        if not drawing.ActivateView(view_name(adapter, right)):
+            raise RuntimeError("failed to activate right view for pinch-axis height")
+        draw.ClearSelection2(True)
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        for append, raw_entity in ((False, base_edge), (True, pinch_entity)):
+            selection_data = selection_manager.CreateSelectData()
+            selection_data.View = right
+            entity = _early_bound(raw_entity, "IEntity")
+            if not entity.Select4(append, selection_data):
+                raise RuntimeError("failed to select pinch-axis height entity")
+        pinch_height = draw.AddVerticalDimension2(
+            RIGHT_CENTER[0] - 0.036, _front_y(PINCH_HEIGHT / 2.0), 0.0
+        )
+        draw.ClearSelection2(True)
+        if pinch_height is None:
+            raise RuntimeError("failed to create pinch-axis height dimension")
+        set_arc_endpoints_to_center(adapter, pinch_height, label="pinch-axis height")
+        set_basic_dimension(adapter, pinch_height, label="pinch-axis height")
     add_feature_control_frame(
         adapter,
         right,
@@ -380,7 +381,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinch common-axis true position",
         entity=pinch_entity,
     )
-    add_note(adapter, "PINCH ENTRY FACE E (+X)", 0.180, 0.225)
+    entry_face_label = add_note(adapter, "PINCH ENTRY FACE E (+X)", 0.180, 0.225)
+    if entry_face_label is None:
+        raise RuntimeError("failed to add datum-E pinch-entry face label")
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025
     )

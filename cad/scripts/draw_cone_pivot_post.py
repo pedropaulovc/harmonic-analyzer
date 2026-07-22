@@ -174,6 +174,7 @@ def _format_table_note(note: Any, *, label: str) -> Any:
     return note
 
 
+@_telemetry.traced("drawing.table_note", label_param="label")
 def _add_table_note(adapter: Any, text: str, x: float, y: float, *, label: str) -> Any:
     note = add_note(adapter, text, x, y)
     if note is None:
