@@ -17,42 +17,27 @@ Fix (frame.SLDASM): turn it **+90deg about Y** with `ROT_Y_POS90` (from
 `_transforms`; equals `rows_from_euler([0,90,0])`). The turn maps local Z (window
 normal) -> machine +X, local X (177.8 width) -> machine Z, local Y -> machine Y.
 
-Placement after the turn: inserted on-solution (`place_component(...,
-ground=False, mirror=False)`) then **CONSTRAINED BY THREE ORTHOGONAL MATES**
-against the base (NOT grounded — the user wanted the centring done by a mate, not
-a hand-tuned constant). Two of the three are flip-free COINCIDENT mates:
+Placement after the turn (CURRENT): inserted on its exact authored transform
+(`place_component(..., ground=False)`, `support_target = [SUPPORT_X,
+SUPPORT_SEAT_Y=139.7, 0.0]`, `SUPPORT_ROWS=ROT_Y_POS90`) and pinned with a SINGLE
+`lock_mate(Front@support <-> Right@base)` to the fixed base — the frame's
+"single-mate strategy" (every rigid member: exact transform + one lock mate on a
+DEFAULT plane; `assert_component_placed` is the readback tripwire). The +90 turn
+already makes the pose deterministic, so no orientation/seat mate is needed.
 
-* `Front@support <-> Right@base` **distance** `SUPPORT_X=72.9` (pivot x), `flip=True`;
-* `FootSeat@support <-> DeckTop@base` **COINCIDENT** — physical foot seat (foot
-  bottom on base top, y 50.8), named datum on each part;
-* `Right@support <-> Front@base` **COINCIDENT** — centres the 177.8-wide
-  (+/-88.9) wall on the base z-axis (z 0) by symmetry plane, no z offset.
-
-After the +90 turn the part's Front plane (local-Z normal) faces machine X, its
-Right plane (local-X normal) faces machine Z, Top plane stays on machine Y. Seed
-insert on-solution (z 0, foot at base top) so both coincident mates lock their
-DOF without moving and solve clean (flip-free).
-
-**Mate-side lesson (4 approaches tried for the foot seat y):** on a +90-turned
-part the orientation-preserving sense ("aligned") puts the origin on the FAR
-side, so a naive plane-distance mate lands there and the verify-and-flip recovery
-deletes + re-adds it — the part visibly JUMPS. (a) `Top@support<->Top@base`
-distance `flip=True` lands it in one solve but still uses the flip knob. (b) An
-`"anti_aligned"` swMateAlign reaches the near side WITHOUT flip but inverts the
-part ORIENTATION 180deg (foot up, window -X — rotation assert drift 2.0, FAILS):
-alignment is the WRONG knob, it also rotates. (c) A physical coincident of the
-foot/base-top FACE OBJECTS (selected by normal, `IComponent2.GetCorrespondingEntity`)
-is flip-free but walking the base's HUNDREDS of faces to find the deck costs ~45s.
-(d) **WINNER — named DATUM PLANES on the contact**, mated coincident: flip-free,
-0.4s, robust (no coordinate pick, no face walk), no adapter code. Added
-`FootSeat` to the support (`create_plane` offset `-HALF_Y` from Top Plane = the
-foot face) and `DeckTop` to the base (offset `BOTTOM_THICKNESS+TOP_THICKNESS=50.8`
-= the top face); `create_plane` offset is SIGNED (neg flips the side), Top Plane
-normal is +Y. The pivot-x DISTANCE mate (a) still needs `flip=True` — a free-space
-offset has no contact to seat a datum on, so its side selector is unavoidable.
-
-Verified: frame builds fully-defined (status 3, not fixed), support lands in one
-solve (no moved/flipped/delete lines), foot seat 0.4s, no interference, healthy.
+**Superseded — the datum-mate design (removed 2026-07-22).** The support used to
+be CONSTRAINED BY THREE ORTHOGONAL MATES, one of them
+`FootSeat@support <-> DeckTop@base` COINCIDENT (foot bottom on base top), after a
+4-approach bake-off for the foot-seat y: (a) `Top<->Top` distance `flip=True`, (b)
+`"anti_aligned"` swMateAlign — inverts orientation 180deg, FAILS, (c) physical
+face-object coincident — flip-free but ~45s walking the base's faces, (d) WINNER
+at the time: named DATUM PLANES on the contact (`FootSeat` offset `-HALF_Y` on the
+support, `DeckTop` offset 50.8 on the base), mated coincident, 0.4s. That whole
+approach is GONE: exact-transform placement made all three mates redundant, so
+`FootSeat`, the base `DeckTop`, and the other members' mate datums (`TopEnd`,
+`RingTop`, `Underside`, `MidLength`, lag-screw `ScrewAxis`) were orphaned and
+deleted. Lesson retained: signed `create_plane` offset flips the datum side, and a
+free-space distance mate (no contact to seat a datum on) still needs `flip=True`.
 
 **Mount caveat (RESOLVED).** The north pivot ball mount originally stayed at z
 +101.6 and cantilevered ~12.7 mm past the centred wall edge (88.9). Fixed — NOT by
