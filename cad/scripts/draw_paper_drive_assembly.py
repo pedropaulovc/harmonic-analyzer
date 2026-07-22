@@ -109,10 +109,10 @@ ASSEMBLY_NOTES = "\n".join(
 # in the right field above the title-block keep-out.
 FRONT_CENTER = (0.070, 0.145)
 RIGHT_CENTER = (0.170, 0.170)
-ISO_CENTER = (0.215, 0.115)
-ISO_VIEW_SCALE = (1, 10)
-BRACKET_DETAIL_CENTER = (0.100, 0.225)
-BRACKET_DETAIL_SCALE = (1, 3)
+ISO_CENTER = (0.180, 0.080)
+ISO_VIEW_SCALE = (1, 7)
+BRACKET_DETAIL_CENTER = (0.100, 0.230)
+BRACKET_DETAIL_SCALE = (1, 4)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
 BOM_ANCHOR = (0.248, 0.265)
@@ -183,8 +183,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 "transgear-bracket",
                 "bracket-screw",
                 "transgear-latch",
-                "transgear-feed-pinion",
-                "transgear-pinion",
             }
         ),
         label="paper-drive transgear detail",
@@ -201,8 +199,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The pictorial exposes most component families, but its transgear cluster
     # still hides eight BOM items. The isolated transgear detail exposes the
-    # five clustered families that are concealed or whose leaders cross in the
-    # three main projections.
+    # bracket/screw pair and removes latch item 15 from the right view before
+    # its leader can cross item 19 there.
     add_auto_balloons_across_views(
         adapter, (iso, front, bracket_detail, right), expected=len(BOM_COMPONENTS),
         label="paper-drive assembly balloons",
