@@ -157,8 +157,8 @@ ASSEMBLY_NOTES = "\n".join(
         "ASSEMBLY NOTES",
         "1. INSTALL CONE GEARS T006-T120 IN 6-TOOTH STEPS; T120 AT BIG END.",
         "2. SHOWN: CONE PLATFORM ENGAGED; ALIGNMENT PINION DISENGAGED.",
-        "3. ADJUST CONE-TIP END PLAY TO 0.05-0.10 MM; LOCK PINCH SCREW.",
-        "   VERIFY CONE SHAFT ROTATES FREELY AFTER LOCKING.",
+        "3. ADJUST CONE-TIP SCREW TO REMOVE AXIAL PLAY WITHOUT BINDING;",
+        "   VERIFY FREE SHAFT ROTATION, THEN TIGHTEN PINCH SCREW.",
         "4. PINION DISENGAGED: 2.00 MM TIP GAP; ENGAGED C-C: 41.30 MM.",
         "5. SET STRAPS 12.38 DEG WEST OF VERTICAL AT PARK; 0.25 MM AXIAL",
         "   CLEARANCE EACH SIDE OF PINION DRUM.",
@@ -175,7 +175,7 @@ ASSEMBLY_NOTES = "\n".join(
 GENERAL_FRONT_CENTER = (0.060, 0.165)
 GENERAL_RIGHT_CENTER = (0.190, 0.165)
 GENERAL_ISO_CENTER = (0.335, 0.165)
-GENERAL_NOTES_ORIGIN = (0.018, 0.070)
+GENERAL_NOTES_ORIGIN = (0.018, 0.085)
 
 # Sheet 2: one continuous 32-row parts list plus a small orientation view.
 BOM_ANCHOR = (0.018, 0.262)
@@ -189,11 +189,12 @@ EXTERIOR_ISO_CENTER = (0.345, 0.155)
 # Sheet 4: two isolated views keep the coaxial concealed items readable.  The
 # bushing and shaft share the underside view; the crank gear gets a separate
 # front view because its projected attachment lies on top of the shaft callout.
-CONCEALED_BOTTOM_CENTER = (0.115, 0.155)
+CONCEALED_BOTTOM_CENTER = (0.115, 0.135)
 CONCEALED_FRONT_CENTER = (0.285, 0.155)
 CONCEALED_BOTTOM_STEMS = frozenset({"cone-tip-bushing", "cone-gear-shaft"})
 CONCEALED_FRONT_STEMS = frozenset({"crank-drive-gear"})
-CONCEALED_BALLOON_RING_MARGIN = 0.035
+CONCEALED_BOTTOM_BALLOON_RING_MARGIN = 0.015
+CONCEALED_FRONT_BALLOON_RING_MARGIN = 0.025
 CONCEALED_BALLOON_CLEARANCE = 0.006
 BOM_COLUMN_WIDTHS = {
     "ITEM NO.": 0.014,
@@ -797,7 +798,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         concealed_bottom,
         bottom_balloons,
-        margin=CONCEALED_BALLOON_RING_MARGIN,
+        margin=CONCEALED_BOTTOM_BALLOON_RING_MARGIN,
         clearance=CONCEALED_BALLOON_CLEARANCE,
     )
 
@@ -826,7 +827,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         concealed_front,
         front_balloons,
-        margin=CONCEALED_BALLOON_RING_MARGIN,
+        margin=CONCEALED_FRONT_BALLOON_RING_MARGIN,
         clearance=CONCEALED_BALLOON_CLEARANCE,
     )
     if add_note(
