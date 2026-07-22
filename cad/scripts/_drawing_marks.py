@@ -25,6 +25,27 @@ from _common import (
 )
 
 
+def _feature_tree(feature: Any) -> Any:
+    """Yield ``feature`` and every subfeature, depth-first.
+
+    Hole Wizard placement dimensions live on ``ProfileFeature`` subfeatures,
+    so both the mark AND the clear path must walk the same tree — a clear
+    that stops at top level leaves stale marks on child-feature dimensions.
+    """
+    stack = [feature]
+    while stack:
+        current = stack.pop()
+        yield current
+        child = _read_member(current, "GetFirstSubFeature")
+        children: list[Any] = []
+        for _ in range(1000):
+            if not child:
+                break
+            children.append(child)
+            child = _read_member(child, "GetNextSubFeature")
+        stack.extend(reversed(children))
+
+
 def mark_dimensions_for_drawing(
     adapter: Any, feature_name: str, dimension_names: set[str]
 ) -> None:
@@ -39,9 +60,7 @@ def mark_dimensions_for_drawing(
     """
     feature = _feature_by_name(adapter, feature_name)
     matches: dict[str, tuple[Any, str]] = {}
-    stack = [feature]
-    while stack:
-        current = stack.pop()
+    for current in _feature_tree(feature):
         current_name = str(_read_member(current, "Name"))
         display = _read_member(current, "GetFirstDisplayDimension")
         for _ in range(1000):
@@ -61,15 +80,6 @@ def mark_dimensions_for_drawing(
                 matches[name] = (display, full_name)
             display = current.GetNextDisplayDimension(display)
 
-        child = _read_member(current, "GetFirstSubFeature")
-        children: list[Any] = []
-        for _ in range(1000):
-            if not child:
-                break
-            children.append(child)
-            child = _read_member(child, "GetNextSubFeature")
-        stack.extend(reversed(children))
-
     missing = dimension_names - matches.keys()
     if missing:
         raise RuntimeError(
@@ -87,14 +97,15 @@ def mark_dimensions_for_drawing(
 def clear_dimensions_for_drawing(adapter: Any) -> None:
     cleared = 0
     for feature in _iter_features(adapter):
-        display = _read_member(feature, "GetFirstDisplayDimension")
-        for _ in range(1000):
-            if not display:
-                break
-            if bool(_read_member(display, "MarkedForDrawing")):
-                display.MarkedForDrawing = False
-                cleared += 1
-            display = feature.GetNextDisplayDimension(display)
+        for current in _feature_tree(feature):
+            display = _read_member(current, "GetFirstDisplayDimension")
+            for _ in range(1000):
+                if not display:
+                    break
+                if bool(_read_member(display, "MarkedForDrawing")):
+                    display.MarkedForDrawing = False
+                    cleared += 1
+                display = current.GetNextDisplayDimension(display)
     _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
 
 

@@ -1168,6 +1168,7 @@ def _assert_third_angle_order(frustum_x: float, circle_x: float) -> None:
         )
 
 
+@_telemetry.traced("drawing.projection_symbol_check")
 def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
     """Fail every drawing at creation if the template carries first-angle ink."""
     ddoc.EditTemplate()
@@ -1600,6 +1601,7 @@ def set_dimension_precision(
     adapter.currentModel.EditRebuild3()
 
 
+@_telemetry.traced("drawing.reference_dimensions")
 def set_reference_dimensions(
     adapter: Any, annotations: Iterable[Any], names: Iterable[str]
 ) -> None:
@@ -1712,6 +1714,25 @@ def add_edge_dimension(
     if dimension is None:
         raise RuntimeError(f"failed to add the {label} {orientation} dimension")
     return dimension
+
+
+@_telemetry.traced("drawing.visible_entity_scan", label_param="label")
+def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[Any]:
+    """All visible entities of ``entity_kind`` across the view's components.
+
+    The GetVisibleComponents/GetVisibleEntities2 walk is the COM-expensive
+    core of every per-sheet edge/face scanner — one traced chokepoint here so
+    each scanner shows up as a named child span instead of an unspanned gap
+    (observability invariant). ``entity_kind`` is swViewEntityType_e (1=edge,
+    2=vertex, 3=face).
+    """
+    drawing_view = _early_bound(view, "IView")
+    entities: list[Any] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        entities.extend(
+            drawing_view.GetVisibleEntities2(component, entity_kind) or []
+        )
+    return entities
 
 
 @_telemetry.traced("drawing.arc_center_endpoints", label_param="label")

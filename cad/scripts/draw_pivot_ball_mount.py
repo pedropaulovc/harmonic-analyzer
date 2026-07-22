@@ -27,6 +27,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from pivot_ball_mount_spec import (
@@ -123,19 +124,17 @@ def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
 
 def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
     """Return real seat and cross-bore edges from the front view."""
-    drawing_view = _early_bound(view, "IView")
     circles: list[tuple[float, float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = edge.GetCurve()
-            if curve is None:
-                continue
-            curve = _early_bound(curve, "ICurve")
-            if not curve.IsCircle():
-                continue
-            params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-            circles.append((params[6], params[1], edge))
+    for raw_edge in visible_view_entities(view, 1, label="ball-mount front edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        circles.append((params[6], params[1], edge))
     if not circles:
         raise RuntimeError("front view has no circular model edges")
     seat_radius, seat_height, seat_edge = min(
@@ -158,18 +157,16 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
 
 def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """Return the visible cylindrical face for one turned diameter."""
-    drawing_view = _early_bound(view, "IView")
     candidates: list[tuple[float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_face in drawing_view.GetVisibleEntities2(component, 3) or []:
-            face = _early_bound(raw_face, "IFace2")
-            surface = face.GetSurface()
-            if surface is None:
-                continue
-            surface = _early_bound(surface, "ISurface")
-            if not surface.IsCylinder():
-                continue
-            candidates.append((float(surface.CylinderParams[6]) * 1000.0, face))
+    for raw_face in visible_view_entities(view, 3, label="ball-mount faces"):
+        face = _early_bound(raw_face, "IFace2")
+        surface = face.GetSurface()
+        if surface is None:
+            continue
+        surface = _early_bound(surface, "ISurface")
+        if not surface.IsCylinder():
+            continue
+        candidates.append((float(surface.CylinderParams[6]) * 1000.0, face))
     if not candidates:
         raise RuntimeError("front view has no visible cylindrical faces")
     target_radius = diameter_mm / 2.0

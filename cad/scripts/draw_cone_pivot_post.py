@@ -24,6 +24,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_pivot_post_spec import (
@@ -98,21 +99,17 @@ def _circular_edge(
     center_y_mm: float,
 ) -> Any:
     """Return the visible circular edge matching radius and model height."""
-    drawing_view = _early_bound(view, "IView")
-    components = drawing_view.GetVisibleComponents() or []
     candidates: list[tuple[float, float, Any]] = []
-    for component in components:
-        edges = drawing_view.GetVisibleEntities2(component, 1) or []
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = edge.GetCurve()
-            if curve is None:
-                continue
-            curve = _early_bound(curve, "ICurve")
-            if not curve.IsCircle():
-                continue
-            params = tuple(float(value) for value in curve.CircleParams)
-            candidates.append((params[6] * 1000.0, params[1] * 1000.0, edge))
+    for edge in visible_view_entities(view, 1, label="pivot-post front edges"):
+        edge = _early_bound(edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) for value in curve.CircleParams)
+        candidates.append((params[6] * 1000.0, params[1] * 1000.0, edge))
     if not candidates:
         raise RuntimeError("front view has no visible circular model edges")
     _telemetry.info(
@@ -139,23 +136,21 @@ def _crank_bore_edge(
 ) -> tuple[Any, tuple[float, float]]:
     """Return a visible rim edge adjacent to the modeled crank-bore cylinder."""
     expected_radius_m = CRANK_BORE_DIA / 2000.0
-    drawing_view = _early_bound(view, "IView")
     candidates: list[Any] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for edge in drawing_view.GetVisibleEntities2(component, 1) or []:
-            edge = _early_bound(edge, "IEdge")
-            for face in edge.GetTwoAdjacentFaces2() or []:
-                if face is None:
-                    continue
-                face = _early_bound(face, "IFace2")
-                surface = _early_bound(face.GetSurface(), "ISurface")
-                if not surface.IsCylinder():
-                    continue
-                parameters = surface.CylinderParams
-                if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
-                    continue
-                candidates.append(edge)
-                break
+    for edge in visible_view_entities(view, 1, label="pivot-post crank-bore rim"):
+        edge = _early_bound(edge, "IEdge")
+        for face in edge.GetTwoAdjacentFaces2() or []:
+            if face is None:
+                continue
+            face = _early_bound(face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if not surface.IsCylinder():
+                continue
+            parameters = surface.CylinderParams
+            if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
+                continue
+            candidates.append(edge)
+            break
     if not candidates:
         raise RuntimeError(
             "front view has no visible edge adjacent to the modeled crank-bore "

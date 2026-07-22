@@ -23,6 +23,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     set_reference_dimensions,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_adjuster_spec import (
@@ -83,19 +84,17 @@ def _circular_edge(
     view: Any, *, radius_mm: float, center_y_mm: float
 ) -> Any:
     """Return the visible circular model edge at the requested axis station."""
-    drawing_view = _early_bound(view, "IView")
     candidates: list[tuple[float, float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = edge.GetCurve()
-            if curve is None:
-                continue
-            curve = _early_bound(curve, "ICurve")
-            if not curve.IsCircle():
-                continue
-            params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-            candidates.append((params[6], params[1], edge))
+    for raw_edge in visible_view_entities(view, 1, label="tip-adjuster edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        candidates.append((params[6], params[1], edge))
     if not candidates:
         raise RuntimeError("drawing view has no circular model edges")
     radius, center_y, edge = min(

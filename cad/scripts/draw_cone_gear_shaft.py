@@ -24,6 +24,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_gear_shaft_spec import SECTION_DIAS, SHAFT_LENGTH
@@ -82,23 +83,19 @@ DIMENSION_PRECISION = {name: 3 for name in END_KEEP}
 
 def _outer_end_edge(adapter: Any, view: Any) -> Any:
     """Return the largest visible circular model edge in the end view."""
-    drawing_view = _early_bound(view, "IView")
-    components = drawing_view.GetVisibleComponents() or []
     circles: list[tuple[float, Any]] = []
-    for component in components:
-        edges = drawing_view.GetVisibleEntities2(component, 1) or []
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = edge.GetCurve()
-            if curve is None:
-                continue
-            curve = _early_bound(curve, "ICurve")
-            if not curve.IsCircle():
-                continue
-            params = curve.CircleParams
-            if params is None or len(params) < 7:
-                continue
-            circles.append((float(params[6]), edge))
+    for edge in visible_view_entities(view, 1, label="gear-shaft end edges"):
+        edge = _early_bound(edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = curve.CircleParams
+        if params is None or len(params) < 7:
+            continue
+        circles.append((float(params[6]), edge))
     if not circles:
         raise RuntimeError("end view has no visible circular model edge")
     circles.sort(key=lambda item: item[0])
@@ -112,21 +109,17 @@ def _outer_end_edge(adapter: Any, view: Any) -> Any:
 @_telemetry.traced("drawing.cylindrical_face_scan")
 def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """Return the visible cylindrical face for one shaft diameter."""
-    drawing_view = _early_bound(view, "IView")
-    components = drawing_view.GetVisibleComponents() or []
     candidates: list[tuple[float, Any]] = []
-    for component in components:
-        faces = drawing_view.GetVisibleEntities2(component, 3) or []
-        for face in faces:
-            face = _early_bound(face, "IFace2")
-            surface = face.GetSurface()
-            if surface is None:
-                continue
-            surface = _early_bound(surface, "ISurface")
-            if not surface.IsCylinder():
-                continue
-            radius_mm = float(surface.CylinderParams[6]) * 1000.0
-            candidates.append((radius_mm, face))
+    for face in visible_view_entities(view, 3, label="gear-shaft side faces"):
+        face = _early_bound(face, "IFace2")
+        surface = face.GetSurface()
+        if surface is None:
+            continue
+        surface = _early_bound(surface, "ISurface")
+        if not surface.IsCylinder():
+            continue
+        radius_mm = float(surface.CylinderParams[6]) * 1000.0
+        candidates.append((radius_mm, face))
     if not candidates:
         raise RuntimeError("side view has no visible cylindrical faces")
     target_radius = diameter_mm / 2.0

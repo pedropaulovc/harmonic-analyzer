@@ -26,6 +26,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_block_spec import (
@@ -86,7 +87,10 @@ FRONT_KEEP = {
     "SlitW": (FRONT_CENTER[0], 0.232),
 }
 TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] + 0.036, TOP_CENTER[1]),
+    # Text far enough east that the dimension's arrows and the dim-attached
+    # datum-D tag (which SolidWorks snaps to the text) sit clear of the view
+    # and of each other (eye-pass catch: box/arrow through the 12.00 digits).
+    "Depth": (TOP_CENTER[0] + 0.052, TOP_CENTER[1]),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
@@ -105,19 +109,17 @@ def _circle_entity(
     label: str,
 ) -> Any:
     """Return a real circular model edge by size and vertical station."""
-    drawing_view = _early_bound(view, "IView")
     candidates: list[tuple[float, float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = edge.GetCurve()
-            if curve is None:
-                continue
-            curve = _early_bound(curve, "ICurve")
-            if not curve.IsCircle():
-                continue
-            params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-            candidates.append((params[6], params[1], edge))
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        candidates.append((params[6], params[1], edge))
     if not candidates:
         raise RuntimeError(f"{label} view has no visible circular model edges")
     radius, center_y, edge = min(
@@ -139,25 +141,23 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
     ``min_span_mm`` guards against picking a sliver edge: the foot spans
     BLOCK_X (14.0) in the front view and BLOCK_Z (12.0) in the right view.
     """
-    drawing_view = _early_bound(view, "IView")
     candidates: list[tuple[float, float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for edge in drawing_view.GetVisibleEntities2(component, 1) or []:
-            edge = _early_bound(edge, "IEdge", "GetStartVertex", "GetEndVertex")
-            start = edge.GetStartVertex()
-            end = edge.GetEndVertex()
-            if start is None or end is None:
-                continue
-            start = _early_bound(start, "IVertex", "GetPoint")
-            end = _early_bound(end, "IVertex", "GetPoint")
-            p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
-            p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
-            if abs(p0[1]) > 0.01 or abs(p1[1]) > 0.01:
-                continue
-            # The foot's bottom edges run along model X in the front view and
-            # along model Z in the right view — take the larger in-plane span.
-            span_x = max(abs(p1[0] - p0[0]), abs(p1[2] - p0[2]))
-            candidates.append((span_x, min(p0[2], p1[2]), edge))
+    for edge in visible_view_entities(view, 1, label="tip-block foot edges"):
+        edge = _early_bound(edge, "IEdge", "GetStartVertex", "GetEndVertex")
+        start = edge.GetStartVertex()
+        end = edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        start = _early_bound(start, "IVertex", "GetPoint")
+        end = _early_bound(end, "IVertex", "GetPoint")
+        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+        if abs(p0[1]) > 0.01 or abs(p1[1]) > 0.01:
+            continue
+        # The foot's bottom edges run along model X in the front view and
+        # along model Z in the right view — take the larger in-plane span.
+        span_x = max(abs(p1[0] - p0[0]), abs(p1[2] - p0[2]))
+        candidates.append((span_x, min(p0[2], p1[2]), edge))
     if not candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     span_x, _z, edge = max(candidates, key=lambda item: item[0])
@@ -292,9 +292,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=TOP_KEEP["Depth"],
-        # Offset the tag box east of the dimension text so the D box does not
-        # sit ON the 12.00 text (eye-pass catch: box/arrow through the digits).
-        symbol_xy=(TOP_KEEP["Depth"][0] + 0.020, TOP_KEEP["Depth"][1]),
+        symbol_xy=TOP_KEEP["Depth"],
         datum="D",
         label="block-depth median plane",
         entity_type="DIMENSION",

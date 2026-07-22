@@ -25,6 +25,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from arbor_pedestal_spec import (
@@ -96,41 +97,39 @@ DIMENSION_PRECISION = {"BoreDia": 3}
 @_telemetry.traced("drawing.front_entity_scan")
 def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
     """Return the datum-A foot, datum-B side, right flank, bore, and crown."""
-    drawing_view = _early_bound(view, "IView")
     foot_candidates: list[tuple[float, Any]] = []
     side_candidates: list[tuple[float, Any]] = []
     flank_candidates: list[tuple[float, Any]] = []
     bore_candidates: list[tuple[float, float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = edge.GetCurve()
-            if curve is not None:
-                curve = _early_bound(curve, "ICurve")
-                if curve.IsCircle():
-                    params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-                    bore_candidates.append((params[6], params[1], edge))
-            start = edge.GetStartVertex()
-            end = edge.GetEndVertex()
-            if start is None or end is None:
-                continue
-            start = _early_bound(start, "IVertex", "GetPoint")
-            end = _early_bound(end, "IVertex", "GetPoint")
-            p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
-            p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
-            if abs(p0[1]) <= 0.01 and abs(p1[1]) <= 0.01:
-                foot_candidates.append((abs(p1[0] - p0[0]), edge))
-            if (
-                abs(p0[0] + FOOT_WIDTH / 2.0) <= 0.01
-                and abs(p1[0] + FOOT_WIDTH / 2.0) <= 0.01
-            ):
-                side_candidates.append((abs(p1[1] - p0[1]), edge))
-            if (
-                min(p0[0], p1[0]) > 0.0
-                and abs(p1[1] - p0[1]) > 40.0
-                and abs(p1[0] - p0[0]) > 0.5
-            ):
-                flank_candidates.append((abs(p1[1] - p0[1]), edge))
+    for raw_edge in visible_view_entities(view, 1, label="pedestal front edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is not None:
+            curve = _early_bound(curve, "ICurve")
+            if curve.IsCircle():
+                params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+                bore_candidates.append((params[6], params[1], edge))
+        start = edge.GetStartVertex()
+        end = edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        start = _early_bound(start, "IVertex", "GetPoint")
+        end = _early_bound(end, "IVertex", "GetPoint")
+        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+        if abs(p0[1]) <= 0.01 and abs(p1[1]) <= 0.01:
+            foot_candidates.append((abs(p1[0] - p0[0]), edge))
+        if (
+            abs(p0[0] + FOOT_WIDTH / 2.0) <= 0.01
+            and abs(p1[0] + FOOT_WIDTH / 2.0) <= 0.01
+        ):
+            side_candidates.append((abs(p1[1] - p0[1]), edge))
+        if (
+            min(p0[0], p1[0]) > 0.0
+            and abs(p1[1] - p0[1]) > 40.0
+            and abs(p1[0] - p0[0]) > 0.5
+        ):
+            flank_candidates.append((abs(p1[1] - p0[1]), edge))
     if not foot_candidates:
         raise RuntimeError("front view has no model edge on the foot-seat plane")
     foot_span, foot_edge = max(foot_candidates, key=lambda item: item[0])
@@ -169,43 +168,39 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
 
 def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
     """Return a plan-view edge at one modeled depth station."""
-    drawing_view = _early_bound(view, "IView")
     candidates: list[tuple[float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
-            edge = _early_bound(raw_edge, "IEdge")
-            start = edge.GetStartVertex()
-            end = edge.GetEndVertex()
-            if start is None or end is None:
-                continue
-            start = _early_bound(start, "IVertex", "GetPoint")
-            end = _early_bound(end, "IVertex", "GetPoint")
-            p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
-            p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
-            if (
-                abs(p0[2] - z_mm) <= 0.01
-                and abs(p1[2] - z_mm) <= 0.01
-            ):
-                candidates.append((abs(p1[0] - p0[0]), edge))
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} plan edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        start = edge.GetStartVertex()
+        end = edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        start = _early_bound(start, "IVertex", "GetPoint")
+        end = _early_bound(end, "IVertex", "GetPoint")
+        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+        if (
+            abs(p0[2] - z_mm) <= 0.01
+            and abs(p1[2] - z_mm) <= 0.01
+        ):
+            candidates.append((abs(p1[0] - p0[0]), edge))
     if not candidates:
         raise RuntimeError(f"plan view has no {label} edge at z={z_mm:.3f} mm")
     return max(candidates, key=lambda item: item[0])[1]
 
 
 def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> Any:
-    drawing_view = _early_bound(view, "IView")
     candidates: list[tuple[float, Any]] = []
-    for component in drawing_view.GetVisibleComponents() or []:
-        for raw_edge in drawing_view.GetVisibleEntities2(component, 1) or []:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = edge.GetCurve()
-            if curve is None:
-                continue
-            curve = _early_bound(curve, "ICurve")
-            if not curve.IsCircle():
-                continue
-            radius = float(curve.CircleParams[6]) * 1000.0
-            candidates.append((abs(radius - radius_mm), edge))
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        radius = float(curve.CircleParams[6]) * 1000.0
+        candidates.append((abs(radius - radius_mm), edge))
     if not candidates or candidates[0][0] > 0.01:
         candidates.sort(key=lambda item: item[0])
     if not candidates or min(candidates, key=lambda item: item[0])[0] > 0.01:
