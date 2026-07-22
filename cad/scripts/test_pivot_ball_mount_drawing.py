@@ -77,7 +77,7 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert "STEM_DIM_TEXT = (0.180, _front_y(12.0))" in source
     assert "frame_xy=(0.180, _front_y(12.0) - 0.014)" in source
     assert 'characteristic="profile_surface"' in source
-    assert "leader=False" in source
+    assert "leader=False" not in source
     assert 'label="stem diameter"' in source
     assert 'entity_type="SILHOUETTE"' in source
     assert source.count('entity_type="DIMENSION"') == 1

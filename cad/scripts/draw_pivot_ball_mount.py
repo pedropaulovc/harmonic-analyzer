@@ -332,7 +332,6 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="datum-B axis perpendicularity",
         entity_type="DIMENSION",
-        leader=False,
     )
     # The BASIC height and position zone locate the cross-bore axis from the
     # seat plane and through the stem axis without a prose-only acceptance rule.
