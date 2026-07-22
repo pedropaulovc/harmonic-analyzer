@@ -49,7 +49,15 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from cone_tip_adjuster_spec import CHAMFER, DRAWING_DIMENSIONS, DRAWING_NOTES
+from cone_tip_adjuster_spec import (
+    CHAMFER,
+    CUP_DEPTH,
+    CUP_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    SLOT_D,
+    SLOT_W,
+)
 
 PART_NAME = "cone-tip-adjuster"
 SPEC = fastener(PART_NAME)
@@ -57,10 +65,9 @@ MATERIAL = SPEC.material  # black-oxide screw (t00471)
 
 BODY_DIA = SPEC.model_diameter_mm  # interference-safe modeled thread minor envelope
 BODY_LEN = SPEC.length_mm
-CUP_DIA = 2.0  # blind bore the shaft tip rests in
-CUP_DEPTH = 6.0
-SLOT_W = 1.5
-SLOT_D = 1.5
+# Cup/slot geometry comes from cone_tip_adjuster_spec — the drawing's single
+# source of the marked dimensions — so a spec correction rebuilds the SLDPRT
+# from the same values the print annotates.
 
 
 def _slot_strip_area(r: float, w: float) -> float:

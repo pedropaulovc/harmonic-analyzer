@@ -93,6 +93,7 @@ DIMENSION_CALLOUTS = {
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
+@_telemetry.traced("drawing.front_entity_scan")
 def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
     """Return the datum-A foot, datum-B side, right flank, bore, and crown."""
     drawing_view = _early_bound(view, "IView")

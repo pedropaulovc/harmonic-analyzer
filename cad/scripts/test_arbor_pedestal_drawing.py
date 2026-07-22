@@ -67,7 +67,7 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "BOXED 6.00/16.00 LOCATE STRAP NEAR/FAR FACES FROM D" in notes
     assert "DIMENSIONS AND GD&T APPLY BEFORE COATING" in notes
     assert "MASK ARBOR BORE" in notes
-    assert "DIA 3.25\nHOLE" in notes
+    assert "DIA 3.26\nHOLE" in notes
     assert "FOOT SEAT A, LEFT SIDE B" in notes
     assert "PROFILE-CONTROLLED SURFACES" in notes
     assert "25-50 um" not in notes

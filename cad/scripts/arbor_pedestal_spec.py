@@ -22,8 +22,12 @@ DOME_DIA = 2.0 * TOP_RADIUS  # 20.0: the round head around the clamp bore
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525: the 3/8 in cylinder-arbor journal
 BORE_HEIGHT = 54.0  # arbor axis above the foot seat (drive height)
 SCREW_THREAD = "#4"  # flange hold-down clearance hole
-SCREW_CLEARANCE_DIA = 3.251  # the #4 NORMAL clearance the wizard actually cuts
-# (blind_cut_dia_mm of HoleSpec("clearance", SCREW_THREAD) in the builder)
+# The #4 NORMAL clearance the wizard actually cuts — sourced from the same
+# resolver the builder feeds wizard_holes, so the masking note can never
+# disagree with the modeled hole (3.251).
+from _holes import HoleSpec as _HoleSpec, blind_cut_dia_mm as _blind_cut_dia_mm
+
+SCREW_CLEARANCE_DIA = _blind_cut_dia_mm(_HoleSpec("clearance", SCREW_THREAD))
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},

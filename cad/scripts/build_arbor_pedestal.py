@@ -68,6 +68,7 @@ from arbor_pedestal_spec import (
     FOOT_DEPTH,
     FOOT_HEIGHT,
     FOOT_WIDTH,
+    SCREW_CLEARANCE_DIA,
     SCREW_THREAD,
     STRAP_T,
     TOP_RADIUS,
@@ -87,7 +88,8 @@ MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 # hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange):
 # #4 clearance NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim).
 SCREW_HOLE_SPEC = HoleSpec("clearance", SCREW_THREAD)
-SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)  # 3.251; re-exposed for the
+SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.264, single-sourced from the spec's
+# resolver call (same HoleSpec) so the modeled hole and the masking note agree;
 # drive-train assembly's foot-screw clearance assert (build_drive_train_assembly)
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
 
