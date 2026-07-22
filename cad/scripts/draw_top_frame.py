@@ -73,6 +73,7 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5
 # front elevation makes the full 41 mm rail/boss thickness and datum A visible.
 TOP_CENTER = (0.135, 0.175)
 FRONT_CENTER = (0.345, 0.150)
+DATUM_C_SYMBOL_XY = (0.210, 0.105)
 
 
 # Per-view survivors of the marked-dimension import. Width/Depth are the straight
@@ -250,7 +251,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="left outer rail-face datum", entity=datum_b_edge, shoulder=True,
     )
     add_datum_feature(
-        adapter, top, symbol_xy=(0.245, 0.105), datum="C",
+        adapter, top, symbol_xy=DATUM_C_SYMBOL_XY, datum="C",
         label="lower outer rail-face datum", entity=datum_c_edge, shoulder=True,
     )
     add_feature_control_frame(

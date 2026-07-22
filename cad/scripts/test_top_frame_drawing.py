@@ -67,7 +67,9 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 3
-    assert 'symbol_xy=(0.245, 0.105), datum="C"' in source
+    assert 'symbol_xy=DATUM_C_SYMBOL_XY, datum="C"' in source
+    assert 'label="lower outer rail-face datum", entity=datum_c_edge' in source
+    assert drawing.DATUM_C_SYMBOL_XY[0] < drawing.TOP_CENTER[0] + part.OUTER_X / 2000.0
     assert 'quantity="4X COLUMN BORES"' in source
     assert 'quantity="4X BOSS ODS"' in source
     assert 'allow_coincident=True' in source

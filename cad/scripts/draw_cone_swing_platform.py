@@ -41,7 +41,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
-from build_cone_swing_platform import NORTH_OVERHANG, PLATE_LEN, PLATE_T
+from _holes import blind_cut_dia_mm
+from build_cone_swing_platform import PIVOT_HOLE_SPEC, PLATE_T
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -72,7 +73,7 @@ TOP_KEEP = {
 
 
 def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
-    """Draw the model X=0 cone axis through the plan view."""
+    """Draw the plan-view cone axis through the modeled pivot-hole center."""
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
 
@@ -85,7 +86,8 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
         values = tuple(float(value) for value in mapped.ArrayData)
         return values[0], values[1]
 
-    projected_vertices: list[tuple[float, float]] = []
+    expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
+    pivot_centers: list[tuple[float, float]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = adapter._attempt(
@@ -93,44 +95,39 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> None:
         ) or ()
         for raw_edge in edges:
             edge = _early_bound(raw_edge, "IEdge")
-            for getter in (edge.GetStartVertex, edge.GetEndVertex):
-                raw_vertex = adapter._attempt(getter, default=None)
-                if raw_vertex is None:
-                    continue
-                vertex = _early_bound(raw_vertex, "IVertex")
-                xyz = tuple(float(value) for value in vertex.GetPoint())
-                projected_vertices.append(_view_xy(xyz))
-    if not projected_vertices:
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            parameters = tuple(float(value) for value in curve.CircleParams)
+            if abs(parameters[6] - expected_radius_m) > 1e-6:
+                continue
+            pivot_centers.append(_view_xy(parameters[:3]))
+    if not pivot_centers:
         raise RuntimeError(
-            "cone-platform plan view has no visible vertices for sheet registration"
+            "cone-platform plan view has no visible pivot-hole rim at "
+            f"radius {expected_radius_m:g} m"
         )
 
+    pivot = pivot_centers[0]
+    if any(
+        abs(center[0] - pivot[0]) > 1e-6 or abs(center[1] - pivot[1]) > 1e-6
+        for center in pivot_centers[1:]
+    ):
+        raise RuntimeError(
+            f"cone-platform plan view has conflicting pivot centers: {pivot_centers!r}"
+        )
     outline = tuple(float(value) for value in view.GetOutline())
-    view_x = [point[0] for point in projected_vertices]
-    view_y = [point[1] for point in projected_vertices]
-    dx = (outline[0] + outline[2] - min(view_x) - max(view_x)) / 2.0
-    dy = (outline[1] + outline[3] - min(view_y) - max(view_y)) / 2.0
-
-    def _sheet_xy(z_mm: float) -> tuple[float, float]:
-        x, y = _view_xy((0.0, 0.0, z_mm / 1000.0))
-        return x + dx, y + dy
-
-    north = _sheet_xy(NORTH_OVERHANG)
-    south = _sheet_xy(NORTH_OVERHANG - PLATE_LEN)
     margin = 0.001
-    for label, point in (("north", north), ("south", south)):
-        if not (
-            outline[0] - margin <= point[0] <= outline[2] + margin
-            and outline[1] - margin <= point[1] <= outline[3] + margin
-        ):
-            raise RuntimeError(
-                f"cone-axis {label} endpoint {point!r} falls outside plan-view "
-                f"outline {outline!r} after sheet registration"
-            )
-    _telemetry.debug(
-        "cone-axis view-to-sheet registration "
-        f"dx={dx * 1000:.2f} mm dy={dy * 1000:.2f} mm"
-    )
+    if not (
+        outline[0] - margin <= pivot[0] <= outline[2] + margin
+        and outline[1] - margin <= pivot[1] <= outline[3] + margin
+    ):
+        raise RuntimeError(
+            f"projected pivot center {pivot!r} falls outside plan-view outline "
+            f"{outline!r}"
+        )
+    north = (pivot[0], outline[3])
+    south = (pivot[0], outline[1])
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     model = adapter.currentModel
     # IDrawingDoc.EditSheet explicitly makes subsequently created geometry

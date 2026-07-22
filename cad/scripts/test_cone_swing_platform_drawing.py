@@ -53,8 +53,11 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "_add_cone_axis_centerline(adapter, top)" in source
     assert "view.ModelToViewTransform" in source
     assert "view.GetVisibleEntities2" in source
+    assert "blind_cut_dia_mm(PIVOT_HOLE_SPEC)" in source
+    assert "curve.CircleParams" in source
+    assert "pivot_centers" in source
     assert "view.GetOutline()" in source
-    assert "after sheet registration" in source
+    assert "projected pivot center" in source
     assert "drawing.EditSheet()" in source
     assert "drawing.EditSketch()" not in source
     assert "_visible_broad_face_edges(adapter, end)" in source
