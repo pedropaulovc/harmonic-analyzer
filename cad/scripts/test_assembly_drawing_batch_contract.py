@@ -7,6 +7,7 @@ from pathlib import Path
 
 import _config
 import _assembly_drawing_bom
+import _drawing_common as drawing_common
 import draw_channel_assembly
 import draw_drive_train_assembly
 import draw_frame_assembly
@@ -14,7 +15,11 @@ import draw_harmonic_analyzer_assembly
 import draw_magnifier_assembly
 import draw_paper_drive_assembly
 import draw_summing_assembly
-from _drawing_common import _bom_identity_map, _set_bom_cell_text
+from _drawing_common import (
+    _bom_identity_map,
+    _configure_manual_bom_column,
+    _set_bom_cell_text,
+)
 
 
 SHEETS = (
@@ -51,56 +56,81 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
 )
 
 
-def test_grouped_bom_cell_writes_retry_through_hidden_rows() -> None:
+def test_grouped_bom_columns_become_user_defined_before_cell_writes(
+    monkeypatch,
+) -> None:
     class GroupedTable:
         def __init__(self) -> None:
             self.calls: list[tuple[int, int, bool, str]] = []
-            self.rows = {
-                5: {1: "transgear-removable", 2: ""},
-                6: {1: "transgear-removable", 2: ""},
-                7: {1: "transgear-removable", 2: ""},
-            }
-            self.TotalRowCount = 8
+            self.column_types = {1: 201, 2: 204}
+            self.column_titles = {1: "PART NUMBER", 2: "DESCRIPTION"}
+            self.column_properties: dict[int, str] = {}
+            self.values: dict[tuple[int, int], str] = {}
 
-        def RowHidden(self, row: int) -> bool:
-            return row in self.rows
+        def SetColumnType3(
+            self, column: int, column_type: int, include_hidden: bool, title: str
+        ) -> int:
+            self.column_types[column] = column_type
+            return 0
+
+        def GetColumnType2(self, column: int, include_hidden: bool) -> int:
+            return self.column_types[column]
+
+        def SetColumnTitle2(
+            self, column: int, title: str, include_hidden: bool
+        ) -> bool:
+            self.column_titles[column] = title
+            return True
+
+        def SetColumnCustomProperty(self, column: int, title: str) -> bool:
+            if self.column_types[column] != 204:
+                return False
+            self.column_properties[column] = title
+            return True
+
+        def GetColumnCustomProperty(self, column: int) -> str:
+            return self.column_properties.get(column, "")
 
         def SetText2(
             self, row: int, column: int, include_hidden: bool, text: str
         ) -> None:
             self.calls.append((row, column, include_hidden, text))
-            if include_hidden:
-                self.rows[row][column] = text
+            if column in self.column_properties:
+                self.values[row, column] = text
 
         def DisplayedText2(
             self, row: int, column: int, include_hidden: bool
         ) -> str:
-            if include_hidden:
-                return self.rows.get(row, {}).get(column, "")
-            values = {cells.get(column, "") for cells in self.rows.values()}
-            return values.pop() if len(values) == 1 else ""
+            return self.values.get((row, column), "")
+
+    monkeypatch.setattr(
+        drawing_common._sw_type_info,
+        "early_bound_or_flag",
+        lambda table, *_args: table,
+    )
 
     for column, value, label in (
         (2, "CHAIN SPROCKET, T12/T18/T24; 1 EACH", "DESCRIPTION"),
-        (1, "MHA-086", "PART NUMBER"),
+        (1, "MHA-081", "PART NUMBER"),
     ):
         table = GroupedTable()
+        _configure_manual_bom_column(
+            table,
+            column,
+            label,
+            replace_native=label == "PART NUMBER",
+            label=label,
+        )
         _set_bom_cell_text(
             table,
             4,
             column,
             value,
-            identity_column=1,
-            accepted_identities={"transgear-removable"},
             label=label,
         )
         assert table.DisplayedText2(4, column, False) == value
-        assert table.calls == [
-            (4, column, False, value),
-            (5, column, True, value),
-            (6, column, True, value),
-            (7, column, True, value),
-        ]
+        assert table.column_properties[column] == label
+        assert table.calls == [(4, column, False, value)]
 
     common_source = Path(_set_bom_cell_text.__code__.co_filename).read_text(
         encoding="utf-8"

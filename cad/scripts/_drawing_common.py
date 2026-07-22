@@ -2524,14 +2524,20 @@ def insert_bom_table(
             )
         description_column = header.index("DESCRIPTION")
         part_column = header.index("PART NUMBER")
+        _configure_manual_bom_column(
+            table,
+            description_column,
+            "DESCRIPTION",
+            replace_native=False,
+            label=f"{label} BOM description",
+        )
         remaining = {key.strip().lower(): text for key, text in descriptions.items()}
         for row in range(1, rows):
             part = str(
                 adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
                 or ""
             ).strip().lower()
-            component = identities.get(part, part)
-            text = remaining.pop(component, None)
+            text = remaining.pop(identities.get(part, part), None)
             if text is None:
                 continue
             if not table.IsCellTextEditable(row, description_column):
@@ -2543,12 +2549,6 @@ def insert_bom_table(
                 row,
                 description_column,
                 text,
-                identity_column=part_column,
-                accepted_identities={
-                    identity
-                    for identity, mapped_component in identities.items()
-                    if mapped_component == component
-                },
                 label=f"{label} BOM description",
             )
         if remaining:
@@ -2563,52 +2563,58 @@ def insert_bom_table(
     return table
 
 
+def _configure_manual_bom_column(
+    table: Any,
+    column: int,
+    title: str,
+    *,
+    replace_native: bool,
+    label: str,
+) -> None:
+    """Make a BOM output column user-defined and verify its API contract.
+
+    Generated same-part aggregate cells reject manual ``SetText2`` writes.  A
+    user-defined column whose custom-property name equals its title is the
+    documented unattached/manual form and remains editable on aggregate rows.
+    ``PART NUMBER`` starts as a special generated column, so it first needs an
+    explicit conversion to the custom-property column type.
+    """
+    bom = _sw_type_info.early_bound_or_flag(
+        table,
+        "IBomTableAnnotation",
+        "GetColumnCustomProperty",
+        "SetColumnCustomProperty",
+    )
+    if replace_native:
+        status = int(table.SetColumnType3(column, 204, True, title))
+        if status != 0:
+            raise RuntimeError(f"{label} column conversion failed: status={status}")
+        if int(table.GetColumnType2(column, True)) != 204:
+            raise RuntimeError(f"{label} column did not become custom-property type")
+        if not table.SetColumnTitle2(column, title, True):
+            raise RuntimeError(f"{label} column title did not persist")
+    if not bom.SetColumnCustomProperty(column, title):
+        raise RuntimeError(f"{label} column did not become user-defined")
+    applied = str(bom.GetColumnCustomProperty(column) or "").strip().upper()
+    if applied != title.upper():
+        raise RuntimeError(
+            f"{label} column property did not persist: {applied!r} != {title!r}"
+        )
+
+
 def _set_bom_cell_text(
     table: Any,
     row: int,
     column: int,
     text: str,
     *,
-    identity_column: int,
-    accepted_identities: set[str],
     label: str,
 ) -> None:
-    """Write and verify a BOM cell, including grouped configuration rows.
-
-    A same-part BOM exposes one aggregate row over hidden configuration rows.
-    SolidWorks silently discards a visible-only ``SetText2`` on that aggregate,
-    so enumerate ``TotalRowCount`` and write every matching hidden member row
-    before failing the readback contract.
-    """
+    """Write and verify one user-defined BOM cell."""
     table.SetText2(row, column, False, text)
     applied = str(table.DisplayedText2(row, column, False) or "")
-    if applied == text:
-        return
-    normalized = {identity.strip().lower() for identity in accepted_identities}
-    total_rows = int(table.TotalRowCount)
-    hidden_snapshot: list[tuple[int, bool, str]] = []
-    written_rows: list[int] = []
-    for hidden_row in range(1, total_rows):
-        hidden = bool(table.RowHidden(hidden_row))
-        identity = str(
-            table.DisplayedText2(hidden_row, identity_column, True) or ""
-        ).strip()
-        hidden_snapshot.append((hidden_row, hidden, identity))
-        if not hidden or identity.lower() not in normalized:
-            continue
-        table.SetText2(hidden_row, column, True, text)
-        written_rows.append(hidden_row)
-    if not written_rows:
-        raise RuntimeError(
-            f"{label} has no matching hidden member rows for "
-            f"{sorted(normalized)!r}: {hidden_snapshot!r}"
-        )
-    applied = str(table.DisplayedText2(row, column, False) or "")
     if applied != text:
-        raise RuntimeError(
-            f"{label} did not persist after hidden rows {written_rows!r}: "
-            f"{applied!r} != {text!r}; rows={hidden_snapshot!r}"
-        )
+        raise RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")
 
 
 def _min_angular_gap(ring_radius: float, balloon_radius: float, *, clearance: float) -> float:
