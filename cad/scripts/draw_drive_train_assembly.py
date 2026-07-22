@@ -233,7 +233,7 @@ BOM_ISO_CENTER = (0.310, 0.165)
 # bands in the former full-assembly identification views.  Every exterior BOM
 # family appears in exactly one group and gets one deliberately attached balloon.
 EXTERIOR_VIEW_CENTERS = ((0.078, 0.150), (0.215, 0.150), (0.350, 0.150))
-EXTERIOR_VIEW_NAMES = ("*Isometric", "*Front", "*Isometric")
+EXTERIOR_VIEW_NAMES = ("*Isometric", "*Isometric", "*Isometric")
 EXTERIOR_VIEW_LABELS = (
     "VIEW A — CONE PLATFORM / GEAR TRAIN",
     "VIEW B — PINION ENGAGEMENT",
