@@ -51,10 +51,11 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         symbol_xy=(0.108, 0.150),
         datum="A",
         label="thread pitch-diameter datum feature",
+        callout_below="1/4-20 THREAD",
     )
-    for edge_xy, frame_xy, label in (
-        ((0.070, 0.16905), (0.108, 0.182), "shoulder total runout"),
-        ((0.070, 0.17850), (0.108, 0.204), "head total runout"),
+    for edge_xy, frame_xy, below_text, label in (
+        ((0.070, 0.16980), (0.108, 0.182), "SHOULDER OD", "shoulder total runout"),
+        ((0.070, 0.17850), (0.108, 0.204), "HEAD OD", "head total runout"),
     ):
         add_feature_control_frame(
             adapter,
@@ -64,6 +65,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
             characteristic="total_runout",
             tolerance="0.05",
             datums=("A",),
+            quantity=below_text,
             label=label,
         )
     add_feature_control_frame(
@@ -74,22 +76,24 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
+        quantity="HEAD BEARING FACE",
         label="head bearing face perpendicularity",
     )
     add_feature_control_frame(
         adapter,
         end,
-        edge_xy=(0.070, 0.13095),
+        edge_xy=(0.070, 0.13020),
         frame_xy=(0.108, 0.118),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
+        quantity="SHOULDER END FACE",
         label="shoulder end perpendicularity",
     )
     add_surface_finish(
         adapter,
         end,
-        edge_xy=(0.08347, 0.13653),
+        edge_xy=(0.08400, 0.13600),
         symbol_xy=(0.125, 0.136),
         roughness_ra="0.8",
         label="ground shoulder finish",
@@ -110,6 +114,8 @@ RECIPE = FastenerSheet(
     side_keep=SIDE_KEEP,
     side_dimension_callouts=SIDE_DIMENSION_CALLOUTS,
     note_xy=(0.020, 0.105),
+    end_note_xy=(0.020, 0.245),
+    side_centerline_face_xy=(0.190, 0.145),
     decorate=_decorate,
 )
 

@@ -160,7 +160,7 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     assert base.PIVOT_SEAT_SPEC.thread_class == "2B"
     assert base.PIVOT_HOLE_DEPTH - spec.THREAD_TAIL_LEN >= 1.5
     assert "DO NOT RELEASE" not in spec.DRAWING_NOTES
-    assert f"THREAD LENGTH {spec.THREAD_TAIL_LEN:.2f}" in spec.DRAWING_NOTES
+    assert "THREAD LENGTH 8.00" not in spec.DRAWING_NOTES
     assert f"{spec.MIN_FULL_FORM:.2f} MIN FULL-FORM THREAD" in spec.DRAWING_NOTES
     assert "INCOMPLETE THREAD/RUNOUT AT SHOULDER 1P MAX" in spec.DRAWING_NOTES
     assert (
@@ -170,10 +170,11 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
         - spec.DISTAL_CHAMFER
         >= spec.MIN_FULL_FORM
     )
-    assert f"MATING PLATE THICKNESS {spec.PLATFORM_THICKNESS:.2f} MAX" in (
+    assert "SLOT CENTERPLANE OFFSET FROM DATUM A 0.00 +/-0.05" in (
         spec.DRAWING_NOTES
     )
-    assert f"{spec.AXIAL_CLEARANCE:.2f} MIN AXIAL CLEARANCE" in spec.DRAWING_NOTES
+    assert "MANDATORY UNDERHEAD FILLET R0.10-0.25" in spec.DRAWING_NOTES
+    assert "MANDATORY DISTAL START CHAMFER 0.25-0.50 X 45°" in spec.DRAWING_NOTES
 
 
 def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
@@ -185,10 +186,12 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     ).read_text(encoding="utf-8")
     assert drawing.RECIPE.end_view == "*Bottom"
     assert drawing.RECIPE.side_center == (0.190, 0.170)
-    assert spec.END_VIEW_NOTE == "SHOULDER-END VIEW"
+    assert "INNER CIRCLE = DATUM A THREAD" in spec.END_VIEW_NOTE
+    assert "MIDDLE CIRCLE = GROUND SHOULDER OD" in spec.END_VIEW_NOTE
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShoulderLg", "ThreadLg"}
     assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"] == "1/4-20 UNC-2A"
     assert drawing.RECIPE.decorate is drawing._decorate
+    assert drawing.RECIPE.side_centerline_face_xy == (0.190, 0.145)
     assert drawing_source.count("add_datum_feature(") == 1
     assert drawing_source.count("add_feature_control_frame(") == 3
     assert drawing_source.count("add_surface_finish(") == 1

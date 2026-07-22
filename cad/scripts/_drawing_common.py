@@ -314,6 +314,7 @@ def add_datum_feature(
     entity: Any | None = None,
     shoulder: bool = False,
     annotation: Any | None = None,
+    callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
@@ -340,7 +341,13 @@ def add_datum_feature(
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
     tag = _sw_type_info.early_bound_or_flag(
-        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel", "Shoulder"
+        tag,
+        "IDatumTag",
+        "SetLabel",
+        "GetAnnotation",
+        "GetLabel",
+        "SetText",
+        "Shoulder",
     )
     if not tag.SetLabel(datum):
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
@@ -353,6 +360,8 @@ def add_datum_feature(
         raise RuntimeError(f"failed to position datum {datum} ({label})")
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
+    if callout_below and not tag.SetText(4, callout_below):
+        raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return tag
