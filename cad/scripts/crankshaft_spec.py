@@ -17,12 +17,12 @@ PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
-    "3DSketch1": {"PinHeight"},
+    "PinHole": {"PinHeight"},
 }
 # The cross-hole's Ø/THRU callout comes from the associative native Hole Wizard
 # annotation. Its axial station is the model's PinHeight dimension on the
-# wizard's nested 3DSketch1 subfeature; the drawing-mark walker reaches the
-# complete feature tree so that model-owned dimension can be imported.
+# wizard's nested 3DSketch1 subfeature; the drawing-mark walker starts from the
+# named PinHole parent and reaches that complete feature tree.
 
 # Lines kept short (<~66 chars) so the left-anchored block stays clear of the
 # title block (x >= 0.264 m); it grows DOWNWARD from its anchor.

@@ -53,7 +53,7 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     assert "edge=cross_hole_edge" in source
     assert source.count("add_edge_dimension(") == 0
     assert source.count("set_basic_dimensions(") == 1
-    assert crankshaft_spec.DRAWING_DIMENSIONS["3DSketch1"] == {"PinHeight"}
+    assert crankshaft_spec.DRAWING_DIMENSIONS["PinHole"] == {"PinHeight"}
 
 
 def test_linked_notes_define_remaining_operations() -> None:
