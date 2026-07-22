@@ -49,13 +49,23 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from boss_hook_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "boss-hook"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
-ROD_DIA = 3.0  # DIMENSIONS.md ch18: hook rod (low)
-SHANK_RISE = 12.0  # straight rise before the elbow (derived)
-ELBOW_R = 3.0  # centreline bend radius (low)
+# Geometry nominals live in boss_hook_geom (the prose-free module assemblies
+# import); re-imported here so the build and the assembly can never drift.
+from boss_hook_geom import ELBOW_R, ROD_DIA, SHANK_RISE  # noqa: E402
 ARM_RUN = 3.5  # straight run after the elbow; tip at x 6.5 (derived)
 # Rod centreline tops out at y = SHANK_RISE + ELBOW_R = 15 (machine 1015);
 # tip at x = ELBOW_R + ARM_RUN = 6.5 (machine 97).
@@ -183,6 +193,17 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

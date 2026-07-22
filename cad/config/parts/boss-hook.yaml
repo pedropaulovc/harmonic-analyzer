@@ -1,5 +1,8 @@
 boss-hook:
   number: MHA-005
-  material: Plain Carbon Steel
+  material: ASTM A108 Grade 1018 steel
+  material_specification: "ASTM A108 Grade 1018 steel"
+  finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"

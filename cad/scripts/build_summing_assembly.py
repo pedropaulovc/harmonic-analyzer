@@ -71,8 +71,11 @@ from summing_lever_spec import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
 KNIFE_CONTACT_Y = KNIFE[1] + HEX_H / 2.0  # knife-edge contact ridge line (995.13)
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
-# --- counter-spring chain (build_boss_hook / counter_spring_spec) -----------
-from build_boss_hook import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
+# --- counter-spring chain (boss_hook_geom / counter_spring_spec) ------------
+# boss_hook_geom, NOT build_boss_hook: the part build's import closure carries
+# boss_hook_spec's drawing prose, which would fold note edits into this
+# assembly's full-rebuild recipe (codex #361).
+from boss_hook_geom import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
 from counter_spring_spec import (  # noqa: E402
     BOTTOM_HOOK_LEAD as CS_BOTTOM_LEAD,
     COIL_OD as CS_COIL_OD,

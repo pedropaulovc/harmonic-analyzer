@@ -53,7 +53,19 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
+from pen_hanger_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FRONT_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
+    TOP_VIEW_NOTE,
+)
 
 import _telemetry
 
@@ -252,6 +264,19 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Front View Note": FRONT_VIEW_NOTE,
+            "Top View Note": TOP_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

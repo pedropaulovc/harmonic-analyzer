@@ -1717,6 +1717,9 @@ def task_check():
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
+        # Cross-sheet ownership checks whose filename intentionally does not match
+        # the one-file-per-drawing discovery pattern above.
+        SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
     ]
     recipe_test_deps = sorted({
         *(str(path.resolve()) for path in recipe_tests),
@@ -1772,8 +1775,14 @@ def task_check():
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_nameplate_geometry.py")],
         },
         "recipe": {
+            # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via
+            # _config.parts(), and module_deps_of tracks _config.py but not the
+            # YAML documents it loads -- without these deps a finish/material
+            # edit would leave the stamp valid and the guard silently stale
+            # (codex review #361).
             "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
                          *recipe_test_deps,
+                         *_CONFIG_YAMLS,
                          str(PROJECT_DRWDOT.resolve())],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },

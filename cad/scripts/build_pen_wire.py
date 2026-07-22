@@ -39,6 +39,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -46,26 +47,36 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from pen_wire_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ELEVATION_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "pen-wire"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-WIRE_DIA = 0.8  # hair-thin in the photos; renderable stand-in (low)
-CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
-
-# --- endpoint anchors (machine frame; asserted by build_pen_assembly) --------
-WHEEL_X = 53.0  # magnifying-wheel centre (build_magnifier_assembly.WHEEL_X)
-WHEEL_BAR_Y = 575.7  # wheel axis height = the vertical-tangent point's y
-RIM_DIA = 100.0  # ch. 21 annotated (build_magnifying_wheel.RIM_OUTER_DIA)
-WHEEL_MID_Z = -146.9  # rim groove mid-plane (wheel mid-plane)
-WIRE_HOLE_Y = 513.0  # pen-rod wire hole: PEN_ROD_POS y 398 + local 115
-
-# Hanging run: 0.25 off the rim surface at the pen-rod-side tangent, straight
-# down to the wire-hole level (the wire passes 1.7 clear in front of the
-# rod's z -149 front face -- the tie-off through the hole is implied).
-WIRE_X = WHEEL_X - RIM_DIA / 2.0 - WIRE_DIA / 2.0 - CLEARANCE  # 2.35
-WIRE_BOTTOM = (WIRE_X, WIRE_HOLE_Y, WHEEL_MID_Z)
-WIRE_LEN = WHEEL_BAR_Y - WIRE_HOLE_Y  # 62.7
+# Geometry nominals (wire dia, endpoint anchors, run length) live in
+# pen_wire_geom -- the prose-free module build_pen_assembly imports -- and are
+# re-imported here so the build and the assembly can never drift.
+from pen_wire_geom import (  # noqa: E402
+    CLEARANCE,
+    RIM_DIA,
+    WHEEL_BAR_Y,
+    WHEEL_MID_Z,
+    WHEEL_X,
+    WIRE_BOTTOM,
+    WIRE_DIA,
+    WIRE_HOLE_Y,
+    WIRE_LEN,
+    WIRE_X,
+)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -99,7 +110,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=WIRE_LEN)),
     )
     name_last_feature(adapter, "Wire")
-    drive_jobs.append(("D1@Wire", '"WireLength"'))
+    # Name the extrude depth "Depth" so the drawing can mark the run length
+    # (mirrors build_crankshaft's Shaft/Depth); the drive now targets that name.
+    length_dim = name_dimensions(adapter, "Wire", ["Depth"])
+    drive_jobs.append((length_dim[0], '"WireLength"'))
     v_wire = math.pi * (WIRE_DIA / 2.0) ** 2 * WIRE_LEN
     await volume_check(adapter, "wire", v_wire, 0.005 * v_wire)
 
@@ -114,6 +128,18 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Elevation View Note": ELEVATION_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

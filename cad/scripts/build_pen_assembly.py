@@ -108,9 +108,12 @@ FRAME_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 SET_SCREW_POS = (38.0, 413.0, -154.0)
 
 # --- amplification wire 2 (rim -> pen rod) -----------------------------------
-# Endpoints + length live in build_pen_wire.py (the part's length IS the run);
+# Endpoints + length live in pen_wire_geom (the part's length IS the run);
 # assert them against THIS script's anchors so a layout move fails loud.
-from build_pen_wire import (  # noqa: E402
+# pen_wire_geom, NOT build_pen_wire: the part build's import closure carries
+# pen_wire_spec's drawing prose, which would fold note edits into this
+# assembly's full-rebuild recipe (codex #361).
+from pen_wire_geom import (  # noqa: E402
     WIRE_BOTTOM as PEN_WIRE_BOTTOM,
     WIRE_LEN as PEN_WIRE_LEN,
 )

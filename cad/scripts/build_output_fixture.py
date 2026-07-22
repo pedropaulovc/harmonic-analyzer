@@ -41,27 +41,42 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
 from _holes import TAP_DRILL_MM
+from output_fixture_spec import (
+    COLLAR_DIA,
+    COLLAR_HEIGHT,
+    CROSS_HOLE_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
+    ROD_BORE_DIA,
+)
 
 PART_NAME = "output-fixture"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-COLLAR_DIA = 10.0  # DIMENSIONS.md ch20: p.48 bottom close-up (low)
-COLLAR_HEIGHT = 8.0  # DIMENSIONS.md ch20 (low)
-# The Ø5 vertical rod slides through the coaxial bore -- an engineered 0.2 mm
-# running/slip fit, NOT a drilled hole, so it stays a plain dimensioned cut (the
-# Hole Wizard's standard drills are for drilled holes/pins/seats; a nearest-
-# drill fit would slop the slide).
-ROD_BORE_DIA = 5.2  # Ø5 vertical rod + clearance
-#
-# The cross hole is DESIGNED as a #4-40 tapped thumb-screw hole, but it pierces
-# the CURVED collar wall RADIALLY -- there is no planar seat for wizard_holes /
-# find_planar_face to place a Hole Wizard feature on -- so it stays a plain cut
-# at the #4-40 tap-drill diameter (Ø2.261) as the geometric stand-in (the real
-# thread designation can't be carried on the cylindrical wall with this helper).
-# No interference either way: the assembly OMITS this thumb screw (the cross
-# hole doubles as the wire tie), and the mating Ø2.0 shank fits Ø2.261 anyway.
-CROSS_HOLE_DIA = TAP_DRILL_MM["#4-40"]  # 2.261: #4-40 tap drill (was Ø3.0)
+# Collar nominals live in output_fixture_spec (the drawing consumes the same
+# values), so the print and the part cannot silently drift (codex review #361).
+# Design notes that stay with the producer:
+# - The Ø5 vertical rod slides through the coaxial ROD_BORE_DIA bore -- an
+#   engineered 0.2 mm running/slip fit, NOT a drilled hole, so it stays a plain
+#   dimensioned cut (a nearest-drill Hole Wizard fit would slop the slide).
+# - The cross hole is DESIGNED as a #4-40 tapped thumb-screw hole, but it
+#   pierces the CURVED collar wall RADIALLY -- no planar seat for wizard_holes
+#   -- so it stays a plain cut at the #4-40 tap-drill diameter as the geometric
+#   stand-in. No interference either way: the assembly OMITS this thumb screw
+#   (the cross hole doubles as the wire tie) and the mating Ø2.0 shank fits.
+if CROSS_HOLE_DIA != TAP_DRILL_MM["#4-40"]:  # spec is pure data; pin it here
+    raise RuntimeError(
+        f"output_fixture_spec.CROSS_HOLE_DIA {CROSS_HOLE_DIA} != "
+        f"#4-40 tap drill {TAP_DRILL_MM['#4-40']}"
+    )
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent crossed
 
 # HookAnchorPoint: where the lever-wire's hook BALL JOINT grabs the fixture.
@@ -212,6 +227,18 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

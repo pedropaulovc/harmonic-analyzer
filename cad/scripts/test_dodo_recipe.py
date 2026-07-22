@@ -1051,7 +1051,14 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
     assert {
         "_holes.py",
         "build_platen_guide.py",
+        "test_pen_summing_drawing_batch_contract.py",
     } <= deps
+
+    command = recipe["actions"][0][1][0]
+    assert any(
+        Path(argument).name == "test_pen_summing_drawing_batch_contract.py"
+        for argument in command
+    ), "the pen/summing metadata contract must execute under check:recipe"
 
 
 def test_submodule_digest_is_checkout_eol_independent(tmp_path):

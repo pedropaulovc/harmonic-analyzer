@@ -1,5 +1,8 @@
 gooseneck:
   number: MHA-032
-  material: Chrome Stainless Steel
+  material: AISI 1010 seamless steel tube
+  material_specification: AISI 1010 seamless steel tube
+  finish: ASTM B456 SC2 Ni-Cr plate after braze; Ra 0.8 max; dims pre-plate
+  quantity: 1
   tolerance_class: machined_block
   process: "machined (steel)"

@@ -297,6 +297,54 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="summing-lever",
         script_name="draw_summing_lever.py",
     ),
+    DrawingSpec(
+        name="boss_hook",
+        part="boss_hook",
+        artifact_stem="boss-hook",
+        script_name="draw_boss_hook.py",
+    ),
+    DrawingSpec(
+        name="output_fixture",
+        part="output_fixture",
+        artifact_stem="output-fixture",
+        script_name="draw_output_fixture.py",
+    ),
+    DrawingSpec(
+        name="pen_frame",
+        part="pen_frame",
+        artifact_stem="pen-frame",
+        script_name="draw_pen_frame.py",
+    ),
+    DrawingSpec(
+        name="pen_hanger",
+        part="pen_hanger",
+        artifact_stem="pen-hanger",
+        script_name="draw_pen_hanger.py",
+    ),
+    DrawingSpec(
+        name="pen_wire",
+        part="pen_wire",
+        artifact_stem="pen-wire",
+        script_name="draw_pen_wire.py",
+    ),
+    DrawingSpec(
+        name="gooseneck",
+        part="gooseneck",
+        artifact_stem="gooseneck",
+        script_name="draw_gooseneck.py",
+    ),
+    DrawingSpec(
+        name="gooseneck_clamp",
+        part="gooseneck_clamp",
+        artifact_stem="gooseneck-clamp",
+        script_name="draw_gooseneck_clamp.py",
+    ),
+    DrawingSpec(
+        name="measuring_stick",
+        part="measuring_stick",
+        artifact_stem="measuring-stick",
+        script_name="draw_measuring_stick.py",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

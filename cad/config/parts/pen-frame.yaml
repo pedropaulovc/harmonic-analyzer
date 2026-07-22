@@ -1,5 +1,8 @@
 pen-frame:
   number: MHA-048
-  material: Brass
+  material: C36000 free-machining brass
   tolerance_class: machined_block
   process: "machined (brass)"
+  material_specification: "C36000 free-machining brass"
+  finish: "draw-filed, lay along 40 mm edge (long faces)"
+  quantity: 1

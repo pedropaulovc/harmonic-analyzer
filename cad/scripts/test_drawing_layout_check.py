@@ -12,6 +12,7 @@ print.
 
 from __future__ import annotations
 
+from inspect import getsource
 from types import SimpleNamespace
 
 import pytest
@@ -77,6 +78,61 @@ class _FakeAdapter:
     def _get_attr_or_call(obj, name):
         member = getattr(obj, name, None)
         return member() if callable(member) else member
+
+
+class _FakeNote:
+    def __init__(self, text):
+        self.text = text
+
+    def GetText(self):
+        return self.text
+
+    def SetText(self, text):
+        self.text = text
+        return True
+
+
+def _edge_break_doc(text):
+    note = _FakeNote(text)
+    annotation = SimpleNamespace(
+        GetType=lambda: drawing_common._ANNOT_NOTE,
+        GetSpecificAnnotation=lambda: note,
+    )
+    sheet_view = SimpleNamespace(GetAnnotations=lambda: [annotation])
+    return note, SimpleNamespace(GetFirstView=lambda: sheet_view)
+
+
+def test_metric_edge_break_replaces_inch_origin_template_note():
+    note, ddoc = _edge_break_doc(drawing_common._OLD_EDGE_BREAK_NOTE)
+    drawing_common._normalize_metric_edge_break_note(_FakeAdapter(None), ddoc)
+    assert note.text == drawing_common._METRIC_EDGE_BREAK_NOTE
+
+
+def test_metric_edge_break_accepts_a_repaired_template():
+    note, ddoc = _edge_break_doc(drawing_common._METRIC_EDGE_BREAK_NOTE)
+    drawing_common._normalize_metric_edge_break_note(_FakeAdapter(None), ddoc)
+    assert note.text == drawing_common._METRIC_EDGE_BREAK_NOTE
+
+
+def test_metric_edge_break_fails_loud_when_template_note_is_missing():
+    note, ddoc = _edge_break_doc("SOME OTHER TEMPLATE NOTE")
+    with pytest.raises(RuntimeError, match="exactly one recognized"):
+        drawing_common._normalize_metric_edge_break_note(_FakeAdapter(None), ddoc)
+    assert note.text == "SOME OTHER TEMPLATE NOTE"
+
+
+def test_finalize_exports_pdf_before_reopen_and_skips_clean_save():
+    source = getsource(drawing_common.finalize_drawing)
+    first_reopen = source.index("reopen_drawing")
+    pdf_export = source.index("pdf_path=str(outputs.pdf)")
+    assert pdf_export < first_reopen
+    # The dirty-scale branch saves a NEWER SLDDRW after that first export, so
+    # it must re-export the PDF to match the persisted drawing (codex review
+    # #361); the clean path keeps the single early export.
+    assert source.count("save_drawing(") == 2
+    assert source.rindex("save_drawing(") > source.index("if sheet_scale_dirty:")
+    assert '"GetSaveFlag"' in source
+    assert "save skipped" in source
 
 
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):
