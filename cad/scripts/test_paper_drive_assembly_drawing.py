@@ -94,6 +94,8 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert source.count("place_view(") == 4
     assert source.count("scale=VIEW_SCALE") == 3
     assert source.count("isolate_drawing_view_components(") == 1
+    assert drawing.SHEET_SCALE == (1.0, 5.0)
+    assert drawing.VIEW_SCALE == (1, 5)
     assert f"{_chain.LINK_COUNT}-LINK CHAIN" in drawing.ASSEMBLY_NOTES
     assert "T24 AND T12 SPROCKETS" in drawing.ASSEMBLY_NOTES
     assert all(

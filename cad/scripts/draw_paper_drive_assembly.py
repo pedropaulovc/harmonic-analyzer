@@ -50,12 +50,12 @@ PNG = OUTPUTS.png
 # machine x=0, spanning +-226) dominates the front view, while the platen +
 # guide rails + transgear cluster stack at machine y ~260-350 and the spare T18
 # gear rests low on the base (~y 53) -- a ~452 mm width x ~320 mm height span,
-# only ~45 mm deep. 1:4 shrinks the 452 mm width to a ~113 mm on-sheet front
-# view (in the 100-130 mm target); the shallow depth keeps the right view ~11 mm
-# wide so the front (right edge ~117 mm) and right (centre 130 mm) views clear.
-# 1:3 (front ~151 mm) would overrun the right view and the left border.
-SHEET_SCALE = (1.0, 4.0)
-VIEW_SCALE = (1, 4)
+# only ~45 mm deep. Live drawing bounds include projected component extents
+# beyond the nominal support-bar span: at 1:4 the front crossed the left zone
+# by 11.8 mm and overlapped the right view by 18.1 mm. 1:5 keeps both main
+# orthographic views inside their own fields while remaining readable.
+SHEET_SCALE = (1.0, 5.0)
+VIEW_SCALE = (1, 5)
 
 # One BOM row per UNIQUE top-level component of build_paper_drive_assembly.py.
 # The clamp-/fillister-/bracket-screw seeds and BOTH roller-chain link stems
@@ -101,15 +101,13 @@ ASSEMBLY_NOTES = "\n".join(
     )
 )
 
-# Three views kept on summing's centres: the front view opens on the wide bar,
-# the right view pulled to 0.130 to clear the iso balloons (which spread ~0.05
-# left of the iso outline), while the iso stays at 0.225 -- right balloons clear
-# of the title-block keep-out (x >= 0.264) and above the bottom border.
-FRONT_CENTER = (0.060, 0.150)
-RIGHT_CENTER = (0.130, 0.150)
+# The 1:5 orthographic fields retain 80 mm between centres; the isometric stays
+# in the right field above the title-block keep-out.
+FRONT_CENTER = (0.070, 0.145)
+RIGHT_CENTER = (0.150, 0.145)
 ISO_CENTER = (0.225, 0.140)
-BRACKET_DETAIL_CENTER = (0.095, 0.235)
-BRACKET_DETAIL_SCALE = (1, 2)
+BRACKET_DETAIL_CENTER = (0.100, 0.225)
+BRACKET_DETAIL_SCALE = (1, 3)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
 BOM_ANCHOR = (0.248, 0.265)
@@ -195,7 +193,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, (iso, front, right, bracket_detail), expected=len(BOM_COMPONENTS),
         label="paper-drive assembly balloons",
     )
-    if add_note(adapter, "TRANSGEAR BRACKET DETAIL", 0.070, 0.205) is None:
+    if add_note(adapter, "TRANSGEAR BRACKET DETAIL", 0.070, 0.192) is None:
         raise RuntimeError("failed to label paper-drive transgear bracket detail")
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
         raise RuntimeError("failed to add paper-drive assembly notes")
