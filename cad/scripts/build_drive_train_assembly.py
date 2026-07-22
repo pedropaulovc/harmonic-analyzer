@@ -533,10 +533,10 @@ from build_cone_pivot_screw import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
-    THREAD as PSCREW_THREAD,
     THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
 )
 from cone_pivot_screw_spec import (  # noqa: E402
+    THREAD as PSCREW_THREAD,
     THREAD_TAP_DRILL_DIA as PSCREW_THREAD_TAP_DRILL_DIA,
 )
 from build_swing_stop_screw import (  # noqa: E402

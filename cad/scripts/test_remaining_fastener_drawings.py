@@ -159,6 +159,7 @@ def test_slotted_screw_slot_dimensions_live_in_the_pure_contract(
 def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     spec = importlib.import_module("cone_pivot_screw_spec")
     base = importlib.import_module("build_harmonic_base")
+    drive = importlib.import_module("build_drive_train_assembly")
     platform = importlib.import_module("build_cone_swing_platform")
 
     assert spec.SHOULDER_LEN == spec.PLATFORM_THICKNESS + spec.AXIAL_CLEARANCE
@@ -168,6 +169,8 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     assert base.PIVOT_SEAT_SPEC.kind == "tapped"
     assert base.PIVOT_SEAT_SPEC.size == spec.THREAD
     assert base.PIVOT_SEAT_SPEC.thread_class == "2B"
+    assert drive.PSCREW_THREAD == spec.THREAD
+    assert drive.PSCREW_THREAD_TAP_DRILL_DIA == spec.THREAD_TAP_DRILL_DIA
     assert spec.THREAD_MAJOR_DIA == pytest.approx(6.35)
     assert spec.THREAD_TAP_DRILL_DIA == base.PIVOT_SCREW_HOLE_DIA
     assert base.PIVOT_HOLE_DEPTH - spec.THREAD_TAIL_LEN >= 1.5
