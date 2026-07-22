@@ -227,11 +227,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=grip_edge,
-        frame_xy=(0.125, 0.245),
+        frame_xy=(0.115, 0.255),
         characteristic="profile_surface",
         tolerance="0.10",
         datums=("A", "B"),
-        quantity="GRIP PROFILE; BASIC AXIS 5.00 FROM B, 90 DEG TO A, INTERSECTS A",
+        quantity="GRIP PROFILE",
         label="lever grip profile",
         entity_type="SILHOUETTE",
     )
@@ -254,11 +254,12 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         text=(
             "STRAIGHT CONICAL GRIP PROFILE\n"
-            "<MOD-DIAM>4.00+/-0.05 AT BASIC 3.50 FROM HUB AXIS\n"
+            "<MOD-DIAM>4.00+/-0.05 AT BASIC 3.50\n"
+            "FROM HUB AXIS\n"
             "<MOD-DIAM>6.00+/-0.05 AT TIP"
         ),
         entity_xy=grip_edge,
-        note_xy=(0.120, 0.235),
+        note_xy=(0.078, 0.235),
         label="lever conical grip size",
         entity_type="SILHOUETTE",
     )
@@ -294,8 +295,8 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.045)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.025)
+    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.138)
 
     return await finalize_drawing(
         adapter,

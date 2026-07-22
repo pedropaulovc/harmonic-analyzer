@@ -45,6 +45,8 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "SPHERICAL CROWN" in source
+    assert 'quantity="GRIP PROFILE"' in source
+    assert "GRIP PROFILE; BASIC AXIS" not in source
     assert "BLIND BORE BOTTOM" in notes
     assert "DATUM A" in notes and "DATUM B" in notes
     assert "LINEAR +/-" not in notes
