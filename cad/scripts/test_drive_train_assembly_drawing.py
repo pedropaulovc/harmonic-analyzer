@@ -136,6 +136,8 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert "_defer_front_balloons(adapter, balloons)" in source
     assert '"IModelDocExtension", "DeleteSelection2"' in source
     assert "RootDrawingComponent2(False)" in source
+    assert "GetVisibleEntities2(c, 1)" in source
+    assert "selected_view.SelectEntity(selected_edge, False)" in source
     assert '"IModelDocExtension",\n        "CreateBalloonOptions",\n        "InsertBOMBalloon2"' in source
     assert 'drawing_name.rsplit("/", 1)[-1].casefold()' in source
     assert 'identity.startswith(f"{stem}-")' in source

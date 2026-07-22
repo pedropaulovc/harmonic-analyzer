@@ -35,7 +35,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
@@ -226,6 +226,7 @@ def _add_drive_train_balloons(
         raise ValueError("drive-train view and balloon-margin counts differ")
     all_balloons: list[Any] = []
     item_numbers: set[str] = set()
+    view_balloons: list[list[Any]] = []
     for index, (view, margin) in enumerate(
         zip(views, BALLOON_RING_MARGINS, strict=True), start=1
     ):
@@ -235,25 +236,32 @@ def _add_drive_train_balloons(
         )
         if index == 1:
             balloons = _defer_front_balloons(adapter, balloons)
-        if index == len(views):
-            existing = {
-                _balloon_item_number(adapter, note, label=view_label)
-                for note in balloons
-            }
-            for stem, item in BOTTOM_MANUAL_BALLOON_ITEMS.items():
-                if item in item_numbers or item in existing:
-                    continue
-                balloons.append(
-                    _create_component_balloon(
-                        adapter, view, stem=stem, expected_item=item
-                    )
-                )
+        view_balloons.append(balloons)
         if not balloons:
             continue
         _spread_balloons(adapter, view, balloons, margin=margin)
         for note in balloons:
             item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
         all_balloons.extend(balloons)
+
+    for stem, item in BOTTOM_MANUAL_BALLOON_ITEMS.items():
+        if item in item_numbers:
+            continue
+        note, owner_view = _create_component_balloon(
+            adapter, views, stem=stem, expected_item=item
+        )
+        owner_index = next(
+            index for index, candidate in enumerate(views) if candidate is owner_view
+        )
+        view_balloons[owner_index].append(note)
+        _spread_balloons(
+            adapter,
+            owner_view,
+            view_balloons[owner_index],
+            margin=BALLOON_RING_MARGINS[owner_index],
+        )
+        item_numbers.add(item)
+        all_balloons.append(note)
 
     expected_numbers = {str(item) for item in range(1, expected + 1)}
     missing = sorted(expected_numbers - item_numbers, key=int)
@@ -346,38 +354,56 @@ def _defer_front_balloons(adapter: Any, balloons: list[Any]) -> list[Any]:
 
 @_telemetry.traced("drawing.component_balloon", label_param="stem")
 def _create_component_balloon(
-    adapter: Any, view: Any, *, stem: str, expected_item: str
-) -> Any:
-    """Insert one BOM balloon from a uniquely selected leaf drawing component."""
-    root = adapter._attempt(
-        lambda: view.RootDrawingComponent2(False), default=None
-    )
-    if root is None:
-        raise RuntimeError(f"drive-train {stem} balloon view has no root component")
-
-    pending = list(_drawing_component_children(root))
-    matches: list[Any] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        if children:
+    adapter: Any, views: tuple[Any, ...], *, stem: str, expected_item: str
+) -> tuple[Any, Any]:
+    """Insert one BOM balloon on a real visible edge of the requested component."""
+    selected_view: Any | None = None
+    selected_edge: Any | None = None
+    enumerated: list[str] = []
+    for view in views:
+        root = adapter._attempt(
+            lambda v=view: v.RootDrawingComponent2(False), default=None
+        )
+        if root is None:
             continue
-        if _drawing_component_matches(
-            adapter, drawing_component, frozenset({stem})
-        ):
-            matches.append(drawing_component)
-    if len(matches) != 1:
+        pending = list(_drawing_component_children(root))
+        while pending:
+            drawing_component = pending.pop()
+            children = _drawing_component_children(drawing_component)
+            pending.extend(children)
+            if children:
+                continue
+            if not _drawing_component_matches(
+                adapter, drawing_component, frozenset({stem})
+            ):
+                continue
+            enumerated.append(str(drawing_component.Name or ""))
+            component = adapter._attempt(
+                lambda dc=drawing_component: dc.Component, default=None
+            )
+            edges = adapter._attempt(
+                lambda v=view, c=component: v.GetVisibleEntities2(c, 1), default=()
+            ) or ()
+            if not edges:
+                continue
+            selected_view = view
+            selected_edge = edges[0]
+            break
+        if selected_edge is not None:
+            break
+    if selected_view is None or selected_edge is None:
         raise RuntimeError(
-            f"drive-train {stem} balloon expected one drawing component, "
-            f"found {len(matches)}"
+            f"drive-train {stem} balloon has no visible edge across drawing views; "
+            f"matching components={enumerated}"
         )
 
     draw = adapter.currentModel
+    ddoc = _sw_type_info.early_bound_or_flag(draw, "IDrawingDoc", "ActivateView")
+    if not ddoc.ActivateView(view_name(adapter, selected_view)):
+        raise RuntimeError(f"failed to activate drive-train {stem} balloon view")
     draw.ClearSelection2(True)
-    component = _sw_type_info.early_bound_or_flag(matches[0], "IDrawingComponent", "Select")
-    if not component.Select(False, None):
-        raise RuntimeError(f"failed to select drive-train {stem} drawing component")
+    if not selected_view.SelectEntity(selected_edge, False):
+        raise RuntimeError(f"failed to select drive-train {stem} visible edge")
     extension = _sw_type_info.early_bound_or_flag(
         draw.Extension,
         "IModelDocExtension",
@@ -405,7 +431,7 @@ def _create_component_balloon(
             f"drive-train {stem} balloon resolved item {item}, expected {expected_item}"
         )
     _telemetry.success(f"drive-train {stem} component balloon -> item {item}")
-    return note
+    return note, selected_view
 
 
 @_telemetry.traced("drawing.isolate_bottom_balloon_components")
