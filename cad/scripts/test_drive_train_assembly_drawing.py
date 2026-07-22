@@ -123,10 +123,10 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert drawing.BOM_ROWS_PER_SECTION == 12
     assert sum(drawing.BOM_COLUMN_WIDTHS.values()) == 0.125
     assert drawing.BALLOON_RING_MARGINS == (0.034, 0.014, 0.014, 0.014)
-    assert set(drawing.BALLOON_POSITIONS) == {
-        "5", "8", "11", "14", "20", "21", "24", "30"
-    }
-    assert source.count("position_bom_balloon(") == 1
+    assert drawing.BALLOON_SLOT_SWAPS == (
+        ("5", "11"), ("8", "30"), ("14", "24"), ("20", "21")
+    )
+    assert "_swap_drive_train_balloon_slots(adapter, balloons)" in source
     assert "T006-T120" in drawing.ASSEMBLY_NOTES
     assert "CONE PLATFORM ENGAGED" in drawing.ASSEMBLY_NOTES
     assert all(

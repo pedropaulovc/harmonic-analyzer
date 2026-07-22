@@ -3070,7 +3070,7 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
     row_indices = range(rows)
-    split = adapter._attempt(lambda: table.GetSplitInformation())
+    split = adapter._attempt(lambda: table.GetSplitInformation(0, 0, 0, 0))
     if split and len(split) >= 5 and int(split[0]) == 1:
         _direction, _index, count, range_start, range_end = (
             int(value) for value in split[:5]

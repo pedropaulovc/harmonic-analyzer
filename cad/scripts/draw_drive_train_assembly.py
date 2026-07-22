@@ -28,13 +28,13 @@ from _drawing_common import (
     _spread_balloons,
     finalize_drawing,
     new_project_drawing,
-    position_bom_balloon,
     read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
@@ -140,16 +140,7 @@ BOM_COLUMN_WIDTHS = {
     "QTY.": 0.012,
 }
 BALLOON_RING_MARGINS = (0.034, 0.014, 0.014, 0.014)
-BALLOON_POSITIONS = {
-    "5": (0.0272, 0.1283),
-    "8": (0.0551, 0.1667),
-    "11": (0.0309, 0.1156),
-    "14": (0.0975, 0.0898),
-    "20": (0.1162, 0.1673),
-    "21": (0.1254, 0.1568),
-    "24": (0.1107, 0.0958),
-    "30": (0.0432, 0.1742),
-}
+BALLOON_SLOT_SWAPS = (("5", "11"), ("8", "30"), ("14", "24"), ("20", "21"))
 
 
 @_telemetry.traced("drawing.format_drive_train_bom")
@@ -184,8 +175,13 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
         raise RuntimeError(
             f"drive-train BOM returned {len(pieces)} split-table objects, expected 3"
         )
-    for index, piece in enumerate((table, *pieces)):
-        split_info = adapter._attempt(lambda p=piece: p.GetSplitInformation())
+    for index, raw_piece in enumerate((table, *pieces)):
+        piece = _sw_type_info.early_bound_or_flag(
+            raw_piece, "ITableAnnotation", "GetAnnotation", "GetSplitInformation"
+        )
+        split_info = adapter._attempt(
+            lambda p=piece: p.GetSplitInformation(0, 0, 0, 0)
+        )
         annotation = adapter._attempt(lambda p=piece: p.GetAnnotation())
         position = adapter._attempt(
             lambda a=annotation: adapter._get_attr_or_call(a, "GetPosition")
@@ -199,6 +195,43 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
         f"drive-train BOM split at {BOM_ROWS_PER_SECTION} rows; "
         f"HorizontalAutoSplit returned {len(pieces)} objects"
     )
+
+
+def _swap_drive_train_balloon_slots(adapter: Any, balloons: list[Any]) -> None:
+    """Swap four inverted front-view slot pairs without changing occupied slots."""
+    by_item = {
+        _balloon_item_number(adapter, note, label="drive-train balloon slot swap"): note
+        for note in balloons
+    }
+    for first, second in BALLOON_SLOT_SWAPS:
+        if first not in by_item or second not in by_item:
+            raise RuntimeError(
+                f"drive-train balloon slot pair {first}/{second} is missing"
+            )
+        annotations = []
+        anchors = []
+        for item in (first, second):
+            note = _sw_type_info.early_bound_or_flag(
+                by_item[item], "INote", "GetAnnotation"
+            )
+            annotation = note.GetAnnotation()
+            if annotation is None:
+                raise RuntimeError(f"drive-train balloon item {item} has no annotation")
+            annotation = _sw_type_info.early_bound_or_flag(
+                annotation, "IAnnotation", "GetPosition", "SetPosition"
+            )
+            anchor = annotation.GetPosition()
+            if not anchor or len(anchor) < 2:
+                raise RuntimeError(f"drive-train balloon item {item} has no anchor")
+            annotations.append(annotation)
+            anchors.append((float(anchor[0]), float(anchor[1])))
+        for item, annotation, target in (
+            (first, annotations[0], anchors[1]),
+            (second, annotations[1], anchors[0]),
+        ):
+            if not annotation.SetPosition(target[0], target[1], 0.0):
+                raise RuntimeError(f"failed to swap drive-train balloon item {item}")
+    adapter.currentModel.EditRebuild3()
 
 
 @_telemetry.traced("drawing.drive_train_balloons")
@@ -220,6 +253,8 @@ def _add_drive_train_balloons(
         if not balloons:
             continue
         _spread_balloons(adapter, view, balloons, margin=margin)
+        if index == 1:
+            _swap_drive_train_balloon_slots(adapter, balloons)
         for note in balloons:
             item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
         all_balloons.extend(balloons)
@@ -379,18 +414,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # pair and behind the gear ladders in the pictorial.  The bottom projection
     # exposes those remaining BOM identities rather than accepting an
     # incomplete balloon set.
-    balloons = _add_drive_train_balloons(
+    _add_drive_train_balloons(
         adapter, (front, right, iso, bottom), expected=len(BOM_COMPONENTS),
         label="drive-train assembly balloons",
     )
-    for item_number, position_xy in BALLOON_POSITIONS.items():
-        position_bom_balloon(
-            adapter,
-            balloons,
-            item_number=item_number,
-            position_xy=position_xy,
-            label="drive-train assembly balloons",
-        )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add drive-train assembly notes")
 

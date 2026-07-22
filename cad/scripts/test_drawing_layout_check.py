@@ -170,7 +170,7 @@ def test_split_table_box_uses_only_the_rendered_row_range():
     annotation = SimpleNamespace(GetPosition=lambda: [0.020, 0.265, 0.0])
     table = SimpleNamespace(
         GetAnnotation=lambda: annotation,
-        GetSplitInformation=lambda: (1, 0, 3, 0, 11),
+        GetSplitInformation=lambda *_args: (1, 0, 3, 0, 11),
         RowCount=33,
         ColumnCount=4,
         GetColumnWidth=lambda _index: 0.025,
@@ -192,7 +192,7 @@ def test_later_split_table_piece_includes_the_repeated_header_height():
     annotation = SimpleNamespace(GetPosition=lambda: [0.145, 0.265, 0.0])
     table = SimpleNamespace(
         GetAnnotation=lambda: annotation,
-        GetSplitInformation=lambda: (1, 1, 3, 12, 23),
+        GetSplitInformation=lambda *_args: (1, 1, 3, 12, 23),
         RowCount=33,
         ColumnCount=4,
         GetColumnWidth=lambda _index: 0.025,
