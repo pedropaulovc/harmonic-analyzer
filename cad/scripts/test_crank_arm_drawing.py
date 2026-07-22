@@ -94,14 +94,11 @@ def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
     # anchor-to-frame vector takes, which is what drove the Ra symbol's leader
     # across two views. IGtol::SetLeader cannot ask for bent, so the ordinary
     # path goes through IAnnotation::SetLeader3 and checks its int status.
-    # Leaderless, dimension-associated frames additionally need
-    # IGtol::SetLeader(False): SetLeader3(swNO_LEADER) changes only the style.
     assert "annotation.SetLeader3(" in common
     assert "_LEADER_BENT," in common
     assert "gtol.SetLeader(True, 0, False, False)" not in common
-    assert "gtol.SetLeader(False, _LEADER_SIDE_SMART, False, False)" in common
-    assert "bool(gtol.IsAttached()) != leader" in common
-    assert "int(gtol.GetLeaderCount()) != expected_leaders" in common
+    assert "not bool(gtol.IsAttached())" in common
+    assert "int(gtol.GetLeaderCount()) != 1" in common
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

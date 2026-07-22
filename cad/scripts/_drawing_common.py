@@ -424,8 +424,7 @@ def add_feature_control_frame(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
-    leader: bool = True,
-    attachment: Literal["entity", "dimension_stack"] = "entity",
+    leader_attach_xy: tuple[float, float] | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
@@ -433,17 +432,9 @@ def add_feature_control_frame(
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
     draw = adapter.currentModel
-    edge = None
-    if attachment == "entity":
-        edge = _select_view_entity(
-            adapter, view, entity_type, edge_xy, label=label, entity=entity
-        )
-    elif attachment == "dimension_stack":
-        if leader:
-            raise ValueError(f"{label}: a dimension stack cannot have a leader")
-        draw.ClearSelection2(True)
-    else:
-        raise ValueError(f"{label}: unknown GTol attachment {attachment!r}")
+    edge = _select_view_entity(
+        adapter, view, entity_type, edge_xy, label=label, entity=entity
+    )
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
@@ -528,19 +519,17 @@ def add_feature_control_frame(
         "GetAttachedEntityCount3",
         "SetAttachedEntities",
         "SetPosition2",
-        "SetLeader",
         "SetLeader3",
+        "SetLeaderAttachmentPointAtIndex",
+        "GetLeaderPointsAtIndex",
     )
-    if attachment == "entity" and int(annotation.GetAttachedEntityCount3()) != 1:
+    if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
-    # A frame associated directly with a size dimension is conventionally
-    # stacked without a leader; the selected dimension remains its attachment.
-    leader_style = _LEADER_BENT if leader else 0
     leader_status = int(
         annotation.SetLeader3(
-            leader_style,
+            _LEADER_BENT,
             _LEADER_SIDE_SMART,
             True,  # smart arrowhead
             False,  # perpendicular (GTol-only; not wanted here)
@@ -555,28 +544,36 @@ def add_feature_control_frame(
         )
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
+    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
+        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
+    ):
+        raise RuntimeError(f"failed to position feature-control-frame leader ({label})")
     draw.EditRebuild3()
-    if not leader:
-        # Positioning a newly inserted free GTol creates its default leader.
-        # Disable it through both the annotation and GTol interfaces only after
-        # the final position exists; doing this before SetPosition2 is
-        # overwritten by that position operation.
-        annotation.SetLeader(False, _LEADER_SIDE_SMART, True, False)
-        gtol.SetLeader(False, _LEADER_SIDE_SMART, False, False)
-        draw.EditRebuild3()
-    expected_entities = 1 if attachment == "entity" else 0
-    expected_leaders = 1 if leader else 0
     if (
-        int(annotation.GetAttachedEntityCount3()) != expected_entities
-        or bool(gtol.IsAttached()) != leader
-        or int(gtol.GetLeaderCount()) != expected_leaders
+        int(annotation.GetAttachedEntityCount3()) != 1
+        or not bool(gtol.IsAttached())
+        or int(gtol.GetLeaderCount()) != 1
     ):
         raise RuntimeError(
             f"feature-control frame attachment mismatch ({label}): "
-            f"entities={annotation.GetAttachedEntityCount3()}, "
-            f"expected={expected_entities}; leaders={gtol.GetLeaderCount()}, "
-            f"expected={expected_leaders}"
+            f"entities={annotation.GetAttachedEntityCount3()}, expected=1; "
+            f"leaders={gtol.GetLeaderCount()}, expected=1"
         )
+    if leader_attach_xy is not None:
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if len(points) < 6:
+            raise RuntimeError(f"feature-control-frame leader is unreadable ({label})")
+        actual_attach = (float(points[-3]), float(points[-2]))
+        attach_error = math.hypot(
+            actual_attach[0] - leader_attach_xy[0],
+            actual_attach[1] - leader_attach_xy[1],
+        )
+        if attach_error > 0.005:
+            raise RuntimeError(
+                f"feature-control-frame leader attachment moved ({label}): "
+                f"actual={actual_attach}, requested={leader_attach_xy}, "
+                f"error={attach_error:.6g} m"
+            )
     draw.ClearSelection2(True)
     return gtol
 
