@@ -115,7 +115,7 @@ GENERAL_RIGHT_CENTER = (0.200, 0.150)
 GENERAL_ISO_CENTER = (0.320, 0.145)
 ID_FRONT_CENTER = (0.070, 0.145)
 ID_RIGHT_CENTER = (0.170, 0.200)
-ID_ISO_CENTER = (0.180, 0.070)
+ID_ISO_CENTER = (0.180, 0.080)
 ISO_VIEW_SCALE = (1, 7)
 BRACKET_DETAIL_CENTER = (0.085, 0.230)
 BRACKET_DETAIL_SCALE = (1, 4)
@@ -234,6 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("transgear-latch", "15"),
         ),
         label="paper-drive transgear balloons",
+        margin=0.022,
     )
     # The pictorial exposes most component families. Seed exact transgear
     # balloons first, then validate the union supplied by the main views.
@@ -246,7 +247,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if add_note(adapter, "TRANSGEAR DETAIL", 0.020, 0.260) is None:
         raise RuntimeError("failed to label paper-drive transgear detail")
-    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.120, 0.255) is None:
+    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.018, 0.205) is None:
         raise RuntimeError("failed to add paper-drive identification heading")
 
     return await finalize_drawing(

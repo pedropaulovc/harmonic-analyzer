@@ -3146,6 +3146,7 @@ def add_component_bom_balloons(
     *,
     items: Sequence[tuple[str, str]],
     label: str,
+    margin: float = 0.014,
 ) -> list[Any]:
     """Insert and ring one checked balloon per requested component family."""
     if not items:
@@ -3164,7 +3165,9 @@ def add_component_bom_balloons(
         )
         for stem, item in items
     ]
-    _spread_balloons(adapter, view, balloons)
+    if margin <= 0.0:
+        raise ValueError(f"{label}: balloon ring margin must be positive")
+    _spread_balloons(adapter, view, balloons, margin=margin)
     adapter.currentModel.EditRebuild3()
     _telemetry.success(f"{label}: inserted {len(balloons)} targeted balloons")
     return balloons
