@@ -126,6 +126,13 @@ def test_drive_train_has_seven_named_and_numbered_sheets() -> None:
     assert "SEE SHEET 6" in drawing.GENERAL_POINTER_NOTE
 
 
+def test_sheet_two_parts_list_fits_the_drawing_zone() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert drawing.BOM_ANCHOR == (0.018, 0.264)
+    assert drawing.BOM_ROW_HEIGHT == 0.0075
+    assert "table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)" in source
+
+
 def test_sheet_three_identifies_four_disjoint_subsystems_deliberately() -> None:
     expected = (
         frozenset(

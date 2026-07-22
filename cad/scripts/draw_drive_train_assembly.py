@@ -227,7 +227,8 @@ GENERAL_ISO_CENTER = (0.335, 0.165)
 GENERAL_POINTER_ORIGIN = (0.018, 0.070)
 
 # Sheet 2: one continuous 32-row parts list plus a small orientation view.
-BOM_ANCHOR = (0.018, 0.262)
+BOM_ANCHOR = (0.018, 0.264)
+BOM_ROW_HEIGHT = 0.0075
 BOM_ISO_CENTER = (0.310, 0.165)
 
 # Sheets 3 and 6: four isolated subsystem views replace the black, overlapping gear
@@ -489,6 +490,19 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
             raise RuntimeError(
                 f"drive-train BOM column {title!r} width {actual:.4f} m "
                 f"does not match requested {requested:.4f} m"
+            )
+
+    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
+    if rows != len(BOM_COMPONENTS) + 1:
+        raise RuntimeError(
+            f"drive-train BOM has {rows} rows, expected {len(BOM_COMPONENTS) + 1}"
+        )
+    for row in range(rows):
+        actual = float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0))
+        if abs(actual - BOM_ROW_HEIGHT) > 0.0005:
+            raise RuntimeError(
+                f"drive-train BOM row {row} height {actual:.4f} m "
+                f"does not match requested {BOM_ROW_HEIGHT:.4f} m"
             )
 
     adapter.currentModel.EditRebuild3()
