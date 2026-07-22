@@ -61,7 +61,7 @@ def test_notes_are_complete_but_do_not_repeat_title_or_template_requirements() -
             or "THREADED END BELOW IT IS NOT MODELED" in notes
             or (
                 part_name == "cone-pivot-screw"
-                and "THREAD MAJOR DIA" in spec.END_VIEW_NOTE
+                and "EXTERNAL THREAD" in spec.END_VIEW_NOTE
             )
         )
         assert thread_representation, part_name
