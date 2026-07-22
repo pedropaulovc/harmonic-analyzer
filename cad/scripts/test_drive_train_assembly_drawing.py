@@ -100,6 +100,8 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
 
 def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assembly_notes = "\n".join(drawing.ASSEMBLY_NOTES)
+    normalized_notes = " ".join(assembly_notes.split())
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("_add_drive_train_balloons(") == 2
     assert 'configuration_grouping="same-part"' in source
@@ -107,7 +109,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert '"GetComponents2"' in source
     assert '"InsertTableAnnotation2"' in source
     assert "expected_sheet_names=SHEET_NAMES" in source
-    assert source.count("add_note(") == 5
+    assert source.count("add_note(") == 7
     assert source.count("scale=VIEW_SCALE") == 9
     assert source.count("scale=VIEW_SCALE,") == 2
     assert '"*Bottom"' in source
@@ -119,7 +121,11 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         "PARTS LIST",
         "EXTERIOR ITEM IDENTIFICATION",
         "CONCEALED ITEM IDENTIFICATION",
+        "SETUP AND ACCEPTANCE",
     )
+    assert source.count(" OF 5") == 5
+    assert " OF 4" not in source
+    assert "ActivateSheet(SHEET_NAMES[4])" in source
     assert drawing.BOTTOM_VISIBILITY_STEMS == {
         "cone-tip-bushing",
         "cone-gear-shaft",
@@ -201,18 +207,45 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert drawing.CONCEALED_BOTTOM_BALLOON_RING_MARGIN == 0.015
     assert drawing.CONCEALED_FRONT_BALLOON_RING_MARGIN == 0.025
     assert drawing.CONCEALED_BALLOON_CLEARANCE == 0.006
+    assert drawing.CONCEALED_HEADING_ORIGIN == (0.060, 0.255)
+    assert drawing.SETUP_HEADING_ORIGIN == (0.060, 0.255)
+    assert drawing.SETUP_NOTE_ORIGINS == (
+        (0.018, 0.070),
+        (0.158, 0.070),
+        (0.300, 0.095),
+    )
     assert "_swap_drive_train_balloon_slots" not in source
-    assert "POSITION 01 AT ITEM 4/T120 END" in drawing.ASSEMBLY_NOTES
-    assert "POSITION 20 AT ITEM 5/T006 END" in drawing.ASSEMBLY_NOTES
-    assert "CONE PLATFORM ENGAGED" in drawing.ASSEMBLY_NOTES
-    assert "REMOVE AXIAL PLAY WITHOUT BINDING" in drawing.ASSEMBLY_NOTES
-    assert "VERIFY FREE SHAFT ROTATION" in drawing.ASSEMBLY_NOTES
-    assert "2.00 MM TIP GAP" in drawing.ASSEMBLY_NOTES
-    assert "0.10-0.25 MM" in drawing.ASSEMBLY_NOTES
-    assert "BACK STRAP ONLY" in drawing.ASSEMBLY_NOTES
-    assert "FRONT REMAINS SPRING-FREE" in drawing.ASSEMBLY_NOTES
+    assert drawing.GENERAL_POINTER_NOTE == (
+        "SETUP, ORIENTATION, BACKLASH, AND FINAL ACCEPTANCE: SEE SHEET 5."
+    )
+    assert "MACHINE FRONT = PAPER/OUTPUT SIDE (-Z)" in assembly_notes
+    assert "EAST = VIEWER RIGHT (-X)" in assembly_notes
+    assert '"T120 END" = ITEM 4 / ITEM 27 T120 END' in assembly_notes
+    assert '"T006 END" = ITEM 5 / ITEM 27 T006 END' in assembly_notes
+    assert "40.55 + j(6.889) MM" in assembly_notes
+    assert "22.90 + j(7.0566) MM" in assembly_notes
+    assert "2.00 MM CLEARANCE" in assembly_notes
+    assert "41.30 MM C-C" in assembly_notes
+    assert "12.38 DEG" in assembly_notes
+    assert "0.25 MM AXIAL CLEARANCE" in assembly_notes
+    assert "7.00 MM" in assembly_notes
+    assert "0.10-0.25 MM MINIMUM SURFACE" in assembly_notes
+    assert "40 DEG" in assembly_notes
+    assert "MACHINE-BACK ITEM 13" in assembly_notes
+    assert (
+        "SET 0.05-0.20 MM TANGENTIAL BACKLASH AT EACH ITEM 27/28 "
+        "PITCH-CIRCLE MESH"
+    ) in normalized_notes
+    assert "FINAL FUNCTIONAL ACCEPTANCE" in assembly_notes
+    assert "ITEM 29 ONE REVOLUTION" in assembly_notes
+    assert "ITEM 21 ONE" in assembly_notes
+    assert "ITEM 17 SHALL RETURN ITEM 12 TO 2.00 MM GAP" in assembly_notes
+    assert "ITEM 3 SHALL SWING FREELY TO CONTACT" in assembly_notes
+    assert "RECHECK ITEM 25 FOR FREE" in assembly_notes
+    assert "CAM SHAFT ONE FULL TURN" not in assembly_notes
+    assert "0.05-0.10" not in assembly_notes
     assert all(
-        token not in drawing.ASSEMBLY_NOTES
+        token not in assembly_notes
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
     )
 

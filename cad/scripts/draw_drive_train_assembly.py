@@ -59,7 +59,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Four sheets let the ~300 mm-wide mechanism use a readable 1:3 scale without
+# Five sheets let the ~300 mm-wide mechanism use a readable 1:3 scale without
 # forcing its 32-row BOM, exterior balloons, concealed-item identification, and
 # functional setup notes into one field.  All views use the sheet scale so the
 # title block remains truthful without per-view scale exceptions.
@@ -70,6 +70,7 @@ SHEET_NAMES = (
     "PARTS LIST",
     "EXTERIOR ITEM IDENTIFICATION",
     "CONCEALED ITEM IDENTIFICATION",
+    "SETUP AND ACCEPTANCE",
 )
 
 # One BOM row per UNIQUE top-level component of build_drive_train_assembly.py.
@@ -155,30 +156,108 @@ FRONT_DEFERRED_BALLOON_ITEMS = frozenset(
     if stem in FRONT_DEFERRED_BALLOON_STEMS
 )
 
-ASSEMBLY_NOTES = "\n".join(
-    (
-        "ASSEMBLY NOTES",
-        "1. INSTALL ITEM 27 PER THE CONE-GEAR POSITION SCHEDULE ON SHEET 2;",
-        "   POSITION 01 AT ITEM 4/T120 END, POSITION 20 AT ITEM 5/T006 END.",
-        "2. SHOWN: CONE PLATFORM ENGAGED; ALIGNMENT PINION DISENGAGED.",
-        "3. ADJUST CONE-TIP SCREW TO REMOVE AXIAL PLAY WITHOUT BINDING;",
-        "   VERIFY FREE SHAFT ROTATION, THEN TIGHTEN PINCH SCREW.",
-        "4. PINION DISENGAGED: 2.00 MM TIP GAP; ENGAGED C-C: 41.30 MM.",
-        "5. SET STRAPS 12.38 DEG WEST OF VERTICAL AT PARK; 0.25 MM AXIAL",
-        "   CLEARANCE EACH SIDE OF PINION DRUM.",
-        "6. PHASE BOTH CAMS ALIKE WITH ECCENTRIC AND SET-PIN BOSS DOWN.",
-        "   AT PARK: FOLLOWER PLANE 7.00 MM FROM CAM FRONT; AIR 0.10-0.25 MM.",
-        "7. CAMS DOWN: SET ENGAGE LEVER 40 DEG EAST OF VERTICAL.",
-        "8. INSTALL LEAF SPRING AT BACK STRAP ONLY; FRONT REMAINS SPRING-FREE.",
-        "   PRELOAD FOR POSITIVE RETURN TO THE 2.00 MM DISENGAGED TIP GAP.",
-    )
+GENERAL_POINTER_NOTE = (
+    "SETUP, ORIENTATION, BACKLASH, AND FINAL ACCEPTANCE: SEE SHEET 5."
 )
 
-# Sheet 1: uncluttered assembly views and setup/inspection notes.
+# Sheet 5 holds the source-backed assembly contract in three short columns.
+# Interfaces whose fit, retention, torque, or joining process is not defined by
+# the part sources are deliberately not completed here with invented values.
+ASSEMBLY_NOTES = (
+    "\n".join(
+        (
+            "ORIENTATION — APPLIES TO ALL SHEETS",
+            "MACHINE FRONT = PAPER/OUTPUT SIDE (-Z);",
+            "MACHINE BACK = +Z.",
+            "IN THE MACHINE-FRONT VIEW:",
+            "EAST = VIEWER RIGHT (-X);",
+            "WEST = VIEWER LEFT (+X); UP = +Y.",
+            '"T120 END" = ITEM 4 / ITEM 27 T120 END.',
+            '"T006 END" = ITEM 5 / ITEM 27 T006 END.',
+            "",
+            "ASSEMBLY AND SETUP",
+            "1. INSTALL ITEM 27 CONE GEARS T120 THROUGH T006",
+            "   IN 6-TOOTH STEPS ON ITEM 25 CONE GEAR SHAFT;",
+            "   T120 AT ITEM 4 END AND T006 AT ITEM 5 END.",
+            "2. SET ITEM 27 CENTER PLANES 40.55 + j(6.889) MM",
+            "   FROM ITEM 25 MACHINE-FRONT END FACE, j = 0...19",
+            "   FOR T120, T114...T006. SET FACES SQUARE TO",
+            "   ITEM 25 AXIS; SOLDER EACH GEAR TO SHAFT; NO KEY.",
+            "3. INSTALL ITEM 28 CYLINDER DRUM GEARS FREE TO",
+            "   ROTATE ON ITEM 1 CYLINDER DRUM ARBOR. SET ITEM 28",
+            "   TOOTHED-DISC MIDPLANES 22.90 + j(7.0566) MM",
+            "   FROM ITEM 1 MACHINE-FRONT END, j = 0...19.",
+            "   TOOTHED DISC FACES MACHINE FRONT; CAM FACES",
+            "   MACHINE BACK. PHASE ALL ITEM 28 INDEX NOTCHES ALIKE.",
+            "4. SHOWN: ITEM 3 ENGAGED AND CLAMPED BY ITEM 9;",
+            "   ITEM 12 DISENGAGED. LOOSEN ITEM 9 ONLY TO SWING",
+            "   ITEM 3. ITEM 11 LIMITS DISENGAGED TRAVEL.",
+        )
+    ),
+    "\n".join(
+        (
+            "ASSEMBLY AND SETUP — CONTINUED",
+            "5. TURN ITEM 7 UNTIL ITEM 25 AXIAL PLAY IS REMOVED",
+            "   AND ITEM 25 ROTATES FREELY BY HAND. HOLD ITEM 7;",
+            "   TIGHTEN ITEM 8 TO LOCK. RECHECK FREE ROTATION.",
+            "6. DISENGAGED: SET 2.00 MM CLEARANCE BETWEEN ITEM 12",
+            "   AND ITEM 28 TOOTH-TIP CIRCLE ENVELOPES, MEASURED",
+            "   ON THE LINE JOINING THEIR AXES; AXES SHALL BE LEVEL.",
+            "7. ENGAGED: SET 41.30 MM C-C BETWEEN ITEM 22 PINION",
+            "   DRUM ARBOR AXIS AND ITEM 1 CYLINDER DRUM ARBOR AXIS.",
+            "8. AT DISENGAGED PARK, SET THE LINE JOINING ITEM 15",
+            "   TORQUE-SHAFT AXIS AND ITEM 22 DRUM-ARBOR AXIS",
+            "   12.38 DEG TOWARD MACHINE WEST FROM +Y VERTICAL.",
+            "   SET BOTH ITEM 13 STRAPS PARALLEL.",
+            "9. SET 0.25 MM AXIAL CLEARANCE BETWEEN EACH ITEM 12",
+            "   DRUM END FACE AND ADJACENT ITEM 13 INNER FACE.",
+            "10. INSTALL BOTH ITEM 19 CAMS ON ITEM 16 WITH",
+            "    ECCENTRIC CENTER AND SET-PIN BOSS BELOW ITEM 16",
+            "    AXIS AT PARK; PHASE BOTH CAMS ALIKE.",
+            "11. SET EACH ITEM 18 FOLLOWER-PIN AXIAL CENTER PLANE",
+            "    7.00 MM FROM THE CORRESPONDING ITEM 19",
+            "    MACHINE-FRONT END FACE, PARALLEL TO ITEM 16 AXIS.",
+            "12. AT PARK, SET 0.10-0.25 MM MINIMUM SURFACE",
+            "    CLEARANCE BETWEEN EACH ITEM 18 AND ITEM 19 CAM OD,",
+            "    MEASURED AS THE SHORTEST NORMAL DISTANCE.",
+            "13. AT PARK, SET ITEM 20 LEVER ROD CENTERLINE 40 DEG",
+            "    TOWARD MACHINE EAST FROM +Y VERTICAL; ITEM 19",
+            "    ECCENTRICS SHALL BE DOWN.",
+            "14. INSTALL ONE ITEM 17 AT THE MACHINE-BACK ITEM 13",
+            "    STRAP ONLY; NONE AT THE MACHINE-FRONT STRAP.",
+            "    ITEM 17 SHALL RETURN BOTH ITEM 13 STRAPS TO THE",
+            "    2.00 MM DISENGAGED GAP.",
+            "15. SET 0.05-0.20 MM TANGENTIAL BACKLASH AT EACH",
+            "    ITEM 27/28 PITCH-CIRCLE MESH.",
+        )
+    ),
+    "\n".join(
+        (
+            "FINAL FUNCTIONAL ACCEPTANCE",
+            "A. WITH ITEM 3 ENGAGED AND ITEM 9 TIGHT, HAND-ROTATE",
+            "   ITEM 29 ONE REVOLUTION. ITEM 30/26 AND ALL",
+            "   ITEM 27/28 MESHES SHALL ROLL WITHOUT BINDING.",
+            "   EACH ITEM 28 SHALL REMAIN FREE ON ITEM 1.",
+            "B. WITH ITEM 12 DISENGAGED, HAND-ROTATE ITEM 21 ONE",
+            "   REVOLUTION. ITEM 12/22 SHALL TURN FREELY WITHOUT",
+            "   CONTACTING ITEM 28.",
+            "C. OPERATE ITEM 20 FROM PARK UNTIL ITEM 12/28 C-C IS",
+            "   41.30 MM. BOTH ITEM 18 FOLLOWERS SHALL MOVE THEIR",
+            "   ITEM 13 STRAPS TOGETHER WITHOUT BINDING. RELEASE",
+            "   ITEM 20; ITEM 17 SHALL RETURN ITEM 12 TO 2.00 MM GAP.",
+            "D. LOOSEN ITEM 9. ITEM 3 SHALL SWING FREELY TO CONTACT",
+            "   ITEM 11 AND RETURN. RETIGHTEN ITEM 9.",
+            "E. AFTER ITEM 8 IS TIGHT, RECHECK ITEM 25 FOR FREE",
+            "   ROTATION AND NO AXIAL PLAY.",
+        )
+    ),
+)
+
+# Sheet 1: uncluttered assembly views and a pointer to the setup sheet.
 GENERAL_FRONT_CENTER = (0.060, 0.165)
 GENERAL_RIGHT_CENTER = (0.190, 0.165)
 GENERAL_ISO_CENTER = (0.335, 0.165)
-GENERAL_NOTES_ORIGIN = (0.018, 0.085)
+GENERAL_POINTER_ORIGIN = (0.018, 0.070)
 
 # Sheet 2: one continuous 32-row parts list plus a small orientation view.
 BOM_ANCHOR = (0.018, 0.262)
@@ -205,6 +284,11 @@ CONCEALED_FRONT_STEMS = frozenset({"crank-drive-gear"})
 CONCEALED_BOTTOM_BALLOON_RING_MARGIN = 0.015
 CONCEALED_FRONT_BALLOON_RING_MARGIN = 0.025
 CONCEALED_BALLOON_CLEARANCE = 0.006
+CONCEALED_HEADING_ORIGIN = (0.060, 0.255)
+
+# Sheet 5: three text columns, clear of the zone frame and title block.
+SETUP_NOTE_ORIGINS = ((0.018, 0.070), (0.158, 0.070), (0.300, 0.095))
+SETUP_HEADING_ORIGIN = (0.060, 0.255)
 BOM_COLUMN_WIDTHS = {
     "ITEM NO.": 0.014,
     "PART NUMBER": 0.025,
@@ -720,7 +804,7 @@ def _isolate_balloon_components(
 
 @_telemetry.traced("drawing.create_drive_train_sheets")
 def _create_drive_train_sheets(adapter: Any) -> None:
-    """Duplicate the still-blank project sheet into the four-sheet package."""
+    """Duplicate the still-blank project sheet into the five-sheet package."""
     draw = adapter.currentModel
     ddoc = _sw_type_info.early_bound_or_flag(
         draw,
@@ -882,11 +966,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (general_front, general_right, general_iso):
         set_hidden_lines_removed(adapter, view)
     if add_note(
-        adapter, "SHEET 1 OF 4 — GENERAL ASSEMBLY", 0.018, 0.255
+        adapter, "SHEET 1 OF 5 — GENERAL ASSEMBLY", 0.018, 0.255
     ) is None:
         raise RuntimeError("failed to add general-assembly heading")
-    if add_note(adapter, ASSEMBLY_NOTES, *GENERAL_NOTES_ORIGIN) is None:
-        raise RuntimeError("failed to add drive-train assembly notes")
+    if add_note(adapter, GENERAL_POINTER_NOTE, *GENERAL_POINTER_ORIGIN) is None:
+        raise RuntimeError("failed to add drive-train setup-sheet pointer")
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate drive-train parts-list sheet")
@@ -907,7 +991,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _insert_cone_gear_schedule(adapter, bom_table, bom_iso)
     if add_note(
         adapter,
-        "SHEET 2 OF 4 — PARTS LIST; ITEM NUMBERS APPLY TO SHEETS 3 AND 4",
+        "SHEET 2 OF 5 — PARTS LIST; ITEM NUMBERS APPLY TO SHEETS 3-5",
         0.170,
         0.255,
     ) is None:
@@ -941,7 +1025,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if add_note(
         adapter,
-        "SHEET 3 OF 4 — EXTERIOR ITEM IDENTIFICATION; HIDDEN LINES REMOVED",
+        "SHEET 3 OF 5 — EXTERIOR ITEM IDENTIFICATION; HIDDEN LINES REMOVED",
         0.018,
         0.255,
     ) is None:
@@ -1008,13 +1092,24 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if add_note(
         adapter,
-        "SHEET 4 OF 4 — CONCEALED ITEM IDENTIFICATION\n"
+        "SHEET 4 OF 5 — CONCEALED ITEM IDENTIFICATION\n"
         "LEFT: ITEMS 6 AND 25, BOTTOM VIEW; RIGHT: ITEM 26, FRONT VIEW\n"
         "OUTER COMPONENTS HIDDEN; HIDDEN LINES VISIBLE",
-        0.018,
-        0.255,
+        *CONCEALED_HEADING_ORIGIN,
     ) is None:
         raise RuntimeError("failed to add concealed-identification heading")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[4]):
+        raise RuntimeError("failed to activate setup-and-acceptance sheet")
+    if add_note(
+        adapter,
+        "SHEET 5 OF 5 — SETUP AND ACCEPTANCE",
+        *SETUP_HEADING_ORIGIN,
+    ) is None:
+        raise RuntimeError("failed to add setup-and-acceptance heading")
+    for notes, origin in zip(ASSEMBLY_NOTES, SETUP_NOTE_ORIGINS, strict=True):
+        if add_note(adapter, notes, *origin) is None:
+            raise RuntimeError("failed to add setup-and-acceptance notes")
 
     return await finalize_drawing(
         adapter,
