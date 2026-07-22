@@ -3,7 +3,7 @@ r"""Reproduction script: cone swing platform (book ch. 12, p. 18 "pivot").
 The wedge-shaped plate the whole cone-gear set rides on. The book's
 top-down photo (p. 18) labels the TIP end "pivot": the merged green
 column (big-end journal + crank pedestal, ONE casting), the cone shaft
-and the tip clamp block all stand ON this plate, and the whole unit --
+and the tip adjuster-carrier block all stand ON this plate, and the whole unit --
 crank, 16T pinion, chain wheel included -- swings horizontally about a
 vertical axis near the shaft's thin tip to dis/engage the cone set from
 the cylinder set (video 4/4, engage/disengage stills). Swing separation

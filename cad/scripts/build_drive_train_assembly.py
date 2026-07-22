@@ -9,8 +9,9 @@ drive plane at y 104.8, not the old 126.8):
   seated perpendicular to the stepped shaft (p.18/p.20 photos), the
   shaft inclined in PLAN and carried at BOTH ends ON the cone swing
   platform (p.18: the wedge plate labelled "pivot" at its tip): big end
-  journaled in the green pivot post, thin 1/32" tip in the black tip
-  block (the GT tip post at world (-81, 105, +102), realized at station
+  journaled in the green pivot post, thin 1/32" tip end-play located by the
+  external spacer and cup-ended adjuster carried in the black tip block (the GT tip post at world
+  (-81, 105, +102), realized at station
   185). The plate pivots about a vertical axis at its TIP end, so the
   whole set swings horizontally out of mesh as one unit -- the p1
   disengage DOF; pivoting at the tip gives the big gears (which need
@@ -488,7 +489,7 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
 # plate labelled "pivot" at its tip end). The green pivot post (big-end
-# journal) and the black tip block (1/32" tip journal) stand ON the plate;
+# journal) and the black tip block (cup-ended adjuster carrier) stand ON the plate;
 # the plate pivots about a vertical axis at cone station PIVOT_STATION, just
 # north of the shaft's rear end, so on disengage the BIG end -- where the
 # gears need the most working-depth separation -- swings the farthest
@@ -496,7 +497,7 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
 POST_STATION = 1.5  # pivot post plan centre: south flank z -98.59, 1.1 air
 # to the 64T south face (-73.5) at the NORTH flank (-74.59)
 TIP_BLOCK_STATION = 185.0  # tip block plan centre; the shaft's tip end
-# (station 190) journals INSIDE its bore -- the GT tip post (-81, 104.6, +102)
+# (station 190) rests in the adjuster cup -- the GT tip post (-81, 104.6, +102)
 PIVOT_STATION = 196.0  # platform swing pivot (plan), north of the shaft end
 
 # --- platform <-> riders fit (SolidWorks-free, import-time) ------------------
@@ -653,18 +654,21 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BORE_Y as POST_CRANK_Y,
 )
 from build_cone_tip_block import (  # noqa: E402
+    ADJUSTER_BORE_DIA as TIP_ADJ_BORE_DIA,
     ADJUSTER_BORE_DEPTH as TIP_ADJ_BORE_DEPTH,
+    ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
-    BORE_HEIGHT as TIP_BORE_HEIGHT,
     PINCH_BORE_DIA as TIP_PINCH_BORE_DIA,
     PINCH_BORE_Y as TIP_PINCH_Y,
+    SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
 )
 from build_cone_tip_bushing import (  # noqa: E402
     BORE_DIA as BUSH_BORE_DIA,
     LENGTH as BUSH_LEN,
 )
 from build_cone_tip_adjuster import (  # noqa: E402
+    BODY_DIA as ADJ_BODY_DIA,
     BODY_LEN as ADJ_LEN,
     CUP_DEPTH as ADJ_CUP_DEPTH,
     CUP_DIA as ADJ_CUP_DIA,
@@ -673,15 +677,15 @@ from build_cone_tip_pinch_screw import (  # noqa: E402
     SHANK_DIA as PINCH_SHANK_DIA,
     SHANK_LEN as PINCH_SHANK_LEN,
 )
-from build_cone_gear_shaft import (  # noqa: E402
+from cone_gear_shaft_spec import (  # noqa: E402
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
 )
 # One journal drive height across the platform and both riders: plate
 # thickness under each foot + bore height = 54 above the base top.
 if (abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
-        or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_BORE_HEIGHT)) > 1e-9):
-    raise AssertionError("cone journal height drifted between platform/post/block")
+        or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_ADJUSTER_AXIS_HEIGHT)) > 1e-9):
+    raise AssertionError("cone axis height drifted between platform/post/block")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
@@ -714,13 +718,13 @@ for _lbl, _s0, _hx, _hz in (
         if _plat_half_width(_end) < _hx + 0.25:
             raise AssertionError(
                 f"{_lbl} overhangs the swing platform at station {_end:g}")
-# The shaft's tip end journals INSIDE the tip block (>= 5 engaged, end short
-# of the north face).
+# The shaft's tip reaches through the block to the adjuster cup (>= 5 inside
+# the block envelope, end short of the north face).
 _TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]  # 190.0
 if not (TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + 5.0
         <= _TIP_END_STATION
         <= TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - 0.5):
-    raise AssertionError("shaft tip end does not journal inside the tip block")
+    raise AssertionError("shaft tip end does not reach the tip-block adjuster")
 # The stub end stands proud of the post's south flank (nothing hides it).
 _STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]  # -100.06
 _POST_SOUTH_Z = cone_station(POST_STATION)[2] - POST_BLOCK_DIA / 2.0  # -98.59
@@ -730,7 +734,7 @@ if _STUB_END_Z > _POST_SOUTH_Z - 1.0:
         f"flank {_POST_SOUTH_Z:.2f}")
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing (spacer) | block
-# south face | 1/32" journal | adjuster screw in the counterbore, its blind cup
+# south face | short unsupported tip span | adjuster screw in the tapped bore, its blind cup
 # holding the shaft's tip end; the block's top slit + pinch screw lock it.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0  # 179: block south face
 BUSH_STATION = TIP_SOUTH_STATION - BUSH_LEN  # 175: bushing south end
@@ -745,10 +749,14 @@ if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 if ADJ_EMBED > TIP_ADJ_BORE_DEPTH - 0.5:
     raise AssertionError("adjuster bottoms out in the block counterbore")
+if TIP_ADJ_BORE_DIA - ADJ_BODY_DIA < 0.25:
+    raise AssertionError("modeled adjuster envelope interferes with its tap drill")
 if not (_ADJ_MOUTH + 0.5 <= _TIP_END_STATION <= _ADJ_MOUTH + ADJ_CUP_DEPTH - 0.5):
     raise AssertionError("shaft tip end does not rest inside the adjuster cup")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:
     raise AssertionError("adjuster cup too tight around the tip stub")
+if TIP_SHAFT_PASSAGE_DIA < _STUB_DIA + 0.25:
+    raise AssertionError("tip-block passage too tight around the shaft tip")
 # The pinch screw THREADS INTO the block's tapped #3-48 cross-bore: the
 # modeled shank rides at tap-drill - ~0.3 (memory/fastener-policy lag
 # precedent), so the fit is an engagement band, not the old equality.
@@ -1673,7 +1681,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "cone-tip-block",
         [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]], [0.0, INCLINE_DEG, 0.0],
         ROT_Y_INCLINE, ground=False,
-        label="cone-tip-block (tip journal, on the plate)",
+        label="cone-tip-block (end-play adjuster support, on the plate)",
     )
     # Tip end-play stack (item 5, v4_t00471): the brass spacer bushing on the
     # tip stub, the axial adjuster screw in the block's counterbore, and the
@@ -2130,8 +2138,8 @@ async def build(adapter) -> dict[str, str]:
         d_axial,
         label=f"cone-shaft axial d={d_axial:.2f}", verify=(cone_shaft, cone_o),
     )
-    # Tip block: positioned BY the shaft it journals -- coaxial on the shaft's
-    # axis (which the post + platform already carry) + an axial seat + a
+    # Tip block: aligned to the shaft/adjuster axis (which the post + platform
+    # already carry) + an axial seat + a
     # parallel anti-spin against the PLATFORM (not the spinning shaft). Its
     # height falls out of the coaxial (bore height + plate = drive height,
     # asserted at import), so its foot lands ON PlateTop with no seat mate --
@@ -2142,7 +2150,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Axis1@{tip_block}", "AXIS"),
         named_ref(f"Axis1@{cone_shaft}", "AXIS"),
-        label="tip-block journals the shaft tip", verify=(tip_block, tb_o),
+        label="tip-block adjuster axis aligned to shaft tip", verify=(tip_block, tb_o),
     )
     await distance_driver(
         adapter,
@@ -2186,8 +2194,8 @@ async def build(adapter) -> dict[str, str]:
         label="tip-bushing anti-spin (spin immaterial)",
         verify=(tip_bushing, bush_o),
     )
-    # The adjuster screws into the BLOCK's counterbore: coaxial on the block's
-    # journal axis + an axial seat off the block's Front plane + an anti-spin
+    # The adjuster screws into the BLOCK's tapped bore: coaxial on the block's
+    # adjuster axis + an axial seat off the block's Front plane + an anti-spin
     # (the pinch screw locks its turn in reality).
     adj_o = _org(adapter, tip_adjuster)
     adj_axial = sum((adj_o[k] - tb_o[k]) * cone_axis_dir[k] for k in range(3))

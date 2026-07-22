@@ -307,7 +307,7 @@ sections:
       - - Cone shaft length
         - 190 mm
         - '7.5'
-        - 'M6.7: pivot journal 25 + stack 19 × 6.889 + 6.5 ≈ 137.4 + thin-tip journal through the knob post at station 177 (length kept 190; the stack lengthened slightly with the shallower incline)'
+        - 'M6.7: pivot journal 25 + stack 19 × 6.889 + 6.5 ≈ 137.4 + thin T006/tip section reaching the external spacer and adjuster cup (length kept 190; the stack lengthened slightly with the shallower incline)'
         - derived
         - low
       - - Cone shaft diameter
@@ -543,7 +543,7 @@ sections:
         - ch30 GT crank re-anchor (y −1.98 with the 2026-07-14 engaged-mesh Y_CRANK at slack 0.25); the chain plane moved south to z −155 (T12 band −157.5..−152.5, well in front of the pedestal cylinder front face −121.4)
         - med
       - - Cone pivot
-        - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post, tip in the black clamp block, both standing ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
+        - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post; the thin tip is end-play located by the external spacer and cup-ended adjuster carried in the black block. The post and block both stand ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
         - p.18 + ch. 12 notes; v4 stills (t00393/t00396/t00417 engage/disengage)
         - high
   - prose: |2
@@ -564,7 +564,7 @@ sections:
         - med (GT height; shape photo-scaled)
       - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
         - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 (north, pivot) → east 20 / west 37 (south, big end) over 214 along the cone axis; the west flare makes the pivot → lock-knob line SOLID plate (the old bolt-on lock lobe is gone); plan corners rounded to the neighbouring hardware (NE/NW/SW R10 ≈ the lock washer, SE R12 = the crank column''s radius); Ø6.5 pivot hole riding the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch (chord of the R191.7 swing arc from the engaged seat out through the west taper edge, 10.46 stud travel to the mouth); carries the "crank axis" reference + CrankAxisSeat datum (vertical, 43.11 from the pivot along the plate frame, crank height 92.185 above the plate bottom — 2026-07-14 engaged-mesh Y_CRANK at slack 0.25) the whole crank rig mates to; plate top y 57.15 — the post/block bores sit 47.65 above it = drive line 104.8 (chiral plate: authored MIRRORED under MIRROR_PLANE "x0")'
-        - 'FLOATED, pivot at cone station 196 = (+79.69, 103.29) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft (via both journals), tip block AND the crank rig all ride it — the p1 disengage DOF is the plate''s swing about its tip-end vertical axis, FREE by default (deferred PARK_cone_swing driver): 6.41° to clear the knob washer, the west edge then meeting the swing-stop screw'
+        - 'FLOATED, pivot at cone station 196 = (+79.69, 103.29) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft (big-end journal plus external-spacer/adjuster-cup tip location), tip block AND crank rig all ride it — the p1 disengage DOF is the plate''s swing about its tip-end vertical axis, FREE by default; its dof-manifest drive sweeps 6.41° to clear the knob washer, the west edge then meeting the swing-stop screw'
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; dims photo-scaled vs the 64T
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
@@ -572,8 +572,8 @@ sections:
         - 'centre (+121.85, −86.59) = cone shaft station 1.5; south flank −98.59 (64T south face 1.1 clear at the north flank); the shaft''s front stub ends 1.47 proud of the south flank at z −100.06. Absorbs the old separate crank-pedestal (user-confirmed vs v4_t00411/t00417): the crank rig rides the SWINGING plate, so the oblique 16T↔64T mesh survives the p1 disengage — the machine''s M.O. (ch12 "oblique angle"). DOCUMENTED DEVIATION: the GT cone_front boss (−123.07 ± 1.6) belonged to the retired nested-pedestal story — the platform architecture ends the shaft at the post'
         - p.18 "pivot"-plate bracket + v4 stills (one green column serving both bores), read green cast like the pedestals
         - med
-      - - '`cone-tip-block` (small-end journal + end-play clamp, on the plate — GT cone_back realized)'
-        - 'black steel block 14 × 12 × 55 tall, Ø0.79 (1/32") tip journal bore at 47.65 above the plate top (abs y 104.8); north-face counterbore Ø7.9 × 8 threading the cone-tip-adjuster; 1.2-wide top slit down to 47.0 (the clamp flexure) crossed by a Ø2.4 pinch cross-bore at 53.2 — the McMaster 61815K41 base-mount shaft-support pattern, here locking the ADJUSTER''s threads after the end-play set'
+      - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
+        - 'black steel block 14 × 12 × 55 tall; north-face 5/16-18 UNC-2B blind tapped bore on the cone axis 47.65 above the plate top (abs y 104.8), 8 deep, carrying the cup-ended cone-tip-adjuster; 1.2-wide top slit down to 47.0 (the clamp flexure) crossed by a #3-48 pinch joint at 53.2 — the McMaster 61815K41 pattern here locks the ADJUSTER''s threads after the end-play set. The former Ø0.819 through journal was removed: the source-faithful long slit erased it, while the external spacer plus adjuster cup are the actual tip support.'
         - 'centre (+82.07, 92.56) = cone shaft station 185, standing ON the swing platform beside the pivot; the shaft tip end (station 190, z 97.4) rests inside the adjuster''s blind cup. ch30 GT cone_back triangulated the tip post at authored (+81.03, 104.60, +101.83) ± 2 — x within 1.1, bore on the drive line; the old "inside the portal frustum" blocker died with M6.12 (the rocker-arm-support lives at authored x −28..−117, the other side of the machine)'
         - ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry)
         - med (GT-anchored)

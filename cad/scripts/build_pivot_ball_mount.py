@@ -46,20 +46,27 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from pivot_ball_mount_spec import (
+    BALL_CENTER_H,
+    BALL_DIA,
+    BASE_DIA,
+    BASE_H,
+    BORE_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    STEM_DIA,
+)
 
 import _telemetry
 
 PART_NAME = "pivot-ball-mount"
 MATERIAL = "Plain Carbon Steel"  # chrome-look ball/pillar in the photos
 
-BALL_DIA = 13.0  # narrowed from Ø19 so the north mount's z-footprint [75.0,
-# 88.0] fits the 14.8 mm window between the channel-19 bar (z 74.1) and the
-# support north edge (z 88.9); the other 3 mounts shrink to match (scaled, low)
-BALL_CENTER_H = 25.2  # ball centre above the seat (derived: 253.8 - 228.6)
-BASE_DIA = 13.0  # seat pad, narrowed with the ball to fit the support window (low)
-BASE_H = 4.0  # seat pad height (scaled, low)
-STEM_DIA = 8.0  # pillar between pad and ball (scaled, low)
-BORE_DIA = 6.5  # shaft cross-bore, rides the Ø6.35 pivot shaft (derived)
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > ball dia
 
 BALL_R = BALL_DIA / 2.0
@@ -229,6 +236,14 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

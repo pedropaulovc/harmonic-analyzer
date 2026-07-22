@@ -442,6 +442,42 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_transgear_pinion.py",
     ),
     DrawingSpec(
+        name="cone_gear_shaft",
+        part="cone_gear_shaft",
+        artifact_stem="cone-gear-shaft",
+        script_name="draw_cone_gear_shaft.py",
+    ),
+    DrawingSpec(
+        name="cone_pivot_post",
+        part="cone_pivot_post",
+        artifact_stem="cone-pivot-post",
+        script_name="draw_cone_pivot_post.py",
+    ),
+    DrawingSpec(
+        name="cone_tip_adjuster",
+        part="cone_tip_adjuster",
+        artifact_stem="cone-tip-adjuster",
+        script_name="draw_cone_tip_adjuster.py",
+    ),
+    DrawingSpec(
+        name="cone_tip_block",
+        part="cone_tip_block",
+        artifact_stem="cone-tip-block",
+        script_name="draw_cone_tip_block.py",
+    ),
+    DrawingSpec(
+        name="arbor_pedestal",
+        part="arbor_pedestal",
+        artifact_stem="arbor-pedestal",
+        script_name="draw_arbor_pedestal.py",
+    ),
+    DrawingSpec(
+        name="pivot_ball_mount",
+        part="pivot_ball_mount",
+        artifact_stem="pivot-ball-mount",
+        script_name="draw_pivot_ball_mount.py",
+    ),
+    DrawingSpec(
         name="crankshaft",
         part="crankshaft",
         artifact_stem="crankshaft",

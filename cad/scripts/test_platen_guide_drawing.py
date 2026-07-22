@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import _drawing_common as common
 import cut_release
 import draw_platen_guide as drawing
 import build_platen_guide as guide
@@ -118,6 +119,9 @@ def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
     assert "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol>" in xml
     assert xml.count("<DatumCompartment>") == 3
     assert property_link("Manufacturing Notes") == '$PRPSHEET:"Manufacturing Notes"'
+    assert "GTOL-SPROF" in _gtol_frame_xml(
+        "profile_surface", "0.10", datums=("C",)
+    )
 
 
 def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:
@@ -162,6 +166,21 @@ def test_projection_symbol_requires_third_angle_order() -> None:
 
     with pytest.raises(RuntimeError, match="first-angle projection symbol"):
         _assert_third_angle_order(circle_x, frustum_x)
+
+
+def test_dirty_reopened_scale_is_reexported_to_pdf() -> None:
+    source = Path(common.__file__).read_text(encoding="utf-8")
+    first_reopen = source.index("await reopen_drawing(adapter, outputs.slddrw)")
+    dirty_branch = source.index("if sheet_scale_dirty:", first_reopen)
+    persisted_pdf_export = source.index(
+        "adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)",
+        dirty_branch,
+    )
+    second_reopen = source.index(
+        "await reopen_drawing(adapter, outputs.slddrw)", first_reopen + 1
+    )
+    assert dirty_branch < persisted_pdf_export < second_reopen
+    assert "PDF re-export after dirty-scale save failed" in source
 
 
 def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:

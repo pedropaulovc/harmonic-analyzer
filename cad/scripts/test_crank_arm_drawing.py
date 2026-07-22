@@ -92,11 +92,14 @@ def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
     assert "annotation.SetAttachedEntities(dispatch_array([edge]))" in common
     # Bent, not straight: a straight leader runs at whatever angle the
     # anchor-to-frame vector takes, which is what drove the Ra symbol's leader
-    # across two views. IGtol::SetLeader cannot ask for bent, so the recipe goes
-    # through IAnnotation::SetLeader3 and checks its int status (0 == set).
+    # across two views. IGtol::SetLeader cannot ask for bent, so the ordinary
+    # path goes through IAnnotation::SetLeader3 and checks its int status.
     assert "annotation.SetLeader3(" in common
     assert "_LEADER_BENT," in common
     assert "gtol.SetLeader(True, 0, False, False)" not in common
+    # DIMENSION-attach entity registration is flow-dependent (0 or 1 depending
+    # on insertion order), so the check accepts either; edge attachments stay 1.
+    assert 'expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}' in common
     assert "not bool(gtol.IsAttached())" in common
     assert "int(gtol.GetLeaderCount()) != 1" in common
 

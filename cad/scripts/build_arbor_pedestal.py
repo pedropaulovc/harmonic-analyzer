@@ -46,6 +46,7 @@ from _common import (
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -54,27 +55,43 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from arbor_pedestal_spec import (
+    BORE_DIA,
+    BORE_HEIGHT,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FOOT_DEPTH,
+    FOOT_HEIGHT,
+    FOOT_WIDTH,
+    SCREW_CLEARANCE_DIA,
+    SCREW_THREAD,
+    STRAP_T,
+    TOP_RADIUS,
+)
+from _holes import HoleSpec, wizard_holes
 
 PART_NAME = "arbor-pedestal"
 MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 
-FOOT_WIDTH = 24.0  # X; the rocker-support foot rail sits 0.25 east -- keep
-FOOT_DEPTH = 16.0  # Z; front face -98.5 clears the portal south plate by 0.5
-FOOT_HEIGHT = 5.0  # the low flange under the strap (photo-scaled, low)
-STRAP_T = 10.0  # Z; thin strap FLUSH with the foot's +Z face (L, not T):
-# band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8. Keeps the
-# arbor's 7.5 engagement from the north face; the -Z flange carries the screw
-# Foot-screw shank O2.9 pass-through (build_foot_screw, the flange hold-down;
-# its 8.0 shank reaches 3.0 into the base past this 5.0 flange): #4 clearance
-# NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim).
-SCREW_HOLE_SPEC = HoleSpec("clearance", "#4")
-SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)  # 3.251; re-exposed for the
+# Geometry comes from arbor_pedestal_spec — the drawing's single source of the
+# marked dimensions — so a spec correction rebuilds the SLDPRT from the same
+# values the print annotates (foot envelope, strap, dome, journal bore).
+#
+# STRAP_T: band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8.
+# Keeps the arbor's 7.5 engagement from the north face; the -Z flange carries
+# the screw. Foot-screw shank O2.9 pass-through (build_foot_screw, the flange
+# hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange):
+# #4 clearance NORMAL fit (Ø3.251, the wizard twin of the old Ø3.2 artefact dim).
+SCREW_HOLE_SPEC = HoleSpec("clearance", SCREW_THREAD)
+SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.2512, the seat-proven cut (see the
+# spec's pin rationale); the post-create assert below keeps model, note and
 # drive-train assembly's foot-screw clearance assert (build_drive_train_assembly)
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
-TOP_RADIUS = 10.0  # dome radius = strap half-width at the top (24 -> 20 taper)
-BORE_DIA = 0.375 * IN  # 9.525: arbor diameter (ch. 13, legacy, med)
-BORE_HEIGHT = 54.0  # ch30 GT: drive height above base top (was 76)
 
 BORE_RADIUS = BORE_DIA / 2.0
 
@@ -119,6 +136,9 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=FOOT_HEIGHT)),
     )
     name_last_feature(adapter, "Foot")
+    # Name the extrude DEPTH so the foot flange height is a markable drawing dim.
+    foot_ht_dim = name_dimensions(adapter, "Foot", ["FootHt"])
+    drive_jobs += [(foot_ht_dim[0], '"FootHeight"')]
     v_foot = FOOT_WIDTH * FOOT_DEPTH * FOOT_HEIGHT
     volume = await volume_check(adapter, "foot", v_foot, 0.005 * v_foot)
 
@@ -246,15 +266,20 @@ async def build(adapter) -> dict[str, str]:
     # z SCREW_Z), drilled from the foot bottom (y=0) -- the fillister screw
     # bolts the casting to the base. The foot bottom is a clean rectangle (the
     # strap/dome/bore are all above it), so find_planar_face resolves cleanly.
-    screw_dia = blind_cut_dia_mm(SCREW_HOLE_SPEC)
     screw_cut = wizard_holes(
         adapter, SCREW_HOLE_SPEC,
         [[0.0, 0.0, SCREW_Z]],
         (0.0, -1.0, 0.0), "flange hold-down hole (#4 clearance)", name="ScrewHole",
         placement_dims=[((None, None), ("ScrewZ", '"ScrewZ"'))],
     )
+    if abs(screw_cut.hole_dia_mm - SCREW_CLEARANCE_DIA) > 0.005:
+        raise RuntimeError(
+            f"flange hold-down hole cut Ø{screw_cut.hole_dia_mm:.4f} != spec "
+            f"SCREW_CLEARANCE_DIA Ø{SCREW_CLEARANCE_DIA} -- the seat's wizard "
+            "table moved; realign the spec pin (and the sheet masking note)"
+        )
     drive_jobs += screw_cut.placement_drive_jobs
-    v_hole = math.pi * (screw_dia / 2.0) ** 2 * FOOT_HEIGHT
+    v_hole = math.pi * (SCREW_CLEARANCE_DIA / 2.0) ** 2 * FOOT_HEIGHT
     volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
     v_final = volume
 
@@ -269,6 +294,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Manufacturing Notes": DRAWING_NOTES},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

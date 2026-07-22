@@ -1720,6 +1720,11 @@ def task_check():
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
+        # Drawing infrastructure and cross-sheet contracts do not follow the
+        # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
+        SCRIPTS_DIR / "test_drawing_marks.py",
+        SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
+        SCRIPTS_DIR / "test_fastener_catalog.py",
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
@@ -1738,22 +1743,34 @@ def task_check():
             # truth_model reads harmonics/phases/amplitudes/magnification from
             # _config + the YAML layer, so those must invalidate the math stamp
             # too (codex review). The base-footprint gate reads placement +
-            # footprint constants straight off these build modules, so they
-            # must invalidate it too.
+            # footprint constants straight off these build modules -- folded via
+            # module_deps_of so the geometry contracts they import (the
+            # *_spec.py single-source modules) invalidate the stamp too (codex
+            # review #353: a FOOT_WIDTH edit in arbor_pedestal_spec.py must
+            # re-run the gate, not leave its stamp valid).
             "file_dep": [str(VERIFY_PY),
-                         str((SCRIPTS_DIR / "truth_model.py").resolve()),
-                         str((SCRIPTS_DIR / "build_drive_train_assembly.py").resolve()),
-                         str((SCRIPTS_DIR / "build_cone_pivot_post.py").resolve()),
-                         str((SCRIPTS_DIR / "build_cone_pivot_screw.py").resolve()),
-                         str((SCRIPTS_DIR / "build_swing_stop_screw.py").resolve()),
-                         str((SCRIPTS_DIR / "build_cone_swing_platform.py").resolve()),
-                         str((SCRIPTS_DIR / "build_cone_lock_knob.py").resolve()),
-                         str((SCRIPTS_DIR / "build_cone_tip_block.py").resolve()),
-                         str((SCRIPTS_DIR / "build_cone_tip_bushing.py").resolve()),
-                         str((SCRIPTS_DIR / "build_cone_tip_adjuster.py").resolve()),
-                         str((SCRIPTS_DIR / "build_cone_tip_pinch_screw.py").resolve()),
-                         str((SCRIPTS_DIR / "build_arbor_pedestal.py").resolve()),
-                         str((SCRIPTS_DIR / "build_harmonic_base.py").resolve()),
+                         *sorted({
+                             str(Path(dep).resolve())
+                             for module in (
+                                 "truth_model.py",
+                                 "build_drive_train_assembly.py",
+                                 "build_cone_pivot_post.py",
+                                 "build_cone_pivot_screw.py",
+                                 "build_swing_stop_screw.py",
+                                 "build_cone_swing_platform.py",
+                                 "build_cone_lock_knob.py",
+                                 "build_cone_tip_block.py",
+                                 "build_cone_tip_bushing.py",
+                                 "build_cone_tip_adjuster.py",
+                                 "build_cone_tip_pinch_screw.py",
+                                 "build_arbor_pedestal.py",
+                                 "build_harmonic_base.py",
+                             )
+                             for dep in (
+                                 SCRIPTS_DIR / module,
+                                 *module_deps_of(SCRIPTS_DIR / module),
+                             )
+                         }),
                          config_py, *_CONFIG_YAMLS],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "math"],
         },

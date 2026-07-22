@@ -13,7 +13,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Literal, Sequence
 from xml.etree import ElementTree
 
 import _telemetry
@@ -53,6 +53,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 # free-standing layout element (the general-notes block, schedule cells). Tables
 # are enumerated separately via IView.GetTableAnnotations.
 _ANNOT_NOTE = 6
+_DIMENSION_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 # swInsertAnnotation_e flags used by the curated model-item import. Hole Wizard
 # placement dimensions live on an absorbed sketch and require their dedicated
 # flag; MarkedForDrawing alone does not make them importable.
@@ -72,6 +73,7 @@ _INSERT_HOLE_WIZARD_LOCATION_DIMS = 0x20000
 _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
+_SEL_DIMENSION = 14  # swSelectType_e.swSelDIMENSIONS
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
 # The interface each GD&T kind's geometry actually lives on -- reached via
 # IAnnotation::GetSpecificAnnotation, never off IAnnotation itself.
@@ -286,18 +288,28 @@ def _select_view_entity(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
     draw.ClearSelection2(True)
+    selected = False
     if entity is not None:
-        selected = view.SelectEntity(entity, False)
-        if not selected:
-            raise RuntimeError(f"failed to select {label} {entity_type.lower()}")
-    elif xy is None:
-        raise ValueError(f"{label} requires either a sheet pick or an entity")
-    elif not draw.Extension.SelectByID2(
-        "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
-    ):
+        if entity_type == "SILHOUETTE":
+            selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            selection_data = selection_manager.CreateSelectData()
+            selection_data.View = view
+            selectable = _sw_type_info.early_bound_or_flag(
+                entity, "ISilhouetteEdge", "Select2"
+            )
+            selected = bool(selectable.Select2(False, selection_data))
+        else:
+            selected = bool(view.SelectEntity(entity, False))
+    elif xy is not None:
+        selected = bool(
+            draw.Extension.SelectByID2(
+                "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
+            )
+        )
+    if not selected:
+        where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
         raise RuntimeError(
-            f"failed to select {label} {entity_type.lower()} at "
-            f"sheet ({xy[0]:g}, {xy[1]:g})"
+            f"failed to select {label} {entity_type.lower()} {where}"
         )
     count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
     entity = draw.SelectionManager.GetSelectedObject6(count, -1)
@@ -356,8 +368,9 @@ def add_datum_feature(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
-    shoulder: bool = False,
     annotation: Any | None = None,
+    shoulder: bool = False,
+    position_tolerance_m: float = 1e-6,
     callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
@@ -383,10 +396,32 @@ def add_datum_feature(
             raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
         draw.ClearSelection2(True)
         annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "Select2"
+            annotation, "IAnnotation", "Select3", "GetSpecificAnnotation"
         )
-        if not annotation.Select2(False, 0):
-            raise RuntimeError(f"failed to select {label} dimension annotation")
+        selected = bool(annotation.Select3(False, null_callout()))
+        if not selected:
+            display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+            if display is not None:
+                display = _sw_type_info.early_bound_or_flag(
+                    display, "IDisplayDimension", "GetNameForSelection"
+                )
+                selection_name = str(display.GetNameForSelection() or "")
+                selected = bool(
+                    selection_name
+                    and draw.Extension.SelectByID2(
+                        selection_name,
+                        "DIMENSION",
+                        0.0,
+                        0.0,
+                        0.0,
+                        False,
+                        0,
+                        null_callout(),
+                        0,
+                    )
+                )
+        if not selected:
+            raise RuntimeError(f"failed to select {label} annotation")
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
@@ -403,11 +438,27 @@ def add_datum_feature(
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
     if shoulder:
         tag.Shoulder = True
-    annotation = _sw_type_info.early_bound_or_flag(
-        tag.GetAnnotation(), "IAnnotation", "SetPosition2"
+    tag_annotation = _sw_type_info.early_bound_or_flag(
+        tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
     )
-    if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
+    actual_position = tag_annotation.GetPosition()
+    position_error = (
+        math.inf
+        if not actual_position
+        else math.hypot(
+            float(actual_position[0]) - symbol_xy[0],
+            float(actual_position[1]) - symbol_xy[1],
+        )
+    )
+    if position_error > position_tolerance_m:
+        raise RuntimeError(
+            f"datum {datum} position did not persist ({label}): "
+            f"{tuple(actual_position[:2]) if actual_position else None}; "
+            f"requested={symbol_xy}, error={position_error:.6g} m, "
+            f"limit={position_tolerance_m:.6g} m"
+        )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
     if callout_below and not tag.SetText(4, callout_below):
@@ -434,12 +485,14 @@ def add_feature_control_frame(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    leader_attach_xy: tuple[float, float] | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
+    draw = adapter.currentModel
     edge = _select_annotation_entity(
         adapter,
         view,
@@ -449,12 +502,19 @@ def add_feature_control_frame(
         entity_type=entity_type,
         label=label,
     )
-    draw = adapter.currentModel
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
     gtol = _sw_type_info.early_bound_or_flag(
-        gtol, "IGtol", "GetFrameCount", "AddFrame", "GetFrame", "GetAnnotation"
+        gtol,
+        "IGtol",
+        "GetFrameCount",
+        "AddFrame",
+        "GetFrame",
+        "GetAnnotation",
+        "SetLeader",
+        "IsAttached",
+        "GetLeaderCount",
     )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
@@ -527,12 +587,19 @@ def add_feature_control_frame(
         "SetAttachedEntities",
         "SetPosition2",
         "SetLeader3",
+        "SetLeaderAttachmentPointAtIndex",
+        "GetLeaderPointsAtIndex",
     )
-    if int(annotation.GetAttachedEntityCount3()) != 1:
+    # A GTol inserted from a selected display dimension reports its association
+    # through IGtol.IsAttached/GetLeaderCount; whether the dimension ALSO lands
+    # in the annotation's model-entity array is flow-dependent (0 on the
+    # pre-merge insertion order, 1 on the current one), so accept either.
+    # Ordinary edge/silhouette attachments must register exactly one entity.
+    expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}
+    if entity_type != "DIMENSION" and int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
-    # Bent leader: a straight leader runs at whatever angle the anchor-to-frame
-    # vector takes and can cut clean across a neighbouring view.
+    # Bent leaders keep ordinary feature attachments out of neighbouring views.
     leader_status = int(
         annotation.SetLeader3(
             _LEADER_BENT,
@@ -550,13 +617,38 @@ def add_feature_control_frame(
         )
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
+    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
+        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
+    ):
+        raise RuntimeError(f"failed to position feature-control-frame leader ({label})")
     draw.EditRebuild3()
     if (
-        int(annotation.GetAttachedEntityCount3()) != 1
+        int(annotation.GetAttachedEntityCount3()) not in expected_entities
         or not bool(gtol.IsAttached())
         or int(gtol.GetLeaderCount()) != 1
     ):
-        raise RuntimeError(f"feature-control frame lacks one attached leader ({label})")
+        raise RuntimeError(
+            f"feature-control frame attachment mismatch ({label}): "
+            f"entities={annotation.GetAttachedEntityCount3()}, "
+            f"expected in {sorted(expected_entities)}; "
+            f"attached={bool(gtol.IsAttached())}; "
+            f"leaders={gtol.GetLeaderCount()}, expected=1"
+        )
+    if leader_attach_xy is not None:
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if len(points) < 6:
+            raise RuntimeError(f"feature-control-frame leader is unreadable ({label})")
+        actual_attach = (float(points[-3]), float(points[-2]))
+        attach_error = math.hypot(
+            actual_attach[0] - leader_attach_xy[0],
+            actual_attach[1] - leader_attach_xy[1],
+        )
+        if attach_error > 0.005:
+            raise RuntimeError(
+                f"feature-control-frame leader attachment moved ({label}): "
+                f"actual={actual_attach}, requested={leader_attach_xy}, "
+                f"error={attach_error:.6g} m"
+            )
     draw.ClearSelection2(True)
     return gtol
 
@@ -573,6 +665,7 @@ def add_surface_finish(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    leader_attach_xy: tuple[float, float] | None = None,
     production_method: str = "",
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
@@ -626,7 +719,11 @@ def add_surface_finish(
     if production_method and str(symbol.GetText(2) or "").strip() != production_method:
         raise RuntimeError(f"surface target did not persist ({label})")
     annotation = _sw_type_info.early_bound_or_flag(
-        symbol.GetAnnotation(), "IAnnotation", "SetPosition2", "SetLeader3"
+        symbol.GetAnnotation(),
+        "IAnnotation",
+        "SetPosition2",
+        "SetLeader3",
+        "SetLeaderAttachmentPointAtIndex",
     )
     leader_status = int(
         annotation.SetLeader3(
@@ -645,6 +742,10 @@ def add_surface_finish(
         )
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position surface-finish symbol ({label})")
+    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
+        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
+    ):
+        raise RuntimeError(f"failed to position surface-finish leader ({label})")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return symbol
@@ -657,6 +758,7 @@ def add_view_centerline(
     *,
     face_xy: tuple[float, float] | None = None,
     label: str,
+    entity: Any | None = None,
     face: Any | None = None,
 ) -> Any:
     """Insert the axis centerline of a cylindrical face shown in ``view``.
@@ -670,7 +772,12 @@ def add_view_centerline(
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     _select_view_entity(
-        adapter, view, "FACE", face_xy, label=label, entity=face
+        adapter,
+        view,
+        "FACE",
+        face_xy,
+        label=label,
+        entity=entity if entity is not None else face,
     )
     centerline = adapter._attempt(lambda: ddoc.InsertCenterLine2())
     if centerline is None:
@@ -777,12 +884,37 @@ def model_point_in_view(
 
 @_telemetry.traced("drawing.linked_note", label_param="property_name")
 def add_property_linked_note(
-    adapter: Any, property_name: str, x: float, y: float
+    adapter: Any,
+    property_name: str,
+    x: float,
+    y: float,
+    *,
+    char_height: float | None = None,
 ) -> Any:
     """Place one note whose displayed text resolves from the source SLDPRT."""
     note = add_note(adapter, property_link(property_name), x, y)
     if note is None:
         raise RuntimeError(f"failed to add linked drawing note {property_name!r}")
+    if char_height is None:
+        return note
+
+    note = _early_bound(note, "INote", "GetAnnotation")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"linked drawing note {property_name!r} has no annotation")
+    annotation = _early_bound(
+        annotation, "IAnnotation", "GetTextFormat", "SetTextFormat"
+    )
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(
+            f"linked drawing note {property_name!r} has no text format"
+        )
+    text_format.CharHeight = float(char_height)
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(
+            f"failed to set linked drawing note {property_name!r} text height"
+        )
     return note
 
 
@@ -845,14 +977,20 @@ def add_attached_note(
     view: Any,
     *,
     text: str,
-    entity_xy: tuple[float, float],
+    entity_xy: tuple[float, float] | None = None,
     note_xy: tuple[float, float],
     label: str,
     entity_type: str = "EDGE",
+    entity: Any | None = None,
 ) -> Any:
-    """Attach one literal arrowed note to a drawing-view entity."""
-    entity = _select_view_entity(
-        adapter, view, entity_type, entity_xy, label=label
+    """Attach one literal arrowed note to a drawing-view entity.
+
+    Provide EITHER ``entity_xy`` (a sheet-coordinate pick) OR ``entity`` (a
+    precise model entity — for an offset/inclined rim whose projected edge has
+    no stable sheet coordinate); ``_select_view_entity`` prefers ``entity``.
+    """
+    target = _select_view_entity(
+        adapter, view, entity_type, entity_xy, label=label, entity=entity
     )
     draw = adapter.currentModel
     note = draw.InsertNote(text)
@@ -872,7 +1010,7 @@ def add_attached_note(
         "GetLeaderCount",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
-        if not annotation.SetAttachedEntities(dispatch_array([entity])):
+        if not annotation.SetAttachedEntities(dispatch_array([target])):
             raise RuntimeError(f"failed to attach note ({label})")
     status = annotation.SetLeader3(1, 0, True, False, False, False)
     if status != 0:
@@ -1192,11 +1330,36 @@ def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
             circle_specs.append((float(center.X), float(arc.GetRadius())))
         frustum_x, circle_x = _projection_symbol_centers(circle_specs, line_x_pairs)
         _assert_third_angle_order(frustum_x, circle_x)
+        # A correct block DEFINITION can persist in the document even when the
+        # placed title-block INSTANCE was deleted, mirrored, or never inserted,
+        # so the definition geometry alone does not prove the sheet shows the
+        # symbol.  Require at least one placed instance and reject a rotated /
+        # mirrored one (which flips the projection convention on the sheet).
+        definition = candidates[0]
+        instance_count = int(definition.GetInstanceCount())
+        with _telemetry.span(
+            "drawing.projection_symbol_scan", instances=instance_count
+        ):
+            if instance_count < 1:
+                raise RuntimeError(
+                    "third-angle projection block is defined but has no placed "
+                    "instance — the title-block symbol was deleted or never inserted"
+                )
+            for raw_instance in definition.GetInstances() or ():
+                instance = _early_bound(raw_instance, "ISketchBlockInstance")
+                angle = float(instance.Angle) % math.tau
+                if min(angle, math.tau - angle) > math.radians(0.5):
+                    raise RuntimeError(
+                        "placed third-angle projection block instance is rotated "
+                        f"(angle={angle:.4f} rad) — a rotated or mirrored symbol "
+                        "misreads the projection convention on the sheet"
+                    )
         _telemetry.event(
             "drawing.projection_symbol_verified",
             convention="third-angle",
             frustum_x=frustum_x,
             circle_x=circle_x,
+            instance_count=instance_count,
         )
     finally:
         ddoc.EditSheet()
@@ -1536,15 +1699,27 @@ def curate_view_dimensions(
 
 
 def set_dimension_callouts(
-    adapter: Any, annotations: Iterable[Any], below_text: dict[str, str]
+    adapter: Any,
+    annotations: Iterable[Any],
+    callout_text: dict[str, str],
+    *,
+    location: Literal["above", "below"] = "below",
 ) -> None:
-    """Append callout text below named dimensions (e.g. THRU / depth notes).
+    """Append native callout text above or below named dimensions.
 
     A bare Ø does not tell the machinist whether a hole is through or blind;
     ASME hole callouts carry that below the value.  Keyed on the parametric
     dimension name, so a value collision can never stamp the wrong hole.
+
+    ``above`` is required when a datum feature symbol is attached to the same
+    size dimension: SOLIDWORKS places that symbol between the primary value and
+    the below-callout lane, while the above-callout lane remains unobstructed.
     """
-    remaining = dict(below_text)
+    text_part = {
+        "above": 3,  # swDimensionTextCalloutAbove
+        "below": _DIMENSION_TEXT_CALLOUT_BELOW,
+    }[location]
+    remaining = dict(callout_text)
     for annotation in annotations:
         annotation = _sw_type_info.early_bound_or_flag(
             annotation, "IAnnotation", "GetSpecificAnnotation"
@@ -1560,7 +1735,7 @@ def set_dimension_callouts(
             display, "IDisplayDimension", "SetText"
         )
         adapter._attempt(
-            lambda d=display, s=text: d.SetText(4, s)  # swDimensionTextCalloutBelow
+            lambda d=display, s=text: d.SetText(text_part, s)
         )
     if remaining:
         raise RuntimeError(
@@ -1691,6 +1866,64 @@ def set_dimension_precision(
     adapter.currentModel.EditRebuild3()
 
 
+@_telemetry.traced("drawing.reference_dimensions")
+def set_reference_dimensions(
+    adapter: Any, annotations: Iterable[Any], names: Iterable[str]
+) -> None:
+    """Parenthesize NAMED dimensions so they read as REFERENCE, not controlling.
+
+    A fastener modeled at its thread MINOR diameter carries the real spec in a
+    thread callout; the modeled OD is reference geometry, not a controlling
+    dimension.  Showing that OD as a hard value contradicts the thread callout
+    (a 5/16-18 thread's Ø6.20 minor cannot grow crests — codex machinist
+    review), so the OD dim is boxed in parentheses: ASME reference-dimension
+    notation.  Keyed on the parametric name so a value collision can never
+    parenthesize the wrong dimension.  Fails loud if any name is unmatched.
+
+    ``IDisplayDimension.ShowParenthesis`` only affects "text above the dimension
+    line", which a leadered diameter callout does not have (it sets the flag but
+    renders nothing), so instead bracket the value with a "(" prefix and ")"
+    suffix via ``SetText`` — the same proven channel ``set_dimension_callouts``
+    uses for the below-text — which renders on any dimension form.
+    """
+    text_prefix = 1  # swDimensionTextParts_e.swDimensionTextPrefix
+    text_suffix = 2  # swDimensionTextParts_e.swDimensionTextSuffix
+    # A custom prefix REPLACES the auto diameter glyph, so carry SolidWorks'
+    # own "<MOD-DIAM>" token to keep the Ø on a diameter dim: "(Ø6.20)".
+    open_paren = "(<MOD-DIAM>"
+    wanted = set(names)
+    marked: set[str] = set()
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        if name not in wanted:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        adapter._attempt(lambda d=display: d.SetText(text_prefix, open_paren))
+        adapter._attempt(lambda d=display: d.SetText(text_suffix, ")"))
+        # SetText reports nothing, so verify the SIDE EFFECT: read the parts back
+        # (a silent no-op would ship the OD as a controlling dim vs the thread).
+        got_prefix = adapter._attempt(lambda d=display: d.GetText(text_prefix))
+        got_suffix = adapter._attempt(lambda d=display: d.GetText(text_suffix))
+        if str(got_prefix) != open_paren or str(got_suffix) != ")":
+            raise RuntimeError(
+                f"reference (parenthesis) mark on dimension {name!r} did not take: "
+                f"prefix={got_prefix!r} suffix={got_suffix!r}"
+            )
+        marked.add(name)
+    missing = wanted - marked
+    if missing:
+        raise RuntimeError(f"reference dimensions not applied: {sorted(missing)}")
+    adapter.currentModel.EditRebuild3()
+
+
 def offset_dimension_text(
     adapter: Any,
     annotations: Iterable[Any],
@@ -1729,14 +1962,17 @@ def add_edge_dimension(
     text_xy: tuple[float, float],
     label: str,
     orientation: str = "smart",
+    entity_type: Literal["EDGE", "SILHOUETTE"] = "EDGE",
 ) -> Any:
-    """Dimension across two edges picked at explicit sheet points (meters).
+    """Dimension across two view entities picked at explicit sheet points.
 
     The adapter's ``add_overall_dimension`` derives its picks from
     ``IView.GetOutline``, which pads the geometry with a whitespace margin, so
     its coordinate picks can miss.  Recipes know their layout exactly — the
-    explicit points make the pick deterministic.  Fails loud on either pick or
-    on dimension creation.
+    explicit sheet-meter points make the pick deterministic. Revolved outlines
+    are drawing silhouettes rather than model edges, so callers must request
+    ``SILHOUETTE`` for those flanks. Fails loud on either pick or dimension
+    creation.
 
     ``orientation`` pins the measured direction: ``"smart"`` (default) lets
     SolidWorks infer from the picks and text position, while ``"horizontal"`` /
@@ -1752,11 +1988,12 @@ def add_edge_dimension(
     draw.ClearSelection2(True)
     for index, (x, y) in enumerate((p0, p1)):
         selected = draw.Extension.SelectByID2(
-            "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
+            "", entity_type, x, y, 0.0, index > 0, 0, null_callout(), 0
         )
         if not selected:
             raise RuntimeError(
-                f"failed to select {label} edge {index} at sheet ({x:g}, {y:g})"
+                f"failed to select {label} {entity_type.lower()} {index} "
+                f"at sheet ({x:g}, {y:g})"
             )
     if orientation == "horizontal":
         dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)
@@ -1773,11 +2010,75 @@ def add_edge_dimension(
     return dimension
 
 
-def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
-    """Box a drawing-native locating dimension as BASIC and verify the result."""
+@_telemetry.traced("drawing.visible_entity_scan", label_param="label")
+def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[Any]:
+    """All visible entities of ``entity_kind`` across the view's components.
+
+    The GetVisibleComponents/GetVisibleEntities2 walk is the COM-expensive
+    core of every per-sheet edge/face scanner — one traced chokepoint here so
+    each scanner shows up as a named child span instead of an unspanned gap
+    (observability invariant). ``entity_kind`` is swViewEntityType_e (1=edge,
+    2=vertex, 3=face).
+    """
+    drawing_view = _early_bound(view, "IView")
+    entities: list[Any] = []
+    for component in drawing_view.GetVisibleComponents() or []:
+        entities.extend(
+            drawing_view.GetVisibleEntities2(component, entity_kind) or []
+        )
+    return entities
+
+
+@_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
+def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.
+
+    A line-to-circle dimension keeps SolidWorks' default tangent/min-max arc
+    condition, so the value locates the rim instead of the axis — off by the
+    hole radius. Verify each flipped endpoint sticks; fail loud when the
+    dimension has no circular endpoint at all.
+    """
     display = _sw_type_info.early_bound_or_flag(
         dimension, "IDisplayDimension", "GetDimension"
     )
+    model_dimension = _early_bound(display.GetDimension(), "IDimension")
+    draw = adapter.currentModel
+    arc_end_set = False
+    for index in (1, 2):
+        if int(model_dimension.GetArcEndCondition(index)) == 0:
+            continue
+        result = int(
+            model_dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
+        )
+        if result != 0:
+            raise RuntimeError(
+                f"failed to set {label} endpoint {index} to arc center "
+                f"(SolidWorks result {result})"
+            )
+        draw.GraphicsRedraw2()
+        if int(model_dimension.GetArcEndCondition(index)) != 1:
+            raise RuntimeError(f"{label} did not retain center arc condition")
+        arc_end_set = True
+    if not arc_end_set:
+        raise RuntimeError(f"{label} has no circular endpoint")
+    return dimension
+
+
+def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Box a drawing-native locating dimension as BASIC and verify the result."""
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "GetDimension", "SetText", "GetText"
+    )
+    adapter._attempt(
+        lambda: display.SetText(_DIMENSION_TEXT_CALLOUT_BELOW, "")
+    )
+    below_text = adapter._attempt(
+        lambda: display.GetText(_DIMENSION_TEXT_CALLOUT_BELOW), default=""
+    )
+    if str(below_text or ""):
+        raise RuntimeError(
+            f"{label} BASIC dimension retained below-text {below_text!r}"
+        )
     model_dimension = _sw_type_info.early_bound_or_flag(
         display.GetDimension(), "IDimension", "SetToleranceType", "GetToleranceType"
     )
@@ -2592,6 +2893,19 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     return LayoutElement(name, "table", x, y - height, x + width, y)
 
 
+def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
+    """Whether a datum tag is attached to a display dimension.
+
+    SolidWorks reports ``IDatumTag`` primitive coordinates for this attachment
+    type in the dimension's local frame.  They must not be mixed with the
+    sheet-space annotation position used by the layout audit.
+    """
+    attachment_types = adapter._attempt(
+        lambda: adapter._get_attr_or_call(annotation, "GetAttachedEntityTypes")
+    ) or ()
+    return _SEL_DIMENSION in (int(value) for value in attachment_types)
+
+
 def _measured_gdt_box(
     adapter: Any, annotation: Any, kind: int
 ) -> tuple[float, float, float, float] | None:
@@ -2609,6 +2923,15 @@ def _measured_gdt_box(
     library declares it on ``IBomTable`` and ``INote`` only, verified against a
     working ``INote.GetExtent()`` in the same probe run.)
     """
+    if kind == _ANNOT_DATUM:
+        if _datum_is_dimension_attached(adapter, annotation):
+            # A datum attached to a display dimension reports IDatumTag primitive
+            # coordinates in that dimension's local frame, unlike the sheet-space
+            # primitives of an edge-attached tag. Its IAnnotation.GetPosition is
+            # still the documented sheet-space symbol origin, so the nominal datum
+            # box below is the truthful overflow check for this attachment type.
+            return None
+
     spec = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
     )
@@ -2633,6 +2956,7 @@ def _measured_gdt_box(
             points.extend((v[ix], v[iy]) for ix, iy in offsets if iy < len(v))
     if not points:
         return None
+
     xs = [p[0] for p in points]
     ys = [p[1] for p in points]
     return min(xs), min(ys), max(xs), max(ys)
@@ -2863,6 +3187,9 @@ def _datum_leader_segments(
     leader driven 41.8 mm down through the whole end view) and crank-arm (datum A
     across a 16 mm section), both passing every gate.
     """
+    if _datum_is_dimension_attached(adapter, annotation):
+        return []
+
     spec = adapter._attempt(
         lambda: adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
     )
