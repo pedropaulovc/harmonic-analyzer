@@ -22,6 +22,11 @@ from pinion_cam_geometry import (
     TAP_DRILL_DIA as TAP_DRILL_DIA,
 )
 
+# Ream band about the 6.37 mid nominal: 6.375 MAX / 6.360 MIN (running fit
+# on the Ø6.35 lift rod). Asymmetric because BORE is the model's as-cut
+# nominal, not the band midpoint.
+BORE_BAND = (0.005, -0.010)
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},
     "BoreProfile": {"BoreDia"},

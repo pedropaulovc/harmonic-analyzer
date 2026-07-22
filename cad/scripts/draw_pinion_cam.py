@@ -37,8 +37,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import fit_limits
 from pinion_cam_spec import (
     BORE,
+    BORE_BAND,
     BOSS_DIA,
     BOSS_PROUD,
     BOSS_Z,
@@ -101,7 +103,7 @@ TOP_KEEP = {
     "BossCz": (0.155, 0.200),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "FINAL REAM LIMITS\n6.375 MAX / 6.360 MIN THRU",
+    "BoreDia": f"FINAL REAM LIMITS\n{fit_limits(BORE, BORE_BAND)} THRU",
     "CollarOd": "+/-0.05",
     "CollarCy": "+/-0.05 BOTH END FACES",
     "Depth": "+/-0.05",

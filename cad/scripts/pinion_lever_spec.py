@@ -23,6 +23,10 @@ from pinion_lever_geometry import (
     WALL_T as WALL_T,
 )
 
+# Symmetric ream band about the 6.3675 mid nominal: 6.375 MAX / 6.360 MIN
+# (running fit on the Ø6.35 pivot shaft).
+BORE_BAND = (0.0075, -0.0075)
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},

@@ -40,11 +40,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import fit_limits
 from crank_handle_spec import (
     COLLAR_DIA,
     HANDLE_LENGTH,
     HANDLE_MAX_DIA,
     PEAK_X,
+    PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -99,7 +101,7 @@ DIMENSION_CALLOUTS = {
     "HandleLength": "+0.00/-0.25 OVERALL",
     "PivotBoreDia": (
         "NOMINAL REF ONLY\n"
-        "FINAL LIMITS 6.15 MAX / 6.10 MIN THRU"
+        f"FINAL LIMITS {fit_limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND, decimals=2)} THRU"
     ),
 }
 

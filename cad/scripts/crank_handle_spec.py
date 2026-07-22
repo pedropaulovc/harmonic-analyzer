@@ -23,6 +23,8 @@ NECK_R = 4.8  # waist just below the collar (neck Ø9.6)
 PEAK_X = 62.0  # axial station of the maximum diameter
 CAP_R = 3.5  # flat butt cap radius (Ø7)
 PIVOT_BORE_DIA = 6.125  # final reamed bore limits 6.10-6.15
+# Symmetric ream band about the mid nominal: 6.15 MAX / 6.10 MIN.
+PIVOT_BORE_BAND = (0.025, -0.025)
 
 _FRONT_DX = PEAK_X - COLLAR_LENGTH
 _FRONT_DH = HANDLE_MAX_DIA / 2.0 - NECK_R

@@ -40,6 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import REAM_SLIDE, fit_limits
 from pinion_handle_spec import (
     CAP_SAG,
     GRIP_DIA,
@@ -110,7 +111,9 @@ TOP_KEEP = {
     "RodDia": (0.300, 0.092),
 }
 DIMENSION_CALLOUTS = {
-    "TubeId": "NOMINAL REF ONLY\nFINAL REAM LIMITS\n8.025 MAX / 8.010 MIN\nRa 1.6",
+    "TubeId": (
+        f"NOMINAL REF ONLY\nFINAL REAM LIMITS\n{fit_limits(TUBE_ID, REAM_SLIDE)}\nRa 1.6"
+    ),
     "GripLen": "+/-0.10 CYL. LENGTH",
     "TubeLen": (
         "+0.10/-0.00 BORE DEPTH"

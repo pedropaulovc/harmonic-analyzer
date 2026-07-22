@@ -39,6 +39,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import fit_limits
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
@@ -81,9 +82,7 @@ RIGHT_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "PinDia": (
-        "FINAL LIMITS\n"
-        f"{PIN_DIA + PIN_DIA_TOL:.3f} MAX / {PIN_DIA - PIN_DIA_TOL:.3f} MIN\n"
-        "Ra 0.8"
+        f"FINAL LIMITS\n{fit_limits(PIN_DIA, (PIN_DIA_TOL, -PIN_DIA_TOL))}\nRa 0.8"
     ),
     "Depth": "+/-0.05\nSEATED FLAT END TO CROWN ROOT",
 }

@@ -80,7 +80,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert source.count('entity_type="FACE"') == 0
     assert 'characteristic="circular_runout"' in source
     assert "add_surface_finish(" not in source
-    assert "6.360 MIN / 6.375 MAX" in drawing.DIMENSION_CALLOUTS["HubBore"]
+    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["HubBore"]
     assert "Ra 1.6" in drawing.DIMENSION_CALLOUTS["HubBore"]
     assert "+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDepth"]
     assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]

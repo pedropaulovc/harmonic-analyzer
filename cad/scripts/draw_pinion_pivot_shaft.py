@@ -34,6 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import SHAFT_H, fit_limits
 from pinion_pivot_shaft_spec import (
     CAP_RADIUS,
     CAP_SAG,
@@ -78,7 +79,10 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
 DIMENSION_CALLOUTS = {
-    "ShaftDia": "NOMINAL REF ONLY\nFINAL LIMITS\n<MOD-DIAM>6.350 MAX / <MOD-DIAM>6.330 MIN",
+    "ShaftDia": (
+        "NOMINAL REF ONLY\nFINAL LIMITS\n"
+        + fit_limits(SHAFT_DIA, SHAFT_H, diameter=True)
+    ),
     "Depth": "+/-0.25 CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
 }
 

@@ -37,8 +37,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import fit_limits
 from pinion_lever_spec import (
     BORE,
+    BORE_BAND,
     CAP_RADIUS,
     CAP_SAG,
     HUB_LEN,
@@ -103,7 +105,7 @@ RIGHT_KEEP = {
     "EndWall": (0.235, 0.190),
 }
 DIMENSION_CALLOUTS = {
-    "HubBore": "NOMINAL REF\n6.360 MIN / 6.375 MAX\nRa 1.6",
+    "HubBore": f"NOMINAL REF\n{fit_limits(BORE, BORE_BAND)}\nRa 1.6",
     "BoreDepth": "+0.10/-0.00 FULL-DIA DEPTH FROM B; FLAT BOTTOM",
     "EndWall": "+/-0.05 END WALL TO CROWN ROOT PLANE",
     "RodTipY": "+/-0.25 FROM HUB AXIS",
