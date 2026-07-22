@@ -579,6 +579,55 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="thumb-screw",
         script_name="draw_thumb_screw.py",
     ),
+    DrawingSpec(
+        name="summing_assembly",
+        part="summing",
+        artifact_stem="summing-assembly",
+        script_name="draw_summing_assembly.py",
+        source_kind="assembly",
+    ),
+    DrawingSpec(
+        name="channel_assembly",
+        part="channel",
+        artifact_stem="channel-assembly",
+        script_name="draw_channel_assembly.py",
+        source_kind="assembly",
+    ),
+    DrawingSpec(
+        name="drive_train_assembly",
+        part="drive_train",
+        artifact_stem="drive-train-assembly",
+        script_name="draw_drive_train_assembly.py",
+        source_kind="assembly",
+    ),
+    DrawingSpec(
+        name="frame_assembly",
+        part="frame",
+        artifact_stem="frame-assembly",
+        script_name="draw_frame_assembly.py",
+        source_kind="assembly",
+    ),
+    DrawingSpec(
+        name="magnifier_assembly",
+        part="magnifier",
+        artifact_stem="magnifier-assembly",
+        script_name="draw_magnifier_assembly.py",
+        source_kind="assembly",
+    ),
+    DrawingSpec(
+        name="paper_drive_assembly",
+        part="paper_drive",
+        artifact_stem="paper-drive-assembly",
+        script_name="draw_paper_drive_assembly.py",
+        source_kind="assembly",
+    ),
+    DrawingSpec(
+        name="harmonic_analyzer_assembly",
+        part="harmonic_analyzer",
+        artifact_stem="harmonic-analyzer-assembly",
+        script_name="draw_harmonic_analyzer_assembly.py",
+        source_kind="assembly",
+    ),
 )
 
 DRAWINGS_BY_NAME = {drawing.name: drawing for drawing in DRAWINGS}

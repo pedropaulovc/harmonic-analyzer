@@ -123,11 +123,15 @@ import _config
 import _telemetry
 from _common import (
     UNDER_CONSTRAINED,
+    apply_custom_properties,
+    apply_summary_info,
     check,
     log,
     run_build,
 )
+from _drawing_marks import DRAWN_BY
 from _assembly import (
+    assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
     bore_axis_ref,
@@ -1736,6 +1740,29 @@ async def build(adapter) -> dict[str, str]:
                         "channel-lever"))
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
+    # Title-block identity for the assembly drawing (draw_channel_assembly.py):
+    # assembly_title_properties supplies the Title/Generator and TOL_* cells
+    # finalize_drawing requires without consulting the part registry;
+    # released component drawing (the BOM has no material/finish columns).
+    apply_custom_properties(
+        adapter,
+        {
+            **assembly_title_properties(ASM_NAME),
+            # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
+            # (a longer number overflows the DWG. NO. title-block cell).
+            "Number": "MHA-A02",
+            "Revision": "A",
+            "Revision Description": "Initial release",
+            "Material": "SEE COMPONENT DRAWINGS",
+            "Material Specification": "SEE COMPONENT DRAWINGS",
+            "Finish": "SEE COMPONENT DRAWINGS",
+            "Quantity": "1",
+            "Drawn By": DRAWN_BY,
+        },
+    )
+    # The PART cell resolves the document summary Title; "channel assembly" (not
+    # the bare stem) so the sheet identifies itself as an assembly drawing.
+    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 

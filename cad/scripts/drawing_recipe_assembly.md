@@ -33,7 +33,7 @@ landed with the shared infrastructure on branch `draw-assembly-infra`.
 
    ```python
    apply_custom_properties(adapter, {
-       **part_properties(ASM_NAME),          # Title/Generator + required TOL_* cells
+       **assembly_title_properties(ASM_NAME), # Title/Generator + required TOL_* cells
        "Number": "MHA-A##",                  # next free assembly-drawing id
        "Revision": "A",
        "Revision Description": "Initial release",

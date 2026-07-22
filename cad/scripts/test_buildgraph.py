@@ -27,7 +27,9 @@ from _buildgraph import (  # noqa: E402
     references_of,
     script_for,
     stamps_part_properties,
+    stamps_title_block_properties,
 )
+from _assembly import assembly_title_properties  # noqa: E402
 
 
 def _helper_names(stem_script: str) -> set[str]:
@@ -283,24 +285,38 @@ def test_module_deps_follow_non_helper_siblings():
     assert "channels.yaml" in cfg, cfg
 
 
-def test_stamps_part_properties_only_genuine_stampers():
-    """Only assemblies that STAMP properties in-script are flagged, via the
-    function-level call graph. channel calls _spring.build_spring
-    (-> save_part_and_images) so it stamps its stretched springs; pen stamps its
-    OWN assembly doc's title-block/BOM properties (apply_custom_properties +
-    part_properties, added with the pen assembly drawing) — so its
-    title_block.yaml dep is genuine and an edit there must rebuild it, at the
-    accepted cost of the conservative parts-row/template over-deps.
-    summing/magnifier import part-builder CONSTANTS and paper_drive reaches only
-    build_cone_gear MATH helpers, so none of them stamp and a registry-row edit
-    only REFRESHES them, no FULL (codex P2)."""
-    assert stamps_part_properties(script_for("channel")), "channel stamps stretched springs"
-    assert stamps_part_properties(script_for("pen")), \
-        "pen stamps its assembly title-block properties in-script"
-    for non in ("frame", "summing", "magnifier", "paper_drive", "drive_train"):
-        assert not stamps_part_properties(script_for(non)), f"{non} must not be a stamper"
-    # a part build script genuinely stamps its own properties (sanity on the graph).
-    assert stamps_part_properties(SCRIPTS_DIR / "build_fillister_screw.py")
+def test_part_and_title_property_stampers_are_distinct():
+    """Assembly identity must not masquerade as in-script part generation."""
+    title_stampers = {
+        stem for stem in ASSEMBLY_ORDER
+        if stamps_title_block_properties(script_for(stem))
+    }
+    part_stampers = {
+        stem for stem in ASSEMBLY_ORDER
+        if stamps_part_properties(script_for(stem))
+    }
+    assert title_stampers == set(ASSEMBLY_ORDER)
+    assert part_stampers == {"channel"}
+
+    leaf = SCRIPTS_DIR / "build_fillister_screw.py"
+    assert stamps_part_properties(leaf)
+    assert stamps_title_block_properties(leaf)
+
+
+def test_assembly_title_properties_never_read_part_registry_fields():
+    props = assembly_title_properties("frame")
+    assert set(props) == {
+        "Title",
+        "Generator",
+        "TOL_LIN_XX",
+        "TOL_LIN_XXX",
+        "TOL_ANG",
+        "TOL_SURFACE",
+        "TOL_HOLE_MINUS",
+        "TOL_HOLE_PLUS",
+    }
+    assert props["Title"] == "frame"
+    assert props["Generator"].startswith("harmonic-analyzer @ ")
 
 
 def _run() -> int:

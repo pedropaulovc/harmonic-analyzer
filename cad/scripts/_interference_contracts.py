@@ -24,8 +24,20 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
         _CAM_PIN_GATE_LIMIT_MM3,
 }
 
+# The cone-platform pivot screw's modeled thread envelope intentionally equals
+# the harmonic-base tap-drill cylinder. SolidWorks reports a 0.06 mm^3 overlap
+# at that coincident threaded-seat boundary; keep the exact nested pair bounded
+# so any deeper engagement or neighboring clash still fails the gate.
+_HARMONIC_ANALYZER_ALLOWED_PAIRS = {
+    frozenset((
+        "frame-1/harmonic-base-1",
+        "drive-train-1/cone-pivot-screw-1",
+    )): 0.10,
+}
+
 _BY_ASSEMBLY: dict[str, Mapping[frozenset[str], float]] = {
     "drive-train": _DRIVE_TRAIN_ALLOWED_PAIRS,
+    "harmonic-analyzer": _HARMONIC_ANALYZER_ALLOWED_PAIRS,
 }
 
 

@@ -42,11 +42,15 @@ import sys
 from _common import (
     OUT_PNG,
     OUT_SLDASM,
+    apply_custom_properties,
+    apply_summary_info,
     check,
     run_build,
 )
+from _drawing_marks import DRAWN_BY
 from _assembly import (
     _discard_copy_source,
+    assembly_title_properties,
     assert_component_placed,
     assert_components_fully_defined,
     check_no_interference,
@@ -55,6 +59,7 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _transforms import IDENTITY
+from _interference_contracts import allowed_interference_pairs
 
 import _telemetry
 
@@ -123,7 +128,32 @@ async def build(adapter) -> dict[str, str]:
                           STICK_EULER, STICK_ROWS)
 
     assert_components_fully_defined(adapter)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
+
+    # Title-block identity for the top assembly drawing
+    # (draw_harmonic_analyzer_assembly.py): assembly_title_properties supplies
+    # Title/Generator and the TOL_* general-tolerance cells finalize_drawing
+    # hard-requires; material/finish defer to each released component drawing
+    # because the top-level BOM has no material/finish columns.
+    apply_custom_properties(
+        adapter,
+        {
+            **assembly_title_properties(ASM_NAME),
+            # MHA-A## = assembly-drawing ids (A08 = the top machine assembly).
+            "Number": "MHA-A08",
+            "Revision": "A",
+            "Revision Description": "Initial release",
+            "Material": "SEE COMPONENT DRAWINGS",
+            "Material Specification": "SEE COMPONENT DRAWINGS",
+            "Finish": "SEE COMPONENT DRAWINGS",
+            "Quantity": "1",
+            "Drawn By": DRAWN_BY,
+        },
+    )
+    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
 
     # The machine is authored output-side -Z, so SolidWorks' native Front view
     # shows the BACK. Redefine the document's standard views so Front (and the

@@ -509,9 +509,12 @@ def part_row_files(dashed_name: str) -> list[str]:
     return sorted({str(row.resolve()), str(defaults.resolve())})
 
 
-# Parts-registry stamping is always a direct, by-name call to one of these.
-_STAMP_PRIMITIVES = frozenset({"part_properties", "apply_custom_properties",
-                               "save_part_and_images"})
+# A generic custom-property write says nothing about registry ownership.  Part
+# generation and assembly-title stamping therefore have distinct primitives.
+_PART_STAMP_PRIMITIVES = frozenset({"part_properties", "save_part_and_images"})
+_TITLE_BLOCK_STAMP_PRIMITIVES = frozenset(
+    {*_PART_STAMP_PRIMITIVES, "assembly_title_properties"}
+)
 
 
 def _function_call_names(node: ast.AST) -> tuple[set[str], set[tuple[str, str]]]:
@@ -529,13 +532,14 @@ def _function_call_names(node: ast.AST) -> tuple[set[str], set[tuple[str, str]]]
     return simple, attrs
 
 
-@functools.lru_cache(maxsize=1)
-def _stamping_modules() -> frozenset[str]:
+@functools.lru_cache(maxsize=None)
+def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
     """Module stems that contain a function which TRANSITIVELY calls a stamping
     primitive -- a whole-program, function-level call graph over every local
-    module. A script stamps a registry row iff its own module is in this set.
+    module. ``primitives`` selects the property contract being classified.
 
-    This is precise where a module-level "is it imported" test is not: an assembly
+    For part-registry classification this is precise where a module-level
+    "is it imported" test is not: an assembly
     that imports a part builder only for CONSTANTS (``build_summing_assembly`` <-
     ``build_boss_hook`` values), or that calls only a builder's MATH helpers
     (``build_paper_drive_assembly`` -> ``_gear`` -> ``build_cone_gear.gap_area_in_disc``),
@@ -581,7 +585,7 @@ def _stamping_modules() -> frozenset[str]:
             if key in stamping:
                 continue
             stem, _ = key
-            hit = bool(simple & _STAMP_PRIMITIVES)
+            hit = bool(simple & primitives)
             if not hit:
                 for s in simple:
                     if (stem, s) in stamping or imp_name[stem].get(s) in stamping:
@@ -600,16 +604,18 @@ def _stamping_modules() -> frozenset[str]:
 
 
 def stamps_part_properties(script: Path) -> bool:
-    """True if this build script stamps properties in-script: a registry row for a
-    part with NO separate part task -- one it GENERATES in-script (e.g.
-    build_channel_assembly's stretched springs) -- or, since the pen assembly
-    drawing, its OWN assembly doc's title-block/BOM properties
-    (build_pen_assembly). Drives whether an ASSEMBLY depends on parts rows /
-    title_block.yaml / the part template directly; a non-stamping assembly's
-    parts metadata propagates via the rebuilt ``.SLDPRT`` -> REFRESH. Flagging is
-    conservative in the over-rebuild direction only. Resolved by the
-    function-level call graph in ``_stamping_modules``."""
-    return script.stem in _stamping_modules()
+    """True when this script generates and stamps a part-registry-owned part.
+
+    For assemblies this is intentionally narrower than title-block stamping:
+    only channel generates stretched spring variants in-script.  The predicate
+    controls referenced part-row and part-template recipe dependencies.
+    """
+    return script.stem in _stamping_modules(_PART_STAMP_PRIMITIVES)
+
+
+def stamps_title_block_properties(script: Path) -> bool:
+    """True when this script stamps the general-tolerance title-block fields."""
+    return script.stem in _stamping_modules(_TITLE_BLOCK_STAMP_PRIMITIVES)
 
 
 def dependents_of(stem: str) -> list[str]:

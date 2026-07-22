@@ -1,5 +1,6 @@
 transgear-removable:
   number: MHA-081
+  description: "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
   material: Plain Carbon Steel
   tolerance_class: machined_block
   fit_class: gear_mesh

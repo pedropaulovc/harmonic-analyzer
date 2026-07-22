@@ -35,9 +35,9 @@ def test_required_drawing_paths() -> None:
 
 
 def test_part_rows_keep_their_part_source() -> None:
-    """The assembly extension must not disturb the six part-drawing rows."""
+    """The assembly rows must not disturb the part-drawing rows."""
     for spec in DRAWINGS:
-        if spec.name == "pen_assembly":
+        if spec.source_kind == "assembly":
             continue
         assert spec.source_kind == "part"
         assert spec.source.as_posix().endswith(f"/out/sldprt/{spec.artifact_stem}.SLDPRT")
@@ -84,7 +84,8 @@ def test_assembly_stamps_title_block_properties() -> None:
     )
     assert "apply_custom_properties" in source
     assert "SEE PARTS LIST" in source
-    assert "part_properties(ASM_NAME)" in source  # carries the required TOL_* cells
+    assert "assembly_title_properties(ASM_NAME)" in source
+    assert "part_properties(ASM_NAME)" not in source
 
 
 def test_drawing_places_bom_and_balloons() -> None:

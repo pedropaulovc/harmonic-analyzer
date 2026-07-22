@@ -166,6 +166,103 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
     ]
 
 
+def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
+    def annotation(name, owner_type, extent):
+        note = SimpleNamespace(GetExtent=extent, IsBomBalloon=lambda: False)
+        return SimpleNamespace(
+            GetLeaderCount=0,
+            GetSpecificAnnotation=note,
+            GetType=drawing_common._ANNOT_NOTE,
+            GetName=name,
+            OwnerType=owner_type,
+        )
+
+    drawing_note = annotation(
+        "setup-notes", 1, [0.02, 0.08, 0.0, 0.12, 0.20, 0.0]
+    )
+    template_note = annotation(
+        "zone-label", 2, [0.00, 0.00, 0.0, 0.01, 0.01, 0.0]
+    )
+    sheet_gdt = SimpleNamespace(
+        GetLeaderCount=0,
+        GetSpecificAnnotation=SimpleNamespace(GetPosition=[-0.02, 0.0, 0.0]),
+        GetType=drawing_common._ANNOT_GTOL,
+        GetName="template-gdt",
+        GetPosition=[-0.02, 0.0, 0.0],
+        OwnerType=1,
+    )
+    sheet_view = SimpleNamespace(
+        GetNextView=None,
+        GetAnnotations=lambda: [drawing_note, template_note, sheet_gdt],
+        GetTableAnnotations=[],
+    )
+    zone = {
+        0: ZONE_MARGINS["top"],
+        1: ZONE_MARGINS["bottom"],
+        2: ZONE_MARGINS["right"],
+        3: ZONE_MARGINS["left"],
+    }
+    sheet = SimpleNamespace(
+        GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H],
+        GetZoneMargin=lambda code: zone[code],
+    )
+    model = SimpleNamespace(GetCurrentSheet=sheet, GetFirstView=lambda: sheet_view)
+
+    elements, leaders, _region = drawing_common.collect_layout_elements(
+        _FakeAdapter(model)
+    )
+
+    assert leaders == []
+    assert [(element.label, element.kind) for element in elements] == [
+        ("setup-notes", "note"),
+        ("title-block", "titleblock"),
+    ]
+
+
+def test_split_table_box_uses_only_the_rendered_row_range():
+    annotation = SimpleNamespace(GetPosition=lambda: [0.020, 0.265, 0.0])
+    table = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetSplitInformation=lambda *_args: (1, 0, 3, 0, 11),
+        RowCount=33,
+        ColumnCount=4,
+        GetColumnWidth=lambda _index: 0.025,
+        GetRowHeight=lambda _index: 0.008,
+    )
+
+    element = drawing_common._table_element(
+        _FakeAdapter(SimpleNamespace()), table, "split-bom"
+    )
+
+    assert element is not None
+    assert (element.label, element.kind) == ("split-bom", "table")
+    assert (element.xmin, element.ymin, element.xmax, element.ymax) == pytest.approx(
+        (0.020, 0.169, 0.120, 0.265)
+    )
+
+
+def test_later_split_table_piece_includes_the_repeated_header_height():
+    annotation = SimpleNamespace(GetPosition=lambda: [0.145, 0.265, 0.0])
+    table = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetSplitInformation=lambda *_args: (1, 1, 3, 12, 23),
+        RowCount=33,
+        ColumnCount=4,
+        GetColumnWidth=lambda _index: 0.025,
+        GetRowHeight=lambda index: 0.010 if index == 0 else 0.008,
+    )
+
+    element = drawing_common._table_element(
+        _FakeAdapter(SimpleNamespace()), table, "split-bom-2"
+    )
+
+    assert element is not None
+    assert (element.label, element.kind) == ("split-bom-2", "table")
+    assert (element.xmin, element.ymin, element.xmax, element.ymax) == pytest.approx(
+        (0.145, 0.159, 0.245, 0.265)
+    )
+
+
 def test_disjoint_layout_is_clean():
     elements = [
         _el("V1", 0.05, 0.18, 0.11, 0.23),

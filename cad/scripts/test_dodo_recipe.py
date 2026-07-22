@@ -722,15 +722,12 @@ def test_config_deps_are_fine_grained():
     frame_recipe = _rel(dodo._recipe_files("frame"), cfg)
     assert not any(t.startswith("parts/") for t in frame_recipe), frame_recipe
     assert "dimensions.yaml" not in frame_recipe
-    # The title_block token narrows the same way: a non-stamping assembly must
-    # NOT fold title_block.yaml into its recipe (a title-block edit re-stamps the
-    # parts and REFRESHES dependents — never a FULL rebuild), while a stamping
-    # assembly (channel, stretched springs) keeps it. tolerances.yaml (the fit
-    # classes) must stay out of frame too — title_block living in its OWN file is
-    # what keeps a title-block edit from FULL-rebuilding the fit readers
-    # (drive_train/paper_drive).
+    # Assembly title stamping is a separate contract: every released assembly
+    # drawing owns TOL_* properties and therefore tracks title_block.yaml, but
+    # that must not imply ownership of part-registry rows or the part template.
+    # tolerances.yaml (fit classes) stays out of frame.
     assert "tolerances.yaml" not in frame_recipe, frame_recipe
-    assert "title_block.yaml" not in frame_recipe, frame_recipe
+    assert "title_block.yaml" in frame_recipe, frame_recipe
     channel_recipe = _rel(dodo._recipe_files("channel"), cfg)
     assert "parts/channel-spring-installed.yaml" in channel_recipe, channel_recipe
     assert "title_block.yaml" in channel_recipe, channel_recipe
@@ -744,6 +741,20 @@ def test_config_deps_are_fine_grained():
     frame_names = {Path(p).name.lower() for p in dodo._recipe_files("frame")}
     assert "harmonic-analyzer.prtdot" in channel_names, channel_names
     assert "harmonic-analyzer.prtdot" not in frame_names, frame_names
+    for stem in dodo.ASSEMBLY_ORDER:
+        recipe = dodo._recipe_files(stem)
+        rel_recipe = _rel(recipe, cfg)
+        names = {Path(path).name.lower() for path in recipe}
+        script = dodo.script_for(stem)
+        dynamic_part_rows = dodo._expand_parts_token(stem, "assembly", script)
+        assert "title_block.yaml" in rel_recipe, stem
+        assert dodo._expand_title_block_token("assembly", script), stem
+        if stem == "channel":
+            assert dynamic_part_rows, stem
+            assert "harmonic-analyzer.prtdot" in names, stem
+            continue
+        assert dynamic_part_rows == [], stem
+        assert "harmonic-analyzer.prtdot" not in names, stem
     # ... and every normal part task carries it directly (NewPart instantiates it).
     a_stem = next(iter(dodo.part_stems()))
     part_names = {Path(p).name.lower()

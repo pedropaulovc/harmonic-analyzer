@@ -1249,6 +1249,86 @@ def new_project_drawing(
     return draw, sheet
 
 
+def create_blank_drawing_sheets(
+    adapter: Any, sheet_names: Sequence[str], *, label: str
+) -> None:
+    """Rename the initial blank sheet and duplicate it into a checked package."""
+    if not sheet_names or len(sheet_names) != len(set(sheet_names)):
+        raise ValueError(f"{label}: sheet names must be nonempty and unique")
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    sheet = ddoc.GetCurrentSheet()
+    if sheet is None:
+        raise RuntimeError(f"{label}: drawing template has no initial sheet")
+    initial_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if len(initial_names) != 1:
+        raise RuntimeError(
+            f"{label}: drawing template has {len(initial_names)} sheets, expected 1"
+        )
+    if next(iter_views(adapter), None) is not None:
+        raise RuntimeError(f"{label}: initial drawing sheet is not blank")
+    sheet.SetName(sheet_names[0])
+    renamed = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+    if renamed != sheet_names[0]:
+        raise RuntimeError(f"{label}: failed to rename initial sheet: {renamed!r}")
+
+    for previous_name, new_name in zip(sheet_names[:-1], sheet_names[1:], strict=True):
+        pasted_name = ""
+        for attempt in range(1, 4):
+            if not ddoc.ActivateSheet(previous_name):
+                raise RuntimeError(f"{label}: failed to activate {previous_name!r}")
+            before_names = tuple(
+                adapter._get_attr_or_call(ddoc, "GetSheetNames") or ()
+            )
+            draw.ClearSelection2(True)
+            if not draw.Extension.SelectByID2(
+                previous_name,
+                "SHEET",
+                0.0,
+                0.0,
+                0.0,
+                False,
+                0,
+                null_callout(),
+                0,
+            ):
+                raise RuntimeError(f"{label}: failed to select {previous_name!r}")
+            draw.EditCopy()
+            returned = bool(ddoc.PasteSheet(2, 2))
+            after_names = tuple(
+                adapter._get_attr_or_call(ddoc, "GetSheetNames") or ()
+            )
+            added = tuple(name for name in after_names if name not in before_names)
+            if len(after_names) == len(before_names) + 1 and len(added) == 1:
+                pasted_name = added[0]
+                if not returned:
+                    _telemetry.warn(
+                        f"{label}: PasteSheet returned false but created "
+                        f"{pasted_name!r}"
+                    )
+                break
+            _telemetry.warn(
+                f"{label}: PasteSheet attempt {attempt}/3 created no sheet "
+                f"(returned={returned!r}, before={before_names!r}, "
+                f"after={after_names!r})"
+            )
+        if not pasted_name:
+            raise RuntimeError(f"{label}: failed to duplicate {previous_name!r}")
+        if not ddoc.ActivateSheet(pasted_name):
+            raise RuntimeError(f"{label}: failed to activate {pasted_name!r}")
+        sheet = ddoc.GetCurrentSheet()
+        if sheet is None:
+            raise RuntimeError(f"{label}: pasted sheet has no ISheet")
+        sheet.SetName(new_name)
+        renamed = str(adapter._get_attr_or_call(sheet, "GetName") or "")
+        if renamed != new_name:
+            raise RuntimeError(f"{label}: failed to rename sheet: {renamed!r}")
+
+    actual = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if actual != tuple(sheet_names):
+        raise RuntimeError(f"{label}: sheet order mismatch: {actual!r}")
+
+
 def _projection_symbol_centers(
     circle_specs: list[tuple[float, float]],
     line_x_pairs: list[tuple[float, float]],
@@ -1440,7 +1520,7 @@ def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
 def assert_asme_b_sheet(
     adapter: Any, sheet: Any, *, phase: str, scale: tuple[float, float] = (1.0, 1.0)
 ) -> None:
-    properties = list(adapter._get_attr_or_call(sheet, "GetProperties") or [])
+    properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
     if len(properties) < 7:
         raise RuntimeError(f"{phase}: incomplete drawing sheet properties {properties!r}")
     if properties[2:4] != [float(scale[0]), float(scale[1])]:
@@ -1470,33 +1550,90 @@ async def reopen_drawing(adapter: Any, path: Path) -> tuple[Any, Any]:
     return reopened, sheet
 
 
-def render_pdf_png(pdf: Path, png: Path) -> None:
+def _contact_preview_grid(page_count: int) -> tuple[int, int]:
+    """Return the contact-preview column/row count for a multi-sheet drawing."""
+    if page_count < 2:
+        raise ValueError(f"contact preview requires at least 2 pages, got {page_count}")
+    if page_count <= 4:
+        return (2, 2)
+    columns = math.ceil(math.sqrt(page_count))
+    return (columns, math.ceil(page_count / columns))
+
+
+def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
+    """Render a drawing PDF to its preview PNG.
+
+    Single-sheet drawings retain the historical one-page 300 dpi preview.
+    Multi-sheet drawings use the registered preview path for a contact sheet,
+    keeping the doit/cache/release artifact contract to one PNG. The historical
+    2x2 layout is retained through four pages; larger drawings use the smallest
+    near-square grid that fits every page. Exact page images for a review can be
+    rendered from the packaged vector PDF.
+    """
     import pypdfium2 as pdfium
+    from PIL import Image
 
     document = pdfium.PdfDocument(str(pdf))
-    if len(document) != 1:
-        raise RuntimeError(f"drawing PDF has {len(document)} pages, expected 1")
-    page = document[0]
-    image = page.render(scale=ASME_B_DPI / 72.0).to_pil()
-    page.close()
-    document.close()
-    if image.size == (ASME_B_PNG_SIZE[0], ASME_B_PNG_SIZE[1] + 1):
-        image = image.crop((0, 0, *ASME_B_PNG_SIZE))
-    png.parent.mkdir(parents=True, exist_ok=True)
-    image.save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
-    if image.size != ASME_B_PNG_SIZE:
+    if len(document) != expected_pages:
         raise RuntimeError(
-            f"ASME B PNG is {image.size}, expected {ASME_B_PNG_SIZE}"
+            f"drawing PDF has {len(document)} pages, expected {expected_pages}"
         )
+    images: list[Any] = []
+    for index in range(expected_pages):
+        page = document[index]
+        image = page.render(scale=ASME_B_DPI / 72.0).to_pil()
+        page.close()
+        if image.size == (ASME_B_PNG_SIZE[0], ASME_B_PNG_SIZE[1] + 1):
+            image = image.crop((0, 0, *ASME_B_PNG_SIZE))
+        if image.size != ASME_B_PNG_SIZE:
+            document.close()
+            raise RuntimeError(
+                f"ASME B PNG page {index + 1} is {image.size}, "
+                f"expected {ASME_B_PNG_SIZE}"
+            )
+        images.append(image)
+    document.close()
+    png.parent.mkdir(parents=True, exist_ok=True)
+    if expected_pages == 1:
+        images[0].save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
+        return
+
+    columns, rows = _contact_preview_grid(expected_pages)
+    cell_size = (ASME_B_PNG_SIZE[0] // columns, ASME_B_PNG_SIZE[1] // rows)
+    scale = min(
+        cell_size[0] / ASME_B_PNG_SIZE[0],
+        cell_size[1] / ASME_B_PNG_SIZE[1],
+    )
+    preview_size = (
+        round(ASME_B_PNG_SIZE[0] * scale),
+        round(ASME_B_PNG_SIZE[1] * scale),
+    )
+    contact = Image.new("RGB", ASME_B_PNG_SIZE, "white")
+    for index, image in enumerate(images):
+        cell = image.resize(preview_size, Image.Resampling.LANCZOS)
+        column = index % columns
+        row = index // columns
+        contact.paste(
+            cell,
+            (
+                column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2,
+                row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2,
+            ),
+        )
+    contact.save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
 
 
-def sanitize_pdf_metadata(pdf: Path, *, title: str) -> None:
+def sanitize_pdf_metadata(
+    pdf: Path, *, title: str, expected_pages: int = 1
+) -> None:
     """Replace seat/user PDF metadata while preserving the vector page."""
     from pypdf import PdfReader, PdfWriter
 
     reader = PdfReader(pdf)
-    if len(reader.pages) != 1:
-        raise RuntimeError(f"drawing PDF has {len(reader.pages)} pages, expected 1")
+    if len(reader.pages) != expected_pages:
+        raise RuntimeError(
+            f"drawing PDF has {len(reader.pages)} pages, expected {expected_pages}"
+        )
     writer = PdfWriter()
     writer.clone_document_from_reader(reader)
     metadata = {
@@ -2306,6 +2443,31 @@ def _activate_and_select_view(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
+def _bom_identity_map(
+    expected_components: Sequence[str], identity_aliases: dict[str, str] | None
+) -> dict[str, str]:
+    """Map every accepted BOM identity to one normalized component stem."""
+    expected = {component.strip().lower() for component in expected_components}
+    if len(expected) != len(expected_components):
+        raise ValueError("BOM expected-component identities are not unique")
+    identities = {component: component for component in expected}
+    for alias, component in (identity_aliases or {}).items():
+        normalized_alias = alias.strip().lower()
+        normalized_component = component.strip().lower()
+        if normalized_component not in expected:
+            raise ValueError(
+                f"BOM identity alias {alias!r} targets unknown component {component!r}"
+            )
+        existing = identities.get(normalized_alias)
+        if existing is not None and existing != normalized_component:
+            raise ValueError(
+                f"BOM identity alias {alias!r} maps to both "
+                f"{existing!r} and {normalized_component!r}"
+            )
+        identities[normalized_alias] = normalized_component
+    return identities
+
+
 @_telemetry.traced("drawing.bom_table", label_param="label")
 def insert_bom_table(
     adapter: Any,
@@ -2314,6 +2476,8 @@ def insert_bom_table(
     anchor_xy: tuple[float, float],
     expected_components: Sequence[str],
     descriptions: dict[str, str] | None = None,
+    identity_aliases: dict[str, str] | None = None,
+    configuration_grouping: Literal["separate", "same-part"] = "separate",
     label: str,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
@@ -2323,6 +2487,8 @@ def insert_bom_table(
     template, anchored top-left at ``anchor_xy`` (sheet meters). Validated hard:
     one data row per ``expected_components`` entry and every expected part
     number present, so a BOM that silently dropped a component can never ship.
+    ``identity_aliases`` maps alternate displayed identities (such as released
+    part numbers) back to the expected component stems.
     ``descriptions`` maps a part number to its DESCRIPTION cell text (written
     per cell and read-verified) — the components carry no Description custom
     property, and a blank column reads as an unreleased sheet. Returns the
@@ -2345,7 +2511,7 @@ def insert_bom_table(
         0,  # swNumberingType_e.swNumberingType_None (non-indented BOM)
         False,  # DetailedCutList
         False,  # DissolvePartLevelRows
-        False,  # DisplayAsOneItem
+        configuration_grouping == "same-part",
     )
     draw.ClearSelection2(True)
     if bom is None:
@@ -2359,13 +2525,33 @@ def insert_bom_table(
     if feature is None:
         raise RuntimeError(f"{label} BOM table has no BOM feature")
     feature = _sw_type_info.early_bound_or_flag(
-        feature, "IBomFeature", "SetConfigurations"
+        feature,
+        "IBomFeature",
+        "SetConfigurations",
+        "PartConfigurationGrouping",
+        "DisplayAsOneItem",
     )
     if not feature.SetConfigurations(
         True, bool_array([True]), bstr_array([configuration])
     ):
         raise RuntimeError(
             f"failed to bind {label} BOM table to configuration {configuration!r}"
+        )
+    grouping_value = 2 if configuration_grouping == "same-part" else 1
+    setattr(feature, "PartConfigurationGrouping", grouping_value)
+    setattr(feature, "DisplayAsOneItem", configuration_grouping == "same-part")
+    actual_grouping = int(
+        adapter._get_attr_or_call(feature, "PartConfigurationGrouping") or 0
+    )
+    actual_one_item = bool(
+        adapter._get_attr_or_call(feature, "DisplayAsOneItem")
+    )
+    if actual_grouping != grouping_value or actual_one_item != (
+        configuration_grouping == "same-part"
+    ):
+        raise RuntimeError(
+            f"{label} BOM configuration grouping did not persist: "
+            f"grouping={actual_grouping}, one_item={actual_one_item}"
         )
     draw.ForceRebuild3(False)
     adapter.currentModel.EditRebuild3()
@@ -2392,18 +2578,26 @@ def insert_bom_table(
             f"{label} BOM table is {rows}x{columns}, expected {expected_rows} rows: "
             f"{contents!r}"
         )
-    flattened = {cell.strip().lower() for row in contents[1:] for cell in row}
+    identities = _bom_identity_map(expected_components, identity_aliases)
+    header = [cell.strip().upper() for cell in contents[0]]
+    part_column = header.index("PART NUMBER") if "PART NUMBER" in header else None
+    if part_column is None:
+        observed = {cell.strip().lower() for row in contents[1:] for cell in row}
+    else:
+        observed = {
+            identities.get(row[part_column].strip().lower(), row[part_column].strip().lower())
+            for row in contents[1:]
+        }
     missing = sorted(
         component
         for component in expected_components
-        if component.strip().lower() not in flattened
+        if component.strip().lower() not in observed
     )
     if missing:
         raise RuntimeError(
             f"{label} BOM table is missing components {missing}: {contents!r}"
         )
     if descriptions:
-        header = [cell.strip().upper() for cell in contents[0]]
         if "DESCRIPTION" not in header or "PART NUMBER" not in header:
             raise RuntimeError(
                 f"{label} BOM header carries no DESCRIPTION/PART NUMBER: {header!r}"
@@ -2416,21 +2610,20 @@ def insert_bom_table(
                 adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
                 or ""
             ).strip().lower()
-            text = remaining.pop(part, None)
+            text = remaining.pop(identities.get(part, part), None)
             if text is None:
                 continue
             if not table.IsCellTextEditable(row, description_column):
                 raise RuntimeError(
                     f"{label} BOM description cell {row} is not editable"
                 )
-            table.SetText2(row, description_column, False, text)
-            applied = str(
-                table.DisplayedText2(row, description_column, False) or ""
+            _set_bom_cell_text(
+                table,
+                row,
+                description_column,
+                text,
+                label=f"{label} BOM description",
             )
-            if applied != text:
-                raise RuntimeError(
-                    f"{label} BOM description did not persist: {applied!r} != {text!r}"
-                )
         if remaining:
             raise RuntimeError(
                 f"{label} BOM descriptions not applied (no matching row): "
@@ -2441,6 +2634,21 @@ def insert_bom_table(
         f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
     )
     return table
+
+
+def _set_bom_cell_text(
+    table: Any,
+    row: int,
+    column: int,
+    text: str,
+    *,
+    label: str,
+) -> None:
+    """Write and verify one visible BOM cell."""
+    table.SetText2(row, column, False, text)
+    applied = str(table.DisplayedText2(row, column, False) or "")
+    if applied != text:
+        raise RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")
 
 
 def _min_angular_gap(ring_radius: float, balloon_radius: float, *, clearance: float) -> float:
@@ -2578,7 +2786,12 @@ def _push_apart_on_ring(
 
 
 def _spread_balloons(
-    adapter: Any, view: Any, balloons: list[Any], *, margin: float = 0.014
+    adapter: Any,
+    view: Any,
+    balloons: list[Any],
+    *,
+    margin: float = 0.014,
+    clearance: float = _BALLOON_CLEARANCE_M,
 ) -> None:
     """Re-ring auto-balloons evenly around ``view`` (the layout audit fails loud).
 
@@ -2692,7 +2905,7 @@ def _spread_balloons(
     # and had been in the generated binding all along. The claim was never tested
     # and the sheet carried the defect for it.)
     gap = _min_angular_gap(
-        min(radius_x, radius_y), max(radii), clearance=_BALLOON_CLEARANCE_M
+        min(radius_x, radius_y), max(radii), clearance=clearance
     )
     angles = _push_apart_on_ring([theta for theta, _ in items], min_gap=gap)
     for angle, (_theta, annotation) in zip(angles, items):
@@ -2703,6 +2916,54 @@ def _spread_balloons(
 
 
 @_telemetry.traced("drawing.auto_balloons", label_param="label")
+def _create_auto_balloons(
+    adapter: Any, view: Any, *, label: str, allow_empty: bool = False
+) -> list[Any]:
+    """Create item-number balloons for one selected view without repositioning."""
+    _activate_and_select_view(adapter, view, label=label)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    options = ddoc.CreateAutoBalloonOptions()
+    if options is None:
+        raise RuntimeError(f"failed to create auto-balloon options ({label})")
+    options = _sw_type_info.early_bound_or_flag(options, "IAutoBalloonOptions")
+    options.Layout = 1
+    options.ReverseDirection = False
+    options.IgnoreMultiple = True
+    options.InsertMagneticLine = False
+    options.LeaderAttachmentToFaces = True
+    options.Style = 1
+    options.Size = 2
+    options.UpperTextContent = 1
+    options.ItemNumberStart = 1
+    options.ItemNumberIncrement = 1
+    options.ItemOrder = 1
+    notes = ddoc.AutoBalloon5(options)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if not notes or isinstance(notes, str):
+        if allow_empty:
+            return []
+        raise RuntimeError(f"AutoBalloon5 produced no balloons ({label})")
+    balloons = list(notes)
+    identities: list[str] = []
+    for note in balloons:
+        item = _balloon_item_number(adapter, note, label=label)
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetName")
+        identities.append(f"{note.GetName()}=item {item}")
+    _telemetry.info(f"{label}: AutoBalloon5 identities {identities}")
+    return balloons
+
+
+def _balloon_item_number(adapter: Any, note: Any, *, label: str) -> str:
+    """Read one BOM balloon's displayed upper item number."""
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetBomBalloonText")
+    item = str(adapter._attempt(lambda: note.GetBomBalloonText(True)) or "").strip()
+    if not item:
+        raise RuntimeError(f"{label}: BOM balloon has no upper item number")
+    return item
+
+
 def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> list[Any]:
     """Auto-insert circular item-number balloons around one assembly view.
 
@@ -2712,32 +2973,8 @@ def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> 
     per component (``IgnoreMultiple``). Fails loud unless at least ``expected``
     balloons landed. Returns the balloon notes.
     """
-    _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    options = ddoc.CreateAutoBalloonOptions()
-    if options is None:
-        raise RuntimeError(f"failed to create auto-balloon options ({label})")
-    options = _sw_type_info.early_bound_or_flag(options, "IAutoBalloonOptions")
-    options.Layout = 1  # swBalloonLayoutType_e.swDetailingBalloonLayout_Square
-    options.ReverseDirection = False
-    options.IgnoreMultiple = True  # one balloon per component, not per instance
-    options.InsertMagneticLine = False
-    options.LeaderAttachmentToFaces = True
-    options.Style = 1  # swBalloonStyle_e.swBS_Circular
-    options.Size = 2  # swBalloonFit_e.swBF_2Chars
-    options.UpperTextContent = 1  # swBalloonTextContent_e.swBalloonTextItemNumber
-    options.ItemNumberStart = 1
-    options.ItemNumberIncrement = 1
-    # swBalloonItemNumbersOrder_e.swBalloonItemNumbers_DoNotChangeItemNumbers:
-    # the BOM table owns the item numbering; balloons must not resequence it.
-    options.ItemOrder = 1
-    notes = ddoc.AutoBalloon5(options)
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    if not notes or isinstance(notes, str):
-        raise RuntimeError(f"AutoBalloon5 produced no balloons ({label})")
-    balloons = list(notes)
+    balloons = _create_auto_balloons(adapter, view, label=label)
     if len(balloons) < expected:
         raise RuntimeError(
             f"{label}: {len(balloons)} balloons landed, expected >= {expected}"
@@ -2746,6 +2983,348 @@ def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> 
     draw.EditRebuild3()
     _telemetry.success(f"{label}: {len(balloons)} BOM balloons inserted")
     return balloons
+
+
+def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
+    """Return children across callable and materialized pywin32 shapes."""
+    member = drawing_component.GetChildren
+    children = member() if callable(member) else member
+    return tuple(children or ())
+
+
+def _drawing_component_stems(
+    adapter: Any, drawing_component: Any, stems: frozenset[str]
+) -> set[str]:
+    """Return requested file stems represented by one leaf drawing component."""
+    component = adapter._attempt(
+        lambda dc=drawing_component: dc.Component, default=None
+    )
+    path = ""
+    if component is not None:
+        path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
+    name = str(drawing_component.Name or "")
+    drawing_name = name.split("@", 1)[0].replace("\\", "/")
+    identities = {
+        Path(str(path)).stem.casefold(),
+        drawing_name.rsplit("/", 1)[-1].casefold(),
+    }
+    return {
+        stem
+        for stem in stems
+        if any(
+            identity == stem
+            or (
+                identity.startswith(f"{stem}-")
+                and identity.removeprefix(f"{stem}-").isdigit()
+            )
+            for identity in identities
+        )
+    }
+
+
+@_telemetry.traced("drawing.isolate_components", label_param="label")
+def isolate_drawing_view_components(
+    adapter: Any,
+    view: Any,
+    *,
+    visible_stems: frozenset[str],
+    label: str,
+) -> None:
+    """Show only requested top-level component families in one drawing view."""
+    if not visible_stems:
+        raise ValueError(f"{label}: visible component set must not be empty")
+    root = adapter._attempt(
+        lambda: view.RootDrawingComponent2(False), default=None
+    )
+    if root is None:
+        raise RuntimeError(f"{label}: drawing view has no root component")
+
+    pending = list(_drawing_component_children(root))
+    found: set[str] = set()
+    enumerated: list[str] = []
+    while pending:
+        drawing_component = pending.pop()
+        children = _drawing_component_children(drawing_component)
+        pending.extend(children)
+        enumerated.append(str(drawing_component.Name or ""))
+        if children:
+            continue
+        matched = _drawing_component_stems(
+            adapter, drawing_component, visible_stems
+        )
+        drawing_component.Visible = bool(matched)
+        found.update(matched)
+
+    missing = sorted(visible_stems - found)
+    if missing:
+        raise RuntimeError(
+            f"{label}: component families not found: {missing}; "
+            f"enumerated={sorted(enumerated)}"
+        )
+    adapter.currentModel.EditRebuild3()
+    _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
+
+
+def _create_component_bom_balloon(
+    adapter: Any,
+    view: Any,
+    *,
+    stem: str,
+    expected_item: str,
+    label: str,
+) -> Any:
+    """Attach one BOM balloon to a visible edge of a requested component."""
+    root = adapter._attempt(
+        lambda: view.RootDrawingComponent2(False), default=None
+    )
+    if root is None:
+        raise RuntimeError(f"{label}: drawing view has no root component")
+    selected_edge: Any | None = None
+    enumerated: list[str] = []
+    pending = list(_drawing_component_children(root))
+    while pending:
+        drawing_component = pending.pop()
+        children = _drawing_component_children(drawing_component)
+        pending.extend(children)
+        if children:
+            continue
+        if stem not in _drawing_component_stems(
+            adapter, drawing_component, frozenset({stem})
+        ):
+            continue
+        enumerated.append(str(drawing_component.Name or ""))
+        component = adapter._attempt(
+            lambda dc=drawing_component: dc.Component, default=None
+        )
+        edges = adapter._attempt(
+            lambda: view.GetVisibleEntities2(component, 1), default=()
+        ) or ()
+        if not edges:
+            continue
+        selected_edge = edges[0]
+        break
+    if selected_edge is None:
+        raise RuntimeError(
+            f"{label}: {stem} has no visible edge; matching={enumerated}"
+        )
+
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"{label}: failed to activate {stem} view")
+    draw.ClearSelection2(True)
+    if not view.SelectEntity(selected_edge, False):
+        raise RuntimeError(f"{label}: failed to select {stem} visible edge")
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    options = extension.CreateBalloonOptions()
+    if options is None:
+        raise RuntimeError(f"{label}: failed to create {stem} balloon options")
+    options = _sw_type_info.early_bound_or_flag(options, "IBalloonOptions")
+    options.Style = 1
+    options.Size = 2
+    options.UpperTextContent = 1
+    options.ShowQuantity = False
+    options.ItemNumberStart = 1
+    options.ItemNumberIncrement = 1
+    options.ItemOrder = 1
+    note = extension.InsertBOMBalloon2(options)
+    draw.ClearSelection2(True)
+    if note is None:
+        raise RuntimeError(f"{label}: failed to insert {stem} balloon")
+    item = _balloon_item_number(adapter, note, label=label)
+    if item != expected_item:
+        raise RuntimeError(
+            f"{label}: {stem} resolved item {item}, expected {expected_item}"
+        )
+    return note
+
+
+@_telemetry.traced("drawing.component_bom_balloons", label_param="label")
+def add_component_bom_balloons(
+    adapter: Any,
+    view: Any,
+    *,
+    items: Sequence[tuple[str, str]],
+    label: str,
+    margin: float = 0.014,
+) -> list[Any]:
+    """Insert and ring one checked balloon per requested component family."""
+    if not items:
+        raise ValueError(f"{label}: component balloon list must not be empty")
+    stems = [stem for stem, _item in items]
+    numbers = [item for _stem, item in items]
+    if len(stems) != len(set(stems)) or len(numbers) != len(set(numbers)):
+        raise ValueError(f"{label}: duplicate component or item number")
+    balloons = [
+        _create_component_bom_balloon(
+            adapter,
+            view,
+            stem=stem,
+            expected_item=item,
+            label=label,
+        )
+        for stem, item in items
+    ]
+    if margin <= 0.0:
+        raise ValueError(f"{label}: balloon ring margin must be positive")
+    _spread_balloons(adapter, view, balloons, margin=margin)
+    adapter.currentModel.EditRebuild3()
+    _telemetry.success(f"{label}: inserted {len(balloons)} targeted balloons")
+    return balloons
+
+
+@_telemetry.traced("drawing.auto_balloons_across_views", label_param="label")
+def add_auto_balloons_across_views(
+    adapter: Any,
+    views: Sequence[Any],
+    *,
+    expected: int,
+    label: str,
+    existing_balloons: Sequence[Any] = (),
+    margin: float = 0.014,
+) -> list[Any]:
+    """Balloon successive views until every BOM item number is represented.
+
+    Dense assemblies can hide whole component families in one pictorial view.
+    AutoBalloon5 only balloons items visible in the selected view, so run it on
+    each orthographic and pictorial view, preserve every placed balloon, and
+    validate the union of displayed BOM item numbers against the table's full
+    contiguous item range. Each view's balloons are spread around that view.
+    """
+    if margin <= 0.0:
+        raise ValueError(f"{label}: balloon ring margin must be positive")
+    all_balloons = list(existing_balloons)
+    item_numbers = {
+        _balloon_item_number(adapter, note, label=f"{label} existing")
+        for note in existing_balloons
+    }
+    for index, view in enumerate(views, start=1):
+        view_label = f"{label} view {index}"
+        balloons = _create_auto_balloons(
+            adapter, view, label=view_label, allow_empty=True
+        )
+        if not balloons:
+            continue
+        _spread_balloons(adapter, view, balloons, margin=margin)
+        for note in balloons:
+            item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
+        all_balloons.extend(balloons)
+    expected_numbers = {str(item) for item in range(1, expected + 1)}
+    missing = sorted(expected_numbers - item_numbers, key=int)
+    unexpected = sorted(item_numbers - expected_numbers)
+    if missing or unexpected:
+        raise RuntimeError(
+            f"{label}: balloon item coverage mismatch; missing={missing}, "
+            f"unexpected={unexpected}, seen={sorted(item_numbers)}"
+        )
+    adapter.currentModel.EditRebuild3()
+    _telemetry.success(
+        f"{label}: {len(all_balloons)} balloons cover all {expected} BOM items"
+    )
+    return all_balloons
+
+
+@_telemetry.traced("drawing.position_bom_balloon", label_param="label")
+def position_bom_balloon(
+    adapter: Any,
+    balloons: Sequence[Any],
+    *,
+    item_number: str,
+    position_xy: tuple[float, float],
+    label: str,
+    position_tolerance_m: float = 1e-6,
+) -> None:
+    """Move one uniquely identified BOM balloon to a checked sheet position."""
+    if position_tolerance_m <= 0.0:
+        raise ValueError("balloon position tolerance must be positive")
+    matches = [
+        note
+        for note in balloons
+        if _balloon_item_number(adapter, note, label=label) == item_number
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one balloon for item {item_number}, got {len(matches)}"
+        )
+    note = _sw_type_info.early_bound_or_flag(
+        matches[0],
+        "INote",
+        "GetAnnotation",
+        "IsStackedBalloon",
+        "IsStackedBalloonMaster",
+    )
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: item {item_number} has no annotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation,
+        "IAnnotation",
+        "GetPosition",
+        "GetSpecificAnnotation",
+        "SetPosition",
+    )
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = ddoc.GetCurrentSheet()
+    magnetic_lines = int(
+        adapter._get_attr_or_call(sheet, "GetMagneticLinesCount") or 0
+    )
+    _telemetry.info(
+        f"{label}: item {item_number} placement diagnostics "
+        f"stacked={bool(note.IsStackedBalloon())}, "
+        f"stack_master={bool(note.IsStackedBalloonMaster())}, "
+        f"magnetic_lines={magnetic_lines}"
+    )
+    note.LockPosition = False
+    info = note.GetBalloonInfo()
+    anchor = annotation.GetPosition()
+    if info is None or len(info) < 2 or anchor is None or len(anchor) < 2:
+        raise RuntimeError(f"{label}: item {item_number} has no position read-back")
+    actual_xy = (float(info[0]), float(info[1]))
+    delta = tuple(expected - actual for actual, expected in zip(actual_xy, position_xy))
+    target_anchor = (float(anchor[0]) + delta[0], float(anchor[1]) + delta[1])
+    # GetBalloonInfo can lag the note's new origin until the graphics pipeline
+    # redraws. Retry the SAME absolute anchor, never a cumulative delta against
+    # stale circle data, and redraw before judging each rendered-circle readback.
+    for _attempt in range(3):
+        note.LockPosition = False
+        moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
+        if not moved:
+            raise RuntimeError(f"{label}: failed to position item {item_number}")
+        note.LockPosition = True
+        adapter.currentModel.EditRebuild3()
+        adapter.currentModel.GraphicsRedraw2()
+        current_note = annotation.GetSpecificAnnotation()
+        if current_note is None:
+            raise RuntimeError(
+                f"{label}: item {item_number} note vanished after positioning"
+            )
+        note = _sw_type_info.early_bound_or_flag(
+            current_note, "INote", "GetBalloonInfo"
+        )
+        moved_anchor = annotation.GetPosition()
+        moved_info = note.GetBalloonInfo()
+        _telemetry.info(
+            f"{label}: item {item_number} attempt {_attempt + 1} "
+            f"anchor={tuple(float(value) for value in moved_anchor[:2]) if moved_anchor else None}, "
+            f"circle={tuple(float(value) for value in moved_info[:2]) if moved_info else None}"
+        )
+        if moved_info and all(
+            abs(float(moved_info[index]) - expected) <= position_tolerance_m
+            for index, expected in enumerate(position_xy)
+        ):
+            break
+    info = note.GetBalloonInfo()
+    if info is None or len(info) < 2:
+        raise RuntimeError(f"{label}: item {item_number} circle has no final read-back")
+    actual_xy = (float(info[0]), float(info[1]))
+    if any(
+        abs(actual - expected) > position_tolerance_m
+        for actual, expected in zip(actual_xy, position_xy)
+    ):
+        raise RuntimeError(
+            f"{label}: item {item_number} circle moved to {actual_xy}, "
+            f"expected {position_xy}"
+        )
 
 
 def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:
@@ -2861,10 +3440,12 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     The project's hole tables are inserted top-left-anchored
     (``swBOMConfigurationAnchor_TopLeft``), so the anchor position (read off the
     table's underlying ``IAnnotation``) is the top-left corner and the box grows
-    right and DOWN from it.
+    right and DOWN from it.  A horizontally split table still reports the
+    source table's total ``RowCount``; ``GetSplitInformation`` identifies the
+    row range rendered by this piece, which is the only range its box may sum.
     """
     table = _sw_type_info.early_bound_or_flag(
-        table, "ITableAnnotation", "GetAnnotation"
+        table, "ITableAnnotation", "GetAnnotation", "GetSplitInformation"
     )
     inner = adapter._attempt(
         lambda: adapter._get_attr_or_call(table, "GetAnnotation")
@@ -2881,13 +3462,24 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
         return None
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    row_indices = range(rows)
+    split = adapter._attempt(lambda: table.GetSplitInformation(0, 0, 0, 0))
+    if split and len(split) >= 5 and int(split[0]) == 1:
+        _direction, _index, count, range_start, range_end = (
+            int(value) for value in split[:5]
+        )
+        if count > 1 and 0 <= range_start <= range_end < rows:
+            visible = list(range(range_start, range_end + 1))
+            if range_start > 0:
+                visible.insert(0, 0)  # repeated heading on later pieces
+            row_indices = visible
     width = sum(
         float(adapter._attempt(lambda i=i: table.GetColumnWidth(i)) or 0.0)
         for i in range(columns)
     )
     height = sum(
         float(adapter._attempt(lambda i=i: table.GetRowHeight(i)) or 0.0)
-        for i in range(rows)
+        for i in row_indices
     )
     x, y = float(position[0]), float(position[1])
     return LayoutElement(name, "table", x, y - height, x + width, y)
@@ -3334,8 +3926,9 @@ def collect_layout_elements(
     Also returned: every annotation's LEADER geometry (for the crossing audit)
     and the sheet's :class:`DrawableRegion`, queried from its zone margins.
 
-    Notes owned by the SHEET view are the sheet-format frame + zone labels (at
-    the sheet edges by design) and are excluded.
+    Notes owned by the drawing SHEET are included. Notes owned by the drawing
+    TEMPLATE are the sheet-format frame, zone labels, and title block; those are
+    excluded while the title block remains covered by its explicit keep-out.
     """
     drawing_model = adapter.currentModel
     ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
@@ -3428,12 +4021,37 @@ def collect_layout_elements(
         for table in _iter_tables(adapter, view):
             tables[table.label] = table
 
-    # Hole tables anchor to the SHEET view, not a drawing view -- scan it for
-    # tables only (its notes are the sheet-format frame + title block).
+    # Hole tables and free drawing notes anchor to the SHEET view, not a drawing
+    # view. Template-owned notes are the sheet-format frame + title block and
+    # must remain excluded; IAnnotation.OwnerType distinguishes the two without
+    # relying on generated annotation names or positions.
     sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
     if sheet_view is not None:
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
+        for element, annotation in _iter_view_annotations(adapter, sheet_view):
+            if element.kind != "note":
+                continue
+            owner_type = int(
+                adapter._attempt(
+                    lambda a=annotation: adapter._get_attr_or_call(a, "OwnerType"),
+                    default=-1,
+                )
+                or -1
+            )
+            if owner_type != 1:  # swAnnotationOwner_DrawingSheet
+                continue
+            element = replace(element, owner="sheet")
+            elements.append(element)
+            leaders.extend(
+                _leader_segments_of(
+                    adapter,
+                    annotation,
+                    label=element.label,
+                    kind=element.kind,
+                    owner="sheet",
+                )
+            )
 
     elements.extend(tables.values())
     # Reserve the checked-in title block as a keep-out: any element overlapping
@@ -3499,6 +4117,7 @@ async def finalize_drawing(
     scale: tuple[float, float] = (1.0, 1.0),
     redundant_note_substrings: Sequence[str] = (),
     expected_redundant_notes: int = 0,
+    expected_sheet_names: tuple[str, ...] | None = None,
 ) -> dict[str, str]:
     """Save, reopen-validate, and export the finished drawing (SLDDRW/PDF/PNG).
 
@@ -3510,52 +4129,95 @@ async def finalize_drawing(
     ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
     drawing_model.EditRebuild3()
-    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-    if sheet is None:
-        raise RuntimeError("finished drawing has no current sheet")
-    sheet_name = adapter._get_attr_or_call(sheet, "GetName")
-    if not sheet_name or not ddoc.ActivateSheet(sheet_name):
-        raise RuntimeError("failed to activate drawing sheet for export")
-
-    if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
-        raise RuntimeError("failed to set final drawing sheet scale")
-    assert_asme_b_sheet(adapter, sheet, phase="before save", scale=scale)
-
-    # Point the sheet's $PRPSHEET property links at the FIRST drawing view's
-    # model, by the view's REAL name -- setting it earlier (before views exist)
-    # is silently ignored by SolidWorks. Every project drawing is single-model,
-    # so the first view is always the right source. Done AFTER the final
-    # SetScale: the property put rebuilds the sheet under the hood, and a
-    # SetScale on the pre-put handle returns False. Re-fetch the handle after.
-    first_view = next(iter_views(adapter), None)
-    if first_view is None:
-        raise RuntimeError("finished drawing has no views to link sheet properties to")
-    first_name = view_name(adapter, first_view)
-    sheet.CustomPropertyView = first_name
-    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-    linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
-    if linked != first_name:
+    sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if not sheet_names:
+        raise RuntimeError("finished drawing has no sheets")
+    if expected_sheet_names is not None and sheet_names != expected_sheet_names:
         raise RuntimeError(
-            f"CustomPropertyView did not take: {linked!r} != {first_name!r}")
+            f"drawing sheet contract mismatch: {sheet_names!r} != "
+            f"{expected_sheet_names!r}"
+        )
 
-    # The template's title block reads the general-tolerance cells from the
-    # linked model via $PRPSHEET -- a stale source part (built before
-    # part_properties stamped the TOL_* set) would save a drawing with BLANK
-    # tolerance cells and no error. Validate here, the chokepoint every recipe
-    # passes through, against the model the sheet is now actually linked to,
-    # rather than trusting each recipe's read_required_properties list
-    # (Codex P2 #289).
-    linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
-    if linked_model is None:
-        raise RuntimeError(
-            f"view {first_name!r} has no referenced document to validate")
-    linked_model = _sw_type_info.early_bound_or_flag(
-        linked_model, "IModelDoc2", "GetCustomInfoValue")
-    read_required_properties(
-        linked_model,
-        TITLE_BLOCK_TOLERANCE_PROPERTIES,
-        required=TITLE_BLOCK_TOLERANCE_PROPERTIES,
-    )
+    # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
+    # real view after all views exist, validate the linked model's title-block
+    # tolerance properties, and hold every sheet to the same ASME B contract.
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        if sheet is None:
+            raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+        if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+            raise RuntimeError(
+                f"failed to set final drawing sheet {sheet_name!r} scale"
+            )
+        assert_asme_b_sheet(
+            adapter, sheet, phase=f"before save {sheet_name}", scale=scale
+        )
+        properties = list(
+            adapter._get_attr_or_call(sheet, "GetProperties2") or []
+        )
+        if len(properties) < 8:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
+            )
+        if bool(properties[7]):
+            # PasteSheet preserves the source sheet's "same as sheet specified
+            # in Document Properties" flag. In that mode SolidWorks silently
+            # ignores a per-sheet CustomPropertyView assignment and returns the
+            # literal UI label instead of a view name. Clear the mode through
+            # the current ISheet API while preserving every other property.
+            sheet.SetProperties2(
+                int(properties[0]),
+                int(properties[1]),
+                float(properties[2]),
+                float(properties[3]),
+                bool(properties[4]),
+                float(properties[5]),
+                float(properties[6]),
+                False,
+            )
+            sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+            properties = list(
+                adapter._get_attr_or_call(sheet, "GetProperties2") or []
+            )
+            if len(properties) < 8 or bool(properties[7]):
+                raise RuntimeError(
+                    f"failed to enable explicit property source on {sheet_name!r}"
+                )
+            assert_asme_b_sheet(
+                adapter,
+                sheet,
+                phase=f"explicit property source {sheet_name}",
+                scale=scale,
+            )
+        first_view = next(iter_views(adapter), None)
+        if first_view is None:
+            raise RuntimeError(
+                f"drawing sheet {sheet_name!r} has no view for property links"
+            )
+        first_name = view_name(adapter, first_view)
+        sheet.CustomPropertyView = first_name
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
+        if linked != first_name:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} CustomPropertyView did not take: "
+                f"{linked!r} != {first_name!r}"
+            )
+        linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
+        if linked_model is None:
+            raise RuntimeError(
+                f"view {first_name!r} has no referenced document to validate"
+            )
+        linked_model = _sw_type_info.early_bound_or_flag(
+            linked_model, "IModelDoc2", "GetCustomInfoValue"
+        )
+        read_required_properties(
+            linked_model,
+            TITLE_BLOCK_TOLERANCE_PROPERTIES,
+            required=TITLE_BLOCK_TOLERANCE_PROPERTIES,
+        )
 
     # The title block's UNIT cell links $PRP:"UNIT_DISPLAY" (a DRAWING-doc
     # property, unlike the $PRPSHEET part-property links), so the declared unit
@@ -3565,10 +4227,19 @@ async def finalize_drawing(
     from _common import apply_custom_properties
     apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
-    removed_notes = sum(
-        remove_notes_matching(adapter, substring)
-        for substring in redundant_note_substrings
-    )
+    # Cleanup and audit each active sheet independently; annotations and layout
+    # coordinates are sheet-scoped, so different pages must not be conflated.
+    removed_notes = 0
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(
+                f"failed to activate drawing sheet {sheet_name!r} for layout audit"
+            )
+        removed_notes += sum(
+            remove_notes_matching(adapter, substring)
+            for substring in redundant_note_substrings
+        )
+        check_drawing_layout(adapter, stem=f"{outputs.slddrw.stem}:{sheet_name}")
     if removed_notes != expected_redundant_notes:
         raise RuntimeError(
             f"final drawing removed {removed_notes} redundant notes, "
@@ -3577,11 +4248,6 @@ async def finalize_drawing(
         )
     if removed_notes:
         _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
-
-    # The layout is now complete -- audit element collisions / sheet overflow on
-    # the finished sheet before the first save, so a broken layout never reaches
-    # the saved SLDDRW / PDF / PNG.
-    check_drawing_layout(adapter, stem=outputs.slddrw.stem)
 
     # Export the PDF while the just-authored drawing is still fully loaded.
     # A large drawing can reopen view-only even when its referenced views report
@@ -3592,9 +4258,25 @@ async def finalize_drawing(
     )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
-    drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
-    if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
-        raise RuntimeError("failed to persist reopened drawing sheet scale")
+    drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    reopened_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if reopened_names != sheet_names:
+        raise RuntimeError(
+            f"reopened drawing sheets changed: {reopened_names!r} != {sheet_names!r}"
+        )
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(
+                f"failed to activate reopened drawing sheet {sheet_name!r}"
+            )
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        if sheet is None or not sheet.SetScale(
+            float(scale[0]), float(scale[1]), False, False
+        ):
+            raise RuntimeError(
+                f"failed to persist reopened drawing sheet {sheet_name!r} scale"
+            )
     sheet_scale_dirty = bool(
         adapter._get_attr_or_call(drawing_model, "GetSaveFlag")
     )
@@ -3617,10 +4299,44 @@ async def finalize_drawing(
             )
     if not sheet_scale_dirty:
         _telemetry.info("final drawing sheet scale already persisted; save skipped")
-    drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
-    assert_asme_b_sheet(adapter, sheet, phase="post-save reopen", scale=scale)
-    sanitize_pdf_metadata(outputs.pdf, title=pdf_title)
-    render_pdf_png(outputs.pdf, outputs.png)
+    drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    final_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+    if final_names != sheet_names:
+        raise RuntimeError(
+            f"final drawing sheets changed: {final_names!r} != {sheet_names!r}"
+        )
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(
+                f"failed to activate final drawing sheet {sheet_name!r}"
+            )
+        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+        if sheet is None:
+            raise RuntimeError(f"final drawing sheet {sheet_name!r} has no ISheet")
+        assert_asme_b_sheet(
+            adapter, sheet, phase=f"post-save reopen {sheet_name}", scale=scale
+        )
+        first_view = next(iter_views(adapter), None)
+        if first_view is None:
+            raise RuntimeError(
+                f"final drawing sheet {sheet_name!r} has no property-link view"
+            )
+        expected_property_view = view_name(adapter, first_view)
+        persisted_property_view = str(
+            adapter._get_attr_or_call(sheet, "CustomPropertyView") or ""
+        )
+        if persisted_property_view != expected_property_view:
+            raise RuntimeError(
+                f"final sheet {sheet_name!r} property link changed: "
+                f"{persisted_property_view!r} != {expected_property_view!r}"
+            )
+    if not ddoc.ActivateSheet(sheet_names[0]):
+        raise RuntimeError("failed to restore first drawing sheet after validation")
+    sanitize_pdf_metadata(
+        outputs.pdf, title=pdf_title, expected_pages=len(sheet_names)
+    )
+    render_pdf_png(outputs.pdf, outputs.png, expected_pages=len(sheet_names))
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
         raise RuntimeError(f"drawing export incomplete: {artifacts!r}")
