@@ -19,10 +19,11 @@ from _assembly_drawing_bom import (
     configured_part_numbers,
     insert_identified_bom_table,
 )
-from _common import check, run_build
+from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_component_bom_balloons,
+    create_blank_drawing_sheets,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -51,6 +52,8 @@ PNG = OUTPUTS.png
 # ASME B; refined against the first render.
 SHEET_SCALE = (1.0, 8.0)
 VIEW_SCALE = (1, 8)
+ID_VIEW_SCALE = (1, 10)
+SHEET_NAMES = ("GENERAL ARRANGEMENT", "INSTALLATION AND ITEM IDENTIFICATION")
 
 # One BOM row per top-level component. TOP-LEVEL-ONLY: the seven subassemblies
 # (each inserted whole and fixed) plus the loose measuring stick. The BOM PART
@@ -108,9 +111,12 @@ ASSEMBLY_NOTES = "\n".join(
 
 # Three views left-shifted so the iso's balloon cloud clears the right view and
 # the title-block keep-out (the summing slice's proven arrangement).
-FRONT_CENTER = (0.060, 0.150)
-RIGHT_CENTER = (0.130, 0.150)
-ISO_CENTER = (0.225, 0.140)
+GENERAL_FRONT_CENTER = (0.060, 0.150)
+GENERAL_RIGHT_CENTER = (0.130, 0.150)
+GENERAL_ISO_CENTER = (0.215, 0.150)
+ID_FRONT_CENTER = (0.055, 0.170)
+ID_RIGHT_CENTER = (0.125, 0.170)
+ID_ISO_CENTER = (0.210, 0.170)
 BOM_ANCHOR = (0.248, 0.265)
 
 
@@ -140,6 +146,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(adapter, scale=SHEET_SCALE)
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="harmonic-analyzer drawing"
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -152,18 +161,36 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate harmonic-analyzer general sheet")
+    general_front = place_view(
+        adapter, str(SOURCE), "*Front", *GENERAL_FRONT_CENTER, scale=VIEW_SCALE
+    )
+    general_right = place_view(
+        adapter, str(SOURCE), "*Right", *GENERAL_RIGHT_CENTER, scale=VIEW_SCALE
+    )
+    general_iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *GENERAL_ISO_CENTER, scale=VIEW_SCALE
+    )
+    for view in (general_front, general_right, general_iso):
+        set_hidden_lines_removed(adapter, view)
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError(
+            "failed to activate harmonic-analyzer installation sheet"
+        )
     front = place_view(
-        adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE
+        adapter, str(SOURCE), "*Front", *ID_FRONT_CENTER, scale=ID_VIEW_SCALE
     )
     right = place_view(
-        adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
+        adapter, str(SOURCE), "*Right", *ID_RIGHT_CENTER, scale=ID_VIEW_SCALE
     )
     iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
+        adapter, str(SOURCE), "*Isometric", *ID_ISO_CENTER, scale=ID_VIEW_SCALE
     )
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-
     insert_identified_bom_table(
         adapter,
         front,
@@ -196,6 +223,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OUTPUTS,
         pdf_title="Harmonic Analyzer Assembly Drawing",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

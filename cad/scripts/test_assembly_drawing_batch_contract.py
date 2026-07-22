@@ -205,6 +205,7 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
         expected_views = {
             draw_paper_drive_assembly: 8,
             draw_magnifier_assembly: 5,
+            draw_harmonic_analyzer_assembly: 6,
         }.get(drawing, 3)
         assert source.count("place_view(") == expected_views, drawing.ARTIFACT_STEM
         if drawing is draw_frame_assembly:
@@ -213,6 +214,9 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
         elif drawing is draw_magnifier_assembly:
             assert "for view in (general_front, general_right, general_iso):" in source
             assert "for view in (iso, front):" in source
+        elif drawing is draw_harmonic_analyzer_assembly:
+            assert "for view in (general_front, general_right, general_iso):" in source
+            assert "for view in (front, right, iso):" in source
         else:
             assert "for view in (front, right, iso):" in source, (
                 drawing.ARTIFACT_STEM

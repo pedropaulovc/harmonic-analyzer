@@ -116,7 +116,15 @@ def test_drawing_places_bom_and_balloons() -> None:
     }
     assert len(balloon_items) == len(drawing.BOM_COMPONENTS)
     assert drawing.SHEET_SCALE == (1.0, 8.0)
+    assert drawing.ID_VIEW_SCALE == (1, 10)
+    assert drawing.SHEET_NAMES == (
+        "GENERAL ARRANGEMENT",
+        "INSTALLATION AND ITEM IDENTIFICATION",
+    )
     assert source.count("scale=VIEW_SCALE") == 3
+    assert source.count("scale=ID_VIEW_SCALE") == 3
+    assert source.count("create_blank_drawing_sheets(") == 1
+    assert "expected_sheet_names=SHEET_NAMES" in source
     assert source.count("add_note(") == 1
     assert "MHA-A01 THROUGH MHA-A07" in drawing.ASSEMBLY_NOTES
     assert "INSTALL IN ORDER" in drawing.ASSEMBLY_NOTES
