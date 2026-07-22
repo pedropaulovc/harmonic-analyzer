@@ -25,6 +25,10 @@ SHEETS = (
     draw_summing_assembly,
 )
 
+ORDINARY_SHEETS = tuple(
+    drawing for drawing in SHEETS if drawing is not draw_drive_train_assembly
+)
+
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "ALL DIMENSIONS",
     "BREAK ALL",
@@ -57,10 +61,17 @@ def test_assembly_notes_are_numbered_in_order() -> None:
         lines = drawing.ASSEMBLY_NOTES.splitlines()
         assert lines[0] == "ASSEMBLY NOTES", drawing.ARTIFACT_STEM
         assert len(lines) >= 4, drawing.ARTIFACT_STEM
-        for number, line in enumerate(lines[1:], start=1):
-            assert line.startswith(f"{number}. "), (
+        expected_number = 1
+        for line in lines[1:]:
+            if line.startswith("   "):
+                assert expected_number > 1, drawing.ARTIFACT_STEM
+                assert line.strip(), drawing.ARTIFACT_STEM
+                continue
+            assert line.startswith(f"{expected_number}. "), (
                 f"{drawing.ARTIFACT_STEM}: {line}"
             )
+            expected_number += 1
+        assert expected_number >= 4, drawing.ARTIFACT_STEM
 
 
 def test_each_sheet_has_a_complete_bom_contract() -> None:
@@ -135,8 +146,8 @@ def test_unresolved_assembly_inputs_are_release_holds_not_guessed_details() -> N
     assert "LOCATING FEATURES AND FASTENERS" in top_notes
 
 
-def test_each_sheet_uses_three_hlr_views_bom_and_balloons() -> None:
-    for drawing in SHEETS:
+def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
+    for drawing in ORDINARY_SHEETS:
         source = Path(drawing.__file__).read_text(encoding="utf-8")
         assert source.count("place_view(") == 3, drawing.ARTIFACT_STEM
         assert "for view in (front, right, iso):" in source, drawing.ARTIFACT_STEM
@@ -151,3 +162,17 @@ def test_each_sheet_uses_three_hlr_views_bom_and_balloons() -> None:
             "add_auto_balloons_across_views("
         )
         assert balloon_calls == 1, drawing.ARTIFACT_STEM
+
+
+def test_drive_train_adds_an_isolated_bottom_view_for_enclosed_bom_items() -> None:
+    source = Path(draw_drive_train_assembly.__file__).read_text(encoding="utf-8")
+    assert source.count("place_view(") == 4
+    assert "for view in (front, right, iso):" in source
+    assert "set_hidden_lines_removed(adapter, view)" in source
+    assert '"*Bottom"' in source
+    assert "set_hidden_lines_visible(adapter, bottom)" in source
+    assert "_isolate_bottom_balloon_components(adapter, bottom)" in source
+    assert source.count("insert_identified_bom_table(") == 1
+    assert "part_numbers=BOM_PART_NUMBERS" in source
+    assert source.count("add_auto_balloons_across_views(") == 1
+    assert "adapter, (front, right, iso, bottom)" in source
