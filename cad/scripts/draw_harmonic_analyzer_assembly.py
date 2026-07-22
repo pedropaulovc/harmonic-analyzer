@@ -22,7 +22,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_auto_balloons,
+    add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -154,8 +154,11 @@ async def build(adapter: Any) -> dict[str, str]:
         part_numbers=BOM_PART_NUMBERS,
         label="harmonic-analyzer assembly",
     )
-    add_auto_balloons(
-        adapter, iso, expected=len(BOM_COMPONENTS),
+    # The pictorial exposes the loose stick and three exterior subassemblies,
+    # but the frame conceals the remaining top-level identities. Complete and
+    # validate the eight-item BOM set across all three projections.
+    add_auto_balloons_across_views(
+        adapter, (iso, front, right), expected=len(BOM_COMPONENTS),
         label="harmonic-analyzer assembly balloons",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
