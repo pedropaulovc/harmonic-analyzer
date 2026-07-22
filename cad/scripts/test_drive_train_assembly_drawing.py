@@ -106,19 +106,20 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
     assert source.count('"Finish": "SEE COMPONENT DRAWINGS"') == 1
 
 
-def test_drive_train_has_six_named_and_numbered_sheets() -> None:
+def test_drive_train_has_seven_named_and_numbered_sheets() -> None:
     build_source = inspect.getsource(drawing.build)
     assert drawing.SHEET_NAMES == (
         "GENERAL ASSEMBLY",
         "PARTS LIST",
-        "EXTERIOR ITEM IDENTIFICATION",
+        "GEAR-TRAIN ITEM IDENTIFICATION",
         "CONCEALED ITEM IDENTIFICATION",
         "GEAR-TRAIN SETUP",
+        "PINION ITEM IDENTIFICATION",
         "PINION SETUP AND ACCEPTANCE",
     )
     for index, name in enumerate(drawing.SHEET_NAMES):
         assert f"ActivateSheet(SHEET_NAMES[{index}])" in build_source
-        assert f"SHEET {index + 1} OF 6 — {name}" in build_source
+        assert f"SHEET {index + 1} OF 7 — {name}" in build_source
     assert "expected_sheet_names=SHEET_NAMES" in build_source
     assert "SEE SHEET 5" in drawing.GENERAL_POINTER_NOTE
     assert "SEE SHEET 6" in drawing.GENERAL_POINTER_NOTE
@@ -234,7 +235,7 @@ def test_sheet_five_has_an_explicit_twenty_pair_station_contract() -> None:
     assert "_insert_gear_requirements_table(" in build_source
 
 
-def test_sheet_six_uses_state_and_acceptance_tables_with_a_parked_view() -> None:
+def test_sheet_seven_uses_state_and_acceptance_tables_with_a_parked_view() -> None:
     parameters = drawing.PINION_PARAMETER_ROWS
     acceptance = drawing.ACCEPTANCE_ROWS
     assert len(parameters) == 8

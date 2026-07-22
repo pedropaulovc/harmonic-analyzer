@@ -57,7 +57,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Six sheets let the ~300 mm-wide mechanism use a readable 1:3 scale without
+# Seven sheets let the ~300 mm-wide mechanism use a readable 1:3 scale without
 # forcing its 32-row BOM, exterior balloons, concealed-item identification, and
 # functional setup data into one field.  All views use the sheet scale so the
 # title block remains truthful without per-view scale exceptions.
@@ -66,9 +66,10 @@ VIEW_SCALE = (1, 3)
 SHEET_NAMES = (
     "GENERAL ASSEMBLY",
     "PARTS LIST",
-    "EXTERIOR ITEM IDENTIFICATION",
+    "GEAR-TRAIN ITEM IDENTIFICATION",
     "CONCEALED ITEM IDENTIFICATION",
     "GEAR-TRAIN SETUP",
+    "PINION ITEM IDENTIFICATION",
     "PINION SETUP AND ACCEPTANCE",
 )
 
@@ -126,8 +127,8 @@ CONCEALED_BALLOON_ITEMS = {
     if stem in BOTTOM_VISIBILITY_STEMS
 }
 GENERAL_POINTER_NOTE = (
-    "GEAR-TRAIN SETUP: SEE SHEET 5. PINION SETUP AND FINAL ACCEPTANCE: "
-    "SEE SHEET 6."
+    "GEAR-TRAIN SETUP: SEE SHEET 5. PINION ITEMS: SEE SHEET 6. "
+    "PINION SETUP AND FINAL ACCEPTANCE: SEE SHEET 7."
 )
 
 # Sheet 5 holds the source-backed assembly contract in three short columns.
@@ -229,27 +230,15 @@ GENERAL_POINTER_ORIGIN = (0.018, 0.070)
 BOM_ANCHOR = (0.018, 0.262)
 BOM_ISO_CENTER = (0.310, 0.165)
 
-# Sheet 3: four isolated subsystem views replace the black, overlapping gear
+# Sheets 3 and 6: four isolated subsystem views replace the black, overlapping gear
 # bands in the former full-assembly identification views.  Every exterior BOM
 # family appears in exactly one group and gets one deliberately attached balloon.
-EXTERIOR_VIEW_CENTERS = (
-    (0.095, 0.155),
-    (0.215, 0.190),
-    (0.215, 0.095),
-    (0.345, 0.155),
-)
 EXTERIOR_VIEW_NAMES = ("*Front", "*Isometric", "*Isometric", "*Isometric")
 EXTERIOR_VIEW_LABELS = (
     "VIEW A — CONE PLATFORM / GEAR TRAIN",
     "VIEW B — PINION SUPPORT / STRAPS",
     "VIEW C — PINION CAM / CONTROLS",
     "VIEW D — CYLINDER / CRANK",
-)
-EXTERIOR_VIEW_LABEL_ORIGINS = (
-    (0.045, 0.235),
-    (0.165, 0.235),
-    (0.165, 0.140),
-    (0.305, 0.235),
 )
 EXTERIOR_VIEW_STEMS = (
     frozenset(
@@ -298,6 +287,12 @@ EXTERIOR_VIEW_STEMS = (
         }
     ),
 )
+GEAR_IDENTIFICATION_VIEW_INDICES = (0, 3)
+GEAR_IDENTIFICATION_VIEW_CENTERS = ((0.120, 0.150), (0.320, 0.150))
+GEAR_IDENTIFICATION_LABEL_ORIGINS = ((0.070, 0.235), (0.270, 0.235))
+PINION_IDENTIFICATION_VIEW_INDICES = (1, 2)
+PINION_IDENTIFICATION_VIEW_CENTERS = ((0.120, 0.150), (0.310, 0.150))
+PINION_IDENTIFICATION_LABEL_ORIGINS = ((0.070, 0.235), (0.260, 0.235))
 
 # Sheet 4: selected context makes the three concealed families comprehensible
 # without duplicating their exterior balloons.
@@ -344,7 +339,7 @@ GEAR_SETUP_VIEW_LABELS = (
 )
 GEAR_SETUP_VIEW_LABEL_ORIGINS = ((0.270, 0.150), (0.350, 0.150))
 
-# Sheet 6: a large parked/disengaged reference view plus scan-friendly setup
+# Sheet 7: a large parked/disengaged reference view plus scan-friendly setup
 # and functional-acceptance tables.  The saved assembly does not claim to show
 # the engaged pose.
 PINION_SETUP_VIEW_CENTER = (0.095, 0.165)
@@ -364,8 +359,8 @@ BOM_COLUMN_WIDTHS = {
     "DESCRIPTION": 0.074,
     "QTY.": 0.012,
 }
-EXTERIOR_BALLOON_RING_MARGINS = (0.020, 0.014, 0.014, 0.014)
-EXTERIOR_BALLOON_CLEARANCES = (0.002, 0.002, 0.002, 0.002)
+EXTERIOR_BALLOON_RING_MARGINS = (0.020, 0.014)
+EXTERIOR_BALLOON_CLEARANCES = (0.002, 0.002)
 
 CONE_GEAR_SCHEDULE = tuple(
     (position, f"T{int(channel['cone_teeth']):03d}", int(channel["cone_teeth"]))
@@ -918,18 +913,24 @@ def _add_component_balloons(
     adapter: Any,
     views: tuple[Any, ...],
     groups: tuple[frozenset[str], ...],
+    *,
+    label: str,
 ) -> list[Any]:
     """Attach one validated BOM balloon per exterior family in isolated views."""
-    if len(views) != len(groups):
-        raise ValueError("drive-train grouped view and component counts differ")
+    field_count = len(groups)
+    if not (
+        len(views)
+        == field_count
+        == len(EXTERIOR_BALLOON_RING_MARGINS)
+        == len(EXTERIOR_BALLOON_CLEARANCES)
+    ):
+        raise ValueError(f"{label}: grouped view, component, and ring counts differ")
 
-    expected_stems = frozenset(BOM_COMPONENTS) - BOTTOM_VISIBILITY_STEMS
     observed_stems = frozenset().union(*groups)
-    if observed_stems != expected_stems:
+    unexpected_stems = observed_stems - frozenset(BOM_COMPONENTS)
+    if unexpected_stems:
         raise RuntimeError(
-            "drive-train exterior group coverage mismatch: "
-            f"missing={sorted(expected_stems - observed_stems)}, "
-            f"unexpected={sorted(observed_stems - expected_stems)}"
+            f"{label}: unexpected BOM families: {sorted(unexpected_stems)}"
         )
     duplicates = [
         stem for stem in observed_stems if sum(stem in group for group in groups) != 1
@@ -968,7 +969,7 @@ def _add_component_balloons(
         )
         all_balloons.extend(view_balloons)
         _telemetry.success(
-            f"drive-train exterior group {index}: "
+            f"{label} group {index}: "
             f"{len(view_balloons)} deliberately attached balloons"
         )
     return all_balloons
@@ -1138,7 +1139,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (general_front, general_right, general_iso):
         set_hidden_lines_removed(adapter, view)
     if add_note(
-        adapter, "SHEET 1 OF 6 — GENERAL ASSEMBLY", 0.018, 0.255
+        adapter, "SHEET 1 OF 7 — GENERAL ASSEMBLY", 0.018, 0.255
     ) is None:
         raise RuntimeError("failed to add general-assembly heading")
     if add_note(adapter, GENERAL_POINTER_NOTE, *GENERAL_POINTER_ORIGIN) is None:
@@ -1162,7 +1163,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _format_drive_train_bom(adapter, bom_table)
     if add_note(
         adapter,
-        "SHEET 2 OF 6 — PARTS LIST; ITEM NUMBERS APPLY TO SHEETS 3-6",
+        "SHEET 2 OF 7 — PARTS LIST; ITEM NUMBERS APPLY TO SHEETS 3-7",
         0.170,
         0.255,
     ) is None:
@@ -1170,28 +1171,47 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("failed to activate exterior-identification sheet")
-    exterior_views = tuple(
-        place_view(adapter, str(SOURCE), name, *center, scale=VIEW_SCALE)
-        for name, center in zip(
-            EXTERIOR_VIEW_NAMES, EXTERIOR_VIEW_CENTERS, strict=True
+    gear_identification_groups = tuple(
+        EXTERIOR_VIEW_STEMS[index] for index in GEAR_IDENTIFICATION_VIEW_INDICES
+    )
+    gear_identification_views = tuple(
+        place_view(
+            adapter,
+            str(SOURCE),
+            EXTERIOR_VIEW_NAMES[index],
+            *center,
+            scale=VIEW_SCALE,
+        )
+        for index, center in zip(
+            GEAR_IDENTIFICATION_VIEW_INDICES,
+            GEAR_IDENTIFICATION_VIEW_CENTERS,
+            strict=True,
         )
     )
-    for index, (view, stems) in enumerate(
-        zip(exterior_views, EXTERIOR_VIEW_STEMS, strict=True), start=1
+    for field, (view, stems) in enumerate(
+        zip(gear_identification_views, gear_identification_groups, strict=True),
+        start=1,
     ):
         set_hidden_lines_removed(adapter, view)
         _isolate_balloon_components(
-            adapter, view, visible_stems=stems, label=f"exterior group {index}"
+            adapter, view, visible_stems=stems, label=f"gear identification {field}"
         )
-    _add_component_balloons(adapter, exterior_views, EXTERIOR_VIEW_STEMS)
-    for label, origin in zip(
-        EXTERIOR_VIEW_LABELS, EXTERIOR_VIEW_LABEL_ORIGINS, strict=True
+    _add_component_balloons(
+        adapter,
+        gear_identification_views,
+        gear_identification_groups,
+        label="drive-train gear identification",
+    )
+    for index, origin in zip(
+        GEAR_IDENTIFICATION_VIEW_INDICES,
+        GEAR_IDENTIFICATION_LABEL_ORIGINS,
+        strict=True,
     ):
-        if add_note(adapter, label, *origin) is None:
-            raise RuntimeError("failed to add exterior subsystem-view label")
+        if add_note(adapter, EXTERIOR_VIEW_LABELS[index], *origin) is None:
+            raise RuntimeError("failed to add gear identification-view label")
     if add_note(
         adapter,
-        "SHEET 3 OF 6 — EXTERIOR ITEM IDENTIFICATION; "
+        "SHEET 3 OF 7 — GEAR-TRAIN ITEM IDENTIFICATION; "
         "SELECTED SUBSYSTEMS SHOWN; HIDDEN LINES REMOVED",
         0.018,
         0.255,
@@ -1268,7 +1288,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("failed to add concealed relationship-view label")
     if add_note(
         adapter,
-        "SHEET 4 OF 6 — CONCEALED ITEM IDENTIFICATION; "
+        "SHEET 4 OF 7 — CONCEALED ITEM IDENTIFICATION; "
         "SELECTED COMPONENTS SHOWN; HIDDEN LINES VISIBLE",
         *CONCEALED_HEADING_ORIGIN,
     ) is None:
@@ -1299,12 +1319,68 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("failed to add gear setup view label")
     if add_note(
         adapter,
-        "SHEET 5 OF 6 — GEAR-TRAIN SETUP",
+        "SHEET 5 OF 7 — GEAR-TRAIN SETUP",
         *SETUP_HEADING_ORIGIN,
     ) is None:
         raise RuntimeError("failed to add gear-train setup heading")
 
     if not ddoc.ActivateSheet(SHEET_NAMES[5]):
+        raise RuntimeError("failed to activate pinion-identification sheet")
+    pinion_identification_groups = tuple(
+        EXTERIOR_VIEW_STEMS[index] for index in PINION_IDENTIFICATION_VIEW_INDICES
+    )
+    pinion_identification_views = tuple(
+        place_view(
+            adapter,
+            str(SOURCE),
+            EXTERIOR_VIEW_NAMES[index],
+            *center,
+            scale=VIEW_SCALE,
+        )
+        for index, center in zip(
+            PINION_IDENTIFICATION_VIEW_INDICES,
+            PINION_IDENTIFICATION_VIEW_CENTERS,
+            strict=True,
+        )
+    )
+    for field, (view, stems) in enumerate(
+        zip(
+            pinion_identification_views,
+            pinion_identification_groups,
+            strict=True,
+        ),
+        start=1,
+    ):
+        set_hidden_lines_removed(adapter, view)
+        _isolate_balloon_components(
+            adapter,
+            view,
+            visible_stems=stems,
+            label=f"pinion identification {field}",
+        )
+    _add_component_balloons(
+        adapter,
+        pinion_identification_views,
+        pinion_identification_groups,
+        label="drive-train pinion identification",
+    )
+    for index, origin in zip(
+        PINION_IDENTIFICATION_VIEW_INDICES,
+        PINION_IDENTIFICATION_LABEL_ORIGINS,
+        strict=True,
+    ):
+        if add_note(adapter, EXTERIOR_VIEW_LABELS[index], *origin) is None:
+            raise RuntimeError("failed to add pinion identification-view label")
+    if add_note(
+        adapter,
+        "SHEET 6 OF 7 — PINION ITEM IDENTIFICATION; "
+        "SELECTED SUBSYSTEMS SHOWN; HIDDEN LINES REMOVED",
+        0.018,
+        0.255,
+    ) is None:
+        raise RuntimeError("failed to add pinion-identification heading")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[6]):
         raise RuntimeError("failed to activate pinion setup-and-acceptance sheet")
     pinion_setup = place_view(
         adapter,
@@ -1330,7 +1406,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _insert_acceptance_table(adapter)
     if add_note(
         adapter,
-        "SHEET 6 OF 6 — PINION SETUP AND ACCEPTANCE",
+        "SHEET 7 OF 7 — PINION SETUP AND ACCEPTANCE",
         *SETUP_HEADING_ORIGIN,
     ) is None:
         raise RuntimeError("failed to add pinion setup-and-acceptance heading")

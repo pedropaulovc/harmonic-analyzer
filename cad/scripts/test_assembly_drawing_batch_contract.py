@@ -181,9 +181,10 @@ def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
     assert draw_drive_train_assembly.SHEET_NAMES == (
         "GENERAL ASSEMBLY",
         "PARTS LIST",
-        "EXTERIOR ITEM IDENTIFICATION",
+        "GEAR-TRAIN ITEM IDENTIFICATION",
         "CONCEALED ITEM IDENTIFICATION",
         "GEAR-TRAIN SETUP",
+        "PINION ITEM IDENTIFICATION",
         "PINION SETUP AND ACCEPTANCE",
     )
     assert set().union(
