@@ -80,10 +80,9 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert "leader=False" in source
     assert 'label="stem diameter"' in source
     assert 'entity_type="SILHOUETTE"' in source
-    assert source.count('entity_type="DIMENSION"') == 2
-    assert "symbol_xy=(0.205, STEM_DIM_TEXT[1])" in source
-    assert "shoulder=True" in source
-    assert "position_tolerance_m=0.0005" in source
+    assert source.count('entity_type="DIMENSION"') == 1
+    assert "symbol_xy=(0.150, _front_y(12.0))" in source
+    assert "position_tolerance_m=0.020" in source
     assert "set_basic_dimension(" in source
     assert "add_view_centerline(" in source
     assert 'roughness_ra="1.6"' in source

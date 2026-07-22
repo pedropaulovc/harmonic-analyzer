@@ -311,13 +311,15 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=STEM_DIM_TEXT,
-        symbol_xy=(0.205, STEM_DIM_TEXT[1]),
+        edge_xy=(
+            FRONT_CENTER[0] + STEM_DIA / 2.0 * _S,
+            _front_y(12.0),
+        ),
+        symbol_xy=(0.150, _front_y(12.0)),
         datum="B",
-        label="stem diameter feature of size",
-        entity_type="DIMENSION",
-        shoulder=True,
-        position_tolerance_m=0.0005,
+        label="stem cylindrical datum feature",
+        entity_type="SILHOUETTE",
+        position_tolerance_m=0.020,
     )
     add_feature_control_frame(
         adapter,
