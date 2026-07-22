@@ -166,11 +166,16 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
 def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     drawing = importlib.import_module("draw_cone_pivot_screw")
     spec = importlib.import_module("cone_pivot_screw_spec")
+    build_source = Path(
+        importlib.import_module("build_cone_pivot_screw").__file__
+    ).read_text(encoding="utf-8")
     assert drawing.RECIPE.end_view == "*Bottom"
     assert drawing.RECIPE.side_center == (0.190, 0.170)
     assert spec.END_VIEW_NOTE == "SHOULDER-END VIEW"
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShoulderLg", "ThreadLg"}
     assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"].endswith("FULL THREAD")
+    assert '_blank_ref_geometry(adapter, "HeadTop", "PLANE")' in build_source
+    assert '_blank_ref_geometry(adapter, pivot_axis, "AXIS")' in build_source
 
 
 def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter() -> None:

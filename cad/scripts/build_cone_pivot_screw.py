@@ -166,7 +166,11 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven screw (equations neutral)", volume, 0.02 * v_slot)
 
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis")
+    pivot_axis = await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis"
+    )
+    _blank_ref_geometry(adapter, "HeadTop", "PLANE")
+    _blank_ref_geometry(adapter, pivot_axis, "AXIS")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
@@ -181,6 +185,20 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _blank_ref_geometry(adapter, name: str, kind: str) -> None:
+    """Keep the slot construction plane and mating axis out of saved renders."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        name, kind, 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
 
 
 if __name__ == "__main__":
