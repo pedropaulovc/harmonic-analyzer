@@ -212,7 +212,7 @@ BOM_COLUMN_WIDTHS = {
     "QTY.": 0.012,
 }
 EXTERIOR_BALLOON_RING_MARGINS = (0.014, 0.014, 0.014)
-PINION_PIVOT_SHAFT_BALLOON_POSITION = (0.153, 0.120)
+PINION_PIVOT_SHAFT_BALLOON_POSITION = (0.199, 0.120)
 
 CONE_GEAR_SCHEDULE = tuple(
     (position, f"T{int(channel['cone_teeth']):03d}", int(channel["cone_teeth"]))
@@ -450,11 +450,11 @@ def _add_drive_train_balloons(
         item_numbers.add(item)
         all_balloons.append(note)
 
-    # On the right-side view, item 15's generated ring position at
-    # (0.1526, 0.1351) crossed item 24's leader at (0.1694, 0.1378).
-    # Keep item 15 below that measured intersection while retaining the same
-    # component attachment. The shared helper verifies the rendered balloon
-    # circle itself, and the sheet layout gate verifies the resulting leaders.
+    # On the right-side view, item 15's leader runs from its component at
+    # (0.1526, 0.1351) to its balloon near (0.1989, 0.1424), crossing item 24
+    # at (0.1694, 0.1378). Keep that balloon below the measured intersection
+    # while retaining its X and component attachment. The shared helper verifies
+    # the rendered circle itself; the sheet gate then verifies both leaders.
     position_bom_balloon(
         adapter,
         all_balloons,

@@ -194,7 +194,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert drawing.CONE_SCHEDULE_TEXT_HEIGHT == 0.0025
     assert drawing.CONE_SCHEDULE_ROW_HEIGHT == 0.006
     assert drawing.EXTERIOR_BALLOON_RING_MARGINS == (0.014, 0.014, 0.014)
-    assert drawing.PINION_PIVOT_SHAFT_BALLOON_POSITION == (0.153, 0.120)
+    assert drawing.PINION_PIVOT_SHAFT_BALLOON_POSITION == (0.199, 0.120)
     assert 'item_number="15"' in source
     assert 'label="drive-train item 15 leader routing"' in source
     assert drawing.CONCEALED_BOTTOM_BALLOON_RING_MARGIN == 0.015
