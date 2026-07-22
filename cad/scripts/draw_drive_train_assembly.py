@@ -188,6 +188,7 @@ EXTERIOR_ISO_CENTER = (0.345, 0.155)
 
 # Sheet 4: isolated underside view of the three otherwise enclosed BOM items.
 CONCEALED_BOTTOM_CENTER = (0.150, 0.165)
+CONCEALED_BALLOON_RING_MARGIN = 0.035
 BOM_COLUMN_WIDTHS = {
     "ITEM NO.": 0.014,
     "PART NUMBER": 0.025,
@@ -777,7 +778,10 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         concealed_balloons.append(note)
     _spread_balloons(
-        adapter, concealed_bottom, concealed_balloons, margin=0.025
+        adapter,
+        concealed_bottom,
+        concealed_balloons,
+        margin=CONCEALED_BALLOON_RING_MARGIN,
     )
     if add_note(
         adapter,
