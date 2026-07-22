@@ -3095,6 +3095,7 @@ def position_bom_balloon(
         moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
         if not moved:
             raise RuntimeError(f"{label}: failed to position item {item_number}")
+        note.LockPosition = True
         adapter.currentModel.EditRebuild3()
         adapter.currentModel.GraphicsRedraw2()
         current_note = annotation.GetSpecificAnnotation()
@@ -3116,9 +3117,6 @@ def position_bom_balloon(
             abs(float(moved_info[index]) - expected) <= position_tolerance_m
             for index, expected in enumerate(position_xy)
         ):
-            note.LockPosition = True
-            adapter.currentModel.EditRebuild3()
-            adapter.currentModel.GraphicsRedraw2()
             break
     info = note.GetBalloonInfo()
     if info is None or len(info) < 2:

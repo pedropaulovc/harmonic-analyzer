@@ -92,24 +92,12 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     )
     assert source.count("add_note(") == 2
     assert source.count("place_view(") == 4
-    assert source.count("scale=VIEW_SCALE") == 3
+    assert source.count("scale=VIEW_SCALE") == 2
+    assert source.count("scale=ISO_VIEW_SCALE") == 1
     assert source.count("isolate_drawing_view_components(") == 1
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert drawing.VIEW_SCALE == (1, 5)
-    assert set(drawing.BALLOON_POSITIONS) == {
-        "1",
-        "2",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "14",
-        "15",
-        "16",
-        "17",
-        "19",
-    }
+    assert drawing.ISO_VIEW_SCALE == (1, 7)
     assert f"{_chain.LINK_COUNT}-LINK CHAIN" in drawing.ASSEMBLY_NOTES
     assert "T24 AND T12 SPROCKETS" in drawing.ASSEMBLY_NOTES
     assert all(

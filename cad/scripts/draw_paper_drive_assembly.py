@@ -26,7 +26,6 @@ from _drawing_common import (
     finalize_drawing,
     isolate_drawing_view_components,
     new_project_drawing,
-    position_bom_balloon,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -105,24 +104,11 @@ ASSEMBLY_NOTES = "\n".join(
 # The 1:5 orthographic fields retain 80 mm between centres; the isometric stays
 # in the right field above the title-block keep-out.
 FRONT_CENTER = (0.070, 0.145)
-RIGHT_CENTER = (0.150, 0.145)
-ISO_CENTER = (0.225, 0.140)
+RIGHT_CENTER = (0.170, 0.170)
+ISO_CENTER = (0.225, 0.080)
+ISO_VIEW_SCALE = (1, 7)
 BRACKET_DETAIL_CENTER = (0.100, 0.225)
 BRACKET_DETAIL_SCALE = (1, 3)
-BALLOON_POSITIONS = {
-    "1": (0.258, 0.105),
-    "2": (0.258, 0.125),
-    "4": (0.258, 0.145),
-    "5": (0.210, 0.085),
-    "6": (0.150, 0.205),
-    "7": (0.235, 0.085),
-    "8": (0.175, 0.205),
-    "14": (0.125, 0.205),
-    "15": (0.130, 0.085),
-    "16": (0.258, 0.165),
-    "17": (0.155, 0.085),
-    "19": (0.180, 0.085),
-}
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
 BOM_ANCHOR = (0.248, 0.265)
@@ -173,7 +159,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
     )
     iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
+        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -204,18 +190,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # The pictorial exposes most component families, but its transgear cluster
     # still hides eight BOM items. The isolated bracket detail exposes the two
     # families concealed even across the three main projections.
-    balloons = add_auto_balloons_across_views(
+    add_auto_balloons_across_views(
         adapter, (iso, front, right, bracket_detail), expected=len(BOM_COMPONENTS),
         label="paper-drive assembly balloons",
     )
-    for item_number, position_xy in BALLOON_POSITIONS.items():
-        position_bom_balloon(
-            adapter,
-            balloons,
-            item_number=item_number,
-            position_xy=position_xy,
-            label=f"paper-drive item {item_number} placement",
-        )
     if add_note(adapter, "TRANSGEAR BRACKET", 0.020, 0.260) is None:
         raise RuntimeError("failed to label paper-drive transgear bracket detail")
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
