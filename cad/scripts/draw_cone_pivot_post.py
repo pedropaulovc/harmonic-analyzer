@@ -253,7 +253,7 @@ def _add_crank_axis_table(adapter: Any) -> None:
     _add_table_note(
         adapter,
         "AXIS = LINE THROUGH P AND Q",
-        0.220,
+        0.280,
         0.209,
         label="crank-axis table definition",
     )
@@ -398,7 +398,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=post_side_xy,
-        frame_xy=(0.220, 0.105),
+        frame_xy=(0.220, 0.160),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
