@@ -550,34 +550,59 @@ def _create_drive_train_sheets(adapter: Any) -> None:
         )
 
     for previous_name, new_name in zip(SHEET_NAMES[:-1], SHEET_NAMES[1:], strict=True):
-        if not ddoc.ActivateSheet(previous_name):
-            raise RuntimeError(
-                f"failed to activate blank drive-train sheet {previous_name!r}"
+        pasted_name = ""
+        for attempt in range(1, 4):
+            if not ddoc.ActivateSheet(previous_name):
+                raise RuntimeError(
+                    f"failed to activate blank drive-train sheet {previous_name!r}"
+                )
+            before_names = tuple(
+                adapter._get_attr_or_call(ddoc, "GetSheetNames") or ()
             )
-        draw.ClearSelection2(True)
-        selected = draw.Extension.SelectByID2(
-            previous_name,
-            "SHEET",
-            0.0,
-            0.0,
-            0.0,
-            False,
-            0,
-            null_callout(),
-            0,
-        )
-        if not selected:
-            raise RuntimeError(
-                f"failed to select blank drive-train sheet {previous_name!r}"
+            draw.ClearSelection2(True)
+            selected = draw.Extension.SelectByID2(
+                previous_name,
+                "SHEET",
+                0.0,
+                0.0,
+                0.0,
+                False,
+                0,
+                null_callout(),
+                0,
             )
-        draw.EditCopy()
-        # swInsertOption_MoveToEnd=2, swRenameOption_No=2. Copying the current
-        # blank sheet preserves the hand-made project sheet format and title
-        # block without copying any model views or property-view state.
-        if not ddoc.PasteSheet(2, 2):
-            raise RuntimeError(
-                f"failed to duplicate blank drive-train sheet {previous_name!r}"
+            if not selected:
+                raise RuntimeError(
+                    f"failed to select blank drive-train sheet {previous_name!r}"
+                )
+            draw.EditCopy()
+            # swInsertOption_MoveToEnd=2, swRenameOption_No=2. Copying the
+            # blank sheet preserves the project sheet format and title block.
+            returned = bool(ddoc.PasteSheet(2, 2))
+            after_names = tuple(
+                adapter._get_attr_or_call(ddoc, "GetSheetNames") or ()
             )
+            added = tuple(name for name in after_names if name not in before_names)
+            if len(after_names) == len(before_names) + 1 and len(added) == 1:
+                pasted_name = added[0]
+                if not returned:
+                    _telemetry.warn(
+                        "PasteSheet returned false but created "
+                        f"{pasted_name!r}; accepting verified side effect"
+                    )
+                break
+            _telemetry.warn(
+                f"PasteSheet attempt {attempt}/3 created no sheet "
+                f"(returned={returned!r}, before={before_names!r}, "
+                f"after={after_names!r})"
+            )
+        if not pasted_name:
+            raise RuntimeError(
+                f"failed to duplicate blank drive-train sheet {previous_name!r} "
+                "after 3 verified attempts"
+            )
+        if not ddoc.ActivateSheet(pasted_name):
+            raise RuntimeError(f"failed to activate pasted sheet {pasted_name!r}")
         sheet = ddoc.GetCurrentSheet()
         if sheet is None:
             raise RuntimeError("pasted drive-train sheet has no ISheet")
