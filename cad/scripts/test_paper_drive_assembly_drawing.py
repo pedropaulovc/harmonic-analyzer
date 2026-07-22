@@ -87,7 +87,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert 'configuration_grouping="same-part"' in source
     assert source.count("add_auto_balloons_across_views(") == 1
     assert "(iso, front, right)," in source
-    assert source.count("add_note(") == 4
+    assert source.count("add_note(") == 3
     assert source.count("place_view(") == 8
     assert source.count("scale=VIEW_SCALE") == 5
     assert source.count("scale=ISO_VIEW_SCALE") == 1
