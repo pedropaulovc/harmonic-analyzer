@@ -113,7 +113,13 @@ BOTTOM_VISIBILITY_STEMS = frozenset(
     {"cone-tip-bushing", "cone-gear-shaft", "crank-drive-gear"}
 )
 FRONT_DEFERRED_BALLOON_STEMS = frozenset(
-    {"swing-stop-screw", "pinion-lever", "foot-screw", "crank-pinion"}
+    {
+        "swing-stop-screw",
+        "pinion-pivot-shaft",
+        "pinion-lever",
+        "foot-screw",
+        "crank-pinion",
+    }
 )
 FRONT_DEFERRED_BALLOON_ITEMS = frozenset(
     str(index)
@@ -136,9 +142,9 @@ ASSEMBLY_NOTES = "\n".join(
 # The 32-row BOM is split into three compact sections across the sheet top;
 # four views and their balloons occupy the open field below it.
 FRONT_CENTER = (0.080, 0.135)
-RIGHT_CENTER = (0.185, 0.135)
-ISO_CENTER = (0.285, 0.145)
-BOTTOM_CENTER = (0.345, 0.105)
+RIGHT_CENTER = (0.200, 0.135)
+ISO_CENTER = (0.310, 0.145)
+BOTTOM_CENTER = (0.365, 0.105)
 BOM_ANCHOR = (0.020, 0.265)
 BOM_ROWS_PER_SECTION = 12
 BOM_COLUMN_WIDTHS = {

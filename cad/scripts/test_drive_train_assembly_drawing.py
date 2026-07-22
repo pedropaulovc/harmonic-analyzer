@@ -117,11 +117,12 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     }
     assert drawing.FRONT_DEFERRED_BALLOON_STEMS == {
         "swing-stop-screw",
+        "pinion-pivot-shaft",
         "pinion-lever",
         "foot-screw",
         "crank-pinion",
     }
-    assert drawing.FRONT_DEFERRED_BALLOON_ITEMS == {"11", "20", "24", "30"}
+    assert drawing.FRONT_DEFERRED_BALLOON_ITEMS == {"11", "15", "20", "24", "30"}
     assert "_defer_front_balloons(adapter, balloons)" in source
     assert '"IModelDocExtension", "DeleteSelection2"' in source
     assert "RootDrawingComponent2(False)" in source
