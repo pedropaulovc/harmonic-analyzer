@@ -203,18 +203,37 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, rod_location_y, label="rod-pin Y location")
 
-    # Datum A on the pivot bore axis (picked at 9 o'clock so the tag stands off
-    # to the LEFT), Ra on the bore at 6 o'clock, and a position FCF tying the
-    # rod-pin hole to A.
-    pivot_left = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, _PIVOT_MID_Y)
+    # Datum A identifies the pivot bore's cylindrical surface.  Keep its leader
+    # oblique to both centre-mark axes so the triangle unmistakably terminates
+    # on the circumference rather than appearing to identify the bore centre.
+    pivot_datum_angle = math.radians(135.0)
+    pivot_radius = PIVOT_HOLE_DIA / 2.0
+    pivot_datum_rim = _sheet_xy(
+        pivot_radius * math.cos(pivot_datum_angle),
+        _PIVOT_MID_Y + pivot_radius * math.sin(pivot_datum_angle),
+    )
+    pivot_datum_standoff = 0.020
     add_datum_feature(
         adapter,
         front,
-        edge_xy=pivot_left,
-        symbol_xy=(pivot_left[0] - 0.020, pivot_left[1]),
+        edge_xy=pivot_datum_rim,
+        symbol_xy=(
+            pivot_datum_rim[0]
+            + pivot_datum_standoff * math.cos(pivot_datum_angle),
+            pivot_datum_rim[1]
+            + pivot_datum_standoff * math.sin(pivot_datum_angle),
+        ),
         datum="A",
-        label="pivot bore axis",
+        label="pivot bore cylindrical datum feature",
+        shoulder=True,
+        # SolidWorks snaps this circular bore attachment to its nearest legal
+        # anchor.  The live readback is 0.0109 mm from the requested point;
+        # allow that native normalization while retaining the shared strict
+        # persistence check for freely positioned annotations.
+        position_tolerance_m=0.0001,
     )
+    # Ra on the bore at 6 o'clock, and a position FCF tying the rod-pin hole
+    # to the complete A-B-C datum reference frame.
     pivot_bottom = _sheet_xy(0.0, _PIVOT_MID_Y - PIVOT_HOLE_DIA / 2.0)
     add_surface_finish(
         adapter,

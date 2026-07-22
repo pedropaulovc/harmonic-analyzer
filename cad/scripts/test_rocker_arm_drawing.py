@@ -37,6 +37,9 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert rocker_arm_spec.CURVE_RADIUS == arm.CURVE_RADIUS
     assert rocker_arm_spec.ARM_DEPTH == arm.ARM_DEPTH
     assert rocker_arm_spec.ARM_THICKNESS == arm.ARM_THICKNESS
+    assert rocker_arm_spec.TOP_ARC_LEN == arm.TOP_ARC_LEN
+    assert rocker_arm_spec.BOT_ARC_LEN == arm.BOT_ARC_LEN
+    assert rocker_arm_spec.TIP_FACE == arm.TIP_FACE
     assert rocker_arm_spec.ROD_HOLE_X == arm.ROD_HOLE_X
 
 
@@ -72,6 +75,10 @@ def test_native_gdt_and_finish_present() -> None:
     # A = pivot bore axis, B = broad face (right end view), C = rod-side tip
     # face; the rod-pin position frame references all three.
     assert source.count("add_datum_feature(") == 3
+    assert source.count("position_tolerance_m=0.0001") == 1
+    assert "pivot_datum_angle = math.radians(135.0)" in source
+    assert 'label="pivot bore cylindrical datum feature"' in source
+    assert source.count("shoulder=True") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert 'datums=("A", "B", "C")' in source
     assert 'characteristic="position"' in source
