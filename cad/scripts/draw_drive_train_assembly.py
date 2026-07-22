@@ -328,16 +328,17 @@ CONE_SCHEDULE_ROW_HEIGHT = 0.006
 GEAR_REQUIREMENTS_ANCHOR = (0.275, 0.232)
 GEAR_REQUIREMENTS_COLUMN_WIDTHS = (0.028, 0.072, 0.040)
 GEAR_REQUIREMENTS_ROW_HEIGHT = 0.012
-GEAR_SETUP_VIEW_CENTERS = ((0.315, 0.120), (0.385, 0.120))
+GEAR_SETUP_VIEW_CENTERS = ((0.310, 0.095), (0.375, 0.095))
+GEAR_SETUP_VIEW_SCALE = (1, 5)
 GEAR_SETUP_VIEW_STEMS = (
     frozenset({"cone-gear-shaft", "cone-gear"}),
     frozenset({"cylinder-gear-shaft", "cylinder-gear"}),
 )
 GEAR_SETUP_VIEW_LABELS = (
-    "ITEMS 25/27 — CONE-GEAR STATIONS",
-    "ITEMS 1/28 — CYLINDER-GEAR STATIONS",
+    "ITEMS 25/27 — CONE STACK — SCALE 1:5",
+    "ITEMS 1/28 — DRUM STACK — SCALE 1:5",
 )
-GEAR_SETUP_VIEW_LABEL_ORIGINS = ((0.270, 0.150), (0.350, 0.150))
+GEAR_SETUP_VIEW_LABEL_ORIGINS = ((0.280, 0.125), (0.345, 0.125))
 
 # Sheet 7: a large parked/disengaged reference view plus scan-friendly setup
 # and functional-acceptance tables.  The saved assembly does not claim to show
@@ -1309,7 +1310,7 @@ async def build(adapter: Any) -> dict[str, str]:
         start=1,
     ):
         view = place_view(
-            adapter, str(SOURCE), "*Right", *center, scale=VIEW_SCALE
+            adapter, str(SOURCE), "*Right", *center, scale=GEAR_SETUP_VIEW_SCALE
         )
         set_hidden_lines_removed(adapter, view)
         _isolate_balloon_components(
