@@ -297,7 +297,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.130, 0.140),
+        symbol_xy=(0.100, 0.135),
         datum="C",
         label="north-end datum plane",
         entity=north_edge,

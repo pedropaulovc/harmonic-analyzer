@@ -75,6 +75,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "entity=pivot_edge" in source
     assert "annotation=pivot_callout.GetAnnotation()" not in source
     assert 'datum="C"' in source and "entity=north_edge" in source
+    assert "symbol_xy=(0.100, 0.135)" in source
     assert 'characteristic="profile_surface"' not in source
     assert 'characteristic="straightness"' in source
     assert 'quantity="2X LONG STRAIGHT PLAN EDGES"' in source
