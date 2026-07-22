@@ -187,6 +187,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         range(120, 0, -6)
     )
     assert len({row[1] for row in drawing.CONE_GEAR_SCHEDULE}) == 20
+    assert drawing.CONE_SCHEDULE_ANCHOR == (0.155, 0.170)
     assert sum(drawing.CONE_SCHEDULE_COLUMN_WIDTHS) == 0.098
     assert drawing.CONE_SCHEDULE_TEXT_HEIGHT == 0.0025
     assert drawing.CONE_SCHEDULE_ROW_HEIGHT == 0.006
