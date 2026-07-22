@@ -85,7 +85,7 @@ def test_feature_requirements_use_inspectable_datum_controls() -> None:
     assert "SIZE PER NATIVE CALLOUT" in pinion_spring_spec.DRAWING_NOTES
     assert source.count("add_native_hole_callout(") == 1
     assert source.count("add_attached_note(") == 1
-    assert 'entity_type="SILHOUETTE"' in source
+    assert 'label="spring short terminal inside edge"' in source
     assert "NO TWIST" not in pinion_spring_spec.DRAWING_NOTES
     assert 'quantity="FOOT BROAD FACE"' in source
     assert abs(spring._BLADE_LEN - pinion_spring_spec.BLADE_STRAIGHT_LEN) < 1e-9

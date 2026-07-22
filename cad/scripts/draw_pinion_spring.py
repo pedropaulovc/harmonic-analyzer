@@ -170,7 +170,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=(_front_x(terminal_mid[0]), _front_y(terminal_mid[1])),
         note_xy=(0.215, 0.235),
         label="spring short terminal inside edge",
-        entity_type="SILHOUETTE",
     )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
