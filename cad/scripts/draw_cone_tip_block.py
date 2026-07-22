@@ -365,7 +365,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_note(adapter, "PINCH ENTRY FACE E (+X)", 0.180, 0.225)
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.020, 0.075, char_height=0.0025
+        adapter, "Manufacturing Notes", 0.020, 0.080, char_height=0.0025
     )
 
     return await finalize_drawing(
