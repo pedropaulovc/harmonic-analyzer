@@ -528,6 +528,7 @@ def add_feature_control_frame(
         "GetAttachedEntityCount3",
         "SetAttachedEntities",
         "SetPosition2",
+        "SetLeader",
         "SetLeader3",
     )
     if attachment == "entity" and int(annotation.GetAttachedEntityCount3()) != 1:
@@ -557,8 +558,10 @@ def add_feature_control_frame(
     draw.EditRebuild3()
     if not leader:
         # Positioning a newly inserted free GTol creates its default leader.
-        # Disable it only after the final position exists; doing this before
-        # SetPosition2 is overwritten by that position operation.
+        # Disable it through both the annotation and GTol interfaces only after
+        # the final position exists; doing this before SetPosition2 is
+        # overwritten by that position operation.
+        annotation.SetLeader(False, _LEADER_SIDE_SMART, True, False)
         gtol.SetLeader(False, _LEADER_SIDE_SMART, False, False)
         draw.EditRebuild3()
     expected_entities = 1 if attachment == "entity" else 0
