@@ -22,7 +22,6 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_component_bom_balloons,
     add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
@@ -163,21 +162,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # No single view exposes all eleven component families in the dense bank.
     # Cover the BOM across the three projections and validate every item number.
-    # The pivot-bushing and connecting-rod attachments sit in a tight vertical
-    # cluster in the right view. Seed that checked pair on a tighter local ring
-    # so their leaders preserve attachment order, then let the normal multi-view
-    # pass supply and validate the remaining nine BOM identities.
-    targeted_balloons = add_component_bom_balloons(
-        adapter,
-        right,
-        items=(("pivot-bushing", "4"), ("connecting-rod", "7")),
-        label="channel clustered item balloons",
-        margin=0.006,
-    )
+    # Items 4 and 7 attach in a tight vertical cluster in the right view. A
+    # 6 mm ring margin gives the measured balloon radii a larger enforced
+    # angular separation while preserving attachment order; the layout audit
+    # remains the final proof that the leaders do not cross.
     add_auto_balloons_across_views(
         adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
         label="channel assembly balloons",
-        existing_balloons=targeted_balloons,
+        margin=0.006,
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add channel assembly notes")

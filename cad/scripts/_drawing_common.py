@@ -3181,6 +3181,7 @@ def add_auto_balloons_across_views(
     expected: int,
     label: str,
     existing_balloons: Sequence[Any] = (),
+    margin: float = 0.014,
 ) -> list[Any]:
     """Balloon successive views until every BOM item number is represented.
 
@@ -3190,6 +3191,8 @@ def add_auto_balloons_across_views(
     validate the union of displayed BOM item numbers against the table's full
     contiguous item range. Each view's balloons are spread around that view.
     """
+    if margin <= 0.0:
+        raise ValueError(f"{label}: balloon ring margin must be positive")
     all_balloons = list(existing_balloons)
     item_numbers = {
         _balloon_item_number(adapter, note, label=f"{label} existing")
@@ -3202,7 +3205,7 @@ def add_auto_balloons_across_views(
         )
         if not balloons:
             continue
-        _spread_balloons(adapter, view, balloons)
+        _spread_balloons(adapter, view, balloons, margin=margin)
         for note in balloons:
             item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
         all_balloons.extend(balloons)
