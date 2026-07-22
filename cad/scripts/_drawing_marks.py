@@ -101,6 +101,60 @@ def set_dimension_symmetric_tolerance(
     )
 
 
+def set_dimension_bilateral_tolerance(
+    adapter: Any,
+    feature_name: str,
+    dimension_name: str,
+    lower_deviation_mm: float,
+    upper_deviation_mm: float,
+) -> None:
+    """Apply signed lower/upper deviations to one named source dimension."""
+    if lower_deviation_mm > upper_deviation_mm:
+        raise ValueError("lower dimension deviation must not exceed upper deviation")
+    if lower_deviation_mm == upper_deviation_mm:
+        raise ValueError("bilateral dimension tolerance must have a nonzero range")
+    feature = _feature_by_name(adapter, feature_name)
+    matches: list[Any] = []
+    display = _read_member(feature, "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if not display:
+            break
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        name = str(_read_member(dimension, "Name"))
+        if _dim_owner_feature(dimension) == feature_name and name == dimension_name:
+            matches.append(dimension)
+        display = feature.GetNextDisplayDimension(display)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: expected exactly one dimension, "
+            f"found {len(matches)}"
+        )
+    tolerance = _early_bound(matches[0].Tolerance, "IDimensionTolerance")
+    tolerance.Type = 2  # swTolType_e.swTolBILAT
+    lower_m = lower_deviation_mm / 1000.0
+    upper_m = upper_deviation_mm / 1000.0
+    if not tolerance.SetValues(lower_m, upper_m):
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: SetValues rejected "
+            f"{lower_deviation_mm:+.2f}/{upper_deviation_mm:+.2f} mm"
+        )
+    if int(tolerance.Type) != 2:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: bilateral tolerance type did not persist"
+        )
+    minimum = float(tolerance.GetMinValue())
+    maximum = float(tolerance.GetMaxValue())
+    if abs(minimum - lower_m) > 1e-9 or abs(maximum - upper_m) > 1e-9:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: tolerance readback "
+            f"{minimum:g}/{maximum:g} m != {lower_m:g}/{upper_m:g} m"
+        )
+    _telemetry.success(
+        f"toleranced {dimension_name}@{feature_name}: "
+        f"{lower_deviation_mm:+.2f}/{upper_deviation_mm:+.2f} mm"
+    )
+
+
 def mark_dimensions_for_drawing(
     adapter: Any, feature_name: str, dimension_names: set[str]
 ) -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import Any, Callable, Literal, Mapping
 
 from _common import check
 from _drawing_common import (
@@ -40,6 +40,7 @@ class FastenerSheet:
     end_note_xy: tuple[float, float] = (0.050, 0.220)
     side_centerline_face_xy: tuple[float, float] | None = None
     end_center_mark: Literal["required", "not_applicable"] = "not_applicable"
+    decorate: Callable[[Any, Any, Any, Any], None] | None = None
 
 
 async def build_fastener_sheet(
@@ -145,6 +146,9 @@ async def build_fastener_sheet(
             side_annotations,
             dict(recipe.side_dimension_callouts or {}),
         )
+
+    if recipe.decorate is not None:
+        recipe.decorate(adapter, side, end, iso)
 
     add_property_linked_note(adapter, "Manufacturing Notes", *recipe.note_xy)
     add_property_linked_note(adapter, "End View Note", *recipe.end_note_xy)

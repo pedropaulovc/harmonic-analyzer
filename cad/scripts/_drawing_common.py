@@ -227,6 +227,7 @@ _GTOL_SYMBOLS = {
     "profile_surface": "GTOL-SPROF",
     "perpendicularity": "GTOL-PERP",
     "straightness": "GTOL-STRAIGHT",
+    "total_runout": "GTOL-TRUN",
 }
 
 

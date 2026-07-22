@@ -160,12 +160,26 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     assert base.PIVOT_SEAT_SPEC.thread_class == "2B"
     assert base.PIVOT_HOLE_DEPTH - spec.THREAD_TAIL_LEN >= 1.5
     assert "DO NOT RELEASE" not in spec.DRAWING_NOTES
-    assert f"{spec.THREAD_TAIL_LEN:.2f} MIN FULL THREAD" in spec.DRAWING_NOTES
+    assert f"THREAD LENGTH {spec.THREAD_TAIL_LEN:.2f}" in spec.DRAWING_NOTES
+    assert f"{spec.MIN_FULL_FORM:.2f} MIN FULL-FORM THREAD" in spec.DRAWING_NOTES
+    assert "INCOMPLETE THREAD/RUNOUT AT SHOULDER 1P MAX" in spec.DRAWING_NOTES
+    assert (
+        spec.THREAD_TAIL_LEN
+        - spec.THREAD_LENGTH_TOL
+        - spec.THREAD_RUNOUT_PITCHES * spec.THREAD_PITCH
+        - spec.DISTAL_CHAMFER
+        >= spec.MIN_FULL_FORM
+    )
+    assert f"MATING PLATE THICKNESS {spec.PLATFORM_THICKNESS:.2f} MAX" in (
+        spec.DRAWING_NOTES
+    )
+    assert f"{spec.AXIAL_CLEARANCE:.2f} MIN AXIAL CLEARANCE" in spec.DRAWING_NOTES
 
 
 def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     drawing = importlib.import_module("draw_cone_pivot_screw")
     spec = importlib.import_module("cone_pivot_screw_spec")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     build_source = Path(
         importlib.import_module("build_cone_pivot_screw").__file__
     ).read_text(encoding="utf-8")
@@ -173,7 +187,13 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert drawing.RECIPE.side_center == (0.190, 0.170)
     assert spec.END_VIEW_NOTE == "SHOULDER-END VIEW"
     assert set(drawing.SIDE_KEEP) == {"HeadHt", "ShoulderLg", "ThreadLg"}
-    assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"].endswith("FULL THREAD")
+    assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"] == "1/4-20 UNC-2A"
+    assert drawing.RECIPE.decorate is drawing._decorate
+    assert drawing_source.count("add_datum_feature(") == 1
+    assert drawing_source.count("add_feature_control_frame(") == 3
+    assert drawing_source.count("add_surface_finish(") == 1
+    assert build_source.count("set_dimension_symmetric_tolerance(") == 3
+    assert build_source.count("set_dimension_bilateral_tolerance(") == 2
     assert '_blank_ref_geometry(adapter, "HeadTop", "PLANE")' in build_source
     assert '_blank_ref_geometry(adapter, pivot_axis, "AXIS")' in build_source
 

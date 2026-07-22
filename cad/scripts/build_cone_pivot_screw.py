@@ -44,6 +44,8 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from cone_pivot_screw_spec import (
     DRAWING_DIMENSIONS,
@@ -173,6 +175,15 @@ async def build(adapter) -> dict[str, str]:
     _blank_ref_geometry(adapter, pivot_axis, "AXIS")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_symmetric_tolerance(adapter, "HeadProfile", "HeadDiaDim", 0.10)
+    set_dimension_symmetric_tolerance(adapter, "Head", "HeadHt", 0.10)
+    set_dimension_bilateral_tolerance(
+        adapter, "ShoulderProfile", "ShoulderDiaDim", -0.05, -0.02
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Shoulder", "ShoulderLg", 0.00, 0.05
+    )
+    set_dimension_symmetric_tolerance(adapter, "ThreadTail", "ThreadLg", 0.10)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

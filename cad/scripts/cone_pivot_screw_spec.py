@@ -27,6 +27,11 @@ UNDERHEAD_LEN = _SPEC.length_mm
 THREAD_TAIL_LEN = UNDERHEAD_LEN - SHOULDER_LEN
 THREAD = _SPEC.thread
 THREAD_DESIGNATION = f"{THREAD} UNC-2A"
+THREAD_PITCH = 25.4 / 20.0
+THREAD_LENGTH_TOL = 0.10
+THREAD_RUNOUT_PITCHES = 1.0
+DISTAL_CHAMFER = 0.50
+MIN_FULL_FORM = 6.00
 # Thread geometry is omitted.  The smaller tail cylinder is a reference
 # envelope at the mating tap-drill diameter, consistent with the repo's other
 # simplified threaded fasteners; the drawing thread callout controls the part.
@@ -36,6 +41,14 @@ if THREAD_TAIL_LEN < SHOULDER_DIA:
     raise ValueError(
         "cone pivot thread engagement must be at least one nominal diameter"
     )
+if (
+    THREAD_TAIL_LEN
+    - THREAD_LENGTH_TOL
+    - THREAD_RUNOUT_PITCHES * THREAD_PITCH
+    - DISTAL_CHAMFER
+    < MIN_FULL_FORM
+):
+    raise ValueError("cone pivot full-form thread requirement exceeds worst-case tail")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDiaDim"},
@@ -47,20 +60,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
-        f"{THREAD_DESIGNATION} PER ASME B1.1-2024.",
-        f"THREAD TAIL {THREAD_TAIL_LEN:.2f} MIN FULL THREAD; THREAD GEOMETRY "
-        "OMITTED IN VIEWS.",
-        f"GROUND SHOULDER Ø{SHOULDER_DIA:.2f} -0.02/-0.05 X "
-        f"{SHOULDER_LEN:.2f} +/-0.05.",
-        f"SHOULDER LENGTH PROVIDES {AXIAL_CLEARANCE:.2f} NOMINAL AXIAL "
-        f"CLEARANCE OVER A {PLATFORM_THICKNESS:.2f} PLATE.",
-        f"HEAD Ø{HEAD_DIA:.2f} +/-0.10 X {HEAD_T:.2f} +/-0.10.",
+        f"{THREAD_DESIGNATION} PER ASME B1.1-2024; DATUM FEATURE A.",
+        "DATUM A IS THE DERIVED THREAD PITCH-DIAMETER AXIS.",
+        f"THREAD LENGTH {THREAD_TAIL_LEN:.2f}; {MIN_FULL_FORM:.2f} MIN FULL-FORM THREAD.",
+        f"INCOMPLETE THREAD/RUNOUT AT SHOULDER {THREAD_RUNOUT_PITCHES:g}P MAX.",
+        "THREAD GEOMETRY OMITTED IN VIEWS.",
+        f"FUNCTIONAL INTERFACE: MATING PLATE THICKNESS {PLATFORM_THICKNESS:.2f} "
+        f"MAX; {AXIAL_CLEARANCE:.2f} MIN AXIAL CLEARANCE.",
+        "GROUND SHOULDER SURFACE Ra 0.8 MAX.",
         f"STRAIGHT DRIVER SLOT {SLOT_W:.2f} +/-0.10 WIDE X "
         f"{SLOT_D:.2f} +/-0.10 DEEP, CENTERED.",
         "SLOT EXTENDS ACROSS FULL HEAD DIAMETER; OPEN AT BOTH SIDES.",
-        "UNDERHEAD FILLET R0.25 MAX; THREAD RUNOUT 2P MAX.",
-        "SHOULDER AND HEAD OD TOTAL RUNOUT 0.05 TO THREAD PITCH-DIAMETER AXIS.",
-        "BEARING FACE AND SHOULDER END PERPENDICULAR 0.05 TO THREAD AXIS.",
+        f"UNDERHEAD FILLET R0.25 MAX; DISTAL START CHAMFER {DISTAL_CHAMFER:.2f} "
+        "X 45° MAX.",
     )
 )
 END_VIEW_NOTE = "SHOULDER-END VIEW"
