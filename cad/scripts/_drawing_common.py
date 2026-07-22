@@ -3472,15 +3472,18 @@ async def finalize_drawing(
             "save final drawing sheet scale",
             await adapter.save_file(str(outputs.slddrw)),
         )
-        persisted_artifacts = save_drawing(
+        # The PDF exported above predates this save, so the packaged PDF (and
+        # the PNG rendered from it below) would not match the persisted native
+        # drawing. Re-export while the just-saved doc is still fully loaded
+        # (codex review #361).
+        _telemetry.info("dirty-scale save: re-exporting PDF to match")
+        retry = save_drawing(
             adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
         )
-        if set(persisted_artifacts) != {"drawing", "pdf"}:
+        if "pdf" not in retry:
             raise RuntimeError(
-                "persisted-scale drawing save/export incomplete: "
-                f"{persisted_artifacts!r}"
+                "PDF re-export after dirty-scale save failed: " f"{retry!r}"
             )
-        artifacts.update(persisted_artifacts)
     if not sheet_scale_dirty:
         _telemetry.info("final drawing sheet scale already persisted; save skipped")
     drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
