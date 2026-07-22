@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import math as _math
 from inspect import getsource
+import math as _math
 from types import SimpleNamespace
 
 import pytest
@@ -28,6 +29,7 @@ from _drawing_layout_check import (
     LayoutElement,
     LeaderCrossing,
     LeaderSegment,
+    Overlap,
     audit_layout,
     format_findings,
     find_leader_crossings,
@@ -673,6 +675,20 @@ def test_audit_layout_reports_crossings_alongside_boxes():
     assert len(crossings) == 1
     assert "move the anchor or the text placement" in format_findings(
         overlaps, overflows, crossings
+    )
+
+
+def test_overlap_description_reports_both_measured_boxes():
+    finding = Overlap(
+        _el("notes", 0.010, 0.020, 0.080, 0.060, kind="note"),
+        _el("section-label", 0.050, 0.040, 0.090, 0.070, kind="note"),
+        depth_x=0.030,
+        depth_y=0.020,
+    )
+
+    assert finding.describe() == (
+        "note 'notes' [10.0, 20.0, 80.0, 60.0] mm overlaps note "
+        "'section-label' [50.0, 40.0, 90.0, 70.0] mm by 30.0 x 20.0 mm"
     )
 
 

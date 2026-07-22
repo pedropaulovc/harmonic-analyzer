@@ -24,7 +24,6 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
-    add_surface_finish,
     add_view_centerline,
     create_section_view,
     curate_view_dimensions,
@@ -75,8 +74,8 @@ FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
 # At 1:1 the full 86 mm rod leaves enough room for the hub callouts and GD&T
 # without crowding the orthographic views.
 FRONT_CENTER = (0.078, 0.170)
-SECTION_CENTER = (0.190, 0.150)
-ISO_CENTER = (0.330, 0.205)
+SECTION_CENTER = (0.190, 0.185)
+ISO_CENTER = (0.330, 0.135)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -92,15 +91,15 @@ BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
     "HubOd": (0.025, 0.102),
-    "HubBore": (0.115, 0.090),
+    "HubBore": (0.115, 0.085),
     "RodTipY": (0.044, 0.170),
 }
 RIGHT_KEEP = {
-    "BoreDepth": (0.205, 0.116),
-    "EndWall": (0.225, 0.132),
+    "BoreDepth": (0.225, 0.145),
+    "EndWall": (0.235, 0.165),
 }
 DIMENSION_CALLOUTS = {
-    "HubBore": "SIZE LIMITS: 6.360 MIN / 6.375 MAX",
+    "HubBore": "NOMINAL REF\n6.360 MIN / 6.375 MAX\nRa 1.6",
     "BoreDepth": "+0.10/-0.00 FULL-DIA DEPTH FROM B; FLAT BOTTOM",
     "EndWall": "+/-0.05 END WALL TO CROWN ROOT PLANE",
     "RodTipY": "+/-0.25 FROM HUB AXIS",
@@ -159,7 +158,7 @@ async def build(adapter: Any) -> dict[str, str]:
         line_end=(FRONT_CENTER[0], hub_center[1] + 0.018),
         view_xy=SECTION_CENTER,
         section_label="A",
-        scale=(2, 1),
+        scale=(1, 1),
         label="lever longitudinal hub section",
     )
     set_hidden_lines_removed(adapter, section)
@@ -199,7 +198,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         section,
         edge_xy=flat_face,
-        symbol_xy=(flat_face[0] - 0.025, flat_face[1] - 0.018),
+        symbol_xy=(flat_face[0] - 0.025, flat_face[1]),
         datum="B",
         label="lever flat end face",
         entity_type="FACE",
@@ -208,7 +207,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=hub_right,
-        frame_xy=(0.145, 0.090),
+        frame_xy=(0.145, 0.120),
         characteristic="circular_runout",
         tolerance="0.05",
         datums=("A",),
@@ -218,7 +217,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         section,
         edge_xy=flat_face,
-        frame_xy=(0.245, 0.098),
+        frame_xy=(0.235, 0.150),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
@@ -243,14 +242,6 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=grip_edge,
         label="lever tapered grip axis",
     )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(0.116, 0.070),
-        roughness_ra="1.6",
-        label="lever finished bore",
-    )
     add_attached_note(
         adapter,
         front,
@@ -268,8 +259,8 @@ async def build(adapter: Any) -> dict[str, str]:
     crown_edge = model_point_in_view(
         adapter,
         section,
-        (0.0, 0.0, -(HUB_LEN / 2.0 + CAP_SAG) / 1000.0),
-        label="lever spherical crown apex",
+        (0.0, HUB_OD / 2000.0, -HUB_LEN / 2000.0),
+        label="lever spherical crown root",
     )
     add_attached_note(
         adapter,
@@ -280,7 +271,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{HUB_LEN + CAP_SAG:.2f} REF B TO APEX"
         ),
         entity_xy=crown_edge,
-        note_xy=(0.245, 0.155),
+        note_xy=(0.300, 0.240),
         label="lever spherical crown definition",
         entity_type="SILHOUETTE",
     )
@@ -288,7 +279,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         section,
         edge_xy=crown_edge,
-        frame_xy=(0.245, 0.180),
+        frame_xy=(0.315, 0.205),
         characteristic="profile_surface",
         tolerance="0.10",
         datums=("A", "B"),
@@ -297,8 +288,8 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.210, 0.255)
-    add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.138)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.085)
 
     return await finalize_drawing(
         adapter,

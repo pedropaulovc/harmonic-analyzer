@@ -58,11 +58,12 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 
 def test_lever_drive_is_fully_released_for_manufacture() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
+    normalized = " ".join(notes.split())
     assert "RELEASE HOLD" not in notes
     assert "AT ASSEMBLY" not in notes
     assert "LIFT ROD" not in notes
-    assert "GRIP AXIS: BASIC 5.00 FROM B" in notes
-    assert "BASIC 90 DEG TO A" in notes
+    assert "GRIP AXIS: BASIC 5.00 FROM B" in normalized
+    assert "BASIC 90 DEG TO A" in normalized
 
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
@@ -74,8 +75,9 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert source.count('entity_type="FACE"') == 2
     assert 'characteristic="profile_surface"' in source
     assert 'datums=("A", "B")' in source
-    assert "add_surface_finish(" in source
+    assert "add_surface_finish(" not in source
     assert "6.360 MIN / 6.375 MAX" in drawing.DIMENSION_CALLOUTS["HubBore"]
+    assert "Ra 1.6" in drawing.DIMENSION_CALLOUTS["HubBore"]
     assert "+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDepth"]
     assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
     assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall"}
