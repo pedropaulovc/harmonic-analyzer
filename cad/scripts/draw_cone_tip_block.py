@@ -321,7 +321,7 @@ async def build(adapter: Any) -> dict[str, str]:
             FRONT_CENTER[0] + SLIT_W / 2.0 * _S,
             _front_y(BLOCK_HEIGHT - 4.0),
         ),
-        frame_xy=(0.145, 0.225),
+        frame_xy=(0.170, 0.255),
         characteristic="position",
         tolerance="0.10",
         datums=("B",),
