@@ -29,6 +29,7 @@ from _drawing_common import (
     create_section_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -175,16 +176,13 @@ async def build(adapter: Any) -> dict[str, str]:
 
     bore_top = (hub_center[0], hub_center[1] + BORE_R_SHEET)
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
-    # The south crown makes the right-view bounds asymmetric about z=0.  View
-    # placement centres that full -6.5..+5.0 mm silhouette, so locate the flat
-    # +Z face from the true bounding-box centre rather than half the hub length.
-    z_min = -HUB_LEN / 2.0 - CAP_SAG
     z_max = HUB_LEN / 2.0
-    z_center = (z_min + z_max) / 2.0
-    section_scale = 2.0
-    section_hub_y = SECTION_CENTER[1] - (FRONT_BBOX_CY * section_scale / 1000.0)
-    flat_face_x = SECTION_CENTER[0] - (z_max - z_center) * section_scale / 1000.0
-    flat_face = (flat_face_x, section_hub_y)
+    flat_face = model_point_in_view(
+        adapter,
+        section,
+        (0.0, 0.0, z_max / 1000.0),
+        label="lever flat end face",
+    )
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
     add_datum_feature(
         adapter,
@@ -198,7 +196,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         section,
         edge_xy=flat_face,
-        symbol_xy=(flat_face_x - 0.025, section_hub_y - 0.018),
+        symbol_xy=(flat_face[0] - 0.025, flat_face[1] - 0.018),
         datum="B",
         label="lever flat end face",
     )
@@ -261,10 +259,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lever conical grip size",
         entity_type="SILHOUETTE",
     )
-    crown_edge = (
-        SECTION_CENTER[0]
-        + (HUB_LEN / 2.0 + CAP_SAG - z_center) * section_scale / 1000.0,
-        section_hub_y,
+    crown_edge = model_point_in_view(
+        adapter,
+        section,
+        (0.0, 0.0, -(HUB_LEN / 2.0 + CAP_SAG) / 1000.0),
+        label="lever spherical crown apex",
     )
     add_attached_note(
         adapter,

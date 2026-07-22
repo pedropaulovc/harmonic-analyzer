@@ -750,6 +750,30 @@ def create_section_view(
     return section
 
 
+def model_point_in_view(
+    adapter: Any,
+    view: Any,
+    xyz: tuple[float, float, float],
+    *,
+    label: str,
+) -> tuple[float, float]:
+    """Project a model-space point into drawing-sheet coordinates."""
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    model_point = math_utility.CreatePoint(double_array([float(v) for v in xyz]))
+    if model_point is None:
+        raise RuntimeError(f"failed to create model point ({label})")
+    model_point = _early_bound(model_point, "IMathPoint")
+    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
+    view_point = model_point.MultiplyTransform(transform)
+    if view_point is None:
+        raise RuntimeError(f"failed to project model point into view ({label})")
+    view_point = _early_bound(view_point, "IMathPoint")
+    coordinates = list(view_point.ArrayData or ())
+    if len(coordinates) < 2:
+        raise RuntimeError(f"projected model point has no sheet coordinates ({label})")
+    return (float(coordinates[0]), float(coordinates[1]))
+
+
 @_telemetry.traced("drawing.linked_note", label_param="property_name")
 def add_property_linked_note(
     adapter: Any, property_name: str, x: float, y: float
