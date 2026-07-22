@@ -20,7 +20,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_auto_balloons,
+    add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -147,10 +147,12 @@ async def build(adapter: Any) -> dict[str, str]:
         part_numbers=BOM_PART_NUMBERS,
         label="magnifier assembly",
     )
-    # Balloon the ISOMETRIC view: the pictorial keeps every component visible,
-    # while the orthographic views stack the clamped lever chain under HLR.
-    add_auto_balloons(
-        adapter, iso, expected=len(BOM_COMPONENTS),
+    # The pictorial exposes almost the whole mechanism, but the live HLR view
+    # can conceal one of the two column-clamp halves. Complete and validate the
+    # BOM identity set across the orthographic views instead of weakening the
+    # required 13-item coverage.
+    add_auto_balloons_across_views(
+        adapter, (iso, front, right), expected=len(BOM_COMPONENTS),
         label="magnifier assembly balloons",
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:

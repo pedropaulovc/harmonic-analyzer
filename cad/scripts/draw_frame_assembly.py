@@ -17,10 +17,11 @@ from _assembly_drawing_bom import (
     configured_part_numbers,
     insert_identified_bom_table,
 )
-from _common import check, run_build
+from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons,
+    create_blank_drawing_sheets,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -45,10 +46,14 @@ PNG = OUTPUTS.png
 
 # The frame is the whole structural tower: cast base at machine y ~0-51, four
 # smooth columns rising to the top-frame ring at y ~1000-1041 -- a ~1040 mm
-# span, ~460 wide x ~280 deep. 1:5 keeps the tall front + right + iso views and
-# the BOM on ASME B; refined against the first render.
-SHEET_SCALE = (1.0, 5.0)
-VIEW_SCALE = (1, 5)
+# span, ~460 wide x ~280 deep. The live 1:5 projections were 219-241 mm tall,
+# leaving no truthful single-sheet arrangement clear of the ASME-B zones and
+# title block. At 1:6 the two orthographic views remain about 183 mm tall and
+# readable on the general sheet; the large pictorial, parts list and balloons
+# get their own sheet.
+SHEET_SCALE = (1.0, 6.0)
+VIEW_SCALE = (1, 6)
+SHEET_NAMES = ("GENERAL ASSEMBLY", "PARTS LIST AND ITEM IDENTIFICATION")
 
 # One BOM row per UNIQUE top-level component of build_frame_assembly.py. The
 # four corner columns (tube-frame) and four hold-down lag-screws are native
@@ -68,15 +73,18 @@ BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 ASSEMBLY_NOTES = "\n".join(
     (
         "ASSEMBLY NOTES",
-        "1. INSTALL FOUR LAG SCREWS FROM THE BASE UNDERSIDE INTO THE SUPPORT.",
-        "2. SEAT TOP-FRAME RING ON ALL FOUR COLUMNS AS SHOWN.",
-        "3. VERIFY FRAME IS SQUARE BEFORE FINAL TIGHTENING.",
+        "1. INSTALL FOUR LAG SCREWS FROM THE BASE UNDERSIDE",
+        "   INTO THE SUPPORT.",
+        "2. SEAT TOP-FRAME RING ON ALL FOUR",
+        "   COLUMNS AS SHOWN.",
+        "3. VERIFY FRAME IS SQUARE BEFORE FINAL",
+        "   TIGHTENING.",
     )
 )
 
-FRONT_CENTER = (0.075, 0.140)
-RIGHT_CENTER = (0.165, 0.140)
-ISO_CENTER = (0.250, 0.130)
+GENERAL_FRONT_CENTER = (0.065, 0.155)
+GENERAL_RIGHT_CENTER = (0.150, 0.155)
+ID_ISO_CENTER = (0.115, 0.145)
 # Top-left BOM anchor, bounded above by the sheet ZONE band (0.2667) and kept
 # left of the title-block keep-out; refined against the first render.
 BOM_ANCHOR = (0.250, 0.265)
@@ -108,6 +116,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(adapter, scale=SHEET_SCALE)
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="frame drawing")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -120,21 +129,31 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(
-        adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate frame general assembly sheet")
+    general_front = place_view(
+        adapter, str(SOURCE), "*Front", *GENERAL_FRONT_CENTER, scale=VIEW_SCALE
     )
-    right = place_view(
-        adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE
+    general_right = place_view(
+        adapter, str(SOURCE), "*Right", *GENERAL_RIGHT_CENTER, scale=VIEW_SCALE
     )
-    iso = place_view(
-        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE
-    )
-    for view in (front, right, iso):
+    for view in (general_front, general_right):
         set_hidden_lines_removed(adapter, view)
+    if add_note(adapter, "SHEET 1 OF 2 — GENERAL ASSEMBLY", 0.018, 0.255) is None:
+        raise RuntimeError("failed to add frame general assembly heading")
+    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.045) is None:
+        raise RuntimeError("failed to add frame assembly notes")
 
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate frame parts-list sheet")
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *ID_ISO_CENTER, scale=VIEW_SCALE
+    )
+    set_hidden_lines_removed(adapter, iso)
     insert_identified_bom_table(
         adapter,
-        front,
+        iso,
         anchor_xy=BOM_ANCHOR,
         descriptions=BOM_COMPONENTS,
         part_numbers=BOM_PART_NUMBERS,
@@ -146,14 +165,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, iso, expected=len(BOM_COMPONENTS),
         label="frame assembly balloons",
     )
-    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
-        raise RuntimeError("failed to add frame assembly notes")
+    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.018, 0.255) is None:
+        raise RuntimeError("failed to add frame identification heading")
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Frame Assembly Drawing",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

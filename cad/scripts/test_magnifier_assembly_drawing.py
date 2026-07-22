@@ -100,7 +100,8 @@ def test_assembly_stamps_title_block_properties() -> None:
 def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
-    assert source.count("add_auto_balloons(") == 1
+    assert source.count("add_auto_balloons_across_views(") == 1
+    assert "adapter, (iso, front, right)" in source
     assert drawing.SHEET_SCALE == (1.0, 4.0)
     assert source.count("scale=VIEW_SCALE") == 3
     assert source.count("add_note(") == 1
