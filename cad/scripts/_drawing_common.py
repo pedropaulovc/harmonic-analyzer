@@ -2985,6 +2985,111 @@ def isolate_drawing_view_components(
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
+def _create_component_bom_balloon(
+    adapter: Any,
+    view: Any,
+    *,
+    stem: str,
+    expected_item: str,
+    label: str,
+) -> Any:
+    """Attach one BOM balloon to a visible edge of a requested component."""
+    root = adapter._attempt(
+        lambda: view.RootDrawingComponent2(False), default=None
+    )
+    if root is None:
+        raise RuntimeError(f"{label}: drawing view has no root component")
+    selected_edge: Any | None = None
+    enumerated: list[str] = []
+    pending = list(_drawing_component_children(root))
+    while pending:
+        drawing_component = pending.pop()
+        children = _drawing_component_children(drawing_component)
+        pending.extend(children)
+        if children:
+            continue
+        if stem not in _drawing_component_stems(
+            adapter, drawing_component, frozenset({stem})
+        ):
+            continue
+        enumerated.append(str(drawing_component.Name or ""))
+        component = adapter._attempt(
+            lambda dc=drawing_component: dc.Component, default=None
+        )
+        edges = adapter._attempt(
+            lambda: view.GetVisibleEntities2(component, 1), default=()
+        ) or ()
+        if not edges:
+            continue
+        selected_edge = edges[0]
+        break
+    if selected_edge is None:
+        raise RuntimeError(
+            f"{label}: {stem} has no visible edge; matching={enumerated}"
+        )
+
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"{label}: failed to activate {stem} view")
+    draw.ClearSelection2(True)
+    if not view.SelectEntity(selected_edge, False):
+        raise RuntimeError(f"{label}: failed to select {stem} visible edge")
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    options = extension.CreateBalloonOptions()
+    if options is None:
+        raise RuntimeError(f"{label}: failed to create {stem} balloon options")
+    options = _sw_type_info.early_bound_or_flag(options, "IBalloonOptions")
+    options.Style = 1
+    options.Size = 2
+    options.UpperTextContent = 1
+    options.ShowQuantity = False
+    options.ItemNumberStart = 1
+    options.ItemNumberIncrement = 1
+    options.ItemOrder = 1
+    note = extension.InsertBOMBalloon2(options)
+    draw.ClearSelection2(True)
+    if note is None:
+        raise RuntimeError(f"{label}: failed to insert {stem} balloon")
+    item = _balloon_item_number(adapter, note, label=label)
+    if item != expected_item:
+        raise RuntimeError(
+            f"{label}: {stem} resolved item {item}, expected {expected_item}"
+        )
+    return note
+
+
+@_telemetry.traced("drawing.component_bom_balloons", label_param="label")
+def add_component_bom_balloons(
+    adapter: Any,
+    view: Any,
+    *,
+    items: Sequence[tuple[str, str]],
+    label: str,
+) -> list[Any]:
+    """Insert and ring one checked balloon per requested component family."""
+    if not items:
+        raise ValueError(f"{label}: component balloon list must not be empty")
+    stems = [stem for stem, _item in items]
+    numbers = [item for _stem, item in items]
+    if len(stems) != len(set(stems)) or len(numbers) != len(set(numbers)):
+        raise ValueError(f"{label}: duplicate component or item number")
+    balloons = [
+        _create_component_bom_balloon(
+            adapter,
+            view,
+            stem=stem,
+            expected_item=item,
+            label=label,
+        )
+        for stem, item in items
+    ]
+    _spread_balloons(adapter, view, balloons)
+    adapter.currentModel.EditRebuild3()
+    _telemetry.success(f"{label}: inserted {len(balloons)} targeted balloons")
+    return balloons
+
+
 @_telemetry.traced("drawing.auto_balloons_across_views", label_param="label")
 def add_auto_balloons_across_views(
     adapter: Any,
@@ -2992,6 +3097,7 @@ def add_auto_balloons_across_views(
     *,
     expected: int,
     label: str,
+    existing_balloons: Sequence[Any] = (),
 ) -> list[Any]:
     """Balloon successive views until every BOM item number is represented.
 
@@ -3001,8 +3107,11 @@ def add_auto_balloons_across_views(
     validate the union of displayed BOM item numbers against the table's full
     contiguous item range. Each view's balloons are spread around that view.
     """
-    all_balloons: list[Any] = []
-    item_numbers: set[str] = set()
+    all_balloons = list(existing_balloons)
+    item_numbers = {
+        _balloon_item_number(adapter, note, label=f"{label} existing")
+        for note in existing_balloons
+    }
     for index, view in enumerate(views, start=1):
         view_label = f"{label} view {index}"
         balloons = _create_auto_balloons(

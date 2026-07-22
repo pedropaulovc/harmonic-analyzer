@@ -22,6 +22,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_component_bom_balloons,
     add_auto_balloons_across_views,
     finalize_drawing,
     isolate_drawing_view_components,
@@ -109,8 +110,8 @@ ASSEMBLY_NOTES = "\n".join(
 # in the right field above the title-block keep-out.
 FRONT_CENTER = (0.070, 0.145)
 RIGHT_CENTER = (0.170, 0.170)
-ISO_CENTER = (0.180, 0.080)
-ISO_VIEW_SCALE = (1, 7)
+ISO_CENTER = (0.210, 0.105)
+ISO_VIEW_SCALE = (1, 9)
 BRACKET_DETAIL_CENTER = (0.100, 0.230)
 BRACKET_DETAIL_SCALE = (1, 4)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
@@ -197,13 +198,24 @@ async def build(adapter: Any) -> dict[str, str]:
         configuration_grouping="same-part",
         label="paper-drive assembly",
     )
-    # The pictorial exposes most component families, but its transgear cluster
-    # still hides eight BOM items. The isolated transgear detail exposes the
-    # bracket/screw pair and removes latch item 15 from the right view before
-    # its leader can cross item 19 there.
+    targeted_balloons = add_component_bom_balloons(
+        adapter,
+        bracket_detail,
+        items=(
+            ("transgear-bracket", "12"),
+            ("bracket-screw", "13"),
+            ("transgear-latch", "15"),
+        ),
+        label="paper-drive transgear balloons",
+    )
+    # The pictorial exposes most component families. Seed exact transgear
+    # balloons first, then validate the union supplied by the main views.
     add_auto_balloons_across_views(
-        adapter, (iso, front, bracket_detail, right), expected=len(BOM_COMPONENTS),
+        adapter,
+        (iso, front, right),
+        expected=len(BOM_COMPONENTS),
         label="paper-drive assembly balloons",
+        existing_balloons=targeted_balloons,
     )
     if add_note(adapter, "TRANSGEAR DETAIL", 0.020, 0.260) is None:
         raise RuntimeError("failed to label paper-drive transgear detail")
