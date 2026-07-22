@@ -115,6 +115,8 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         "cone-gear-shaft",
         "crank-drive-gear",
     }
+    assert drawing.BOTTOM_MANUAL_BALLOON_STEMS == {"crank-drive-gear"}
+    assert drawing.BOTTOM_MANUAL_BALLOON_ITEMS == {"crank-drive-gear": "26"}
     assert drawing.FRONT_DEFERRED_BALLOON_STEMS == {
         "swing-stop-screw",
         "pinion-pivot-shaft",
@@ -134,6 +136,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert "_defer_front_balloons(adapter, balloons)" in source
     assert '"IModelDocExtension", "DeleteSelection2"' in source
     assert "RootDrawingComponent2(False)" in source
+    assert '"IModelDocExtension",\n        "CreateBalloonOptions",\n        "InsertBOMBalloon2"' in source
     assert 'drawing_name.rsplit("/", 1)[-1].casefold()' in source
     assert 'identity.startswith(f"{stem}-")' in source
     assert "enumerated drawing components" in source

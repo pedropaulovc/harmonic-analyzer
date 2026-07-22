@@ -112,6 +112,12 @@ BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 BOTTOM_VISIBILITY_STEMS = frozenset(
     {"cone-tip-bushing", "cone-gear-shaft", "crank-drive-gear"}
 )
+BOTTOM_MANUAL_BALLOON_STEMS = frozenset({"crank-drive-gear"})
+BOTTOM_MANUAL_BALLOON_ITEMS = {
+    stem: str(index)
+    for index, stem in enumerate(BOM_COMPONENTS, start=1)
+    if stem in BOTTOM_MANUAL_BALLOON_STEMS
+}
 FRONT_DEFERRED_BALLOON_STEMS = frozenset(
     {
         "swing-stop-screw",
@@ -229,6 +235,19 @@ def _add_drive_train_balloons(
         )
         if index == 1:
             balloons = _defer_front_balloons(adapter, balloons)
+        if index == len(views):
+            existing = {
+                _balloon_item_number(adapter, note, label=view_label)
+                for note in balloons
+            }
+            for stem, item in BOTTOM_MANUAL_BALLOON_ITEMS.items():
+                if item in item_numbers or item in existing:
+                    continue
+                balloons.append(
+                    _create_component_balloon(
+                        adapter, view, stem=stem, expected_item=item
+                    )
+                )
         if not balloons:
             continue
         _spread_balloons(adapter, view, balloons, margin=margin)
@@ -323,6 +342,70 @@ def _defer_front_balloons(adapter: Any, balloons: list[Any]) -> list[Any]:
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return kept
+
+
+@_telemetry.traced("drawing.component_balloon", label_param="stem")
+def _create_component_balloon(
+    adapter: Any, view: Any, *, stem: str, expected_item: str
+) -> Any:
+    """Insert one BOM balloon from a uniquely selected leaf drawing component."""
+    root = adapter._attempt(
+        lambda: view.RootDrawingComponent2(False), default=None
+    )
+    if root is None:
+        raise RuntimeError(f"drive-train {stem} balloon view has no root component")
+
+    pending = list(_drawing_component_children(root))
+    matches: list[Any] = []
+    while pending:
+        drawing_component = pending.pop()
+        children = _drawing_component_children(drawing_component)
+        pending.extend(children)
+        if children:
+            continue
+        if _drawing_component_matches(
+            adapter, drawing_component, frozenset({stem})
+        ):
+            matches.append(drawing_component)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"drive-train {stem} balloon expected one drawing component, "
+            f"found {len(matches)}"
+        )
+
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    component = _sw_type_info.early_bound_or_flag(matches[0], "IDrawingComponent", "Select")
+    if not component.Select(False, None):
+        raise RuntimeError(f"failed to select drive-train {stem} drawing component")
+    extension = _sw_type_info.early_bound_or_flag(
+        draw.Extension,
+        "IModelDocExtension",
+        "CreateBalloonOptions",
+        "InsertBOMBalloon2",
+    )
+    options = extension.CreateBalloonOptions()
+    if options is None:
+        raise RuntimeError(f"failed to create drive-train {stem} balloon options")
+    options = _sw_type_info.early_bound_or_flag(options, "IBalloonOptions")
+    options.Style = 1
+    options.Size = 2
+    options.UpperTextContent = 1
+    options.ShowQuantity = False
+    options.ItemNumberStart = 1
+    options.ItemNumberIncrement = 1
+    options.ItemOrder = 1
+    note = extension.InsertBOMBalloon2(options)
+    draw.ClearSelection2(True)
+    if note is None:
+        raise RuntimeError(f"failed to insert drive-train {stem} BOM balloon")
+    item = _balloon_item_number(adapter, note, label=f"drive-train {stem} balloon")
+    if item != expected_item:
+        raise RuntimeError(
+            f"drive-train {stem} balloon resolved item {item}, expected {expected_item}"
+        )
+    _telemetry.success(f"drive-train {stem} component balloon -> item {item}")
+    return note
 
 
 @_telemetry.traced("drawing.isolate_bottom_balloon_components")
