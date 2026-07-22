@@ -2530,7 +2530,8 @@ def insert_bom_table(
                 adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
                 or ""
             ).strip().lower()
-            text = remaining.pop(identities.get(part, part), None)
+            component = identities.get(part, part)
+            text = remaining.pop(component, None)
             if text is None:
                 continue
             if not table.IsCellTextEditable(row, description_column):
@@ -2542,6 +2543,12 @@ def insert_bom_table(
                 row,
                 description_column,
                 text,
+                identity_column=part_column,
+                accepted_identities={
+                    identity
+                    for identity, mapped_component in identities.items()
+                    if mapped_component == component
+                },
                 label=f"{label} BOM description",
             )
         if remaining:
@@ -2562,22 +2569,46 @@ def _set_bom_cell_text(
     column: int,
     text: str,
     *,
+    identity_column: int,
+    accepted_identities: set[str],
     label: str,
 ) -> None:
     """Write and verify a BOM cell, including grouped configuration rows.
 
     A same-part BOM exposes one aggregate row over hidden configuration rows.
     SolidWorks silently discards a visible-only ``SetText2`` on that aggregate,
-    so retry with ``IncludeHidden=True`` before failing the readback contract.
+    so enumerate ``TotalRowCount`` and write every matching hidden member row
+    before failing the readback contract.
     """
     table.SetText2(row, column, False, text)
     applied = str(table.DisplayedText2(row, column, False) or "")
     if applied == text:
         return
-    table.SetText2(row, column, True, text)
+    normalized = {identity.strip().lower() for identity in accepted_identities}
+    total_rows = int(table.TotalRowCount)
+    hidden_snapshot: list[tuple[int, bool, str]] = []
+    written_rows: list[int] = []
+    for hidden_row in range(1, total_rows):
+        hidden = bool(table.RowHidden(hidden_row))
+        identity = str(
+            table.DisplayedText2(hidden_row, identity_column, True) or ""
+        ).strip()
+        hidden_snapshot.append((hidden_row, hidden, identity))
+        if not hidden or identity.lower() not in normalized:
+            continue
+        table.SetText2(hidden_row, column, True, text)
+        written_rows.append(hidden_row)
+    if not written_rows:
+        raise RuntimeError(
+            f"{label} has no matching hidden member rows for "
+            f"{sorted(normalized)!r}: {hidden_snapshot!r}"
+        )
     applied = str(table.DisplayedText2(row, column, False) or "")
     if applied != text:
-        raise RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")
+        raise RuntimeError(
+            f"{label} did not persist after hidden rows {written_rows!r}: "
+            f"{applied!r} != {text!r}; rows={hidden_snapshot!r}"
+        )
 
 
 def _min_angular_gap(ring_radius: float, balloon_radius: float, *, clearance: float) -> float:

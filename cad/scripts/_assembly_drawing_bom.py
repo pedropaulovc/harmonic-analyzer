@@ -102,6 +102,8 @@ def insert_identified_bom_table(
                 row,
                 part_column,
                 number,
+                identity_column=part_column,
+                accepted_identities={stem, identity},
                 label=f"{label} BOM part number",
             )
         if remaining:
