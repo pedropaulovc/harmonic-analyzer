@@ -34,7 +34,7 @@ def test_notes_describe_the_chrome_tube_and_bend() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert '"Manufacturing Notes", 0.016, 0.105' in source
+    assert '"Manufacturing Notes", 0.016, 0.114' in source
 
 
 def test_view_scale_is_explicit() -> None:

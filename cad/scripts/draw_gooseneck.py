@@ -124,7 +124,11 @@ async def build(adapter: Any) -> dict[str, str]:
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.105)
+    # 0.114 (was 0.105): machinist round 2 grew the notes to 22 lines and the
+    # block crossed the bottom zone border by 16.1 mm; the trim reclaims ~2
+    # lines and the raise covers the rest (nothing sits above until the
+    # elevation leg at x>0.16).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.114)
     add_property_linked_note(adapter, "Elevation View Note", 0.160, 0.022)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.095)
 
