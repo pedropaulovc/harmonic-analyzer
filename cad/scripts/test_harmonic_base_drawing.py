@@ -142,4 +142,4 @@ def test_dirty_reopened_scale_is_reexported_to_pdf() -> None:
         "await reopen_drawing(adapter, outputs.slddrw)", first_reopen + 1
     )
     assert dirty_branch < persisted_pdf_export < second_reopen
-    assert "persisted-scale drawing save/export incomplete" in common_source
+    assert "PDF re-export after dirty-scale save failed" in common_source
