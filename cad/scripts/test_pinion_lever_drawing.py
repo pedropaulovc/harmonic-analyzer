@@ -45,7 +45,9 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_lever_spec.DRAWING_NOTES
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "SPHERICAL CROWN" in source
-    assert "TIP FACE FLAT; SQUARE TO A" in source
+    assert "TIP FACE FLAT WITHIN 0.05" in source
+    assert "PERPENDICULAR TO GRIP AXIS" in source
+    assert '"WITHIN 0.10"' in source
     assert "GRIP PROFILE; BASIC AXIS" not in source
     assert "BLIND BORE BOTTOM" in notes
     assert "DATUM A" in notes and "DATUM B" in notes
@@ -64,6 +66,8 @@ def test_lever_drive_is_fully_released_for_manufacture() -> None:
     assert "LIFT ROD" not in notes
     assert "GRIP AXIS: 5.00+/-0.10 FROM B" in normalized
     assert "90+/-0.5 DEG TO A" in normalized
+    assert "SHORTEST DISTANCE BETWEEN GRIP AXIS AND A: 0.00 TO 0.10" in normalized
+    assert "GRIP-TO-HUB JUNCTION R0.25 MAX" in normalized
     assert "EXEMPT FROM THE TITLE-BLOCK EDGE-BREAK" in normalized
 
 
@@ -81,17 +85,16 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDepth"]
     assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
     assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall"}
-    assert "<MOD-DIAM>{ROD_ROOT_DIA:.2f}" in source
     assert "<MOD-DIAM>{ROD_TIP_DIA:.2f}" in source
-    assert "{ROD_Y0:.2f}" in source
+    assert "GRIP_HALF_ANGLE_DEG" in source
     assert "{HUB_LEN:.2f} REF" in source
-    assert "{HUB_LEN + CAP_SAG:.2f} REF" in source
+    assert "{CAP_SAG:.2f}+/-0.10 AXIAL HEIGHT" in source
     assert "create_section_view(" not in source
     assert 'place_view(adapter, str(SOURCE), "*Right"' in source
     assert "set_hidden_lines_visible(adapter, side)" in source
     assert source.count("model_point_in_view(") == 2
     assert "ModelToViewTransform" in common_source
-    assert "(0.0, HUB_OD / 2000.0, z_max / 1000.0)" in source
+    assert "(0.0, HUB_OD / 2000.0, HUB_LEN / 2000.0)" in source
     assert "section_hub_y" not in source
     assert 'sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")' in common_source
     assert "segment = sketch_manager.CreateLine(" in common_source

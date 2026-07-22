@@ -75,8 +75,8 @@ def test_part_numbers_are_unique_across_the_complete_registry() -> None:
     assert duplicates == {}
 
 
-def test_new_pin_and_spring_numbers_follow_the_existing_registry_tail() -> None:
-    assert _config.parts("pinion-cam-pin")["number"] == "MHA-113"
+def test_new_pin_and_spring_numbers_use_reserved_unique_allocations() -> None:
+    assert _config.parts("pinion-cam-pin")["number"] == "MHA-116"
     assert _config.parts("pinion-spring")["number"] == "MHA-114"
 
 

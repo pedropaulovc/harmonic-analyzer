@@ -21,11 +21,12 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -66,11 +67,11 @@ FRONT_KEEP = {
     "PinDia": (0.030, 0.235),
 }
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.030),
+    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
 }
 DIMENSION_CALLOUTS = {
     "PinDia": "NOMINAL REF ONLY\nFINAL LIMITS\n4.020 MAX / 4.012 MIN\nRa 0.8",
-    "Depth": "+/-0.05 CYLINDRICAL SHANK",
+    "Depth": "+/-0.05\nSEATED FLAT END TO CROWN ROOT",
 }
 
 
@@ -134,36 +135,36 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
-    end_radius = PIN_DIA * END_VIEW_SCALE / 2000.0
-    end_circle = (FRONT_CENTER[0] + end_radius, FRONT_CENTER[1])
-    add_datum_feature(
+    add_view_centerline(
         adapter,
-        front,
-        edge_xy=end_circle,
-        symbol_xy=(0.105, 0.228),
-        datum="A",
-        label="pinion cam-pin cylindrical-shank axis",
+        right,
+        face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
+        label="pinion cam-pin shank axis centerline",
     )
     crown_axial = CAP_SAG / 2.0
     crown_radial = math.sqrt(
         CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
     )
-    right_crown_face = (
-        RIGHT_CENTER[0]
-        + (PIN_LEN / 2.0 + crown_axial) * SHEET_SCALE[0] / 1000.0,
-        RIGHT_CENTER[1] + crown_radial * SHEET_SCALE[0] / 2000.0,
+    outer_crown_face = model_point_in_view(
+        adapter,
+        right,
+        (
+            0.0,
+            crown_radial / 1000.0,
+            (PIN_LEN + crown_axial) / 1000.0,
+        ),
+        label="pinion cam-pin outer crown face",
     )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=right_crown_face,
+        edge_xy=outer_crown_face,
         frame_xy=(0.245, 0.235),
         characteristic="profile_surface",
         tolerance="0.05",
-        datums=("A",),
-        quantity="BOTH CROWNS",
+        quantity="OUTER CROWN",
         label="pinion cam-pin crown profile",
-        entity_type="FACE",
+        entity_type="SILHOUETTE",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.110)
