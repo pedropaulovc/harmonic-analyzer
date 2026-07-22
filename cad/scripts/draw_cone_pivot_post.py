@@ -396,16 +396,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        front,
-        edge_xy=post_side_xy,
-        frame_xy=(0.220, 0.160),
+        top,
+        edge_xy=TOP_KEEP["BlockDia"],
+        frame_xy=(0.160, 0.220),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
         diameter=True,
-        quantity="DATUM B AXIS",
         label="datum-B axis perpendicularity",
-        entity_type="SILHOUETTE",
+        entity_type="DIMENSION",
+        leader=False,
     )
     add_feature_control_frame(
         adapter,
