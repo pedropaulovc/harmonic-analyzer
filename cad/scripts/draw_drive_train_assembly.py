@@ -115,6 +115,11 @@ BOTTOM_VISIBILITY_STEMS = frozenset(
 FRONT_DEFERRED_BALLOON_STEMS = frozenset(
     {"swing-stop-screw", "pinion-lever", "foot-screw", "crank-pinion"}
 )
+FRONT_DEFERRED_BALLOON_ITEMS = frozenset(
+    str(index)
+    for index, stem in enumerate(BOM_COMPONENTS, start=1)
+    if stem in FRONT_DEFERRED_BALLOON_STEMS
+)
 
 ASSEMBLY_NOTES = "\n".join(
     (
@@ -212,20 +217,11 @@ def _add_drive_train_balloons(
         zip(views, BALLOON_RING_MARGINS, strict=True), start=1
     ):
         view_label = f"{label} view {index}"
-        deferred_components: tuple[Any, ...] = ()
+        balloons = _create_auto_balloons(
+            adapter, view, label=view_label, allow_empty=True
+        )
         if index == 1:
-            deferred_components = _hide_selected_balloon_components(
-                adapter, view, FRONT_DEFERRED_BALLOON_STEMS
-            )
-        try:
-            balloons = _create_auto_balloons(
-                adapter, view, label=view_label, allow_empty=True
-            )
-        finally:
-            for component in deferred_components:
-                component.Visible = True
-            if deferred_components:
-                adapter.currentModel.EditRebuild3()
+            balloons = _defer_front_balloons(adapter, balloons)
         if not balloons:
             continue
         _spread_balloons(adapter, view, balloons, margin=margin)
@@ -284,40 +280,42 @@ def _drawing_component_matches(
     }
 
 
-@_telemetry.traced("drawing.defer_front_balloon_components")
-def _hide_selected_balloon_components(
-    adapter: Any, view: Any, stems: frozenset[str]
-) -> tuple[Any, ...]:
-    """Temporarily hide four front-view items so later views own their balloons."""
-    root = adapter._attempt(
-        lambda: view.RootDrawingComponent2(False), default=None
-    )
-    if root is None:
-        raise RuntimeError("drive-train front view has no root drawing component")
-
-    pending = list(_drawing_component_children(root))
-    found: set[str] = set()
-    hidden: list[Any] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        if children:
-            continue
-        matched = _drawing_component_matches(adapter, drawing_component, stems)
-        if not matched:
-            continue
-        drawing_component.Visible = False
-        hidden.append(drawing_component)
-        found.update(matched)
-
-    missing = sorted(stems - found)
-    if missing:
-        raise RuntimeError(
-            f"drive-train front view cannot defer missing components: {missing}"
+@_telemetry.traced("drawing.defer_front_balloons")
+def _defer_front_balloons(adapter: Any, balloons: list[Any]) -> list[Any]:
+    """Delete four crowded front balloons so later views can own those items."""
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    kept: list[Any] = []
+    selected_items: set[str] = set()
+    for note in balloons:
+        item = _balloon_item_number(
+            adapter, note, label="drive-train front balloon deferral"
         )
-    adapter.currentModel.EditRebuild3()
-    return tuple(hidden)
+        if item not in FRONT_DEFERRED_BALLOON_ITEMS:
+            kept.append(note)
+            continue
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+        annotation = note.GetAnnotation()
+        if annotation is None:
+            raise RuntimeError(f"drive-train front balloon item {item} has no annotation")
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "Select2"
+        )
+        if not annotation.Select2(bool(selected_items), 0):
+            raise RuntimeError(f"failed to select front balloon item {item} for deferral")
+        selected_items.add(item)
+
+    if selected_items != FRONT_DEFERRED_BALLOON_ITEMS:
+        missing = sorted(FRONT_DEFERRED_BALLOON_ITEMS - selected_items, key=int)
+        raise RuntimeError(f"drive-train front balloons cannot defer missing items: {missing}")
+    extension = _sw_type_info.early_bound_or_flag(
+        draw.Extension, "IModelDocExtension", "DeleteSelection2"
+    )
+    if not extension.DeleteSelection2(0):
+        raise RuntimeError("failed to delete deferred drive-train front balloons")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return kept
 
 
 @_telemetry.traced("drawing.isolate_bottom_balloon_components")
