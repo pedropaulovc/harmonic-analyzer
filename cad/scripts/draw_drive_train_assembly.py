@@ -28,6 +28,7 @@ from _drawing_common import (
     _spread_balloons,
     finalize_drawing,
     new_project_drawing,
+    position_bom_balloon,
     read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -129,7 +130,7 @@ ASSEMBLY_NOTES = "\n".join(
 FRONT_CENTER = (0.080, 0.135)
 RIGHT_CENTER = (0.185, 0.135)
 ISO_CENTER = (0.285, 0.145)
-BOTTOM_CENTER = (0.345, 0.095)
+BOTTOM_CENTER = (0.345, 0.105)
 BOM_ANCHOR = (0.020, 0.265)
 BOM_ROWS_PER_SECTION = 12
 BOM_COLUMN_WIDTHS = {
@@ -139,6 +140,16 @@ BOM_COLUMN_WIDTHS = {
     "QTY.": 0.012,
 }
 BALLOON_RING_MARGINS = (0.034, 0.014, 0.014, 0.014)
+BALLOON_POSITIONS = {
+    "5": (0.0272, 0.1283),
+    "8": (0.0551, 0.1667),
+    "11": (0.0309, 0.1156),
+    "14": (0.0975, 0.0898),
+    "20": (0.1162, 0.1673),
+    "21": (0.1254, 0.1568),
+    "24": (0.1107, 0.0958),
+    "30": (0.0432, 0.1742),
+}
 
 
 @_telemetry.traced("drawing.format_drive_train_bom")
@@ -173,9 +184,20 @@ def _format_drive_train_bom(adapter: Any, table: Any) -> None:
         raise RuntimeError(
             f"drive-train BOM returned {len(pieces)} split-table objects, expected 3"
         )
+    for index, piece in enumerate((table, *pieces)):
+        split_info = adapter._attempt(lambda p=piece: p.GetSplitInformation())
+        annotation = adapter._attempt(lambda p=piece: p.GetAnnotation())
+        position = adapter._attempt(
+            lambda a=annotation: adapter._get_attr_or_call(a, "GetPosition")
+        )
+        _telemetry.info(
+            f"drive-train BOM split object {index}: "
+            f"info={split_info!r}, position={position!r}"
+        )
     adapter.currentModel.EditRebuild3()
     _telemetry.success(
-        f"drive-train BOM split at {BOM_ROWS_PER_SECTION} rows into 3 sections"
+        f"drive-train BOM split at {BOM_ROWS_PER_SECTION} rows; "
+        f"HorizontalAutoSplit returned {len(pieces)} objects"
     )
 
 
@@ -357,10 +379,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # pair and behind the gear ladders in the pictorial.  The bottom projection
     # exposes those remaining BOM identities rather than accepting an
     # incomplete balloon set.
-    _add_drive_train_balloons(
+    balloons = _add_drive_train_balloons(
         adapter, (front, right, iso, bottom), expected=len(BOM_COMPONENTS),
         label="drive-train assembly balloons",
     )
+    for item_number, position_xy in BALLOON_POSITIONS.items():
+        position_bom_balloon(
+            adapter,
+            balloons,
+            item_number=item_number,
+            position_xy=position_xy,
+            label="drive-train assembly balloons",
+        )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add drive-train assembly notes")
 
