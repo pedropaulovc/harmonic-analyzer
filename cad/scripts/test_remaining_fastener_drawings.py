@@ -135,6 +135,45 @@ def test_assembly_fastener_quantities_are_pinned() -> None:
 
 
 @pytest.mark.parametrize(
+    "spec_name",
+    (
+        "cone_tip_pinch_screw_spec",
+        "hanger_screw_spec",
+        "pen_set_screw_spec",
+        "swing_stop_screw_spec",
+        "thumb_screw_spec",
+    ),
+)
+def test_sheets_without_length_dimensions_state_catalog_underhead_length(
+    spec_name: str,
+) -> None:
+    spec = importlib.import_module(spec_name)
+    assert spec.DRAWING_DIMENSIONS.get("Shank", set()).isdisjoint(
+        {"ShankLg", "ThreadLg"}
+    )
+    assert f"UNDERHEAD LENGTH {spec.SHANK_LEN:.2f}." in spec.DRAWING_NOTES
+
+
+@pytest.mark.parametrize(
+    "spec_name",
+    (
+        "bracket_screw_spec",
+        "clamp_screw_spec",
+        "fillister_screw_spec",
+        "foot_screw_spec",
+        "lag_screw_spec",
+        "slotted_screw_spec",
+    ),
+)
+def test_dimensioned_sheets_do_not_duplicate_underhead_length_note(
+    spec_name: str,
+) -> None:
+    spec = importlib.import_module(spec_name)
+    assert "ShankLg" in set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert "UNDERHEAD LENGTH" not in spec.DRAWING_NOTES
+
+
+@pytest.mark.parametrize(
     ("spec_name", "build_name"),
     (
         ("cone_pivot_screw_spec", "build_cone_pivot_screw"),

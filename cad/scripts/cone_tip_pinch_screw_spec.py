@@ -33,6 +33,7 @@ DRAWING_NOTES = "\n".join(
             thread=THREAD,
             thread_designation=THREAD_DESIGNATION,
             underhead_length_mm=SHANK_LEN,
+            length_control="note",
         ),
         *slotted_round_head_notes(
             head_dia_mm=HEAD_DIA,

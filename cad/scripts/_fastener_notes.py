@@ -29,10 +29,13 @@ def thread_control_notes(
     thread_designation: str,
     underhead_length_mm: float,
     end_face_control: Literal["fcf", "direct"] = "fcf",
+    length_control: Literal["dimension", "note"] = "dimension",
 ) -> tuple[str, ...]:
     """Return the common, measurable external-thread manufacturing contract."""
     if end_face_control not in ("fcf", "direct"):
         raise ValueError(f"unsupported end-face control style: {end_face_control!r}")
+    if length_control not in ("dimension", "note"):
+        raise ValueError(f"unsupported length control style: {length_control!r}")
     pitch = _thread_pitch_mm(thread)
     min_full_form = underhead_length_mm - 4.0 * pitch
     if min_full_form <= 0.0:
@@ -48,10 +51,14 @@ def thread_control_notes(
             "DISTAL END FACE PERPENDICULAR 0.05 TO THREAD "
             "PITCH-DIAMETER AXIS."
         )
+    length_note = ()
+    if length_control == "note":
+        length_note = (f"UNDERHEAD LENGTH {underhead_length_mm:.2f}.",)
     return (
         f"{thread_designation} PER ASME B1.1-2024.",
         "ACCEPT THREADS USING SYSTEM 21 PER ASME B1.3-2007 (R2022).",
         "THREAD EXTENT FROM UNDERHEAD FILLET TO DISTAL START CHAMFER.",
+        *length_note,
         f"{min_full_form:.2f} MIN FULL THREAD FORM BETWEEN RUNOUT ZONES.",
         "UNDERHEAD INCOMPLETE THREAD 2P MAX FROM FILLET TANGENCY.",
         "DISTAL INCOMPLETE THREAD 2P MAX FROM CHAMFER END.",

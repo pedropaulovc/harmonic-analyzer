@@ -31,6 +31,7 @@ DRAWING_NOTES = "\n".join(
             thread=THREAD,
             thread_designation=THREAD_DESIGNATION,
             underhead_length_mm=SHANK_LEN,
+            length_control="note",
         ),
         *hex_head_notes(across_flats_mm=HEAD_AF, head_height_mm=HEAD_H),
         "HEX CENTER WITHIN DIA 0.10 OF THREAD PITCH-DIAMETER AXIS.",

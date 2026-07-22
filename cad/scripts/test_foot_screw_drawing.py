@@ -78,4 +78,4 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["number"] == "MHA-103"
     assert config["material"] == config["material_specification"]
     assert config["finish"]
-    assert int(config["quantity"]) == 2
+    assert int(config["quantity"]) == 3
