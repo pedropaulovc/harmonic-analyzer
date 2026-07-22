@@ -49,11 +49,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 _ANNOT_NOTE = 6
 _DIMENSION_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
-_TEMPLATE_EDGE_NOTE_SNIPPET = "R.01 OR CHAMFER .01 MAX"
-_TEMPLATE_EDGE_NOTE = (
-    "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
-)
-
 # swAnnotationType_e for the native GD&T symbols the recipes place at explicit
 # sheet coordinates (datum tags, feature-control frames, surface-finish symbols).
 # None of these interfaces expose a real bounding box (IDisplayData returns only
@@ -1057,29 +1052,6 @@ def new_project_drawing(
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
-    sheet_view = adapter._get_attr_or_call(ddoc, "GetFirstView")
-    annotations = adapter._attempt(
-        lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
-    ) or []
-    replaced = 0
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
-        )
-        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
-            continue
-        note = adapter._get_attr_or_call(annotation, "GetSpecificAnnotation")
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetText", "SetText")
-        text = str(adapter._get_attr_or_call(note, "GetText") or "")
-        if _TEMPLATE_EDGE_NOTE_SNIPPET not in text:
-            continue
-        if not note.SetText(_TEMPLATE_EDGE_NOTE):
-            raise RuntimeError("failed to replace template edge-break note")
-        replaced += 1
-    if replaced != 1:
-        raise RuntimeError(
-            f"expected one template edge-break note, replaced {replaced}"
-        )
     # 2 decimals by default: 3-decimal display (76.000) reads as false precision
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3.
