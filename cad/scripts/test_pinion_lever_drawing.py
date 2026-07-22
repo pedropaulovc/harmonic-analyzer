@@ -69,6 +69,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert source.count("add_datum_feature(") == 2
     assert source.count("add_feature_control_frame(") == 4
     assert source.count('entity_type="SILHOUETTE"') == 4
+    assert source.count('entity_type="FACE"') == 2
     assert 'characteristic="profile_surface"' in source
     assert 'datums=("A", "B")' in source
     assert "add_surface_finish(" in source
