@@ -70,7 +70,10 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "_visible_plan_controls(adapter, top)" in source
     assert 'label="pivot-hole size"' in source and "edge=pivot_edge" in source
     assert 'datum="B"' in source
-    assert "annotation=pivot_callout.GetAnnotation()" in source
+    assert 'label="pivot-hole cylindrical datum feature"' in source
+    assert "symbol_xy=(0.085, 0.159)" in source
+    assert "entity=pivot_edge" in source
+    assert "annotation=pivot_callout.GetAnnotation()" not in source
     assert 'datum="C"' in source and "entity=north_edge" in source
     assert 'characteristic="profile_surface"' not in source
     assert 'characteristic="straightness"' in source

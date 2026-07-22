@@ -274,30 +274,33 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_cone_axis_centerline(adapter, top)
 
     pivot_edge, north_edge, straight_side_edge = _visible_plan_controls(adapter, top)
-    pivot_callout = add_native_hole_callout(
+    add_native_hole_callout(
         adapter,
         top,
-        callout_xy=(0.155, 0.165),
+        callout_xy=(0.170, 0.200),
         label="pivot-hole size",
         edge=pivot_edge,
     )
+    # A datum tag attached to the Hole Wizard callout reports its native
+    # annotation position as sheet (0, 0), so the fail-loud layout gate sees it
+    # off-border even though SetPosition2 succeeds. Attach B to the cylindrical
+    # feature itself instead, with a short radial leader that unmistakably ends
+    # on the projected circumference rather than the centre mark/axis.
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.225, 0.165),
+        symbol_xy=(0.085, 0.159),
         datum="B",
-        label="pivot-hole size datum axis",
-        annotation=pivot_callout.GetAnnotation(),
-        shoulder=True,
+        label="pivot-hole cylindrical datum feature",
+        entity=pivot_edge,
     )
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.145, 0.185),
+        symbol_xy=(0.130, 0.140),
         datum="C",
         label="north-end datum plane",
         entity=north_edge,
-        shoulder=True,
     )
     add_feature_control_frame(
         adapter,
@@ -312,7 +315,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.175, 0.135),
+        frame_xy=(0.150, 0.125),
         characteristic="perpendicularity",
         tolerance="0.10",
         datums=("A",),
