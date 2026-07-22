@@ -194,4 +194,4 @@ def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
     assert "_format_drive_train_bom(adapter, bom_table)" in source
     assert "_create_drive_train_sheets(adapter)" in source
     assert "expected_sheet_names=SHEET_NAMES" in source
-    assert source.count("ddoc.ActivateSheet(SHEET_NAMES[") == 4
+    assert source.count("ddoc.ActivateSheet(SHEET_NAMES[") == 5

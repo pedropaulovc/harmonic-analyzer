@@ -100,7 +100,7 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
 
 def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assembly_notes = "\n".join(drawing.ASSEMBLY_NOTES)
+    assembly_notes = drawing.ASSEMBLY_NOTES
     normalized_notes = " ".join(assembly_notes.split())
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("_add_drive_train_balloons(") == 2
@@ -214,6 +214,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         (0.158, 0.070),
         (0.300, 0.095),
     )
+    assert len(drawing.SETUP_NOTE_COLUMNS) == 3
     assert "_swap_drive_train_balloon_slots" not in source
     assert drawing.GENERAL_POINTER_NOTE == (
         "SETUP, ORIENTATION, BACKLASH, AND FINAL ACCEPTANCE: SEE SHEET 5."
