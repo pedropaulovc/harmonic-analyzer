@@ -58,8 +58,8 @@ def test_notes_specify_ball_bore_and_shaft_without_title_block_duplicates() -> N
     assert "DATUM B" in notes
     assert "FINISH SYMBOL" in notes
     assert "AFTER PLATE" in notes
-    assert "BALL/STEM INTERSECTION; NO BLEND OR UNDERCUT" in notes
-    assert "STEM/PAD SHOULDER AS SHOWN; NO BLEND OR UNDERCUT" in notes
+    assert "SHOULDERS: EDGE BREAK 0.10 MAX" in notes
+    assert "NO TRANSITION BLEND OR UNDERCUT" in notes
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -75,15 +75,14 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert source.count('characteristic="circular_runout"') == 1
     assert "frame_xy=(0.205, 0.165)" in source
     assert "STEM_DIM_TEXT = (0.180, _front_y(12.0))" in source
-    assert "frame_xy=(0.180, _front_y(12.0) - 0.022)" in source
+    assert "frame_xy=(0.180, _front_y(12.0) - 0.014)" in source
     assert 'characteristic="profile_surface"' in source
-    assert 'quantity="STEM AXIS"' in source
-    assert "leader=False" not in source
+    assert "leader=False" in source
     assert 'label="stem diameter"' in source
     assert 'entity_type="SILHOUETTE"' in source
-    assert source.count('entity_type="DIMENSION"') == 1
-    assert "FRONT_CENTER[0] + STEM_DIA / 2.0 * _S" in source
-    assert "symbol_xy=STEM_DIM_TEXT" in source
+    assert source.count('entity_type="DIMENSION"') == 2
+    assert "symbol_xy=(0.205, STEM_DIM_TEXT[1])" in source
+    assert "shoulder=True" in source
     assert "position_tolerance_m=0.0005" in source
     assert "set_basic_dimension(" in source
     assert "add_view_centerline(" in source
