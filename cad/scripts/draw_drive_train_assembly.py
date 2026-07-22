@@ -461,6 +461,7 @@ def _add_drive_train_balloons(
         item_number="15",
         position_xy=PINION_PIVOT_SHAFT_BALLOON_POSITION,
         label="drive-train item 15 leader routing",
+        position_tolerance_m=0.0015,
     )
 
     missing = sorted(expected_items - item_numbers, key=int)

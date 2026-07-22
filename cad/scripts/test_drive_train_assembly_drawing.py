@@ -197,6 +197,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert drawing.PINION_PIVOT_SHAFT_BALLOON_POSITION == (0.199, 0.120)
     assert 'item_number="15"' in source
     assert 'label="drive-train item 15 leader routing"' in source
+    assert "position_tolerance_m=0.0015" in source
     assert drawing.CONCEALED_BOTTOM_BALLOON_RING_MARGIN == 0.015
     assert drawing.CONCEALED_FRONT_BALLOON_RING_MARGIN == 0.025
     assert drawing.CONCEALED_BALLOON_CLEARANCE == 0.006
