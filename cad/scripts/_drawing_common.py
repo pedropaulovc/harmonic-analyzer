@@ -977,14 +977,20 @@ def add_attached_note(
     view: Any,
     *,
     text: str,
-    entity_xy: tuple[float, float],
+    entity_xy: tuple[float, float] | None = None,
     note_xy: tuple[float, float],
     label: str,
     entity_type: str = "EDGE",
+    entity: Any | None = None,
 ) -> Any:
-    """Attach one literal arrowed note to a drawing-view entity."""
-    entity = _select_view_entity(
-        adapter, view, entity_type, entity_xy, label=label
+    """Attach one literal arrowed note to a drawing-view entity.
+
+    Provide EITHER ``entity_xy`` (a sheet-coordinate pick) OR ``entity`` (a
+    precise model entity — for an offset/inclined rim whose projected edge has
+    no stable sheet coordinate); ``_select_view_entity`` prefers ``entity``.
+    """
+    target = _select_view_entity(
+        adapter, view, entity_type, entity_xy, label=label, entity=entity
     )
     draw = adapter.currentModel
     note = draw.InsertNote(text)
@@ -1004,7 +1010,7 @@ def add_attached_note(
         "GetLeaderCount",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
-        if not annotation.SetAttachedEntities(dispatch_array([entity])):
+        if not annotation.SetAttachedEntities(dispatch_array([target])):
             raise RuntimeError(f"failed to attach note ({label})")
     status = annotation.SetLeader3(1, 0, True, False, False, False)
     if status != 0:

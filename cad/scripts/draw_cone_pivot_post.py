@@ -427,12 +427,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="journal-bore clocking axis",
         position_tolerance_m=0.016,
     )
-    crank_entity, crank_xy = _crank_bore_edge(adapter, front)
+    crank_entity, _ = _crank_bore_edge(adapter, front)
     add_attached_note(
         adapter,
         front,
         text=f"CRANK BORE <MOD-DIAM>{CRANK_BORE_DIA:.3f} +/-0.025 THRU",
-        entity_xy=crank_xy,
+        entity=crank_entity,
         note_xy=(0.145, _front_y(CRANK_BORE_HEIGHT) + 0.025),
         label="crank-bore size",
     )
