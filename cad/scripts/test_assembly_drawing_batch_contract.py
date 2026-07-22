@@ -178,12 +178,13 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
 
 def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
     source = Path(draw_drive_train_assembly.__file__).read_text(encoding="utf-8")
-    assert source.count("place_view(") == 8
+    assert source.count("place_view(") == 9
     assert "for view in exterior_views:" in source
     assert "set_hidden_lines_removed(adapter, view)" in source
     assert '"*Bottom"' in source
     assert "set_hidden_lines_visible(adapter, concealed_bottom)" in source
-    assert "_isolate_bottom_balloon_components(adapter, concealed_bottom)" in source
+    assert "set_hidden_lines_visible(adapter, concealed_front)" in source
+    assert source.count("_isolate_balloon_components(") == 3
     assert source.count("insert_identified_bom_table(") == 1
     assert "part_numbers=BOM_PART_NUMBERS" in source
     assert source.count("_add_drive_train_balloons(") == 2

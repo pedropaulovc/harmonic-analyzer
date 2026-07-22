@@ -105,10 +105,11 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert 'configuration_grouping="same-part"' in source
     assert "expected_sheet_names=SHEET_NAMES" in source
     assert source.count("add_note(") == 5
-    assert source.count("scale=VIEW_SCALE") == 8
-    assert source.count("scale=VIEW_SCALE,") == 1
+    assert source.count("scale=VIEW_SCALE") == 9
+    assert source.count("scale=VIEW_SCALE,") == 2
     assert '"*Bottom"' in source
-    assert "_isolate_bottom_balloon_components(adapter, concealed_bottom)" in source
+    assert '"*Front"' in source
+    assert source.count("_isolate_balloon_components(") == 3
     assert "drawing_component.Visible = bool(matched)" in source
     assert drawing.SHEET_NAMES == (
         "GENERAL ASSEMBLY",
@@ -121,6 +122,15 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
         "cone-gear-shaft",
         "crank-drive-gear",
     }
+    assert drawing.CONCEALED_BOTTOM_STEMS == {
+        "cone-tip-bushing",
+        "cone-gear-shaft",
+    }
+    assert drawing.CONCEALED_FRONT_STEMS == {"crank-drive-gear"}
+    assert (
+        drawing.CONCEALED_BOTTOM_STEMS | drawing.CONCEALED_FRONT_STEMS
+        == drawing.BOTTOM_VISIBILITY_STEMS
+    )
     assert drawing.CONCEALED_BALLOON_ITEMS == {
         "cone-tip-bushing": "6",
         "cone-gear-shaft": "25",

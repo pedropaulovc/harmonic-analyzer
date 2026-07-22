@@ -186,8 +186,13 @@ EXTERIOR_FRONT_CENTER = (0.075, 0.155)
 EXTERIOR_RIGHT_CENTER = (0.220, 0.155)
 EXTERIOR_ISO_CENTER = (0.345, 0.155)
 
-# Sheet 4: isolated underside view of the three otherwise enclosed BOM items.
-CONCEALED_BOTTOM_CENTER = (0.150, 0.165)
+# Sheet 4: two isolated views keep the coaxial concealed items readable.  The
+# bushing and shaft share the underside view; the crank gear gets a separate
+# front view because its projected attachment lies on top of the shaft callout.
+CONCEALED_BOTTOM_CENTER = (0.115, 0.155)
+CONCEALED_FRONT_CENTER = (0.285, 0.155)
+CONCEALED_BOTTOM_STEMS = frozenset({"cone-tip-bushing", "cone-gear-shaft"})
+CONCEALED_FRONT_STEMS = frozenset({"crank-drive-gear"})
 CONCEALED_BALLOON_RING_MARGIN = 0.035
 CONCEALED_BALLOON_CLEARANCE = 0.006
 BOM_COLUMN_WIDTHS = {
@@ -494,9 +499,15 @@ def _create_component_balloon(
     return note, selected_view
 
 
-@_telemetry.traced("drawing.isolate_bottom_balloon_components")
-def _isolate_bottom_balloon_components(adapter: Any, view: Any) -> None:
-    """Show only the three enclosed BOM families in the auxiliary bottom view."""
+@_telemetry.traced("drawing.isolate_balloon_components")
+def _isolate_balloon_components(
+    adapter: Any,
+    view: Any,
+    *,
+    visible_stems: frozenset[str],
+    label: str,
+) -> None:
+    """Show only the requested enclosed BOM families in an auxiliary view."""
     root = adapter._attempt(
         lambda: view.RootDrawingComponent2(False), default=None
     )
@@ -512,9 +523,7 @@ def _isolate_bottom_balloon_components(adapter: Any, view: Any) -> None:
         pending.extend(children)
 
         enumerated.append(str(drawing_component.Name or ""))
-        matched = _drawing_component_matches(
-            adapter, drawing_component, BOTTOM_VISIBILITY_STEMS
-        )
+        matched = _drawing_component_matches(adapter, drawing_component, visible_stems)
         if children:
             continue
         drawing_component.Visible = bool(matched)
@@ -524,10 +533,10 @@ def _isolate_bottom_balloon_components(adapter: Any, view: Any) -> None:
         for stem in matched:
             _telemetry.event("drawing.component_visible", component=stem)
 
-    missing = sorted(BOTTOM_VISIBILITY_STEMS - found)
+    missing = sorted(visible_stems - found)
     if missing:
         raise RuntimeError(
-            "drive-train bottom view is missing enclosed components: "
+            f"drive-train {label} view is missing enclosed components: "
             f"{missing}; enumerated drawing components: {sorted(enumerated)}"
         )
     adapter.currentModel.EditRebuild3()
@@ -771,27 +780,62 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
     )
     set_hidden_lines_visible(adapter, concealed_bottom)
-    _isolate_bottom_balloon_components(adapter, concealed_bottom)
-    concealed_balloons: list[Any] = []
-    for stem, item in CONCEALED_BALLOON_ITEMS.items():
+    _isolate_balloon_components(
+        adapter,
+        concealed_bottom,
+        visible_stems=CONCEALED_BOTTOM_STEMS,
+        label="bottom",
+    )
+    bottom_balloons: list[Any] = []
+    for stem in sorted(CONCEALED_BOTTOM_STEMS):
+        item = CONCEALED_BALLOON_ITEMS[stem]
         note, _owner_view = _create_component_balloon(
             adapter, (concealed_bottom,), stem=stem, expected_item=item
         )
-        concealed_balloons.append(note)
+        bottom_balloons.append(note)
     _spread_balloons(
         adapter,
         concealed_bottom,
-        concealed_balloons,
+        bottom_balloons,
+        margin=CONCEALED_BALLOON_RING_MARGIN,
+        clearance=CONCEALED_BALLOON_CLEARANCE,
+    )
+
+    concealed_front = place_view(
+        adapter,
+        str(SOURCE),
+        "*Front",
+        *CONCEALED_FRONT_CENTER,
+        scale=VIEW_SCALE,
+    )
+    set_hidden_lines_visible(adapter, concealed_front)
+    _isolate_balloon_components(
+        adapter,
+        concealed_front,
+        visible_stems=CONCEALED_FRONT_STEMS,
+        label="front",
+    )
+    front_balloons: list[Any] = []
+    for stem in sorted(CONCEALED_FRONT_STEMS):
+        item = CONCEALED_BALLOON_ITEMS[stem]
+        note, _owner_view = _create_component_balloon(
+            adapter, (concealed_front,), stem=stem, expected_item=item
+        )
+        front_balloons.append(note)
+    _spread_balloons(
+        adapter,
+        concealed_front,
+        front_balloons,
         margin=CONCEALED_BALLOON_RING_MARGIN,
         clearance=CONCEALED_BALLOON_CLEARANCE,
     )
     if add_note(
         adapter,
         "SHEET 4 OF 4 — CONCEALED ITEM IDENTIFICATION\n"
-        "OUTER COMPONENTS HIDDEN; HIDDEN LINES VISIBLE\n"
-        "ITEMS 6, 25 AND 26 ONLY",
+        "LEFT: ITEMS 6 AND 25, BOTTOM VIEW; RIGHT: ITEM 26, FRONT VIEW\n"
+        "OUTER COMPONENTS HIDDEN; HIDDEN LINES VISIBLE",
+        0.018,
         0.255,
-        0.225,
     ) is None:
         raise RuntimeError("failed to add concealed-identification heading")
 
