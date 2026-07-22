@@ -24,6 +24,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons_across_views,
     finalize_drawing,
+    isolate_drawing_view_components,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -107,6 +108,8 @@ ASSEMBLY_NOTES = "\n".join(
 FRONT_CENTER = (0.060, 0.150)
 RIGHT_CENTER = (0.130, 0.150)
 ISO_CENTER = (0.225, 0.140)
+BRACKET_DETAIL_CENTER = (0.095, 0.235)
+BRACKET_DETAIL_SCALE = (1, 2)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
 BOM_ANCHOR = (0.248, 0.265)
@@ -161,6 +164,20 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    bracket_detail = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *BRACKET_DETAIL_CENTER,
+        scale=BRACKET_DETAIL_SCALE,
+    )
+    set_hidden_lines_removed(adapter, bracket_detail)
+    isolate_drawing_view_components(
+        adapter,
+        bracket_detail,
+        visible_stems=frozenset({"transgear-bracket", "bracket-screw"}),
+        label="paper-drive transgear bracket detail",
+    )
 
     insert_identified_bom_table(
         adapter,
@@ -172,11 +189,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="paper-drive assembly",
     )
     # The pictorial exposes most component families, but its transgear cluster
-    # still hides eight BOM items. Cover the union of all three projections.
+    # still hides eight BOM items. The isolated bracket detail exposes the two
+    # families concealed even across the three main projections.
     add_auto_balloons_across_views(
-        adapter, (iso, front, right), expected=len(BOM_COMPONENTS),
+        adapter, (iso, front, right, bracket_detail), expected=len(BOM_COMPONENTS),
         label="paper-drive assembly balloons",
     )
+    if add_note(adapter, "TRANSGEAR BRACKET DETAIL", 0.070, 0.205) is None:
+        raise RuntimeError("failed to label paper-drive transgear bracket detail")
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.070) is None:
         raise RuntimeError("failed to add paper-drive assembly notes")
 

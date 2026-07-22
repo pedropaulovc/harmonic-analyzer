@@ -86,9 +86,14 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert source.count("insert_identified_bom_table(") == 1
     assert 'configuration_grouping="same-part"' in source
     assert source.count("add_auto_balloons_across_views(") == 1
-    assert "adapter, (iso, front, right), expected=len(BOM_COMPONENTS)" in source
-    assert source.count("add_note(") == 1
+    assert (
+        "adapter, (iso, front, right, bracket_detail), "
+        "expected=len(BOM_COMPONENTS)" in source
+    )
+    assert source.count("add_note(") == 2
+    assert source.count("place_view(") == 4
     assert source.count("scale=VIEW_SCALE") == 3
+    assert source.count("isolate_drawing_view_components(") == 1
     assert f"{_chain.LINK_COUNT}-LINK CHAIN" in drawing.ASSEMBLY_NOTES
     assert "T24 AND T12 SPROCKETS" in drawing.ASSEMBLY_NOTES
     assert all(

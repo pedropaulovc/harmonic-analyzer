@@ -2905,6 +2905,86 @@ def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> 
     return balloons
 
 
+def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
+    """Return children across callable and materialized pywin32 shapes."""
+    member = drawing_component.GetChildren
+    children = member() if callable(member) else member
+    return tuple(children or ())
+
+
+def _drawing_component_stems(
+    adapter: Any, drawing_component: Any, stems: frozenset[str]
+) -> set[str]:
+    """Return requested file stems represented by one leaf drawing component."""
+    component = adapter._attempt(
+        lambda dc=drawing_component: dc.Component, default=None
+    )
+    path = ""
+    if component is not None:
+        path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
+    name = str(drawing_component.Name or "")
+    drawing_name = name.split("@", 1)[0].replace("\\", "/")
+    identities = {
+        Path(str(path)).stem.casefold(),
+        drawing_name.rsplit("/", 1)[-1].casefold(),
+    }
+    return {
+        stem
+        for stem in stems
+        if any(
+            identity == stem
+            or (
+                identity.startswith(f"{stem}-")
+                and identity.removeprefix(f"{stem}-").isdigit()
+            )
+            for identity in identities
+        )
+    }
+
+
+@_telemetry.traced("drawing.isolate_components", label_param="label")
+def isolate_drawing_view_components(
+    adapter: Any,
+    view: Any,
+    *,
+    visible_stems: frozenset[str],
+    label: str,
+) -> None:
+    """Show only requested top-level component families in one drawing view."""
+    if not visible_stems:
+        raise ValueError(f"{label}: visible component set must not be empty")
+    root = adapter._attempt(
+        lambda: view.RootDrawingComponent2(False), default=None
+    )
+    if root is None:
+        raise RuntimeError(f"{label}: drawing view has no root component")
+
+    pending = list(_drawing_component_children(root))
+    found: set[str] = set()
+    enumerated: list[str] = []
+    while pending:
+        drawing_component = pending.pop()
+        children = _drawing_component_children(drawing_component)
+        pending.extend(children)
+        enumerated.append(str(drawing_component.Name or ""))
+        if children:
+            continue
+        matched = _drawing_component_stems(
+            adapter, drawing_component, visible_stems
+        )
+        drawing_component.Visible = bool(matched)
+        found.update(matched)
+
+    missing = sorted(visible_stems - found)
+    if missing:
+        raise RuntimeError(
+            f"{label}: component families not found: {missing}; "
+            f"enumerated={sorted(enumerated)}"
+        )
+    adapter.currentModel.EditRebuild3()
+    _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
+
+
 @_telemetry.traced("drawing.auto_balloons_across_views", label_param="label")
 def add_auto_balloons_across_views(
     adapter: Any,
