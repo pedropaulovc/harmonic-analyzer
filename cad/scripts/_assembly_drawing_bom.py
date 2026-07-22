@@ -8,11 +8,7 @@ from typing import Any, Literal
 
 import _config
 import _telemetry
-from _drawing_common import (
-    _configure_manual_bom_column,
-    _set_bom_cell_text,
-    insert_bom_table,
-)
+from _drawing_common import _set_bom_cell_text, insert_bom_table
 
 
 _PART_NUMBER = re.compile(r"MHA-(?:\d{3}|A\d{2})\Z")
@@ -78,33 +74,20 @@ def insert_identified_bom_table(
             raise RuntimeError(f"{label} BOM has no PART NUMBER column: {header!r}")
         part_column = header.index("PART NUMBER")
         item_column = header.index("ITEM NO.") if "ITEM NO." in header else None
-        original_rows = [
-            (
-                row,
-                str(table.DisplayedText2(row, part_column, False) or "")
-                .strip()
-                .lower(),
-                (
-                    str(table.DisplayedText2(row, item_column, False) or "").strip()
-                    if item_column is not None
-                    else str(row)
-                ),
-            )
-            for row in range(1, rows)
-        ]
-        _configure_manual_bom_column(
-            table,
-            part_column,
-            "PART NUMBER",
-            replace_native=True,
-            label=f"{label} BOM part number",
-        )
         source_rows: list[tuple[str, str]] = []
         remaining = {stem.lower(): number for stem, number in part_numbers.items()}
         stems_by_number = {
             number.lower(): stem.lower() for stem, number in part_numbers.items()
         }
-        for row, identity, item in original_rows:
+        for row in range(1, rows):
+            identity = str(
+                table.DisplayedText2(row, part_column, False) or ""
+            ).strip().lower()
+            item = (
+                str(table.DisplayedText2(row, item_column, False) or "").strip()
+                if item_column is not None
+                else str(row)
+            )
             stem = stems_by_number.get(identity, identity)
             source_rows.append((item, stem))
             number = remaining.pop(stem, None)

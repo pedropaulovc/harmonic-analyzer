@@ -2524,13 +2524,6 @@ def insert_bom_table(
             )
         description_column = header.index("DESCRIPTION")
         part_column = header.index("PART NUMBER")
-        _configure_manual_bom_column(
-            table,
-            description_column,
-            "DESCRIPTION",
-            replace_native=False,
-            label=f"{label} BOM description",
-        )
         remaining = {key.strip().lower(): text for key, text in descriptions.items()}
         for row in range(1, rows):
             part = str(
@@ -2563,45 +2556,6 @@ def insert_bom_table(
     return table
 
 
-def _configure_manual_bom_column(
-    table: Any,
-    column: int,
-    title: str,
-    *,
-    replace_native: bool,
-    label: str,
-) -> None:
-    """Make a BOM output column user-defined and verify its API contract.
-
-    Generated same-part aggregate cells reject manual ``SetText2`` writes.  A
-    user-defined column whose custom-property name equals its title is the
-    documented unattached/manual form and remains editable on aggregate rows.
-    ``PART NUMBER`` starts as a special generated column, so it first needs an
-    explicit conversion to the custom-property column type.
-    """
-    bom = _sw_type_info.early_bound_or_flag(
-        table,
-        "IBomTableAnnotation",
-        "GetColumnCustomProperty",
-        "SetColumnCustomProperty",
-    )
-    if replace_native:
-        status = int(table.SetColumnType3(column, 204, True, title))
-        if status != 0:
-            raise RuntimeError(f"{label} column conversion failed: status={status}")
-        if int(table.GetColumnType2(column, True)) != 204:
-            raise RuntimeError(f"{label} column did not become custom-property type")
-        if not table.SetColumnTitle2(column, title, True):
-            raise RuntimeError(f"{label} column title did not persist")
-    if not bom.SetColumnCustomProperty(column, title):
-        raise RuntimeError(f"{label} column did not become user-defined")
-    applied = str(bom.GetColumnCustomProperty(column) or "").strip().upper()
-    if applied != title.upper():
-        raise RuntimeError(
-            f"{label} column property did not persist: {applied!r} != {title!r}"
-        )
-
-
 def _set_bom_cell_text(
     table: Any,
     row: int,
@@ -2610,7 +2564,7 @@ def _set_bom_cell_text(
     *,
     label: str,
 ) -> None:
-    """Write and verify one user-defined BOM cell."""
+    """Write and verify one visible BOM cell."""
     table.SetText2(row, column, False, text)
     applied = str(table.DisplayedText2(row, column, False) or "")
     if applied != text:

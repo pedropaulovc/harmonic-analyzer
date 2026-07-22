@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import _config
-import _assembly_drawing_bom
-import _drawing_common as drawing_common
+import _grouped_bom_properties
 import draw_channel_assembly
 import draw_drive_train_assembly
 import draw_frame_assembly
@@ -15,11 +15,8 @@ import draw_harmonic_analyzer_assembly
 import draw_magnifier_assembly
 import draw_paper_drive_assembly
 import draw_summing_assembly
-from _drawing_common import (
-    _bom_identity_map,
-    _configure_manual_bom_column,
-    _set_bom_cell_text,
-)
+from _drawing_common import _bom_identity_map
+from _grouped_bom_properties import apply_grouped_bom_properties
 
 
 SHEETS = (
@@ -56,90 +53,35 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
 )
 
 
-def test_grouped_bom_columns_become_user_defined_before_cell_writes(
-    monkeypatch,
-) -> None:
-    class GroupedTable:
-        def __init__(self) -> None:
-            self.calls: list[tuple[int, int, bool, str]] = []
-            self.column_types = {1: 201, 2: 204}
-            self.column_titles = {1: "PART NUMBER", 2: "DESCRIPTION"}
-            self.column_properties: dict[int, str] = {}
-            self.values: dict[tuple[int, int], str] = {}
-
-        def SetColumnType3(
-            self, column: int, column_type: int, include_hidden: bool, title: str
-        ) -> int:
-            self.column_types[column] = column_type
-            return 0
-
-        def GetColumnType2(self, column: int, include_hidden: bool) -> int:
-            return self.column_types[column]
-
-        def SetColumnTitle2(
-            self, column: int, title: str, include_hidden: bool
-        ) -> bool:
-            self.column_titles[column] = title
-            return True
-
-        def SetColumnCustomProperty(self, column: int, title: str) -> bool:
-            if self.column_types[column] != 204:
-                return False
-            self.column_properties[column] = title
-            return True
-
-        def GetColumnCustomProperty(self, column: int) -> str:
-            return self.column_properties.get(column, "")
-
-        def SetText2(
-            self, row: int, column: int, include_hidden: bool, text: str
-        ) -> None:
-            self.calls.append((row, column, include_hidden, text))
-            if column in self.column_properties:
-                self.values[row, column] = text
-
-        def DisplayedText2(
-            self, row: int, column: int, include_hidden: bool
-        ) -> str:
-            return self.values.get((row, column), "")
-
+def test_grouped_bom_identity_is_persisted_on_every_configuration(monkeypatch) -> None:
+    configurations = {name: SimpleNamespace() for name in ("T12", "T18", "T24")}
+    model = SimpleNamespace(GetConfigurationByName=configurations.get)
+    adapter = SimpleNamespace(currentModel=model)
     monkeypatch.setattr(
-        drawing_common._sw_type_info,
-        "early_bound_or_flag",
-        lambda table, *_args: table,
+        _grouped_bom_properties,
+        "_early_bound",
+        lambda config, _interface: config,
     )
 
-    for column, value, label in (
-        (2, "CHAIN SPROCKET, T12/T18/T24; 1 EACH", "DESCRIPTION"),
-        (1, "MHA-081", "PART NUMBER"),
-    ):
-        table = GroupedTable()
-        _configure_manual_bom_column(
-            table,
-            column,
-            label,
-            replace_native=label == "PART NUMBER",
-            label=label,
-        )
-        _set_bom_cell_text(
-            table,
-            4,
-            column,
-            value,
-            label=label,
-        )
-        assert table.DisplayedText2(4, column, False) == value
-        assert table.column_properties[column] == label
-        assert table.calls == [(4, column, False, value)]
+    apply_grouped_bom_properties(
+        adapter,
+        tuple(configurations),
+        part_number="MHA-081",
+        description="CHAIN SPROCKET, T12/T18/T24; 1 EACH",
+    )
 
-    common_source = Path(_set_bom_cell_text.__code__.co_filename).read_text(
-        encoding="utf-8"
-    )
-    identified_source = Path(_assembly_drawing_bom.__file__).read_text(
-        encoding="utf-8"
-    )
-    assert "label=f\"{label} BOM description\"" in common_source
-    assert "label=f\"{label} BOM part number\"" in identified_source
+    for config in configurations.values():
+        assert config.BOMPartNoSource == 8
+        assert config.AlternateName == "MHA-081"
+        assert config.UseAlternateNameInBOM is True
+        assert config.Description == "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+        assert config.UseDescriptionInBOM is True
+
+
+def test_grouped_bom_metadata_is_authored_by_both_part_builders() -> None:
+    for script in ("build_transgear_removable.py", "build_cone_gear.py"):
+        source = (Path(__file__).parent / script).read_text(encoding="utf-8")
+        assert source.count("apply_grouped_bom_properties(") == 1, script
 
 
 def test_bom_identity_map_accepts_stems_and_released_number_aliases() -> None:
@@ -232,11 +174,16 @@ def test_top_level_bom_uses_released_subassembly_numbers() -> None:
 
 
 def test_configured_variants_remain_visible_after_bom_row_collapse() -> None:
-    assert draw_drive_train_assembly.BOM_COMPONENTS["cone-gear"] == (
-        "CONE GEAR, T006-T120 BY 6; 1 EACH"
+    cone_description = "CONE GEAR, T006-T120 BY 6; 1 EACH"
+    sprocket_description = "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+    assert draw_drive_train_assembly.BOM_COMPONENTS["cone-gear"] == cone_description
+    assert _config.parts("cone-gear")["description"] == cone_description
+    assert (
+        draw_paper_drive_assembly.BOM_COMPONENTS["transgear-removable"]
+        == sprocket_description
     )
-    assert draw_paper_drive_assembly.BOM_COMPONENTS["transgear-removable"] == (
-        "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+    assert (
+        _config.parts("transgear-removable")["description"] == sprocket_description
     )
 
 

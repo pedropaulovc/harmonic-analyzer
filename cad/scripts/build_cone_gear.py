@@ -77,6 +77,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _grouped_bom_properties import apply_grouped_bom_properties
 from cone_gear_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, GEAR_DATA
 from _common import (
     OUT_PNG,
@@ -808,9 +809,14 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
     check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
-    description = str(_config.parts(PART_NAME).get("description", "")).strip()
-    if not description:
-        raise RuntimeError("cone-gear registry description is required for grouped BOMs")
+    grouped_spec = _config.parts(PART_NAME)
+    description = str(grouped_spec.get("description", "")).strip()
+    apply_grouped_bom_properties(
+        adapter,
+        [name for name, _teeth in CONFIGS],
+        part_number=str(grouped_spec.get("number", "")),
+        description=description,
+    )
     apply_custom_properties(adapter, {"Description": description})
     await report_mass_properties(adapter)
 

@@ -30,6 +30,8 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
+import _telemetry
 from _common import (
     IN,
     OUT_PNG,
@@ -47,6 +49,7 @@ from _common import (
     save_part_and_images,
     set_sketch_direct_db,
 )
+from _grouped_bom_properties import apply_grouped_bom_properties
 # ``set_global`` is imported from _common under a distinct name: the gear-math
 # globals below use build_cone_gear's stricter 4-arg ``set_global`` (asserts the
 # round-tripped value to test the equation-parser dialect), while the plain
@@ -63,8 +66,6 @@ from build_cone_gear import (
     set_global,
     set_global_read,
 )
-
-import _telemetry
 
 PART_NAME = "transgear-removable"
 MATERIAL = "Plain Carbon Steel"  # ch. 23 photos: steel, unlike the brass wheels
@@ -541,6 +542,13 @@ async def build(adapter) -> dict[str, str]:
         )
     _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
+    grouped_spec = _config.parts(PART_NAME)
+    apply_grouped_bom_properties(
+        adapter,
+        [name for name, _teeth in CONFIGS],
+        part_number=str(grouped_spec.get("number", "")),
+        description=str(grouped_spec.get("description", "")),
+    )
     check("activate T24 for saved views", await adapter.set_active_configuration("T24"))
     await report_mass_properties(adapter)
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
