@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
 from enum import StrEnum
 from typing import Any
@@ -30,7 +30,6 @@ from _common import (
     log,
     set_isometric_view,
 )
-
 # The sprockets the chain seats on (the mounted T24 + crank T12 removables).
 # A chain link touching one of these is intended MESH, not a fault: the chain
 # rides the pitch circle so the links overlap the teeth in the shared z-plane
@@ -2190,13 +2189,23 @@ def delete_assembly_feature(adapter: Any, name: str) -> None:
     if adapter._attempt(lambda: asm_h.FeatureByName(name), default=None) is not None:
         raise RuntimeError(f"feature {name!r} still present after delete")
 
-def check_no_interference(adapter: Any) -> None:
+def check_no_interference(
+    adapter: Any,
+    *,
+    allowed_pairs: Mapping[frozenset[str], float] | None = None,
+) -> None:
     """Run interference detection on the active assembly; raise on any hit.
 
     Raw-COM stopgap until the MCP adapter implements ``check_interference``
     (``IAssemblyDoc::InterferenceDetectionManager``; the tool-layer call
     currently returns a simulated result without adapter support).
     Coincident/tangent contact is not treated as interference.
+
+    ``allowed_pairs`` maps an exact two-component name set to the largest
+    intentional overlap volume permitted in mm^3.  This is for modeled
+    interference fits whose nominal CAD solids genuinely overlap: both the
+    pair identity and the measured volume must match, so a neighbouring clash
+    or an unexpectedly deep overlap remains a hard fault.
 
     Chain-internal contact (a pair of roller-chain links touching each other)
     is allowed and reported separately, not raised: a chain is an articulating
@@ -2228,6 +2237,7 @@ def check_no_interference(adapter: Any) -> None:
             log("interference detection: computing interferences ...")
             interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
         details = []
+        bounded_contacts = []
         chain_contacts = []
         chain_mesh_contacts = []
         for interference in list(interferences or []):
@@ -2239,6 +2249,11 @@ def check_no_interference(adapter: Any) -> None:
                 names.append(str(_read_member(comp, "Name2")))
                 configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
+            pair = frozenset(names)
+            allowed_volume = (allowed_pairs or {}).get(pair)
+            if len(names) == 2 and allowed_volume is not None and volume_mm3 <= allowed_volume:
+                bounded_contacts.append((names, volume_mm3, allowed_volume))
+                continue
             if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
                 chain_contacts.append(volume_mm3)
                 continue
@@ -2259,6 +2274,7 @@ def check_no_interference(adapter: Any) -> None:
             details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
         adapter._attempt(lambda: mgr.Done(), default=None)
         isp.set_attribute("hits", len(details))
+        isp.set_attribute("bounded_contacts", len(bounded_contacts))
         isp.set_attribute("chain_contacts", len(chain_contacts))
         isp.set_attribute("chain_mesh_contacts", len(chain_mesh_contacts))
         if chain_contacts:
@@ -2271,6 +2287,11 @@ def check_no_interference(adapter: Any) -> None:
                 f"{len(chain_mesh_contacts)} chain<->sprocket mesh contacts"
                 f" (<= {max(chain_mesh_contacts):.2f} mm^3) allowed -- chain seated"
                 f" on the pitch circle"
+            )
+        for names, volume_mm3, allowed_volume in bounded_contacts:
+            _telemetry.debug(
+                f"{' <-> '.join(names)} intentional fit overlap "
+                f"{volume_mm3:.2f} mm^3 allowed (limit {allowed_volume:.2f} mm^3)"
             )
         if details:
             raise RuntimeError(
@@ -3009,7 +3030,10 @@ def save_assembly_in_place(
     log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, "
         f"warn={warn})")
 async def refresh_assembly(
-    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+    adapter: Any,
+    asm_name: str,
+    views: Iterable[str] = DEFAULT_VIEWS,
+    allowed_pairs: Mapping[frozenset[str], float] | None = None,
 ) -> dict[str, str]:
     """Reload an assembly's parts in place -- the cheap incremental rebuild.
 
@@ -3131,7 +3155,12 @@ async def refresh_assembly(
         # state. Reuse it across the read-only gates instead of paying two more
         # whole-model ForceRebuild3 calls (issue #326).
         assert_manifest_dof_state(adapter, asm_name, resolve=False)
-        check_no_interference(adapter)
+        # allowed_pairs is threaded in by the refresh ENTRYPOINT
+        # (refresh_assembly.py) rather than looked up here: importing
+        # _interference_contracts in this common helper would fold the press-fit
+        # contract module (and the pinion geometry constants it pulls in) into
+        # every assembly script's recipe closure (codex #359).
+        check_no_interference(adapter, allowed_pairs=allowed_pairs)
         assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)
     else:
         # No-op reload: the per-config rebuild-fault check above already ran

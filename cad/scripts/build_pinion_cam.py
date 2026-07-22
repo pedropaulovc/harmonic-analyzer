@@ -41,6 +41,7 @@ from _common import (
     extrude_at_offset,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -48,27 +49,38 @@ from _common import (
     set_global,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
+from pinion_cam_geometry import (
+    BORE,
+    BOSS_DIA,
+    BOSS_PROUD,
+    BOSS_Z,
+    CAM_LEN,
+    CAM_OD,
+    ECC,
+    TAP_DRILL_DIA,
+)
+from pinion_cam_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "pinion-cam"
 MATERIAL = "Plain Carbon Steel"  # bright steel collar (img01)
-
-CAM_OD = 9.2  # collar OD -- the photo reads ~9.5 vs the Ø6.35 rod (med);
-# trimmed 0.3 because the PARK clearance is the SKEW-perpendicular distance
-# from the collar axis to the LEANING pin line, not the vertical gap at the
-# crossing x (9.5 left the pair 0.009 interpenetrating: two 0.00 mm^3
-# interference-gate hits on the first PR8 assembly build)
-CAM_LEN = 9.0  # along the rod (med)
-ECC = 1.0  # bore offset -> 2.0 full lift; 0.575 min wall over the bore
-BORE = 6.35  # rides the lift rod (derived)
-BOSS_DIA = 3.2  # set-pin dome, photo ~3.2 (low)
-BOSS_PROUD = 0.5  # proud of the OD at the thick (down/park) side; capped
-# by the SPRING FOOT crossing under the back cam at the same z band:
-# the boss sweep circle (ecc + R + proud about LIFT_Y 58.14) bottoms at
-# 51.89 vs the 51.6 strip top (0.29 air; 1.2 dug 0.41 into the strip)
-BOSS_Z = 1.7  # boss axis station from the front face: near the FRONT so
-# the boss z band (+-1.6) stays clear of the follower pin band -- the cam
-# is placed with the pin near its BACK end (build_drive_train CAM_Z0_OFF);
-# a mid-collar boss would sweep through the pin in 3D mid-rotation
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 CAM_R = CAM_OD / 2.0
 BORE_R = BORE / 2.0
@@ -103,8 +115,28 @@ def _boss_added() -> float:
 V_BOSS = _boss_added()  # ~17.5
 
 
+def _tap_drill_removed() -> float:
+    """Volume from the boss tip through to the existing rod bore."""
+    tap_r = TAP_DRILL_DIA / 2.0
+    n = 2000
+    h = 2.0 * tap_r / n
+
+    def f(x: float) -> float:
+        chord = 2.0 * math.sqrt(max(tap_r**2 - x * x, 0.0))
+        bore_wall_y = -math.sqrt(max(BORE_R**2 - x * x, 0.0))
+        return chord * (bore_wall_y - _BOSS_TIP_Y)
+
+    s = f(-tap_r) + f(tap_r)
+    s += 4.0 * sum(f(-tap_r + (2 * k - 1) * h) for k in range(1, n // 2 + 1))
+    s += 2.0 * sum(f(-tap_r + 2 * k * h) for k in range(1, n // 2))
+    return s * h / 3.0
+
+
+V_TAP_DRILL = _tap_drill_removed()
+
+
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -115,6 +147,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "Ecc", f"{ECC}mm")
     await set_global(adapter, "BoreDia", f"{BORE}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    await set_global(adapter, "TapDrillDia", f"{TAP_DRILL_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -135,6 +168,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=CAM_LEN)),
     )
     name_last_feature(adapter, "Collar")
+    depth_dim = name_dimensions(adapter, "Collar", ["Depth"])
+    drive_jobs += [(depth_dim[0], '"CamLen"')]
     v_solid = math.pi * CAM_R**2 * CAM_LEN
     volume = await volume_check(adapter, "collar", v_solid, 0.005 * v_solid)
 
@@ -178,6 +213,46 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "SetPinBoss")
     volume = await volume_check(adapter, "set-pin boss", volume + V_BOSS, 0.1 * V_BOSS)
 
+    # M2.5 x 0.45 tap drill, cut from the boss tip into the existing rod bore.
+    # The drawing releases the final 6H thread and minimum full-thread length;
+    # this pilot geometry makes the machining operation part of the model too.
+    check(
+        "create_plane tap drill at boss tip",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Top Plane",
+                offset=_BOSS_TIP_Y,
+            )
+        ),
+    )
+    tap_plane_name = name_last_feature(adapter, "TapDrillPlane")
+    tap = SketchDims()
+    check(
+        "create_sketch tap drill",
+        await adapter.create_sketch(tap_plane_name),
+    )
+    await define_circle(
+        adapter, 0.0, -BOSS_Z, TAP_DRILL_DIA / 2.0, "tap drill", dims=tap,
+        names=("TapCx", "TapCz", "TapDrillDia"),
+        drives=(None, None, '"TapDrillDia"'),
+    )
+    await ensure_fully_defined(adapter, "tap-drill sketch")
+    check("exit_sketch tap drill", await adapter.exit_sketch())
+    name_last_feature(adapter, "TapDrillProfile")
+    drive_jobs += tap.apply(adapter, "TapDrillProfile")
+    check(
+        "cut M2.5 tap drill to bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=-_BOSS_TIP_Y,
+            )
+        ),
+    )
+    name_last_feature(adapter, "M2.5TapDrill")
+    volume -= V_TAP_DRILL
+    await volume_check(adapter, "M2.5 tap drill", volume, 0.05 * V_TAP_DRILL)
+
     # Named bore axis for the rod mate (Axis1).
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "cam bore axis")
 
@@ -189,10 +264,26 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven cam (equations neutral)", volume, 0.01 * V_COLLAR)
 
+    # Manufacturing drawing support: mark exactly the print's dimensions and
+    # stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

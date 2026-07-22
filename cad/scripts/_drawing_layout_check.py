@@ -181,10 +181,16 @@ class Overlap:
     depth_y: float
 
     def describe(self) -> str:
+        def box_mm(element: LayoutElement) -> str:
+            return (
+                f"[{element.xmin * 1000:.1f}, {element.ymin * 1000:.1f}, "
+                f"{element.xmax * 1000:.1f}, {element.ymax * 1000:.1f}] mm"
+            )
+
         return (
-            f"{self.a.kind} {self.a.label!r} overlaps {self.b.kind} "
-            f"{self.b.label!r} by {self.depth_x * 1000:.1f} x "
-            f"{self.depth_y * 1000:.1f} mm"
+            f"{self.a.kind} {self.a.label!r} {box_mm(self.a)} overlaps "
+            f"{self.b.kind} {self.b.label!r} {box_mm(self.b)} by "
+            f"{self.depth_x * 1000:.1f} x {self.depth_y * 1000:.1f} mm"
         )
 
 

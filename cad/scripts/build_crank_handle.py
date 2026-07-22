@@ -2,10 +2,10 @@ r"""Reproduction script: crank handle (book ch. 11, pp. 12-15).
 
 The pear-shaped wooden handle (stained black) that rotates on the crank-arm
 pivot -- the book calls it "a smooth piece of wood ... well-suited for a firm
-grip" (p.12). The brass collar at the crank end is modelled as an integral
-cylindrical section of the revolve profile (it gets its own appearance at
-M3 material assignment); the slotted pivot screw is a separate part
-(grouped with the plain shafts/pins).
+grip" (p.12). The current source part is one oak body: the collar-shaped
+cylindrical section at the crank end is integral with the revolve profile.
+Do not claim a separate brass collar on its manufacturing drawing unless the
+source model is split and assigned accordingly.
 
 The silhouette is now genuinely SMOOTH (the earlier revision approximated it
 with straight, axially-faceted segments). Two internally-tangent circular
@@ -41,6 +41,7 @@ from _common import (
     apply_color,
     STAINED_OAK,
     check,
+    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -52,20 +53,45 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _saved_part_guard import require_saved_drawing_properties
 
 PART_NAME = "crank-handle"
 MATERIAL = "Oak"  # see _common.apply_material docstring
 
-HANDLE_LENGTH = 90.0  # DIMENSIONS.md ch11: handle length (low)
-HANDLE_MAX_DIA = 22.0  # DIMENSIONS.md ch11: handle diameter (low)
-COLLAR_LENGTH = 6.0  # DIMENSIONS.md ch11: brass collar, p.12 photo (low)
-COLLAR_DIA = 11.0  # DIMENSIONS.md ch11: brass collar, p.12 photo (low)
+# Primitive nominals come from the drawing spec (single source of truth shared
+# with the manufacturing print).
+from crank_handle_spec import (  # noqa: E402
+    CAP_R,
+    COLLAR_DIA,
+    COLLAR_LENGTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FRONT_PROFILE_R,
+    HANDLE_LENGTH,
+    HANDLE_MAX_DIA,
+    ISOMETRIC_VIEW_NOTE,
+    NECK_R,
+    PEAK_X,
+    PIVOT_BORE_DIA,
+    REAR_PROFILE_R,
+)
 
 COLLAR_R = COLLAR_DIA / 2.0
 PEAK_R = HANDLE_MAX_DIA / 2.0
-NECK_R = 4.8  # waist just below the collar (p.12 photo); < collar -> shoulder
-PEAK_X = 62.0  # axial station of the maximum diameter (p.15 photo, ~0.69 L)
-CAP_R = 3.5  # flat butt cap (metal disc + slot screw seat), p.15 photo
+
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
 
 # Smooth pear silhouette = two circular arcs that meet at the swell (PEAK_X,
 # PEAK_R) with a common horizontal tangent (both centres sit directly below
@@ -76,10 +102,10 @@ CAP_R = 3.5  # flat butt cap (metal disc + slot screw seat), p.15 photo
 # For a chord that rises dh over run dx to a horizontal-tangent apex, the
 # radius is R = (dx^2 + dh^2) / (2 dh) and the centre is PEAK_R - R below.
 _dx_f, _dh_f = PEAK_X - COLLAR_LENGTH, PEAK_R - NECK_R
-FRONT_R = (_dx_f**2 + _dh_f**2) / (2.0 * _dh_f)
+FRONT_R = FRONT_PROFILE_R
 FRONT_CY = PEAK_R - FRONT_R
 _dx_r, _dh_r = HANDLE_LENGTH - PEAK_X, PEAK_R - CAP_R
-REAR_R = (_dx_r**2 + _dh_r**2) / (2.0 * _dh_r)
+REAR_R = REAR_PROFILE_R
 REAR_CY = PEAK_R - REAR_R
 # Both circles pass through the swell apex (their common top point) and share
 # x = PEAK_X centres -> they are internally tangent there (|ΔCY| == ΔR):
@@ -87,7 +113,7 @@ assert abs(abs(FRONT_CY - REAR_CY) - abs(FRONT_R - REAR_R)) < 1e-6
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -106,6 +132,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "NeckR", f"{NECK_R}mm")
     await set_global(adapter, "PeakX", f"{PEAK_X}mm")
     await set_global(adapter, "CapR", f"{CAP_R}mm")
+    await set_global(adapter, "PivotBoreDia", f"{PIVOT_BORE_DIA}mm")
 
     # Per-sketch SketchDims records each dim in emission order; apply() renames
     # them and collects the drive jobs run in one deferred batch at the end (every
@@ -147,6 +174,14 @@ async def build(adapter) -> dict[str, str]:
             PEAK_X, REAR_CY, HANDLE_LENGTH, CAP_R, PEAK_X, PEAK_R
         ),
     )
+    # Construction-only witness line inside the visible swell.  Keep both ends
+    # clear of the profile and axis: a line that touches the already-constrained
+    # arc join or axis inherits coincident relations and makes its peak-station
+    # dimension redundant/over-defining in SolidWorks.
+    peak_station = check(
+        "peak station construction line",
+        await adapter.add_centerline(PEAK_X, 2.0, PEAK_X, 3.0),
+    )
     cap_face = check(
         "butt cap face",
         await adapter.add_line(HANDLE_LENGTH, CAP_R, HANDLE_LENGTH, 0.0),
@@ -157,7 +192,7 @@ async def build(adapter) -> dict[str, str]:
     )
     set_sketch_direct_db(adapter, False)
 
-    # 16-DOF profile. The centerline merged into the (0, 0) / (HANDLE_LENGTH,
+    # The profile centerline merged into the (0, 0) / (HANDLE_LENGTH,
     # 0) chain ends, so horizontal + a length dim on it pin the axis (as in
     # crank-pin). The collar face/top/step get h/v + linear dims; each arc
     # centre is anchored (radius then derives from a pinned point -- the neck
@@ -201,6 +236,22 @@ async def build(adapter) -> dict[str, str]:
                 await adapter.add_sketch_dimension(ent, None, "linear", value),
             )
             profile.record(name, drive)
+    check(
+        "peak station vertical",
+        await adapter.add_sketch_constraint(peak_station, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{peak_station}.start", PEAK_X, 2.0, "peak station"
+    )
+    profile.record("PeakStation", '"PeakX"')
+    profile.record(None, None)
+    check(
+        "peak witness construction length",
+        await adapter.add_sketch_dimension(
+            peak_station, None, "linear", 1.0
+        ),
+    )
+    profile.record(None, None)
     # Each arc centre is off-axis (PEAK_X != 0, *_CY < 0): anchor_point_to_origin
     # emits a horizontal then a vertical distance dim. The horizontal span is
     # PEAK_X (clean knob -> "PeakX"); the vertical span is the arc-centre depth
@@ -233,8 +284,35 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Handle")
 
-    # Capture the as-built volume as the neutrality reference (the revolved
-    # twin-arc silhouette has no tidy closed form), then apply the deferred drive
+    # Axial running bore through the grip. The Right plane is normal to the
+    # handle's +X turning axis, so this cut is coaxial with the revolve and its
+    # true-circle end view gives the drawing an inspectable bore callout.
+    bore = SketchDims()
+    check("create_sketch pivot bore", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        PIVOT_BORE_DIA / 2.0,
+        "pivot bore",
+        dims=bore,
+        names=("PivotBoreCy", "PivotBoreCz", "PivotBoreDia"),
+        drives=(None, None, '"PivotBoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "pivot bore sketch")
+    check("exit_sketch pivot bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotBoreProfile")
+    drive_jobs += bore.apply(adapter, "PivotBoreProfile")
+    check(
+        "cut pivot bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.5 * HANDLE_LENGTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "PivotBore")
+
+    # Capture the as-built volume as the neutrality reference (the bored,
+    # revolved twin-arc silhouette has no tidy closed form), then apply the deferred drive
     # equations after the model + a rebuild exists so every target resolves. Each
     # equation evaluates to the value just built, so the geometry must not move.
     mass = await adapter.get_mass_properties()
@@ -251,10 +329,26 @@ async def build(adapter) -> dict[str, str]:
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
+    # Manufacturing drawing support: mark exactly the print's axial dimensions
+    # and stamp the make-critical title-block properties.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, STAINED_OAK)  # ch30 plates: see _common palette
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
 
 
 if __name__ == "__main__":

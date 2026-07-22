@@ -98,6 +98,7 @@ from _assembly_postbuild import (
     discard_open_documents,
     load_dof_manifest,
 )
+from _interference_contracts import allowed_interference_pairs
 from _common import (  # component iteration helpers (read-only)
     _early_bound,
     _read_member,
@@ -859,7 +860,13 @@ def _run_soundness_battery(
         f"{name}:model-healthy",
         lambda: _assert_soundness_health(adapter, name, rebuilt),
     )
-    report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
+    report.gate(
+        f"{name}:interference-free",
+        lambda: check_no_interference(
+            adapter,
+            allowed_pairs=allowed_interference_pairs(name),
+        ),
+    )
     if name == CHANNEL_OWNER:
         report.gate(
             f"{name}:channel-independence",
@@ -980,7 +987,13 @@ async def _verify_static_one(
         f"{name}:model-healthy",
         lambda: _assert_soundness_health(adapter, name, rebuilt),
     )
-    report.gate(f"{name}:interference-free", lambda: check_no_interference(adapter))
+    report.gate(
+        f"{name}:interference-free",
+        lambda: check_no_interference(
+            adapter,
+            allowed_pairs=allowed_interference_pairs(name),
+        ),
+    )
     # component-count REMOVED: every historical failure of that gate was a stale band
     # or a gate bug (never a real regression), so it cost more in false alarms than it
     # ever caught. The expected counts survive as reference data in `_COMPONENT_BAND`.

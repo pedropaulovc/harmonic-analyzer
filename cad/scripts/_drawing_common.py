@@ -28,7 +28,12 @@ from _drawing_layout_check import (
 )
 from _drawing_registry import PROJECT_DRWDOT
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, dispatch_array
+from solidworks_mcp.adapters.com_variant import (
+    bool_array,
+    bstr_array,
+    dispatch_array,
+    double_array,
+)
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     TOL_BASIC,
@@ -782,6 +787,101 @@ def add_view_centerline(
     return centerline
 
 
+@_telemetry.traced("drawing.section_view", label_param="label")
+def create_section_view(
+    adapter: Any,
+    parent_view: Any,
+    *,
+    line_start: tuple[float, float],
+    line_end: tuple[float, float],
+    view_xy: tuple[float, float],
+    section_label: str,
+    scale: tuple[int, int] = (1, 1),
+    label: str,
+) -> Any:
+    """Create a full, unaligned section from one straight cutting-plane line.
+
+    The coordinates are drawing-sheet meters.  ``ISketchManager.CreateLine``
+    leaves the new sketch segment selected, which is the documented precondition for
+    ``CreateSectionViewAt5``.  The section is deliberately unaligned so a part
+    recipe can place and scale it independently of the parent view.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    name = view_name(adapter, parent_view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate section parent view {name!r} ({label})")
+    draw.ClearSelection2(True)
+    segment = sketch_manager.CreateLine(
+        float(line_start[0]),
+        float(line_start[1]),
+        0.0,
+        float(line_end[0]),
+        float(line_end[1]),
+        0.0,
+    )
+    if segment is None:
+        raise RuntimeError(f"failed to create section line ({label})")
+    # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
+    section = ddoc.CreateSectionViewAt5(
+        float(view_xy[0]),
+        float(view_xy[1]),
+        0.0,
+        section_label,
+        0x1 | 0x8,
+        None,
+        0.0,
+    )
+    if section is None:
+        raise RuntimeError(f"failed to create section view ({label})")
+    section = _sw_type_info.early_bound_or_flag(
+        section, "IView", "GetSection", "SetViewPosition"
+    )
+    section.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+    if not section.SetViewPosition(
+        double_array([float(view_xy[0]), float(view_xy[1])]), False
+    ):
+        raise RuntimeError(f"failed to position section view ({label})")
+    dr_section = section.GetSection()
+    if dr_section is None:
+        raise RuntimeError(f"section view has no section definition ({label})")
+    dr_section = _sw_type_info.early_bound_or_flag(
+        dr_section, "IDrSection", "SetAutoHatch", "SetLabel2"
+    )
+    dr_section.SetAutoHatch(True)
+    if int(dr_section.SetLabel2(section_label)) < 0:
+        raise RuntimeError(f"failed to persist section label ({label})")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    return section
+
+
+@_telemetry.traced("drawing.model_point_projection", label_param="label")
+def model_point_in_view(
+    adapter: Any,
+    view: Any,
+    xyz: tuple[float, float, float],
+    *,
+    label: str,
+) -> tuple[float, float]:
+    """Project a model-space point into drawing-sheet coordinates."""
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    model_point = math_utility.CreatePoint(double_array([float(v) for v in xyz]))
+    if model_point is None:
+        raise RuntimeError(f"failed to create model point ({label})")
+    model_point = _early_bound(model_point, "IMathPoint")
+    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
+    view_point = model_point.MultiplyTransform(transform)
+    if view_point is None:
+        raise RuntimeError(f"failed to project model point into view ({label})")
+    view_point = _early_bound(view_point, "IMathPoint")
+    coordinates = list(view_point.ArrayData or ())
+    if len(coordinates) < 2:
+        raise RuntimeError(f"projected model point has no sheet coordinates ({label})")
+    return (float(coordinates[0]), float(coordinates[1]))
+
+
 @_telemetry.traced("drawing.linked_note", label_param="property_name")
 def add_property_linked_note(
     adapter: Any,
@@ -877,22 +977,16 @@ def add_attached_note(
     view: Any,
     *,
     text: str,
-    edge_xy: tuple[float, float],
+    entity_xy: tuple[float, float],
     note_xy: tuple[float, float],
     label: str,
     entity_type: str = "EDGE",
-    entity: Any | None = None,
 ) -> Any:
-    """Attach one literal, arrowed manufacturing callout to a model entity."""
-    draw = adapter.currentModel
-    edge = _select_view_entity(
-        adapter,
-        view,
-        entity_type,
-        edge_xy,
-        label=label,
-        entity=entity,
+    """Attach one literal arrowed note to a drawing-view entity."""
+    entity = _select_view_entity(
+        adapter, view, entity_type, entity_xy, label=label
     )
+    draw = adapter.currentModel
     note = draw.InsertNote(text)
     if note is None:
         raise RuntimeError(f"failed to insert attached note ({label})")
@@ -910,9 +1004,9 @@ def add_attached_note(
         "GetLeaderCount",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
-        if not annotation.SetAttachedEntities(dispatch_array([edge])):
+        if not annotation.SetAttachedEntities(dispatch_array([entity])):
             raise RuntimeError(f"failed to attach note ({label})")
-    status = int(annotation.SetLeader3(1, 0, True, False, False, False))
+    status = annotation.SetLeader3(1, 0, True, False, False, False)
     if status != 0:
         raise RuntimeError(f"failed to create attached-note leader ({label}): {status}")
     if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
@@ -922,7 +1016,7 @@ def add_attached_note(
         int(annotation.GetAttachedEntityCount3()) != 1
         or int(annotation.GetLeaderCount()) != 1
     ):
-        raise RuntimeError(f"attached note lacks one attached arrow ({label})")
+        raise RuntimeError(f"attached note lacks one arrow ({label})")
     draw.ClearSelection2(True)
     return note
 
@@ -1678,6 +1772,37 @@ def set_dimension_text(
     if remaining:
         raise RuntimeError(f"dimension text not applied: {sorted(remaining)}")
     adapter.currentModel.EditRebuild3()
+
+
+@_telemetry.traced("drawing.reference_dimension", label_param="label")
+def set_reference_dimension(
+    adapter: Any,
+    annotation: Any,
+    *,
+    label: str,
+    diameter: bool = False,
+) -> Any:
+    """Parenthesize one displayed nominal as an ASME reference dimension."""
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetSpecificAnnotation"
+    )
+    display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+    if display is None:
+        raise RuntimeError(f"{label} has no display dimension")
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "SetText", "GetText"
+    )
+    prefix_text = "(<MOD-DIAM>" if diameter else "("
+    display.SetText(1, prefix_text)  # swDimensionTextPrefix
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    prefix = str(display.GetText(1) or "")
+    suffix = str(display.GetText(2) or "")
+    if (prefix, suffix) != (prefix_text, ")"):
+        raise RuntimeError(
+            f"failed to parenthesize {label}: prefix={prefix!r}, suffix={suffix!r}"
+        )
+    adapter.currentModel.EditRebuild3()
+    return display
 
 
 def set_dimension_precision(

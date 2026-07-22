@@ -683,6 +683,11 @@ VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 # Verify/preflight gate logic that is NOT on any assembly's build closure (so it
 # does not ride a .SLDASM digest) -> a direct file_dep of verify:/preflight tasks.
 POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
+# Interference-acceptance contract read by verify.py's soundness gate. Like
+# POSTBUILD_PY it decides gate OUTCOMES, so a change to it must re-run soundness
+# even when no geometry moved; the part-geometry it imports already rides each
+# assembly's execution token (codex #359).
+INTERFERENCE_CONTRACTS_PY = (SCRIPTS_DIR / "_interference_contracts.py").resolve()
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
@@ -1577,6 +1582,7 @@ def task_verify_soundness():
         deps = [
             str(VERIFY_PY),
             str(POSTBUILD_PY),
+            str(INTERFERENCE_CONTRACTS_PY),
             str(sldasm),
             _assembly_execution_token(stem),
         ]

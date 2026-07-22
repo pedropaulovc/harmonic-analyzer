@@ -432,10 +432,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         text=f"CRANK BORE <MOD-DIAM>{CRANK_BORE_DIA:.3f} +/-0.025 THRU",
-        edge_xy=crank_xy,
+        entity_xy=crank_xy,
         note_xy=(0.145, _front_y(CRANK_BORE_HEIGHT) + 0.025),
         label="crank-bore size",
-        entity=crank_entity,
     )
     add_feature_control_frame(
         adapter,

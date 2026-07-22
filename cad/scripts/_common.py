@@ -924,7 +924,12 @@ async def volume_check(adapter: Any, label: str, expected: float, tol: float) ->
 
 @_telemetry.traced("feature.extrude")
 def extrude_at_offset(
-    adapter: Any, depth: float, offset: float, flip: bool = False
+    adapter: Any,
+    depth: float,
+    offset: float,
+    flip: bool = False,
+    *,
+    merge_result: bool = True,
 ) -> str:
     """Boss-extrude the last exited sketch starting at an offset from its plane.
 
@@ -960,7 +965,7 @@ def extrude_at_offset(
         0.0, 0.0,  # Dang1/2
         False, False,  # OffsetReverse1/2
         False, False,  # TranslateSurface1/2
-        True,  # Merge
+        merge_result,  # Merge
         False,  # UseFeatScope
         True,  # UseAutoSelect
         3,  # T0: swStartOffset
