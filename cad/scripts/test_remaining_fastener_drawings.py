@@ -164,15 +164,19 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
 
     assert spec.SHOULDER_LEN == spec.PLATFORM_THICKNESS + spec.AXIAL_CLEARANCE
     assert spec.SHOULDER_DIA == pytest.approx(6.35)
+    assert spec.THREAD == "#10-24"
+    assert spec.THREAD_MAJOR_DIA == pytest.approx(4.826)
+    assert spec.THREAD_PITCH == pytest.approx(25.4 / 24.0)
+    assert (spec.SHOULDER_DIA - spec.THREAD_MAJOR_DIA) / 2.0 >= 0.75
     assert spec.PLATFORM_THICKNESS == platform.PLATE_T
     assert platform.PIVOT_HOLE_DIA > spec.SHOULDER_DIA
-    assert spec.THREAD_TAIL_LEN >= spec.SHOULDER_DIA
+    assert spec.THREAD_TAIL_LEN >= spec.THREAD_MAJOR_DIA
     assert base.PIVOT_SEAT_SPEC.kind == "tapped"
     assert base.PIVOT_SEAT_SPEC.size == spec.THREAD
     assert base.PIVOT_SEAT_SPEC.thread_class == "2B"
     assert drive.PSCREW_THREAD == spec.THREAD
     assert drive.PSCREW_THREAD_TAP_DRILL_DIA == spec.THREAD_TAP_DRILL_DIA
-    assert spec.THREAD_MAJOR_DIA == pytest.approx(6.35)
+    assert spec.THREAD_TAP_DRILL_DIA == pytest.approx(3.797)
     assert spec.THREAD_TAP_DRILL_DIA == base.PIVOT_SCREW_HOLE_DIA
     assert base.PIVOT_HOLE_DEPTH - spec.THREAD_TAIL_LEN >= 1.5
     assert "DO NOT RELEASE" not in spec.DRAWING_NOTES

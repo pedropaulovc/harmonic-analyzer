@@ -3,7 +3,7 @@ r"""Reproduction script: cone platform pivot screw (item 2, p.18 "pivot").
 The slotted shoulder screw the swing platform rotates on.  Its ground shoulder
 is 0.25 mm longer than the plate thickness, so tightening the threaded tail
 against the base leaves running axial clearance instead of clamping the plate.
-The distinct 1/4-20 UNC-2A tail engages the base's blind UNC-2B seat.
+The distinct #10-24 UNC-2A tail engages the base's blind UNC-2B seat.
 
 Stacked extrudes from the under-head datum (origin, Top plane): head up,
 shoulder and thread tail down; one rectangular cut across the head top forms

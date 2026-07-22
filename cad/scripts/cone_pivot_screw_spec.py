@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the cone pivot screw and drawing.
 
 The screw is a made, slotted shoulder screw.  Its ground shoulder carries the
-6.35 mm swing plate with deliberate axial clearance; a distinct 1/4-20 UNC-2A
+6.35 mm swing plate with deliberate axial clearance; a distinct #10-24 UNC-2A
 tail engages the matching blind UNC-2B base seat.  The catalog owns the thread,
 overall under-head length, and shoulder diameter.
 """
@@ -9,7 +9,7 @@ overall under-head length, and shoulder diameter.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
-from _holes import TAP_DRILL_MM
+from _holes import TAP_DRILL_MM, THREAD_MAJOR_MM
 
 
 _SPEC = fastener("cone-pivot-screw")
@@ -27,20 +27,22 @@ UNDERHEAD_LEN = _SPEC.length_mm
 THREAD_TAIL_LEN = UNDERHEAD_LEN - SHOULDER_LEN
 THREAD = _SPEC.thread
 THREAD_DESIGNATION = f"{THREAD} UNC-2A"
-THREAD_PITCH = 25.4 / 20.0
+THREAD_PITCH = 25.4 / int(THREAD.rsplit("-", 1)[1])
 THREAD_LENGTH_TOL = 0.10
 THREAD_RUNOUT_PITCHES = 1.0
 DISTAL_CHAMFER = 0.50
 MIN_FULL_FORM = 6.00
 # The part carries the external thread's major-diameter envelope plus a native
 # cosmetic thread.  The mating base hole remains authored at the tap drill.
-THREAD_MAJOR_DIA = 25.4 / 4.0
+THREAD_MAJOR_DIA = THREAD_MAJOR_MM[THREAD]
 THREAD_TAP_DRILL_DIA = TAP_DRILL_MM[THREAD]
 
-if THREAD_TAIL_LEN < SHOULDER_DIA:
+if THREAD_TAIL_LEN < THREAD_MAJOR_DIA:
     raise ValueError(
         "cone pivot thread engagement must be at least one nominal diameter"
     )
+if THREAD_MAJOR_DIA >= SHOULDER_DIA:
+    raise ValueError("cone pivot thread must leave a positive annular shoulder seat")
 if (
     THREAD_TAIL_LEN
     - THREAD_LENGTH_TOL

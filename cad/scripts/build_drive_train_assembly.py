@@ -1708,7 +1708,7 @@ async def build(adapter) -> dict[str, str]:
     # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC.
     # Its shoulder bottoms on the base top, placing the head 0.25 above the
     # plate and leaving the plate free to swing; the threaded tail enters the
-    # matching blind 1/4-20 UNC-2B seat.
+    # matching blind #10-24 UNC-2B seat.
     pivot_screw = await place_component(
         adapter, "cone-pivot-screw",
         [ppivot[0], Y_BASE_TOP + PSCREW_SHOULDER_LEN, ppivot[2]],
