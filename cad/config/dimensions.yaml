@@ -1794,7 +1794,7 @@ sections:
       (`SPRING_*`). The engage path (PR5) is the p.69 cam: the lift rod rides
       the blocks' WEST bores (`LIFT_X = PIVOT_X − 15`; it sat east through the
       DP40 cram, but an east lift swings the drum OUT of mesh), and each strap
-      tail carries a Ø3 follower pin (table row above) the rod's radial cam
+      tail carries a Ø4 follower pin (table row above) the rod's radial cam
       pin lifts — parked gap 0.9, first touch at ~12° rod azimuth, engaged
       pose holdable at ~11°, tail-cap gouge excluded through the sweep, all
       asserted analytically (`CAM_*` + the segment-distance scan). At DP 49.82
