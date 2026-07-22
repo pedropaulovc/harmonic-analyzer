@@ -131,7 +131,7 @@ MANUAL_EXTERIOR_BALLOON_ITEMS = {
 }
 MANUAL_EXTERIOR_VIEW_ORDER = {
     "cone-tip-adjuster": (2, 1, 0),
-    "cone-tip-pinch-screw": (1, 2, 0),
+    "cone-tip-pinch-screw": (2, 1, 0),
     "swing-stop-screw": (1, 2, 0),
     "alignment-pinion": (2, 1, 0),
     "crank-pinion": (1, 2, 0),
