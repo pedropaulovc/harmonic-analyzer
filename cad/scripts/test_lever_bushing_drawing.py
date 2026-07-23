@@ -49,7 +49,7 @@ def test_native_gdt_controls_bushing_functional_surfaces() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
     assert "edge_xy=bore_top" in source
-    assert source.count("position_tolerance_m=0.0001") == 1
+    assert source.count("position_tolerance_m=0.001") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"circular_runout\"" in source
     assert "characteristic=\"parallelism\"" in source

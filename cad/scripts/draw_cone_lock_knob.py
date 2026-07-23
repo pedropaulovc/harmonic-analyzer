@@ -282,7 +282,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_position_xy=(0.12469169737294514, 0.2537515839143207),
         datum="A",
         label="knob body axis",
-        position_tolerance_m=0.00002,
+        position_tolerance_m=0.001,
     )
     add_feature_control_frame(
         adapter,

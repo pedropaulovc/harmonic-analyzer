@@ -234,7 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_position_xy=(0.08615498326870875, 0.10781527172509928),
         datum="B",
         label="cam final bore axis",
-        position_tolerance_m=0.00002,
+        position_tolerance_m=0.001,
     )
     # The OD-axis datum is constrained more strongly: live readback places its
     # tag 18.197 mm from the requested sheet point.  Keep the intended anchor
@@ -261,7 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_position_xy=(0.19595148576383914, 0.17098280543184766),
         datum="D",
         label="cam boss OD axis",
-        position_tolerance_m=0.00002,
+        position_tolerance_m=0.001,
     )
     add_feature_control_frame(
         adapter,

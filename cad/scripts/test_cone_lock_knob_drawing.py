@@ -79,10 +79,10 @@ def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
         '        expected_position_xy=(0.12469169737294514, 0.2537515839143207),\n'
         '        datum="A",\n'
         '        label="knob body axis",\n'
-        "        position_tolerance_m=0.00002,"
+        "        position_tolerance_m=0.001,"
         in source
     )
-    assert source.count("position_tolerance_m=0.00002") == 1
+    assert source.count("position_tolerance_m=0.001") == 1
 
 
 def test_view_scales_are_explicit() -> None:

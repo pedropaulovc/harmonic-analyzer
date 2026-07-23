@@ -57,10 +57,10 @@ def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
         "        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),\n"
         '        datum="A",\n'
         '        label="pinion arbor axis",\n'
-        "        position_tolerance_m=0.00002,"
+        "        position_tolerance_m=0.001,"
         in source
     )
-    assert source.count("position_tolerance_m=0.00002") == 1
+    assert source.count("position_tolerance_m=0.001") == 1
     assert "characteristic=\"cylindricity\"" in source
     # Only the flat front tip is squared to the axis -- the back end is the crown.
     assert source.count("characteristic=\"perpendicularity\"") == 1

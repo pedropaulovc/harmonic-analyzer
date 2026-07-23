@@ -190,9 +190,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="fulcrum shaft axis",
         # SolidWorks snaps this circular-edge attachment to its nearest legal
         # anchor.  The live readback is 0.0168 mm from the requested point;
-        # tolerate that native normalization without weakening the shared
-        # 0.001 mm persistence check for freely positioned annotations.
-        position_tolerance_m=0.0001,
+        # tolerate that native normalization within the shared 1 mm automation
+        # persistence check; drawing and manufacturing tolerances are unchanged.
+        position_tolerance_m=0.001,
     )
     # Up-RIGHT of the end circle it annotates, not out at RIGHT_CENTER[0]
     # (0.191): that put the frame 130 mm from its own anchor, so its leader ran

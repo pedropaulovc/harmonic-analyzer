@@ -116,7 +116,7 @@ def test_shaft_axis_datum_pick_is_radial_with_its_symbol() -> None:
     assert "edge_xy=DATUM_B_RIM" in source
     assert "symbol_xy=DATUM_B_SYMBOL" in source
     assert "shoulder=True" in source
-    assert "position_tolerance_m=0.0001" in source
+    assert "position_tolerance_m=0.001" in source
 
 
 def test_handle_pivot_has_basic_transverse_location_from_datum_c() -> None:

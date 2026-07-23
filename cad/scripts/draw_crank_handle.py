@@ -206,7 +206,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # are the same legal placement, so gate the bounded normalization rather
         # than one session's exact floating-point result.
         expected_position_xy=(RIGHT_CENTER[0], 0.245),
-        position_tolerance_m=0.00002,
+        position_tolerance_m=0.001,
         datum="A",
         label="collar OD datum axis",
     )

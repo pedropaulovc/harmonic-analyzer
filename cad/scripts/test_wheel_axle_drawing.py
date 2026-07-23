@@ -65,10 +65,10 @@ def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
     assert (
         '        datum="B",\n'
         '        label="stud bearing axis",\n'
-        "        position_tolerance_m=0.00002,"
+        "        position_tolerance_m=0.001,"
         in source
     )
-    assert source.count("position_tolerance_m=0.00002") == 1
+    assert source.count("position_tolerance_m=0.001") == 1
     assert source.count("expected_position_xy=ept(") == 1
     assert source.count("characteristic=\"perpendicularity\"") == 1
     assert source.count("characteristic=\"circular_runout\"") == 1

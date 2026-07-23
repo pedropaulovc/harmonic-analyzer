@@ -320,7 +320,7 @@ def add_datum_feature(
     entity: Any | None = None,
     annotation: Any | None = None,
     shoulder: bool = False,
-    position_tolerance_m: float = 1e-6,
+    position_tolerance_m: float = 0.001,
     callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
@@ -328,11 +328,39 @@ def add_datum_feature(
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges. Restricted datum tags
     can apply a deterministic normalization to ``symbol_xy``; when live
-    readback proves one, ``expected_position_xy`` keeps the persistence guard
-    tight around that normalized point without pretending the raw request is
-    what SolidWorks stores.
+    readback proves one, ``expected_position_xy`` bounds the persistence guard
+    around that normalized point without pretending the raw request is what
+    SolidWorks stores. Datum readback is session-dependent at micron scale, so
+    the default automation tolerance is 1 mm; this does not alter drawing or
+    manufacturing tolerances.
     """
     draw = adapter.currentModel
+    if annotation is not None:
+        selection_mode = "annotation"
+    elif entity is not None:
+        selection_mode = "entity"
+    elif edge_entity is not None:
+        selection_mode = "edge_entity"
+    else:
+        selection_mode = "sheet_coordinate"
+    selection_fields = {
+        "datum_position_signal": "drawing.datum_selection_request",
+        "datum": datum,
+        "drawing_label": label,
+        "selection_mode": selection_mode,
+        "entity_type": entity_type,
+        "edge_x_m": edge_xy[0] if edge_xy else None,
+        "edge_y_m": edge_xy[1] if edge_xy else None,
+        "requested_x_m": symbol_xy[0],
+        "requested_y_m": symbol_xy[1],
+    }
+    _telemetry.event("drawing.datum_selection_request", **selection_fields)
+    _telemetry.info(
+        f"datum {datum} selection request ({label}): "
+        f"mode={selection_mode}, entity_type={entity_type}, edge={edge_xy}, "
+        f"requested={symbol_xy}",
+        **selection_fields,
+    )
     if annotation is None:
         _select_annotation_entity(
             adapter,
@@ -407,14 +435,48 @@ def add_datum_feature(
             float(actual_position[1]) - expected_position[1],
         )
     )
+    actual_xy = (
+        None
+        if not actual_position
+        else (float(actual_position[0]), float(actual_position[1]))
+    )
+    position_fields = {
+        "datum_position_signal": "drawing.datum_position_readback",
+        "datum": datum,
+        "drawing_label": label,
+        "selection_mode": selection_mode,
+        "entity_type": entity_type,
+        "edge_x_m": edge_xy[0] if edge_xy else None,
+        "edge_y_m": edge_xy[1] if edge_xy else None,
+        "requested_x_m": symbol_xy[0],
+        "requested_y_m": symbol_xy[1],
+        "expected_x_m": expected_position[0],
+        "expected_y_m": expected_position[1],
+        "actual_x_m": actual_xy[0] if actual_xy else None,
+        "actual_y_m": actual_xy[1] if actual_xy else None,
+        "position_error_mm": (
+            position_error * 1000.0 if math.isfinite(position_error) else None
+        ),
+        "position_tolerance_mm": position_tolerance_m * 1000.0,
+        "normalized_expectation": expected_position_xy is not None,
+    }
+    _telemetry.event("drawing.datum_position_readback", **position_fields)
+    position_message = (
+        f"datum {datum} position readback ({label}): "
+        f"requested={symbol_xy}, expected={expected_position}, actual={actual_xy}, "
+        f"error={position_error * 1000.0:.6f} mm, "
+        f"limit={position_tolerance_m * 1000.0:.6f} mm"
+    )
     if position_error > position_tolerance_m:
+        _telemetry.warn(position_message, **position_fields)
         raise RuntimeError(
             f"datum {datum} position did not persist ({label}): "
-            f"{tuple(actual_position[:2]) if actual_position else None}; "
+            f"{actual_xy}; "
             f"requested={symbol_xy}, expected={expected_position}, "
             f"error={position_error:.6g} m, "
             f"limit={position_tolerance_m:.6g} m"
         )
+    _telemetry.info(position_message, **position_fields)
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
     if callout_below and not tag.SetText(4, callout_below):

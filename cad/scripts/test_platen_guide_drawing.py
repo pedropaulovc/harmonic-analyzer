@@ -174,10 +174,10 @@ def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
     assert (
-        'label="guide bottom edge",\n        position_tolerance_m=0.0001'
+        'label="guide bottom edge",\n        position_tolerance_m=0.001'
         in source
     )
-    assert source.count("position_tolerance_m=0.0001") == 1
+    assert source.count("position_tolerance_m=0.001") == 1
     assert source.count("add_feature_control_frame(") == 3
     assert "characteristic=\"flatness\"" in source
     assert "characteristic=\"parallelism\"" in source

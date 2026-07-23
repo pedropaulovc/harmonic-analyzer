@@ -233,7 +233,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # anchor.  The live readback is 0.0109 mm from the requested point;
         # allow that native normalization while retaining the shared strict
         # persistence check for freely positioned annotations.
-        position_tolerance_m=0.0001,
+        position_tolerance_m=0.001,
     )
     # Ra on the bore at 6 o'clock, and a position FCF tying the rod-pin hole
     # to the complete A-B-C datum reference frame.

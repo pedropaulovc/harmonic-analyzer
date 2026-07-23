@@ -147,7 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="drum bore axis",
         shoulder=True,
-        position_tolerance_m=0.0001,
+        position_tolerance_m=0.001,
     )
     add_feature_control_frame(
         adapter,

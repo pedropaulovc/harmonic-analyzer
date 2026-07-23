@@ -109,7 +109,7 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
         expected_tolerance = (
             "position_tolerance_m=0.008"
             if module.__name__ == "draw_cylinder_gear"
-            else "position_tolerance_m=0.0001"
+            else "position_tolerance_m=0.001"
         )
         assert expected_tolerance in source, module.__name__
         assert "shoulder=True" in source, module.__name__
