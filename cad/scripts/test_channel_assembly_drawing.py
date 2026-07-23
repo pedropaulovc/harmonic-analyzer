@@ -129,6 +129,8 @@ def test_manual_balloon_moves_are_locked_and_read_back() -> None:
     assert "annotation.SetPosition2(" not in helper
     assert "annotation.GetSpecificAnnotation()" in helper
     assert "annotation.GetPosition()" in helper
+    assert "target_anchor = position_xy" in helper
+    assert "position_xy[index]" in helper
     assert "note.LockPosition = True" in helper
     assert "note.LockPosition = False" not in helper
     assert "note.GetBalloonInfo()" in helper

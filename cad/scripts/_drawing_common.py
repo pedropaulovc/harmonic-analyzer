@@ -3283,12 +3283,11 @@ def position_bom_balloon(
     anchor = annotation.GetPosition()
     if info is None or len(info) < 2 or anchor is None or len(anchor) < 2:
         raise RuntimeError(f"{label}: item {item_number} has no position read-back")
-    actual_xy = (float(info[0]), float(info[1]))
-    delta = tuple(expected - actual for actual, expected in zip(actual_xy, position_xy))
-    target_anchor = (float(anchor[0]) + delta[0], float(anchor[1]) + delta[1])
-    # GetBalloonInfo can lag the note's new origin until the graphics pipeline
-    # redraws. Retry the SAME absolute anchor, never a cumulative delta against
-    # stale circle data, and redraw before judging each rendered-circle readback.
+    target_anchor = position_xy
+    # SetPosition controls the note origin while GetBalloonInfo reports the
+    # rendered balloon circle. AutoBalloon can offset those two points, so close
+    # the loop on the measured circle after each rebuild instead of assuming a
+    # fixed origin-to-circle transform.
     for _attempt in range(3):
         note.LockPosition = True
         moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
@@ -3317,6 +3316,14 @@ def position_bom_balloon(
             for index, expected in enumerate(position_xy)
         ):
             break
+        if moved_info is None or len(moved_info) < 2:
+            continue
+        target_anchor = tuple(
+            target_anchor[index]
+            + position_xy[index]
+            - float(moved_info[index])
+            for index in range(2)
+        )
     info = note.GetBalloonInfo()
     if info is None or len(info) < 2:
         raise RuntimeError(f"{label}: item {item_number} circle has no final read-back")
