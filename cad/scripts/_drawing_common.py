@@ -3283,6 +3283,7 @@ def position_bom_balloon(
         "GetAnnotation",
         "IsStackedBalloon",
         "IsStackedBalloonMaster",
+        "SetTextPoint",
     )
     annotation = note.GetAnnotation()
     if annotation is None:
@@ -3321,9 +3322,7 @@ def position_bom_balloon(
     # fixed origin-to-circle transform.
     for _attempt in range(3):
         note.LockPosition = True
-        moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
-        if not moved:
-            raise RuntimeError(f"{label}: failed to position item {item_number}")
+        note.SetTextPoint(target_anchor[0], target_anchor[1], 0.0)
         note.LockPosition = True
         adapter.currentModel.EditRebuild3()
         adapter.currentModel.GraphicsRedraw2()
@@ -3331,7 +3330,7 @@ def position_bom_balloon(
             adapter, item_number=item_number, label=label
         )
         note = _sw_type_info.early_bound_or_flag(
-            note, "INote", "GetBalloonInfo", "LockPosition"
+            note, "INote", "GetBalloonInfo", "LockPosition", "SetTextPoint"
         )
         annotation = _sw_type_info.early_bound_or_flag(
             annotation, "IAnnotation", "GetPosition", "SetPosition"
