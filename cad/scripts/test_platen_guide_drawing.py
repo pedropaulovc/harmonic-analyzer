@@ -34,7 +34,7 @@ def test_platen_guide_native_front_is_hole_entry_face() -> None:
     assert "(0.0, 0.0, 1.0)" in source
     assert "UpdateStandardViews" not in source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Front", 0.190, FRONT_VIEW_Y_M' in source
+    assert '"*Front", FRONT_VIEW_X_M, FRONT_VIEW_Y_M' in source
 
 
 def test_contact_preview_grid_preserves_legacy_layout_and_scales() -> None:
@@ -96,9 +96,19 @@ def test_drawing_hole_sizes_follow_unc_policy() -> None:
 
 
 def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
-    assert guide.HOLE_X[:2] == (53.0, 67.0)
-    assert tuple(x + 180.0 for x in guide.HOLE_X[:2]) == guide.HOLE_X[2:]
-    assert guide.SCREW_STATION_X == tuple(30.0 + 60.0 * i for i in range(5))
+    assert guide.LOCK_STATION_X == pytest.approx(
+        (guide.GUIDE_LENGTH * 0.3, guide.GUIDE_LENGTH * 0.7)
+    )
+    assert guide.HOLE_X == pytest.approx(
+        tuple(
+            station + offset
+            for station in guide.LOCK_STATION_X
+            for offset in (-guide.LOCK_SCREW_DX, guide.LOCK_SCREW_DX)
+        )
+    )
+    assert guide.SCREW_STATION_X == pytest.approx(
+        tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
+    )
     source = Path(guide.__file__).read_text(encoding="utf-8")
     assert 'HoleSpec("clearance", "#4")' in source
     assert '"tapped_bottoming", "#4-40"' in source
@@ -177,14 +187,16 @@ def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
         drawing.FRONT_LEFT_X_M + station / 1000.0
         for station in (*drawing.THROUGH_X, *drawing.BLIND_X)
     }
-    assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(0.220)
+    assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(
+        drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0
+    )
     assert min(abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x) == pytest.approx(
-        0.030
+        (guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "def _bottom_surface_edge(" in source
     assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
-    assert "if span_mm < 299.9:" in source
+    assert "if span_mm < GUIDE_LENGTH - 0.1:" in source
     assert "datum_b_entity = _bottom_surface_edge(front)" in source
     assert "entity=datum_b_entity" in source
     assert "symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098)" in source

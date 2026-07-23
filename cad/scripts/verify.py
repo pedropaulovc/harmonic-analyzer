@@ -185,11 +185,10 @@ _COMPONENT_BAND = {
     "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in the real device)
     "magnifier": (11, 13),      # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
     "pen": (7, 9),              # ch 24, measured 8 (+pen-wire, 2026-07-04)
-    "paper-drive": (118, 126),  # ch 22-23-25, expected 122 (54 placed + 68-link
+    "paper-drive": (112, 120),  # ch 22-23-25, expected 116 (54 placed + 62-link
     # chain; the paper-drive rework replaced the two rails + pinion-bar topology
     # with one bar + two-piece clamps + the hanging-platen furniture and its
-    # 22 lock-mated fillister screws, and the lower knob centre lengthened the
-    # loop 60 -> 68 links)
+    # 22 lock-mated fillister screws; the 2026-07-23 refit resolves 62 links)
     "harmonic-analyzer": (7, 9),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
 }
 

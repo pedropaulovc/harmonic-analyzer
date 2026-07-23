@@ -1350,13 +1350,13 @@ sections:
         - scaled
         - low
       - - Wheel bar (M6.4/M6.8; clamp unified with the platen bar 2026-07)
-        - '10 tall × 9 deep steel HALF-width bar (`wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar) at y 575.7, back face −129.9 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 22 × 9-family stock depth as the ONE 22 × 9 × 452 `support-bar` at y 295.6 (see ch. 22)'
+        - '10 tall × 9 deep steel HALF-width bar (`wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar) at y 575.7, back face −129.9 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 22 × 9-family stock depth as the ONE 22 × 9 × 452 `support-bar` at y 306.734 (see ch. 22)'
         - —
         - 'M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112)'
         - derived
         - low
       - - Column clamp (two-piece, wheel bar — unified with the platen-bar clamps 2026-07)
-        - 'the same black two-piece semi-arc pair as the platen bar''s (`column-clamp-front`/`-back`, ch. 22 row): front arc face at −129.9 carries the bar back face, back arc closes on the Ø25.4 column, two clamp screws through the bar flanking the column (heads on the bar front face). The green one-piece channel collar (and its backed-out pinch screw) is RETIRED — no consumer left'
+        - 'the same black two-piece semi-arc pair as the platen bar''s (`column-clamp-front`/`-back`, ch. 22 row): front arc face at −129.9 carries the bar back face, back arc closes on the Ø25.4 column, two clamp screws through the bar flanking the column (heads recessed 0.2 below the bar front so the refitted platen can slide across the east clamp). The green one-piece channel collar (and its backed-out pinch screw) is RETIRED — no consumer left'
         - —
         - p.50–55 (ch30 p005 two-piece arcs)
         - scaled + derived
@@ -1397,15 +1397,15 @@ sections:
       - confidence
       rows:
       - - Front face height
-        - 140 mm
-        - '5.51'
-        - photo callout p.55
-        - annotated
-        - high
+        - 134.82 mm (front-face H:W = 1:2)
+        - '5.31'
+        - 'user-confirmed ch30-p002 Pose Studio proportion; supersedes the nominal 140 mm p.55 callout for the fitted model'
+        - fitted + ratio
+        - med
       - - Width (travel direction)
-        - ~300 mm
-        - ~11.8
-        - 'p.55 front photo aspect ≈ 2.15:1 vs 140 mm; p.54 inset vs 460 mm frame agrees. M2 revision: supersedes earlier ~200 estimate'
+        - 269.64 mm
+        - '10.62'
+        - 'ch30-p002 Pose Studio width fit (300 × 0.8988); paired with the user-confirmed 1:2 front-face ratio'
         - scaled
         - low
       - - Plate thickness
@@ -1415,27 +1415,27 @@ sections:
         - scaled
         - low
       - - Rack bar (rework E3)
-        - '300 × 12 × 6, brass, teeth-down at the platen''s bottom edge, crests protruding 2 below it (band y 303..315, z −138.9..−132.9)'
+        - '269.64 × 12 × 6, brass, teeth-down at the platen''s bottom edge, crests protruding 2 below it (band y 271.234..283.234, z −138.9..−132.9)'
         - —
-        - 'ch22 back-side photo (the exposed rack band below the bottom guide rail is ~10-12 tall, not 30); teeth cut at DP 30 / PA 14.5° (ch. 23 measurement), 112 gaps at p = 2.660 mm — `build_platen_rack.py`'
+        - 'ch22 back-side photo (the exposed rack band below the bottom guide rail is ~10-12 tall, not 30); teeth cut at DP 30 / PA 14.5° (ch. 23 measurement), 101 gaps at p = 2.660 mm — `build_platen_rack.py`'
         - scaled
         - low
       - - Support bar + two-piece clamps (rework E1/E2)
-        - 'ONE bar 452 × 22 tall × 9 deep (ends x ±226, ~29 past each column), front face −138.9 on the platen back, centre y 295.6; clamped to each Ø25.4 column by a FRONT semi-arc (17.9 deep, bar back → column axis) + BACK semi-arc (14 deep), both 48 wide × 16 tall, black, closed by 2 × Ø3.9 × 28 slotted screws whose heads sit on the bar''s front face flanking the column (x ±197 ∓ 17.5)'
+        - 'ONE bar 452 × 22 tall × 9 deep (ends x ±226, ~29 past each column), front face −138.9 on the platen back, centre y 306.734; clamped to each Ø25.4 column by a FRONT semi-arc (17.9 deep, bar back → column axis) + BACK semi-arc (14 deep), both 48 wide × 16 tall, black, closed by 2 × Ø3.9 × 28 slotted screws whose heads sit on the bar''s front face flanking the column (x ±197 ∓ 17.5)'
         - —
         - 'book p.62 caption ("the bar that the platen rides on", singular) + ch30 p002 (bar ends, screw heads) + ch30 p005 (two-piece black collar); REFUTES the M6.4 two-rail (y 440/334) + one-piece channel-collar layout'
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 300 × 5 × 10 screwed across the FULL platen back (bottom y 272.6..277.6, top 306.6..311.6 — the platen HANGS by the top rail''s underside on the bar''s top edge 306.6), each by 5 fillister screws whose heads show on the platen front (rows y 275.1/309.1, x −120..+120 step 60), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 19 × 2 (2 per rail, stations ±90, 2 fillister screws each) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 7, the top pair hangs 14 over it — so the platen cannot fall off'
+        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 19 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 fillister screws each) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 7, the top pair hangs 14 over it — so the platen cannot fall off without colliding with the east column clamp'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
         - med
       - - Paper clip strips (×2)
-        - ~125 × 10 × 1.2, Ø3 end-screw holes, bright brass (NOT blackened)
+        - 112.35 × 8.988 × 1.2, #4 clearance end-screw holes, bright brass (NOT blackened)
         - —
-        - p.55 front photo vs 140 mm (the strips read bright against the darkened platen)
+        - ch30-p002 Pose Studio scale fit (the strips read bright against the darkened platen)
         - scaled
         - low
       - - Material
@@ -1445,19 +1445,19 @@ sections:
         - stated
         - high
       - - Platen position (rework)
-        - plate x −150..+150 (centred between the columns, the ch30 rest pose), y 262.1..402.1, front face z −142.9 (back face on the bar front at −138.9); hangs on the single y-295.6 support bar
+        - plate x −33.213..+236.427, y 273.234..408.054, front face z −142.9 (back face on the bar front at −138.9); top-left fixed by the ch30-p002 delta fit; hangs on the single y-306.734 support bar
         - —
-        - 'rework layout: the platen must sit between the columns (the clamp screw heads protrude 2.5 in front of the bar and the ch30 front view shows them exposed); REFUTES the M6.4 x −258..+42 offset'
+        - 'ch30-p002 Pose Studio delta fit: current-model origin translated (+116.787,+20.122), width scaled 0.8988, then height corrected to H:W = 1:2 while preserving the fitted top-left corner; z delta rejected as front-view depth leakage'
         - derived
         - med
       - - Paper clips position (rework E4)
-        - 'two vertical strips hugging the platen''s extreme left/right edges from the TOP edge down (y 320..445): left x −149..−139, right +139..+149, on the paper face (z −144.1..−142.9)'
+        - 'two vertical strips hugging the resized platen''s extreme left/right edges from the TOP edge down (y 295.704..408.054): left x −32.314..−23.326, right +226.540..+235.528, on the paper face (z −144.1..−142.9)'
         - —
-        - 'ch22 front photo: the bright strips run at the edges from the top edge down ~125; REFUTES the M6.4 inboard bottom-anchored bands'
+        - 'ch22 front photo: the bright strips run at the edges from the top edge down; ch30-p002 fit sets 112.35; REFUTES the M6.4 inboard bottom-anchored bands'
         - scaled
         - med
       - - Clip screws ×4 + platen sockets
-        - brass fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank through each clip's own Ø3 end holes (machine x ±144, y 328/437) into Ø3 × 3.5 blind sockets in the platen front face; under-head faces on the clip fronts (z −144.1); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - brass fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank through each clip's #4 clearance end holes (machine x −27.820/+231.034, y 302.894/400.864) into #4-40 bottoming-tapped sockets in the platen front face; under-head faces on the clip fronts (z −144.1); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
         - p.55 front photo (clip end screws)
         - scaled + derived
@@ -1468,11 +1468,11 @@ sections:
       horizontal travel); two brass clips (left/right) retain the recording paper;
       gearing can be unlatched from the rack for free repositioning/reset (the
       whole transgear cluster tilts away — see ch. 23 rework notes).
-      Rework rack mesh: rack teeth-down with crests at y 303, pitch line 303.85;
-      the 12T DP30 feed pinion's axis sits PD/2 + 0.8 below it (stud (−12, 297.97)
+      Rework rack mesh: rack teeth-down with crests at y 271.234, pitch line 272.081;
+      the 12T DP30 feed pinion's axis sits PD/2 + 0.8 below it (stud (0, 266.201)
       post-mirror) — the 0.8 centre extension clears the _gear-recipe gap floor at
       the pinion base circle (drive-train-style checker-arbitrated slack). Rack
-      x0 = stud_x + p/2 + 51p pre-mirror ≈ 148.99, putting a rack GAP centre
+      x0 = −31.949, putting a rack GAP centre
       exactly over the stud where the pinion's +90° tooth rises (12T: 90 = 3γ).
 - heading: Chapter 23 — Translational Gearing (pp. 56–59)
   elements:
@@ -1547,7 +1547,7 @@ sections:
         - counted + scaled
         - med
       - - Drive chain (roller chain; paper-drive rework 2026-07-07)
-        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` filled by the native connected-linkage chain pattern along the `_chain.py` centreline loop): the centreline rides each mounted removable''s PITCH circle (knob T24 r 24 about post-mirror (−54.575, 284.133); crank T12 r 12 about (−122.8, 142.985) = the crank axis), taut common external tangent on the bar side, slack arc solved to close the 68-link loop (sag ≈ 21 below the straight tangent, vs the p006 crop read 18); link pin plane z −155 (both wheels coplanar: bands −156.2..−153.8). z stack (rework E6): inner plates STRADDLE the 2.4 sprocket (inner faces ±1.45, 0.25 clear/side), bushings ±1.45, outer plates 2.55..3.35, pins ±3.35 — only the roller↔tooth seating remains as intended contact'
+        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` filled by the native connected-linkage chain pattern along the `_chain.py` centreline loop): the centreline rides each mounted removable''s PITCH circle (knob T24 r 24 about post-mirror (−42.575, 252.367); crank T12 r 12 about (−122.8, 142.985) = the crank axis), taut common external tangent on the bar side, slack arc solved to close the 62-link loop (sag ≈ 20.6 below the straight tangent, vs the p006 crop read 18); link pin plane z −155 (both wheels coplanar: bands −156.2..−153.8). z stack (rework E6): inner plates STRADDLING the 2.4 sprocket (inner faces ±1.45, 0.25 clear/side), bushings ±1.45, outer plates 2.55..3.35, pins ±3.35 — only the roller↔tooth seating remains as intended contact'
         - —
         - ch30 p002/p005/p006 (taut run + visibly drooping slack run) + ch. 23 p.58-59 (chain wider than the wheel); crank centre from ch30 GT; knob centre = stud + latch c2c 44.766 @ −18°
         - scaled + derived
@@ -1565,7 +1565,7 @@ sections:
         - counted + derived
         - med
       - - Pinion bar — RETIRED (paper-drive rework 2026-07-07)
-        - 'the transgear cluster does NOT hang from a dedicated bar: book p.62/63 shows the cluster''s bracket screwed to the BACK of the single platen support bar (2 large slotted screws). `pinion-bar.SLDPRT` deleted; replaced by `transgear-bracket` (30 × 63.5 × 4 black plate, Ø9.6 stud bore at machine (−12, 255.07), 2 × Ø4.4 screw holes at stud ± 10 on the bar mid-height 295.6; 1.5-deep full-width front groove at stud-local y 16..24 clears the platen''s bottom guide rail sliding past the bar-back plane)'
+        - 'the transgear cluster does NOT hang from a dedicated bar: book p.62/63 shows the cluster''s bracket screwed to the BACK of the single platen support bar (2 large slotted screws). `pinion-bar.SLDPRT` deleted; replaced by `transgear-bracket` (30 × 63.5 × 4 black plate, Ø9.6 stud bore at machine (0, 266.20), 2 × Ø4.4 screw holes at stud ± 10 on the bar mid-height 306.734; 1.5-deep full-width front groove at stud-local y 16..24 clears the platen''s bottom guide rail sliding past the bar-back plane; the 2026-07-23 x re-centre clears the resized platen''s lower clip screw)'
         - —
         - book p.62 top-down + p.63 back view; memory/paper-drive-rework.md E1
         - scaled + derived
@@ -1585,11 +1585,11 @@ sections:
       - - Latch arm (rework E8)
         - 'tapered link, 2.6 thick (it lives in the 3.0 slot between the rack''s back face −132.9 and the bar-front/bracket plane −129.9): big hub Ø22 / small hub Ø16, both bores Ø9.6; centre distance 44.766 = the PERMANENT 12T:120T DP38 mesh (44.116 nominal + 0.65 gap-floor extension); assembled at −18° below +X — the arm pivots ON the stud, so this c2c never changes; unlatching tilts the whole cluster away from the rack (v4_transgear 001 vs 011-013). The old 66.05 "rest c2c" was a fit against the refuted disc-meshes-rack topology; Appendix C #8''s two-centre-distance riddle dissolves'
         - —
-        - 'ch30 p002 knob wrap centre (~(55-58, 279-287) pre-mirror, within parallax of stud + 44.766 @ −18°) + `v4_transgear_008` (arm with a hole pivoting on the stud); memory/paper-drive-rework.md E8'
+        - 'ch30 p002 knob wrap centre plus the 2026-07-23 platen collision gate: pre-mirror (42.575, 252.367) = centred stud + 44.766 @ −18°; `v4_transgear_008` confirms the arm pivots on the stud; memory/paper-drive-rework.md E8'
         - scaled + derived
         - med
       - - Knob shaft (rework E8)
-        - 'stepped Ø9.525, through the latch small hub at pre-mirror (54.575, 284.133), spanning machine z −157.5 → −130: removable seat z −157.5..−148.4 (T24 chain-wrapped at −156.2..−153.8), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
+        - 'stepped Ø9.525, through the latch small hub at pre-mirror (42.575, 252.367), spanning machine z −157.5 → −130: removable seat z −157.5..−148.4 (T24 chain-wrapped at −156.2..−153.8), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
         - —
         - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −155 chain plane'
         - scaled + derived

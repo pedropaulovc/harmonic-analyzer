@@ -1,14 +1,14 @@
 r"""Reproduction script: platen paper clip strip (book ch. 22, p. 55).
 
 One of the two thin BRIGHT BRASS strips hugging the platen front's extreme
-left/right edges, running from the TOP edge down ~125 (ch22 front photo);
+left/right edges, running from the TOP edge down ~112 (ch22 front photo);
 the recording paper slides under them and a screw holds each end. Used
 twice in the assembly (vertical, so the assembly rotates the +X-authored
 strip 90 about Z). Natural brass -- no paint (they read bright against the
 blackened platen; the old PANEL_BLACK made them invisible).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 22" — scaled from the p.55 front
-photo vs the 140 mm height callout (low).
+Dimensions: cad/DIMENSIONS.md "Chapter 22" — ch30-p002 Pose Studio fit,
+scaled 0.8988 in the visible plane (low).
 
 Layout: length along +X, width along +Y from the origin corner,
 thickness extruded +Z; screw holes inset from the ends.
@@ -44,13 +44,13 @@ from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-CLIP_LENGTH = 125.0  # DIMENSIONS.md ch22: ~0.9x plate height, p.55 (low)
-CLIP_WIDTH = 10.0  # DIMENSIONS.md ch22 (low)
+CLIP_LENGTH = 112.35  # ch30-p002 Pose Studio: 125 * 0.8988
+CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
 CLIP_THICKNESS = 1.2  # DIMENSIONS.md ch22: thin spring strip (low)
 # End screws: the brass fillister clip screws (Ø2.9 shank) pass THROUGH, so
 # each end hole is a #4 clearance Hole Wizard hole (normal fit Ø3.251; was a
 # plain Ø3.0 cut) -- memory/fastener-policy-us-customary.
-HOLE_INSET = 8.0  # from each end
+HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
 
 
 async def build(adapter) -> dict[str, str]:
@@ -61,7 +61,7 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations): strip plan size, end-screw hole, and
     # the inset that drives both hole stations. The mm suffix is load-bearing --
     # this is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 125 would be read as 125 inches, blowing the
+    # document units (an unsuffixed 112.35 would be read as inches, blowing the
     # part up 25.4x in-plane). CLIP_THICKNESS is an extrude DEPTH (a feature
     # parameter, not a sketch dim), so its global is an editable knob that drives
     # nothing -- matching the exemplars.

@@ -298,24 +298,26 @@ for i, x_c in enumerate(p.LOCK_STATION_X):
            [station - p.LOCK_WIDTH / 2.0, p.GUIDE_Y[0], p.LOCK_Z0],
            IDENTITY, f"guide-lock bottom x{x_c:.0f}", **_SOLV)
 for i, sx in enumerate((p.PLATEN_SOCKET_XY[0][0], p.PLATEN_SOCKET_XY[2][0])):
-    clip_x = -(p.PLATE_X0 + sx + p.CLIP_WIDTH / 2.0)
+    clip_x = p.PLATE_X0 + p.PLATE_WIDTH - sx - p.CLIP_WIDTH / 2.0
     expect(PD, f"platen-clip-{i + 1}",
            [clip_x, p.PLATE_Y0 + p.PLATE_HEIGHT, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
            _rz(-90.0), f"platen-clip x{clip_x:+.0f}", **_SOLV)
-expect(PD, "platen-paper-1", [p.PLATE_X0 + 20.25, p.PLATE_Y0 + 6.0, p.PLATE_FRONT_Z - 0.5],
+_paper_side = (p.PLATE_WIDTH - p.PAPER_WIDTH) / 2.0
+_paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - p.PAPER_HEIGHT - 5.3928
+expect(PD, "platen-paper-1", [p.PLATE_X0 + _paper_side, _paper_y, p.PLATE_FRONT_Z - 0.5],
        IDENTITY, "platen-paper", **_SOLV)
 _fs = 0
 for x, y in p.CLIP_SCREW_XY:
     _fs += 1
-    expect(PD, f"fillister-screw-{_fs}", [-x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
+    expect(PD, f"fillister-screw-{_fs}", [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
            IDENTITY, f"clip screw {_fs}", **_SOLV)
 for x, y in p.GUIDE_SCREW_XY:
     _fs += 1
-    expect(PD, f"fillister-screw-{_fs}", [-x, y, p.PLATE_FRONT_Z + p.PLATEN_CBORE_DEPTH],
+    expect(PD, f"fillister-screw-{_fs}", [x, y, p.PLATE_FRONT_Z + p.PLATEN_CBORE_DEPTH],
            IDENTITY, f"guide screw {_fs}", **_SOLV)
 for x, y in p.LOCK_SCREW_XY:
     _fs += 1
-    expect(PD, f"fillister-screw-{_fs}", [-x, y, p.LOCK_Z0 + 2.0],
+    expect(PD, f"fillister-screw-{_fs}", [x, y, p.LOCK_Z0 + 2.0],
            p.ROT_Y_180, f"lock screw {_fs}", **_SOLV)
 expect(PD, "transgear-bracket-1", [p.STUD_XY[0], p.STUD_XY[1], p.BRACKET_Z0], IDENTITY, "transgear-bracket")
 for i, dx in enumerate((p.BRACKET_SCREW_DX, -p.BRACKET_SCREW_DX)):

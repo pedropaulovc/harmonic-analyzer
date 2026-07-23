@@ -128,6 +128,8 @@ from build_support_bar import (  # noqa: E402
     BAR_DEPTH,
     BAR_HEIGHT,
     BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (machine -X holes)
+    BRACKET_STUD_X,
+    CLAMP_CBORE_DEPTH,
     CLAMP_HOLE_X,
 )
 from column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
@@ -175,22 +177,24 @@ from build_platen_rack import (  # noqa: E402
     FIRST_GAP_X as RACK_FIRST_GAP_X,
     PITCH as RACK_PITCH,
 )
+from build_platen_paper import (  # noqa: E402
+    PAPER_HEIGHT,
+    PAPER_WIDTH,
+)
 
-PLATE_X0 = -150.0  # centred between the columns (ch30 rest pose)
-# ch30 p002 pose-studio re-anchor (2026-07-18): the support-bar + reducer
-# cluster fit 42.9 LOWER than the old layout (support-bar 338.5 -> 295.6);
-# the platen hangs on the bar and the stud/knob derive from the rack, so the
-# WHOLE stack rides down together (mesh + hang preserved). y-only -- the
-# fit's z component was front-view drag leakage. The platen's own position/
-# size gets fine-tuned over several later rounds (memory/ch30-p002-refit-
-# roadmap).
-PLATE_Y0 = 262.1
+PLATE_X0 = -33.213
+# ch30-p002 Pose Studio refit (2026-07-23): the platen's top-left reference
+# corner was hand-aligned at (-33.213, 408.054) in the current assembly. The
+# width is 300 * 0.8988 and the user-confirmed H:W ratio is 1:2, so preserving
+# that top edge puts the resized plate bottom here. The fit's z delta remains
+# ignored: a near-front view does not constrain depth.
+PLATE_Y0 = 273.234
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
-GUIDE_Y = (272.6, 306.6)  # bottom / top rail seats (machine y)
-BAR_TOP_Y = GUIDE_Y[1]  # 349.5
-BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0  # 338.5
+GUIDE_Y = (283.734, 317.734)  # bottom / top rail seats (machine y)
+BAR_TOP_Y = GUIDE_Y[1]
+BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 # 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
@@ -224,14 +228,14 @@ FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
 # rack crests' reach at nominal centres -- extend like the drive-train's
 # checker-arbitrated mesh slacks (rb - (PD/2 - addendum) = 0.685, +0.115).
 RACK_MESH_EXT = 0.8
-STUD_XY = (-12.0, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)  # machine (-12, 297.9667)
+STUD_XY = (BRACKET_STUD_X, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)
 LATCH_ANGLE_DEG = -162.0  # knob swung low toward the crank at machine -X (ch30
 # p002); the machine reflection of the pre-mirror -18 deg (theta -> 180 - theta,
 # x -> -x), so the arm reaches west/-X and down from the stud.
 KNOB_SHAFT_XY = (
     STUD_XY[0] + LATCH_C2C * math.cos(math.radians(LATCH_ANGLE_DEG)),
     STUD_XY[1] + LATCH_C2C * math.sin(math.radians(LATCH_ANGLE_DEG)),
-)  # machine (-54.575, 284.133)
+)  # machine (-42.575, 252.367)
 
 # z stack on the stud (front -> back): collar | disc | feed pinion | latch arm
 # | bracket. The disc window clears the platen furniture: the guide-screw
@@ -269,8 +273,8 @@ if THIRD_PHASE_DEG > THIRD_GAMMA / 2.0:
 # from RACK_X0, so a GAP sits over the machine stud (-X) near the platen's left
 # (-X) edge -- the reflection of the pre-mirror right-edge phasing.
 _k = math.floor((STUD_XY[0] - RACK_FIRST_GAP_X - PLATE_X0) / RACK_PITCH)
-RACK_X0 = STUD_XY[0] - RACK_FIRST_GAP_X - _k * RACK_PITCH  # -148.985: gap on the
-# stud, left edge ~1 east of the platen's
+RACK_X0 = STUD_XY[0] - RACK_FIRST_GAP_X - _k * RACK_PITCH
+# The resized rack keeps a gap centred on the relocated stud.
 
 # Net platen feed per CRANK revolution through the real train (T12/T24
 # mounted): 0.5 chain * (12/120) gear * pi*PD rack = 1.596 mm. Every stage is
@@ -287,8 +291,8 @@ NET_RACK_TRAVEL_PER_CRANK_REV = (
 SPARE_GEAR_POS = (160.0, 53.2, -15.0)  # machine +X (west) of the platen
 
 # --- fasteners ----------------------------------------------------------------
-# Platen-clip screws: through the clips' O3 end holes into the platen's edge
-# sockets (pre-mirror machine coords = platen-local + plate origin).
+# Platen-clip screws: through the clips' end holes into the platen's edge
+# sockets (machine coords = platen-local + plate origin).
 CLIP_SCREW_XY = tuple(
     (PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET_XY
 )
@@ -629,7 +633,7 @@ async def build(adapter) -> dict[str, str]:
     # --- support bar + two-piece clamps ---------------------------------------
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
     # Symmetric about machine x=0; its bracket-screw holes flank the stud at
-    # machine -12 (see build_support_bar.py).
+    # machine x=0 (see build_support_bar.py).
     support_bar = await place_component(
         adapter,
         "support-bar",
@@ -650,7 +654,7 @@ async def build(adapter) -> dict[str, str]:
     clamp_x = sorted(CLAMP_HOLE_X)
     clamp_seeds: list[str] = []
     for index, x in enumerate(clamp_x[:2]):
-        target = [x, BAR_CY, BAR_FRONT_Z]
+        target = [x, BAR_CY, BAR_FRONT_Z + CLAMP_CBORE_DEPTH]
         seed = await place_component(
             adapter,
             "clamp-screw",
@@ -668,7 +672,9 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, seed, target, IDENTITY)
         clamp_seeds.append(seed)
-    clamp_targets = [[x, BAR_CY, BAR_FRONT_Z] for x in clamp_x[2:]]
+    clamp_targets = [
+        [x, BAR_CY, BAR_FRONT_Z + CLAMP_CBORE_DEPTH] for x in clamp_x[2:]
+    ]
     clamp_instances = await linear_component_pattern(
         adapter,
         clamp_seeds,
@@ -756,8 +762,9 @@ async def build(adapter) -> dict[str, str]:
     # strip vertical (the machine reflection of the pre-mirror Rz+90); each lands
     # 1 inside its edge with its holes on the platen's edge sockets.
     for sx in (PLATEN_SOCKET_XY[0][0], PLATEN_SOCKET_XY[2][0]):
-        # pre-mirror hole line -> strip edge, negated to the machine (-X) frame.
-        clip_x = -(PLATE_X0 + sx + CLIP_WIDTH / 2.0)
+        # Preserve the historical right-then-left instance order while mapping
+        # each local socket line into the now-asymmetric machine placement.
+        clip_x = PLATE_X0 + PLATE_WIDTH - sx - CLIP_WIDTH / 2.0
         # Rz(-90) hangs the strip from its top-edge origin (the pre-mirror Rz+90
         # rose from the bottom; the reflection swaps the origin end).
         clip = await place_component(
@@ -767,10 +774,14 @@ async def build(adapter) -> dict[str, str]:
             label=f"platen-clip (x{clip_x:+.0f})")
         await _lock_to_platen(clip, f"platen-clip x{clip_x:+.0f}")
     # Recording paper over the platen front face: front 0.5 proud, clear of the
-    # edge clips, 6 top/bottom margin. The 0.25-thick sheet leaves 0.25 air
+    # edge clips, with the fitted side/top margins. The 0.25-thick sheet leaves 0.25 air
     # behind it (build_platen_paper) so no face lands coplanar on the platen.
+    paper_side_margin = (PLATE_WIDTH - PAPER_WIDTH) / 2.0
+    paper_top_margin = 5.3928  # ch30-p002 fit: old 6 mm margin * 0.8988
     paper = await place_component(adapter, "platen-paper",
-                                  [PLATE_X0 + 20.25, PLATE_Y0 + 6.0, PLATE_FRONT_Z - 0.5],
+                                  [PLATE_X0 + paper_side_margin,
+                                   PLATE_Y0 + PLATE_HEIGHT - PAPER_HEIGHT - paper_top_margin,
+                                   PLATE_FRONT_Z - 0.5],
                                   [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await _lock_to_platen(paper, "platen-paper")
 
@@ -779,7 +790,7 @@ async def build(adapter) -> dict[str, str]:
     # body. Native X patterns replicate the regular grids and remain driven by
     # their seeds as the platen travels.
     clip_targets = [
-        [-x, y, PLATE_FRONT_Z - CLIP_THICKNESS] for x, y in CLIP_SCREW_XY
+        [x, y, PLATE_FRONT_Z - CLIP_THICKNESS] for x, y in CLIP_SCREW_XY
     ]
     clip_max_x = max(target[0] for target in clip_targets)
     clip_seed_target = min(
@@ -823,9 +834,9 @@ async def build(adapter) -> dict[str, str]:
         "platen clip-screw grid",
     )
 
-    # One seed per row at machine +X; five instances at 60 mm pitch run to -X.
+    # One seed per row at machine +X; five proportional stations run to -X.
     guide_targets = [
-        [-x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH] for x, y in GUIDE_SCREW_XY
+        [x, y, PLATE_FRONT_Z + PLATEN_CBORE_DEPTH] for x, y in GUIDE_SCREW_XY
     ]
     guide_max_x = max(target[0] for target in guide_targets)
     guide_seed_target = min(
@@ -852,7 +863,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         [guide_seed],
         axis1="x",
-        spacing1_mm=60.0,
+        spacing1_mm=PLATEN_GUIDE_HOLE_X[1] - PLATEN_GUIDE_HOLE_X[0],
         instances1=5,
         axis2="y",
         spacing2_mm=max(target[1] for target in guide_targets) - guide_seed_target[1],
@@ -869,12 +880,13 @@ async def build(adapter) -> dict[str, str]:
         "platen guide-screw grid",
     )
 
-    # Two positive-X seeds per row cross the centre in one 180 mm pattern.
-    lock_targets = [[-x, y, LOCK_Z0 + 2.0] for x, y in LOCK_SCREW_XY]
+    # Two seeds at the right-hand station reproduce at the left-hand station.
+    lock_targets = [[x, y, LOCK_Z0 + 2.0] for x, y in LOCK_SCREW_XY]
     lock_min_y = min(target[1] for target in lock_targets)
+    plate_mid_x = PLATE_X0 + PLATE_WIDTH / 2.0
     lock_seed_targets = [
         target for target in lock_targets
-        if target[0] > 0.0 and target[1] == lock_min_y
+        if target[0] > plate_mid_x and target[1] == lock_min_y
     ]
     lock_seeds: list[str] = []
     for target in lock_seed_targets:
@@ -895,7 +907,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         lock_seeds,
         axis1="x",
-        spacing1_mm=180.0,
+        spacing1_mm=LOCK_STATION_X[1] - LOCK_STATION_X[0],
         instances1=2,
         axis2="y",
         spacing2_mm=max(target[1] for target in lock_targets) - lock_min_y,
@@ -921,8 +933,8 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, 0.0],
         IDENTITY,
     )
-    # One exact-pose seed at machine -2; PatternAxisX forward runs toward -X
-    # and creates the second screw at -22. Ry(180) points both shanks into the
+    # One exact-pose seed at machine +10; PatternAxisX forward runs toward -X
+    # and creates the second screw at -10. Ry(180) points both shanks into the
     # support bar while their under-head planes bear on the bracket back face.
     bracket_seed_target = [STUD_XY[0] + BRACKET_SCREW_DX, BAR_CY, STUB_Z0]
     bracket_seed = await place_component(

@@ -29,8 +29,14 @@ SHEETS = (
     draw_summing_assembly,
 )
 
+DOCUMENTATION_SHEETS = tuple(
+    drawing for drawing in SHEETS if drawing is not draw_paper_drive_assembly
+)
+
 ORDINARY_SHEETS = tuple(
-    drawing for drawing in SHEETS if drawing is not draw_drive_train_assembly
+    drawing
+    for drawing in DOCUMENTATION_SHEETS
+    if drawing is not draw_drive_train_assembly
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
@@ -96,14 +102,14 @@ def test_bom_identity_map_accepts_stems_and_released_number_aliases() -> None:
 
 
 def test_assembly_notes_do_not_repeat_title_block_metadata() -> None:
-    for drawing in SHEETS:
+    for drawing in DOCUMENTATION_SHEETS:
         notes = drawing.ASSEMBLY_NOTES.upper()
         for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
             assert duplicate not in notes, f"{drawing.ARTIFACT_STEM}: {duplicate}"
 
 
 def test_assembly_notes_are_numbered_in_order() -> None:
-    for drawing in SHEETS:
+    for drawing in DOCUMENTATION_SHEETS:
         lines = drawing.ASSEMBLY_NOTES.splitlines()
         assert lines[0] == "ASSEMBLY NOTES", drawing.ARTIFACT_STEM
         assert len(lines) >= 4, drawing.ARTIFACT_STEM
@@ -121,7 +127,7 @@ def test_assembly_notes_are_numbered_in_order() -> None:
 
 
 def test_each_sheet_has_a_complete_bom_contract() -> None:
-    for drawing in SHEETS:
+    for drawing in DOCUMENTATION_SHEETS:
         assert drawing.BOM_COMPONENTS, drawing.ARTIFACT_STEM
         assert all(drawing.BOM_COMPONENTS.values()), drawing.ARTIFACT_STEM
         assert len(drawing.BOM_COMPONENTS) == len(set(drawing.BOM_COMPONENTS.values())), (
@@ -140,7 +146,7 @@ def test_each_sheet_has_a_complete_bom_contract() -> None:
 
 
 def test_part_bom_numbers_come_from_the_part_registry() -> None:
-    for drawing in SHEETS:
+    for drawing in DOCUMENTATION_SHEETS:
         if drawing is draw_harmonic_analyzer_assembly:
             continue
         assert drawing.BOM_PART_NUMBERS == {
@@ -178,13 +184,7 @@ def test_configured_variants_remain_visible_after_bom_row_collapse() -> None:
     sprocket_description = "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
     assert draw_drive_train_assembly.BOM_COMPONENTS["cone-gear"] == cone_description
     assert _config.parts("cone-gear")["description"] == cone_description
-    assert (
-        draw_paper_drive_assembly.BOM_COMPONENTS["transgear-removable"]
-        == sprocket_description
-    )
-    assert (
-        _config.parts("transgear-removable")["description"] == sprocket_description
-    )
+    assert _config.parts("transgear-removable")["description"] == sprocket_description
 
 
 def test_unresolved_assembly_inputs_are_release_holds_not_guessed_details() -> None:
@@ -203,7 +203,6 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
     for drawing in ORDINARY_SHEETS:
         source = Path(drawing.__file__).read_text(encoding="utf-8")
         expected_views = {
-            draw_paper_drive_assembly: 8,
             draw_magnifier_assembly: 5,
             draw_harmonic_analyzer_assembly: 6,
         }.get(drawing, 3)

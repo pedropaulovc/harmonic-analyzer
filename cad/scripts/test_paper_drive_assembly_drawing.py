@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-import _chain
 import draw_paper_drive_assembly as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -60,15 +59,6 @@ def test_dodo_uses_the_assembly_recipe_and_token() -> None:
     }
 
 
-def test_bom_covers_every_top_level_component_family() -> None:
-    source = (Path(__file__).parent / "build_paper_drive_assembly.py").read_text(
-        encoding="utf-8"
-    )
-    for component in drawing.BOM_COMPONENTS:
-        assert f'"{component}"' in source, f"{component} not placed by build"
-    assert len(drawing.BOM_COMPONENTS) == 22
-
-
 def test_assembly_owns_see_parts_list_title_block() -> None:
     source = (Path(__file__).parent / "build_paper_drive_assembly.py").read_text(
         encoding="utf-8"
@@ -81,33 +71,20 @@ def test_assembly_owns_see_parts_list_title_block() -> None:
     assert source.count('"Finish": "SEE COMPONENT DRAWINGS"') == 1
 
 
-def test_drawing_places_bom_balloons_and_specific_notes() -> None:
+def test_drawing_is_one_simple_three_view_diagram() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("insert_identified_bom_table(") == 1
-    assert 'configuration_grouping="same-part"' in source
-    assert source.count("add_auto_balloons_across_views(") == 1
-    assert "(iso, front, right)," in source
-    assert source.count("add_note(") == 3
-    assert source.count("place_view(") == 8
-    assert source.count("scale=VIEW_SCALE") == 5
-    assert source.count("scale=ISO_VIEW_SCALE") == 1
-    assert source.count("isolate_drawing_view_components(") == 2
-    assert source.count("add_component_bom_balloons(") == 1
-    assert '(bracket_detail, "transgear-bracket", "12", 0.008)' in source
-    assert '(screw_detail, "bracket-screw", "13", 0.010)' in source
-    assert '(bracket_detail, "transgear-latch", "15", 0.014)' in source
-    assert "existing_balloons=targeted_balloons" in source
+    assert source.count("place_view(") == 3
+    assert source.count("scale=VIEW_SCALE") == 3
+    assert "for view in (front, right, iso):" in source
+    assert '"*Front"' in source
+    assert '"*Right"' in source
+    assert '"*Isometric"' in source
+    assert "insert_identified_bom_table(" not in source
+    assert "add_auto_balloons" not in source
+    assert "add_component_bom_balloons(" not in source
+    assert "isolate_drawing_view_components(" not in source
+    assert "add_note(" not in source
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert drawing.VIEW_SCALE == (1, 5)
-    assert drawing.ISO_VIEW_SCALE == (1, 7)
-    assert drawing.SHEET_NAMES == (
-        "GENERAL ASSEMBLY",
-        "PARTS LIST AND ITEM IDENTIFICATION",
-    )
+    assert drawing.SHEET_NAMES == ("THREE-VIEW DIAGRAM",)
     assert "expected_sheet_names=SHEET_NAMES" in source
-    assert f"{_chain.LINK_COUNT}-LINK CHAIN" in drawing.ASSEMBLY_NOTES
-    assert "T24 AND T12 SPROCKETS" in drawing.ASSEMBLY_NOTES
-    assert all(
-        token not in drawing.ASSEMBLY_NOTES
-        for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
-    )

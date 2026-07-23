@@ -6,9 +6,9 @@ covering most of the platen; without it the CAD platen reads as a bare
 dark board. Consumable media, but modeled for photo fidelity (M6.8
 photo-tuning).
 
-Sized to sit between the two platen clips (clip bands at platen-local
-x 8..18 and 280..290 - see build_paper_drive_assembly CLIP_FRONT_DX) with a
-6 mm top/bottom margin. The front face sits 0.5 mm proud of the platen front
+Sized by the ch30-p002 Pose Studio fit to sit between the resized platen
+clips with an 18.2007 mm side margin and 5.3928 mm top margin. The front
+face sits 0.5 mm proud of the platen front
 face; the sheet is 0.25 thick so its BACK face keeps the standard 0.25 clear
 of the platen instead of landing coplanar on it — two coincident faces
 z-fight in the offline renders (the ch30 gallery views read as torn white
@@ -48,9 +48,8 @@ from _common import (
 PART_NAME = "platen-paper"
 MATERIAL = "Oak"  # nearest wood-fibre entry in the SW database; colour overridden
 
-PAPER_WIDTH = 259.5  # spans platen-local x 20.25..279.75: 2.25 clear of
-# each clip band (8..18 / 280..290) per the 0.25-margin design rule
-PAPER_HEIGHT = 128.0  # platen 140 minus 6 top/bottom margins
+PAPER_WIDTH = 233.2386  # ch30-p002 Pose Studio: 259.5 * 0.8988
+PAPER_HEIGHT = 115.0464  # ch30-p002 Pose Studio: 128 * 0.8988
 PAPER_THICKNESS = 0.25  # front face stays 0.5 proud (assembly plants it at
 # PLATE_FRONT_Z - 0.5); the thinner sheet leaves 0.25 air behind so the back
 # face never coincides with the platen front face (render z-fight)
@@ -65,7 +64,7 @@ async def build(adapter) -> dict[str, str]:
     # thickness (an extrude depth -- a knob, but a feature parameter, so nothing
     # drives it). The mm suffix is load-bearing -- this is an INCH document and
     # the equation manager reads BARE numbers in document units (an unsuffixed
-    # 259.5 = 259.5 in).
+    # 233.2386 = 233.2386 in).
     await set_global(adapter, "PaperWidth", f"{PAPER_WIDTH}mm")
     await set_global(adapter, "PaperHeight", f"{PAPER_HEIGHT}mm")
     await set_global(adapter, "PaperThickness", f"{PAPER_THICKNESS}mm")
