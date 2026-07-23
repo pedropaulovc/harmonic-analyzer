@@ -247,6 +247,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum D attaches on the boss's LEFT flank, opposite the two position
     # frames on the right, so its leader unambiguously lands on the boss OD
     # rather than the tap/axis region (machinist round 1).
+    # Live readback normalizes the restricted tag by 2.409 mm; bound only that
+    # annotation-placement behavior while retaining the reviewed sheet point.
     add_datum_feature(
         adapter,
         bottom,
@@ -254,6 +256,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.192, 0.170),
         datum="D",
         label="cam boss OD axis",
+        position_tolerance_m=0.0025,
     )
     add_feature_control_frame(
         adapter,
