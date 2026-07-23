@@ -46,6 +46,7 @@ def test_cascaded_drive_geometry_closes() -> None:
 
 def test_refitted_platen_clears_fixed_support_hardware() -> None:
     assert support.CLAMP_CBORE_DEPTH > 2.5
+    assert support.CLAMP_CBORE_DIA > support.CLAMP_HOLE_DIA
     assert math.isclose(assembly.STUD_XY[0], support.BRACKET_STUD_X)
     assert support.BRACKET_HOLE_X == tuple(
         support.BRACKET_STUD_X + dx for dx in (-10.0, 10.0)

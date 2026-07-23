@@ -64,11 +64,12 @@ CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
 # across the east clamp screw line, so proud heads would block its slide.
 CLAMP_CBORE_DIA = 8.5
 CLAMP_CBORE_DEPTH = 2.7
+CLAMP_HOLE_DIA = 4.978
 CLAMP_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
     "#8",
     overrides_mm={
-        "HoleDiameter": 4.978,
+        "HoleDiameter": CLAMP_HOLE_DIA,
         "CounterBoreDiameter": CLAMP_CBORE_DIA,
         "CounterBoreDepth": CLAMP_CBORE_DEPTH,
     },
@@ -131,7 +132,7 @@ async def build(adapter) -> dict[str, str]:
     # thread into the bar; covered by the platen, so a through cut reads clean).
     # Positions are the photo layout.
     front_z = -BAR_DEPTH / 2.0
-    clamp_dia = blind_cut_dia_mm(CLAMP_HOLE_SPEC)
+    clamp_dia = CLAMP_HOLE_DIA
     bracket_dia = blind_cut_dia_mm(BRACKET_HOLE_SPEC)
     wizard_holes(
         adapter, CLAMP_HOLE_SPEC,
