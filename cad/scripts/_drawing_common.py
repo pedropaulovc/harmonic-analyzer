@@ -120,20 +120,6 @@ _SF_BOX_DOWN_M = 0.0
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
 
-# The hand-made DRWDOT was authored from an inch standard, then changed to mm.
-# Its edge-break note retained the inch-origin ``.01`` value even though the
-# title block now declares millimetres, rendering an impractical 0.01 mm break.
-# Normalize the instantiated drawing (not the shared binary template) so every
-# generated sheet carries the metric equivalent requested by the machinist
-# review.  Accept the new text too, making this forward-compatible with a later
-# manual DRWDOT repair; fail loud if neither spelling exists.
-_OLD_EDGE_BREAK_NOTE = (
-    "REMOVE BURRS AND BREAK SHARP EDGES R.01 OR CHAMFER .01 MAX"
-)
-_METRIC_EDGE_BREAK_NOTE = (
-    "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
-)
-
 # swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
 # is bent: a straight leader runs at whatever angle its anchor-to-text vector
 # happens to take, which is what drove the old Ra symbol's leader diagonally
@@ -1225,7 +1211,6 @@ def new_project_drawing(
     # format and view geometry is inert (all typed SelectByID2 picks fail).
     # EditSheet() drops back to the sheet layer; idempotent when already there.
     ddoc.EditSheet()
-    _normalize_metric_edge_break_note(adapter, ddoc)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
@@ -1443,60 +1428,6 @@ def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
         )
     finally:
         ddoc.EditSheet()
-
-
-@_telemetry.traced("drawing.normalize_edge_break")
-def _normalize_metric_edge_break_note(adapter: Any, ddoc: Any) -> None:
-    """Replace the template's inch-origin edge break with its metric value."""
-    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
-    if sheet_view is None:
-        raise RuntimeError("drawing template has no sheet view for note normalization")
-    annotations = adapter._attempt(
-        lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
-    ) or []
-    matched = 0
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
-        )
-        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
-            continue
-        specific = adapter._attempt(
-            lambda a=annotation: adapter._get_attr_or_call(
-                a, "GetSpecificAnnotation"
-            )
-        )
-        if specific is None:
-            continue
-        note = _sw_type_info.early_bound_or_flag(
-            specific, "INote", "GetText", "SetText"
-        )
-        raw = str(adapter._get_attr_or_call(note, "GetText") or "")
-        normalized = " ".join(raw.upper().split())
-        if normalized not in {_OLD_EDGE_BREAK_NOTE, _METRIC_EDGE_BREAK_NOTE}:
-            continue
-        matched += 1
-        if normalized == _METRIC_EDGE_BREAK_NOTE:
-            continue
-        changed = adapter._attempt(
-            lambda n=note: n.SetText(_METRIC_EDGE_BREAK_NOTE), default=False
-        )
-        if not changed:
-            raise RuntimeError("failed to replace drawing edge-break note")
-        applied = " ".join(
-            str(adapter._get_attr_or_call(note, "GetText") or "").upper().split()
-        )
-        if applied != _METRIC_EDGE_BREAK_NOTE:
-            raise RuntimeError(
-                "drawing edge-break note replacement did not persist: "
-                f"{applied!r}"
-            )
-    if matched != 1:
-        raise RuntimeError(
-            "drawing template must contain exactly one recognized edge-break "
-            f"note, found {matched}"
-        )
-    _telemetry.event("drawing.edge_break_normalized", value_mm=0.25)
 
 
 def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
