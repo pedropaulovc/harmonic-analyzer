@@ -74,6 +74,12 @@ def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
     assert source.count('characteristic="perpendicularity"') == 1
     assert source.count('characteristic="circular_runout"') == 1
     assert source.count("add_surface_finish(") == 1
+    assert (
+        'symbol_xy=(0.124880, 0.253823),\n        datum="A",\n'
+        '        label="knob body axis"'
+        in source
+    )
+    assert "symbol_xy=(0.128, 0.255)" not in source
 
 
 def test_view_scales_are_explicit() -> None:

@@ -27,7 +27,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from cone_lock_knob_spec import (
     BODY_DIA,
     BODY_TOP,
-    DOME_R,
+    DOME_R as DOME_R,
     STUD_DIA,
     STUD_LEN,
     STUD_THREAD,
@@ -272,7 +272,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=body_circle,
-        symbol_xy=(0.128, 0.255),
+        symbol_xy=(0.124880, 0.253823),
         datum="A",
         label="knob body axis",
     )

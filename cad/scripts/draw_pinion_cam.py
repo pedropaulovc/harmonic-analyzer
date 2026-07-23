@@ -224,7 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=bore_bottom,
-        symbol_xy=(0.085, 0.105),
+        symbol_xy=(0.086080, 0.107633),
         datum="B",
         label="cam final bore axis",
     )

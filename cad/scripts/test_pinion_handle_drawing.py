@@ -86,6 +86,11 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
     assert source.count("add_feature_control_frame(") == 4
+    assert (
+        'label="handle final bore axis",\n        position_tolerance_m=0.0001'
+        in source
+    )
+    assert source.count("position_tolerance_m=0.0001") == 1
     assert "add_surface_finish(" not in source
     assert {"GripLen", "TubeLen", "RodSpan"} <= set().union(
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()

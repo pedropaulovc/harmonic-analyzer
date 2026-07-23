@@ -88,6 +88,12 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 4
     assert source.count("add_feature_control_frame(") == 2
+    assert (
+        'symbol_xy=(0.086080, 0.107633),\n        datum="B",\n'
+        '        label="cam final bore axis"'
+        in source
+    )
+    assert "symbol_xy=(0.085, 0.105)" not in source
     assert "set_basic_dimension(" in source
     assert 'datums=("A", "B", "C")' in source
     assert 'datums=("D",)' in source

@@ -254,6 +254,8 @@ async def build(adapter: Any) -> dict[str, str]:
         flat_end_x,
         bore_center[1] + TUBE_OD * SHEET_SCALE[0] / 4000.0,
     )
+    # Live readback normalizes this axis-attached tag by 0.0127 mm; the
+    # allowance verifies annotation persistence only, not part geometry.
     add_datum_feature(
         adapter,
         front,
@@ -261,6 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(bore_center[0], bore_center[1] + 0.032),
         datum="A",
         label="handle final bore axis",
+        position_tolerance_m=0.0001,
     )
     add_datum_feature(
         adapter,
