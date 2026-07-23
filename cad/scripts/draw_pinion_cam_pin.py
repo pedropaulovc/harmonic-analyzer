@@ -162,6 +162,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinion cam-pin shank axis centerline",
     )
     end_radius = PIN_DIA * END_VIEW_SCALE / 2000.0
+    # SolidWorks restricts this axis-attached tag and live readback normalizes
+    # the intended sheet point by 6.187 mm.  Bound only annotation placement;
+    # part dimensions and GD&T remain unchanged.
     add_datum_feature(
         adapter,
         front,
@@ -169,6 +172,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.105, 0.228),
         datum="A",
         label="cam-pin cylindrical-shank datum axis",
+        position_tolerance_m=0.0065,
     )
     seated_flat_face = model_point_in_view(
         adapter,

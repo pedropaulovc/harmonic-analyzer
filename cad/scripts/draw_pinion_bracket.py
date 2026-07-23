@@ -200,6 +200,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     pivot_bore_edge = (_front_x(0.0), _front_y(0.0) - PIVOT_R_SHEET)
     arbor_bore_edge = (_front_x(0.0), _front_y(C2C) + ARBOR_R_SHEET)
+    # SolidWorks restricts this axis-attached tag and live readback normalizes
+    # the intended sheet point by 12.439 mm.  Bound only annotation placement;
+    # part dimensions and GD&T remain unchanged.
     add_datum_feature(
         adapter,
         front,
@@ -207,7 +210,10 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(pivot_bore_edge[0] + 0.026, pivot_bore_edge[1] - 0.009),
         datum="A",
         label="pivot bore axis",
+        position_tolerance_m=0.013,
     )
+    # The arbor-axis tag is independently restricted and live readback
+    # normalizes its intended sheet point by 5.676 mm.  Bound only this tag.
     add_datum_feature(
         adapter,
         front,
@@ -215,6 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(arbor_bore_edge[0] + 0.020, arbor_bore_edge[1] + 0.017),
         datum="B",
         label="arbor bore axis",
+        position_tolerance_m=0.006,
     )
     add_datum_feature(
         adapter,

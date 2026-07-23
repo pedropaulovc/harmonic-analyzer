@@ -8,6 +8,7 @@ radius and pass that entity to the drawing annotation helpers.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from _common import _early_bound
@@ -39,3 +40,41 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
             f"nearest is {radius_mm:.4f} mm"
         )
     return edge
+
+
+def visible_tooth_tip_silhouette(
+    adapter: Any, view: Any, outside_diameter_mm: float
+) -> Any:
+    """Return the upper side-view silhouette at the specified tooth-tip radius."""
+    target_radius_m = outside_diameter_mm / 2000.0
+    candidates: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        silhouettes = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 4), default=()
+        ) or ()
+        for raw_silhouette in silhouettes:
+            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
+            start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
+            end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
+            if start is None or end is None:
+                continue
+            start_xyz = adapter._get_attr_or_call(start, "ArrayData")
+            end_xyz = adapter._get_attr_or_call(end, "ArrayData")
+            if not start_xyz or not end_xyz:
+                continue
+            start_radius = math.hypot(float(start_xyz[0]), float(start_xyz[1]))
+            end_radius = math.hypot(float(end_xyz[0]), float(end_xyz[1]))
+            if abs(start_radius - target_radius_m) > 0.00001:
+                continue
+            if abs(end_radius - target_radius_m) > 0.00001:
+                continue
+            mean_y = (float(start_xyz[1]) + float(end_xyz[1])) / 2.0
+            candidates.append((mean_y, silhouette))
+
+    if not candidates:
+        raise RuntimeError(
+            "no visible tooth-tip silhouette matches radius "
+            f"{target_radius_m * 1000.0:.4f} mm"
+        )
+    return max(candidates, key=lambda candidate: candidate[0])[1]

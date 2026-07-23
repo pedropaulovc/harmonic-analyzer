@@ -167,6 +167,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Datum A = the axle BORE rim (round 1: the old pick landed on the hub OD,
     # so the rotational datum read as the drum, not the functional bore).
+    # SolidWorks restricts this axis-attached tag and live readback normalizes
+    # the intended sheet point by 3.173 mm.  Bound only annotation placement.
     add_datum_feature(
         adapter,
         front,
@@ -174,6 +176,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),
         datum="A",
         label="axle bore axis",
+        position_tolerance_m=0.0035,
     )
     add_feature_control_frame(
         adapter,

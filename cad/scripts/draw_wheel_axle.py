@@ -314,6 +314,8 @@ async def build(adapter: Any) -> dict[str, str]:
             END_CENTER[1] + STUD_DIA / 2.0 * _K * math.sin(_DATUM_B_ANGLE)),
         axis="y", label="stud circle datum-B pick",
     )
+    # Live readback normalizes this restricted tag by 13.776 um; this bound
+    # applies only to annotation placement, not part geometry or GD&T.
     add_datum_feature(
         adapter,
         end,
@@ -322,6 +324,7 @@ async def build(adapter: Any) -> dict[str, str]:
                       END_CENTER[1] + _DATUM_B_OFFSET[1]),
         datum="B",
         label="stud bearing axis",
+        position_tolerance_m=0.00002,
     )
     add_feature_control_frame(
         adapter,

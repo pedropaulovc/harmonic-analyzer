@@ -16,7 +16,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -30,6 +30,7 @@ from _drawing_common import (
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_platen_guide import HOLE_X as THROUGH_X
@@ -60,6 +61,8 @@ FRONT_LEFT_X_M = 0.040
 FRONT_VIEW_Y_M = 0.110
 FRONT_HOLE_Y_M = 0.1111
 FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
+# Put datum B's symbol midway between the A3/A4 hole axes, clear of both.
+DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (BLIND_X[2] + BLIND_X[3]) / 2000.0
 # 0.020: the table's left edge lands ~0.3 mm right of its anchor (measured). The
 # bound is the 12.7 mm zone margin (~0.0127) the audit checks, which the
 # re-centred frame rule now matches (~0.0126); 0.020 keeps the edge clear of both.
@@ -69,6 +72,30 @@ THREAD_DESIGNATION = "#4-40 UNC-2B"
 THREAD_MAJOR_DIA_MM = 2.845
 THREAD_PITCH_MM = 25.4 / 40.0
 THREAD_TAP_DRILL_MM = 2.261
+
+
+def _bottom_surface_edge(view: Any) -> Any:
+    """Return the guide's 300 mm model edge on the bottom datum surface."""
+    candidates: list[tuple[float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label="platen-guide bottom edge"):
+        edge = _early_bound(raw_edge, "IEdge", "GetStartVertex", "GetEndVertex")
+        start = edge.GetStartVertex()
+        end = edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        start = _early_bound(start, "IVertex", "GetPoint")
+        end = _early_bound(end, "IVertex", "GetPoint")
+        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+        if abs(p0[1]) > 0.01 or abs(p1[1]) > 0.01:
+            continue
+        candidates.append((abs(p1[0] - p0[0]), edge))
+    if not candidates:
+        raise RuntimeError("front view has no model edge on the guide bottom surface")
+    span_mm, edge = max(candidates, key=lambda item: item[0])
+    if span_mm < 299.9:
+        raise RuntimeError(f"guide bottom edge span is only {span_mm:.3f} mm")
+    return edge
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -167,7 +194,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Native datum reference frame and feature controls replace former notes 5-7.
     # Right view shows the 10 mm depth: left edge is the blind-hole entry face A.
     datum_a_edge = (0.365, 0.110)
-    datum_b_edge = (0.190, FRONT_BOTTOM_Y_M)
+    datum_b_entity = _bottom_surface_edge(front)
     datum_c_edge = (FRONT_LEFT_X_M, FRONT_HOLE_Y_M)
     add_datum_feature(
         adapter,
@@ -186,10 +213,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=datum_b_edge,
-        symbol_xy=(0.190, 0.098),
+        entity=datum_b_entity,
+        symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098),
         datum="B",
+        # SolidWorks normalizes this legal bottom-edge attachment 0.0507 mm
+        # upward when the symbol is committed.  Accept that measured native
+        # readback shift; this is an automation check, not a part tolerance.
         label="guide bottom edge",
+        position_tolerance_m=0.0001,
     )
     # Dropped to y=0.098 from FRONT_HOLE_Y_M (0.1111): level with the edge, the
     # box is UNAVOIDABLY struck through. `insert_hole_table` gives no control over

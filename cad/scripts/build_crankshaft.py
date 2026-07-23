@@ -71,9 +71,10 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # T12 at -157.5, pedestal slab at -145..-125) while the inboard 16T station
 # stayed, so the shaft spans -175..-30. The arm/handle sweep entirely in front
 # of the chain plane and cannot foul the chain when turning (book ch30
-# p005/p002). Pin cross-hole: was Ø5.0 photo-read, now #9 drill (Ø4.978,
-# wizard) -- the nearest number drill; radial through the shaft at the
-# crank-seat height.
+# p005/p002). Pin cross-hole: #9 drill (Ø4.978, wizard) through local X at
+# station 4.0, coaxial with the crank arm's local-Y pilot after the arm's
+# assembly transform.  Both land at the arm mid-plane and are taper-reamed
+# together for MHA-024.
 # Keyed-chain seat stations (local +Y from the outboard origin): named datum
 # planes the T12 chain wheel and the 16T pinion mate COINCIDENT to in the
 # assembly (the frame CboreSeat idiom). Coincident replaces the old unsigned
@@ -109,10 +110,11 @@ async def build(adapter) -> dict[str, str]:
     # already mm (0.375 * IN), so it serialises as its mm value.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
-    await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
-    # (The old PinHoleDia/PinHoleHeight knobs are gone: the cross-hole is a
-    # native Hole Wizard #9 feature; its size comes from the drill table and
-    # its station is baked into the placement point.)
+    # PinHoleHeight is deliberately the COM-free spec constant used below.
+    # On the local-X radial point, assigning the same 4 mm value through a
+    # 3D-sketch equation built the hole but made ForceRebuild3 fail on both
+    # +X and -X probes (2026-07-22).  The released drawing owns the native
+    # associative end-face-to-axis dimension; no unstable equation is saved.
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -142,15 +144,17 @@ async def build(adapter) -> dict[str, str]:
     # Tapered-pin cross-hole through the crank seat: a native Hole Wizard #9
     # drill placed RADIALLY on the shaft's cylindrical face (3D-sketch
     # placement; no planar face carries the drill axis). The placement point
-    # sits on the surface at the crank-seat height, +Z side; through-all
-    # drills diametrally out the -Z wall.
+    # sits on the surface at the crank-seat height, -X side; through-all
+    # drills diametrally out the +X wall.  The circle's parameter seam lies
+    # on +X and rejects the otherwise-neutral station equation on rebuild;
+    # -X defines the identical finished bore axis away from that seam.
+    # ROT_X_POS90 preserves local X as machine X, matching the arm pilot.
     drive_jobs += wizard_hole_on_cylinder(
         adapter,
         HoleSpec("drilled_number", "#9"),
-        [0.0, PIN_HOLE_HEIGHT, SHAFT_DIA / 2.0],
+        [-SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0],
         "tapered-pin cross-hole (#9)",
         name="PinHole",
-        y_dim=("PinHeight", '"PinHoleHeight"'),
     )
     # Cross-drill removal = the perpendicular cylinder-cylinder intersection,
     # integrated numerically (probe-exact; replaces the old ~178 as-built

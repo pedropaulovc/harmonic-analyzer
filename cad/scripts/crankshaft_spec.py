@@ -12,25 +12,23 @@ SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats)
 # (_holes.NUMBER_DRILL_MM["#9"]); the value is mirrored here so the drawing's
 # view math and notes stay COM-free.
 PIN_HOLE_DIA = 4.978
-PIN_HOLE_HEIGHT = 12.0  # crank hub centre above the outboard end
+PIN_HOLE_HEIGHT = 4.0  # arm mid-plane above the outboard end
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
-    "PinHole": {"PinHeight"},
 }
 # The cross-hole's Ø/THRU callout comes from the associative native Hole Wizard
-# annotation. Its axial station is the model's PinHeight dimension on the
-# wizard's nested 3DSketch1 subfeature; the drawing-mark walker starts from the
-# named PinHole parent and reaches that complete feature tree.
+# annotation. Its axial station is a drawing-native basic dimension from the
+# crank-end face to the hole axis.
 
 # Lines kept short (<~66 chars) so the left-anchored block stays clear of the
 # title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
         "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "MATCH-REAMING WITH THE CRANK ARM TO FIT CUSTOM TAPER PIN",
-        "MHA-024 IS AN ASSEMBLY OPERATION OUTSIDE THIS PART DRAWING.",
+        "MATCH-REAM WITH CRANK ARM MHA-020 TO FIT CUSTOM TAPER PIN",
+        "MHA-024; ASSEMBLY OPERATION OUTSIDE THIS PART DRAWING.",
     )
 )
 END_VIEW_NOTE = "CRANK-END VIEW SCALE 2:1"

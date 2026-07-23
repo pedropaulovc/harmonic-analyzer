@@ -40,7 +40,12 @@ def test_linked_notes_define_remaining_arbor_operations() -> None:
     # FREE on the fixed arbor, so the print must forbid the legacy keyseat.
     assert "KEYSEAT" in notes
     assert "RUN FREE" in notes
-    assert "CENTRE MARKS" in notes
+    assert "CENTRE MARKS" not in notes
+    assert notes.splitlines() == [
+        "TURN OR CENTRELESS-GRIND FULL LENGTH; NO FLATS, STEPS OR KEYSEAT.",
+        "STATIONARY ARBOR: 20 CYLINDER GEARS RUN FREE ON THE FULL O.D.; "
+        "CLAMPED IN PEDESTALS AT BOTH ENDS.",
+    ]
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -59,6 +64,9 @@ def test_profile_view_is_rotated_axis_horizontal() -> None:
 def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
+    assert "edge_xy=end_top" in source
+    assert "symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.024)" in source
+    assert "position_tolerance_m=0.0001" in source
     assert source.count("add_feature_control_frame(") == 2
     assert source.count('characteristic="cylindricity"') == 1
     assert source.count('characteristic="perpendicularity"') == 1
@@ -90,6 +98,8 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("cylinder-gear-shaft")
-    assert "1018" in str(config["material_specification"])
+    expected = "SAE 1018 CF bar, ASTM A108-24"
+    assert config["material"] == expected
+    assert config["material_specification"] == expected
     assert config["finish"]
     assert int(config["quantity"]) == 1

@@ -88,6 +88,27 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 4
     assert source.count("add_feature_control_frame(") == 2
+    assert (
+        'symbol_xy=(0.085, 0.105),\n        datum="B",\n'
+        '        label="cam final bore axis",\n'
+        "        position_tolerance_m=0.003,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.003") == 1
+    assert (
+        'symbol_xy=(0.155, 0.105),\n        datum="C",\n'
+        '        label="cam OD datum axis",\n'
+        "        position_tolerance_m=0.019,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.019") == 1
+    assert (
+        'symbol_xy=(0.192, 0.170),\n        datum="D",\n'
+        '        label="cam boss OD axis",\n'
+        "        position_tolerance_m=0.0025,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.0025") == 1
     assert "set_basic_dimension(" in source
     assert 'datums=("A", "B", "C")' in source
     assert 'datums=("D",)' in source

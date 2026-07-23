@@ -397,21 +397,9 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance="0.50",
         datums=("A", "B", "C"),
         diameter=True,
-        quantity="A1, C1-C3, D1-D4",
+        quantity="A1, B1, C1-C3, D1-D4",
         label="tapped-hole true position",
         entity=hole_entities[8],
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.025, 0.150),
-        characteristic="position",
-        tolerance="0.50",
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="1X DIA 6.53 BLIND HOLE",
-        label="unthreaded pilot-hole true position",
-        entity=hole_entities[4],
     )
     add_feature_control_frame(
         adapter,
@@ -455,7 +443,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=3,
+        # The cone-pivot seat is now the fourth Hole Wizard tapped group; all
+        # four imported generic notes are replaced by the native hole table.
+        expected_redundant_notes=4,
     )
 
 

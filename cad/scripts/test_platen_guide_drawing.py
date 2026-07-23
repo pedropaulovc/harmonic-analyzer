@@ -159,12 +159,35 @@ def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
 def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
+    assert (
+        'label="guide bottom edge",\n        position_tolerance_m=0.0001'
+        in source
+    )
+    assert source.count("position_tolerance_m=0.0001") == 1
     assert source.count("add_feature_control_frame(") == 3
     assert "characteristic=\"flatness\"" in source
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
+
+
+def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
+    hole_axis_x = {
+        drawing.FRONT_LEFT_X_M + station / 1000.0
+        for station in (*drawing.THROUGH_X, *drawing.BLIND_X)
+    }
+    assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(0.220)
+    assert min(abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x) == pytest.approx(
+        0.030
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "def _bottom_surface_edge(" in source
+    assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
+    assert "if span_mm < 299.9:" in source
+    assert "datum_b_entity = _bottom_surface_edge(front)" in source
+    assert "entity=datum_b_entity" in source
+    assert "symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098)" in source
 
 
 def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:

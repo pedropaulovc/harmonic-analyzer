@@ -2917,9 +2917,16 @@ def _spread_balloons(
 
 @_telemetry.traced("drawing.auto_balloons", label_param="label")
 def _create_auto_balloons(
-    adapter: Any, view: Any, *, label: str, allow_empty: bool = False
+    adapter: Any,
+    view: Any,
+    *,
+    label: str,
+    allow_empty: bool = False,
+    layout: int = 1,
 ) -> list[Any]:
     """Create item-number balloons for one selected view without repositioning."""
+    if layout not in range(1, 7):
+        raise ValueError(f"{label}: invalid auto-balloon layout {layout}")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -2927,7 +2934,7 @@ def _create_auto_balloons(
     if options is None:
         raise RuntimeError(f"failed to create auto-balloon options ({label})")
     options = _sw_type_info.early_bound_or_flag(options, "IAutoBalloonOptions")
-    options.Layout = 1
+    options.Layout = layout
     options.ReverseDirection = False
     options.IgnoreMultiple = True
     options.InsertMagneticLine = False
@@ -3182,6 +3189,7 @@ def add_auto_balloons_across_views(
     label: str,
     existing_balloons: Sequence[Any] = (),
     margin: float = 0.014,
+    layout: int = 1,
 ) -> list[Any]:
     """Balloon successive views until every BOM item number is represented.
 
@@ -3201,7 +3209,7 @@ def add_auto_balloons_across_views(
     for index, view in enumerate(views, start=1):
         view_label = f"{label} view {index}"
         balloons = _create_auto_balloons(
-            adapter, view, label=view_label, allow_empty=True
+            adapter, view, label=view_label, allow_empty=True, layout=layout
         )
         if not balloons:
             continue

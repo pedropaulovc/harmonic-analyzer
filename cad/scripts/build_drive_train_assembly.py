@@ -30,9 +30,10 @@ drive plane at y 104.8, not the old 126.8):
   removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
   -- is NOT placed here: paper-drive now owns the whole crank->paper chain
   drive, so the single crank wheel lives there, avoiding a duplicate at the
-  top level -- codex #189 :605. The removable's tapered pin is OMITTED
-  regardless: a tapered pin cannot sit in the straight 5 mm cross-holes
-  without solid interference.)
+  top level -- codex #189 :605. MHA-024 is not inserted in this as-machined
+  assembly model: MHA-020 and MHA-026 retain their coaxial straight pilot
+  holes here, while the released drawings require their shared 1:48 taper to
+  be match-reamed at assembly.)
 * alignment pinion (ch. 25): the 42T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 

@@ -162,14 +162,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # No single view exposes all eleven component families in the dense bank.
     # Cover the BOM across the three projections and validate every item number.
-    # Items 4 and 7 attach in a tight vertical cluster in the right view. A
-    # 6 mm ring margin gives the measured balloon radii a larger enforced
-    # angular separation while preserving attachment order; the layout audit
-    # remains the final proof that the leaders do not cross.
+    # Items 4 and 7 attach in a tight vertical cluster in the right view. Use
+    # SolidWorks' native circular layout so their order follows the view ring;
+    # the measured-radius spread and final layout audit remain the proof that
+    # balloon circles and leaders clear one another.
     add_auto_balloons_across_views(
         adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
         label="channel assembly balloons",
         margin=0.006,
+        layout=2,
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add channel assembly notes")

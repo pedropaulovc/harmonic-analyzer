@@ -46,7 +46,10 @@ def test_sheet_runs_at_1_to_1_with_1_to_4_isometric() -> None:
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = channel_lever_spec.DRAWING_NOTES
     assert "6.50 +0.03/0" in notes
-    assert "BASIC 4.75 FROM DATUM C" in notes
+    assert "DATUM C IS THE LONG TOP FACE" in notes
+    assert "BASIC 4.75 BELOW C" in notes
+    assert "BAR-PIN 127.00; SHOULDER 169.00" in notes
+    assert "SPRING-HOLE 177.80; TIP R3 CENTRE 182.80" in notes
     assert "NOT CONCENTRIC" in notes
     assert "#47 DRILL" not in notes
     assert "#21 DRILL" not in notes
@@ -62,6 +65,16 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'bar_height = add_edge_dimension(' in source
     assert 'set_basic_dimension(adapter, bar_height, label="bar height from datum C")' in source
     assert source.count("add_datum_feature(") == 3
+    assert (
+        'label="fulcrum bore axis",\n        position_tolerance_m=0.0001'
+        in source
+    )
+    assert source.count("position_tolerance_m=0.0001") == 1
+    assert source.count("_force_dimension_black(") == 3
+    assert source.count("annotation.Color = 0") == 1
+    assert "annotation.LayerOverride" in source
+    assert "InsertCenterMark3(2, False, False)" in source
+    assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
     assert source.count("add_feature_control_frame(") == 5
     assert source.count('characteristic="position"') == 2
     assert source.count('datums=("A", "B", "C")') == 3
@@ -88,7 +101,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("channel-lever")
     assert spec["material_specification"] == "ASTM A48 Class 30 gray cast iron"
-    assert spec["material"] == "Gray Cast Iron"
+    assert spec["material"] == "ASTM A48 Class 30 gray cast iron"
     assert spec["finish"] == (
         "RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores"
     )

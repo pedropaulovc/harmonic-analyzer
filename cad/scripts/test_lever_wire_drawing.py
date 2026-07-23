@@ -71,6 +71,12 @@ def test_wire_geom_split_keeps_notes_out_of_consumer_recipes() -> None:
         assert "from lever_wire_geom import" in source
         assert "from build_lever_wire import" not in source
 
+    verify_source = Path(part.__file__).with_name("verify.py").read_text(
+        encoding="utf-8"
+    )
+    assert "import lever_wire_geom as _wire" in verify_source
+    assert "import build_lever_wire as _hw" not in verify_source
+
 
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")

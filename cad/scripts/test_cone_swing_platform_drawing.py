@@ -74,6 +74,14 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "symbol_xy=(pivot_center[0] - 0.010, pivot_center[1])" in source
     assert "entity=pivot_edge" in source
     assert "shoulder=True" in source
+    assert (
+        '        label="pivot-hole cylindrical datum feature",\n'
+        "        entity=pivot_edge,\n"
+        "        shoulder=True,\n"
+        "        position_tolerance_m=0.004,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.004") == 1
     assert "annotation=pivot_callout.GetAnnotation()" not in source
     assert 'datum="C"' in source and "entity=north_edge" in source
     assert "symbol_xy=(0.100, 0.135)" in source
