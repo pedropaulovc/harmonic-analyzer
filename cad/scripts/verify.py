@@ -1297,9 +1297,9 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     The transient drive mate is discarded by closing the doc UNSAVED, so the
     shipped free model is untouched.
     """
-    import build_lever_wire as _hw
     import build_magnifier_assembly as _mag
     from build_output_fixture import HOOK_ANCHOR_LOCAL
+    import lever_wire_geom as _wire
 
     name = "magnifier"
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
@@ -1325,7 +1325,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     # Machine anchors for the invariants (the magnifier is authored
     # machine-handed, #151 -- constants feed straight through).
     axis_xy = (_mag.WHEEL_X, _mag.WHEEL_BAR_Y)  # wheel axis, along Z
-    r_expect = _hw.HUB_DIA / 2.0 + _hw.WIRE_DIA / 2.0 + _hw.CLEARANCE
+    r_expect = _wire.HUB_DIA / 2.0 + _wire.WIRE_DIA / 2.0 + _wire.CLEARANCE
 
     def _xform(comp: str) -> tuple[list[list[float]], list[float]]:
         a = component_transform(adapter, comp)
@@ -1346,7 +1346,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         n_len = math.hypot(n[0], n[1])
         w = [pos[0] - axis_xy[0], pos[1] - axis_xy[1]]
         d_axis = abs(w[0] * n[0] + w[1] * n[1]) / n_len
-        hook = [p + _hw.WIRE_LEN * ui for p, ui in zip(pos, u)]
+        hook = [p + _wire.WIRE_LEN * ui for p, ui in zip(pos, u)]
         frows, fpos = _xform("output-fixture-1")
         anchor = [
             fpos[k]
