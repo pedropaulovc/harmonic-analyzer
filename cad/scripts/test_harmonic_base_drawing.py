@@ -59,8 +59,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "LEAST-SQUARES CYLINDER FITS OVER" in notes
     assert "SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX" in notes
     assert "PROCESS DATA" not in notes
-    assert "B1 IS UNTHREADED" in notes
-    assert "A1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
+    assert "A1/B1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
     assert "MASK DATUM A/B/C FACES, ALL BORES/THREADS" in notes
     assert "PAD TOP; COAT PAD SIDES AND ROOTS" in notes
     assert "A1-A4" not in notes
@@ -79,12 +78,12 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "GetVisibleEntities2(c, 2)" in source
     assert "GetVisibleEntities2(c, 1)" in source
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 6
+    assert source.count("add_feature_control_frame(") == 5
     assert 'quantity="E1-E4 DIA 13 THRU"' in source
     assert 'quantity="DATUM B LONG SIDE"' in source
     assert 'quantity="DATUM C LEFT END"' in source
-    assert 'quantity="A1, C1-C3, D1-D4"' in source
-    assert 'quantity="1X DIA 6.53 BLIND HOLE"' in source
+    assert 'quantity="A1, B1, C1-C3, D1-D4"' in source
+    assert "6.53 BLIND HOLE" not in source
     assert "underside-only counterbore rims are visible" in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
     assert "expected_redundant_notes=4" in source

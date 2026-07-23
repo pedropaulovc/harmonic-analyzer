@@ -48,6 +48,8 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "6.50 +0.03/0" in notes
     assert "BASIC 4.75 FROM DATUM C" in notes
     assert "NOT CONCENTRIC" in notes
+    assert "NATIVE BASIC DIMENSION FROM B" in notes
+    assert "177.80 FROM B" not in notes
     assert "#47 DRILL" not in notes
     assert "#21 DRILL" not in notes
     assert "LINEAR +/-" not in notes
@@ -93,7 +95,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
     spec = _config.parts("channel-lever")
     assert spec["material_specification"] == "ASTM A48 Class 30 gray cast iron"
-    assert spec["material"] == "Gray Cast Iron"
+    assert spec["material"] == "ASTM A48 Class 30 gray cast iron"
     assert spec["finish"] == (
         "RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores"
     )
