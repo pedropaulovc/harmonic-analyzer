@@ -76,6 +76,15 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
     assert source.count("add_feature_control_frame(") == 3
+    assert (
+        "        edge_xy=bore_left,\n"
+        "        symbol_xy=(bore_left[0] - 0.022, bore_left[1] + 0.018),\n"
+        '        datum="A",\n'
+        '        label="lever final bore axis",\n'
+        "        position_tolerance_m=0.005,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.005") == 1
     assert source.count('entity_type="SILHOUETTE"') == 5
     assert source.count('entity_type="FACE"') == 0
     assert 'characteristic="circular_runout"' in source
