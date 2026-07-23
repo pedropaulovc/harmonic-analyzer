@@ -13,6 +13,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import _early_bound, _flag_only  # noqa: E402
@@ -72,6 +74,18 @@ def test_early_bound_delegates_with_selective_fallback_names(monkeypatch) -> Non
     monkeypatch.setattr(sw_type_info, "early_bound_or_flag", wrap)
     assert _early_bound(original, "IComponent2", "GetModelDoc2") is typed
     assert calls == [(original, "IComponent2", ("GetModelDoc2",))]
+
+
+def test_early_bound_propagates_generated_wrapper_failure(monkeypatch) -> None:
+    """The repo helper must not downgrade a failed generated cast to dispatch."""
+    from solidworks_mcp.adapters import sw_type_info
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("generated wrapper construction failed")
+
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", fail)
+    with pytest.raises(RuntimeError, match="generated wrapper construction failed"):
+        _early_bound(object(), "IComponent2", "GetModelDoc2")
 
 
 if __name__ == "__main__":

@@ -1540,14 +1540,13 @@ def _early_bound(obj: Any, interface: str, *method_names: str) -> Any:
     Early-bound wrappers invoke known DISPIDs directly and avoid the repeated
     ``GetIDsOfNames`` calls paid by whole-interface method flagging.  The exact
     names are used only when makepy metadata is unavailable, preserving support
-    for deliberately minimal test doubles and unusual SolidWorks installs.
+    for deliberately minimal test doubles. A generated-wrapper construction
+    failure propagates: silently returning the raw dispatch would hide a broken
+    cast and reintroduce late binding on production SolidWorks objects.
     """
     from solidworks_mcp.adapters import sw_type_info
 
-    try:
-        return sw_type_info.early_bound_or_flag(obj, interface, *method_names)
-    except Exception:
-        return obj
+    return sw_type_info.early_bound_or_flag(obj, interface, *method_names)
 
 
 def _flag_only(obj: Any, *method_names: str) -> None:
