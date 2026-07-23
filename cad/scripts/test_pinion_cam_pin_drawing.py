@@ -53,9 +53,18 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
 
 def test_direct_limits_replace_ambiguous_gdt() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_datum_feature(" in source
+    assert source.count("add_datum_feature(") == 1
     assert "add_feature_control_frame(" in source
     assert "add_view_centerline(" in source
+    assert (
+        "        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),\n"
+        "        symbol_xy=(0.105, 0.228),\n"
+        '        datum="A",\n'
+        '        label="cam-pin cylindrical-shank datum axis",\n'
+        "        position_tolerance_m=0.0065,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.0065") == 1
     assert "add_surface_finish(" not in source
     assert "4.020 MAX / 4.012 MIN" in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "NOMINAL REF ONLY" not in drawing.DIMENSION_CALLOUTS["PinDia"]
