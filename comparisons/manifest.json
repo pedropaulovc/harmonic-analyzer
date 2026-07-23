@@ -14,14 +14,18 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": -0.61,
-        "zoom": 1.0,
-        "target_mm": null,
+        "roll_deg": 0.5,
+        "zoom": 1.2,
+        "target_mm": [
+          7.29,
+          504.74,
+          -25.09
+        ],
         "perspective": {
           "focal_length_mm": 100.0
         },
-        "az_deg": 180.47,
-        "el_deg": -0.14
+        "az_deg": 178.89,
+        "el_deg": 11.26
       },
       "align": {
         "scale": 1.13,
