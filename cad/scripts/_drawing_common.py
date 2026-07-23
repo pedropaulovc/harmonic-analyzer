@@ -120,20 +120,6 @@ _SF_BOX_DOWN_M = 0.0
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
 
-# The hand-made DRWDOT was authored from an inch standard, then changed to mm.
-# Its edge-break note retained the inch-origin ``.01`` value even though the
-# title block now declares millimetres, rendering an impractical 0.01 mm break.
-# Normalize the instantiated drawing (not the shared binary template) so every
-# generated sheet carries the metric equivalent requested by the machinist
-# review.  Accept the new text too, making this forward-compatible with a later
-# manual DRWDOT repair; fail loud if neither spelling exists.
-_OLD_EDGE_BREAK_NOTE = (
-    "REMOVE BURRS AND BREAK SHARP EDGES R.01 OR CHAMFER .01 MAX"
-)
-_METRIC_EDGE_BREAK_NOTE = (
-    "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
-)
-
 # swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
 # is bent: a straight leader runs at whatever angle its anchor-to-text vector
 # happens to take, which is what drove the old Ra symbol's leader diagonally
@@ -1228,7 +1214,6 @@ def new_project_drawing(
     # format and view geometry is inert (all typed SelectByID2 picks fail).
     # EditSheet() drops back to the sheet layer; idempotent when already there.
     ddoc.EditSheet()
-    _normalize_metric_edge_break_note(adapter, ddoc)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
@@ -1332,58 +1317,120 @@ def create_blank_drawing_sheets(
         raise RuntimeError(f"{label}: sheet order mismatch: {actual!r}")
 
 
-@_telemetry.traced("drawing.normalize_edge_break")
-def _normalize_metric_edge_break_note(adapter: Any, ddoc: Any) -> None:
-    """Replace the template's inch-origin edge break with its metric value."""
-    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
-    if sheet_view is None:
-        raise RuntimeError("drawing template has no sheet view for note normalization")
-    annotations = adapter._attempt(
-        lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
-    ) or []
-    matched = 0
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
-        )
-        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
-            continue
-        specific = adapter._attempt(
-            lambda a=annotation: adapter._get_attr_or_call(
-                a, "GetSpecificAnnotation"
-            )
-        )
-        if specific is None:
-            continue
-        note = _sw_type_info.early_bound_or_flag(
-            specific, "INote", "GetText", "SetText"
-        )
-        raw = str(adapter._get_attr_or_call(note, "GetText") or "")
-        normalized = " ".join(raw.upper().split())
-        if normalized not in {_OLD_EDGE_BREAK_NOTE, _METRIC_EDGE_BREAK_NOTE}:
-            continue
-        matched += 1
-        if normalized == _METRIC_EDGE_BREAK_NOTE:
-            continue
-        changed = adapter._attempt(
-            lambda n=note: n.SetText(_METRIC_EDGE_BREAK_NOTE), default=False
-        )
-        if not changed:
-            raise RuntimeError("failed to replace drawing edge-break note")
-        applied = " ".join(
-            str(adapter._get_attr_or_call(note, "GetText") or "").upper().split()
-        )
-        if applied != _METRIC_EDGE_BREAK_NOTE:
-            raise RuntimeError(
-                "drawing edge-break note replacement did not persist: "
-                f"{applied!r}"
-            )
-    if matched != 1:
+def _projection_symbol_centers(
+    circle_specs: list[tuple[float, float]],
+    line_x_pairs: list[tuple[float, float]],
+) -> tuple[float, float]:
+    """Return ``(frustum_x, circle_x)`` for the standard projection symbol."""
+    if len(circle_specs) != 2:
         raise RuntimeError(
-            "drawing template must contain exactly one recognized edge-break "
-            f"note, found {matched}"
+            f"projection symbol must contain two concentric circles, got {len(circle_specs)}"
         )
-    _telemetry.event("drawing.edge_break_normalized", value_mm=0.25)
+    circle_xs = [center_x for center_x, _radius in circle_specs]
+    if max(circle_xs) - min(circle_xs) > 1e-9:
+        raise RuntimeError(f"projection-symbol circles are not concentric: {circle_xs}")
+    circle_x = sum(circle_xs) / len(circle_xs)
+    outer_radius = max(radius for _center_x, radius in circle_specs)
+    frustum_lines = [
+        pair
+        for pair in line_x_pairs
+        if max(abs(pair[0] - circle_x), abs(pair[1] - circle_x))
+        > outer_radius * 1.5
+    ]
+    if len(frustum_lines) != 6:
+        raise RuntimeError(
+            "projection symbol must contain four circle-group entities and six "
+            f"frustum entities; found {len(line_x_pairs) - len(frustum_lines) + 2} "
+            f"and {len(frustum_lines)}"
+        )
+    frustum_xs = [x for pair in frustum_lines for x in pair]
+    frustum_x = (min(frustum_xs) + max(frustum_xs)) / 2.0
+    return frustum_x, circle_x
+
+
+def _assert_third_angle_order(frustum_x: float, circle_x: float) -> None:
+    if circle_x <= frustum_x:
+        raise RuntimeError(
+            "project template carries a first-angle projection symbol: "
+            f"circle_x={circle_x:.6f} is not right of frustum_x={frustum_x:.6f}"
+        )
+
+
+def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
+    """Fail every drawing at creation if the template carries first-angle ink."""
+    ddoc.EditTemplate()
+    try:
+        manager = _early_bound(draw.SketchManager, "ISketchManager")
+        definitions = manager.GetSketchBlockDefinitions() or ()
+        candidates = [
+            _early_bound(definition, "ISketchBlockDefinition")
+            for definition in definitions
+            if Path(str(_early_bound(definition, "ISketchBlockDefinition").FileName))
+            .name.lower()
+            == "third-angle-projection.sldblk"
+        ]
+        if len(candidates) != 1:
+            raise RuntimeError(
+                "project template must contain exactly one third-angle projection "
+                f"block definition, got {len(candidates)}"
+            )
+        sketch = _early_bound(candidates[0].GetSketch(), "ISketch")
+        circle_specs: list[tuple[float, float]] = []
+        line_x_pairs: list[tuple[float, float]] = []
+        for raw_segment in sketch.GetSketchSegments() or ():
+            segment = _early_bound(raw_segment, "ISketchSegment")
+            kind = int(segment.GetType())
+            if kind == 0:
+                line = _early_bound(raw_segment, "ISketchLine")
+                line_x_pairs.append(
+                    (
+                        float(_early_bound(line.GetStartPoint2(), "ISketchPoint").X),
+                        float(_early_bound(line.GetEndPoint2(), "ISketchPoint").X),
+                    )
+                )
+                continue
+            if kind != 1:
+                continue
+            arc = _early_bound(raw_segment, "ISketchArc")
+            if not bool(arc.IsCircle()):
+                continue
+            center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+            circle_specs.append((float(center.X), float(arc.GetRadius())))
+        frustum_x, circle_x = _projection_symbol_centers(circle_specs, line_x_pairs)
+        _assert_third_angle_order(frustum_x, circle_x)
+        # A correct block DEFINITION can persist in the document even when the
+        # placed title-block INSTANCE was deleted, mirrored, or never inserted,
+        # so the definition geometry alone does not prove the sheet shows the
+        # symbol.  Require at least one placed instance and reject a rotated /
+        # mirrored one (which flips the projection convention on the sheet).
+        definition = candidates[0]
+        instance_count = int(definition.GetInstanceCount())
+        with _telemetry.span(
+            "drawing.projection_symbol_scan", instances=instance_count
+        ):
+            if instance_count < 1:
+                raise RuntimeError(
+                    "third-angle projection block is defined but has no placed "
+                    "instance — the title-block symbol was deleted or never inserted"
+                )
+            for raw_instance in definition.GetInstances() or ():
+                instance = _early_bound(raw_instance, "ISketchBlockInstance")
+                angle = float(instance.Angle) % math.tau
+                if min(angle, math.tau - angle) > math.radians(0.5):
+                    raise RuntimeError(
+                        "placed third-angle projection block instance is rotated "
+                        f"(angle={angle:.4f} rad) — a rotated or mirrored symbol "
+                        "misreads the projection convention on the sheet"
+                    )
+        _telemetry.event(
+            "drawing.projection_symbol_verified",
+            convention="third-angle",
+            frustum_x=frustum_x,
+            circle_x=circle_x,
+            instance_count=instance_count,
+        )
+    finally:
+        ddoc.EditSheet()
 
 
 def set_hidden_lines_removed(adapter: Any, view: Any) -> None:

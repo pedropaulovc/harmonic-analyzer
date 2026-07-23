@@ -55,6 +55,10 @@ custom properties via `$PRPSHEET` — `Number` / `Revision` / `Title` and the
 `finalize_drawing` requires the `TOL_*` set on the linked model, so a stale
 source part fails loud instead of saving blank tolerance cells.
 
+The edge-break policy is authored directly in the template as `R0.25 OR
+CHAMFER 0.25 MAX`. Keep generic drawing-wide notes in the template rather than
+rewriting them through COM for every generated drawing.
+
 The title block's UNIT cell currently reads **mm**, matching the generated
 drawing views (which dimension in mm until the inch migration, issue #290,
 lands) — and the `TOL_*` display strings in `title_block.yaml` are the mm
