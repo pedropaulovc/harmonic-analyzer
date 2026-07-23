@@ -154,6 +154,8 @@ async def build(adapter: Any) -> dict[str, str]:
     half_depth = LENGTH * SHEET_SCALE[0] / 2000.0
     left_end = (RIGHT_CENTER[0] - half_depth, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + half_depth, RIGHT_CENTER[1])
+    # Live readback normalizes this restricted axis tag by 4.478 um.  Bound
+    # only the annotation placement; part dimensions and GD&T remain unchanged.
     add_datum_feature(
         adapter,
         front,
@@ -161,6 +163,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
         datum="A",
         label="bushing bore axis",
+        position_tolerance_m=0.00001,
     )
     add_datum_feature(
         adapter,
