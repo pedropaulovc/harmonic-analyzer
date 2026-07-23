@@ -252,7 +252,11 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=fulcrum_left,
         symbol_xy=(fulcrum_left[0] - 0.018, fulcrum_left[1]),
         datum="B",
+        # SolidWorks normalizes this legal bore-axis tag by 0.0020 mm when
+        # committed.  This allowance checks annotation readback only; it does
+        # not alter the part's manufacturing tolerances.
         label="fulcrum bore axis",
+        position_tolerance_m=0.0001,
     )
     top_face = (
         RIGHT_CENTER[0],
