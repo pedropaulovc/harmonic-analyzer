@@ -21,14 +21,14 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -77,9 +77,27 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pen-frame source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
+    drawing_model, _sheet = new_project_drawing(
+        adapter,
+        category=SPEC.category,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Pen Frame Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "pen frame; brass stirrup yoke; set-screw rail",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
+    read_required_view_properties(
+        adapter,
+        front,
         (
             "Number",
             "Revision",
@@ -103,24 +121,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
-        adapter,
-        category=SPEC.category,
-        property_view=PART_STEM,
-        scale=SHEET_SCALE,
-    )
-    stamp_drawing_summary(
-        adapter,
-        drawing_model,
-        {
-            0: "Pen Frame Manufacturing Drawing",
-            1: "Harmonic Analyzer hobby-machinist book drawing",
-            2: "Harmonic Analyzer Project",
-            3: "pen frame; brass stirrup yoke; set-screw rail",
-            4: "Generated from the project-owned ASME B drawing standard",
-        },
-    )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, iso):

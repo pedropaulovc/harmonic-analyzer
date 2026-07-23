@@ -17,14 +17,14 @@ from _assembly_drawing_bom import (
     configured_part_numbers,
     insert_identified_bom_table,
 )
-from _common import _early_bound, check, run_build
+from _common import _early_bound, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons,
     create_blank_drawing_sheets,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -94,27 +94,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
-    check("open frame assembly source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-        ),
-        required=(
-            "Number",
-            "Revision",
-            "Material",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter, category=SPEC.category, scale=SHEET_SCALE
     )
@@ -136,6 +115,27 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate frame general assembly sheet")
     general_front = place_view(
         adapter, str(SOURCE), "*Front", *GENERAL_FRONT_CENTER, scale=VIEW_SCALE
+    )
+    read_required_view_properties(
+        adapter,
+        general_front,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+        ),
+        required=(
+            "Number",
+            "Revision",
+            "Material",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+        ),
     )
     general_right = place_view(
         adapter, str(SOURCE), "*Right", *GENERAL_RIGHT_CENTER, scale=VIEW_SCALE

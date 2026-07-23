@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -19,7 +19,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -82,28 +82,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pen-rod source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Top View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Top View Note",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter,
         category=SPEC.category,
@@ -123,6 +101,28 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    read_required_view_properties(
+        adapter,
+        front,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Top View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Top View Note",
+        ),
+    )
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
@@ -142,7 +142,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the wire hole")
 
     front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
-    front_top = (FRONT_CENTER[0], FRONT_CENTER[1] + ROD_LENGTH / 2000.0)
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
     front_far_side = (FRONT_CENTER[0] + 0.0025, FRONT_CENTER[1])
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0

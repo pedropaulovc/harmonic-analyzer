@@ -269,7 +269,9 @@ def _select_view_entity(
     entity: Any | None = None,
 ) -> Any:
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
@@ -558,9 +560,7 @@ def add_feature_control_frame(
     frame = _sw_type_info.early_bound_or_flag(
         frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
     )
-    xml = _gtol_frame_xml(
-        characteristic, tolerance, datums=datums, diameter=diameter
-    )
+    xml = _gtol_frame_xml(characteristic, tolerance, datums=datums, diameter=diameter)
     if not migrated and not frame.SetSymbolXml(xml):
         raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
     applied = str(frame.GetSymbolXml() or "")
@@ -922,7 +922,9 @@ def add_property_linked_callout(
 ) -> Any:
     """Attach one arrowed callout whose text resolves from the source SLDPRT."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate linked-callout view {name!r}")
@@ -1044,7 +1046,9 @@ def add_native_hole_callout(
         adapter, view, "EDGE", edge_xy, label=label, entity=edge
     )
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     display = ddoc.AddHoleCallout2(callout_xy[0], callout_xy[1], 0.0)
     if display is None:
         raise RuntimeError(f"failed to insert native hole callout ({label})")
@@ -1072,25 +1076,51 @@ def add_native_hole_callout(
 # template's title block reads via $PRPSHEET. finalize_drawing requires them on
 # the linked model so a stale part can't ship blank tolerance cells.
 TITLE_BLOCK_TOLERANCE_PROPERTIES = (
-    "TOL_LIN_XX", "TOL_LIN_XXX", "TOL_ANG", "TOL_SURFACE",
+    "TOL_LIN_XX",
+    "TOL_LIN_XXX",
+    "TOL_ANG",
+    "TOL_SURFACE",
     # The DRILLED HOLES row's two cells. Required like the rest: with holes now
     # relying on this general tolerance UOS (no per-feature callout), a blank row
     # would silently drop every clearance hole's fit -- so a stale source part
     # that predates the TOL_HOLE_* stamp must fail loud here, not ship blank.
-    "TOL_HOLE_MINUS", "TOL_HOLE_PLUS",
+    "TOL_HOLE_MINUS",
+    "TOL_HOLE_PLUS",
 )
 
 
 def read_required_properties(
     model: Any, names: Sequence[str], *, required: Iterable[str]
 ) -> dict[str, str]:
-    properties = {
-        name: str(model.GetCustomInfoValue("", name) or "") for name in names
-    }
+    properties = {name: str(model.GetCustomInfoValue("", name) or "") for name in names}
     missing = [name for name in required if not properties.get(name)]
     if missing:
         raise RuntimeError(f"source part properties are missing: {missing}")
     return properties
+
+
+def read_required_view_properties(
+    adapter: Any,
+    view: Any,
+    names: Sequence[str],
+    *,
+    required: Iterable[str],
+) -> dict[str, str]:
+    """Validate source properties through an already-placed drawing view.
+
+    ``CreateDrawViewFromModelView3`` accepts a path and loads the referenced
+    model itself while leaving the drawing active. Opening that model explicitly
+    first only activates the SLDPRT/SLDASM and makes SolidWorks switch back to
+    the SLDDRW moments later. Read the same early-bound ``IModelDoc2`` through
+    ``IView::ReferencedDocument`` once the first view exists instead.
+    """
+    view = _sw_type_info.early_bound_or_flag(view, "IView", "ReferencedDocument")
+    model = adapter._get_attr_or_call(view, "ReferencedDocument")
+    if model is None:
+        raise RuntimeError("drawing view has no referenced source document")
+    model = _sw_type_info.early_bound_or_flag(model, "IModelDoc2", "GetCustomInfoValue")
+    with _telemetry.span("drawing.source_properties"):
+        return read_required_properties(model, names, required=required)
 
 
 def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
@@ -1105,7 +1135,9 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
         view, "IView", "GetCThreadCount", "GetFirstCThread"
     )
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     ddoc.ActivateView(name)
     draw.ClearSelection2(True)
@@ -1116,8 +1148,8 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
         raise RuntimeError(f"failed to select drawing view {name!r}")
     adapter._attempt(
         lambda: ddoc.InsertModelAnnotations3(
-            0,      # swImportModelItemsFromEntireModel
-            0x1,    # swInsertCThreads
+            0,  # swImportModelItemsFromEntireModel
+            0x1,  # swInsertCThreads
             False,
             True,
             True,
@@ -1205,7 +1237,8 @@ def new_project_drawing(
     template = DRAWING_TEMPLATES[category]
     if not template.is_file() or template.stat().st_size == 0:
         raise FileNotFoundError(
-            f"project {category.value} drawing standard is missing: {template}")
+            f"project {category.value} drawing standard is missing: {template}"
+        )
 
     draw = new_drawing(
         adapter,
@@ -1463,7 +1496,9 @@ def assert_asme_b_sheet(
 ) -> None:
     properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
     if len(properties) < 7:
-        raise RuntimeError(f"{phase}: incomplete drawing sheet properties {properties!r}")
+        raise RuntimeError(
+            f"{phase}: incomplete drawing sheet properties {properties!r}"
+        )
     if properties[2:4] != [float(scale[0]), float(scale[1])]:
         raise RuntimeError(
             f"{phase}: drawing sheet scale is not "
@@ -1484,7 +1519,9 @@ async def reopen_drawing(adapter: Any, path: Path) -> tuple[Any, Any]:
     adapter.swApp.CloseDoc(title)
     check(f"reopen saved drawing {path.name}", await adapter.open_model(str(path)))
     reopened = adapter.currentModel
-    ddoc = _early_bound(reopened, "IDrawingDoc")  # IDrawingDoc view for GetCurrentSheet (same dispatch)
+    ddoc = _early_bound(
+        reopened, "IDrawingDoc"
+    )  # IDrawingDoc view for GetCurrentSheet (same dispatch)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("reopened drawing has no current sheet")
@@ -1632,7 +1669,9 @@ def add_hole_group_tags(
     if len(edge_points) != len(note_positions):
         raise ValueError("hole edge and tag-position counts differ")
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
@@ -1685,7 +1724,9 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     ``swInsertDimensionsMarkedForDrawing`` only.
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     ddoc.ActivateView(name)
     draw.ClearSelection2(True)
@@ -1718,8 +1759,7 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
         if name
     )
     _telemetry.info(
-        f"model-item import {name}: annotations={len(annotations)}, "
-        f"dimensions={names}"
+        f"model-item import {name}: annotations={len(annotations)}, dimensions={names}"
     )
     return annotations
 
@@ -1816,9 +1856,7 @@ def set_dimension_callouts(
             lambda d=display, s=text: d.SetText(text_part, s)
         )
     if remaining:
-        raise RuntimeError(
-            f"dimension callouts not applied: {sorted(remaining)}"
-        )
+        raise RuntimeError(f"dimension callouts not applied: {sorted(remaining)}")
     adapter.currentModel.EditRebuild3()
 
 
@@ -1938,9 +1976,7 @@ def set_dimension_precision(
                 f"requested {digits} decimals, dimension reports {applied}"
             )
     if remaining:
-        raise RuntimeError(
-            f"dimension precision not applied: {sorted(remaining)}"
-        )
+        raise RuntimeError(f"dimension precision not applied: {sorted(remaining)}")
     adapter.currentModel.EditRebuild3()
 
 
@@ -2059,7 +2095,9 @@ def add_edge_dimension(
     slant reads ambiguous for holes not collinear with their datum).
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
@@ -2230,7 +2268,9 @@ def insert_hole_table(
     returning.
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate hole-table view {name!r}")
@@ -2307,7 +2347,9 @@ def insert_hole_table(
     if basic_locations:
         for column, heading in ((1, "X LOC (BASIC)"), (2, "Y LOC (BASIC)")):
             if not table.IsCellTextEditable(0, column):
-                raise RuntimeError(f"native hole-table header column {column} is not editable")
+                raise RuntimeError(
+                    f"native hole-table header column {column} is not editable"
+                )
             table.SetText2(0, column, False, heading)
             applied_heading = str(table.DisplayedText2(0, column, False) or "")
             if applied_heading.upper() != heading:
@@ -2344,9 +2386,7 @@ def insert_hole_table(
     )
     if tuple(value.upper() for value in header) != expected:
         raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
-    _telemetry.success(
-        f"native hole table inserted: {rows - 1} holes, header={header}"
-    )
+    _telemetry.success(f"native hole table inserted: {rows - 1} holes, header={header}")
     return table
 
 
@@ -2372,7 +2412,9 @@ def bom_table_template(adapter: Any) -> Path:
 def _activate_and_select_view(adapter: Any, view: Any, *, label: str) -> str:
     """Activate ``view`` and select it as a DRAWINGVIEW; return its name."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
@@ -2702,9 +2744,7 @@ def _push_apart_on_ring(
             value_b, weight_b = blocks.pop()
             value_a, weight_a = blocks.pop()
             weight = weight_a + weight_b
-            blocks.append(
-                [(value_a * weight_a + value_b * weight_b) / weight, weight]
-            )
+            blocks.append([(value_a * weight_a + value_b * weight_b) / weight, weight])
     fitted: list[float] = []
     for value, weight in blocks:
         fitted.extend([value] * int(weight))
@@ -3319,7 +3359,9 @@ def _is_small_tag(element: LayoutElement) -> bool:
     )
 
 
-def _center_inside(element: LayoutElement, outline: tuple[float, float, float, float]) -> bool:
+def _center_inside(
+    element: LayoutElement, outline: tuple[float, float, float, float]
+) -> bool:
     """True if ``element``'s center lies within the ``(xmin,ymin,xmax,ymax)`` box."""
     cx = (element.xmin + element.xmax) / 2.0
     cy = (element.ymin + element.ymax) / 2.0
@@ -3396,17 +3438,11 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     table = _sw_type_info.early_bound_or_flag(
         table, "ITableAnnotation", "GetAnnotation", "GetSplitInformation"
     )
-    inner = adapter._attempt(
-        lambda: adapter._get_attr_or_call(table, "GetAnnotation")
-    )
+    inner = adapter._attempt(lambda: adapter._get_attr_or_call(table, "GetAnnotation"))
     if inner is None:
         return None
-    inner = _sw_type_info.early_bound_or_flag(
-        inner, "IAnnotation", "GetPosition"
-    )
-    position = adapter._attempt(
-        lambda: adapter._get_attr_or_call(inner, "GetPosition")
-    )
+    inner = _sw_type_info.early_bound_or_flag(inner, "IAnnotation", "GetPosition")
+    position = adapter._attempt(lambda: adapter._get_attr_or_call(inner, "GetPosition"))
     if not position:
         return None
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
@@ -3486,9 +3522,12 @@ def _measured_gdt_box(
         ("GetArcCount", "GetArcAtIndex", ((1, 2), (4, 5))),
         ("GetTriangleCount", "GetTriangleAtIndex", ((0, 1), (3, 4), (6, 7))),
     ):
-        n = adapter._attempt(
-            lambda c=count_name: int(adapter._get_attr_or_call(spec, c) or 0)
-        ) or 0
+        n = (
+            adapter._attempt(
+                lambda c=count_name: int(adapter._get_attr_or_call(spec, c) or 0)
+            )
+            or 0
+        )
         for i in range(n):
             raw = adapter._attempt(lambda a=at_name, j=i: getattr(spec, a)(j))
             if not raw:
@@ -3589,9 +3628,10 @@ def _iter_view_annotations(adapter: Any, view: Any):
     The live annotation rides along so the caller can pull its leader geometry
     (see :func:`_leader_segments_of`) without a second COM walk.
     """
-    annotations = adapter._attempt(
-        lambda: adapter._get_attr_or_call(view, "GetAnnotations")
-    ) or []
+    annotations = (
+        adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetAnnotations"))
+        or []
+    )
     for annotation in annotations:
         annotation = _sw_type_info.early_bound_or_flag(
             annotation,
@@ -3618,9 +3658,10 @@ def _iter_view_annotations(adapter: Any, view: Any):
 
 def _iter_tables(adapter: Any, view: Any):
     """Yield each table ``LayoutElement`` owned by ``view`` (or the sheet view)."""
-    tables = adapter._attempt(
-        lambda: adapter._get_attr_or_call(view, "GetTableAnnotations")
-    ) or []
+    tables = (
+        adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetTableAnnotations"))
+        or []
+    )
     for table in tables:
         table = _sw_type_info.early_bound_or_flag(
             table, "ITableAnnotation", "GetAnnotation"
@@ -3629,9 +3670,7 @@ def _iter_tables(adapter: Any, view: Any):
             lambda: adapter._get_attr_or_call(table, "GetAnnotation")
         )
         if inner is not None:
-            inner = _sw_type_info.early_bound_or_flag(
-                inner, "IAnnotation", "GetName"
-            )
+            inner = _sw_type_info.early_bound_or_flag(inner, "IAnnotation", "GetName")
         name = (
             str(adapter._get_attr_or_call(inner, "GetName") or "")
             if inner is not None
@@ -3695,7 +3734,8 @@ def _closed_rectangle(
     by position in the list or by its 7 mm size -- both of those are incidental.
     """
     axis = [
-        i for i, (a, b) in enumerate(lines)
+        i
+        for i, (a, b) in enumerate(lines)
         if abs(a[0] - b[0]) < tol or abs(a[1] - b[1]) < tol
     ]
     for quad in combinations(axis, 4):
@@ -3703,7 +3743,7 @@ def _closed_rectangle(
         counts = Counter((round(x, 6), round(y, 6)) for x, y in pts)
         if len(counts) != 4 or any(v != 2 for v in counts.values()):
             continue
-        if len({p[0] for p in counts} ) == 2 and len({p[1] for p in counts}) == 2:
+        if len({p[0] for p in counts}) == 2 and len({p[1] for p in counts}) == 2:
             return set(quad)
     return set()
 
@@ -3738,8 +3778,7 @@ def _datum_leader_segments(
         return []
     spec = _sw_type_info.early_bound_or_flag(spec, "IDatumTag")
     count = int(
-        adapter._attempt(lambda: adapter._get_attr_or_call(spec, "GetLineCount"))
-        or 0
+        adapter._attempt(lambda: adapter._get_attr_or_call(spec, "GetLineCount")) or 0
     )
     lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
     for index in range(count):
@@ -3814,8 +3853,12 @@ def _display_dimension_leader_segments(
         values = [float(v) for v in raw]
         segments.append(
             LeaderSegment(
-                label, "dim",
-                values[4], values[5], values[7], values[8],
+                label,
+                "dim",
+                values[4],
+                values[5],
+                values[7],
+                values[8],
                 owner,
             )
         )
@@ -3841,9 +3884,7 @@ def _leader_segments_of(
         if not raw:
             continue
         values = [float(v) for v in raw]
-        points = [
-            (values[i], values[i + 1]) for i in range(0, len(values) - 2, 3)
-        ]
+        points = [(values[i], values[i + 1]) for i in range(0, len(values) - 2, 3)]
         for start, end in zip(points, points[1:]):
             segments.append(
                 LeaderSegment(label, kind, start[0], start[1], end[0], end[1], owner)
@@ -3880,7 +3921,9 @@ def collect_layout_elements(
     excluded while the title block remains covered by its explicit keep-out.
     """
     drawing_model = adapter.currentModel
-    ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        drawing_model, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("drawing has no current sheet to audit layout on")
@@ -3930,12 +3973,15 @@ def collect_layout_elements(
             # real, drawn, and readable only as IDatumTag geometry -- collect it
             # separately or a datum leader driven through a neighbouring view is
             # invisible to every gate (codex #334).
-            if int(
-                adapter._attempt(
-                    lambda a=annotation: adapter._get_attr_or_call(a, "GetType")
+            if (
+                int(
+                    adapter._attempt(
+                        lambda a=annotation: adapter._get_attr_or_call(a, "GetType")
+                    )
+                    or 0
                 )
-                or 0
-            ) == _ANNOT_DATUM:
+                == _ANNOT_DATUM
+            ):
                 leaders.extend(
                     _datum_leader_segments(
                         adapter, annotation, label=element.label, owner=name
@@ -3949,7 +3995,10 @@ def collect_layout_elements(
             if element.kind == "dim":
                 leaders.extend(
                     _display_dimension_leader_segments(
-                        adapter, annotation, label=element.label, owner=name,
+                        adapter,
+                        annotation,
+                        label=element.label,
+                        owner=name,
                     )
                 )
             # A SMALL note centered inside its owning view is a hole tag / balloon
@@ -4020,8 +4069,6 @@ def collect_layout_elements(
     return elements, leaders, region
 
 
-
-
 def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     """Fail loud on a colliding, border-crossing, or leader-crossed layout.
 
@@ -4040,9 +4087,7 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     """
     with _telemetry.span("drawing.layout_audit"):
         elements, leaders, region = collect_layout_elements(adapter)
-        overlaps, overflows, crossings = audit_layout(
-            elements, region, leaders=leaders
-        )
+        overlaps, overflows, crossings = audit_layout(elements, region, leaders=leaders)
         if not overlaps and not overflows and not crossings:
             _telemetry.success(
                 f"drawing layout clean: {len(elements)} elements, "
@@ -4075,7 +4120,9 @@ async def finalize_drawing(
     PNG.  Returns the artifact dict every drawing recipe returns from build().
     """
     drawing_model = adapter.currentModel
-    ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        drawing_model, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
     drawing_model.EditRebuild3()
     sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
@@ -4174,6 +4221,7 @@ async def finalize_drawing(
     # the inch migration (#290) -- a hardcoded IN cell over mm dimensions would
     # read as inch values and get machined at the wrong scale (Codex P1).
     from _common import apply_custom_properties
+
     apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
     # Cleanup and audit each active sheet independently; annotations and layout
@@ -4202,9 +4250,7 @@ async def finalize_drawing(
     # A large drawing can reopen view-only even when its referenced views report
     # loaded; SolidWorks then rejects PDF SaveAs3 with 0x1001. The SLDDRW is
     # still reopened below and validated as the persisted source artifact.
-    artifacts = save_drawing(
-        adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
-    )
+    artifacts = save_drawing(adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf))
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
     drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
@@ -4239,12 +4285,10 @@ async def finalize_drawing(
         # drawing. Re-export while the just-saved doc is still fully loaded
         # (codex review #361).
         _telemetry.info("dirty-scale save: re-exporting PDF to match")
-        retry = save_drawing(
-            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
-        )
+        retry = save_drawing(adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf))
         if "pdf" not in retry:
             raise RuntimeError(
-                "PDF re-export after dirty-scale save failed: " f"{retry!r}"
+                f"PDF re-export after dirty-scale save failed: {retry!r}"
             )
         drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
     if not sheet_scale_dirty:

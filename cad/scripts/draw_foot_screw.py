@@ -16,14 +16,14 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -95,28 +95,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open foot-screw source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter,
         category=SPEC.category,
@@ -136,6 +114,28 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(8, 1))
+    read_required_view_properties(
+        adapter,
+        side,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
+    )
     end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(8, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(8, 1))
     set_hidden_lines_removed(adapter, side)

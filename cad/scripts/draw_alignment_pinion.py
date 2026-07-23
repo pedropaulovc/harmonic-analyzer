@@ -13,7 +13,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -23,7 +23,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
@@ -52,8 +52,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-FRONT_CENTER = (0.150, 0.185)   # toothed end view
-RIGHT_CENTER = (0.285, 0.185)   # long drum profile (143 mm face)
+FRONT_CENTER = (0.150, 0.185)  # toothed end view
+RIGHT_CENTER = (0.285, 0.185)  # long drum profile (143 mm face)
 
 BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
@@ -78,28 +78,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open alignment-pinion source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Gear Data",
-            "Manufacturing Notes",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Gear Data",
-            "Manufacturing Notes",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter,
         category=SPEC.category,
@@ -119,6 +97,28 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
+    read_required_view_properties(
+        adapter,
+        front,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Gear Data",
+            "Manufacturing Notes",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Gear Data",
+            "Manufacturing Notes",
+        ),
+    )
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     for view in (front, right):
         set_hidden_lines_removed(adapter, view)

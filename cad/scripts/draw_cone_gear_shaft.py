@@ -3,12 +3,11 @@ r"""Create the curated machinist drawing for the stepped cone gear shaft."""
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -19,7 +18,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
@@ -138,28 +137,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open cone-gear-shaft source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter,
         category=SPEC.category,
@@ -179,6 +156,28 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(1, 1))
+    read_required_view_properties(
+        adapter,
+        side,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
+    )
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     for view in (side, end, iso):
@@ -212,12 +211,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Sheet geometry the GD&T picks attach to (meters). The end view shows the
     # Ø9.525 pivot journal as its outermost circle; the side view's tip journal
     # silhouette hugs the axis line (half-height 0.79 mm x scale / 2).
-    pivot_circle = (
-        END_CENTER[0]
-        + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
-        END_CENTER[1]
-        + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
-    )
     pivot_edge = _outer_end_edge(adapter, end)
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)

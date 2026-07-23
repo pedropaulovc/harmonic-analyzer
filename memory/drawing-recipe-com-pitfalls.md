@@ -62,4 +62,16 @@ BOM + auto-balloons):
     fits ~7 characters (`MHA-###` / `MHA-A##`); a longer id overlaps the REV
     cell.
 
+19. **Do not pre-open a drawing's source model.**
+    `IDrawingDoc.CreateDrawViewFromModelView3(path, …)` loads the SLDPRT/SLDASM
+    itself and keeps the SLDDRW active. A live probe from a blank category
+    template showed active doc `Draw… - GEAR` both before and after placement,
+    while `IView.ReferencedDocument` returned the early-bound source model and
+    its custom properties. Pre-opening every source caused the visible
+    SLDPRT→SLDDRW activation round-trip the user noticed. Recipes now create the
+    drawing first, place the first view, then call
+    `read_required_view_properties`; do not weaken or remove their per-recipe
+    required-field lists. Alignment-pinion's three-run `drawing.build` window
+    fell from 12.6–13.1 s to 10.48–10.88 s (~17%).
+
 Related: [[codex-drawing-image-review]].

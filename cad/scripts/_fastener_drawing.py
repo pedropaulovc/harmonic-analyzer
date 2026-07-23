@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Mapping
 
 import _telemetry
-from _common import check
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -15,7 +14,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -59,28 +58,6 @@ async def build_fastener_sheet(
     if not source.is_file():
         raise FileNotFoundError(f"source part is missing: {source}")
 
-    check(f"open {property_view} source", await adapter.open_model(str(source)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "End View Note",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter,
         category=category,
@@ -105,6 +82,28 @@ async def build_fastener_sheet(
         recipe.side_view,
         *recipe.side_center,
         scale=recipe.scale,
+    )
+    read_required_view_properties(
+        adapter,
+        side,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+        ),
     )
     end = place_view(
         adapter,

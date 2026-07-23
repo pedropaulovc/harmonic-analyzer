@@ -22,7 +22,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -32,7 +32,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -222,9 +222,27 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open cone-swing-platform source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
+    drawing_model, _sheet = new_project_drawing(
+        adapter,
+        category=SPEC.category,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Cone Swing Platform Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "cone swing platform; wedge plate; pivot; lock notch",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    read_required_view_properties(
+        adapter,
+        top,
         (
             "Number",
             "Revision",
@@ -248,24 +266,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "End View Note",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
-        adapter,
-        category=SPEC.category,
-        property_view=PART_STEM,
-        scale=SHEET_SCALE,
-    )
-    stamp_drawing_summary(
-        adapter,
-        drawing_model,
-        {
-            0: "Cone Swing Platform Manufacturing Drawing",
-            1: "Harmonic Analyzer hobby-machinist book drawing",
-            2: "Harmonic Analyzer Project",
-            3: "cone swing platform; wedge plate; pivot; lock notch",
-            4: "Generated from the project-owned ASME B drawing standard",
-        },
-    )
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(1, 2))
     for view in (top, iso, end):

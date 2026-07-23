@@ -18,7 +18,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -30,7 +30,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -116,9 +116,27 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pinion-lever source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
+    drawing_model, sheet = new_project_drawing(
+        adapter,
+        category=SPEC.category,
+        property_view=PART_STEM,
+        scale=SHEET_SCALE,
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Pinion Engage Lever Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "pinion engage lever; clamp hub; tapered grip rod",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    read_required_view_properties(
+        adapter,
+        front,
         (
             "Number",
             "Revision",
@@ -138,24 +156,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    drawing_model, sheet = new_project_drawing(
-        adapter,
-        category=SPEC.category,
-        property_view=PART_STEM,
-        scale=SHEET_SCALE,
-    )
-    stamp_drawing_summary(
-        adapter,
-        drawing_model,
-        {
-            0: "Pinion Engage Lever Manufacturing Drawing",
-            1: "Harmonic Analyzer hobby-machinist book drawing",
-            2: "Harmonic Analyzer Project",
-            3: "pinion engage lever; clamp hub; tapered grip rod",
-            4: "Generated from the project-owned ASME B drawing standard",
-        },
-    )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_visible(adapter, front)

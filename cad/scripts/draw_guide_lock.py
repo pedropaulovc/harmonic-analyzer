@@ -21,7 +21,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -32,7 +32,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_basic_dimension,
@@ -110,28 +110,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open guide-lock source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Isometric View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Isometric View Note",
-        ),
-    )
     drawing_model, sheet = new_project_drawing(
         adapter,
         category=SPEC.category,
@@ -152,6 +130,28 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
+    read_required_view_properties(
+        adapter,
+        front,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
+        ),
+    )
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     for view in (front, iso):

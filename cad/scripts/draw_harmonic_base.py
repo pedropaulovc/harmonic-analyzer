@@ -22,7 +22,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -32,7 +32,7 @@ from _drawing_common import (
     finalize_drawing,
     insert_hole_table,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -281,28 +281,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open harmonic-base source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Side View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Side View Note",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter,
         category=SPEC.category,
@@ -323,6 +301,28 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently auto-scale,
     # which shifts every coordinate-based pick on it.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    read_required_view_properties(
+        adapter,
+        top,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Side View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Side View Note",
+        ),
+    )
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
     for view in (top, side):
         set_hidden_lines_removed(adapter, view)

@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -21,7 +21,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    read_required_properties,
+    read_required_view_properties,
     set_dimension_callouts,
     set_basic_dimension,
     set_hidden_lines_removed,
@@ -193,26 +193,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
-    check("open pivot-ball-mount source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-        ),
-    )
     drawing_model, _sheet = new_project_drawing(
         adapter,
         category=SPEC.category,
@@ -232,6 +212,26 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
+    read_required_view_properties(
+        adapter,
+        front,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(3, 1))
     set_hidden_lines_removed(adapter, iso)
     # The elevation carries the cross-bore as a hidden circle through the ball.
@@ -298,7 +298,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum A is the seat face. Datum B is derived from the cylindrical stem,
     # making the sphere, pad, and cross-bore controls inspectable from one DRF.
     _bore_r = BORE_DIA / 2.0 * _S
-    seat_edge = (FRONT_CENTER[0] + 0.008, _front_y(0.0))
     seat_entity, bore_entity = _front_entities(adapter, front)
     add_datum_feature(
         adapter,
