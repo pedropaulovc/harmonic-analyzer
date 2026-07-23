@@ -243,25 +243,27 @@ async def build(adapter: Any) -> dict[str, str]:
         configuration_grouping="same-part",
         label="paper-drive assembly",
     )
-    targeted_balloons = []
-    for detail_view, stem, item_number, margin in (
-        (bracket_detail, "transgear-bracket", "12", 0.008),
-        # Keep the single screw-detail balloon inside the sheet-zone border.
-        (screw_detail, "bracket-screw", "13", 0.006),
-        (bracket_detail, "transgear-latch", "15", 0.014),
-        # Seed the reducer disc before AutoBalloon5 so item 16 cannot take the
-        # ring slot that crosses item 11's leader on the refitted silhouette.
-        (bracket_detail, "rack-pinion", "16", 0.014),
-    ):
-        targeted_balloons.extend(
-            add_component_bom_balloons(
-                adapter,
-                detail_view,
-                items=((stem, item_number),),
-                label=f"paper-drive item {item_number} balloon",
-                margin=margin,
-            )
+    targeted_balloons = add_component_bom_balloons(
+        adapter,
+        bracket_detail,
+        items=(
+            ("transgear-bracket", "12"),
+            ("transgear-latch", "15"),
+            ("rack-pinion", "16"),
+        ),
+        label="paper-drive transgear balloons",
+        margin=0.014,
+    )
+    # Keep the single screw-detail balloon inside the sheet-zone border.
+    targeted_balloons.extend(
+        add_component_bom_balloons(
+            adapter,
+            screw_detail,
+            items=(("bracket-screw", "13"),),
+            label="paper-drive item 13 balloon",
+            margin=0.006,
         )
+    )
     # The pictorial exposes most component families. Seed exact transgear
     # balloons first, then validate the union supplied by the main views.
     add_auto_balloons_across_views(
@@ -271,7 +273,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="paper-drive assembly balloons",
         existing_balloons=targeted_balloons,
     )
-    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.100, 0.215) is None:
+    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.018, 0.215) is None:
         raise RuntimeError("failed to add paper-drive identification heading")
 
     return await finalize_drawing(
