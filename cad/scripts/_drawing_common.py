@@ -3274,7 +3274,11 @@ def position_bom_balloon(
         f"stack_master={bool(note.IsStackedBalloonMaster())}, "
         f"magnetic_lines={magnetic_lines}"
     )
-    note.LockPosition = False
+    # SolidWorks' own note-positioning example locks the note before calling
+    # IAnnotation.SetPosition. Unlocking an AutoBalloon note hands its position
+    # back to the view's automatic ring layout, which can replace the requested
+    # move during the rebuild instead of preserving it.
+    note.LockPosition = True
     info = note.GetBalloonInfo()
     anchor = annotation.GetPosition()
     if info is None or len(info) < 2 or anchor is None or len(anchor) < 2:
@@ -3286,7 +3290,7 @@ def position_bom_balloon(
     # redraws. Retry the SAME absolute anchor, never a cumulative delta against
     # stale circle data, and redraw before judging each rendered-circle readback.
     for _attempt in range(3):
-        note.LockPosition = False
+        note.LockPosition = True
         moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
         if not moved:
             raise RuntimeError(f"{label}: failed to position item {item_number}")
