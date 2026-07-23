@@ -2917,9 +2917,16 @@ def _spread_balloons(
 
 @_telemetry.traced("drawing.auto_balloons", label_param="label")
 def _create_auto_balloons(
-    adapter: Any, view: Any, *, label: str, allow_empty: bool = False
+    adapter: Any,
+    view: Any,
+    *,
+    label: str,
+    allow_empty: bool = False,
+    layout: int = 1,
 ) -> list[Any]:
     """Create item-number balloons for one selected view without repositioning."""
+    if layout not in range(1, 7):
+        raise ValueError(f"{label}: invalid auto-balloon layout {layout}")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -2927,7 +2934,7 @@ def _create_auto_balloons(
     if options is None:
         raise RuntimeError(f"failed to create auto-balloon options ({label})")
     options = _sw_type_info.early_bound_or_flag(options, "IAutoBalloonOptions")
-    options.Layout = 1
+    options.Layout = layout
     options.ReverseDirection = False
     options.IgnoreMultiple = True
     options.InsertMagneticLine = False
@@ -2962,37 +2969,6 @@ def _balloon_item_number(adapter: Any, note: Any, *, label: str) -> str:
     if not item:
         raise RuntimeError(f"{label}: BOM balloon has no upper item number")
     return item
-
-
-def _fresh_bom_balloon(adapter: Any, *, item_number: str, label: str) -> tuple[Any, Any]:
-    """Reacquire one BOM balloon note and annotation from the drawing views."""
-    matches: list[tuple[Any, Any]] = []
-    for view in iter_views(adapter):
-        annotations = adapter._attempt(
-            lambda v=view: adapter._get_attr_or_call(v, "GetAnnotations")
-        ) or ()
-        for annotation in annotations:
-            annotation = _sw_type_info.early_bound_or_flag(
-                annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
-            )
-            if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
-                continue
-            note = annotation.GetSpecificAnnotation()
-            if note is None:
-                continue
-            note = _sw_type_info.early_bound_or_flag(
-                note, "INote", "IsBomBalloon", "GetBomBalloonText"
-            )
-            if not bool(note.IsBomBalloon()):
-                continue
-            if _balloon_item_number(adapter, note, label=label) == item_number:
-                matches.append((note, annotation))
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"{label}: expected one fresh balloon for item {item_number}, "
-            f"got {len(matches)}"
-        )
-    return matches[0]
 
 
 def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> list[Any]:
@@ -3213,6 +3189,7 @@ def add_auto_balloons_across_views(
     label: str,
     existing_balloons: Sequence[Any] = (),
     margin: float = 0.014,
+    layout: int = 1,
 ) -> list[Any]:
     """Balloon successive views until every BOM item number is represented.
 
@@ -3232,7 +3209,7 @@ def add_auto_balloons_across_views(
     for index, view in enumerate(views, start=1):
         view_label = f"{label} view {index}"
         balloons = _create_auto_balloons(
-            adapter, view, label=view_label, allow_empty=True
+            adapter, view, label=view_label, allow_empty=True, layout=layout
         )
         if not balloons:
             continue
@@ -3283,7 +3260,6 @@ def position_bom_balloon(
         "GetAnnotation",
         "IsStackedBalloon",
         "IsStackedBalloonMaster",
-        "SetTextPoint",
     )
     annotation = note.GetAnnotation()
     if annotation is None:
@@ -3306,34 +3282,32 @@ def position_bom_balloon(
         f"stack_master={bool(note.IsStackedBalloonMaster())}, "
         f"magnetic_lines={magnetic_lines}"
     )
-    # SolidWorks' own note-positioning example locks the note before calling
-    # IAnnotation.SetPosition. Unlocking an AutoBalloon note hands its position
-    # back to the view's automatic ring layout, which can replace the requested
-    # move during the rebuild instead of preserving it.
-    note.LockPosition = True
+    note.LockPosition = False
     info = note.GetBalloonInfo()
     anchor = annotation.GetPosition()
     if info is None or len(info) < 2 or anchor is None or len(anchor) < 2:
         raise RuntimeError(f"{label}: item {item_number} has no position read-back")
-    target_anchor = position_xy
-    # SetPosition controls the note origin while GetBalloonInfo reports the
-    # rendered balloon circle. AutoBalloon can offset those two points, so close
-    # the loop on the measured circle after each rebuild instead of assuming a
-    # fixed origin-to-circle transform.
+    actual_xy = (float(info[0]), float(info[1]))
+    delta = tuple(expected - actual for actual, expected in zip(actual_xy, position_xy))
+    target_anchor = (float(anchor[0]) + delta[0], float(anchor[1]) + delta[1])
+    # GetBalloonInfo can lag the note's new origin until the graphics pipeline
+    # redraws. Retry the SAME absolute anchor, never a cumulative delta against
+    # stale circle data, and redraw before judging each rendered-circle readback.
     for _attempt in range(3):
-        note.LockPosition = True
-        note.SetTextPoint(target_anchor[0], target_anchor[1], 0.0)
+        note.LockPosition = False
+        moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
+        if not moved:
+            raise RuntimeError(f"{label}: failed to position item {item_number}")
         note.LockPosition = True
         adapter.currentModel.EditRebuild3()
         adapter.currentModel.GraphicsRedraw2()
-        note, annotation = _fresh_bom_balloon(
-            adapter, item_number=item_number, label=label
-        )
+        current_note = annotation.GetSpecificAnnotation()
+        if current_note is None:
+            raise RuntimeError(
+                f"{label}: item {item_number} note vanished after positioning"
+            )
         note = _sw_type_info.early_bound_or_flag(
-            note, "INote", "GetBalloonInfo", "LockPosition", "SetTextPoint"
-        )
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetPosition", "SetPosition"
+            current_note, "INote", "GetBalloonInfo"
         )
         moved_anchor = annotation.GetPosition()
         moved_info = note.GetBalloonInfo()
@@ -3347,14 +3321,6 @@ def position_bom_balloon(
             for index, expected in enumerate(position_xy)
         ):
             break
-        if moved_info is None or len(moved_info) < 2:
-            continue
-        target_anchor = tuple(
-            target_anchor[index]
-            + position_xy[index]
-            - float(moved_info[index])
-            for index in range(2)
-        )
     info = note.GetBalloonInfo()
     if info is None or len(info) < 2:
         raise RuntimeError(f"{label}: item {item_number} circle has no final read-back")

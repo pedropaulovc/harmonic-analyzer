@@ -103,12 +103,9 @@ def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("add_auto_balloons_across_views(") == 1
-    assert source.count("position_bom_balloon(") == 2
-    assert 'item_number="7"' in source
-    assert "position_xy=(0.123, 0.075)" in source
-    assert 'item_number="4"' in source
-    assert "position_xy=(0.135, 0.075)" in source
+    assert "position_bom_balloon" not in source
     assert "margin=0.006" in source
+    assert "layout=2" in source
     assert "add_component_bom_balloons" not in source
     assert "adapter, (front, right, iso)" in source
     assert drawing.SHEET_SCALE == (1.0, 7.0)
@@ -125,15 +122,11 @@ def test_manual_balloon_moves_are_locked_and_read_back() -> None:
     source = (Path(__file__).parent / "_drawing_common.py").read_text(encoding="utf-8")
     helper = source[source.index("def position_bom_balloon(") :]
     helper = helper[: helper.index("\ndef stamp_drawing_summary(")]
-    assert "note.SetTextPoint(" in helper
-    assert "annotation.SetPosition(" not in helper
+    assert "annotation.SetPosition(" in helper
     assert "annotation.SetPosition2(" not in helper
-    assert "_fresh_bom_balloon(" in helper
+    assert "annotation.GetSpecificAnnotation()" in helper
     assert "annotation.GetPosition()" in helper
-    assert "target_anchor = position_xy" in helper
-    assert "position_xy[index]" in helper
     assert "note.LockPosition = True" in helper
-    assert "note.LockPosition = False" not in helper
     assert "note.GetBalloonInfo()" in helper
     assert "for _attempt in range(3)" in helper
     assert "position_tolerance_m: float = 1e-6" in helper

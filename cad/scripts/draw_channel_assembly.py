@@ -25,7 +25,6 @@ from _drawing_common import (
     add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
-    position_bom_balloon,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -163,28 +162,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # No single view exposes all eleven component families in the dense bank.
     # Cover the BOM across the three projections and validate every item number.
-    # Items 4 and 7 attach in a tight vertical cluster in the right view. Keep
-    # their lower balloon row in the same left-to-right order as the attachment
-    # points so their leaders cannot cross. The 12 mm centre spacing clears the
-    # measured balloon radii plus the drawing audit's ink gap.
-    balloons = add_auto_balloons_across_views(
+    # Items 4 and 7 attach in a tight vertical cluster in the right view. Use
+    # SolidWorks' native circular layout so their order follows the view ring;
+    # the measured-radius spread and final layout audit remain the proof that
+    # balloon circles and leaders clear one another.
+    add_auto_balloons_across_views(
         adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
         label="channel assembly balloons",
         margin=0.006,
-    )
-    position_bom_balloon(
-        adapter,
-        balloons,
-        item_number="7",
-        position_xy=(0.123, 0.075),
-        label="channel connecting-rod balloon",
-    )
-    position_bom_balloon(
-        adapter,
-        balloons,
-        item_number="4",
-        position_xy=(0.135, 0.075),
-        label="channel pivot-bushing balloon",
+        layout=2,
     )
     if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
         raise RuntimeError("failed to add channel assembly notes")
