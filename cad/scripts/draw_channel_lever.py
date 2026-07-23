@@ -48,10 +48,12 @@ from channel_lever_spec import (
     TIP_END_X,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 
@@ -103,6 +105,27 @@ def _force_dimension_black(dimension: Any, *, label: str) -> None:
         raise RuntimeError(f"{label} did not retain black annotation color")
     if not int(annotation.LayerOverride) & 0x1:
         raise RuntimeError(f"{label} did not retain its color override")
+
+
+def _add_tip_arc_center_mark(adapter: Any, view: Any) -> None:
+    """Center-mark the outer R3 arc so its boxed centre coordinate is explicit."""
+    draw = adapter.currentModel
+    drawing_doc = _sw_type_info.early_bound_or_flag(
+        draw, "IDrawingDoc", "ActivateView", "InsertCenterMark3"
+    )
+    if not drawing_doc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate channel-lever front view")
+    draw.ClearSelection2(True)
+    tip_edge = _sheet_xy(TIP_END_X, 0.0)
+    selected = draw.Extension.SelectByID2(
+        "", "EDGE", tip_edge[0], tip_edge[1], 0.0, False, 0, null_callout(), 0
+    )
+    if not selected:
+        raise RuntimeError("failed to select channel-lever tip R3 arc")
+    center_mark = drawing_doc.InsertCenterMark3(2, False, False)
+    draw.ClearSelection2(True)
+    if center_mark is None:
+        raise RuntimeError("failed to add channel-lever tip R3 center mark")
 
 
 FRONT_KEEP = {
@@ -180,6 +203,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
+    _add_tip_arc_center_mark(adapter, front)
 
     # Fulcrum -> bar-pin (127) and fulcrum -> spring-eye (177.8) centre distances
     # (bore edge to bore edge; SolidWorks dimensions circle edges centre-to-centre).

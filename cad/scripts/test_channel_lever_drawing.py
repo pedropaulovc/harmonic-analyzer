@@ -46,10 +46,11 @@ def test_sheet_runs_at_1_to_1_with_1_to_4_isometric() -> None:
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = channel_lever_spec.DRAWING_NOTES
     assert "6.50 +0.03/0" in notes
-    assert "BASIC 4.75 FROM DATUM C" in notes
+    assert "DATUM C IS THE LONG TOP FACE" in notes
+    assert "BASIC 4.75 BELOW C" in notes
+    assert "BAR-PIN 127.00; SHOULDER 169.00" in notes
+    assert "SPRING-HOLE 177.80; TIP R3 CENTRE 182.80" in notes
     assert "NOT CONCENTRIC" in notes
-    assert "NATIVE BASIC DIMENSION FROM B" in notes
-    assert "177.80 FROM B" not in notes
     assert "#47 DRILL" not in notes
     assert "#21 DRILL" not in notes
     assert "LINEAR +/-" not in notes
@@ -72,6 +73,8 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count("_force_dimension_black(") == 3
     assert source.count("annotation.Color = 0") == 1
     assert "annotation.LayerOverride" in source
+    assert "InsertCenterMark3(2, False, False)" in source
+    assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
     assert source.count("add_feature_control_frame(") == 5
     assert source.count('characteristic="position"') == 2
     assert source.count('datums=("A", "B", "C")') == 3
