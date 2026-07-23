@@ -72,6 +72,9 @@ BOM + auto-balloons):
     drawing first, place the first view, then call
     `read_required_view_properties`; do not weaken or remove their per-recipe
     required-field lists. Alignment-pinion's three-run `drawing.build` window
-    fell from 12.6–13.1 s to 10.48–10.88 s (~17%).
+    fell from 12.6–13.1 s to 10.48–10.88 s (~17%). The paired all-55 run was
+    stronger evidence: 643.70 s → 561.02 s, saving 82.68 s (12.84%), with every
+    drawing faster; full `doit -n 4`, 543 contracts, and the 55-sheet rendered
+    contact-sheet inspection all passed.
 
 Related: [[codex-drawing-image-review]].
