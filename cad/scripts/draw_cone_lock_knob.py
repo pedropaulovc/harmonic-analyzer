@@ -268,13 +268,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # mechanically checked -- GD&T and dims both carry CollisionScope.NONE, so
     # a frame printed straight through a callout (which 0.228 did) is invisible
     # to the audit and only shows up on the render.
+    # SolidWorks restricts this circular-axis tag and live readback normalizes
+    # the requested sheet point by 3.335 mm.  Bound that annotation placement
+    # behavior without changing any part dimension or geometric tolerance.
     add_datum_feature(
         adapter,
         top,
         edge_xy=body_circle,
-        symbol_xy=(0.124880, 0.253823),
+        symbol_xy=(0.128, 0.255),
         datum="A",
         label="knob body axis",
+        position_tolerance_m=0.0035,
     )
     add_feature_control_frame(
         adapter,

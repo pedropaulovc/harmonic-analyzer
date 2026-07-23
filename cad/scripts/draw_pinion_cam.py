@@ -220,13 +220,17 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cam front end face",
         entity_type="SILHOUETTE",
     )
+    # SolidWorks restricts this axis-attached tag and live readback normalizes
+    # the requested sheet point by 2.846 mm.  Bound that annotation placement
+    # behavior without changing any part dimension or geometric tolerance.
     add_datum_feature(
         adapter,
         front,
         edge_xy=bore_bottom,
-        symbol_xy=(0.086080, 0.107633),
+        symbol_xy=(0.085, 0.105),
         datum="B",
         label="cam final bore axis",
+        position_tolerance_m=0.003,
     )
     add_datum_feature(
         adapter,
