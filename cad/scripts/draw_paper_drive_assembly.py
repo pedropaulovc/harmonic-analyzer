@@ -29,7 +29,6 @@ from _drawing_common import (
     finalize_drawing,
     isolate_drawing_view_components,
     new_project_drawing,
-    position_bom_balloon,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -249,6 +248,9 @@ async def build(adapter: Any) -> dict[str, str]:
         # Keep the single screw-detail balloon inside the sheet-zone border.
         (screw_detail, "bracket-screw", "13", 0.006),
         (bracket_detail, "transgear-latch", "15", 0.014),
+        # Seed the reducer disc before AutoBalloon5 so item 16 cannot take the
+        # ring slot that crosses item 11's leader on the refitted silhouette.
+        (iso, "rack-pinion", "16", 0.014),
     ):
         targeted_balloons.extend(
             add_component_bom_balloons(
@@ -261,27 +263,13 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     # The pictorial exposes most component families. Seed exact transgear
     # balloons first, then validate the union supplied by the main views.
-    all_balloons = add_auto_balloons_across_views(
+    add_auto_balloons_across_views(
         adapter,
         (iso, front, right),
         expected=len(BOM_COMPONENTS),
         label="paper-drive assembly balloons",
         existing_balloons=targeted_balloons,
     )
-    # The refitted disc/clip silhouette reverses these two attachment heights;
-    # keep the balloon anchors in the same vertical order so their leaders do
-    # not cross through the pictorial view.
-    for item_number, position_xy in (
-        ("16", (0.1359, 0.0835)),
-        ("11", (0.1324, 0.0963)),
-    ):
-        position_bom_balloon(
-            adapter,
-            all_balloons,
-            item_number=item_number,
-            position_xy=position_xy,
-            label=f"paper-drive item {item_number} final placement",
-        )
     if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.018, 0.215) is None:
         raise RuntimeError("failed to add paper-drive identification heading")
 
