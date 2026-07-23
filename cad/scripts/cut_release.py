@@ -793,9 +793,8 @@ def bundle(sw: Any, revision: str, version: str,
     facts["diff"] = render_diff(stage, prev_tag) if prev_tag else None
 
     # 4b. Comparison gallery: ship the gallery the EXPORT stage produced (offline
-    #     Blender render off the stable STLs) under stage/comparisons. Best-effort
-    #     -- if export had no Blender the gallery is absent, so warn + ship without
-    #     it rather than failing. See stage_comparisons.
+    #     Blender render off the stable STLs) under stage/comparisons. Export fails
+    #     loudly when Blender is unavailable, so a release cannot silently omit it.
     facts["comparisons"] = stage_comparisons(stage)
 
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must

@@ -41,6 +41,7 @@ WORKER = TOOLS / "blender_worker.py"
 # still get a working path.
 BLENDER: str | None = None
 _BLENDER_OVERRIDE: str | None = None  # set by main() from --blender
+BLENDER_UNAVAILABLE = "BLENDER_UNAVAILABLE:"
 
 
 def blender_exe() -> str:
@@ -52,32 +53,45 @@ def blender_exe() -> str:
     return BLENDER
 
 
+def _blender_version(exe: str) -> tuple[int, int] | None:
+    """(major, minor) reported by ``<exe> --version``, or None if undeterminable."""
+    try:
+        out = subprocess.run([exe, "--version"], capture_output=True, text=True,
+                             timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"Blender (\d+)\.(\d+)", out)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
 def resolve_blender(override: str | None = None) -> str:
     """Path to any available Blender executable for the headless worker.
 
     ``--blender`` / ``$HARMONIC_BLENDER`` win; otherwise choose the highest
-    version under the standard Windows install directory, then fall back to
-    ``blender`` on PATH. The worker uses stable ``bpy`` rendering operations and
-    is exercised by the real worker invocation, so discovery must not reject an
+    version under the standard Windows install directory or on PATH. The worker
+    uses stable ``bpy`` rendering operations, so discovery does not reject an
     otherwise runnable installation based only on its version number.
     """
     cand = override or os.environ.get("HARMONIC_BLENDER")
     if cand:
         if not Path(cand).exists():
-            raise SystemExit(f"Blender not found at {cand} (--blender / $HARMONIC_BLENDER)")
+            raise SystemExit(f"{BLENDER_UNAVAILABLE} Blender not found at {cand} "
+                             "(--blender / $HARMONIC_BLENDER)")
         return cand
     found: list[tuple[tuple[int, int], str]] = []
     for exe in glob.glob(r"C:/Program Files/Blender Foundation/Blender */blender.exe"):
         m = re.search(r"Blender (\d+)\.(\d+)", exe)
-        version = (int(m.group(1)), int(m.group(2))) if m else (-1, -1)
-        found.append((version, exe))
-    if found:
-        return max(found)[1]
+        if m:
+            found.append(((int(m.group(1)), int(m.group(2))), exe))
     which = shutil.which("blender")
     if which:
-        return which
-    raise SystemExit(
-        "no Blender found; install it or set $HARMONIC_BLENDER / pass --blender")
+        version = _blender_version(which)
+        if version:
+            found.append((version, which))
+    if found:
+        return max(found)[1]
+    raise SystemExit(f"{BLENDER_UNAVAILABLE} no Blender found; install Blender or set "
+                     "$HARMONIC_BLENDER / pass --blender")
 
 
 STL_DIR = CAD_OUT / "stl"
@@ -186,9 +200,6 @@ def main() -> int:
     ap.add_argument("--blender", help="Blender executable (default: $HARMONIC_BLENDER or "
                                       "the highest installed)")
     args = ap.parse_args()
-    # Stash the override only; resolve lazily on first worker launch (blender_exe),
-    # so the no-op path (nothing stale) certifies a current gallery without needing
-    # Blender installed on the seat.
     global _BLENDER_OVERRIDE
     _BLENDER_OVERRIDE = args.blender
     only = set(args.only.split(",")) if args.only else None

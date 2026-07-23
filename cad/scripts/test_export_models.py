@@ -11,6 +11,8 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import _common
 import export_models
 
@@ -480,6 +482,33 @@ def test_current_gallery_skips_redundant_composite_and_index(
         "render_offline.py", "composite.py", "gallery.py",
     ]
     assert calls[0] == ["uv", "run", str(render_tool)]
+
+
+def test_gallery_missing_blender_fails_export_loudly(tmp_path: Path, monkeypatch) -> None:
+    comparisons = tmp_path / "comparisons"
+    tools = comparisons / "tools"
+    tools.mkdir(parents=True)
+    manifest = {"pairs": []}
+    (comparisons / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    for name in ("render_offline.py", "blender_worker.py", "composite.py", "gallery.py"):
+        (tools / name).write_text(name, encoding="utf-8")
+
+    monkeypatch.setattr(export_models, "REPO", tmp_path)
+    monkeypatch.setattr(export_models, "COMPARISONS_DIR", comparisons)
+    monkeypatch.setattr(export_models, "RENDER_OFFLINE", tools / "render_offline.py")
+    monkeypatch.setattr(export_models, "BLENDER_WORKER", tools / "blender_worker.py")
+    monkeypatch.setattr(export_models, "COMPOSITE_PY", tools / "composite.py")
+    monkeypatch.setattr(export_models, "GALLERY_PY", tools / "gallery.py")
+    monkeypatch.setattr(export_models, "GALLERY_STAMP", tmp_path / "gallery.json")
+    monkeypatch.setattr(export_models, "_prune_stale_gallery", lambda: None)
+
+    def _missing_blender(_cmd: list[str], _tag: str) -> list[str]:
+        raise RuntimeError("cmp exited non-zero: BLENDER_UNAVAILABLE: no Blender found")
+
+    monkeypatch.setattr(export_models, "_run_tool", _missing_blender)
+
+    with pytest.raises(RuntimeError, match="comparison gallery requires Blender"):
+        export_models.refresh_comparison_gallery()
 
 
 def test_gallery_digest_includes_blender_worker(tmp_path: Path, monkeypatch) -> None:

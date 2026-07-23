@@ -1147,10 +1147,10 @@ def refresh_comparison_gallery() -> bool:
     composite pass is needed only when outputs remain incomplete. Gallery HTML
     is rebuilt only when renders or gallery inputs changed.
 
-    BEST-EFFORT: the offline renderer needs Blender, which lives on a separate
-    GPU seat, so on an export seat without it this warns + returns False rather
-    than failing the export. The standalone refresh is unchanged: run
-    ``uv run comparisons/tools/render_offline.py`` on a Blender-equipped seat.
+    Blender is a release prerequisite: a missing renderer fails the export loudly
+    rather than silently producing a bundle without its comparison gallery. Other
+    renderer failures remain best-effort so a transient comparison fault does not
+    discard certified CAD exports.
     """
     with _telemetry.span("export.comparisons") as sp:
         try:
@@ -1184,7 +1184,12 @@ def refresh_comparison_gallery() -> bool:
             sp.set_attribute("rendered_pairs", len(rendered))
             sp.set_attribute("full_composite", full_composite)
             sp.set_attribute("outcome", "refreshed" if refreshed else "current")
-        except Exception as exc:  # noqa: BLE001 -- best-effort; never fail export
+        except Exception as exc:  # noqa: BLE001 -- renderer faults are best-effort
+            if "BLENDER_UNAVAILABLE:" in str(exc):
+                raise RuntimeError(
+                    "comparison gallery requires Blender, but none was found; "
+                    "install Blender or set $HARMONIC_BLENDER"
+                ) from exc
             _telemetry.warn(
                 f"comparison gallery not refreshed ({exc}); export continues -- "
                 "refresh on a Blender-equipped seat with "
