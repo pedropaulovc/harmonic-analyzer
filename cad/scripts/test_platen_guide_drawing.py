@@ -150,6 +150,11 @@ def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
     assert "add_hole_group_tags" not in drawing_source
     assert "scale=(3, 1)" not in drawing_source
     assert "scale=(1, 4)" not in drawing_source
+    assert "def _hole_table_entities(" in drawing_source
+    assert "datum_entity=datum_vertex" in drawing_source
+    assert "hole_entities=hole_entities" in drawing_source
+    assert "edge.GetStartVertex(), edge.GetEndVertex()" in drawing_source
+    assert 'view, 1, label="platen-guide hole-table circles"' in drawing_source
     # (The sheet-scale property link now lives inside the hand-made
     # category DRWDOT binaries -- not greppable; verified by eye on the
     # rendered sheets.)

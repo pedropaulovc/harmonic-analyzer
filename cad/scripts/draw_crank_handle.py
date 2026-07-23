@@ -200,6 +200,13 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=collar_od_top,
         symbol_xy=(RIGHT_CENTER[0], 0.245),
+        # Native readback is session-sensitive at this on-axis attachment: one
+        # established session normalized Y down by 9.371 um, while a freshly
+        # restarted session retained the requested point within 0.02 um.  Both
+        # are the same legal placement, so gate the bounded normalization rather
+        # than one session's exact floating-point result.
+        expected_position_xy=(RIGHT_CENTER[0], 0.245),
+        position_tolerance_m=0.00002,
         datum="A",
         label="collar OD datum axis",
     )

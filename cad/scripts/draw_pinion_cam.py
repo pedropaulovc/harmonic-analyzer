@@ -231,9 +231,10 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=bore_bottom,
         symbol_xy=(0.085, 0.105),
+        expected_position_xy=(0.08615498326870875, 0.10781527172509928),
         datum="B",
         label="cam final bore axis",
-        position_tolerance_m=0.003,
+        position_tolerance_m=0.00002,
     )
     # The OD-axis datum is constrained more strongly: live readback places its
     # tag 18.197 mm from the requested sheet point.  Keep the intended anchor
@@ -250,16 +251,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum D attaches on the boss's LEFT flank, opposite the two position
     # frames on the right, so its leader unambiguously lands on the boss OD
     # rather than the tap/axis region (machinist round 1).
-    # Live readback normalizes the restricted tag by 2.409 mm; bound only that
+    # Live readback normalizes the restricted tag by 4.072 mm; bound only that
     # annotation-placement behavior while retaining the reviewed sheet point.
     add_datum_feature(
         adapter,
         bottom,
         edge_xy=bottom_boss_left,
         symbol_xy=(0.192, 0.170),
+        expected_position_xy=(0.19595148576383914, 0.17098280543184766),
         datum="D",
         label="cam boss OD axis",
-        position_tolerance_m=0.0025,
+        position_tolerance_m=0.00002,
     )
     add_feature_control_frame(
         adapter,

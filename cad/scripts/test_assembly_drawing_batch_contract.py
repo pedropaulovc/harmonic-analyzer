@@ -236,6 +236,8 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
             )
             expected_balloon_calls = 1
         assert balloon_calls == expected_balloon_calls, drawing.ARTIFACT_STEM
+        if drawing is draw_channel_assembly:
+            assert source.count("add_component_bom_balloons(") == 1
 
 
 def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:

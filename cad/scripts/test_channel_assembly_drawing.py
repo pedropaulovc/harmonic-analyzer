@@ -103,11 +103,17 @@ def test_drawing_places_bom_and_balloons() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("insert_identified_bom_table(") == 1
     assert source.count("add_auto_balloons_across_views(") == 1
-    assert "position_bom_balloon" not in source
+    assert source.count("add_component_bom_balloons(") == 1
     assert "margin=0.006" in source
     assert "layout=2" in source
-    assert "add_component_bom_balloons" not in source
-    assert "adapter, (front, right, iso)" in source
+    assert "adapter, (front, right)" in source
+    assert "existing_balloons=isometric_balloons" in source
+    assert drawing.ISOMETRIC_BALLOONS == (
+        ("pivot-shaft", "1"),
+        ("fulcrum-shaft", "2"),
+        ("spring-hook", "11"),
+    )
+    assert drawing.ISO_CENTER == (0.205, 0.140)
     assert drawing.SHEET_SCALE == (1.0, 7.0)
     assert source.count("scale=VIEW_SCALE") == 3  # every view pins its scale
     assert source.count("add_note(") == 1
@@ -116,6 +122,18 @@ def test_drawing_places_bom_and_balloons() -> None:
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
     )
+
+
+def test_auto_balloons_select_without_forcing_display_refresh() -> None:
+    source = (Path(__file__).parent / "_drawing_common.py").read_text(
+        encoding="utf-8"
+    )
+    helper = source[source.index("def _create_auto_balloons(") :]
+    helper = helper[: helper.index("\ndef _balloon_item_number(")]
+    select = helper.index("_activate_and_select_view(")
+    balloon = helper.index("ddoc.AutoBalloon5(options)")
+    assert "UpdateViewDisplayGeometry" not in helper
+    assert select < balloon
 
 
 def test_manual_balloon_moves_are_locked_and_read_back() -> None:

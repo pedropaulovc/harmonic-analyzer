@@ -264,6 +264,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=tip_face,
         symbol_xy=(tip_face[0] + 0.012, tip_face[1] + 0.012),
+        expected_position_xy=(0.2648747931647749, 0.1929447587278372),
         datum="C",
         label="rod-side tip face",
     )

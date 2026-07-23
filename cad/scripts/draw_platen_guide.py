@@ -33,7 +33,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_platen_guide import GUIDE_LENGTH
+from build_platen_guide import GUIDE_HEIGHT, GUIDE_LENGTH
 from build_platen_guide import HOLE_X as THROUGH_X
 from build_platen_guide import SCREW_STATION_X as BLIND_X
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -77,7 +77,7 @@ THREAD_TAP_DRILL_MM = 2.261
 
 def _bottom_surface_edge(view: Any) -> Any:
     """Return the guide's full-length model edge on the bottom datum surface."""
-    candidates: list[tuple[float, Any]] = []
+    candidates: list[tuple[float, float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="platen-guide bottom edge"):
         edge = _early_bound(raw_edge, "IEdge", "GetStartVertex", "GetEndVertex")
         start = edge.GetStartVertex()
@@ -90,13 +90,84 @@ def _bottom_surface_edge(view: Any) -> Any:
         p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
         if abs(p0[1]) > 0.01 or abs(p1[1]) > 0.01:
             continue
-        candidates.append((abs(p1[0] - p0[0]), edge))
+        candidates.append((abs(p1[0] - p0[0]), max(p0[2], p1[2]), edge))
     if not candidates:
         raise RuntimeError("front view has no model edge on the guide bottom surface")
-    span_mm, edge = max(candidates, key=lambda item: item[0])
+    span_mm, _front_z_mm, edge = max(candidates, key=lambda item: (item[0], item[1]))
     if span_mm < GUIDE_LENGTH - 0.1:
         raise RuntimeError(f"guide bottom edge span is only {span_mm:.3f} mm")
     return edge
+
+
+def _hole_table_entities(
+    view: Any, stations: tuple[float, ...], datum_edge: Any
+) -> tuple[Any, ...]:
+    """Return the front datum vertex and one circular rim per hole station.
+
+    Sheet-coordinate EDGE picks are display-state dependent.  Use entities from
+    the active drawing view instead, then identify the front-face model topology
+    by its part coordinates.  These entities satisfy IEntity.Select4's active-
+    document requirement because GetVisibleEntities2 returns drawing-context
+    entities, not entities traversed from the source part document.
+    """
+    edge = _early_bound(datum_edge, "IEdge", "GetStartVertex", "GetEndVertex")
+    vertices: list[tuple[float, Any]] = []
+    for raw_vertex in (edge.GetStartVertex(), edge.GetEndVertex()):
+        if raw_vertex is None:
+            continue
+        vertex = _early_bound(raw_vertex, "IVertex", "GetPoint")
+        point = tuple(float(value) for value in vertex.GetPoint())
+        vertices.append((sum(abs(value) for value in point), vertex))
+
+    vertices.sort(key=lambda candidate: candidate[0])
+    if not vertices or vertices[0][0] > 5e-5:
+        nearest = vertices[0][0] if vertices else None
+        raise RuntimeError(
+            "front bottom edge has no origin endpoint for the hole table; "
+            f"nearest error={nearest!r} m"
+        )
+    datum_vertex = vertices[0][1]
+
+    circles: list[tuple[float, float, float, float, Any]] = []
+    for raw_edge in visible_view_entities(
+        view, 1, label="platen-guide hole-table circles"
+    ):
+        edge = _early_bound(raw_edge, "IEdge", "GetCurve")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve", "IsCircle", "CircleParams")
+        if not curve.IsCircle():
+            continue
+        parameters = tuple(float(value) for value in curve.CircleParams)
+        circles.append((*parameters[:3], parameters[6], edge))
+
+    selected: list[Any] = []
+    used: set[int] = set()
+    expected_y = GUIDE_HEIGHT / 2000.0
+    for station in stations:
+        expected_x = station / 1000.0
+        candidates = sorted(
+            (
+                abs(x - expected_x) + abs(y - expected_y) + abs(z),
+                index,
+                radius,
+                edge,
+            )
+            for index, (x, y, z, radius, edge) in enumerate(circles)
+            if index not in used
+        )
+        if not candidates or candidates[0][0] > 5e-5:
+            nearest = candidates[0][0] if candidates else None
+            raise RuntimeError(
+                "front view has no visible circular rim for hole station "
+                f"{station:g} mm; nearest error={nearest!r} m"
+            )
+        _, index, _radius, edge = candidates[0]
+        used.add(index)
+        selected.append(edge)
+
+    return datum_vertex, *selected
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -183,6 +254,10 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
 
     stations = tuple(sorted((*THROUGH_X, *BLIND_X)))
+    datum_b_entity = _bottom_surface_edge(front)
+    datum_vertex, *hole_entities = _hole_table_entities(
+        front, stations, datum_b_entity
+    )
     insert_hole_table(
         adapter,
         front,
@@ -191,6 +266,8 @@ async def build(adapter: Any) -> dict[str, str]:
             (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M)
             for station in stations
         ),
+        datum_entity=datum_vertex,
+        hole_entities=hole_entities,
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         label="platen-guide",
     )
@@ -198,7 +275,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Native datum reference frame and feature controls replace former notes 5-7.
     # Right view shows the 10 mm depth: left edge is the blind-hole entry face A.
     datum_a_edge = (0.365, 0.110)
-    datum_b_entity = _bottom_surface_edge(front)
     datum_c_edge = (FRONT_LEFT_X_M, FRONT_HOLE_Y_M)
     add_datum_feature(
         adapter,

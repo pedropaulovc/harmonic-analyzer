@@ -2831,7 +2831,11 @@ def _create_auto_balloons(
     allow_empty: bool = False,
     layout: int = 1,
 ) -> list[Any]:
-    """Create item-number balloons for one selected view without repositioning."""
+    """Create item-number balloons for one selected view without repositioning.
+
+    Selecting the view is sufficient.  Forcing a display-geometry refresh here
+    neither cured empty ``AutoBalloon5`` results nor came for free.
+    """
     if layout not in range(1, 7):
         raise ValueError(f"{label}: invalid auto-balloon layout {layout}")
     _activate_and_select_view(adapter, view, label=label)
