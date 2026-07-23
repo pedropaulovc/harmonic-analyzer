@@ -30,6 +30,16 @@ work. `_common.run_build` closes the root span before `_telemetry.shutdown()`;
 shutdown drains both providers exactly once. A mock OTLP/HTTP collector test pins
 that even a short process delivers both `/v1/logs` and `/v1/traces` before exit.
 
+**JSONL records use kernel-atomic append.** Do not replace `_AtomicJsonlWriter`
+with persistent text-mode append handles. Multiple build subprocesses share each
+telemetry file, and two real `logs.jsonl` records were observed spliced/truncated
+under `-n 4` contention while `traces.jsonl` happened to remain clean. On Windows
+the writer opens an append-only `CreateFile` handle and sends each formatted JSON
+record through one `WriteFile`; POSIX uses one `O_APPEND` write. An 8-process,
+2,000-record stress test verifies parseability and exact identity coverage. This
+also avoids a `filelock`-per-record workaround: measured locally at ~0.003 ms per
+kernel append versus ~0.65 ms per lock+seek+write+flush record.
+
 **Gotcha — orphans mean you killed it, not a real gap.** A build killed mid-run
 (e.g. `timeout`) cannot finish its still-open `task`/`pipeline`/`build` parents,
 so Jaeger may show children as orphan roots even though completed records were

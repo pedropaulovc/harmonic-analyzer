@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import http.server
+import json
 import os
 import queue
 import subprocess
@@ -277,6 +278,85 @@ def test_otlp_network_processors_are_batched(monkeypatch):
         else:
             monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", original_endpoint)
         _telemetry.configure(force=True)
+
+
+def test_local_jsonl_exporters_use_atomic_append():
+    trace_processors = (
+        _telemetry._tracer_provider._active_span_processor._span_processors
+    )
+    log_processors = (
+        _telemetry._logger_provider._multi_log_record_processor._log_record_processors
+    )
+    trace_outputs = [
+        getattr(item.span_exporter, "out", None)
+        for item in trace_processors
+        if isinstance(item, SimpleSpanProcessor)
+    ]
+    log_outputs = [
+        getattr(item._exporter, "out", None)
+        for item in log_processors
+        if isinstance(item, SimpleLogRecordProcessor)
+    ]
+    assert any(
+        isinstance(item, _telemetry._AtomicJsonlWriter) for item in trace_outputs
+    )
+    assert any(isinstance(item, _telemetry._AtomicJsonlWriter) for item in log_outputs)
+
+
+def test_atomic_jsonl_writer_survives_multiprocess_contention(tmp_path):
+    """Large simultaneous records stay parseable and none are overwritten."""
+    target = tmp_path / "shared.jsonl"
+    start = tmp_path / "start"
+    workers = 8
+    records_per_worker = 250
+    child = r"""
+import json
+import os
+import sys
+import time
+from pathlib import Path
+import _telemetry
+
+target, start = map(Path, sys.argv[1:3])
+worker = int(sys.argv[3])
+while not start.exists():
+    time.sleep(0.001)
+out = _telemetry._AtomicJsonlWriter(target)
+for record in range(int(sys.argv[4])):
+    value = {"worker": worker, "record": record, "payload": "x" * 4096}
+    out.write(json.dumps(value, separators=(",", ":")) + "\n")
+out.close()
+"""
+    env = os.environ.copy()
+    env["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+    processes = [
+        subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                child,
+                str(target),
+                str(start),
+                str(worker),
+                str(records_per_worker),
+            ],
+            cwd=Path(__file__).resolve().parent,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for worker in range(workers)
+    ]
+    start.touch()
+    results = [process.communicate(timeout=30) for process in processes]
+    for process, (_stdout, stderr) in zip(processes, results, strict=True):
+        assert process.returncode == 0, stderr
+
+    parsed = [json.loads(line) for line in target.read_text().splitlines()]
+    identities = {(item["worker"], item["record"]) for item in parsed}
+    assert len(parsed) == workers * records_per_worker
+    assert len(identities) == workers * records_per_worker
 
 
 def test_shutdown_drains_trace_and_log_providers_concurrently(monkeypatch):

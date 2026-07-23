@@ -286,6 +286,89 @@ class _LiveStderr:
             sys.stderr.flush()
 
 
+class _AtomicJsonlWriter:
+    """Append each JSONL record with one kernel write.
+
+    The pipeline fans dozens of subprocesses into the same two telemetry files.
+    A persistent ``TextIOWrapper`` in every process can flush from stale file
+    positions on Windows, splicing the tail of one JSON object into another.
+    Opening with append-only access delegates the end-of-file placement to the
+    kernel for every ``WriteFile`` call, so one formatted record is indivisible
+    without putting a cross-process lock on the telemetry hot path.
+
+    POSIX ``O_APPEND`` gives the same offset+write atomicity for the fallback.
+    Short writes are rejected rather than silently creating malformed JSONL.
+    """
+
+    def __init__(self, path: Path):
+        self._handle: Any | None = None
+        self._fd: int | None = None
+        if os.name == "nt":
+            import win32con
+            import win32file
+
+            file_append_data = 0x0004
+            share = (
+                win32con.FILE_SHARE_READ
+                | win32con.FILE_SHARE_WRITE
+                | win32con.FILE_SHARE_DELETE
+            )
+            self._handle = win32file.CreateFile(
+                str(path),
+                file_append_data,
+                share,
+                None,
+                win32con.OPEN_ALWAYS,
+                win32con.FILE_ATTRIBUTE_NORMAL,
+                None,
+            )
+            return
+
+        self._fd = os.open(
+            path,
+            os.O_APPEND | os.O_CREAT | os.O_WRONLY,
+            0o666,
+        )
+
+    def write(self, value: str) -> int:
+        payload = value.encode("utf-8")
+        if self._handle is not None:
+            import win32file
+
+            _, written = win32file.WriteFile(self._handle, payload)
+        else:
+            assert self._fd is not None
+            written = os.write(self._fd, payload)
+        if written != len(payload):
+            raise OSError(f"short telemetry append: {written}/{len(payload)} bytes")
+        return len(value)
+
+    def flush(self) -> None:
+        # WriteFile/os.write has already handed the complete record to the
+        # kernel. Do not FlushFileBuffers/fsync every span or log record.
+        return
+
+    def close(self) -> None:
+        if self._handle is not None:
+            import win32file
+
+            win32file.CloseHandle(self._handle)
+            self._handle = None
+        if self._fd is not None:
+            os.close(self._fd)
+            self._fd = None
+
+
+class _JsonlSpanExporter(ConsoleSpanExporter):
+    def shutdown(self) -> None:
+        cast(_AtomicJsonlWriter, self.out).close()
+
+
+class _JsonlLogRecordExporter(ConsoleLogRecordExporter):
+    def shutdown(self) -> None:
+        cast(_AtomicJsonlWriter, self.out).close()
+
+
 def configure(*, console: bool = True, force: bool = False) -> None:
     """Wire up the trace + log providers. Idempotent; safe to call from import.
 
@@ -357,11 +440,12 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     tdir = _telemetry_dir()
     if tdir is not None:
         with contextlib.suppress(Exception):
-            traces = (tdir / "traces.jsonl").open("a", encoding="utf-8")
+            traces = _AtomicJsonlWriter(tdir / "traces.jsonl")
             tracer_provider.add_span_processor(
                 SimpleSpanProcessor(
-                    ConsoleSpanExporter(
-                        out=traces, formatter=lambda s: s.to_json(indent=None) + "\n"
+                    _JsonlSpanExporter(
+                        out=cast(IO[str], traces),
+                        formatter=lambda s: s.to_json(indent=None) + "\n",
                     )
                 )
             )
@@ -385,11 +469,12 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     logger_provider = LoggerProvider(resource=resource)
     if tdir is not None:
         with contextlib.suppress(Exception):
-            logs = (tdir / "logs.jsonl").open("a", encoding="utf-8")
+            logs = _AtomicJsonlWriter(tdir / "logs.jsonl")
             logger_provider.add_log_record_processor(
                 SimpleLogRecordProcessor(
-                    ConsoleLogRecordExporter(
-                        out=logs, formatter=lambda r: r.to_json(indent=None) + "\n"
+                    _JsonlLogRecordExporter(
+                        out=cast(IO[str], logs),
+                        formatter=lambda r: r.to_json(indent=None) + "\n",
                     )
                 )
             )
