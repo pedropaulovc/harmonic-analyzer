@@ -29,7 +29,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
+from _gear_drawing_entities import visible_circle_edge, visible_tooth_tip_silhouette
 from crank_drive_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -128,6 +128,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    tooth_tip_silhouette = visible_tooth_tip_silhouette(adapter, right, OUTSIDE_DIA)
 
     add_datum_feature(
         adapter,
@@ -153,10 +154,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(
-            FRONT_FACE_X + FACE_WIDTH * VIEW_SCALE[0] / 2000.0 / 2.0,
-            RIGHT_CENTER[1] + HALF_OD,
-        ),
+        entity=tooth_tip_silhouette,
         frame_xy=(0.270, 0.260),
         characteristic="circular_runout",
         tolerance="0.05",

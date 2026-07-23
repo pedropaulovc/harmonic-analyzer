@@ -85,6 +85,17 @@ def test_hole_states_are_annotated() -> None:
 def test_native_gdt_replaces_form_orientation_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
+    assert (
+        "        edge_xy=(_plan_x(BORE_RADIUS), TOP_CENTER[1]),\n"
+        "        symbol_xy=(0.150, TOP_CENTER[1]),\n"
+        '        datum="B",\n'
+        '        label="column-relief bore",\n'
+        "        # Live readback normalizes this restricted bore tag by 3.253 um. Bound\n"
+        "        # only annotation placement; part dimensions and GD&T remain unchanged.\n"
+        "        position_tolerance_m=0.000005,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.000005") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source

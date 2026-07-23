@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import _config
+import _gear_drawing_entities
 import alignment_pinion_spec
 import cone_gear_spec
 import crank_drive_gear_spec
@@ -112,6 +113,18 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
         )
         assert expected_tolerance in source, module.__name__
         assert "shoulder=True" in source, module.__name__
+
+
+def test_crank_pair_runout_uses_tooth_tip_silhouette_topology() -> None:
+    helper_source = Path(_gear_drawing_entities.__file__).read_text(
+        encoding="utf-8"
+    )
+    assert "GetVisibleEntities2(c, 4)" in helper_source
+    for module in CRANK_PAIR_MODULES:
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "tooth_tip_silhouette = visible_tooth_tip_silhouette(" in source
+        assert "entity=tooth_tip_silhouette" in source
+
 
 def test_tooth_runout_is_stated_against_the_bore_axis_datum() -> None:
     for (part_name, spec), module in zip(SHEETS, DRAWING_MODULES, strict=True):

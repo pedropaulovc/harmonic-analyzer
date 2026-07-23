@@ -111,7 +111,11 @@ def test_manufacturing_notes_present() -> None:
 def test_native_gdt_controls_bore_datum_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
+    assert "tooth_tip_silhouette = visible_tooth_tip_silhouette(" in source
     assert "entity=bore_edge" in source
+    assert "entity=tooth_tip_silhouette" in source
+    assert 'label="gear tooth-tip circular runout"' in source
+    assert 'entity_type="SILHOUETTE"' in source
     assert "shoulder=True" in source
     assert "position_tolerance_m=0.080" in source
     assert 'quantity="2X AXIAL END FACES"' in source
