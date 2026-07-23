@@ -43,7 +43,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_pivot_block_spec import (
     BLOCK_BOTTOM_Y,
     BLOCK_DEPTH,
-    BLOCK_WIDTH,
+    BLOCK_WIDTH as BLOCK_WIDTH,
     BORE_DIA,
     BORE_HALF_SPACING,
     FRONT_BBOX_CY,
@@ -248,6 +248,8 @@ async def build(adapter: Any) -> dict[str, str]:
         _front_x(BORE_HALF_SPACING),
         _front_y(0.0) - BORE_R_SHEET,
     )
+    # SolidWorks restricts this axis-attached tag and live readback normalizes
+    # the intended sheet point by 2.927 mm.  Bound only annotation placement.
     add_datum_feature(
         adapter,
         front,
@@ -255,6 +257,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(_front_x(BORE_HALF_SPACING) + 0.0145, _front_y(0.0) - 0.026),
         datum="B",
         label="pivot bore axis",
+        position_tolerance_m=0.003,
     )
     right_half_depth = BLOCK_DEPTH * SHEET_SCALE[0] / 2000.0
     add_datum_feature(
