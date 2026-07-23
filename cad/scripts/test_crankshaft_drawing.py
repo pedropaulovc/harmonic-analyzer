@@ -34,7 +34,10 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     # a drill-size change in _holes must move the spec (and this test) with it.
     assert crankshaft_spec.PIN_HOLE_DIA == NUMBER_DRILL_MM["#9"]
     assert part.PIN_HOLE_HEIGHT is crankshaft_spec.PIN_HOLE_HEIGHT
-    assert crankshaft_spec.PIN_HOLE_HEIGHT == 12.0
+    assert crankshaft_spec.PIN_HOLE_HEIGHT == 4.0
+    build_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "[-SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0]" in build_source
+    assert "y_dim=" not in build_source
     notes = crankshaft_spec.DRAWING_NOTES
     assert "#9" not in notes
     assert "TAPER PIN" in notes
@@ -44,16 +47,20 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
     assert "INTERSECTS THE SHAFT AXIS" not in notes
     assert "PART ACCEPTANCE:" not in notes
     assert "CUSTOM TAPER PIN" in notes and "MHA-024" in notes
+    assert "CRANK ARM MHA-020" in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Ø/THRU comes from the associative wizard callout; the model-owned nested
-    # sketch dimension supplies the station without a coordinate pick.
+    # Ø/THRU comes from the associative wizard callout; a drawing-native
+    # end-face-to-hole-axis dimension supplies the basic station.
     assert source.count("add_native_hole_callout(") == 1
     assert "GetVisibleEntities2(c, 1)" in source
     assert "cross_hole_edge = _visible_cross_hole_edge(adapter, right)" in source
     assert "edge=cross_hole_edge" in source
-    assert source.count("add_edge_dimension(") == 0
-    assert source.count("set_basic_dimensions(") == 1
-    assert crankshaft_spec.DRAWING_DIMENSIONS["PinHole"] == {"PinHeight"}
+    assert source.count("add_edge_dimension(") == 1
+    assert "pin_station = add_edge_dimension(" in source
+    assert 'orientation="vertical"' in source
+    assert "set_arc_endpoints_to_center(adapter, pin_station" in source
+    assert "set_basic_dimension(adapter, pin_station" in source
+    assert "PinHole" not in crankshaft_spec.DRAWING_DIMENSIONS
 
 
 def test_linked_notes_define_remaining_operations() -> None:
@@ -75,8 +82,6 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert source.count("add_surface_finish(") == 1
     assert "add_view_centerline(" in source
-    assert 'offset_dimension_text(' in source
-    assert '{"PinHeight": (0.132, 0.105)}' in source
     assert "GetVisibleEntities2(c, 3)" in source
     assert "face=shaft_face" in source
     assert "GetVisibleEntities2(c, 4)" in source
@@ -84,8 +89,15 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert "edge_entity=shaft_silhouette" in source
     assert 'production_method="SHAFT OD"' in source
     assert 'dimension_name(adapter, annotation) == "ShaftDiaDim"' in source
-    assert "shaft_datum_edge = _visible_shaft_end_edges(adapter, front)[0][1]" in source
-    assert "entity=shaft_datum_edge" in source
+    assert drawing.DATUM_A_RIGHT == (
+        drawing.FRONT_CENTER[0]
+        + drawing.SHAFT_DIA * drawing.END_VIEW_SCALE / 2000.0,
+        drawing.FRONT_CENTER[1],
+    )
+    assert "edge_xy=DATUM_A_RIGHT" in source
+    assert "entity=shaft_datum_edge" not in source
+    assert "shoulder=True" not in source
+    assert "position_tolerance_m=0.0001" in source
     assert "annotation=shaft_dia_annotation" not in source
     assert "symbol_xy=(0.205, 0.145)" in source
     assert "frame_xy=(0.100, 0.055)" in source
@@ -103,6 +115,7 @@ def test_view_scales_are_explicit() -> None:
     assert crankshaft_spec.END_VIEW_NOTE == "CRANK-END VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
     assert 'add_property_linked_note(adapter, "Crank End Note", 0.250, 0.090)' in source
+    assert 'place_view(adapter, str(SOURCE), "*Right"' in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -37,6 +38,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_arc_endpoints_to_center,
     set_basic_dimension,
     stamp_drawing_summary,
 )
@@ -44,8 +46,10 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from crank_arm_spec import (
     ARM_C2C,
     ARM_END_X,
+    ARM_THICKNESS,
     DIMPLE_X,
     HALF_WIDTH,
+    PIN_HOLE_DIA,
     SHAFT_BORE_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -82,6 +86,19 @@ def _sheet_x(model_x_mm: float) -> float:
     """Sheet X of a model-X point in the front/top views (2:1, bbox-centred)."""
     bbox_center = (ARM_END_X - HALF_WIDTH) / 2.0
     return FRONT_CENTER[0] + (model_x_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
+
+
+DATUM_B_OFFSET = (0.022, 0.035)
+DATUM_B_ANGLE = math.atan2(DATUM_B_OFFSET[1], DATUM_B_OFFSET[0])
+DATUM_B_RADIUS = SHAFT_BORE_DIA * SHEET_SCALE[0] / 2000.0
+DATUM_B_RIM = (
+    _sheet_x(0.0) + DATUM_B_RADIUS * math.cos(DATUM_B_ANGLE),
+    FRONT_CENTER[1] + DATUM_B_RADIUS * math.sin(DATUM_B_ANGLE),
+)
+DATUM_B_SYMBOL = (
+    _sheet_x(0.0) + DATUM_B_OFFSET[0],
+    FRONT_CENTER[1] + DATUM_B_OFFSET[1],
+)
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -179,25 +196,17 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *top_annotations, *right_annotations],
         {"ShaftBoreDia": 3},
     )
-    # Arm width (16): dimension the right view's flat top/bottom faces.  At 2:1
+    # Arm width (16): dimension the right view's flat top/bottom faces. At 2:1
     # the 16 x 8 stock section spans +/-0.016 (Y) x +/-0.008 (Z) around the view
-    # center, so the two horizontal silhouette edges sit exactly here.
-    #
-    # -0.048, not -0.024: this dimension has to stand OUTBOARD of datum A, which
-    # moved to the section's left at x=0.278 (see below).  At -0.024 the dim line
-    # sits at x=0.2758 with its "16.00" text at x=0.2714..0.2816 breaking it
-    # (measured 2026-07-16), which is exactly where datum A's leader has to run --
-    # the tag would have been struck straight through the text.  -0.048 puts the
-    # line at x=0.252 and the text at ~0.2464..0.2583, leaving datum A's box
-    # (0.270..0.278) an 11.7 mm gap and its leader a clean run to the face.  The
-    # dim's own extension lines stay at y=0.119/0.151, above and below that
-    # leader, so nothing crosses.
+    # center. Place the dimension to the right of the section: its former left
+    # position collided with the handle pivot's new basic 8.00 coordinate, while
+    # the right-side band is clear at this height.
     add_edge_dimension(
         adapter,
         right,
         p0=(RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.016),
         p1=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.016),
-        text_xy=(RIGHT_CENTER[0] - 0.048, RIGHT_CENTER[1]),
+        text_xy=(RIGHT_CENTER[0] + 0.050, RIGHT_CENTER[1]),
         label="arm-width overall",
     )
 
@@ -205,6 +214,10 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
+    handle_edge = (
+        _sheet_x(ARM_C2C),
+        FRONT_CENTER[1] + (15.0 / 64.0 * 25.4) * SHEET_SCALE[0] / 2000.0,
+    )
     pivot_location = add_edge_dimension(
         adapter,
         front,
@@ -214,6 +227,68 @@ async def build(adapter: Any) -> dict[str, str]:
         label="shaft-to-handle-pivot location",
     )
     set_basic_dimension(adapter, pivot_location, label="handle-pivot location")
+    handle_transverse = add_edge_dimension(
+        adapter,
+        front,
+        p0=(
+            _sheet_x(ARM_C2C),
+            FRONT_CENTER[1] - HALF_WIDTH * SHEET_SCALE[0] / 1000.0,
+        ),
+        p1=handle_edge,
+        text_xy=(0.240, FRONT_CENTER[1]),
+        label="handle-pivot transverse location",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(
+        adapter, handle_transverse, label="handle-pivot transverse location"
+    )
+    set_basic_dimension(
+        adapter, handle_transverse, label="handle-pivot transverse location"
+    )
+
+    # The straight #14 cross-hole is the released MHA-020 condition. Locate its
+    # axis from datum A on the top view and control its intersection with datum B;
+    # the shared 1:48 reaming operation belongs to the crank assembly.
+    pin_edge = (
+        _sheet_x(0.0),
+        TOP_CENTER[1] + PIN_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
+    )
+    pin_station = add_edge_dimension(
+        adapter,
+        top,
+        p0=(
+            _sheet_x(0.0),
+            TOP_CENTER[1] + ARM_THICKNESS * SHEET_SCALE[0] / 2000.0,
+        ),
+        p1=pin_edge,
+        text_xy=(0.045, TOP_CENTER[1] + 0.004),
+        label="cross-hole station from datum A",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(
+        adapter, pin_station, label="cross-hole station from datum A"
+    )
+    set_basic_dimension(
+        adapter, pin_station, label="cross-hole station from datum A"
+    )
+    add_feature_control_frame(
+        adapter,
+        top,
+        edge_xy=pin_edge,
+        frame_xy=(0.100, 0.230),
+        characteristic="position",
+        tolerance="0.20",
+        datums=("A", "B"),
+        diameter=True,
+        label="cross-hole true position",
+    )
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=pin_edge,
+        callout_xy=(0.170, 0.230),
+        label="crank-arm cross-hole",
+    )
 
     # Native datum/GD&T/surface annotations replace the former prose notes 5/8/9.
     # Right view is the 16 x 8 stock section: its left broad face is datum A.
@@ -241,13 +316,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="crank broad face",
     )
-    shaft_edge = (
-        _sheet_x(0.0),
-        FRONT_CENTER[1] + SHAFT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
-    )
     # Same bore circle, picked at its BOTTOM. The Ra below uses this instead of
-    # shaft_edge so its leader runs level to the bore rather than climbing to the
-    # bore's top THROUGH its own "Ra 1.6" text -- see the note at add_surface_finish.
+    # DATUM_B_RIM so its leader runs level to the bore rather than climbing
+    # through its own "Ra 1.6" text -- see the note at add_surface_finish.
     # In the front view the bore projects as ONE circular edge, so picking it at
     # 6 o'clock rather than 12 selects the same edge and specifies the same
     # surface: this is a routing change, not a respec of which face is finished.
@@ -258,10 +329,12 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=shaft_edge,
-        symbol_xy=(shaft_edge[0] + 0.022, FRONT_CENTER[1] + 0.035),
+        edge_xy=DATUM_B_RIM,
+        symbol_xy=DATUM_B_SYMBOL,
         datum="B",
         label="crank shaft axis",
+        shoulder=True,
+        position_tolerance_m=0.0001,
     )
     # Station moved off ARM_C2C*0.75 (sheet x=0.176) to the flat stretch between
     # the pivot centre and the arm end.  A datum feature symbol may be tagged
@@ -293,10 +366,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(datum_c_edge[0], datum_c_edge[1] - 0.022),
         datum="C",
         label="crank width side",
-    )
-    handle_edge = (
-        _sheet_x(ARM_C2C),
-        FRONT_CENTER[1] + (15.0 / 64.0 * 25.4) * SHEET_SCALE[0] / 2000.0,
     )
     add_feature_control_frame(
         adapter,

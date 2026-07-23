@@ -42,6 +42,7 @@ ARM_THICKNESS = 8.0  # ~half the arm width, p.12 photo (low)
 SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)
 SHAFT_BORE_DIA = 0.375 * MM_PER_IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
 # rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
+PIN_HOLE_DIA = 4.623  # ANSI #14 drill table value used by Hole Wizard
 DIMPLE_DIA = 8.0  # fiducial indentation (low)
 DIMPLE_DEPTH = 0.5  # fiducial indentation (low)
 DIMPLE_X = 30.0  # on the arm near the boss (low)
@@ -68,11 +69,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # $PRPSHEET links, so the print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "SHAFT BORE AND HANDLE PIVOT CENTRED ACROSS 16 WIDTH.",
+        "SHAFT BORE CENTRED ACROSS 16 WIDTH.",
         "HANDLE PIVOT: 15/64 DRILL THRU.",
-        "CROSS-PIN: #14 DRILL AT ASSEMBLY THROUGH SHAFT-BORE AXIS, MID-THICKNESS;",
-        "TAPER-REAM WITH SHAFT FOR NO. 2 TAPER PIN,",
-        "1:48, LARGE END OUTBOARD.",
+        "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
+        "MATCH-REAM WITH CRANKSHAFT MHA-026 TO FIT CUSTOM TAPER PIN",
+        "MHA-024; ASSEMBLY OPERATION OUTSIDE THIS PART DRAWING.",
         "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
     )
 )

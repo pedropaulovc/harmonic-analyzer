@@ -7,8 +7,8 @@ every shared sheet/template, import, curation, and export behavior lives in
 
 The model's shaft axis runs along +Y (outboard/crank end at the origin), so
 the standard side views show the shaft VERTICAL: the crank-end face is the
-``*Bottom`` orientation and the length view is ``*Front`` (outboard end at the
-view bottom, the #9 cross-hole facing the viewer as a circle at station 12).
+``*Bottom`` orientation and the length view is ``*Right`` (outboard end at the
+view bottom, the #9 cross-hole facing the viewer as a circle at station 4).
 
 Run with SolidWorks open::
 
@@ -26,6 +26,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
+    add_edge_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
@@ -33,9 +34,9 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    offset_dimension_text,
     read_required_properties,
-    set_basic_dimensions,
+    set_arc_endpoints_to_center,
+    set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
@@ -72,10 +73,14 @@ SHEET_SCALE = (1.0, 1.0)
 END_VIEW_SCALE = 2.0
 # Crank-end view (the *Bottom orientation: looking along +Y) at 2:1.
 FRONT_CENTER = (0.060, 0.150)
-# Side view (the *Front orientation: shaft vertical, outboard end at the view
+# Side view (the *Right orientation: shaft vertical, outboard end at the view
 # bottom) at 1:1 -- the 145 length spans sheet y 0.0775..0.2225.
 RIGHT_CENTER = (0.150, 0.150)
 ISO_CENTER = (0.345, 0.200)
+DATUM_A_RIGHT = (
+    FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+    FRONT_CENTER[1],
+)
 
 # Derived sheet anchors (meters).
 _SIDE_BOTTOM = RIGHT_CENTER[1] - SHAFT_LENGTH / 2000.0  # outboard end edge
@@ -97,7 +102,6 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1]),
-    "PinHeight": (0.128, 0.090),
 }
 DIMENSION_CALLOUTS = {"ShaftDiaDim": "+0.00/-0.02"}
 
@@ -266,7 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Bottom", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Front", *RIGHT_CENTER, scale=(1, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -282,10 +286,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # contradict the crank-arm bore note, so keep three.
     set_dimension_precision(
         adapter, [*front_annotations, *right_annotations], {"ShaftDiaDim": 3}
-    )
-    set_basic_dimensions(adapter, right_annotations, ("PinHeight",))
-    offset_dimension_text(
-        adapter, right_annotations, {"PinHeight": (0.132, 0.105)}
     )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
@@ -314,18 +314,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # the sheet-space layout audit read a false off-sheet leader.  The visible
     # circular rim is the same cylindrical datum feature and reports truthful
     # sheet-space tag geometry.
-    shaft_datum_edge = _visible_shaft_end_edges(adapter, front)[0][1]
     right_end_edges = _visible_shaft_end_edges(adapter, right)
     crank_end_edge = right_end_edges[0][1]
     far_end_edge = right_end_edges[-1][1]
     add_datum_feature(
         adapter,
         front,
+        edge_xy=DATUM_A_RIGHT,
         symbol_xy=(FRONT_CENTER[0] + 0.027, FRONT_CENTER[1]),
         datum="A",
         label="shaft OD datum axis",
-        entity=shaft_datum_edge,
-        shoulder=True,
+        position_tolerance_m=0.0001,
     )
     add_datum_feature(
         adapter,
@@ -351,6 +350,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # Ø/THRU specification. The axial station is the imported model-owned
     # PinHeight dimension above and takes the title-block linear tolerance.
     cross_hole_edge = _visible_cross_hole_edge(adapter, right)
+    pin_station = add_edge_dimension(
+        adapter,
+        right,
+        p0=(RIGHT_CENTER[0] - SHAFT_DIA / 2000.0, _SIDE_BOTTOM),
+        p1=(RIGHT_CENTER[0], _PIN_CENTER[1] + PIN_HOLE_DIA / 2000.0),
+        text_xy=(0.125, 0.090),
+        label="cross-hole station",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(adapter, pin_station, label="cross-hole station")
+    set_basic_dimension(adapter, pin_station, label="cross-hole station")
     add_native_hole_callout(
         adapter,
         right,

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import crank_arm_spec
 import draw_crank_arm as drawing
 import build_crank_arm as arm
 from _drawing_registry import DRAWINGS_BY_NAME
+from _holes import NUMBER_DRILL_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -48,10 +50,14 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
     notes = crank_arm_spec.DRAWING_NOTES
     assert "TAPER PIN" in notes
-    assert "1:48" in notes
     assert "3/8 IN" in drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
     assert "15/64 DRILL THRU" in notes
-    assert "#14 DRILL" in notes
+    assert "HANDLE PIVOT CENTRED" not in notes
+    assert "FINISHED SIZE FOR THIS PART" in notes
+    assert "MHA-026" in notes and "MHA-024" in notes
+    assert "OUTSIDE THIS PART DRAWING" in notes
+    assert "NOT INDIVIDUAL PART ACCEPTANCE" not in notes
+    assert "NO. 2" not in notes
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
     assert "LINEAR +/-" not in notes
@@ -69,15 +75,65 @@ def test_hole_states_are_annotated() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["ShaftBoreDia"].startswith("THRU")
     assert callouts["DimpleDia"] == "0.5 DEEP"
+    assert crank_arm_spec.PIN_HOLE_DIA == NUMBER_DRILL_MM["#14"]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_native_hole_callout(") == 2
+    assert 'label="crank-arm cross-hole"' in source
 
 
 def test_native_gdt_replaces_form_orientation_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
+    assert source.count("add_feature_control_frame(") == 3
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source
     assert "add_surface_finish(" in source
+
+
+def test_shaft_axis_datum_pick_is_radial_with_its_symbol() -> None:
+    centre = (drawing._sheet_x(0.0), drawing.FRONT_CENTER[1])
+    rim_vector = (
+        drawing.DATUM_B_RIM[0] - centre[0],
+        drawing.DATUM_B_RIM[1] - centre[1],
+    )
+    leader_vector = (
+        drawing.DATUM_B_SYMBOL[0] - drawing.DATUM_B_RIM[0],
+        drawing.DATUM_B_SYMBOL[1] - drawing.DATUM_B_RIM[1],
+    )
+    assert math.isclose(
+        math.hypot(*rim_vector), drawing.DATUM_B_RADIUS, abs_tol=1e-12
+    )
+    assert math.isclose(
+        rim_vector[0] * leader_vector[1] - rim_vector[1] * leader_vector[0],
+        0.0,
+        abs_tol=1e-12,
+    )
+    assert rim_vector[0] * leader_vector[0] + rim_vector[1] * leader_vector[1] > 0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "edge_xy=DATUM_B_RIM" in source
+    assert "symbol_xy=DATUM_B_SYMBOL" in source
+    assert "shoulder=True" in source
+    assert "position_tolerance_m=0.0001" in source
+
+
+def test_handle_pivot_has_basic_transverse_location_from_datum_c() -> None:
+    assert crank_arm_spec.HALF_WIDTH == 8.0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "handle_transverse = add_edge_dimension(" in source
+    assert 'orientation="vertical"' in source
+    assert "set_arc_endpoints_to_center(\n        adapter, handle_transverse" in source
+    assert "set_basic_dimension(\n        adapter, handle_transverse" in source
+
+
+def test_cross_hole_has_basic_datum_a_station_and_position_control() -> None:
+    assert crank_arm_spec.ARM_THICKNESS / 2.0 == 4.0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "pin_station = add_edge_dimension(" in source
+    assert 'label="cross-hole station from datum A"' in source
+    assert "set_arc_endpoints_to_center(\n        adapter, pin_station" in source
+    assert "set_basic_dimension(\n        adapter, pin_station" in source
+    assert 'label="cross-hole true position"' in source
+    assert 'datums=("A", "B")' in source
 
 
 def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
@@ -119,6 +175,8 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("crank-arm")
-    assert spec["material_specification"]
+    expected = "SAE 1018 CF bar, ASTM A108-24"
+    assert spec["material"] == expected
+    assert spec["material_specification"] == expected
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
