@@ -243,7 +243,8 @@ async def build(adapter: Any) -> dict[str, str]:
     targeted_balloons = []
     for detail_view, stem, item_number, margin in (
         (bracket_detail, "transgear-bracket", "12", 0.008),
-        (screw_detail, "bracket-screw", "13", 0.014),
+        # Keep the single screw-detail balloon inside the sheet-zone border.
+        (screw_detail, "bracket-screw", "13", 0.010),
         (bracket_detail, "transgear-latch", "15", 0.014),
     ):
         targeted_balloons.extend(
