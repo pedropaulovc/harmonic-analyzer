@@ -120,7 +120,8 @@ ID_ISO_CENTER = (0.180, 0.080)
 ISO_VIEW_SCALE = (1, 7)
 BRACKET_DETAIL_CENTER = (0.085, 0.230)
 BRACKET_DETAIL_SCALE = (1, 4)
-SCREW_DETAIL_CENTER = (0.045, 0.235)
+# Keep the detail's targeted item-13 balloon below the top sheet-zone border.
+SCREW_DETAIL_CENTER = (0.045, 0.230)
 SCREW_DETAIL_SCALE = (1, 2)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
@@ -266,7 +267,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="paper-drive assembly balloons",
         existing_balloons=targeted_balloons,
     )
-    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.018, 0.205) is None:
+    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.018, 0.215) is None:
         raise RuntimeError("failed to add paper-drive identification heading")
 
     return await finalize_drawing(

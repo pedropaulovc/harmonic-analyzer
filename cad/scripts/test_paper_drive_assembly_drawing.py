@@ -100,6 +100,7 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert drawing.VIEW_SCALE == (1, 5)
     assert drawing.ISO_VIEW_SCALE == (1, 7)
+    assert drawing.SCREW_DETAIL_CENTER == (0.045, 0.230)
     assert drawing.SHEET_NAMES == (
         "GENERAL ASSEMBLY",
         "PARTS LIST AND ITEM IDENTIFICATION",
