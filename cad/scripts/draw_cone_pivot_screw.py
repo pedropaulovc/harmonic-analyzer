@@ -148,6 +148,13 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
             quantity=below_text,
             label=label,
         )
+    head_bearing_edge = _circular_edge(
+        adapter,
+        side,
+        center_y_mm=0.0,
+        radius_mm=HEAD_DIA / 2.0,
+        label="head bearing face edge",
+    )
     add_feature_control_frame(
         adapter,
         side,

@@ -75,7 +75,9 @@ def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
     assert source.count('characteristic="circular_runout"') == 1
     assert source.count("add_surface_finish(") == 1
     assert (
-        'symbol_xy=(0.128, 0.255),\n        datum="A",\n'
+        'symbol_xy=(0.128, 0.255),\n'
+        '        expected_position_xy=(0.12469169737294514, 0.2537515839143207),\n'
+        '        datum="A",\n'
         '        label="knob body axis",\n'
         "        position_tolerance_m=0.0036,"
         in source
