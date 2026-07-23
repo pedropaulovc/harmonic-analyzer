@@ -34,11 +34,16 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from magnifying_lever_spec import ROD_LENGTH
+# Keep both manufactured dimensions as this recipe's public spec surface;
+# contract tests and downstream drawing audits compare these exact aliases.
+from magnifying_lever_spec import ROD_DIA, ROD_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
+
+
+__all__ = ("ROD_DIA", "ROD_LENGTH")
 
 
 SPEC = DRAWINGS_BY_NAME["magnifying_lever"]

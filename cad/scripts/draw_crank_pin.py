@@ -20,7 +20,9 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from crank_pin_spec import PIN_LENGTH
+# Keep the full manufactured-size trio as this recipe's public spec surface;
+# contract tests and downstream drawing audits compare these exact aliases.
+from crank_pin_spec import BIG_END_DIA, PIN_LENGTH, SMALL_END_DIA
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -28,6 +30,9 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
+
+
+__all__ = ("BIG_END_DIA", "PIN_LENGTH", "SMALL_END_DIA")
 
 
 SPEC = DRAWINGS_BY_NAME["crank_pin"]
