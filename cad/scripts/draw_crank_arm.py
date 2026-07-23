@@ -156,7 +156,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crank Arm Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank arm; manufacturing drawing; taper pin",
+            3: "crank arm; manufacturing drawing; straight cross-hole",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -181,7 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    # Top view: cross-drill geometry is visible; its ANSI size/location are in note 6.
+    # Top view: cross-drill geometry is visible; its size is a native hole callout.
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )

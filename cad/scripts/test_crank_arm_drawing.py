@@ -58,6 +58,9 @@ def test_linked_notes_define_a_complete_individual_part() -> None:
     assert "MATCH-REAM" not in notes
     assert "NOT INDIVIDUAL PART ACCEPTANCE" not in notes
     assert "NO. 2" not in notes
+    assert '3: "crank arm; manufacturing drawing; straight cross-hole"' in Path(
+        drawing.__file__
+    ).read_text(encoding="utf-8")
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
     assert "LINEAR +/-" not in notes
