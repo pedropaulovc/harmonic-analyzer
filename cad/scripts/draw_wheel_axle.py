@@ -112,6 +112,7 @@ DIMENSION_CALLOUTS = {"StudDia": "-0.02/-0.05"}
 # circle (see the note at the add_datum_feature call below). Deriving the angle
 # from the offset keeps them from drifting apart in a later edit.
 _DATUM_B_OFFSET = (0.038, -0.052)
+_DATUM_B_EXPECTED_OFFSET = (0.03798608154550024, -0.05198095369384263)
 _DATUM_B_ANGLE = math.atan2(_DATUM_B_OFFSET[1], _DATUM_B_OFFSET[0])
 
 
@@ -314,14 +315,22 @@ async def build(adapter: Any) -> dict[str, str]:
             END_CENTER[1] + STUD_DIA / 2.0 * _K * math.sin(_DATUM_B_ANGLE)),
         axis="y", label="stud circle datum-B pick",
     )
-    # Live readback normalizes this restricted tag by 13.776 um; this bound
-    # applies only to annotation placement, not part geometry or GD&T.
+    # Live readback normalizes this restricted tag's (+38, -52) mm request to
+    # (+37.9860815, -51.9809537) mm -- a deterministic 23.5899 um translation.
+    # Compare with that positive-control point so the deliberately tight 20 um
+    # bound detects DRIFT in the normalization instead of rejecting the known
+    # normalization itself. The bound covers annotation placement only, not
+    # part geometry or GD&T.
     add_datum_feature(
         adapter,
         end,
         edge_xy=stud_circle_at_datum_b,
         symbol_xy=ept(END_CENTER[0] + _DATUM_B_OFFSET[0],
                       END_CENTER[1] + _DATUM_B_OFFSET[1]),
+        expected_position_xy=ept(
+            END_CENTER[0] + _DATUM_B_EXPECTED_OFFSET[0],
+            END_CENTER[1] + _DATUM_B_EXPECTED_OFFSET[1],
+        ),
         datum="B",
         label="stud bearing axis",
         position_tolerance_m=0.00002,
