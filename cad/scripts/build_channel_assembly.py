@@ -1402,6 +1402,12 @@ async def build(adapter) -> dict[str, str]:
     seed_by_amp: dict[float, tuple[int, dict[str, str]]] = {}
     slots_by_seed: dict[int, tuple[int, int, dict[str, list[float]]]] = {}
     copied: list[dict[str, Any]] = []
+    # Component enumeration is a growing assembly-tree walk. Keep the last
+    # proven snapshot and take only one new snapshot after each copy; scanning
+    # both before and after every CopyWithMates2 made 36 walks for 18 copies.
+    # Nothing else inserts a component between these calls, and every delta is
+    # still checked below for exactly one instance of every CHAIN_PART.
+    known_components: set[str] | None = None
     for j in range(CHANNELS):
         st = solve_state(amplitudes[j])  # this channel's bar/lever pose
         amp_key = round(amplitudes[j], 6)
@@ -1434,13 +1440,15 @@ async def build(adapter) -> dict[str, str]:
             adapter, named_ref(f"Front Plane@{own_bushing}", "PLANE"))
         flips = [False] * n_slice
         flips[dim_slot] = slice_info["dim_flip"]
-        with _telemetry.span("cwm.comp_names", channel=j, phase="before"):
-            before_comps = set(component_names(adapter))
+        if known_components is None:
+            with _telemetry.span("cwm.comp_names", channel=j, phase="seed"):
+                known_components = set(component_names(adapter))
         copy_with_mates(
             adapter, [seed_comps[p] for p in CHAIN_PARTS], n_slice, values,
             flips=flips, repeat=repeat, new_entities=new_ents)
         with _telemetry.span("cwm.comp_names", channel=j, phase="after"):
-            new_comps = sorted(set(component_names(adapter)) - before_comps)
+            after_components = set(component_names(adapter))
+        new_comps = sorted(after_components - known_components)
         comps = {}
         for name in new_comps:
             part = name.rsplit("-", 1)[0]
@@ -1453,6 +1461,7 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"ch{j:02d} copy created {len(comps)}/{len(CHAIN_PARTS)} chain"
                 f" parts: {new_comps}")
+        known_components = after_components
         # Land the copy on its DESIGN pose by pinning its 3 operational DOF
         # with TRANSIENT drivers, then deleting them. The chain's DOF are
         # genuinely free, so the copied mates pin the copy only up to the

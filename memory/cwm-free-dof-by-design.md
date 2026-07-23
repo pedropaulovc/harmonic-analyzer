@@ -74,6 +74,16 @@ control, while the dispatch SAFEARRAY returned 2/2. Live full-channel result:
 `cwm.pose_release` 74.233 → 2.292 s. All 60 free DOF, exact 128-component pose
 ledger, health, zero-interference, mate-count and under-constraint gates passed.
 
+**2026-07-23 component-delta scan:** `component_names` is a growing assembly-tree
+walk. The copy loop used to enumerate the complete tree immediately before AND
+after every copy (36 walks for 18 copies) merely to calculate each four-component
+delta. Keep one proven snapshot, enumerate once after each `CopyWithMates2`, verify
+the delta is exactly one of every `CHAIN_PART`, then carry that snapshot forward.
+Live channel build: 36 spans / 55.370 s → 19 spans / 33.337 s (-22.033 s,
+-39.80% in the affected scope); all closing gates above passed and the rendered
+assembly remained visually clean. The one initial seed walk is necessary because
+channels 0/1 are authored before the copy bank begins.
+
 Remaining perf question, not correctness: whether `IDragOperator` absolute Drag
 (minimal attractor repro measured ~0.2 s/part vs ~0.8 s/authored-driver) can
 replace transient drivers on the real slice. The pinned-bank formulation already
