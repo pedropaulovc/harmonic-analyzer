@@ -96,12 +96,12 @@ def test_drawing_places_bom_balloons_and_specific_notes() -> None:
     assert '(bracket_detail, "transgear-bracket", "12", 0.008)' in source
     assert '(screw_detail, "bracket-screw", "13", 0.006)' in source
     assert '(bracket_detail, "transgear-latch", "15", 0.014)' in source
-    assert '(iso, "rack-pinion", "16", 0.014)' in source
+    assert '(bracket_detail, "rack-pinion", "16", 0.014)' in source
     assert "existing_balloons=targeted_balloons" in source
     assert drawing.SHEET_SCALE == (1.0, 5.0)
     assert drawing.VIEW_SCALE == (1, 5)
     assert drawing.ISO_VIEW_SCALE == (1, 7)
-    assert drawing.SCREW_DETAIL_CENTER == (0.045, 0.230)
+    assert drawing.SCREW_DETAIL_CENTER == (0.045, 0.210)
     assert drawing.SHEET_NAMES == (
         "GENERAL ASSEMBLY",
         "PARTS LIST AND ITEM IDENTIFICATION",

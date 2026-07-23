@@ -121,7 +121,7 @@ ISO_VIEW_SCALE = (1, 7)
 BRACKET_DETAIL_CENTER = (0.085, 0.230)
 BRACKET_DETAIL_SCALE = (1, 4)
 # Keep the detail's targeted item-13 balloon below the top sheet-zone border.
-SCREW_DETAIL_CENTER = (0.045, 0.230)
+SCREW_DETAIL_CENTER = (0.045, 0.210)
 SCREW_DETAIL_SCALE = (1, 2)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
@@ -214,6 +214,7 @@ async def build(adapter: Any) -> dict[str, str]:
             {
                 "transgear-bracket",
                 "transgear-latch",
+                "rack-pinion",
             }
         ),
         label="paper-drive transgear detail",
@@ -250,7 +251,7 @@ async def build(adapter: Any) -> dict[str, str]:
         (bracket_detail, "transgear-latch", "15", 0.014),
         # Seed the reducer disc before AutoBalloon5 so item 16 cannot take the
         # ring slot that crosses item 11's leader on the refitted silhouette.
-        (iso, "rack-pinion", "16", 0.014),
+        (bracket_detail, "rack-pinion", "16", 0.014),
     ):
         targeted_balloons.extend(
             add_component_bom_balloons(
@@ -270,7 +271,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="paper-drive assembly balloons",
         existing_balloons=targeted_balloons,
     )
-    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.018, 0.215) is None:
+    if add_note(adapter, "SHEET 2 OF 2 — ITEM IDENTIFICATION", 0.100, 0.215) is None:
         raise RuntimeError("failed to add paper-drive identification heading")
 
     return await finalize_drawing(
