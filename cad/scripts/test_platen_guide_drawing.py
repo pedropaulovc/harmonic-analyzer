@@ -172,6 +172,18 @@ def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
     assert "def _manufacturing_notes" not in source
 
 
+def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
+    hole_axis_x = {
+        drawing.FRONT_LEFT_X_M + station / 1000.0
+        for station in (*drawing.THROUGH_X, *drawing.BLIND_X)
+    }
+    assert drawing.DATUM_B_X_M == pytest.approx(0.220)
+    assert min(abs(drawing.DATUM_B_X_M - x) for x in hole_axis_x) >= 0.030
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "datum_b_edge = (DATUM_B_X_M, FRONT_BOTTOM_Y_M)" in source
+    assert "symbol_xy=(DATUM_B_X_M, 0.098)" in source
+
+
 def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
     xml = _gtol_frame_xml(
         "position", "0.20", datums=("A", "B", "C"), diameter=True
