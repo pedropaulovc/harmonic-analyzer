@@ -128,6 +128,8 @@ from build_support_bar import (  # noqa: E402
     BAR_DEPTH,
     BAR_HEIGHT,
     BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (machine -X holes)
+    BRACKET_STUD_X,
+    CLAMP_CBORE_DEPTH,
     CLAMP_HOLE_X,
 )
 from column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
@@ -226,14 +228,14 @@ FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
 # rack crests' reach at nominal centres -- extend like the drive-train's
 # checker-arbitrated mesh slacks (rb - (PD/2 - addendum) = 0.685, +0.115).
 RACK_MESH_EXT = 0.8
-STUD_XY = (-12.0, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)  # machine (-12, 297.9667)
+STUD_XY = (BRACKET_STUD_X, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)
 LATCH_ANGLE_DEG = -162.0  # knob swung low toward the crank at machine -X (ch30
 # p002); the machine reflection of the pre-mirror -18 deg (theta -> 180 - theta,
 # x -> -x), so the arm reaches west/-X and down from the stud.
 KNOB_SHAFT_XY = (
     STUD_XY[0] + LATCH_C2C * math.cos(math.radians(LATCH_ANGLE_DEG)),
     STUD_XY[1] + LATCH_C2C * math.sin(math.radians(LATCH_ANGLE_DEG)),
-)  # machine (-54.575, 284.133)
+)  # machine (-42.575, 252.367)
 
 # z stack on the stud (front -> back): collar | disc | feed pinion | latch arm
 # | bracket. The disc window clears the platen furniture: the guide-screw
@@ -271,8 +273,8 @@ if THIRD_PHASE_DEG > THIRD_GAMMA / 2.0:
 # from RACK_X0, so a GAP sits over the machine stud (-X) near the platen's left
 # (-X) edge -- the reflection of the pre-mirror right-edge phasing.
 _k = math.floor((STUD_XY[0] - RACK_FIRST_GAP_X - PLATE_X0) / RACK_PITCH)
-RACK_X0 = STUD_XY[0] - RACK_FIRST_GAP_X - _k * RACK_PITCH  # -148.985: gap on the
-# stud, left edge ~1 east of the platen's
+RACK_X0 = STUD_XY[0] - RACK_FIRST_GAP_X - _k * RACK_PITCH
+# The resized rack keeps a gap centred on the relocated stud.
 
 # Net platen feed per CRANK revolution through the real train (T12/T24
 # mounted): 0.5 chain * (12/120) gear * pi*PD rack = 1.596 mm. Every stage is
@@ -631,7 +633,7 @@ async def build(adapter) -> dict[str, str]:
     # --- support bar + two-piece clamps ---------------------------------------
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
     # Symmetric about machine x=0; its bracket-screw holes flank the stud at
-    # machine -12 (see build_support_bar.py).
+    # machine x=0 (see build_support_bar.py).
     support_bar = await place_component(
         adapter,
         "support-bar",
@@ -652,7 +654,7 @@ async def build(adapter) -> dict[str, str]:
     clamp_x = sorted(CLAMP_HOLE_X)
     clamp_seeds: list[str] = []
     for index, x in enumerate(clamp_x[:2]):
-        target = [x, BAR_CY, BAR_FRONT_Z]
+        target = [x, BAR_CY, BAR_FRONT_Z + CLAMP_CBORE_DEPTH]
         seed = await place_component(
             adapter,
             "clamp-screw",
@@ -670,7 +672,9 @@ async def build(adapter) -> dict[str, str]:
         )
         assert_component_placed(adapter, seed, target, IDENTITY)
         clamp_seeds.append(seed)
-    clamp_targets = [[x, BAR_CY, BAR_FRONT_Z] for x in clamp_x[2:]]
+    clamp_targets = [
+        [x, BAR_CY, BAR_FRONT_Z + CLAMP_CBORE_DEPTH] for x in clamp_x[2:]
+    ]
     clamp_instances = await linear_component_pattern(
         adapter,
         clamp_seeds,
@@ -929,8 +933,8 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, 0.0],
         IDENTITY,
     )
-    # One exact-pose seed at machine -2; PatternAxisX forward runs toward -X
-    # and creates the second screw at -22. Ry(180) points both shanks into the
+    # One exact-pose seed at machine +10; PatternAxisX forward runs toward -X
+    # and creates the second screw at -10. Ry(180) points both shanks into the
     # support bar while their under-head planes bear on the bracket back face.
     bracket_seed_target = [STUD_XY[0] + BRACKET_SCREW_DX, BAR_CY, STUB_Z0]
     bracket_seed = await place_component(

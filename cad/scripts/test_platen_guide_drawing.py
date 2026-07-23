@@ -97,7 +97,7 @@ def test_drawing_hole_sizes_follow_unc_policy() -> None:
 
 def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
     assert guide.LOCK_STATION_X == pytest.approx(
-        (guide.GUIDE_LENGTH * 0.2, guide.GUIDE_LENGTH * 0.8)
+        (guide.GUIDE_LENGTH * 0.3, guide.GUIDE_LENGTH * 0.7)
     )
     assert guide.HOLE_X == pytest.approx(
         tuple(
@@ -191,7 +191,7 @@ def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
         drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0
     )
     assert min(abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x) == pytest.approx(
-        guide.GUIDE_LENGTH * 0.1 / 1000.0
+        (guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0
     )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "def _bottom_surface_edge(" in source

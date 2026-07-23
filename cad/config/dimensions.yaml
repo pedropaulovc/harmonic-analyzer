@@ -1356,7 +1356,7 @@ sections:
         - derived
         - low
       - - Column clamp (two-piece, wheel bar — unified with the platen-bar clamps 2026-07)
-        - 'the same black two-piece semi-arc pair as the platen bar''s (`column-clamp-front`/`-back`, ch. 22 row): front arc face at −129.9 carries the bar back face, back arc closes on the Ø25.4 column, two clamp screws through the bar flanking the column (heads on the bar front face). The green one-piece channel collar (and its backed-out pinch screw) is RETIRED — no consumer left'
+        - 'the same black two-piece semi-arc pair as the platen bar''s (`column-clamp-front`/`-back`, ch. 22 row): front arc face at −129.9 carries the bar back face, back arc closes on the Ø25.4 column, two clamp screws through the bar flanking the column (heads recessed 0.2 below the bar front so the refitted platen can slide across the east clamp). The green one-piece channel collar (and its backed-out pinch screw) is RETIRED — no consumer left'
         - —
         - p.50–55 (ch30 p005 two-piece arcs)
         - scaled + derived
@@ -1427,7 +1427,7 @@ sections:
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 19 × 2 (2 per rail, stations x 20.715/182.499, 2 fillister screws each) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 7, the top pair hangs 14 over it — so the platen cannot fall off'
+        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 19 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 fillister screws each) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 7, the top pair hangs 14 over it — so the platen cannot fall off without colliding with the east column clamp'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
@@ -1469,7 +1469,7 @@ sections:
       gearing can be unlatched from the rack for free repositioning/reset (the
       whole transgear cluster tilts away — see ch. 23 rework notes).
       Rework rack mesh: rack teeth-down with crests at y 271.234, pitch line 272.081;
-      the 12T DP30 feed pinion's axis sits PD/2 + 0.8 below it (stud (−12, 266.201)
+      the 12T DP30 feed pinion's axis sits PD/2 + 0.8 below it (stud (0, 266.201)
       post-mirror) — the 0.8 centre extension clears the _gear-recipe gap floor at
       the pinion base circle (drive-train-style checker-arbitrated slack). Rack
       x0 = −31.949, putting a rack GAP centre
@@ -1547,7 +1547,7 @@ sections:
         - counted + scaled
         - med
       - - Drive chain (roller chain; paper-drive rework 2026-07-07)
-        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` filled by the native connected-linkage chain pattern along the `_chain.py` centreline loop): the centreline rides each mounted removable''s PITCH circle (knob T24 r 24 about post-mirror (−54.575, 252.367); crank T12 r 12 about (−122.8, 142.985) = the crank axis), taut common external tangent on the bar side, slack arc solved to close the 60-link loop (sag ≈ 21 below the straight tangent, vs the p006 crop read 18); link pin plane z −155 (both wheels coplanar: bands −156.2..−153.8). z stack (rework E6): inner plates STRADDLING the 2.4 sprocket (inner faces ±1.45, 0.25 clear/side), bushings ±1.45, outer plates 2.55..3.35, pins ±3.35 — only the roller↔tooth seating remains as intended contact'
+        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` filled by the native connected-linkage chain pattern along the `_chain.py` centreline loop): the centreline rides each mounted removable''s PITCH circle (knob T24 r 24 about post-mirror (−42.575, 252.367); crank T12 r 12 about (−122.8, 142.985) = the crank axis), taut common external tangent on the bar side, slack arc solved to close the 62-link loop (sag ≈ 20.6 below the straight tangent, vs the p006 crop read 18); link pin plane z −155 (both wheels coplanar: bands −156.2..−153.8). z stack (rework E6): inner plates STRADDLING the 2.4 sprocket (inner faces ±1.45, 0.25 clear/side), bushings ±1.45, outer plates 2.55..3.35, pins ±3.35 — only the roller↔tooth seating remains as intended contact'
         - —
         - ch30 p002/p005/p006 (taut run + visibly drooping slack run) + ch. 23 p.58-59 (chain wider than the wheel); crank centre from ch30 GT; knob centre = stud + latch c2c 44.766 @ −18°
         - scaled + derived
@@ -1565,7 +1565,7 @@ sections:
         - counted + derived
         - med
       - - Pinion bar — RETIRED (paper-drive rework 2026-07-07)
-        - 'the transgear cluster does NOT hang from a dedicated bar: book p.62/63 shows the cluster''s bracket screwed to the BACK of the single platen support bar (2 large slotted screws). `pinion-bar.SLDPRT` deleted; replaced by `transgear-bracket` (30 × 63.5 × 4 black plate, Ø9.6 stud bore at machine (−12, 266.20), 2 × Ø4.4 screw holes at stud ± 10 on the bar mid-height 306.734; 1.5-deep full-width front groove at stud-local y 16..24 clears the platen''s bottom guide rail sliding past the bar-back plane)'
+        - 'the transgear cluster does NOT hang from a dedicated bar: book p.62/63 shows the cluster''s bracket screwed to the BACK of the single platen support bar (2 large slotted screws). `pinion-bar.SLDPRT` deleted; replaced by `transgear-bracket` (30 × 63.5 × 4 black plate, Ø9.6 stud bore at machine (0, 266.20), 2 × Ø4.4 screw holes at stud ± 10 on the bar mid-height 306.734; 1.5-deep full-width front groove at stud-local y 16..24 clears the platen''s bottom guide rail sliding past the bar-back plane; the 2026-07-23 x re-centre clears the resized platen''s lower clip screw)'
         - —
         - book p.62 top-down + p.63 back view; memory/paper-drive-rework.md E1
         - scaled + derived
@@ -1585,11 +1585,11 @@ sections:
       - - Latch arm (rework E8)
         - 'tapered link, 2.6 thick (it lives in the 3.0 slot between the rack''s back face −132.9 and the bar-front/bracket plane −129.9): big hub Ø22 / small hub Ø16, both bores Ø9.6; centre distance 44.766 = the PERMANENT 12T:120T DP38 mesh (44.116 nominal + 0.65 gap-floor extension); assembled at −18° below +X — the arm pivots ON the stud, so this c2c never changes; unlatching tilts the whole cluster away from the rack (v4_transgear 001 vs 011-013). The old 66.05 "rest c2c" was a fit against the refuted disc-meshes-rack topology; Appendix C #8''s two-centre-distance riddle dissolves'
         - —
-        - 'ch30 p002 knob wrap centre (~(55-58, 279-287) pre-mirror, within parallax of stud + 44.766 @ −18°) + `v4_transgear_008` (arm with a hole pivoting on the stud); memory/paper-drive-rework.md E8'
+        - 'ch30 p002 knob wrap centre plus the 2026-07-23 platen collision gate: pre-mirror (42.575, 252.367) = centred stud + 44.766 @ −18°; `v4_transgear_008` confirms the arm pivots on the stud; memory/paper-drive-rework.md E8'
         - scaled + derived
         - med
       - - Knob shaft (rework E8)
-        - 'stepped Ø9.525, through the latch small hub at pre-mirror (54.575, 284.133), spanning machine z −157.5 → −130: removable seat z −157.5..−148.4 (T24 chain-wrapped at −156.2..−153.8), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
+        - 'stepped Ø9.525, through the latch small hub at pre-mirror (42.575, 252.367), spanning machine z −157.5 → −130: removable seat z −157.5..−148.4 (T24 chain-wrapped at −156.2..−153.8), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
         - —
         - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −155 chain plane'
         - scaled + derived

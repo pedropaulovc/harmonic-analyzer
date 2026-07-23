@@ -9,11 +9,11 @@ transgear bracket (build_transgear_bracket.py). Cross-section 22 tall x
 run ~29 past each column (ch30 p002).
 
 Holes (all along local Z, the machine front-back axis):
-* 4x O4.4 clamp-screw through-holes flanking each column (x +-197 -+ 17.5):
-  the screw heads sit on the BAR's front face (ch30 p002) and thread into
-  the back clamp arc.
-* 2x O4.0 bracket-screw holes at MACHINE x -22 / -2 (the two large slotted
-  screws of the p.62/63 top/back views, flanking the stud at machine -12).
+* 4x clamp-screw counterbores flanking each column (x +-197 -+ 17.5):
+  the screw heads sit sub-flush in the BAR's front face so the refitted platen
+  can slide across the east clamp, and thread into the back clamp arc.
+* 2x O4.0 bracket-screw holes at MACHINE x -10 / +10 (the two large slotted
+  screws of the p.62/63 top/back views, flanking the stud at machine x 0).
 
 The bracket holes make the bar x-ASYMMETRIC, so it is authored MACHINE-
 handed and placed on its exact machine transform (an x-mirrored insert
@@ -59,10 +59,22 @@ BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
 
 COLUMN_X = 197.0  # frame column line (frame assembly)
 CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
-# The O3.9 clamp-screw shanks PASS THROUGH: #8 clearance (normal Ø4.978).
-CLAMP_HOLE_SPEC = HoleSpec("clearance", "#8")
-BRACKET_HOLE_X = (-22.0, -2.0)  # bracket screw line, MACHINE-handed (stud
-# at machine -12 +- 10; the bar is placed machine-handed, see docstring)
+# The O3.9 clamp-screw shanks pass through #8 clearance holes. Their Ø8 heads
+# are recessed 0.2 below the bar front: the right-shifted platen now travels
+# across the east clamp screw line, so proud heads would block its slide.
+CLAMP_CBORE_DIA = 8.5
+CLAMP_CBORE_DEPTH = 2.7
+CLAMP_HOLE_SPEC = HoleSpec(
+    "counterbore_fillister",
+    "#8",
+    overrides_mm={
+        "HoleDiameter": 4.978,
+        "CounterBoreDiameter": CLAMP_CBORE_DIA,
+        "CounterBoreDepth": CLAMP_CBORE_DEPTH,
+    },
+)
+BRACKET_STUD_X = 0.0
+BRACKET_HOLE_X = tuple(BRACKET_STUD_X + dx for dx in (-10.0, 10.0))
 # The ~Ø4 bracket screws THREAD IN: tapped #8-32 (nearest UNC coarse).
 BRACKET_HOLE_SPEC = HoleSpec("tapped", "#8-32")
 
@@ -114,7 +126,7 @@ async def build(adapter) -> dict[str, str]:
     # Screw holes, all through along Z at the bar's mid-height, drilled from the
     # bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads sit --
     # ch30 p002), while the bar is still a plain prism: TWO native Hole Wizard
-    # features -- 4 clamp-screw #8 CLEARANCE holes flanking the columns, and 2
+    # features -- 4 clamp-screw #8 COUNTERBORES flanking the columns, and 2
     # #8-32 TAPPED bracket-screw holes at the stud line (the bracket screws
     # thread into the bar; covered by the platen, so a through cut reads clean).
     # Positions are the photo layout.
@@ -124,7 +136,7 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter, CLAMP_HOLE_SPEC,
         [[x, 0.0, front_z] for x in CLAMP_HOLE_X],
-        (0.0, 0.0, -1.0), "clamp-screw clearance holes (#8)", name="ClampHoles",
+        (0.0, 0.0, -1.0), "clamp-screw counterbores (#8)", name="ClampHoles",
     )
     wizard_holes(
         adapter, BRACKET_HOLE_SPEC,
@@ -132,9 +144,18 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 0.0, -1.0), "bracket-screw tapped holes (#8-32)", name="BracketHoles",
     )
     v_holes = (
-        len(CLAMP_HOLE_X) * math.pi * (clamp_dia / 2.0) ** 2
-        + len(BRACKET_HOLE_X) * math.pi * (bracket_dia / 2.0) ** 2
-    ) * BAR_DEPTH
+        len(CLAMP_HOLE_X)
+        * (
+            math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
+            + math.pi
+            * ((CLAMP_CBORE_DIA / 2.0) ** 2 - (clamp_dia / 2.0) ** 2)
+            * CLAMP_CBORE_DEPTH
+        )
+        + len(BRACKET_HOLE_X)
+        * math.pi
+        * (bracket_dia / 2.0) ** 2
+        * BAR_DEPTH
+    )
     expected -= v_holes
     await volume_check(adapter, "bar with holes", expected, 0.02 * v_holes)
 

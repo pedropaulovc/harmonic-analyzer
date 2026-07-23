@@ -62,7 +62,7 @@ MATERIAL = "Plain Carbon Steel"
 GUIDE_LENGTH = 269.64  # = resized platen width (ch30-p002 Pose Studio)
 GUIDE_HEIGHT = 5.0
 GUIDE_DEPTH = 10.0  # 1.0 past the 9-deep bar so the lock plates clear it
-LOCK_STATION_X = (53.928, 215.712)  # 20% / 80% of guide length
+LOCK_STATION_X = (80.892, 188.748)  # 30% / 70%; inboard of the east column clamp
 LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
 
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))

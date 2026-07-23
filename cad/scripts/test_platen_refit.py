@@ -10,6 +10,7 @@ import build_platen_clip as clip
 import build_platen_guide as guide
 import build_platen_paper as paper
 import build_platen_rack as rack
+import build_support_bar as support
 
 
 def test_platen_envelope_preserves_fitted_top_left_and_ratio() -> None:
@@ -41,3 +42,14 @@ def test_cascaded_drive_geometry_closes() -> None:
     assembly._assert_gear_mesh()
     assembly._assert_knob_shaft_clearance()
     assembly._assert_chain_layout()
+
+
+def test_refitted_platen_clears_fixed_support_hardware() -> None:
+    assert support.CLAMP_CBORE_DEPTH > 2.5
+    assert math.isclose(assembly.STUD_XY[0], support.BRACKET_STUD_X)
+    assert support.BRACKET_HOLE_X == tuple(
+        support.BRACKET_STUD_X + dx for dx in (-10.0, 10.0)
+    )
+    assert guide.LOCK_STATION_X == tuple(
+        guide.GUIDE_LENGTH * fraction for fraction in (0.3, 0.7)
+    )
