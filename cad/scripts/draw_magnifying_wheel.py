@@ -167,15 +167,16 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Datum A = the axle BORE rim (round 1: the old pick landed on the hub OD,
     # so the rotational datum read as the drum, not the functional bore).
-    # SolidWorks restricts this axis-attached tag and current live readback
-    # normalizes the intended sheet point by 3.572 mm. Keep 0.128 mm of
-    # annotation-only slack for template/render normalization; this never
-    # relaxes the part geometry or GD&T contract.
+    # SolidWorks restricts this axis-attached tag to a fixed shoulder location.
+    # The former (+10, +16) mm request deterministically read back at
+    # (+8.107, +12.971) mm -- 3.57196 mm away and just outside the pinned
+    # 3.5 mm placement bound. Request that normalized point directly instead
+    # of relying solely on the annotation-placement guard.
     add_datum_feature(
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0),
-        symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),
+        symbol_xy=(FRONT_CENTER[0] + 0.0081, FRONT_CENTER[1] + 0.0130),
         datum="A",
         label="axle bore axis",
         position_tolerance_m=0.0037,
