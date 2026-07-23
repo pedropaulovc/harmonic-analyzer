@@ -177,11 +177,16 @@ def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
         drawing.FRONT_LEFT_X_M + station / 1000.0
         for station in (*drawing.THROUGH_X, *drawing.BLIND_X)
     }
-    assert drawing.DATUM_B_EDGE_PICK_X_M == pytest.approx(0.190)
     assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(0.220)
-    assert min(abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x) >= 0.030
+    assert min(abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x) == pytest.approx(
+        0.030
+    )
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "datum_b_edge = (DATUM_B_EDGE_PICK_X_M, FRONT_BOTTOM_Y_M)" in source
+    assert "def _bottom_surface_edge(" in source
+    assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
+    assert "if span_mm < 299.9:" in source
+    assert "datum_b_entity = _bottom_surface_edge(front)" in source
+    assert "entity=datum_b_entity" in source
     assert "symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098)" in source
 
 
