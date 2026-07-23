@@ -160,6 +160,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
+    # Live readback normalizes this restricted axis tag by 16.826 um.  Bound
+    # only annotation placement; part dimensions and GD&T remain unchanged.
     add_datum_feature(
         adapter,
         front,
@@ -167,6 +169,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
         datum="A",
         label="pivot shaft axis",
+        position_tolerance_m=0.00002,
     )
     # Cylindricity and the bearing finish both control the shaft's CYLINDRICAL
     # face, which the side view shows edge-on -- so both anchor to its flank

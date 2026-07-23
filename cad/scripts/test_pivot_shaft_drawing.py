@@ -49,6 +49,15 @@ def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 2
+    assert (
+        "        edge_xy=end_top,\n"
+        "        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),\n"
+        '        datum="A",\n'
+        '        label="pivot shaft axis",\n'
+        "        position_tolerance_m=0.00002,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.00002") == 1
     assert "characteristic=\"cylindricity\"" in source
     assert source.count("characteristic=\"perpendicularity\"") == 1
     assert source.count("add_surface_finish(") == 1
