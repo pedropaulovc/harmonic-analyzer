@@ -86,6 +86,18 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
+def _force_dimension_black(dimension: Any, *, label: str) -> None:
+    """Make an added basic dimension print at full black instead of driven gray."""
+    annotation = dimension.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label} has no annotation")
+    annotation.Color = 0  # COLORREF black; overrides the drawing layer color.
+    if int(annotation.Color) != 0:
+        raise RuntimeError(f"{label} did not retain black annotation color")
+    if not int(annotation.LayerOverride) & 0x1:
+        raise RuntimeError(f"{label} did not retain its color override")
+
+
 FRONT_KEEP = {
     "BarLength": (FRONT_CENTER[0] - 0.010, 0.138),
     "TipCentreX": (FRONT_CENTER[0] + 0.070, 0.125),
@@ -176,6 +188,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="fulcrum-to-bar-pin c2c",
     )
     set_basic_dimension(adapter, bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
+    _force_dimension_black(bar_pin_c2c, label="fulcrum-to-bar-pin c2c")
     spring_c2c = add_edge_dimension(
         adapter,
         front,
@@ -185,6 +198,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="fulcrum-to-spring c2c",
     )
     set_basic_dimension(adapter, spring_c2c, label="fulcrum-to-spring c2c")
+    _force_dimension_black(spring_c2c, label="fulcrum-to-spring c2c")
 
     # Section thickness (3.0) + bar height (9.5) on the right end view.
     add_edge_dimension(
