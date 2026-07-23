@@ -212,6 +212,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore axis",
         position_tolerance_m=0.013,
     )
+    # The arbor-axis tag is independently restricted and live readback
+    # normalizes its intended sheet point by 5.676 mm.  Bound only this tag.
     add_datum_feature(
         adapter,
         front,
@@ -219,6 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(arbor_bore_edge[0] + 0.020, arbor_bore_edge[1] + 0.017),
         datum="B",
         label="arbor bore axis",
+        position_tolerance_m=0.006,
     )
     add_datum_feature(
         adapter,

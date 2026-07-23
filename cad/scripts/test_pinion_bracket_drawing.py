@@ -114,6 +114,15 @@ def test_datum_scheme_fully_defines_functional_relationships() -> None:
         in source
     )
     assert source.count("position_tolerance_m=0.013") == 1
+    assert (
+        "        edge_xy=arbor_bore_edge,\n"
+        "        symbol_xy=(arbor_bore_edge[0] + 0.020, arbor_bore_edge[1] + 0.017),\n"
+        '        datum="B",\n'
+        '        label="arbor bore axis",\n'
+        "        position_tolerance_m=0.006,"
+        in source
+    )
+    assert source.count("position_tolerance_m=0.006") == 1
     assert source.count('characteristic="profile_surface"') == 2
     assert 'datums=("A",)' in source
     assert 'datums=("B",)' in source
