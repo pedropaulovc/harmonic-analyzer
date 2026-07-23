@@ -54,10 +54,10 @@ def test_native_gdt_controls_bushing_functional_surfaces() -> None:
         "        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),\n"
         '        datum="A",\n'
         '        label="bushing bore axis",\n'
-        "        position_tolerance_m=0.00001,"
+        "        position_tolerance_m=0.000005,"
         in source
     )
-    assert source.count("position_tolerance_m=0.00001") == 1
+    assert source.count("position_tolerance_m=0.000005") == 1
     assert "characteristic=\"circular_runout\"" in source
     assert "characteristic=\"parallelism\"" in source
     assert source.count("add_surface_finish(") == 1
