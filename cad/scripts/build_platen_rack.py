@@ -17,10 +17,10 @@ root (dedendum 1.157/DP below) half-width 0.412, cut overshoot to y = 13
 (past the bar top at 12, so the cut opens cleanly) half-width 1.143. The
 teeth crest at the bar top = pitch line + addendum (1/DP).
 
-112 gaps at p = pi/30 in = 2.660 mm fill the 300 mm bar (first gap centre
-at 1.33 mm; last opening ends at 297.5 mm).
+101 gaps at p = pi/30 in = 2.660 mm fill the resized 269.64 mm bar (first
+gap centre at 1.33 mm; the count is derived from the live bar length).
 
-Layout: bar x = 0..300, y = 0..12, z = 0..6; teeth cut into the top edge.
+Layout: bar x = 0..269.64, y = 0..12, z = 0..6; teeth cut into the top edge.
 
 Run (SolidWorks already open)::
 
@@ -66,7 +66,7 @@ MATERIAL = "Brass"  # ch. 22/23 photos: brass
 # (2.66 mm) so the mesh interfered (output interference gate, 8 hits ≤ 1.93 mm³).
 DP = 30.0  # 1/in, DIMENSIONS.md ch23 (med — scale anchor of the chapter)
 PA_DEG = 14.5  # period-typical, same as the gear train
-BAR_LENGTH = 300.0  # DIMENSIONS.md ch22: = platen width (low)
+BAR_LENGTH = 269.64  # ch30-p002 Pose Studio: equals resized platen width
 BAR_HEIGHT = 12.0  # exposed band below the bottom guide rail (rework E3, low)
 BAR_THICKNESS = 6.0  # DIMENSIONS.md ch22: edge-on photo (low)
 
@@ -79,7 +79,7 @@ ROOT_Y = PITCH_LINE_Y - DEDENDUM  # 28.174
 CUT_TOP_Y = BAR_HEIGHT + 1.0  # opens past the top edge
 TAN_PA = math.tan(math.radians(PA_DEG))
 
-GAP_COUNT = 112
+GAP_COUNT = int(BAR_LENGTH / PITCH)
 FIRST_GAP_X = PITCH / 2.0  # 1.33 -- first gap centred half a pitch in
 
 
@@ -106,7 +106,7 @@ async def build(adapter) -> dict[str, str]:
     # gap sketch is named (for the namer/pattern) but its dims are NOT recorded
     # or driven; touching them would risk silently breaking the mesh.
     # mm suffix is load-bearing -- this is an INCH document and the equation
-    # manager reads BARE numbers in document units (an unsuffixed 300 = 300 in,
+    # manager reads BARE numbers in document units (an unsuffixed 269.64 is inches,
     # blowing the part up 25.4x).
     await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
     await set_global(adapter, "BarHeight", f"{BAR_HEIGHT}mm")

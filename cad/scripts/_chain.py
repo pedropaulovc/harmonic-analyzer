@@ -31,10 +31,10 @@ from __future__ import annotations
 import math
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (54.575, 241.2332)  # build_paper_drive_assembly KNOB_SHAFT_XY:
-# stud (12, 255.0667) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
-# mesh -- paper-drive rework E8; ch30 p002 pose-studio re-anchor 2026-07-18:
-# the whole bar-hung reducer stack dropped 42.9 with the support-bar)
+KNOB_CENTRE = (54.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
+# stud (12, 266.2007) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
+# mesh). The 2026-07-23 platen refit raises the bar-hung reducer 11.134 mm
+# with the resized platen/support geometry.
 # The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_CRANK)
 # (the ch30 GT crank axis, ABOVE the drive line since the 2026-07-02 re-anchor).
 # Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from
@@ -181,11 +181,9 @@ for _ in range(80):
 SAG = 0.5 * (_LO_SAG + _HI_SAG)  # the BUILT droop (solved for LINK_COUNT).
 # The count quantisation moves the target length by at most LINK_PITCH / 2
 # (~3.2 mm); the slack run's length-vs-droop sensitivity is ~0.85 mm/mm here,
-# so the solved sag lands within ~4 mm of the seed -- INSIDE the +-8 bracket
-# and under the 14-tuned clearance envelope (a tauter chain sits higher in the
-# corridor every M6.8/M6.9 clearance was tuned against; the next-larger count,
-# 56 links, would need SAG 26 -- outside both the p006 photo read (18) and the
-# tuned envelope, so the tauter side is the right quantisation).
+# so the solved sag stays inside the +-8 bracket. At the 2026-07-23 platen
+# layout this selects 60 links and about 21.0 mm sag, close to the p006 photo
+# read (~18 mm) while preserving exact standard-pitch closure.
 assert abs(_loop_length(SAG) - CENTRELINE_LEN) < 1e-6
 
 SLACK_R = _solve_slack_radius(SAG)

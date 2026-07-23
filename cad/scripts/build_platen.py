@@ -6,18 +6,16 @@ strips, and the two back-side guide rails the platen hangs on are
 separate parts (build_platen_rack.py / build_platen_clip.py /
 build_platen_guide.py). Fastener holes:
 
-* four O3 x 3.5 clip-screw sockets in the front face at the plate's
-  extreme left/right edges (x 6/294), the clips spanning local
-  y 15..140 from the TOP edge down (ch22 front photo; holes at the
-  clips' 8-inset end holes -> local y 23/132);
+* four clip-screw sockets in the front face at the resized plate's
+  extreme left/right edges (x 5.3928/264.2472), matching the resized
+  clips' 7.1904-inset end holes at local y 29.6604/127.6296;
 * ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
   at the guide rail centrelines: bottom row y 13, top row y 47 (machine
   318 / 352 with the plate at y 305).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 22" — 140 mm height annotated
-(p.55 callout, high); width ~300 from the front-photo aspect (~2.15:1)
-and the p.54 inset vs the 460 mm frame (low; supersedes an earlier ~200
-estimate); thickness ~4 from the p.55 top edge-on photo (low).
+Dimensions: the ch30-p002 Pose Studio fit sets the width to 269.64 mm and
+the user-confirmed front-face proportion to height:width = 1:2, hence
+134.82 mm high. Thickness remains the p.55 edge-on-photo estimate (~4 mm).
 
 Layout: width along +X, height along +Y from the origin corner, thickness
 extruded +Z.
@@ -64,8 +62,8 @@ import _telemetry
 PART_NAME = "platen"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
-PLATE_WIDTH = 300.0  # DIMENSIONS.md ch22: photo aspect vs 140 mm (low)
-PLATE_HEIGHT = 140.0  # DIMENSIONS.md ch22: p.55 callout (high)
+PLATE_WIDTH = 269.64  # ch30-p002 Pose Studio: 300 * 0.8988 (user fit)
+PLATE_HEIGHT = PLATE_WIDTH / 2.0  # user-confirmed front-face H:W = 1:2
 PLATE_THICKNESS = 4.0  # DIMENSIONS.md ch22: p.55 edge-on photo (low)
 
 # Clip-screw sockets (machine-handed locals, see docstring): the brass
@@ -75,13 +73,16 @@ SOCKET_DEPTH = 3.2  # drill-point reach 3.2 + 0.30*2.261 = 3.88 keeps 0.12 web
 # to the 4.0 back (PAPER) face -- at the old 3.5 the 118-degree point reached
 # 4.18 and pierced a O0.36 pinhole through the platen surface. Screw
 # engagement (~2.8) still clears.
-SOCKET_XY = ((6.0, 23.0), (6.0, 132.0), (294.0, 23.0), (294.0, 132.0))
+SOCKET_XY = (
+    (5.3928, 29.6604), (5.3928, 127.6296),
+    (264.2472, 29.6604), (264.2472, 127.6296),
+)
 
 # Guide-screw through-holes: 2 rows of 5 (heads on the front face, shanks
 # into the guide rails on the back). ONE counterbored #4 fillister Hole
 # Wizard feature; the artefact through/cbore dims are preserved as overrides.
 GUIDE_HOLE_DIA = 3.0  # artefact through Ø (override); #4 fillister shank passes
-GUIDE_HOLE_X = (30.0, 90.0, 150.0, 210.0, 270.0)
+GUIDE_HOLE_X = (26.964, 80.892, 134.82, 188.748, 242.676)
 GUIDE_HOLE_Y = (13.0, 47.0)  # bottom / top rail centrelines (machine 318 / 352)
 GUIDE_HOLE_XY = tuple((x, y) for y in GUIDE_HOLE_Y for x in GUIDE_HOLE_X)
 
@@ -101,7 +102,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Editable knobs (Tools > Equations): the plate envelope. The mm suffix is
     # load-bearing -- this is an INCH document and the equation manager reads
-    # BARE numbers in document units (an unsuffixed 300 = 300 in, blowing the
+    # BARE numbers in document units (an unsuffixed 269.64 = 269.64 in, blowing the
     # part up 25.4x). (The old Socket/GuideHole/Cbore dia+depth knobs are gone:
     # the fastener holes are now native Hole Wizard features whose dimensions
     # come from the #4-40 / #4 standards + explicit artefact overrides, not
@@ -142,10 +143,10 @@ async def build(adapter) -> dict[str, str]:
     v_plate = PLATE_WIDTH * PLATE_HEIGHT * PLATE_THICKNESS
     await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
-    # Verify the annotated 140 mm front-face height BEFORE cutting any holes
+    # Verify the user-confirmed 1:2 front-face height BEFORE cutting any holes
     # (the post-cut view broke the screen-projected face pick live).
     await bbox_extent_check(
-        adapter, "plate height (annotated 140)", "y", PLATE_HEIGHT
+        adapter, "plate height (1:2 front-face ratio)", "y", PLATE_HEIGHT
     )
 
     # Clip-screw sockets: ONE native Hole Wizard #4-40 BOTTOMING-TAPPED blind

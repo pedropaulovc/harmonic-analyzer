@@ -12,7 +12,7 @@ Layout: length along +X, height along +Y from the origin corner, depth
 extruded -Z so native Front looks directly at the hole-entry face. The
 assembly seats local z 0 on the platen back and rotates the part 180 about Y
 to preserve the machine-space rail envelope. The 4 lock
-screw holes run through along Z at the two lock stations (x 60/240 +- 7).
+screw holes run through along Z at the two proportional lock stations.
 
 Run (SolidWorks already open)::
 
@@ -59,10 +59,10 @@ from _holes import (
 PART_NAME = "platen-guide"
 MATERIAL = "Plain Carbon Steel"
 
-GUIDE_LENGTH = 300.0  # = platen width (ch22 back photo: full-width rails)
+GUIDE_LENGTH = 269.64  # = resized platen width (ch30-p002 Pose Studio)
 GUIDE_HEIGHT = 5.0
 GUIDE_DEPTH = 10.0  # 1.0 past the 9-deep bar so the lock plates clear it
-LOCK_STATION_X = (60.0, 240.0)  # lock-plate centres (2 per guide)
+LOCK_STATION_X = (53.928, 215.712)  # 20% / 80% of guide length
 LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
 
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))
@@ -74,7 +74,7 @@ HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCRE
 # Stations = the platen's GUIDE_HOLE_X (pinned by an assert in the assembly
 # module). The lock-screw LockHoles above become #4 clearance (the fillister
 # lock screws pass through) -- memory/fastener-policy-us-customary.
-SCREW_STATION_X = (30.0, 90.0, 150.0, 210.0, 270.0)
+SCREW_STATION_X = (26.964, 80.892, 134.82, 188.748, 242.676)
 SCREW_HOLE_DEPTH = 4.0
 
 DRAWING_NOTES = "HOLE POSITION PER FCF."

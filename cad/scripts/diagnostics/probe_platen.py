@@ -29,8 +29,8 @@ from _assembly import (
     world_point,
 )
 
-PLATE_X0 = -258.0
-PLATE_Y0 = 262.1
+PLATE_X0 = -33.213
+PLATE_Y0 = 273.234
 PLATE_FRONT_Z = -142.9
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -65,7 +65,7 @@ async def build(adapter):
                               IDENTITY, ground=False)
     pl_o = _org(adapter, pl)
     log(f"platen org = {pl_o}")
-    corner0 = world_point(adapter, pl, [300.0, 140.0, 4.0])  # far corner (off both axes)
+    corner0 = world_point(adapter, pl, [269.64, 134.82, 4.0])  # far corner (off both axes)
     log(f"far corner BEFORE = {corner0}")
 
     # Slide axis held parallel to the Top and Front planes at the slide-line
@@ -91,7 +91,7 @@ async def build(adapter):
                           label="platen feed snapshot", verify=(pl, pl_o))
     log(f"after X snapshot(d={abs(pl_o[0]):.1f}): {_status(adapter, pl)}")
 
-    corner1 = world_point(adapter, pl, [300.0, 140.0, 4.0])
+    corner1 = world_point(adapter, pl, [269.64, 134.82, 4.0])
     log(f"far corner AFTER = {corner1}  (flip if jumped from {corner0})")
 
     # Lock a ride-along (platen-rack) to the platen via Front planes -- a Lock
