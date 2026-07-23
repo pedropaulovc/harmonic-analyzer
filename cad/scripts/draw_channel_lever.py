@@ -47,6 +47,7 @@ from channel_lever_spec import (
     PIVOT_HOLE_DIA,
     TIP_END_X,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
@@ -88,9 +89,15 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 
 def _force_dimension_black(dimension: Any, *, label: str) -> None:
     """Make an added basic dimension print at full black instead of driven gray."""
-    annotation = dimension.GetAnnotation()
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "GetAnnotation"
+    )
+    annotation = display.GetAnnotation()
     if annotation is None:
         raise RuntimeError(f"{label} has no annotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "Color", "LayerOverride"
+    )
     annotation.Color = 0  # COLORREF black; overrides the drawing layer color.
     if int(annotation.Color) != 0:
         raise RuntimeError(f"{label} did not retain black annotation color")
