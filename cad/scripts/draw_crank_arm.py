@@ -47,6 +47,7 @@ from crank_arm_spec import (
     ARM_C2C,
     ARM_END_X,
     ARM_THICKNESS,
+    DIMPLE_DIA,
     DIMPLE_X,
     HALF_WIDTH,
     PIN_HOLE_DIA,
@@ -246,9 +247,33 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, handle_transverse, label="handle-pivot transverse location"
     )
 
+    # The horizontal 30.00 marked dimension locates the dimple from datum B.
+    # Add the other nominal coordinate explicitly: centre height from datum C.
+    dimple_edge = (
+        _sheet_x(DIMPLE_X),
+        FRONT_CENTER[1] - DIMPLE_DIA * SHEET_SCALE[0] / 2000.0,
+    )
+    dimple_transverse = add_edge_dimension(
+        adapter,
+        front,
+        p0=(
+            _sheet_x(DIMPLE_X),
+            FRONT_CENTER[1] - HALF_WIDTH * SHEET_SCALE[0] / 1000.0,
+        ),
+        p1=dimple_edge,
+        text_xy=(0.158, FRONT_CENTER[1]),
+        label="dimple transverse location from datum C",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(
+        adapter,
+        dimple_transverse,
+        label="dimple transverse location from datum C",
+    )
+
     # The straight #14 cross-hole is the released MHA-020 condition. Locate its
-    # axis from datum A on the top view and control its intersection with datum B;
-    # the shared 1:48 reaming operation belongs to the crank assembly.
+    # axis from datum A on the top view; the manufacturing note explicitly makes
+    # its nominal longitudinal location the intersection with datum axis B.
     pin_edge = (
         _sheet_x(0.0),
         TOP_CENTER[1] + PIN_HOLE_DIA * SHEET_SCALE[0] / 2000.0,

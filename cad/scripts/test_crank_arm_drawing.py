@@ -47,15 +47,15 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
+def test_linked_notes_define_a_complete_individual_part() -> None:
     notes = crank_arm_spec.DRAWING_NOTES
-    assert "TAPER PIN" in notes
     assert "3/8 IN" in drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
     assert "15/64 DRILL THRU" in notes
     assert "HANDLE PIVOT CENTRED" not in notes
     assert "FINISHED SIZE FOR THIS PART" in notes
-    assert "MHA-026" in notes and "MHA-024" in notes
-    assert "OUTSIDE THIS PART DRAWING" in notes
+    assert "MHA-026" not in notes and "MHA-024" not in notes
+    assert "OUTSIDE THIS PART DRAWING" not in notes
+    assert "MATCH-REAM" not in notes
     assert "NOT INDIVIDUAL PART ACCEPTANCE" not in notes
     assert "NO. 2" not in notes
     # General tolerances live in the title block ONLY -- a second general
@@ -134,6 +134,18 @@ def test_cross_hole_has_basic_datum_a_station_and_position_control() -> None:
     assert "set_basic_dimension(\n        adapter, pin_station" in source
     assert 'label="cross-hole true position"' in source
     assert 'datums=("A", "B")' in source
+    assert "CROSS-HOLE AXIS INTERSECTS DATUM AXIS B." in crank_arm_spec.DRAWING_NOTES
+    assert "MATCH-REAM" not in crank_arm_spec.DRAWING_NOTES
+
+
+def test_dimple_has_both_nominal_location_coordinates() -> None:
+    assert crank_arm_spec.DIMPLE_X == 30.0
+    assert crank_arm_spec.HALF_WIDTH == 8.0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"DimpleX":' in source
+    assert "dimple_transverse = add_edge_dimension(" in source
+    assert 'label="dimple transverse location from datum C"' in source
+    assert "set_arc_endpoints_to_center(\n        adapter,\n        dimple_transverse" in source
 
 
 def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
