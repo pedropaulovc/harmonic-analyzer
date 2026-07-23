@@ -177,11 +177,12 @@ def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
         drawing.FRONT_LEFT_X_M + station / 1000.0
         for station in (*drawing.THROUGH_X, *drawing.BLIND_X)
     }
-    assert drawing.DATUM_B_X_M == pytest.approx(0.220)
-    assert min(abs(drawing.DATUM_B_X_M - x) for x in hole_axis_x) >= 0.030
+    assert drawing.DATUM_B_EDGE_PICK_X_M == pytest.approx(0.190)
+    assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(0.220)
+    assert min(abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x) >= 0.030
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "datum_b_edge = (DATUM_B_X_M, FRONT_BOTTOM_Y_M)" in source
-    assert "symbol_xy=(DATUM_B_X_M, 0.098)" in source
+    assert "datum_b_edge = (DATUM_B_EDGE_PICK_X_M, FRONT_BOTTOM_Y_M)" in source
+    assert "symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098)" in source
 
 
 def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
