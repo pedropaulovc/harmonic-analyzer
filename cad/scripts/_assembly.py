@@ -2214,6 +2214,56 @@ def delete_assembly_feature(adapter: Any, name: str) -> None:
     if adapter._attempt(lambda: asm_h.FeatureByName(name), default=None) is not None:
         raise RuntimeError(f"feature {name!r} still present after delete")
 
+def delete_assembly_features(adapter: Any, names: list[str]) -> None:
+    """Delete multiple assembly features with one native selection + delete.
+
+    ``IModelDocExtension.MultiSelect2`` accepts a heterogeneous array of
+    selectable objects and returns the exact count selected. Pywin32 requires an
+    explicit ``VT_ARRAY | VT_DISPATCH`` SAFEARRAY of raw ``_oleobj_`` values here;
+    list/tuple/variant-wrapper arrays select zero objects. Resolve every feature
+    first, require the full selection count, delete once, then prove all names
+    disappeared. This avoids one solve per feature when a transient mate bank is
+    released together.
+    """
+    if not names:
+        return
+
+    import pythoncom
+    from win32com.client import VARIANT
+
+    model = adapter.currentModel
+    asm_h = _early_bound(model, "IAssemblyDoc")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    features = []
+    for name in names:
+        feature = adapter._attempt(lambda n=name: asm_h.FeatureByName(n), default=None)
+        if feature is None:
+            raise RuntimeError(f"feature to batch-delete not found: {name!r}")
+        features.append(feature)
+
+    adapter._attempt(lambda: model.ClearSelection2(True), default=None)
+    objects = VARIANT(
+        pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH,
+        [feature._oleobj_ for feature in features],
+    )
+    selected = adapter._attempt(
+        lambda: extension.MultiSelect2(objects, False, None), default=0)
+    if int(selected) != len(features):
+        raise RuntimeError(
+            f"batch feature delete selected {selected}/{len(features)} objects")
+    if not adapter._attempt(lambda: extension.DeleteSelection2(0), default=False):
+        raise RuntimeError(
+            f"batch feature delete failed for {len(features)} selected objects")
+
+    survivors = [
+        name for name in names
+        if adapter._attempt(lambda n=name: asm_h.FeatureByName(n), default=None)
+        is not None
+    ]
+    if survivors:
+        raise RuntimeError(f"features still present after batch delete: {survivors}")
+
+
 def check_no_interference(
     adapter: Any,
     *,

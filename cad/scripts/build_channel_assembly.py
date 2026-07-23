@@ -142,6 +142,7 @@ from _assembly import (
     component_transform,
     concentric_mate,
     delete_assembly_feature,
+    delete_assembly_features,
     distance_driver,
     named_ref,
     parallel_mate,
@@ -1478,16 +1479,19 @@ async def build(adapter) -> dict[str, str]:
 
     # Copy every free chain first, then settle their solver-state attractors in
     # one post-copy phase. Driving each copy immediately made every later
-    # CopyWithMates2 addition re-wander already-settled free siblings; the v0.20.0
-    # trace spent 173 s across those repeated pose-drive spans. Re-putting the
-    # complete copied bank before each transient driver keeps every still-free
-    # chain on its design branch while the current channel is committed.
-    def _put_all_copies() -> None:
-        for rec in copied:
-            for part in CHAIN_PARTS:
-                put_component_pose(
-                    adapter, rec["comps"][part], rec["targets"][part])
+    # CopyWithMates2 addition re-wander already-settled free siblings. Keep each
+    # channel's three transient drivers alive until the complete bank is pinned:
+    # settled predecessors then cannot wander, and unprocessed successors do not
+    # matter because their own turn re-puts them on the design branch. This keeps
+    # the necessary put-before-each-driver recipe local to the current 4-part
+    # chain (12 Transform2 puts/channel) instead of re-putting all 18 copies three
+    # times per channel (3,888 puts in the 20-channel all-neutral build).
+    def _put_copy(rec: dict[str, Any]) -> None:
+        for part in CHAIN_PARTS:
+            put_component_pose(
+                adapter, rec["comps"][part], rec["targets"][part])
 
+    drives: list[str] = []
     for rec in copied:
         j = rec["j"]
         seed_j = rec["seed_j"]
@@ -1508,8 +1512,7 @@ async def build(adapter) -> dict[str, str]:
         foot = slice_info["foot"]
         try:
             with _telemetry.span("cwm.pose_drive", channel=j):
-                drives: list[str] = []
-                _put_all_copies()
+                _put_copy(rec)
                 mate = await spin_driver(
                     adapter, named_ref(f"Axis2@{rocker_c}", "AXIS"),
                     pivot_w, (off[0], off[1]),
@@ -1517,7 +1520,7 @@ async def build(adapter) -> dict[str, str]:
                            f" {off[0]:.1f},{off[1]:.1f}"),
                     verify=(rocker_c, _tgt_mm("rocker-arm")))
                 drives.append(mate["name"])
-                _put_all_copies()
+                _put_copy(rec)
                 mate = await distance_driver(
                     adapter, named_ref(f"Axis2@{bar_c}", "AXIS"),
                     named_ref("Right Plane", "PLANE"), foot[0],
@@ -1526,7 +1529,7 @@ async def build(adapter) -> dict[str, str]:
                            f" {amplitudes[j]:+.1f})"),
                     verify=(bar_c, _tgt_mm("amplitude-bar")))
                 drives.append(mate["name"])
-                _put_all_copies()
+                _put_copy(rec)
                 mate = await spin_driver(
                     adapter, named_ref(f"Axis1@{rod_c}", "AXIS"),
                     (pin[0], pin[1]), (ring[0], ring[1]),
@@ -1534,8 +1537,6 @@ async def build(adapter) -> dict[str, str]:
                            f" {ring[0]:.1f},{ring[1]:.1f}"),
                     verify=(rod_c, _tgt_mm("connecting-rod")))
                 drives.append(mate["name"])
-                for name in reversed(drives):
-                    delete_assembly_feature(adapter, name)
         except Exception:
             if _CWM_DEBUG:
                 for part in CHAIN_PARTS:
@@ -1551,7 +1552,13 @@ async def build(adapter) -> dict[str, str]:
             raise
         log(f"ch{j:02d} <- CopyWithMates2 of ch{seed_j:02d}"
             f" (J1a PITCH/2 {PITCH / 2.0:.2f} mm <- own bushing"
-            f" {rec['own_bushing']}, driven to pose + freed)")
+            f" {rec['own_bushing']}, driven to pose; bank release deferred)")
+
+    # Every copied chain now has all three DOF pinned on the design branch.
+    # Release the bank only after the last chain is committed; the closing solve
+    # below proves the stored attractors survive with every operational DOF free.
+    with _telemetry.span("cwm.pose_release", drives=len(drives)):
+        delete_assembly_features(adapter, list(reversed(drives)))
 
     # End-state validation of the replicated channels: ONE closing solve, then
     # prove each copy from the model (the CopyWithMates2 return value LIES):

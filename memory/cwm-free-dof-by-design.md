@@ -53,16 +53,32 @@ scale can't summon a strong non-design attractor (mirrored/rotated transforms,
 coincident PLANE axial mates, 4-part multi-loop, ~100 components — proven by
 `diag_cwm_attractor.py` #227, put held in all nine minimal cells).
 
-MITIGATION (shipping in `build_channel_assembly` via `_cwm.copy_with_mates`,
-`_cwm.py` lines 22-30): put the chain at the design pose (makes the design branch
-the nearest) → author transient driver mates pinning each free DOF (a real DRIVEN
-solve rewrites the copied mates' stored state) → delete the drivers. Put-alone
-reverts; driver-alone solves to the wrong nearest branch; the two-step lands it.
+MITIGATION (shipping in `build_channel_assembly` via `_cwm.copy_with_mates`): put
+the chain at the design pose (makes the design branch the nearest) → author
+transient driver mates pinning each free DOF (a real DRIVEN solve rewrites the
+copied mates' stored state) → delete the drivers. Put-alone reverts;
+driver-alone solves to the wrong nearest branch; the two-step lands it.
 
-Only remaining question (perf, not correctness): whether IDragOperator absolute
-Drag (attractor repro measured ~0.2 s/part vs ~0.8 s/authored-driver, and it
-survived the rebuild at minimal scale) can replace the transient drivers on the
-REAL channel slice — pending validation there.
+**2026-07-23 scale fix:** keep each copied channel's three transient drivers
+alive until the complete bank is committed. Previously every one of the 18
+channels re-put the complete 18×4-component copied bank before each of its three
+drivers: 3,888 `Transform2` puts, 367.398 s of `cwm.pose_drive`. Now only the
+current 4-part chain is re-put before each driver (12 puts/channel); already
+settled predecessors stay pinned and unprocessed successors are overwritten on
+their turn. Release all 54 drivers together with
+`IModelDocExtension.MultiSelect2` + one `DeleteSelection2`. The pywin32 call MUST
+marshal a `VARIANT(VT_ARRAY | VT_DISPATCH, [feature._oleobj_, ...])`; plain
+lists, tuples, and `VT_ARRAY | VT_VARIANT` all returned 0/2 in a live positive
+control, while the dispatch SAFEARRAY returned 2/2. Live full-channel result:
+`assembly.build` 595.817 → 366.710 s (-229.107 s, -38.45%);
+`cwm.pose_release` 74.233 → 2.292 s. All 60 free DOF, exact 128-component pose
+ledger, health, zero-interference, mate-count and under-constraint gates passed.
+
+Remaining perf question, not correctness: whether `IDragOperator` absolute Drag
+(minimal attractor repro measured ~0.2 s/part vs ~0.8 s/authored-driver) can
+replace transient drivers on the real slice. The pinned-bank formulation already
+removes the prior O(N²) put cost, so any Drag experiment must beat the measured
+366.710 s whole assembly and preserve the same closing gates.
 
 Extends [[negative-result-positive-control]] and [[no-untested-failure-assumptions]];
 verify empirically per [[verify-assumptions-live-sw]]; relates to

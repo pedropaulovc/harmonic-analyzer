@@ -187,10 +187,9 @@ def put_component_pose(adapter: Any, name: str, array16: list[float]) -> None:
     a driver alone solves to the NEAREST solution branch -- which, from the
     attractor pose, is the wrong one (measured: the copied channel lever
     solved to the mirror intersection of its J3 pin circles, ~1 mm residuals
-    everywhere). So the caller PUTS the chain at the design pose to make the
-    design branch the nearest one, authors the transient drivers to rewrite
-    the stored state, re-putting between adds (each add re-seats the still-
-    free siblings), then deletes the drivers.
+    everywhere). So the caller PUTS the current chain at the design pose to make
+    that branch nearest, re-puts it between its three driver adds, and keeps
+    already-settled chains pinned until the complete copied bank is committed.
     """
     from solidworks_mcp.adapters.solidworks.assembly import _create_math_transform
 
