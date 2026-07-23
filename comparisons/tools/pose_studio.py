@@ -273,6 +273,41 @@ def _tag_redraw(context):
             area.tag_redraw()
 
 
+def _capture_view_into_props(context):
+    """Bake the current navigated 3D view into the manifest-facing pose fields.
+
+    Native MMB navigation moves ``RegionView3D`` rather than the pose sliders.
+    Saving must therefore capture that view first; otherwise it serialises the
+    stale slider values instead of what the user is looking at.
+    """
+    if not _STATE.get("built"):
+        return None
+    space = _view3d_space(context)
+    if space is None:
+        return None
+    props = context.scene.hac_pose
+    rv3d = space.region_3d
+    # Native scroll zoom changes the free viewport's eye-to-pivot distance.
+    # ``aim_camera`` puts the eye at cam_dist for the current manifest zoom, so
+    # the reciprocal distance ratio is the zoom that reproduces this framing.
+    # Clamp to the slider/manifest contract rather than silently serialising an
+    # out-of-range viewport value.
+    base_dist = max(float(_STATE.get("cam_dist") or 1.0), 1e-6)
+    view_dist = max(float(rv3d.view_distance), 1e-6)
+    zoom = max(1.0, min(15.0, props.zoom * base_dist / view_dist))
+    # The viewport reads in the Z-up display frame; convert the camera matrix
+    # and the pivot back to the Y-up pose frame before inverting to az/el/roll
+    # and reading the target, so the captured pose matches render_offline.
+    az, el, roll = _invert_pose(_VIEW_R_INV @ rv3d.view_matrix.inverted())
+    props.az_deg, props.el_deg, props.roll_deg = az, el, roll
+    loc = _VIEW_R_INV @ rv3d.view_location
+    props.free_target = True
+    props.target_x, props.target_y, props.target_z = loc.x, loc.y, loc.z
+    props.zoom = zoom
+    _aim(props)  # re-centre framing on the captured angle + target
+    return az, el, roll, loc, zoom
+
+
 # Last-seen viewport projection, so the watcher fires only on the CAMERA->free EDGE
 # (not continuously — that would yank the user back while they orbit).
 _LAST_PERSP: dict = {"v": None}
@@ -585,30 +620,17 @@ class HAC_OT_build_scene(bpy.types.Operator):
 class HAC_OT_capture_view(bpy.types.Operator):
     bl_idname = "hac.capture_view"
     bl_label = "Capture From View"
-    bl_description = ("Read az/el/roll + target from the navigated viewport "
-                      "(orbit freely, then bake it into the pose; lens/zoom kept)")
+    bl_description = ("Read az/el/roll, target, and scroll zoom from the navigated "
+                      "viewport, then bake them into the pose")
 
     def execute(self, context):
-        if not _STATE.get("built"):
+        captured = _capture_view_into_props(context)
+        if captured is None:
             self.report({"ERROR"}, "Build Scene first")
             return {"CANCELLED"}
-        space = _view3d_space(context)
-        if space is None:
-            self.report({"ERROR"}, "no 3D viewport")
-            return {"CANCELLED"}
-        props = context.scene.hac_pose
-        rv3d = space.region_3d
-        # The viewport reads in the Z-up display frame; convert the camera matrix
-        # and the pivot back to the Y-up pose frame before inverting to az/el/roll
-        # and reading the target, so the captured pose matches render_offline.
-        az, el, roll = _invert_pose(_VIEW_R_INV @ rv3d.view_matrix.inverted())
-        props.az_deg, props.el_deg, props.roll_deg = az, el, roll
-        loc = _VIEW_R_INV @ rv3d.view_location
-        props.free_target = True
-        props.target_x, props.target_y, props.target_z = loc.x, loc.y, loc.z
-        _aim(props)  # re-centre framing on the captured angle + target
+        az, el, roll, loc, zoom = captured
         self.report({"INFO"}, f"az {az:.1f}  el {el:.1f}  roll {roll:.1f}  "
-                              f"target ({loc.x:.0f},{loc.y:.0f},{loc.z:.0f})")
+                              f"zoom {zoom:.2f}  target ({loc.x:.0f},{loc.y:.0f},{loc.z:.0f})")
         return {"FINISHED"}
 
 
@@ -725,9 +747,14 @@ class HAC_OT_peek_ref(bpy.types.Operator):
 class HAC_OT_save_manifest(bpy.types.Operator):
     bl_idname = "hac.save_manifest"
     bl_label = "Save Pose To Manifest"
-    bl_description = "Write az/el/roll/target/zoom/lens onto this pair in manifest.json"
+    bl_description = ("Capture the current navigated view, then write "
+                      "az/el/roll/target/zoom/lens onto this pair in manifest.json")
 
     def execute(self, context):
+        # MMB navigation updates RegionView3D only. Capture it automatically so
+        # Save Pose always persists the view the user just composed, without a
+        # separate Capture From View click.
+        _capture_view_into_props(context)
         props = context.scene.hac_pose
         path = _manifest_path(props)
         manifest = json.loads(path.read_text(encoding="utf-8"))
