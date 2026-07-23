@@ -2964,6 +2964,37 @@ def _balloon_item_number(adapter: Any, note: Any, *, label: str) -> str:
     return item
 
 
+def _fresh_bom_balloon(adapter: Any, *, item_number: str, label: str) -> tuple[Any, Any]:
+    """Reacquire one BOM balloon note and annotation from the drawing views."""
+    matches: list[tuple[Any, Any]] = []
+    for view in iter_views(adapter):
+        annotations = adapter._attempt(
+            lambda v=view: adapter._get_attr_or_call(v, "GetAnnotations")
+        ) or ()
+        for annotation in annotations:
+            annotation = _sw_type_info.early_bound_or_flag(
+                annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
+            )
+            if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
+                continue
+            note = annotation.GetSpecificAnnotation()
+            if note is None:
+                continue
+            note = _sw_type_info.early_bound_or_flag(
+                note, "INote", "IsBomBalloon", "GetBomBalloonText"
+            )
+            if not bool(note.IsBomBalloon()):
+                continue
+            if _balloon_item_number(adapter, note, label=label) == item_number:
+                matches.append((note, annotation))
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one fresh balloon for item {item_number}, "
+            f"got {len(matches)}"
+        )
+    return matches[0]
+
+
 def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> list[Any]:
     """Auto-insert circular item-number balloons around one assembly view.
 
@@ -3296,13 +3327,14 @@ def position_bom_balloon(
         note.LockPosition = True
         adapter.currentModel.EditRebuild3()
         adapter.currentModel.GraphicsRedraw2()
-        current_note = annotation.GetSpecificAnnotation()
-        if current_note is None:
-            raise RuntimeError(
-                f"{label}: item {item_number} note vanished after positioning"
-            )
+        note, annotation = _fresh_bom_balloon(
+            adapter, item_number=item_number, label=label
+        )
         note = _sw_type_info.early_bound_or_flag(
-            current_note, "INote", "GetBalloonInfo"
+            note, "INote", "GetBalloonInfo", "LockPosition"
+        )
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetPosition", "SetPosition"
         )
         moved_anchor = annotation.GetPosition()
         moved_info = note.GetBalloonInfo()

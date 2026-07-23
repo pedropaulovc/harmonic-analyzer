@@ -127,7 +127,7 @@ def test_manual_balloon_moves_are_locked_and_read_back() -> None:
     helper = helper[: helper.index("\ndef stamp_drawing_summary(")]
     assert "annotation.SetPosition(" in helper
     assert "annotation.SetPosition2(" not in helper
-    assert "annotation.GetSpecificAnnotation()" in helper
+    assert "_fresh_bom_balloon(" in helper
     assert "annotation.GetPosition()" in helper
     assert "target_anchor = position_xy" in helper
     assert "position_xy[index]" in helper
