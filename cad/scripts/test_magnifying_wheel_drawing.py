@@ -60,7 +60,7 @@ def test_native_gdt_and_axial_dims() -> None:
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert (
-        "        symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),\n"
+        "        symbol_xy=(FRONT_CENTER[0] + 0.0081, FRONT_CENTER[1] + 0.0130),\n"
         '        datum="A",\n'
         '        label="axle bore axis",\n'
         "        position_tolerance_m=0.0035,"
