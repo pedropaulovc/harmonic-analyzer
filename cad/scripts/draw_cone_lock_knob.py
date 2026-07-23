@@ -276,9 +276,10 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=body_circle,
         symbol_xy=(0.128, 0.255),
+        expected_position_xy=(0.12469169737294514, 0.2537515839143207),
         datum="A",
         label="knob body axis",
-        position_tolerance_m=0.0035,
+        position_tolerance_m=0.00002,
     )
     add_feature_control_frame(
         adapter,

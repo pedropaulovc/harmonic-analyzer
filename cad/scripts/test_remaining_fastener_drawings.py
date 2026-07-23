@@ -272,6 +272,7 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert drawing_source.count("add_datum_feature(") == 1
     assert drawing_source.count("add_feature_control_frame(") == 4
     assert drawing_source.count("add_surface_finish(") == 1
+    assert "edge_entity=head_bearing_edge" in drawing_source
     assert "import_cosmetic_threads(adapter, side)" in drawing_source
     assert 'place_view(adapter, str(SOURCE), "*Right"' in drawing_source
     assert 'quantity="SLOT MEDIAN PLANE"' in drawing_source
