@@ -19,6 +19,25 @@ Verifying the PR #76 telemetry spine (`cad/scripts/_telemetry.py`) end-to-end on
 
 **Bounded traced build (don't rebuild the world):** a plain `doit assembly:<stem>` drags the ENTIRE COM spine — PR #76 touched `_common.py`, which every part imports, so all ~50 parts + every prior assembly are stale, and `_spine_dep` makes each a hard `task_dep`. To trace just one assembly + a part, call `dodo._run([python, build_<x>.py], "label", log_stem=...)` directly under a `_telemetry.run_pipeline_span(...)` root: `_run` is the real harness launcher (opens `task <label>` span, injects `TRACEPARENT`, spawns subprocess), so the cross-process bridge is genuinely exercised without the spine. summing (13-component) full build ≈ 48s; slow parts like summing_lever ≈ 4min (many `param.dimension` spans).
 
-**Gotcha — orphans mean you killed it, not a real gap.** The spine uses `SimpleSpanProcessor` (exports each span on its *end*). A build killed mid-run (e.g. `timeout`) flushes finished children but never their still-open `task`/`pipeline`/`build` parents → Jaeger shows children as orphan roots. Let builds COMPLETE before auditing. A clean summing+knife_stay run = 73 spans, 1 root, 0 orphans; per-part component-insert + mate spans, `gate.dof`/`gate.interference`/`gate.health` with per-component children. Note Jaeger merges driver+subprocess into one `processID` (identical resource attrs), so a processID-based cross-process detector reads 0 — the bridge is proven instead by 1-root/0-orphan across the process boundary.
+**Network export is batched; local capture is immediate.** The console and
+`traces.jsonl`/`logs.jsonl` processors remain `Simple*`, while only the OTLP
+processors are `Batch*`. Before this split, the first synchronous log request
+and first synchronous span request each stalled about 2.01 s against the local
+collector: a five-process positive control averaged 4.49 s per one-log/one-span
+process. Batched export plus parallel trace/log provider shutdown averaged 2.46 s
+(45% lower), and long CAD processes hide most first-export latency behind COM
+work. `_common.run_build` closes the root span before `_telemetry.shutdown()`;
+shutdown drains both providers exactly once. A mock OTLP/HTTP collector test pins
+that even a short process delivers both `/v1/logs` and `/v1/traces` before exit.
+
+**Gotcha — orphans mean you killed it, not a real gap.** A build killed mid-run
+(e.g. `timeout`) cannot finish its still-open `task`/`pipeline`/`build` parents,
+so Jaeger may show children as orphan roots even though completed records were
+exported. Let builds COMPLETE before auditing. A clean summing+knife_stay run =
+73 spans, 1 root, 0 orphans; per-part component-insert + mate spans,
+`gate.dof`/`gate.interference`/`gate.health` with per-component children. Note
+Jaeger merges driver+subprocess into one `processID` (identical resource attrs),
+so a processID-based cross-process detector reads 0 — the bridge is proven
+instead by 1-root/0-orphan across the process boundary.
 
 Relates to [[harmonic-analyzer-project]].

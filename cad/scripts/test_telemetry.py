@@ -12,8 +12,13 @@ log<->trace correlation, and cross-process trace-context propagation.
 from __future__ import annotations
 
 import asyncio
+import http.server
+import os
+import queue
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 from typing import cast
 
@@ -21,11 +26,12 @@ import pytest
 from opentelemetry._logs import get_logger_provider
 from opentelemetry.sdk._logs import LoggerProvider as SdkLoggerProvider
 from opentelemetry.sdk._logs.export import (
+    BatchLogRecordProcessor,
     InMemoryLogRecordExporter,
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -44,10 +50,14 @@ def capture():
     _telemetry.configure()
 
     spans = InMemorySpanExporter()
-    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(SimpleSpanProcessor(spans))
+    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
+        SimpleSpanProcessor(spans)
+    )
 
     logs = InMemoryLogRecordExporter()
-    cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(SimpleLogRecordProcessor(logs))
+    cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(
+        SimpleLogRecordProcessor(logs)
+    )
     return spans, logs
 
 
@@ -167,13 +177,17 @@ def test_build_session_standalone_opens_root(capture, monkeypatch):
         assert root is not None
         with _telemetry.span("op"):
             pass
-    rootspan = [s for s in spans.get_finished_spans() if s.name == "build.cone_gear"][-1]
+    rootspan = [s for s in spans.get_finished_spans() if s.name == "build.cone_gear"][
+        -1
+    ]
     op = [s for s in spans.get_finished_spans() if s.name == "op"][-1]
     assert rootspan.attributes["label"] == "cone_gear"
     assert op.parent.span_id == rootspan.context.span_id
 
 
-def test_build_session_continues_injected_parent_without_duplicate(capture, monkeypatch):
+def test_build_session_continues_injected_parent_without_duplicate(
+    capture, monkeypatch
+):
     """Under the doit spine (a parent TRACEPARENT is injected) build_session
     yields None and the operation spans attach straight to the injected trace --
     no second pipeline.part.build layer duplicating the doit task span."""
@@ -241,6 +255,101 @@ def test_event_without_active_span_is_noop():
     _telemetry.event("orphan", foo="bar")  # must not raise
 
 
+def test_otlp_network_processors_are_batched(monkeypatch):
+    """Only the network exporters are batched; local capture stays immediate."""
+    original_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
+    try:
+        _telemetry.configure(force=True)
+        trace_processors = (
+            _telemetry._tracer_provider._active_span_processor._span_processors
+        )
+        log_processors = _telemetry._logger_provider._multi_log_record_processor._log_record_processors
+        assert any(isinstance(item, BatchSpanProcessor) for item in trace_processors)
+        assert any(isinstance(item, BatchLogRecordProcessor) for item in log_processors)
+        assert any(isinstance(item, SimpleSpanProcessor) for item in trace_processors)
+        assert any(
+            isinstance(item, SimpleLogRecordProcessor) for item in log_processors
+        )
+    finally:
+        if original_endpoint is None:
+            monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+        else:
+            monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", original_endpoint)
+        _telemetry.configure(force=True)
+
+
+def test_shutdown_drains_trace_and_log_providers_concurrently(monkeypatch):
+    barrier = threading.Barrier(2)
+
+    class Provider:
+        def __init__(self):
+            self.calls = 0
+
+        def shutdown(self):
+            barrier.wait(timeout=1.0)
+            self.calls += 1
+
+    traces = Provider()
+    logs = Provider()
+    monkeypatch.setattr(_telemetry, "_tracer_provider", traces)
+    monkeypatch.setattr(_telemetry, "_logger_provider", logs)
+
+    started = time.perf_counter()
+    _telemetry.shutdown()
+    elapsed = time.perf_counter() - started
+    _telemetry.shutdown()
+
+    assert elapsed < 0.5
+    assert traces.calls == 1
+    assert logs.calls == 1
+
+
+def test_subprocess_shutdown_flushes_batched_otlp_signals(tmp_path):
+    """Positive control: a short process reaches both OTLP endpoints before exit."""
+    received: queue.Queue[str] = queue.Queue()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802 - stdlib handler API
+            self.rfile.read(int(self.headers["Content-Length"]))
+            received.put(self.path)
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, _format, *_args):
+            return
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    try:
+        child = (
+            "import _telemetry as t\n"
+            "t.info('queued log')\n"
+            "with t.span('queued span'):\n"
+            "    pass\n"
+            "t.shutdown()\n"
+        )
+        env = os.environ.copy()
+        env["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"http://127.0.0.1:{server.server_port}"
+        result = subprocess.run(
+            [sys.executable, "-c", child],
+            cwd=Path(__file__).resolve().parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+    assert result.returncode == 0, result.stderr
+    paths = {received.get_nowait() for _ in range(received.qsize())}
+    assert {"/v1/logs", "/v1/traces"} <= paths
+
+
 def test_export_save_as_is_visible_during_long_com_call(capture, tmp_path):
     """The multi-minute assembly SaveAs3 call must not be an opaque trace gap."""
     import export_models
@@ -282,14 +391,16 @@ def test_set_service_relabels_resource_fallback_only():
         # default -> stage: fallback takes effect and the LIVE resource swaps.
         _telemetry.set_service("assembly-build")
         exp = InMemorySpanExporter()
-        cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
-            SimpleSpanProcessor(exp)
-        )
+        cast(
+            SdkTracerProvider, _telemetry.trace.get_tracer_provider()
+        ).add_span_processor(SimpleSpanProcessor(exp))
         with _telemetry.span("op"):
             pass
         (sp,) = [s for s in exp.get_finished_spans() if s.name == "op"]
         assert sp.resource.attributes["service.name"] == "assembly-build"
-        assert sp.resource.attributes["service.namespace"] == _telemetry._SERVICE_NAMESPACE
+        assert (
+            sp.resource.attributes["service.namespace"] == _telemetry._SERVICE_NAMESPACE
+        )
         # fallback-only: a non-forced call does NOT override an already-set label.
         _telemetry.set_service("part-build")
         assert _telemetry._service_name == "assembly-build"

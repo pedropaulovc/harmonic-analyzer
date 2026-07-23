@@ -39,6 +39,7 @@ import logging
 import os
 import socket
 import sys
+import threading
 import time
 import urllib.parse
 from collections.abc import AsyncGenerator, Generator, Mapping
@@ -51,12 +52,14 @@ from opentelemetry._logs import set_logger_provider
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import (
+    BatchLogRecordProcessor,
     ConsoleLogRecordExporter,
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
     ConsoleSpanExporter,
     SimpleSpanProcessor,
 )
@@ -141,7 +144,10 @@ def _resolve_otlp_endpoint() -> str | None:
     env = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if env is not None:
         return env or None
-    return _DEFAULT_OTLP_ENDPOINT if _endpoint_listening(_DEFAULT_OTLP_ENDPOINT) else None
+    return (
+        _DEFAULT_OTLP_ENDPOINT if _endpoint_listening(_DEFAULT_OTLP_ENDPOINT) else None
+    )
+
 
 _T0 = time.perf_counter()
 _LAST_TICK = _T0
@@ -190,11 +196,18 @@ class _ActivityFilter(logging.Filter):
             _touch_activity(f"log {str(record.msg)[:80]}")
         return True
 
+
 # Span nesting depth for the compact console tracer, so the boundary lines
 # indent into a tree and a missing parent is visible at a glance.
-_depth: contextvars.ContextVar[int] = contextvars.ContextVar("_telemetry_depth", default=0)
+_depth: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "_telemetry_depth", default=0
+)
 
 _configured = False
+_tracer_provider: TracerProvider | None = None
+_logger_provider: LoggerProvider | None = None
+_shutdown_provider_ids: set[int] = set()
+_shutdown_lock = threading.Lock()
 
 
 def _stamp() -> str:
@@ -221,7 +234,11 @@ def _compact_span(span: ReadableSpan) -> str:
     """One depth-indented line per finished span: ``⟩ name 1.23s OK [attrs]``."""
     depth_raw = (span.attributes or {}).get("harmonic.depth", 0)
     depth = int(depth_raw) if isinstance(depth_raw, (int, float, str)) else 0
-    dur = (span.end_time - span.start_time) / 1e9 if span.end_time and span.start_time else 0.0
+    dur = (
+        (span.end_time - span.start_time) / 1e9
+        if span.end_time and span.start_time
+        else 0.0
+    )
     status = span.status.status_code.name if span.status else "UNSET"
     mark = {"OK": "OK", "ERROR": "xx", "UNSET": "--"}.get(status, status)
     indent = "  " * depth
@@ -276,9 +293,16 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     tracer). File capture under ``cad/out/reports/telemetry`` is always attempted
     (best-effort).
     """
-    global _configured
+    global _configured, _logger_provider, _tracer_provider
     if _configured and not force:
         return
+
+    # A forced resource swap replaces both process-global providers. Drain the
+    # old pair first: otherwise their exporter threads and JSONL handles survive
+    # until interpreter shutdown, and short-lived ``set_service(force=True)``
+    # callers can lose the records queued immediately before the swap.
+    if force:
+        _shutdown_current_providers()
     _configured = True
 
     if force:
@@ -342,16 +366,20 @@ def configure(*, console: bool = True, force: bool = False) -> None:
                 )
             )
     # OTLP export to the resolved endpoint (Aspire dashboard by default, see
-    # _resolve_otlp_endpoint). SimpleSpanProcessor so short-lived build
-    # subprocesses flush each span on end without relying on an explicit shutdown.
+    # _resolve_otlp_endpoint). Keep the human console and local JSONL processors
+    # synchronous, but batch the network exporter: one synchronous HTTP request
+    # at the first log AND first span otherwise adds ~4 s to every short-lived
+    # build process when Aspire is listening. ``run_build`` closes its root span
+    # before calling shutdown(), which drains this queue without losing the tail.
     if otlp_endpoint:
         with contextlib.suppress(Exception):
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
                 OTLPSpanExporter,
             )
 
-            tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter()))
+            tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(tracer_provider)
+    _tracer_provider = tracer_provider
 
     # ---- logs ---------------------------------------------------------- #
     logger_provider = LoggerProvider(resource=resource)
@@ -372,9 +400,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
             )
 
             logger_provider.add_log_record_processor(
-                SimpleLogRecordProcessor(OTLPLogExporter())
+                BatchLogRecordProcessor(OTLPLogExporter())
             )
     set_logger_provider(logger_provider)
+    _logger_provider = logger_provider
 
     pylog = logging.getLogger(_LOGGER_NAME)
     pylog.setLevel(logging.DEBUG)
@@ -384,7 +413,9 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     pylog.propagate = False
     # Bridge into OTel's logs SDK: carries SeverityNumber + the active span's
     # trace/span id onto every record, so logs and traces correlate.
-    pylog.addHandler(LoggingHandler(level=logging.DEBUG, logger_provider=logger_provider))
+    pylog.addHandler(
+        LoggingHandler(level=logging.DEBUG, logger_provider=logger_provider)
+    )
     if want_console:
         stream = logging.StreamHandler(stream=_LiveStderr())
         stream.setFormatter(_FriendlyFormatter())
@@ -431,6 +462,7 @@ def set_service(name: str, *, force: bool = False) -> None:
 # OTel + printed to the console) at its level. ``progress`` and ``success``    #
 # keep the names the build scripts read most naturally.                        #
 # --------------------------------------------------------------------------- #
+
 
 def _extra(fields: Mapping[str, Any]) -> dict[str, Any] | None:
     """Flatten caller fields into log-record attributes (OTel attribute values
@@ -484,7 +516,9 @@ def event(name: str, **attributes: Any) -> None:
             span.add_event(name, attributes=_extra(attributes) or {})
 
 
-def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, Any, int]:
+def _enter_span(
+    name: str, attributes: Mapping[str, Any] | None
+) -> tuple[Span, Any, int]:
     _touch_activity(f"span-start {name}")
     tracer = get_tracer()
     depth = _depth.get()
@@ -512,7 +546,9 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
     if exc is not None:
         span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, str(exc)))
-        error(f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}")
+        error(
+            f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
+        )
     elif cast(ReadableSpan, span).status.status_code is StatusCode.UNSET:
         # get_current_span() is typed Span (mutable, has set_status); only
         # ReadableSpan exposes .status -- the live SDK span is both.
@@ -576,23 +612,28 @@ def traced(name: str, *, label_param: str | None = None):
             return {}
 
         if inspect.iscoroutinefunction(fn):
+
             @functools.wraps(fn)
             async def awrap(*args, **kwargs):
                 async with aspan(name, **_attrs(args, kwargs)):
                     return await fn(*args, **kwargs)
+
             return awrap
 
         @functools.wraps(fn)
         def wrap(*args, **kwargs):
             with span(name, **_attrs(args, kwargs)):
                 return fn(*args, **kwargs)
+
         return wrap
 
     return deco
 
 
 @contextlib.contextmanager
-def build_session(label: str, /, **attributes: Any) -> Generator[Span | None, None, None]:
+def build_session(
+    label: str, /, **attributes: Any
+) -> Generator[Span | None, None, None]:
     """Root context for a build *process* (``_common.run_build``).
 
     Under the doit spine a parent trace context is injected (``TRACEPARENT``), so
@@ -669,10 +710,54 @@ def run_pipeline_span(stage: str, /, **attributes: Any) -> Generator[Span, None,
             otel_context.detach(token)
 
 
-def shutdown() -> None:
-    """Flush + close providers (force-flush exporters). Best-effort."""
+def _shutdown_provider(provider: TracerProvider | LoggerProvider) -> None:
     with contextlib.suppress(Exception):
-        trace.get_tracer_provider().shutdown()  # type: ignore[attr-defined]
+        provider.shutdown()
+
+
+def _shutdown_current_providers() -> None:
+    """Drain the current trace/log providers once, in parallel.
+
+    Traces and logs have independent OTLP/HTTP exporters. Letting one provider
+    finish before starting the other serializes their network latency at every
+    process exit; two threads overlap those independent drains. Provider-level
+    shutdown already force-flushes batch processors and unregisters each SDK
+    provider's own atexit hook.
+    """
+    providers = [
+        provider for provider in (_tracer_provider, _logger_provider) if provider
+    ]
+    with _shutdown_lock:
+        pending = [
+            provider
+            for provider in providers
+            if id(provider) not in _shutdown_provider_ids
+        ]
+        _shutdown_provider_ids.update(id(provider) for provider in pending)
+
+    if not pending:
+        return
+    if len(pending) == 1:
+        _shutdown_provider(pending[0])
+        return
+
+    workers = [
+        threading.Thread(
+            target=_shutdown_provider,
+            args=(provider,),
+            name=f"otel-shutdown-{type(provider).__name__}",
+        )
+        for provider in pending
+    ]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+
+
+def shutdown() -> None:
+    """Flush + close both signal providers exactly once. Best-effort."""
+    _shutdown_current_providers()
 
 
 # Preconfigure on import: a script that merely ``import _telemetry`` (directly
