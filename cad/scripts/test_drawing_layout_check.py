@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _common
 import _drawing_common as drawing_common
 from _drawing_layout_check import (
     DEFAULT_BOUNDARY_ALLOWANCE_M,
@@ -85,15 +86,104 @@ class _FakeAdapter:
 def test_finalize_exports_pdf_before_reopen_and_skips_clean_save():
     source = getsource(drawing_common.finalize_drawing)
     first_reopen = source.index("reopen_drawing")
+    dirty_branch = source.index("if sheet_scale_dirty:")
+    clean_branch = source.index("if not sheet_scale_dirty:")
     pdf_export = source.index("pdf_path=str(outputs.pdf)")
     assert pdf_export < first_reopen
     # The dirty-scale branch saves a NEWER SLDDRW after that first export, so
     # it must re-export the PDF to match the persisted drawing (codex review
     # #361); the clean path keeps the single early export.
     assert source.count("save_drawing(") == 2
-    assert source.rindex("save_drawing(") > source.index("if sheet_scale_dirty:")
+    assert source.rindex("save_drawing(") > dirty_branch
+    # A clean first reopen already has the persisted sheet and can be audited
+    # directly. Only a dirty-scale save changes the file and needs another
+    # round trip before the final assertion.
+    assert source.count("await reopen_drawing(") == 2
+    assert source[:dirty_branch].count("await reopen_drawing(") == 1
+    assert source[dirty_branch:clean_branch].count("await reopen_drawing(") == 1
+    assert source[clean_branch:].count("await reopen_drawing(") == 0
     assert '"GetSaveFlag"' in source
     assert "save skipped" in source
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("scale_state", "expected_reopens", "expected_native_saves", "expected_exports"),
+    [
+        ("clean", 1, 0, 1),
+        ("dirty", 2, 1, 2),
+    ],
+)
+async def test_finalize_reopens_again_only_after_a_dirty_scale_save(
+    monkeypatch,
+    tmp_path,
+    scale_state,
+    expected_reopens,
+    expected_native_saves,
+    expected_exports,
+):
+    """Exercise both persistence paths without a SolidWorks COM seat."""
+    dirty = scale_state == "dirty"
+    sheet = SimpleNamespace(
+        SetScale=lambda *_args: True,
+        GetProperties2=lambda: [0, 0, 1.0, 1.0, False, 0.0, 0.0, False],
+        GetName=lambda: "Sheet1",
+        CustomPropertyView="",
+    )
+    model = SimpleNamespace(
+        ClearSelection2=lambda *_args: None,
+        EditRebuild3=lambda: True,
+        GetSheetNames=lambda: ("Sheet1",),
+        GetCurrentSheet=lambda: sheet,
+        ActivateSheet=lambda *_args: True,
+        GetSaveFlag=lambda: dirty,
+    )
+    adapter = _FakeAdapter(model)
+    counts = {"reopen": 0, "native_save": 0, "export": 0}
+
+    async def save_file(_path):
+        counts["native_save"] += 1
+        return SimpleNamespace(is_success=True, data=None)
+
+    async def reopen(_adapter, _path):
+        counts["reopen"] += 1
+        return model, sheet
+
+    def save_drawing(_adapter, drawing_path, *, pdf_path):
+        counts["export"] += 1
+        return {"drawing": drawing_path, "pdf": pdf_path}
+
+    adapter.save_file = save_file
+    view = SimpleNamespace(ReferencedDocument=SimpleNamespace())
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda obj, _type: obj)
+    monkeypatch.setattr(drawing_common, "iter_views", lambda _adapter: iter([view]))
+    monkeypatch.setattr(drawing_common, "view_name", lambda _adapter, _view: "View1")
+    monkeypatch.setattr(drawing_common, "read_required_properties", lambda *_a, **_k: {})
+    monkeypatch.setattr(_common, "apply_custom_properties", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing_common, "check_drawing_layout", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing_common, "save_drawing", save_drawing)
+    monkeypatch.setattr(drawing_common, "reopen_drawing", reopen)
+    monkeypatch.setattr(drawing_common, "assert_asme_b_sheet", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing_common, "sanitize_pdf_metadata", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing_common, "render_pdf_png", lambda *_a, **_k: None)
+
+    outputs = drawing_common.DrawingOutputs(
+        slddrw=tmp_path / "drawing.SLDDRW",
+        pdf=tmp_path / "drawing.pdf",
+        png=tmp_path / "drawing.png",
+    )
+    artifacts = await drawing_common.finalize_drawing(
+        adapter,
+        outputs,
+        pdf_title="Test drawing",
+    )
+
+    assert counts == {
+        "reopen": expected_reopens,
+        "native_save": expected_native_saves,
+        "export": expected_exports,
+    }
+    assert set(artifacts) == {"drawing", "pdf", "png"}
 
 
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):

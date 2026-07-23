@@ -4198,7 +4198,7 @@ async def finalize_drawing(
     # Export the PDF while the just-authored drawing is still fully loaded.
     # A large drawing can reopen view-only even when its referenced views report
     # loaded; SolidWorks then rejects PDF SaveAs3 with 0x1001. The SLDDRW is
-    # still reopened below twice and validated as the persisted source artifact.
+    # still reopened below and validated as the persisted source artifact.
     artifacts = save_drawing(
         adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
     )
@@ -4243,9 +4243,9 @@ async def finalize_drawing(
             raise RuntimeError(
                 "PDF re-export after dirty-scale save failed: " f"{retry!r}"
             )
+        drawing_model, sheet = await reopen_drawing(adapter, outputs.slddrw)
     if not sheet_scale_dirty:
         _telemetry.info("final drawing sheet scale already persisted; save skipped")
-    drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
     final_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
     if final_names != sheet_names:
