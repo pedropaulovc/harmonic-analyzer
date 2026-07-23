@@ -33,6 +33,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from build_platen_guide import GUIDE_LENGTH
 from build_platen_guide import HOLE_X as THROUGH_X
 from build_platen_guide import SCREW_STATION_X as BLIND_X
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -54,10 +55,10 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The 1:1 front view is 300 mm long and centred at sheet X=0.190 m, so its
-# left end is X=0.040 m.  The circular-edge pick Y was measured and then
-# read-validated against every expected attached entity in live SolidWorks.
-FRONT_LEFT_X_M = 0.040
+# The 1:1 front view is centred at sheet X=0.190 m. Derive its left edge from
+# the resized guide so hole-table and datum anchors follow the part geometry.
+FRONT_VIEW_X_M = 0.190
+FRONT_LEFT_X_M = FRONT_VIEW_X_M - GUIDE_LENGTH / 2000.0
 FRONT_VIEW_Y_M = 0.110
 FRONT_HOLE_Y_M = 0.1111
 FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
@@ -75,7 +76,7 @@ THREAD_TAP_DRILL_MM = 2.261
 
 
 def _bottom_surface_edge(view: Any) -> Any:
-    """Return the guide's 300 mm model edge on the bottom datum surface."""
+    """Return the guide's full-length model edge on the bottom datum surface."""
     candidates: list[tuple[float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="platen-guide bottom edge"):
         edge = _early_bound(raw_edge, "IEdge", "GetStartVertex", "GetEndVertex")
@@ -93,7 +94,7 @@ def _bottom_surface_edge(view: Any) -> Any:
     if not candidates:
         raise RuntimeError("front view has no model edge on the guide bottom surface")
     span_mm, edge = max(candidates, key=lambda item: item[0])
-    if span_mm < 299.9:
+    if span_mm < GUIDE_LENGTH - 0.1:
         raise RuntimeError(f"guide bottom edge span is only {span_mm:.3f} mm")
     return edge
 
@@ -136,10 +137,10 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(
-        adapter, str(SOURCE), "*Front", 0.190, FRONT_VIEW_Y_M, scale=(1, 1)
+        adapter, str(SOURCE), "*Front", FRONT_VIEW_X_M, FRONT_VIEW_Y_M, scale=(1, 1)
     )
     right = place_view(adapter, str(SOURCE), "*Right", 0.370, 0.110, scale=(1, 1))
-    # A 300 mm bar drawn isometrically at the 1:1 sheet scale spans ~237 x 133 mm,
+    # The guide drawn isometrically at the 1:1 sheet scale fills most of the
     # so this view's outline nearly fills the sheet's upper half: at y=0.210 its
     # top ran 11.2 mm into the 12.7 mm zone band. Dropped to 0.196 (~2.8 mm of
     # top clearance). It cannot shrink instead -- a view at a scale other than
@@ -167,7 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Keep only overall length; hole coordinates live in the native hole table.
     curate_view_dimensions(
-        adapter, front, keep={"Length": (0.190, 0.135)}, view_label="front"
+        adapter, front, keep={"Length": (FRONT_VIEW_X_M, 0.135)}, view_label="front"
     )
     curate_view_dimensions(
         adapter,

@@ -20,6 +20,7 @@ from _assembly_drawing_bom import (
     insert_identified_bom_table,
 )
 from _common import _early_bound, check, run_build
+from _chain import LINK_COUNT
 from _drawing_common import (
     DrawingOutputs,
     add_component_bom_balloons,
@@ -101,7 +102,7 @@ ASSEMBLY_NOTES = "\n".join(
         "   VERIFY FREE X TRAVEL.",
         "2. LOCK 120T DISC AND 12T FEED PINION COAXIAL",
         "   ON THE STUD.",
-        "3. ROUTE ALTERNATING 56-LINK CHAIN AROUND",
+        f"3. ROUTE ALTERNATING {LINK_COUNT}-LINK CHAIN AROUND",
         "   T24 AND T12 SPROCKETS.",
         "4. VERIFY CRANK ROTATION FEEDS THE PLATEN",
         "   WITHOUT BINDING.",
