@@ -26,7 +26,7 @@ from _drawing_layout_check import (
     audit_layout,
     format_findings,
 )
-from _drawing_registry import PROJECT_DRWDOT
+from _drawing_registry import DRAWING_TEMPLATES, DrawingCategory
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -182,9 +182,9 @@ _NOMINAL_BALLOON_HALF_M = 0.006
 # this is only the clearance between them, not a stand-in for the circle itself.
 _BALLOON_CLEARANCE_M = 0.0015
 
-# The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
-# format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
-# None), so its occupied region is reserved here as a fixed keep-out box. Any
+# The hand-made category DRWDOTs bake the shared title block in as sheet-format
+# lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is None),
+# so its occupied region is reserved here as a fixed keep-out box. Any
 # element overlapping it fails the audit, so content can never land on the title
 # block (Codex #269 threads 4). These MUST track the manual template -- if the
 # title block moves, re-measure with the sheet-view annotation dump (probe via
@@ -1185,28 +1185,31 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
 def new_project_drawing(
     adapter: Any,
     *,
+    category: DrawingCategory = DrawingCategory.PART,
     property_view: str | None = None,
     scale: tuple[float, float] = (1.0, 1.0),
     decimals: int = 2,
 ) -> tuple[Any, Any]:
-    """Create a drawing from the hand-made project template.
+    """Create a drawing from its hand-made category template.
 
-    The template embeds its own ASME B sheet format (title block, tolerance
-    block, projection symbol), so there is no SetupSheet6 format re-apply; the
-    only per-drawing knobs are the sheet scale (here) and WHICH view's model
-    feeds the sheet's $PRPSHEET property links -- linked in finalize_drawing,
-    once views exist (SolidWorks silently ignores a CustomPropertyView naming a
-    view that does not exist yet, falling back to 'Default' = first view).
+    Every category template embeds its own ASME B sheet format (title block,
+    tolerance block, projection symbol and drawing-type identity), so there is
+    no SetupSheet6 format re-apply; the only per-drawing knobs are the sheet
+    scale (here) and WHICH view's model feeds the sheet's $PRPSHEET property
+    links -- linked in finalize_drawing, once views exist (SolidWorks silently
+    ignores a CustomPropertyView naming a view that does not exist yet, falling
+    back to 'Default' = first view).
     ``property_view`` is accepted for compatibility and unused.
     """
     _ = property_view
-    if not PROJECT_DRWDOT.is_file() or PROJECT_DRWDOT.stat().st_size == 0:
+    template = DRAWING_TEMPLATES[category]
+    if not template.is_file() or template.stat().st_size == 0:
         raise FileNotFoundError(
-            f"project drawing standard is missing: {PROJECT_DRWDOT}")
+            f"project {category.value} drawing standard is missing: {template}")
 
     draw = new_drawing(
         adapter,
-        template=str(PROJECT_DRWDOT),
+        template=str(template),
         width=ASME_B_WIDTH_M,
         height=ASME_B_HEIGHT_M,
     )

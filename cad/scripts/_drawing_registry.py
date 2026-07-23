@@ -9,16 +9,28 @@ release artifact lists in lockstep as the book's drawing set grows.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_ROOT = SCRIPTS_DIR.parent
 TEMPLATES_DIR = CAD_ROOT / "templates"
+class DrawingCategory(StrEnum):
+    PART = "part"
+    GEAR = "gear"
+    SCHEDULE = "schedule"
+    ASSEMBLY = "assembly"
+
+
 # Hand-made in SolidWorks (title block, tolerance block, embedded ASME B sheet
-# format) -- NOT generated; see cad/templates/README.md. The template
-# embeds its own sheet format, so there is no separate .slddrt.
-PROJECT_DRWDOT = TEMPLATES_DIR / "harmonic-analyzer.DRWDOT"
+# format) -- NOT generated; see cad/templates/README.md. Each category owns the
+# static identity of its sheet; all templates embed their sheet format, so
+# there is no separate .slddrt.
+DRAWING_TEMPLATES = {
+    category: TEMPLATES_DIR / f"harmonic-analyzer-{category.value}.DRWDOT"
+    for category in DrawingCategory
+}
 
 
 @dataclass(frozen=True)
@@ -30,6 +42,7 @@ class DrawingSpec:
     # "part" (default) draws a cad/out/sldprt SLDPRT; "assembly" draws the
     # cad/out/sldasm SLDASM of the assembly build named by ``part``.
     source_kind: str = "part"
+    category: DrawingCategory = DrawingCategory.PART
 
     @property
     def script(self) -> Path:
@@ -58,7 +71,7 @@ class DrawingSpec:
 
     @property
     def assets(self) -> tuple[Path, ...]:
-        return (PROJECT_DRWDOT,)
+        return (DRAWING_TEMPLATES[self.category],)
 
 
 DRAWINGS: tuple[DrawingSpec, ...] = (
@@ -122,6 +135,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="pen-assembly",
         script_name="draw_pen_assembly.py",
         source_kind="assembly",
+        category=DrawingCategory.ASSEMBLY,
     ),
     DrawingSpec(
         name="pinion_lift_rod",
@@ -278,12 +292,14 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="counter_spring",
         artifact_stem="counter-spring",
         script_name="draw_counter_spring.py",
+        category=DrawingCategory.SCHEDULE,
     ),
     DrawingSpec(
         name="channel_spring_installed",
         part="channel_spring_installed",
         artifact_stem="channel-spring-installed",
         script_name="draw_channel_spring_installed.py",
+        category=DrawingCategory.SCHEDULE,
     ),
     DrawingSpec(
         name="spring_hook",
@@ -398,48 +414,56 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="cylinder_gear",
         artifact_stem="cylinder-gear",
         script_name="draw_cylinder_gear.py",
+        category=DrawingCategory.GEAR,
     ),
     DrawingSpec(
         name="cone_gear",
         part="cone_gear",
         artifact_stem="cone-gear",
         script_name="draw_cone_gear.py",
+        category=DrawingCategory.GEAR,
     ),
     DrawingSpec(
         name="crank_drive_gear",
         part="crank_drive_gear",
         artifact_stem="crank-drive-gear",
         script_name="draw_crank_drive_gear.py",
+        category=DrawingCategory.GEAR,
     ),
     DrawingSpec(
         name="crank_pinion",
         part="crank_pinion",
         artifact_stem="crank-pinion",
         script_name="draw_crank_pinion.py",
+        category=DrawingCategory.GEAR,
     ),
     DrawingSpec(
         name="alignment_pinion",
         part="alignment_pinion",
         artifact_stem="alignment-pinion",
         script_name="draw_alignment_pinion.py",
+        category=DrawingCategory.GEAR,
     ),
     DrawingSpec(
         name="rack_pinion",
         part="rack_pinion",
         artifact_stem="rack-pinion",
         script_name="draw_rack_pinion.py",
+        category=DrawingCategory.GEAR,
     ),
     DrawingSpec(
         name="transgear_feed_pinion",
         part="transgear_feed_pinion",
         artifact_stem="transgear-feed-pinion",
         script_name="draw_transgear_feed_pinion.py",
+        category=DrawingCategory.GEAR,
     ),
     DrawingSpec(
         name="transgear_pinion",
         part="transgear_pinion",
         artifact_stem="transgear-pinion",
         script_name="draw_transgear_pinion.py",
+        category=DrawingCategory.GEAR,
     ),
     DrawingSpec(
         name="cone_gear_shaft",
@@ -585,6 +609,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="summing-assembly",
         script_name="draw_summing_assembly.py",
         source_kind="assembly",
+        category=DrawingCategory.ASSEMBLY,
     ),
     DrawingSpec(
         name="channel_assembly",
@@ -592,6 +617,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="channel-assembly",
         script_name="draw_channel_assembly.py",
         source_kind="assembly",
+        category=DrawingCategory.ASSEMBLY,
     ),
     DrawingSpec(
         name="drive_train_assembly",
@@ -599,6 +625,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="drive-train-assembly",
         script_name="draw_drive_train_assembly.py",
         source_kind="assembly",
+        category=DrawingCategory.ASSEMBLY,
     ),
     DrawingSpec(
         name="frame_assembly",
@@ -606,6 +633,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="frame-assembly",
         script_name="draw_frame_assembly.py",
         source_kind="assembly",
+        category=DrawingCategory.ASSEMBLY,
     ),
     DrawingSpec(
         name="magnifier_assembly",
@@ -613,6 +641,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="magnifier-assembly",
         script_name="draw_magnifier_assembly.py",
         source_kind="assembly",
+        category=DrawingCategory.ASSEMBLY,
     ),
     DrawingSpec(
         name="paper_drive_assembly",
@@ -620,6 +649,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="paper-drive-assembly",
         script_name="draw_paper_drive_assembly.py",
         source_kind="assembly",
+        category=DrawingCategory.ASSEMBLY,
     ),
     DrawingSpec(
         name="harmonic_analyzer_assembly",
@@ -627,6 +657,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="harmonic-analyzer-assembly",
         script_name="draw_harmonic_analyzer_assembly.py",
         source_kind="assembly",
+        category=DrawingCategory.ASSEMBLY,
     ),
 )
 

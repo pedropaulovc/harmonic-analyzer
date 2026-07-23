@@ -124,7 +124,11 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
         ),
     )
-    drawing_model, sheet = new_project_drawing(adapter, property_view=PART_STEM)
+    drawing_model, sheet = new_project_drawing(
+        adapter,
+        category=SPEC.category,
+        property_view=PART_STEM,
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,

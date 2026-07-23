@@ -55,7 +55,7 @@ def test_dodo_deps_use_the_sldasm_recipe_and_exact_assembly_token() -> None:
         for dep in deps
     )
     assert dodo._assembly_execution_token("harmonic-analyzer") in deps
-    assert any(dep.endswith("harmonic-analyzer.DRWDOT") for dep in deps)
+    assert any(dep.endswith("harmonic-analyzer-assembly.DRWDOT") for dep in deps)
 
 
 def test_dodo_yields_the_assembly_drawing_task() -> None:

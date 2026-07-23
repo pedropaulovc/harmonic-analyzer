@@ -2,8 +2,8 @@ r"""Create the curated assembly drawing for the pen subassembly.
 
 The first ASSEMBLY drawing (source_kind="assembly" in the registry): front /
 right / isometric views of ``cad/out/sldasm/pen.SLDASM`` plus a top-level
-parts BOM and auto-inserted item-number balloons, on the same hand-made ASME B
-template every part print uses. The title block resolves from the custom
+parts BOM and auto-inserted item-number balloons, on the assembly-category
+ASME B template. The title block resolves from the custom
 properties ``build_pen_assembly.py`` stamps on the assembly (Number, Revision,
 SEE PARTS LIST material/finish, and the TOL_* cells ``finalize_drawing``
 requires).
@@ -107,7 +107,11 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(adapter, scale=SHEET_SCALE)
+    drawing_model, _sheet = new_project_drawing(
+        adapter,
+        category=SPEC.category,
+        scale=SHEET_SCALE,
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,

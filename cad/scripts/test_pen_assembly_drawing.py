@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 
 import draw_pen_assembly as drawing
-from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, DrawingCategory
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -22,6 +22,7 @@ def _load_dodo():
 def test_registry_row_resolves_the_assembly_source() -> None:
     spec = DRAWINGS_BY_NAME["pen_assembly"]
     assert spec.source_kind == "assembly"
+    assert spec.category == DrawingCategory.ASSEMBLY
     assert spec.part == "pen"
     assert spec.source.as_posix().endswith("/out/sldasm/pen.SLDASM")
     assert spec.script == Path(drawing.__file__).resolve()
@@ -49,12 +50,13 @@ def test_dodo_deps_use_the_sldasm_recipe_and_exact_assembly_token() -> None:
     assert any(dep.replace("\\", "/").endswith("/out/sldasm/pen.SLDASM") for dep in deps)
     assert dodo._assembly_execution_token("pen") in deps
     assert dodo._part_execution_token("pen") not in deps
-    assert any(dep.endswith("harmonic-analyzer.DRWDOT") for dep in deps)
+    assert any(dep.endswith("harmonic-analyzer-assembly.DRWDOT") for dep in deps)
     # Regression: part drawings keep their execution-token identity dep.
     part_deps = dodo._drawing_file_deps("fulcrum_shaft")
     assert any(dep.endswith(".fulcrum-shaft.execution") for dep in part_deps)
     assert any(dep.replace("\\", "/").endswith("/out/sldprt/fulcrum-shaft.SLDPRT")
                for dep in part_deps)
+    assert any(dep.endswith("harmonic-analyzer-part.DRWDOT") for dep in part_deps)
 
 
 def test_dodo_yields_the_assembly_drawing_task() -> None:

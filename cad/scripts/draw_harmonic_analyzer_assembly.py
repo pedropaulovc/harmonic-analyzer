@@ -145,7 +145,9 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
         ),
     )
-    drawing_model, _sheet = new_project_drawing(adapter, scale=SHEET_SCALE)
+    drawing_model, _sheet = new_project_drawing(
+        adapter, category=SPEC.category, scale=SHEET_SCALE
+    )
     create_blank_drawing_sheets(
         adapter, SHEET_NAMES, label="harmonic-analyzer drawing"
     )

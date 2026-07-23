@@ -14,8 +14,7 @@ import _drawing_common as common
 import cut_release
 import draw_platen_guide as drawing
 import build_platen_guide as guide
-import _drawing_common as drawing_common
-from _drawing_registry import DRAWINGS, PROJECT_DRWDOT
+from _drawing_registry import DRAWINGS, DRAWING_TEMPLATES, DrawingCategory
 from _drawing_common import (
     _assert_third_angle_order,
     _contact_preview_grid,
@@ -74,8 +73,8 @@ def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
         append_images=pages[1:],
         resolution=72,
     )
-    monkeypatch.setattr(drawing_common, "ASME_B_DPI", 30)
-    monkeypatch.setattr(drawing_common, "ASME_B_PNG_SIZE", (510, 330))
+    monkeypatch.setattr(common, "ASME_B_DPI", 30)
+    monkeypatch.setattr(common, "ASME_B_PNG_SIZE", (510, 330))
 
     render_pdf_png(pdf, png, expected_pages=5)
 
@@ -152,7 +151,7 @@ def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
     assert "scale=(3, 1)" not in drawing_source
     assert "scale=(1, 4)" not in drawing_source
     # (The sheet-scale property link now lives inside the hand-made
-    # harmonic-analyzer.DRWDOT binary -- not greppable; verified by eye on the
+    # category DRWDOT binaries -- not greppable; verified by eye on the
     # rendered sheets.)
 
 
@@ -248,8 +247,26 @@ def test_drawing_registry_is_unique_and_extensible() -> None:
     assert len({spec.part for spec in DRAWINGS}) == len(DRAWINGS)
     outputs = [path for spec in DRAWINGS for path in spec.outputs.values()]
     assert len(set(outputs)) == len(outputs)
-    assert PROJECT_DRWDOT.suffix.lower() == ".drwdot"
-    assert PROJECT_DRWDOT.is_file() and PROJECT_DRWDOT.stat().st_size > 0
+    assert set(DRAWING_TEMPLATES) == set(DrawingCategory)
+    assert {spec.category for spec in DRAWINGS} == set(DrawingCategory)
+    assert all(template.suffix.lower() == ".drwdot"
+               for template in DRAWING_TEMPLATES.values())
+    assert all(template.is_file() and template.stat().st_size > 0
+               for template in DRAWING_TEMPLATES.values())
+    assert all(spec.assets == (DRAWING_TEMPLATES[spec.category],)
+               for spec in DRAWINGS)
+    assert {
+        category: sum(spec.category == category for spec in DRAWINGS)
+        for category in DrawingCategory
+    } == {
+        DrawingCategory.PART: 75,
+        DrawingCategory.GEAR: 8,
+        DrawingCategory.SCHEDULE: 2,
+        DrawingCategory.ASSEMBLY: 8,
+    }
+    for spec in DRAWINGS:
+        source = spec.script.read_text(encoding="utf-8")
+        assert "category=SPEC.category" in source
 
 
 def test_projection_symbol_requires_third_angle_order() -> None:

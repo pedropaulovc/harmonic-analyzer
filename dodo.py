@@ -116,8 +116,8 @@ from _buildgraph import (  # noqa: E402
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 from _drawing_registry import (  # noqa: E402
+    DRAWING_TEMPLATES,
     DRAWINGS_BY_NAME,
-    PROJECT_DRWDOT,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -1807,7 +1807,8 @@ def task_check():
             "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
                          *recipe_test_deps,
                          *_CONFIG_YAMLS,
-                         str(PROJECT_DRWDOT.resolve())],
+                         *(str(path.resolve())
+                           for path in DRAWING_TEMPLATES.values())],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },
         "cache": {

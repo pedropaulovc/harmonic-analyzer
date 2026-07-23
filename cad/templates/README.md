@@ -20,15 +20,27 @@ get-only ones drift from the config). The template is a `file_dep` of every
 part task (`dodo.PART_TEMPLATE`), so editing it rebuilds all parts and busts
 their cache keys.
 
-## harmonic-analyzer.DRWDOT — drawing template
+## Drawing templates
 
-Used by every manufacturing drawing: an ASME B landscape sheet with the
-border/zone geometry, title block, tolerance block and third-angle projection
-symbol drawn directly in the template. The sheet format is embedded in the
-template, so there is no separate `.slddrt`; per-drawing setup only sets the
-sheet scale (`_drawing_common.new_project_drawing`) and links the sheet's
-custom-property view to the first drawing view
-(`_drawing_common.finalize_drawing`).
+Four category templates own the static identity of the drawing while sharing
+the same ASME B landscape border/zone geometry, title block, tolerance block
+and third-angle projection symbol:
+
+- `harmonic-analyzer-part.DRWDOT` — ordinary component drawings
+- `harmonic-analyzer-gear.DRWDOT` — the eight gear/toothed-member drawings
+- `harmonic-analyzer-schedule.DRWDOT` — spring schedule/specification sheets
+- `harmonic-analyzer-assembly.DRWDOT` — BOM/balloon assembly drawings
+
+Their title blocks visibly say PART, GEAR, SCHEDULE or ASSEMBLY, and the saved
+sheet name carries the same identity. `_drawing_registry.DrawingCategory` is
+the source of truth; each drawing task depends only on its category template,
+so changing assembly or gear sheet defaults does not invalidate unrelated
+part drawings.
+
+Each template embeds its sheet format, so there is no separate `.slddrt`;
+per-drawing setup only sets the sheet scale
+(`_drawing_common.new_project_drawing`) and links the sheet's custom-property
+view to the first drawing view (`_drawing_common.finalize_drawing`).
 
 `third-angle-projection.SLDBLK` is the projection-symbol block the title block
 embeds, kept alongside as the editable source for future template work.
@@ -55,9 +67,9 @@ custom properties via `$PRPSHEET` — `Number` / `Revision` / `Title` and the
 `finalize_drawing` requires the `TOL_*` set on the linked model, so a stale
 source part fails loud instead of saving blank tolerance cells.
 
-The edge-break policy is authored directly in the template as `R0.25 OR
-CHAMFER 0.25 MAX`. Keep generic drawing-wide notes in the template rather than
-rewriting them through COM for every generated drawing.
+The edge-break policy is authored directly in all four templates as `R0.25 OR
+CHAMFER 0.25 MAX`. Keep generic drawing-wide notes synchronized across the
+templates rather than rewriting them through COM for every generated drawing.
 
 The title block's UNIT cell currently reads **mm**, matching the generated
 drawing views (which dimension in mm until the inch migration, issue #290,

@@ -599,12 +599,25 @@ def test_drawing_runtime_lock_and_source_dependency(monkeypatch):
         "platen-guide.pdf",
         "platen-guide_drawing.png",
     }
-    assert "harmonic-analyzer.drwdot" in {name.lower() for name in dep_names}
+    assert "harmonic-analyzer-part.drwdot" in {name.lower() for name in dep_names}
 
     build_deps = set(dodo.task_build()["task_dep"])
     bare_deps = set(dodo.task_build_bare()["task_dep"])
     assert drawing in build_deps
     assert drawing not in bare_deps
+
+
+def test_each_drawing_depends_only_on_its_category_template():
+    """A category-only template edit must not invalidate unrelated drawings."""
+    dodo = _load_dodo()
+    tasks = {task["name"]: task for task in dodo.task_drawing()}
+    for name, spec in dodo.DRAWINGS_BY_NAME.items():
+        template_deps = {
+            Path(path).resolve()
+            for path in tasks[name]["file_dep"]
+            if path.lower().endswith(".drwdot")
+        }
+        assert template_deps == {spec.assets[0].resolve()}
 
 
 def test_assembly_artefact_digest_folds_in_refs():

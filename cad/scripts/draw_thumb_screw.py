@@ -39,7 +39,12 @@ RECIPE = FastenerSheet(
 
 async def build(adapter: Any) -> dict[str, str]:
     return await build_fastener_sheet(
-        adapter, source=SOURCE, property_view=PART_STEM, outputs=OUTPUTS, recipe=RECIPE
+        adapter,
+        source=SOURCE,
+        category=SPEC.category,
+        property_view=PART_STEM,
+        outputs=OUTPUTS,
+        recipe=RECIPE,
     )
 
 
