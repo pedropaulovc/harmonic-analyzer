@@ -66,10 +66,19 @@ def test_wire_geom_split_keeps_notes_out_of_consumer_recipes() -> None:
     # never from build_lever_wire, whose lever_wire_spec import would drag the
     # sheet notes into their recipe closures and cache keys.
     assert Path(part.__file__).with_name("lever_wire_geom.py").exists()
-    for consumer in ("build_magnifier_assembly.py", "build_magnifying_wheel.py"):
+    for consumer in (
+        "build_magnifier_assembly.py",
+        "build_magnifying_wheel.py",
+        "verify.py",
+    ):
         source = Path(part.__file__).with_name(consumer).read_text(encoding="utf-8")
-        assert "from lever_wire_geom import" in source
+        if consumer == "verify.py":
+            assert "import lever_wire_geom as _wire" in source
+            assert "_wire." in source
+        else:
+            assert "from lever_wire_geom import" in source
         assert "from build_lever_wire import" not in source
+        assert "_hw." not in source
 
     verify_source = Path(part.__file__).with_name("verify.py").read_text(
         encoding="utf-8"
