@@ -42,6 +42,12 @@ per-drawing setup only sets the sheet scale
 (`_drawing_common.new_project_drawing`) and links the sheet's custom-property
 view to the first drawing view (`_drawing_common.finalize_drawing`).
 
+The document defaults also pin dimension leaders to bent-leader + horizontal
+text for every SolidWorks dimension scope (general, angle, arc length, chamfer,
+diameter, hole, linear, ordinate, radius and angular-running). Keep that policy
+in all four templates. Do not restore the former per-drawing loop of 10 setters
+and 10 readbacks; the template is the document setting's natural source.
+
 `third-angle-projection.SLDBLK` is the projection-symbol block the title block
 embeds, kept alongside as the editable source for future template work.
 

@@ -46,8 +46,10 @@ stays on `swSolidLeaderAlignedText`. It only takes under a
 **TRAP 2 — the umbrella `swDetailingDimension` (200) does NOT propagate.** After
 setting it, every per-type scope still reads 1. All ten (200..209) must be set
 explicitly and read back, or linear/radius/diameter dimensions keep rotated text
-while the umbrella reports success. See `_pin_dimension_text_and_leader_style` /
-`_DIM_DETAILING_SCOPES` in `_drawing_common.py`.
+while the umbrella reports success. The ten values now live in all four category
+DRWDOT files. A live read-back after saving each template proved every 200..209
+scope persisted value 2. Do not restore the former per-drawing loop: it cost
+0.162–0.179 s for 10 setters + 10 readbacks on every sheet.
 
 Always read the preference back: both traps fail SILENTLY (a False return and a
 stale value), never by raising.

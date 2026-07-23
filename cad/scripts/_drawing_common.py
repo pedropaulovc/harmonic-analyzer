@@ -134,45 +134,6 @@ _LEADER_SIDE_SMART = 0
 # notes / GTols / surface-finish / weld / datum-target / block instances only);
 # a dimension's leader+text style comes from this DOCUMENT property instead,
 # with IDisplayDimension::SetBrokenLeader2 as the per-dimension override.
-# swBrokenLeaderHorizontalText delivers BOTH requirements at once: the leader is
-# broken (bent) and the text is always horizontal rather than rotated to follow
-# the leader.
-#
-# These ints are READ OFF the installed swconst.tlb, not the published docs: the
-# API reference prints "See System Options and Document Properties" instead of a
-# value for every swUserPreferenceIntegerValue_e / swUserPreferenceOption_e
-# member, and that page documents none of them. Re-read them from the type
-# library (swconst.tlb, SOLIDWORKS Constant type library) rather than guessing
-# if they ever need revisiting.
-_PREF_DIM_TEXT_AND_LEADER_STYLE = 372
-_BROKEN_LEADER_HORIZONTAL_TEXT = 2
-
-# swUserPreferenceOption_e's dimension scopes. Two live-probed facts pin this
-# list, neither of them documented:
-#
-#  * the style REQUIRES a dimension scope -- writing it under
-#    swDetailingNoOptionSpecified(0) returns False and leaves the document on
-#    swSolidLeaderAlignedText(1), the aligned-text default this fix exists to
-#    replace; and
-#  * the umbrella swDetailingDimension(200) does NOT propagate -- after setting
-#    it, every per-type scope still read 1, so a drawing whose dimensions are
-#    linear/radius/diameter would have kept rotated text.
-#
-# So every scope is set explicitly and read back. Values are from swconst.tlb
-# (the docs print no integer for any swUserPreferenceOption_e member).
-_DIM_DETAILING_SCOPES = {
-    "swDetailingDimension": 200,
-    "swDetailingAngleDimension": 201,
-    "swDetailingArcLengthDimension": 202,
-    "swDetailingChamferDimension": 203,
-    "swDetailingDiameterDimension": 204,
-    "swDetailingHoleDimension": 205,
-    "swDetailingLinearDimension": 206,
-    "swDetailingOrdinateDimension": 207,
-    "swDetailingRadiusDimension": 208,
-    "swDetailingAngularRunningDimension": 209,
-}
-
 # A circular 2-character BOM balloon renders ~10-12 mm across at the template
 # font; its GetExtent is leader-polluted (see _note_element), so it gets this
 # nominal half-span box around its IAnnotation.GetPosition anchor instead.
@@ -1180,40 +1141,6 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     return seed_count, instance_count
 
 
-def _pin_dimension_text_and_leader_style(draw: Any) -> None:
-    """Force every dimension on ``draw`` to a bent leader with HORIZONTAL text.
-
-    Set on the DOCUMENT (``IModelDocExtension::SetUserPreferenceInteger``), not
-    the application, so a build can never drift the seat's global preferences.
-
-    This is the only mechanism that reaches dimensions: ``SetLeader3`` covers
-    notes / GD&T / surface-finish symbols but explicitly not dimensions. Read
-    back and raise on mismatch -- the preference's value enum is undocumented
-    (read from swconst.tlb), so a silent no-op is exactly the failure mode to
-    guard against.
-    """
-    for name, option in _DIM_DETAILING_SCOPES.items():
-        ok = draw.Extension.SetUserPreferenceInteger(
-            _PREF_DIM_TEXT_AND_LEADER_STYLE, option, _BROKEN_LEADER_HORIZONTAL_TEXT
-        )
-        applied = int(
-            draw.Extension.GetUserPreferenceInteger(
-                _PREF_DIM_TEXT_AND_LEADER_STYLE, option
-            )
-        )
-        if not ok or applied != _BROKEN_LEADER_HORIZONTAL_TEXT:
-            raise RuntimeError(
-                "failed to pin dimension text/leader style to broken-leader + "
-                f"horizontal-text for {name} (set returned {ok!r}, document "
-                f"reads {applied})"
-            )
-    _telemetry.event(
-        "drawing.dim_text_leader_style",
-        style=_BROKEN_LEADER_HORIZONTAL_TEXT,
-        scopes=len(_DIM_DETAILING_SCOPES),
-    )
-
-
 def new_project_drawing(
     adapter: Any,
     *,
@@ -1261,7 +1188,6 @@ def new_project_drawing(
     # next to the ±0.25 blanket tolerance. A drawing that genuinely needs finer
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
-    _pin_dimension_text_and_leader_style(draw)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
@@ -3812,8 +3738,8 @@ def _display_dimension_leader_segments(
     #3605215320), and it is not hypothetical: pen-rod's callout text sits at
     sheet (0.104, 0.222), OUTSIDE its owning view (x 0.062..0.078).
 
-    Read the REAL rendered ink, not a reconstruction. ``_pin_dimension_text_and_
-    leader_style`` forces every dimension to ``swBrokenLeaderHorizontalText``, so
+    Read the REAL rendered ink, not a reconstruction. The category drawing
+    templates force every dimension to ``swBrokenLeaderHorizontalText``, so
     the leader is BENT -- a sloped run from the arrow up to an elbow, then a
     horizontal shoulder to the text. A straight attachment->text chord misses
     that elbow: it can fail a clean print or miss a real crossing when the bent
