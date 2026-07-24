@@ -46,6 +46,74 @@ class _FakeAttemptAdapter:
             return default
 
 
+class _RetryExtension:
+    def __init__(self, failures: int) -> None:
+        self.failures = failures
+        self.calls = 0
+
+    def SelectByID2(self, *_args) -> bool:
+        self.calls += 1
+        return self.calls > self.failures
+
+
+class _RetrySelectionManager:
+    selected = object()
+
+    @staticmethod
+    def GetSelectedObjectCount2(_mark: int) -> int:
+        return 1
+
+    def GetSelectedObject6(self, _index: int, _mark: int):
+        return self.selected
+
+
+class _RetryDrawing:
+    def __init__(self, failures: int) -> None:
+        self.Extension = _RetryExtension(failures)
+        self.SelectionManager = _RetrySelectionManager()
+        self.clears = 0
+        self.redraws = 0
+        self.rebuilds = 0
+
+    @staticmethod
+    def ActivateView(_name: str) -> bool:
+        return True
+
+    def ClearSelection2(self, _all_selections: bool) -> None:
+        self.clears += 1
+
+    def GraphicsRedraw2(self) -> None:
+        self.redraws += 1
+
+    def EditRebuild3(self) -> None:
+        self.rebuilds += 1
+
+
+@pytest.mark.parametrize(("failures", "rebuilds"), ((1, 0), (2, 1)))
+def test_coordinate_selection_recovers_after_redraw_and_rebuild(
+    monkeypatch: pytest.MonkeyPatch,
+    failures: int,
+    rebuilds: int,
+) -> None:
+    drawing = _RetryDrawing(failures)
+    adapter = SimpleNamespace(currentModel=drawing)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(_drawing_common, "view_name", lambda *_args: "Drawing View1")
+
+    selected = _drawing_common._select_view_entity(
+        adapter,
+        object(),
+        "EDGE",
+        (0.15, 0.189),
+        label="bore datum",
+    )
+
+    assert selected is drawing.SelectionManager.selected
+    assert drawing.Extension.calls == failures + 1
+    assert drawing.redraws == failures
+    assert drawing.rebuilds == rebuilds
+
+
 def test_visible_cylindrical_face_uses_exact_radius_and_largest_area(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

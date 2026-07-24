@@ -155,12 +155,16 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
     gear_face = _largest_visible_planar_face(adapter, front)
 
-    # Datum A: the bore axis, selected by exact visible edge identity.
+    # Datum A: the bore axis (front view, 45-degree pick with the symbol above).
     datum_radial = math.sqrt(0.5)
+    bore_top = (
+        FRONT_CENTER[0] + BORE_R * datum_radial,
+        FRONT_CENTER[1] + BORE_R * datum_radial,
+    )
     add_datum_feature(
         adapter,
         front,
-        edge_entity=bore_edge,
+        edge_xy=bore_top,
         symbol_xy=(
             FRONT_CENTER[0] + (HALF_OD + 0.018) * datum_radial,
             FRONT_CENTER[1] + (HALF_OD + 0.018) * datum_radial,

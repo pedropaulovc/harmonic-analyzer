@@ -103,10 +103,9 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
             assert "position_tolerance_m=0.080" in source, module.__name__
             assert "shoulder=True" in source, module.__name__
             continue
-        assert "edge_xy=bore_top" not in source, module.__name__
+        assert "edge_xy=bore_top" in source, module.__name__
         assert "edge_xy=bore_bottom" not in source, module.__name__
-        assert source.count("edge_entity=bore_edge") == 1, module.__name__
-        assert source.count("\n        entity=bore_edge") == 1, module.__name__
+        assert source.count("entity=bore_edge") == 1, module.__name__
         expected_tolerance = (
             "position_tolerance_m=0.008"
             if module.__name__ == "draw_cylinder_gear"

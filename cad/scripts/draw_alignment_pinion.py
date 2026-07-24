@@ -138,10 +138,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # vertical with a horizontal line and emit a stray 90-degree ANGLE dim).
     # FACE WIDTH 143.2 is owned by the GEAR DATA block and the drum note.
 
+    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
         adapter,
         front,
-        edge_entity=bore_edge,
+        edge_xy=bore_top,
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.025),
         datum="A",
         label="drum bore axis",

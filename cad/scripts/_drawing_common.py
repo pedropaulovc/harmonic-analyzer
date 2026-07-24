@@ -250,11 +250,27 @@ def _select_view_entity(
         else:
             selected = bool(view.SelectEntity(entity, False))
     elif xy is not None:
-        selected = bool(
-            draw.Extension.SelectByID2(
-                "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
+        for attempt in range(1, 4):
+            selected = bool(
+                draw.Extension.SelectByID2(
+                    "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
+                )
             )
-        )
+            if selected:
+                if attempt > 1:
+                    _telemetry.info(
+                        f"recovered {label} {entity_type.lower()} coordinate "
+                        f"selection on attempt {attempt}",
+                        drawing_selection_recovered=True,
+                        drawing_label=label,
+                        entity_type=entity_type,
+                        selection_attempt=attempt,
+                    )
+                break
+            draw.ClearSelection2(True)
+            if attempt == 2:
+                draw.EditRebuild3()
+            draw.GraphicsRedraw2()
     if not selected:
         where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
         raise RuntimeError(

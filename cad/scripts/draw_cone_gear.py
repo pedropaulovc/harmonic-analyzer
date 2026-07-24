@@ -124,10 +124,11 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to gear bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
+    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
         adapter,
         front,
-        edge_entity=bore_edge,
+        edge_xy=bore_top,
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.028),
         datum="A",
         label="cone gear bore axis",
