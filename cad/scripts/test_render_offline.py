@@ -136,7 +136,7 @@ def test_camera_frame_metadata_preserves_authored_framing(
     _render, mask, offset = renderer.composite._fitted_render(
         pair_id,
         (50, 50),
-        {"scale": 1.0, "dx_px": 0, "dy_px": 0},
+        {"scale": 4.0, "dx_px": 99, "dy_px": -99},
     )
 
     assert offset == (0, 0)

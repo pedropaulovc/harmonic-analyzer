@@ -18,7 +18,7 @@ submodule).
 
 | path | tracked? | content |
 |---|---|---|
-| `manifest.json` | tracked | source of truth: pair id → reference, model, camera pose, 2D align, tier, status |
+| `manifest.json` | tracked | source of truth: pair id → reference, model, camera pose, legacy content-fit 2D align, tier, status |
 | `ATTRIBUTION.md` | tracked | CC BY credits/licensing for the reference photos (ships in every release bundle) |
 | `ref/<id>.jpg` | regen | prepared reference (cropped/rotated, ≤1600 px) — re-derived from the `references` submodule by `prepare_reference` |
 | `index.html` | regen | inspection gallery (tier + text filters; drag the ref⇆cad reveal slider) — `uv run comparisons/tools/gallery.py` |

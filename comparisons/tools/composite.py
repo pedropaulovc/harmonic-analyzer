@@ -77,7 +77,10 @@ def stale_stage(pair: dict, model_mtime: float) -> StaleStage | None:
     ):
         return "render"
     if (
-        meta.get("align") != pair.get("align")
+        (
+            meta.get("registration") != "camera_frame"
+            and meta.get("align") != pair.get("align")
+        )
         or not paths["cad"].exists()
         or not paths["blend"].exists()
     ):
@@ -229,24 +232,22 @@ def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
     Blender renders tagged ``camera_frame`` preserve the exact frame authored
     in Pose Studio, including its target and zoom. SolidWorks captures retain
     the legacy content-fit path because their window-aspect margins are not a
-    camera-frame contract. Both modes may apply a manifest 2D fine-alignment.
+    camera-frame contract. Only content-fit captures use the legacy manifest
+    2D fine-alignment; applying it to a camera frame would transform the pose a
+    second time.
     """
     align = align or {}
     ren = Image.open(pair_paths(pair_id)["render"])
     mask = _content_mask(ren, background=render_bg(pair_id))
     rw, rh = ref_size
-    scale = align.get("scale", 1.0)
     if render_metadata(pair_id).get("registration") == "camera_frame":
-        w, h = max(1, round(rw * scale)), max(1, round(rh * scale))
-        ren = ren.resize((w, h), Image.Resampling.LANCZOS)
-        mask = mask.resize((w, h), Image.Resampling.NEAREST)
-        dx = align.get("dx_px", 0) + (rw - w) // 2
-        dy = align.get("dy_px", 0) + (rh - h) // 2
-        return ren, mask, (dx, dy)
+        ren = ren.resize((rw, rh), Image.Resampling.LANCZOS)
+        mask = mask.resize((rw, rh), Image.Resampling.NEAREST)
+        return ren, mask, (0, 0)
 
     bbox = mask.getbbox() or (0, 0, ren.width, ren.height)
     ren, mask = ren.crop(bbox), mask.crop(bbox)
-    s = min(rw / ren.width, rh / ren.height) * scale
+    s = min(rw / ren.width, rh / ren.height) * align.get("scale", 1.0)
     w, h = max(1, round(ren.width * s)), max(1, round(ren.height * s))
     ren = ren.resize((w, h), Image.Resampling.LANCZOS)
     mask = mask.resize((w, h), Image.Resampling.NEAREST)
