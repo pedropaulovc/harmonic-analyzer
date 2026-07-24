@@ -28,9 +28,9 @@
         "el_deg": 9.26
       },
       "align": {
-        "scale": 1.13,
-        "dx_px": -7,
-        "dy_px": -233
+        "scale": 1.0,
+        "dx_px": 0,
+        "dy_px": 0
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -96,9 +96,9 @@
         "el_deg": 8.8
       },
       "align": {
-        "scale": 1.13,
-        "dx_px": -47,
-        "dy_px": -247
+        "scale": 1.0,
+        "dx_px": 0,
+        "dy_px": 0
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -130,9 +130,9 @@
         "el_deg": 7.8
       },
       "align": {
-        "scale": 1.08,
-        "dx_px": 7,
-        "dy_px": -193
+        "scale": 1.0,
+        "dx_px": 0,
+        "dy_px": 0
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -198,9 +198,9 @@
         "el_deg": 9.0
       },
       "align": {
-        "scale": 1.1,
-        "dx_px": 20,
-        "dy_px": -207
+        "scale": 1.0,
+        "dx_px": 0,
+        "dy_px": 0
       },
       "component_focus": [
         "harmonic_analyzer"
