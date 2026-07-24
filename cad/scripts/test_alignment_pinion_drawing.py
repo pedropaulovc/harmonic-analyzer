@@ -49,6 +49,8 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert source.count("add_surface_finish(") == 1
+    assert "edge_entity=bore_edge" in source
+    assert "edge_xy=bore_top" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

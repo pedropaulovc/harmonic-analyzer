@@ -23,12 +23,14 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_view_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    visible_cylindrical_face,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H
@@ -136,31 +138,6 @@ def _display_as_diameter(adapter: Any, dimension: Any, *, label: str) -> None:
     adapter.currentModel.EditRebuild3()
 
 
-def _add_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
-    """Insert the turned-part axis centerline between the barrel silhouettes."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"failed to activate drawing view {name!r}")
-    draw.ClearSelection2(True)
-    for index, (x, y) in enumerate((BARREL_TOP_EDGE, BARREL_BOTTOM_EDGE)):
-        selected = draw.Extension.SelectByID2(
-            "", "SILHOUETTE", x, y, 0.0, index > 0, 0, null_callout(), 0
-        )
-        if not selected:
-            raise RuntimeError(
-                f"failed to select {label} silhouette edge {index} at "
-                f"sheet ({x:g}, {y:g})"
-            )
-    centerline = ddoc.InsertCenterLine2()
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    if centerline is None:
-        raise RuntimeError(f"failed to insert the {label} axis centerline")
-    return centerline
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -221,7 +198,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    _add_axis_centerline(adapter, front, label="pen-marker")
+    barrel_face = visible_cylindrical_face(
+        adapter,
+        front,
+        BARREL_DIA,
+        label="pen-marker barrel face",
+    )
+    add_view_centerline(
+        adapter,
+        front,
+        face=barrel_face,
+        label="pen-marker axis centerline",
+    )
 
     _add_picked_dimension(
         adapter,

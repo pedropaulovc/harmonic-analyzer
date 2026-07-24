@@ -2133,6 +2133,46 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     return entities
 
 
+@_telemetry.traced("drawing.visible_cylindrical_face", label_param="label")
+def visible_cylindrical_face(
+    adapter: Any,
+    view: Any,
+    diameter_mm: float,
+    *,
+    label: str,
+) -> Any:
+    """Return the largest visible cylindrical face at ``diameter_mm``.
+
+    Sheet-coordinate face picks depend on the current drawing display state.
+    A visible model face carries stable drawing-view identity, so annotations
+    and centerlines should select that entity directly instead.
+    """
+    target_radius_mm = diameter_mm / 2.0
+    candidates: list[tuple[float, Any]] = []
+    seen_radii: list[float] = []
+    for raw_face in visible_view_entities(view, 3, label=label):
+        face = _early_bound(raw_face, "IFace2")
+        surface = face.GetSurface()
+        if surface is None:
+            continue
+        surface = _early_bound(surface, "ISurface")
+        if not surface.IsCylinder():
+            continue
+        radius_mm = float(surface.CylinderParams[6]) * 1000.0
+        seen_radii.append(radius_mm)
+        if abs(radius_mm - target_radius_mm) > 0.01:
+            continue
+        area = float(adapter._attempt(lambda f=face: f.GetArea(), default=0.0) or 0.0)
+        candidates.append((area, face))
+    if not candidates:
+        radii = ", ".join(f"{radius:.4f}" for radius in sorted(seen_radii)) or "none"
+        raise RuntimeError(
+            f"{label}: no visible cylindrical face matches radius "
+            f"{target_radius_mm:.4f} mm; candidates={radii}"
+        )
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
 @_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
 def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
     """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.

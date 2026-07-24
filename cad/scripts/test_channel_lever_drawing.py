@@ -74,7 +74,8 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count("annotation.Color = 0") == 1
     assert "annotation.LayerOverride" in source
     assert "InsertCenterMark3(2, False, False)" in source
-    assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
+    assert "visible_circle_edge(adapter, view, 2.0 * TIP_RADIUS)" in source
+    assert "view.SelectEntity(tip_edge, False)" in source
     assert source.count("add_feature_control_frame(") == 5
     assert source.count('characteristic="position"') == 2
     assert source.count('datums=("A", "B", "C")') == 3

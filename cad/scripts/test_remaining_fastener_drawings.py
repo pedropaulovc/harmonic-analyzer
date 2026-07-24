@@ -11,8 +11,76 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+import _drawing_common
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
+
+
+class _FakeCylinderSurface:
+    def __init__(self, radius_mm: float, *, cylindrical: bool = True) -> None:
+        self.CylinderParams = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, radius_mm / 1000.0)
+        self._cylindrical = cylindrical
+
+    def IsCylinder(self) -> bool:
+        return self._cylindrical
+
+
+class _FakeFace:
+    def __init__(self, radius_mm: float, area: float, *, cylindrical: bool = True) -> None:
+        self._surface = _FakeCylinderSurface(radius_mm, cylindrical=cylindrical)
+        self._area = area
+
+    def GetSurface(self) -> _FakeCylinderSurface:
+        return self._surface
+
+    def GetArea(self) -> float:
+        return self._area
+
+
+class _FakeAttemptAdapter:
+    @staticmethod
+    def _attempt(call, *, default=None):
+        try:
+            return call()
+        except Exception:
+            return default
+
+
+def test_visible_cylindrical_face_uses_exact_radius_and_largest_area(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wrong = _FakeFace(4.0, 100.0)
+    small = _FakeFace(3.175, 1.0)
+    large = _FakeFace(3.175, 2.0)
+    planar = _FakeFace(3.175, 1000.0, cylindrical=False)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(
+        _drawing_common,
+        "visible_view_entities",
+        lambda *_args, **_kwargs: [wrong, small, large, planar],
+    )
+
+    selected = _drawing_common.visible_cylindrical_face(
+        _FakeAttemptAdapter(), object(), 6.35, label="shoulder"
+    )
+
+    assert selected is large
+
+
+def test_visible_cylindrical_face_reports_candidate_radii(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(
+        _drawing_common,
+        "visible_view_entities",
+        lambda *_args, **_kwargs: [_FakeFace(4.0, 1.0)],
+    )
+
+    with pytest.raises(RuntimeError, match=r"radius 3\.1750 mm; candidates=4\.0000"):
+        _drawing_common.visible_cylindrical_face(
+            _FakeAttemptAdapter(), object(), 6.35, label="shoulder"
+        )
 
 
 @dataclass(frozen=True)
@@ -268,7 +336,7 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert drawing.SIDE_DIMENSION_CALLOUTS["ThreadLg"] == spec.THREAD_DESIGNATION
     assert '"1/4-20' not in drawing_source
     assert drawing.RECIPE.decorate is drawing._decorate
-    assert drawing.RECIPE.side_centerline_face_xy == (0.190, 0.145)
+    assert drawing.RECIPE.side_centerline_diameter_mm == spec.SHOULDER_DIA
     assert drawing_source.count("add_datum_feature(") == 1
     assert drawing_source.count("add_feature_control_frame(") == 4
     assert drawing_source.count("add_surface_finish(") == 1

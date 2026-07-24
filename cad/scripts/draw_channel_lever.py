@@ -39,16 +39,17 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
 from channel_lever_spec import (
     BAR_PIN_X,
     BAR_TALL,
     LEVER_SPRING_X,
     LEVER_THICKNESS,
     PIVOT_HOLE_DIA,
+    TIP_RADIUS,
     TIP_END_X,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
@@ -116,11 +117,8 @@ def _add_tip_arc_center_mark(adapter: Any, view: Any) -> None:
     if not drawing_doc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate channel-lever front view")
     draw.ClearSelection2(True)
-    tip_edge = _sheet_xy(TIP_END_X, 0.0)
-    selected = draw.Extension.SelectByID2(
-        "", "EDGE", tip_edge[0], tip_edge[1], 0.0, False, 0, null_callout(), 0
-    )
-    if not selected:
+    tip_edge = visible_circle_edge(adapter, view, 2.0 * TIP_RADIUS)
+    if not view.SelectEntity(tip_edge, False):
         raise RuntimeError("failed to select channel-lever tip R3 arc")
     center_mark = drawing_doc.InsertCenterMark3(2, False, False)
     draw.ClearSelection2(True)

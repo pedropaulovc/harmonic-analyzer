@@ -131,11 +131,10 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to pinion bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
         adapter,
         front,
-        edge_xy=bore_top,
+        edge_entity=bore_edge,
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.030),
         datum="A",
         label="feed pinion bore axis",
