@@ -18,7 +18,8 @@ scorer but NEVER shown to a subject.
     uv run comparisons/bench/run.py --task t1 --model codex-sol --limit 10 --arms P1,P2  # smoke
     uv run comparisons/bench/run.py --task t3 --model codex-sol
     uv run comparisons/bench/run.py --task t1 --model opus                # after codex
-    uv run comparisons/bench/run.py --task t1 --model opus-5              # pinned claude-opus-5
+    uv run comparisons/bench/run.py --task t1 --model opus-5              # pinned claude-opus-5 (Read-only)
+    uv run comparisons/bench/run.py --task t1 --model opus-5-tools        # side-probe: unrestricted tools
 
 Resume is automatic: rerun the same command; done cells are skipped.
 """
@@ -246,14 +247,24 @@ def run_codex(prompt: str, images: list[Path], schema_path: Path, sandbox: Path,
 
 
 def run_opus(prompt: str, images: list[Path], sandbox: Path,
-             claude_model: str = "opus",
+             claude_model: str = "opus", allowed_tools: str | None = None,
              timeout: int = 240) -> tuple[dict | None, int, str, str]:
     imgs = ", ".join(f"./{im.name}" for im in images)
     full = (prompt + f"\n\nThe stimulus image(s) are in this directory: {imgs}. "
             "Use the Read tool to view each, then respond with ONLY the JSON object.")
     cmd = ["claude", "-p", "--model", claude_model, "--effort", "high",
            "--output-format", "json",
-           "--permission-mode", "bypassPermissions", full]
+           "--permission-mode", "bypassPermissions"]
+    if allowed_tools:
+        # --tools sets the AVAILABLE built-in set (verified: the subject reports
+        # Read as its only tool). --allowed-tools does NOT work here: it is a
+        # no-prompt allow-list, so under bypassPermissions Bash still runs.
+        # --strict-mcp-config drops the user's MCP servers, which would
+        # otherwise re-open a scripting path. Both in `=` form, never a separate
+        # arg: the flags are variadic and would swallow the trailing prompt
+        # (same trap as codex's `-i`).
+        cmd += [f"--tools={allowed_tools}", "--strict-mcp-config"]
+    cmd.append(full)
     try:
         proc = subprocess.run(cmd, cwd=str(sandbox), capture_output=True, text=True,
                               timeout=timeout)
@@ -294,9 +305,22 @@ CODEX_MODELS = {
 # the archived column), so a NEW generation gets its own pinned id rather than
 # silently reusing that key -- the recorded model_id on each row is what makes a
 # column reproducible.
+#
+# `tools` is the --allowed-tools value, and it is load-bearing: this benchmark
+# measures how well a PRESENTATION conveys pose error to a reader who LOOKS at
+# it. Left unrestricted, claude-opus-5 answers ~6 cells in 7 by shelling out to
+# numpy/PIL (venv + pip install included) to compute the misregistration
+# numerically -- which scores a different question (every arm collapses to the
+# same pixel math) and costs 10+ min/cell against ~30 s for a visual read. So
+# the scored subject is pinned to Read; `opus-5-tools` keeps the unrestricted
+# path as a side-probe that MEASURES that gap instead of assuming it.
 CLAUDE_MODELS = {
-    "opus": "opus",              # archived column (resolved claude-opus-4-8)
-    "opus-5": "claude-opus-5",   # pinned successor subject
+    "opus": {"model": "opus", "tools": None, "timeout": 240},
+    # 420 s, not the archived 240: a Read-only claude-opus-5 cell measured
+    # 20-152 s at concurrency 8, so 240 would truncate the slow tail under
+    # concurrency 16 and bias the column toward whatever answers fast.
+    "opus-5": {"model": "claude-opus-5", "tools": "Read", "timeout": 420},
+    "opus-5-tools": {"model": "claude-opus-5", "tools": None, "timeout": 900},
 }
 
 
@@ -305,7 +329,9 @@ def invoke(model: str, prompt: str, images: list[Path], schema: dict, sandbox: P
         sp = write_schema("t_" + opaque(prompt)[:8], schema)
         data, tokens, err = run_codex(prompt, images, sp, sandbox, CODEX_MODELS[model])
         return data, tokens, err, CODEX_MODELS[model]
-    data, tokens, err, mid = run_opus(prompt, images, sandbox, CLAUDE_MODELS[model])
+    spec = CLAUDE_MODELS[model]
+    data, tokens, err, mid = run_opus(prompt, images, sandbox, spec["model"],
+                                      spec["tools"], spec["timeout"])
     return data, tokens, err, mid
 
 
@@ -511,7 +537,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", required=True, choices=["t1", "t3", "t2"])
     ap.add_argument("--model", required=True,
-                    choices=["codex", "codex-sol", "opus", "opus-5"])
+                    choices=["codex", "codex-sol", "opus", "opus-5", "opus-5-tools"])
     ap.add_argument("--arms", help="comma list, default all 11")
     ap.add_argument("--pairs", help="comma list, default 6 first-pass")
     ap.add_argument("--n", type=int, default=3)
