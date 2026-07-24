@@ -27,9 +27,11 @@ Resume is automatic: rerun the same command; done cells are skipped.
 import argparse
 import json
 import math
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import zlib
@@ -45,7 +47,15 @@ import gen_cases as gc  # noqa: E402  (bpy-free camera math: _apply, camera_axes
 OUT = BENCH / "out"
 CASES = BENCH / "cases.jsonl"
 RESULTS = OUT / "results.jsonl"
-SANDBOX_ROOT = OUT / "sandbox"
+# The sandbox is the subject's cwd, so it must NOT sit inside the repo: from
+# out/sandbox/<cell> a relative walk reaches cases.jsonl (the per-case delta =
+# the answer key) and results.jsonl (prior rows), and the benchmark contract is
+# that ground truth is never shown to a subject. No cell has ever read one (0
+# non-jpg reads across 168 transcripts), but the isolation should not rest on
+# the subject's good manners. An opaque temp root also means a relative escape
+# finds nothing worth reading. Override with HARMONIC_BENCH_SANDBOX.
+SANDBOX_ROOT = Path(os.environ.get("HARMONIC_BENCH_SANDBOX")
+                    or Path(tempfile.gettempdir()) / "pose-bench-sandbox")
 SCHEMA_DIR = OUT / "schemas"
 SALT = "pose-bench-v1"
 ARMS = P.ARMS
@@ -248,7 +258,8 @@ def run_codex(prompt: str, images: list[Path], schema_path: Path, sandbox: Path,
 
 def run_opus(prompt: str, images: list[Path], sandbox: Path,
              claude_model: str = "opus", allowed_tools: str | None = None,
-             timeout: int = 240) -> tuple[dict | None, int, str, str]:
+             timeout: int = 240,
+             hermetic: bool = False) -> tuple[dict | None, int, str, str]:
     imgs = ", ".join(f"./{im.name}" for im in images)
     full = (prompt + f"\n\nThe stimulus image(s) are in this directory: {imgs}. "
             "Use the Read tool to view each, then respond with ONLY the JSON object.")
@@ -264,6 +275,16 @@ def run_opus(prompt: str, images: list[Path], sandbox: Path,
         # arg: the flags are variadic and would swallow the trailing prompt
         # (same trap as codex's `-i`).
         cmd += [f"--tools={allowed_tools}", "--strict-mcp-config"]
+    if hermetic:
+        # Without this the cell inherits the seat's ambient config -- VERIFIED:
+        # asked what it saw, a default cell quoted back both ~/.claude/CLAUDE.md
+        # and the repo's own CLAUDE.md/AGENTS.md, so every subject was reading
+        # the project's instructions alongside the stimulus. --safe-mode drops
+        # CLAUDE.md, skills, plugins, hooks, MCP servers and custom agents while
+        # leaving auth/model/tools/permissions normal (re-asked under it: NONE).
+        # NOT --bare: it also skips keychain reads, so the CLI lands on
+        # "Not logged in - please run /login".
+        cmd.append("--safe-mode")
     cmd.append(full)
     try:
         proc = subprocess.run(cmd, cwd=str(sandbox), capture_output=True, text=True,
@@ -315,12 +336,14 @@ CODEX_MODELS = {
 # the scored subject is pinned to Read; `opus-5-tools` keeps the unrestricted
 # path as a side-probe that MEASURES that gap instead of assuming it.
 CLAUDE_MODELS = {
-    "opus": {"model": "opus", "tools": None, "timeout": 240},
+    "opus": {"model": "opus", "tools": None, "timeout": 240, "hermetic": False},
     # 420 s, not the archived 240: a Read-only claude-opus-5 cell measured
     # 20-152 s at concurrency 8, so 240 would truncate the slow tail under
     # concurrency 16 and bias the column toward whatever answers fast.
-    "opus-5": {"model": "claude-opus-5", "tools": "Read", "timeout": 420},
-    "opus-5-tools": {"model": "claude-opus-5", "tools": None, "timeout": 900},
+    "opus-5": {"model": "claude-opus-5", "tools": "Read", "timeout": 420,
+               "hermetic": True},
+    "opus-5-tools": {"model": "claude-opus-5", "tools": None, "timeout": 900,
+                     "hermetic": True},
 }
 
 
@@ -331,7 +354,16 @@ def invoke(model: str, prompt: str, images: list[Path], schema: dict, sandbox: P
         return data, tokens, err, CODEX_MODELS[model]
     spec = CLAUDE_MODELS[model]
     data, tokens, err, mid = run_opus(prompt, images, sandbox, spec["model"],
-                                      spec["tools"], spec["timeout"])
+                                      spec["tools"], spec["timeout"],
+                                      spec["hermetic"])
+    # A pinned column must contain ONLY that model. `report.py` groups by the
+    # subject key, not by model_id, so an automatic model switch or a configured
+    # fallback would silently seat a different model in the opus-5 column under
+    # a cell_key that then counts as done. Reject the row instead: response=None
+    # makes done_keys() retry the cell on the next pass. Only checked for a
+    # concrete id -- the archived "opus" spec is an alias by design.
+    if data is not None and spec["model"].startswith("claude-") and mid != spec["model"]:
+        return None, tokens, f"model-mismatch:{mid or 'unknown'}", mid
     return data, tokens, err, mid
 
 
