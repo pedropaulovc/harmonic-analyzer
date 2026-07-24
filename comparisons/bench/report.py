@@ -17,6 +17,7 @@ the decision rule consumes.
 
 import argparse
 import json
+import math
 import random
 from collections import defaultdict
 from pathlib import Path
@@ -236,8 +237,51 @@ def _fmt_pct(x) -> str:
     return f"{100*x:.1f}" if isinstance(x, float) and x == x else "-"
 
 
-def markdown(model: str, t1: dict, t3: dict) -> str:
-    L = [f"## Subject model: `{model}`\n", "### T1 - single-shot pose read\n",
+# Planned cell counts per task (6 first-pass pairs x 11 arms): T1 27 sub-grid
+# tags x n=1, T3 8 delta-pairs x n=3, T2 6 pinned starts. A run publishes its
+# archive at every pass boundary, so a report is far more often PARTIAL than
+# complete -- and a partial one still prints a full-looking arm ranking. Say so
+# in the artefact itself: `results/<model>.report.md` is what a reader consumes,
+# and an early quota checkpoint must not read as a finished benchmark.
+PLANNED = {"t1": 1782, "t3": 1584, "t2": 396}
+
+
+def _strict(o):
+    """NaN/Infinity -> None, recursively (json.dumps(allow_nan=False) then holds)."""
+    if isinstance(o, float):
+        return o if math.isfinite(o) else None
+    if isinstance(o, dict):
+        return {k: _strict(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_strict(v) for v in o]
+    return o
+
+
+def completeness(t1: dict, t3: dict, t2: dict) -> dict:
+    done = {"t1": sum(t["n"] for t in t1["table"].values()),
+            "t3": sum(t["n"] for t in t3["table"].values()),
+            "t2": sum(t["n"] for t in t2["table"].values())}
+    return {"done": done, "planned": PLANNED,
+            "complete": all(done[k] >= PLANNED[k] for k in PLANNED)}
+
+
+def _banner(c: dict) -> str:
+    d, p = c["done"], c["planned"]
+    if c["complete"]:
+        return f"_Complete: T1 {d['t1']}/{p['t1']}, T3 {d['t3']}/{p['t3']}, T2 {d['t2']}/{p['t2']}._\n"
+    return (f"> [!WARNING]\n"
+            f"> **PARTIAL RUN — not a benchmark result.** T1 {d['t1']}/{p['t1']}, "
+            f"T3 {d['t3']}/{p['t3']}, T2 {d['t2']}/{p['t2']} cells. Arm rankings below "
+            f"are provisional: the remaining cells cover pairs, delta classes and the "
+            f"control tier not yet sampled, and confidence intervals stay unavailable "
+            f"until each arm has its full n.\n")
+
+
+def markdown(model: str, t1: dict, t3: dict, comp: dict | None = None) -> str:
+    L = [f"## Subject model: `{model}`\n"]
+    if comp:
+        L.append(_banner(comp))
+    L += ["### T1 - single-shot pose read\n",
          "| arm | n | macro sign % | 95% CI | magnitude % | control FP % | median tok | lat s |",
          "|---|--:|--:|--:|--:|--:|--:|--:|"]
     for arm in t1["ranking"]:
@@ -260,7 +304,8 @@ def markdown(model: str, t1: dict, t3: dict) -> str:
             t = t3["table"][arm]
             bc = ", ".join(f"{k}:{v}" for k, v in t["by_class"].items())
             L.append(f"| {arm} | {t['n']} | {_fmt_pct(t['frac_correct'])} | {bc} |")
-    L.append(f"\n**T1 arm ranking ({model}):** {' > '.join(t1['ranking'])}\n")
+    tag = "" if (comp is None or comp["complete"]) else " — PROVISIONAL"
+    L.append(f"\n**T1 arm ranking ({model}){tag}:** {' > '.join(t1['ranking'])}\n")
     return "\n".join(L)
 
 
@@ -276,9 +321,15 @@ def main() -> int:
         t2 = t2_report(model)
         if not t1["table"] and not t3["table"] and not t2["table"]:
             continue
-        summary[model] = {"t1": t1, "t3": t3, "t2": t2}
-        md.append(markdown(model, t1, t3))
-    (OUT / "summary.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
+        comp = completeness(t1, t3, t2)
+        summary[model] = {"t1": t1, "t3": t3, "t2": t2, "completeness": comp}
+        md.append(markdown(model, t1, t3, comp))
+    # STRICT json: the default encoder writes bare NaN/Infinity for an
+    # unavailable CI or control-FP rate, which json.loads accepts but JSON.parse
+    # (and every other strict parser downstream of the committed artefact)
+    # rejects. Serialise those as null instead.
+    (OUT / "summary.json").write_text(
+        json.dumps(_strict(summary), indent=1, allow_nan=False), encoding="utf-8")
     report_md = OUT / "report.md"
     report_md.write_text("\n".join(md), encoding="utf-8")
     print("\n".join(md))

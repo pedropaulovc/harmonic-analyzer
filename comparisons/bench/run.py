@@ -176,6 +176,22 @@ def opaque(*parts) -> str:
     return sha256((SALT + ":" + ":".join(str(p) for p in parts)).encode()).hexdigest()[:16]
 
 
+def _sandbox(oid: str) -> Path:
+    """The cell's cwd, named by its OPAQUE id -- never by the cell key.
+
+    A subject sees its working directory (Claude Code puts it in the prompt
+    context; asked, a probe cell quoted back
+    `/tmp/pose-bench-sandbox/t1_opus-5_..._+az+3_P7_0_0`, read "az+3" out of it
+    AND recognised the directory as an eval harness). Since a T1 cell key
+    embeds the ground-truth delta tag, that path WAS the answer key. The opaque
+    id is the same one the stimulus files already carry, so the cwd now leaks
+    nothing the subject is not meant to see.
+    """
+    sb = SANDBOX_ROOT / oid
+    sb.mkdir(parents=True, exist_ok=True)
+    return sb
+
+
 def done_keys() -> set:
     if not RESULTS.exists():
         return set()
@@ -321,6 +337,8 @@ CODEX_MODELS = {
     "codex": "gpt-5.5",          # incumbent second subject
     "codex-sol": "gpt-5.6-sol",  # added subject
 }
+# Subjects whose committed archives were collected under the pre-fix harness.
+ARCHIVED_SUBJECTS = ("codex", "codex-sol", "opus")
 # Claude subjects, all at --effort high. The alias "opus" floats with whatever
 # `claude --model opus` resolves to on the day (it recorded claude-opus-4-8 for
 # the archived column), so a NEW generation gets its own pinned id rather than
@@ -403,10 +421,9 @@ def exec_t1(cases, cell, model):
     _t, cid, arm, rep, grid = cell
     row = cases[cid]
     cell_key = f"t1:{model}:{cid}:{arm}:{rep}:{int(grid)}"
-    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
-    sb.mkdir(parents=True, exist_ok=True)
     side = crc(cid, arm) + rep
     oid = opaque("t1", cid, arm, rep, grid)
+    sb = _sandbox(oid)
     imgs = P.build_stimulus(row, arm, sb, oid, grid=grid, side=side % 2, order=side % 2)
     prompt = (T1_CONVENTIONS + f"\n\nThe stimulus is {ARM_ENCODING[arm]}\n\n"
               "Return a JSON object with keys az, el, roll, target_x, target_y, zoom, "
@@ -426,8 +443,8 @@ def exec_t1(cases, cell, model):
 def exec_t3(cases, cell, model):
     _t, pid, dclass, (c1, c2), arm, rep = cell
     cell_key = t3_key(model, cell)
-    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
-    sb.mkdir(parents=True, exist_ok=True)
+    # opaque cwd -- a t3 cell key names the delta-pair tag (the answer)
+    sb = _sandbox(opaque("t3", pid, dclass, arm, rep))
     order = (crc(pid, arm, "t3", dclass) + rep) % 2   # which delta is shown first
     side = crc(pid, arm) % 2                          # arm-internal layout (base-pair keyed)
     first_cid, second_cid = (c1, c2) if order == 0 else (c2, c1)
@@ -523,8 +540,8 @@ def exec_t2(cases, cell, model, server):
     w, h = meta["frozen"]["canvas"]
     bg, align = meta.get("background", "black"), meta.get("align") or {}
     cell_key = f"t2:{model}:{pid}:{start_key}:{arm}"
-    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
-    sb.mkdir(parents=True, exist_ok=True)
+    # opaque cwd -- a t2 cell key names the starting perturbation
+    sb = _sandbox(opaque("t2", pid, start_key, arm))
     sd = cases[f"{pid}+mix1"]["delta"] if start_delta == "M1" else start_delta
     cur = gc._apply(base, target0, r0, u0, sd, zoom0)
     row_syn = {"pair_id": pid, "case_id": f"{pid}+ctrl", "align": align, "background": bg}
@@ -577,7 +594,24 @@ def main() -> int:
     ap.add_argument("--concurrency", type=int, default=6)
     ap.add_argument("--limit", type=int, help="cap cells (smoke)")
     ap.add_argument("--budget-tokens", type=int, default=16_000_000)
+    ap.add_argument("--allow-archived-subject", action="store_true",
+                    help="run a FROZEN archived subject under the current harness")
     args = ap.parse_args()
+
+    # The archived columns were collected under a harness that no longer exists
+    # here: their cells ran with the seat's CLAUDE.md/AGENTS.md in context and
+    # with a repo-local, cell-key-named cwd (i.e. the delta tag was visible in
+    # the working directory). Both are now fixed, so resuming one of those
+    # unfinished columns -- `opus` is only 770/1584 on T3 with T2 unstarted --
+    # would silently append rows from a DIFFERENT harness under the same cell
+    # keys and publish the mixture as one column. Refuse by default.
+    if args.model in ARCHIVED_SUBJECTS and not args.allow_archived_subject:
+        print(f"xx `{args.model}` is a FROZEN archived subject: its rows predate the "
+              "--safe-mode + opaque-sandbox fixes, so resuming it here would mix two "
+              "harnesses under one cell key. Start a new subject id instead (as "
+              "`opus-5` did), or pass --allow-archived-subject if you accept the mix.",
+              flush=True)
+        return 2
 
     cases = load_cases()
     arms = args.arms.split(",") if args.arms else ARMS
