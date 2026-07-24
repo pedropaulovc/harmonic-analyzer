@@ -212,12 +212,12 @@ def test_gear_model_faces_uses_axial_end_and_right_view_top_tip(monkeypatch) -> 
             return (*self.closest, 0.0, 0.0)
 
     lower_tip = Face(
-        Surface("cylinder", 8.5),
-        edges=(Edge((0.006, 0.006, 0.0), (0.006, 0.006, 0.010)),),
-        closest=(0.006, 0.006, 0.005),
+        Surface("other"),
+        edges=(Edge((0.0085, 0.0, 0.0), (0.0085, 0.0, 0.010)),),
+        closest=(0.0085, 0.0, 0.005),
     )
     top_tip = Face(
-        Surface("cylinder", 8.5),
+        Surface("other"),
         edges=(Edge((0.0, 0.0085, 0.0), (0.0, 0.0085, 0.010)),),
         closest=(0.0, 0.0085, 0.005),
     )

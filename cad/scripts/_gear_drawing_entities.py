@@ -90,27 +90,36 @@ def gear_model_faces(
                 )
                 axial_ends.append((area, face))
             continue
-        if not surface.IsCylinder():
-            continue
-        radius_mm = float(surface.CylinderParams[6]) * 1000.0
-        if bore is None and abs(radius_mm - bore_radius) <= _RADIUS_TOLERANCE_MM:
-            bore = face
-        if tip_radius is None or abs(radius_mm - tip_radius) > _RADIUS_TOLERANCE_MM:
-            continue
-        points = _face_vertex_points(adapter, face)
-        if not points:
-            continue
-        z_mid = (
-            min(point[2] for point in points) + max(point[2] for point in points)
-        ) / 2.0
-        target = (0.0, tip_radius / 1000.0, z_mid)
-        closest = adapter._attempt(
-            lambda f=face, p=target: f.GetClosestPointOn(*p), default=None
-        )
-        if closest is None or len(closest) < 3:
-            continue
-        distance = math.dist(target, tuple(float(value) for value in closest[:3]))
-        tooth_tips.append((distance, face))
+        if tip_radius is not None:
+            points = _face_vertex_points(adapter, face)
+            radii_mm = [math.hypot(point[0], point[1]) * 1000.0 for point in points]
+            if radii_mm and max(
+                abs(radius_mm - tip_radius) for radius_mm in radii_mm
+            ) <= _RADIUS_TOLERANCE_MM:
+                z_mid = (
+                    min(point[2] for point in points)
+                    + max(point[2] for point in points)
+                ) / 2.0
+                target = (0.0, tip_radius / 1000.0, z_mid)
+                closest = adapter._attempt(
+                    lambda f=face, p=target: f.GetClosestPointOn(*p), default=None
+                )
+                if closest is not None and len(closest) >= 3:
+                    distance = math.dist(
+                        target, tuple(float(value) for value in closest[:3])
+                    )
+                    tooth_tips.append((distance, face))
+        if surface.IsCylinder():
+            radius_mm = float(surface.CylinderParams[6]) * 1000.0
+            if bore is None and abs(radius_mm - bore_radius) <= _RADIUS_TOLERANCE_MM:
+                bore = face
+
+    _telemetry.event(
+        "drawing.gear_model_faces.classified",
+        face_count=len(faces),
+        axial_end_count=len(axial_ends),
+        tooth_tip_count=len(tooth_tips),
+    )
 
     end = max(axial_ends, key=lambda candidate: candidate[0])[1] if axial_ends else None
     tooth_tip = (
