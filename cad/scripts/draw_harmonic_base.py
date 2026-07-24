@@ -33,7 +33,6 @@ from _drawing_common import (
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -321,8 +320,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # which shifts every coordinate-based pick on it.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
-    for view in (top, side):
-        set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):

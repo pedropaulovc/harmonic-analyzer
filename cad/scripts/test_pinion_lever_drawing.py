@@ -100,7 +100,6 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "({CAP_SAG:.2f}) REF AXIAL HEIGHT" in source
     assert "create_section_view(" not in source
     assert 'place_view(adapter, str(SOURCE), "*Right"' in source
-    assert "set_hidden_lines_visible(adapter, side)" in source
     assert source.count("model_point_in_view(") == 2
     assert "ModelToViewTransform" in common_source
     assert "(0.0, HUB_OD / 2000.0, HUB_LEN / 2000.0)" in source

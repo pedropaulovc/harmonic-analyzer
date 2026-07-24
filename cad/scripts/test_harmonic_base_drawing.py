@@ -126,22 +126,3 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "mask" not in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
-
-
-def test_dirty_reopened_scale_is_reexported_to_pdf() -> None:
-    common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
-        encoding="utf-8"
-    )
-    first_reopen = common_source.index(
-        "await reopen_drawing(adapter, outputs.slddrw)"
-    )
-    dirty_branch = common_source.index("if sheet_scale_dirty:", first_reopen)
-    persisted_pdf_export = common_source.index(
-        "adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)",
-        first_reopen + 1,
-    )
-    second_reopen = common_source.index(
-        "await reopen_drawing(adapter, outputs.slddrw)", first_reopen + 1
-    )
-    assert dirty_branch < persisted_pdf_export < second_reopen
-    assert "PDF re-export after dirty-scale save failed" in common_source

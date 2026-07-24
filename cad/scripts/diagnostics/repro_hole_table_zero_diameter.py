@@ -31,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import _telemetry  # noqa: E402
 from _common import check, run_build  # noqa: E402
-from _drawing_common import insert_hole_table, set_hidden_lines_removed  # noqa: E402
+from _drawing_common import insert_hole_table  # noqa: E402
 from _holes import HoleSpec, _early, _flag, wizard_holes  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import null_callout  # noqa: E402
 from solidworks_mcp.adapters.solidworks.drawing import (  # noqa: E402
@@ -199,7 +199,6 @@ async def build(adapter: Any) -> dict[str, str]:
             VIEW_Y_M,
             scale=(1.0, 1.0),
         )
-        set_hidden_lines_removed(adapter, front)
         table = insert_hole_table(
             adapter,
             front,

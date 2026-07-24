@@ -15,7 +15,6 @@ from _drawing_common import (
     add_surface_finish,
     curate_view_dimensions,
     import_cosmetic_threads,
-    set_hidden_lines_removed,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
@@ -100,7 +99,6 @@ def _circular_edge(
 def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
     """Add the native GD&T and finish controls required by the shoulder joint."""
     right = place_view(adapter, str(SOURCE), "*Right", 0.285, 0.170, scale=SHEET_SCALE)
-    set_hidden_lines_removed(adapter, right)
     curate_view_dimensions(adapter, right, keep=SLOT_KEEP, view_label="slot profile")
 
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, side)

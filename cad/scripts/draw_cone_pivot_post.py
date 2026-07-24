@@ -21,8 +21,6 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_precision,
     set_basic_dimension,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -303,12 +301,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    set_hidden_lines_removed(adapter, iso)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     # The elevation carries both bores as hidden circles; the plan shows them
     # crossing the round column.
-    for view in (front, top):
-        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"

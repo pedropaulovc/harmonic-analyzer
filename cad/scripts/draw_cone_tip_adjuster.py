@@ -19,8 +19,6 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimensions,
     stamp_drawing_summary,
     visible_view_entities,
@@ -152,12 +150,9 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
     end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=(4, 1))
     cup = place_view(adapter, str(SOURCE), "*Top", *CUP_CENTER, scale=(4, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    set_hidden_lines_removed(adapter, iso)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     # The elevation shows the blind cup as hidden lines; the head end view
     # exposes the driver slot across the OD.
-    for view in (front, end, cup):
-        set_hidden_lines_visible(adapter, view)
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
     if (thread_seeds, thread_instances) != (1, 1):
         raise RuntimeError(

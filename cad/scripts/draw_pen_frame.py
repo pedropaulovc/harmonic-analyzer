@@ -29,8 +29,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -118,14 +116,8 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The third-angle right-side view makes the 10 mm depth and the upward
-    # set-screw axis explicit; hidden lines show the blind-to-window thread path.
-    set_hidden_lines_visible(adapter, right)
-
+    place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.090)

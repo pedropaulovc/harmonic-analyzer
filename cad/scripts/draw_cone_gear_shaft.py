@@ -22,7 +22,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -178,8 +177,6 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(1, 1))
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (side, end, iso):
-        set_hidden_lines_removed(adapter, view)
     for label, view in (("side", side), ("end", end), ("iso", iso)):
         outline = adapter._attempt(
             lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
