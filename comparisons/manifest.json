@@ -349,7 +349,7 @@
         "rocker_arm_support"
       ],
       "status": "aligned",
-      "notes": "lower drive train from machine BACK (az~3, white bg): chain+sprockets top-left, connecting-rod bank, cone gears bottom-left, pinion drum, rocker-support frustum right. tune_align skipped (white bg unsupported); content-fit align.",
+      "notes": "lower drive train from machine BACK (az~3, white bg): chain+sprockets top-left, connecting-rod bank, cone gears bottom-left, pinion drum, rocker-support frustum right.",
       "tier": 1
     },
     {
