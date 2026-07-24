@@ -64,11 +64,11 @@ ISO_SCALE = (1, 2)
 
 # The two native profile dims the print keeps: the far dome-centre station
 # (below the side view) and the dome radius (above the right dome).
-FRONT_KEEP = {
-    "RightDomeCentre": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.032),
-    "DomeRadius": (RIGHT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.028),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = (
+    "RightDomeCentre",
+    "DomeRadius",
+)
+RIGHT_KEEP: tuple[str, ...] = ()
 DIMENSION_CALLOUTS = {
     "DomeRadius": f"FULL R, BOTH ENDS - Ø{ROD_DIA:g} ROD",
     "RightDomeCentre": "TO FAR DOME CENTRE",

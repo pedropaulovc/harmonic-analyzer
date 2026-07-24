@@ -92,15 +92,8 @@ GRIP_HALF_ANGLE_DEG = math.degrees(
     math.atan((ROD_TIP_DIA - ROD_ROOT_DIA) / (2.0 * (ROD_LEN - ROD_Y0)))
 )
 
-FRONT_KEEP = {
-    "HubOd": (0.025, 0.102),
-    "HubBore": (0.115, 0.085),
-    "RodTipY": (0.044, 0.170),
-}
-RIGHT_KEEP = {
-    "BoreDepth": (0.245, 0.105),
-    "EndWall": (0.235, 0.190),
-}
+FRONT_KEEP = frozenset({"HubOd", "HubBore", "RodTipY"})
+RIGHT_KEEP = frozenset({"BoreDepth", "EndWall"})
 DIMENSION_CALLOUTS = {
     "HubBore": f"NOMINAL REF\n{fit_limits(BORE, BORE_BAND)}\nRa 1.6",
     "BoreDepth": "+0.10/-0.00 FULL-DIA DEPTH FROM B; FLAT BOTTOM",

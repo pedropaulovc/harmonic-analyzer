@@ -50,7 +50,7 @@ def test_peak_station_uses_visible_construction_geometry() -> None:
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'profile.record("PeakStation",' in build_source
     assert 'profile.record("FrontArcCx",' in build_source
-    assert '"PeakStation":' in drawing_source
+    assert "PeakStation" in drawing.FRONT_KEEP
     assert '"FrontArcCx":' not in drawing_source
     assert "peak station construction line" in build_source
 
@@ -111,7 +111,6 @@ def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     assert 'quantity="TURNED GRIP PROFILE - SEE NOTE"' in source
     assert "set_basic_dimension(" in source
     assert "add_surface_finish(" not in source
-    assert drawing.RIGHT_KEEP["PivotBoreDia"] == (0.360, 0.220)
     assert "frame_xy=(0.350, 0.263)" in source
     assert "frame_xy=(0.180, 0.263)" in source
 

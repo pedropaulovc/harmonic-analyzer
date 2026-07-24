@@ -347,7 +347,7 @@ def test_cone_pivot_producer_rejects_missing_persisted_drawing_property() -> Non
 def test_cone_tip_pinch_sheet_defines_a_flat_end_without_duplicate_head_diameter() -> None:
     drawing = importlib.import_module("draw_cone_tip_pinch_screw")
     spec = importlib.import_module("cone_tip_pinch_screw_spec")
-    assert drawing.END_KEEP == {}
+    assert not drawing.END_KEEP
     assert drawing.RECIPE.side_center == (0.190, 0.190)
     assert spec.DRAWING_DIMENSIONS == {}
     assert "FLAT-END PINCH SCREW; NO CONICAL POINT" in spec.DRAWING_NOTES

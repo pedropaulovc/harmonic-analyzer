@@ -36,19 +36,19 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (6.0, 1.0)
-END_KEEP = {
-    "HeadDiaDim": (0.028, 0.176),
-    "ShoulderDiaDim": (0.028, 0.124),
-}
-SIDE_KEEP = {
-    "HeadHt": (0.190, 0.240),
-    "ShoulderLg": (0.165, 0.185),
-    "ThreadLg": (0.238, 0.132),
-}
-SLOT_KEEP = {
-    "SlotWDim": (0.285, 0.242),
-    "SlotDepth": (0.325, 0.215),
-}
+END_KEEP = (
+    "HeadDiaDim",
+    "ShoulderDiaDim",
+)
+SIDE_KEEP = (
+    "HeadHt",
+    "ShoulderLg",
+    "ThreadLg",
+)
+SLOT_KEEP = (
+    "SlotWDim",
+    "SlotDepth",
+)
 SIDE_DIMENSION_CALLOUTS = {
     "ThreadLg": THREAD_DESIGNATION,
 }

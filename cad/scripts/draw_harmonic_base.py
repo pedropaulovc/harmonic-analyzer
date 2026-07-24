@@ -78,12 +78,12 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-
 TOP_CENTER = (0.130, 0.170)
 SIDE_CENTER = (0.345, 0.075)
 
-# Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position (meters).  Only the bottom plate's overall footprint is marked.
-TOP_KEEP = {
-    "BottomLen": (TOP_CENTER[0], TOP_CENTER[1] + BOTTOM_WIDTH * VIEW_SCALE / 2000.0 + 0.008),
-    "BottomWid": (TOP_CENTER[0] + BOTTOM_LENGTH * VIEW_SCALE / 2000.0 + 0.017, TOP_CENTER[1]),
-}
+# Named survivors of the marked-dimension import. Only the bottom plate's
+# overall footprint is marked; SolidWorks owns their callout placement.
+TOP_KEEP = (
+    "BottomLen",
+    "BottomWid",
+)
 
 # Hole-table origin corner (the plate's lower-left plan corner) + the four
 # mounting-hole rim picks, all in sheet meters.  The native table reads each

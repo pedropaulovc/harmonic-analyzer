@@ -99,12 +99,10 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 # The large concentric radii are carried in the manufacturing note: imported
 # radius dimensions retain off-sheet centre witnesses even in shortened-radius
 # mode.  Keeping them as notes avoids clipped geometry without losing values.
-FRONT_KEEP = {
-    "PivotDia": (0.180, 0.120),
-}
+FRONT_KEEP = frozenset({"PivotDia"})
 NOTE_ONLY_DIMENSIONS = {"TopRadius", "BottomRadius"}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+RIGHT_KEEP = frozenset()
+TOP_KEEP = frozenset()
 
 
 async def build(adapter: Any) -> dict[str, str]:

@@ -41,11 +41,8 @@ def test_catalog_is_the_single_source_of_the_thread() -> None:
     assert drawing.DIMENSION_CALLOUTS == {}
 
 
-def test_head_end_cluster_is_clear_of_the_left_zone_border() -> None:
+def test_head_end_view_uses_the_precomputed_placement() -> None:
     assert drawing.END_CENTER == (0.085, 0.180)
-    assert drawing.END_DIM_X == 0.040
-    assert {xy[0] for xy in drawing.END_KEEP.values()} == {drawing.END_DIM_X}
-    assert abs(drawing.END_CENTER[0] - drawing.END_DIM_X - 0.045) < 1e-12
 
 
 def test_lengths_are_marked_extrude_depth_model_dims() -> None:

@@ -55,7 +55,7 @@ ISO_CENTER = (0.320, 0.160)
 # Note-based: the wire carries no marked model dimension, so every view keeps
 # nothing (the front view is curated with an empty keep to delete any stray
 # auto-import; the offline test asserts union(marks) == union(keeps) == {}).
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP: tuple[str, ...] = ()
 
 
 async def build(adapter: Any) -> dict[str, str]:

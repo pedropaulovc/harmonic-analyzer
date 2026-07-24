@@ -117,14 +117,9 @@ def _shank_silhouette(adapter: Any, view: Any) -> Any:
     return silhouette
 
 
-FRONT_KEEP = {
-    "Rise": (0.075, FRONT_CENTER[1]),
-    "ArmRun": (0.130, 0.205),
-}
-TOP_KEEP = {
-    "RodDia": (0.210, 0.110),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = frozenset({"Rise", "ArmRun"})
+TOP_KEEP = frozenset({"RodDia"})
+RIGHT_KEEP = frozenset()
 
 
 async def build(adapter: Any) -> dict[str, str]:

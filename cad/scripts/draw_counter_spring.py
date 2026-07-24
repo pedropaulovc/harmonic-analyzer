@@ -50,9 +50,9 @@ SHEET_SCALE = (1.0, 2.0)  # 1:2
 FRONT_CENTER = (0.090, 0.140)
 ISO_CENTER = (0.230, 0.150)
 
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP: tuple[str, ...] = ()
+RIGHT_KEEP: tuple[str, ...] = ()
+TOP_KEEP: tuple[str, ...] = ()
 
 
 async def build(adapter: Any) -> dict[str, str]:

@@ -88,13 +88,13 @@ def _plan_x(model_x_mm: float) -> float:
 # position.  All three live on the top view (their sketches lie on the part's
 # Top plane): the depth chain above the view, the width chain to its left, the
 # bore diameter leadered off the relief arc.
-TOP_KEEP = {
-    "Depth": (0.105, 0.261),
-    "Width": (0.058, 0.205),
-    "BoreDia": (0.158, 0.243),
-}
-FRONT_KEEP = {}
-RIGHT_KEEP = {}
+TOP_KEEP = (
+    "Depth",
+    "Width",
+    "BoreDia",
+)
+FRONT_KEEP = ()
+RIGHT_KEEP = ()
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU\nSLIP FIT ON <MOD-DIAM>25.4 COLUMN",
 }

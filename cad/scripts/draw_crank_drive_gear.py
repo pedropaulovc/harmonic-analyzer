@@ -58,9 +58,7 @@ GEAR_DATA_POS = (0.025, 0.262)
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
-}
+FRONT_KEEP = ("BoreDia",)
 DIMENSION_CALLOUTS = {
     # Reamed slip fit on the crankshaft journal (nominal-or-under, like the
     # arbor journals): min 0.03 diametral clearance, inside the project's

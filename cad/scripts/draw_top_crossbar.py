@@ -55,17 +55,8 @@ TOP_CENTER = (0.090, 0.211)
 FRONT_CENTER = (0.165, 0.135)
 ISO_CENTER = (0.355, 0.200)
 
-TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1]),
-}
-FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.034),
-    # -0.047, not -0.035: datum B's tag sits at x=0.138 (16 mm off the bar's
-    # left face), and the now-horizontal "41.00" text centred on x=0.130 ran
-    # straight through it ("41.0B"). This lane clears the tag by ~5 mm and still
-    # starts right of the top view (which ends at x~0.100).
-    "Height": (FRONT_CENTER[0] - 0.047, FRONT_CENTER[1]),
-}
+TOP_KEEP = frozenset({"Depth"})
+FRONT_KEEP = frozenset({"Width", "Height"})
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():

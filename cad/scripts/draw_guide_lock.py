@@ -97,11 +97,11 @@ DATUM_FACE_X = RIGHT_CENTER[0] + LOCK_THICK * SHEET_SCALE[0] / 2000.0
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Width stacks below the front view (under the hole locators),
 # Height sits to its left, the strip thickness rides above the right view.
-FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], 0.088),
-    "Height": (0.064, FRONT_CENTER[1]),
-}
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.196)}
+FRONT_KEEP = (
+    "Width",
+    "Height",
+)
+RIGHT_KEEP = ("Depth",)
 
 
 async def build(adapter: Any) -> dict[str, str]:

@@ -68,13 +68,13 @@ ISO_CENTER = (0.350, 0.150)
 _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
 _HUB_R = HUB_DIA * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    "RimOuterDiaDim": (FRONT_CENTER[0] - _RIM_R - 0.028, FRONT_CENTER[1] + _RIM_R + 0.006),
-    "HubDiaDim": (FRONT_CENTER[0] + _HUB_R + 0.030, FRONT_CENTER[1] - 0.006),
-    "BoreDiaDim": (FRONT_CENTER[0] - _HUB_R - 0.030, FRONT_CENTER[1] + 0.004),
-    "SpokeWidthDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + _HUB_R + 0.020),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = (
+    "RimOuterDiaDim",
+    "HubDiaDim",
+    "BoreDiaDim",
+    "SpokeWidthDim",
+)
+RIGHT_KEEP: tuple[str, ...] = ()
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": "THRU - REAM",
     "SpokeWidthDim": "6X SPOKE",

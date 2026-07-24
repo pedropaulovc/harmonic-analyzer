@@ -67,12 +67,8 @@ ISO_SCALE = (1, 2)
 # bbox-derived 0.022: the callout is centred on its anchor and ~22 mm wide now
 # that it renders horizontally, so it needs to start clear of the border rule
 # at ~0.0126.
-END_KEEP = {
-    "ShaftDia": (0.032, END_CENTER[1]),
-}
-PROFILE_KEEP = {
-    "Depth": (PROFILE_CENTER[0], PROFILE_CENTER[1] - 0.025),
-}
+END_KEEP = ("ShaftDia",)
+PROFILE_KEEP = ("Depth",)
 DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02", "Depth": "+/-0.25"}
 # 3/8 in = 9.525 exactly; the sheet default of 2 decimals would print 9.53,
 # a false contradiction of the exact inch conversion the arbor's bore mates

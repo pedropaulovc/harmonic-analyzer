@@ -73,12 +73,8 @@ RIGHT_CENTER = (
 )
 ISO_CENTER = (0.320, 0.200)
 
-FRONT_KEEP = {
-    "PinDia": (0.030, 0.235),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
-}
+FRONT_KEEP = frozenset({"PinDia"})
+RIGHT_KEEP = frozenset({"Depth"})
 DIMENSION_CALLOUTS = {
     "PinDia": (
         f"FINAL LIMITS\n{fit_limits(PIN_DIA, (PIN_DIA_TOL, -PIN_DIA_TOL))}\nRa 0.8"

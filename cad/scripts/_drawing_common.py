@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from collections.abc import Collection
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
@@ -1652,33 +1653,32 @@ def curate_view_dimensions(
     adapter: Any,
     view: Any,
     *,
-    keep: dict[str, tuple[float, float]],
+    keep: Collection[str],
     view_label: str,
 ) -> list[Any]:
     """Import a view's marked model dimensions and keep exactly ``keep``.
 
-    ``keep`` maps each surviving dimension's parametric name to its sheet
-    position (meters).  Everything else the import produced is deleted; a
-    missing expected dimension fails loud — the print must carry every
-    manufacturing dimension the recipe promises.
+    ``keep`` contains the surviving dimensions' parametric names. Everything
+    else the import produced is deleted; SolidWorks owns the imported
+    dimensions' positions. A missing expected dimension fails loud — the print
+    must carry every manufacturing dimension the recipe promises.
     """
+    expected = set(keep)
     _prepare_view_for_annotation_authoring(adapter, view)
     annotations = delete_unnamed_imports(
         adapter, insert_marked_dimensions(adapter, view)
     )
     names = {dimension_name(adapter, annotation) for annotation in annotations}
-    delete = tuple(sorted(name for name in names if name and name not in keep))
-    curated = curate_dimensions(
-        adapter, annotations, delete=delete, reposition=dict(keep)
-    )
+    delete = tuple(sorted(name for name in names if name and name not in expected))
+    curated = curate_dimensions(adapter, annotations, delete=delete)
     present = {dimension_name(adapter, annotation) for annotation in curated}
-    missing = sorted(set(keep) - present)
+    missing = sorted(expected - present)
     if missing:
         raise RuntimeError(
             f"{view_label} view is missing model dimensions: {missing}; "
             f"available={sorted(present)}"
         )
-    return curate_dimensions(adapter, curated, reposition=dict(keep))
+    return curated
 
 
 def _prepare_view_for_annotation_authoring(adapter: Any, view: Any) -> None:

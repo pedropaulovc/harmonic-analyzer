@@ -53,16 +53,14 @@ SIDE_CENTER = (0.185, 0.190)
 ISO_CENTER = (0.300, 0.170)
 
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
-END_KEEP = {
-    "HeadDia": (END_CENTER[0], END_CENTER[1] + 0.050),
-}
+END_KEEP = ("HeadDia",)
 DIMENSION_CALLOUTS: dict[str, str] = {}
 SIDE_DIMENSION_CALLOUTS = {"ShankLg": "UNDERHEAD LENGTH"}
-SIDE_KEEP = {
-    "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.034),
-    "ShankLg": (SIDE_CENTER[0] - 0.024, SIDE_CENTER[1] - 0.034),
-    "ShankDia": (SIDE_CENTER[0] - 0.050, SIDE_CENTER[1] + 0.016),
-}
+SIDE_KEEP = (
+    "HeadHt",
+    "ShankLg",
+    "ShankDia",
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:

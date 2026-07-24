@@ -118,8 +118,7 @@ def test_transverse_axis_uses_basic_location_and_position_control() -> None:
     assert "add_edge_dimension(" in source
     assert "set_basic_dimension(" in source
     assert "set_reference_dimension(" in source
-    assert drawing.FRONT_KEEP["RodSpan"] == (0.115, 0.245)
-    assert drawing.FRONT_KEEP["TubeId"][0] >= 0.075
+    assert {"RodSpan", "TubeId"} <= drawing.FRONT_KEEP
     assert "frame_xy=(0.315, 0.155)" in source
     assert 'quantity="BODY CROSS-HOLE AXIS BEFORE PRESSING"' in source
     assert "BODY CROSS-HOLE VIEW - LOOKING ALONG HOLE AXIS - SCALE 2:1" in source

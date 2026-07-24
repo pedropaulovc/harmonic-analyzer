@@ -11,7 +11,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
@@ -75,27 +74,34 @@ def _front_y(model_y: float) -> float:
 
 # Front elevation carries the standing block width, height, shaft passage, and
 # top clamp slit. The plan carries the 12 depth.
-FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], _front_y(0.0) - 0.014),
-    "BlockHt": (FRONT_CENTER[0] - 0.028, FRONT_CENTER[1]),
-    "PassageDiaDim": (FRONT_CENTER[0] + 0.048, _front_y(ADJUSTER_AXIS_HEIGHT)),
-    "PassageZ": (FRONT_CENTER[0] - 0.050, _front_y(ADJUSTER_AXIS_HEIGHT / 2.0)),
-    # Keep the slit width directly above the slot; the native 5/16-18 thread
-    # callout routes rightward below it.
-    "SlitW": (FRONT_CENTER[0], 0.232),
-}
-TOP_KEEP = {
-    # Text far enough east that the dimension's arrows and the dim-attached
-    # datum-D tag (which SolidWorks snaps to the text) sit clear of the view
-    # and of each other (eye-pass catch: box/arrow through the 12.00 digits).
-    "Depth": (TOP_CENTER[0] + 0.052, TOP_CENTER[1]),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = (
+    "Width",
+    "BlockHt",
+    "PassageDiaDim",
+    "PassageZ",
+    "SlitW",
+)
+TOP_KEEP = ("Depth",)
+RIGHT_KEEP: tuple[str, ...] = ()
 DIMENSION_CALLOUTS = {
     "BlockHt": "+0.05/-0.00",
     "PassageDiaDim": "THRU - CLEARANCE PASSAGE",
 }
 DIMENSION_PRECISION = {"PassageZ": 2}
+
+
+def _dimension_position(
+    adapter: Any, annotations: list[Any], name: str
+) -> tuple[float, float]:
+    for raw_annotation in annotations:
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if dimension_name(adapter, annotation) != name:
+            continue
+        position = annotation.GetPosition()
+        if not position or len(position) < 2:
+            raise RuntimeError(f"dimension {name!r} has no sheet position")
+        return float(position[0]), float(position[1])
+    raise RuntimeError(f"dimension {name!r} is not present in the curated view")
 
 
 def _circle_entity(
@@ -219,6 +225,8 @@ async def build(adapter: Any) -> dict[str, str]:
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
+    width_position = _dimension_position(adapter, front_annotations, "Width")
+    depth_position = _dimension_position(adapter, top_annotations, "Depth")
     set_dimension_callouts(
         adapter,
         [*front_annotations, *top_annotations, *right_annotations],
@@ -242,9 +250,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Datum A = the foot seat face (the platform-seat datum the adjuster and
     # pinch-axis heights measure from).
-    # Attach datum A to the RIGHT of the foot-bottom edge so its symbol clears
-    # the centred 14.00 Width dimension (which sits at x=FRONT_CENTER[0]).
-    foot_edge = (FRONT_CENTER[0] + 0.005, _front_y(0.0))
     foot_entity = _foot_edge(adapter, front)
     add_datum_feature(
         adapter,
@@ -257,7 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=FRONT_KEEP["Width"],
+        edge_xy=width_position,
         symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024),
         datum="B",
         label="block-width median plane",
@@ -288,8 +293,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        edge_xy=TOP_KEEP["Depth"],
-        symbol_xy=TOP_KEEP["Depth"],
+        edge_xy=depth_position,
+        symbol_xy=depth_position,
         datum="D",
         label="block-depth median plane",
         entity_type="DIMENSION",

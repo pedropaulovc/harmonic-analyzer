@@ -68,10 +68,10 @@ ISO_CENTER = (0.350, 0.150)
 # Per-view survivors of the marked-dimension import: the bend radius (R51) and
 # the horizontal arm run, both on the Front-plane sweep path (so both project to
 # the elevation).  Positions are near the bend/arm at the top of the view.
-FRONT_KEEP = {
-    "BendRadius": (0.225, 0.212),
-    "ArmRun": (0.150, 0.250),
-}
+FRONT_KEEP = (
+    "BendRadius",
+    "ArmRun",
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:

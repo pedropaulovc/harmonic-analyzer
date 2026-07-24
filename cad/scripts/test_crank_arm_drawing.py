@@ -145,7 +145,7 @@ def test_dimple_has_both_nominal_location_coordinates() -> None:
     assert crank_arm_spec.DIMPLE_X == 30.0
     assert crank_arm_spec.HALF_WIDTH == 8.0
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"DimpleX":' in source
+    assert "DimpleX" in drawing.FRONT_KEEP
     assert "dimple_transverse = add_edge_dimension(" in source
     assert 'label="dimple transverse location from datum C"' in source
     assert "set_arc_endpoints_to_center(\n        adapter,\n        dimple_transverse" in source

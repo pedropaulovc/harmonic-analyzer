@@ -96,22 +96,20 @@ SCREW_R_SHEET = SCREW_HOLE_DIA * SHEET_SCALE[0] / 2000.0
 # position.  The bore-station pair (7.5/7.5 off the symmetric mid-plane) stacks
 # above the view; the vertical chain (bore height, lift drop) sits left; the
 # leadered diameters land in the clear corners.
-FRONT_KEEP = {
-    "BlockWidth": (0.135, 0.092),
-    "BlockHeight": (0.212, 0.130),
-    "AnchorZ": (0.062, 0.124),
-    "PivotBoreX": (_front_x(BORE_HALF_SPACING / 2.0), 0.162),
-    "LiftBoreX": (_front_x(-BORE_HALF_SPACING / 2.0), 0.172),
-    "LiftBoreCz": (0.086, 0.146),
-    # Lifted out of the between-views band to the clear sheet RIGHT of the top
-    # view (which ends at x=0.189). Horizontal text makes this callout ~46 mm
-    # wide, and at (0.205, 0.180) it filled the band the bore's Ra symbol needs;
-    # the bore-centre leader now passes ~35 mm clear of the top view's corner.
-    "PivotBoreDia": (0.235, 0.205),
-    "LiftBoreDia": (0.078, 0.184),
-}
-RIGHT_KEEP = {"Depth": (0.280, 0.168)}
-TOP_KEEP = {}
+FRONT_KEEP = frozenset(
+    {
+        "BlockWidth",
+        "BlockHeight",
+        "AnchorZ",
+        "PivotBoreX",
+        "LiftBoreX",
+        "LiftBoreCz",
+        "PivotBoreDia",
+        "LiftBoreDia",
+    }
+)
+RIGHT_KEEP = frozenset({"Depth"})
+TOP_KEEP = frozenset()
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "THRU - REAM 1/4 IN\n+0.05/-0.00",
     "LiftBoreDia": "THRU - REAM 1/4 IN\n+0.05/-0.00",

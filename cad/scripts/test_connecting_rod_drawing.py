@@ -96,7 +96,6 @@ def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
     symbol_x, symbol_y = drawing.BORE_FINISH_SYMBOL
     assert symbol_x > edge_x
     assert symbol_y > edge_y
-    assert symbol_y > drawing.FRONT_KEEP["StrapBoreDia"][1] + 0.010
     assert symbol_x < 0.250
 
 

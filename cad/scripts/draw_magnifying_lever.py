@@ -33,7 +33,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from magnifying_lever_spec import ROD_DIA, ROD_LENGTH
+from magnifying_lever_spec import (
+    ROD_DIA,  # noqa: F401 - drawing contract re-export
+    ROD_LENGTH,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -64,11 +67,11 @@ ISO_SCALE = (1, 2)
 
 # The two native profile dims the print keeps: the far dome-centre station
 # (below the side view) and the dome radius (above the right dome).
-FRONT_KEEP = {
-    "RightDomeCentre": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.032),
-    "DomeRadius": (RIGHT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.028),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = (
+    "RightDomeCentre",
+    "DomeRadius",
+)
+RIGHT_KEEP: tuple[str, ...] = ()
 DIMENSION_CALLOUTS = {
     "DomeRadius": "FULL R, BOTH ENDS - Ø6 ROD",
     "RightDomeCentre": "TO FAR DOME CENTRE",

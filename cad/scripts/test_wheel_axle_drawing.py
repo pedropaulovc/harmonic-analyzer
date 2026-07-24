@@ -29,14 +29,12 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         drawing.STUD_DIA,
         drawing.STUD_LEN,
         drawing.COLLAR_DIA,
-        drawing.COLLAR_LEN,
     ) == (
         wheel_axle_spec.FLANGE_DIA,
         wheel_axle_spec.FLANGE_LEN,
         wheel_axle_spec.STUD_DIA,
         wheel_axle_spec.STUD_LEN,
         wheel_axle_spec.COLLAR_DIA,
-        wheel_axle_spec.COLLAR_LEN,
     )
 
 

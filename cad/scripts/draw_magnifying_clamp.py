@@ -37,10 +37,8 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from magnifying_clamp_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
-    BLOCK_WIDTH,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
-    ROD_BORE_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -78,21 +76,17 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - BLOCK_HEIGHT / 2.0) * SHEET_SCALE[0] / 1000.0
 
 
-FRONT_KEEP = {
-    # In the 0.176..0.201 free band between the notes paragraph (whose longest
-    # line reaches ~0.175) and the right view's left edge: at a centred or
-    # +0.052 position the 20.00 text landed inside the notes text (eye pass;
-    # display dims are overlap-exempt in the audit, so only the eye catches it).
-    "Width": (FRONT_CENTER[0] + 0.072, _front_y(0.0) - 0.014),
-    "Height": (FRONT_CENTER[0] - BLOCK_WIDTH * 2.0 / 1000.0 - 0.022, FRONT_CENTER[1]),
-    "LeverBoreYDim": (FRONT_CENTER[0] + BLOCK_WIDTH * 2.0 / 1000.0 + 0.020, _front_y(LEVER_BORE_Y / 2.0)),
-    "LeverBoreDiaDim": (FRONT_CENTER[0] - 0.045, _front_y(LEVER_BORE_Y) + 0.030),
-}
-TOP_KEEP = {
-    "RodBoreXDim": (_front_x(ROD_BORE_X / 2.0), TOP_CENTER[1] - 0.038),
-    "RodBoreDiaDim": (_front_x(ROD_BORE_X) + 0.034, TOP_CENTER[1] + 0.030),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = (
+    "Width",
+    "Height",
+    "LeverBoreYDim",
+    "LeverBoreDiaDim",
+)
+TOP_KEEP = (
+    "RodBoreXDim",
+    "RodBoreDiaDim",
+)
+RIGHT_KEEP: tuple[str, ...] = ()
 
 DIMENSION_CALLOUTS = {
     "LeverBoreDiaDim": "THRU - SLIP FIT Ø6 ROD",

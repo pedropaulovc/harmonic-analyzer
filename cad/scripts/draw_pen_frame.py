@@ -32,7 +32,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_pen_frame import OUTER_HEIGHT, OUTER_WIDTH
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -59,16 +58,7 @@ FRONT_CENTER = (0.115, 0.165)
 ISO_CENTER = (0.325, 0.175)
 RIGHT_CENTER = (0.220, 0.165)
 
-FRONT_KEEP = {
-    "OuterHeightDim": (
-        FRONT_CENTER[0] - OUTER_WIDTH * VIEW_SCALE / 2000.0 - 0.016,
-        FRONT_CENTER[1],
-    ),
-    "OuterSpanX": (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + OUTER_HEIGHT * VIEW_SCALE / 2000.0 + 0.014,
-    ),
-}
+FRONT_KEEP = frozenset({"OuterHeightDim", "OuterSpanX"})
 
 
 async def build(adapter: Any) -> dict[str, str]:

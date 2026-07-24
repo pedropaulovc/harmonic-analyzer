@@ -19,7 +19,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from crank_pin_spec import BIG_END_DIA, PIN_LENGTH, SMALL_END_DIA
+from crank_pin_spec import (
+    BIG_END_DIA,  # noqa: F401 - drawing contract re-export
+    PIN_LENGTH,
+    SMALL_END_DIA,  # noqa: F401 - drawing contract re-export
+)
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -56,9 +60,7 @@ _HALF_LENGTH = PIN_LENGTH * SHEET_SCALE[0] / 2000.0
 BIG_END_EDGE = (FRONT_CENTER[0] - _HALF_LENGTH, FRONT_CENTER[1])
 SMALL_END_EDGE = (FRONT_CENTER[0] + _HALF_LENGTH, FRONT_CENTER[1])
 
-FRONT_KEEP = {
-    "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.033),
-}
+FRONT_KEEP = ("Length",)
 
 
 @_telemetry.traced("drawing.end_diameter", label_param="label")

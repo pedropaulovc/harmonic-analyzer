@@ -52,14 +52,12 @@ END_CENTER = (0.065, 0.150)
 SIDE_CENTER = (0.190, 0.190)
 ISO_CENTER = (0.320, 0.180)
 
-END_KEEP = {
-    "HeadDia": (0.028, END_CENTER[1] + 0.024),
-}
+END_KEEP = ("HeadDia",)
 DIMENSION_CALLOUTS: dict[str, str] = {}
-SIDE_KEEP = {
-    "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.030),
-    "ShankLg": (SIDE_CENTER[0] - 0.052, SIDE_CENTER[1] - 0.030),
-}
+SIDE_KEEP = (
+    "HeadHt",
+    "ShankLg",
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:

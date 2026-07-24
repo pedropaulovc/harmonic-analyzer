@@ -60,16 +60,8 @@ ISO_CENTER = (0.320, 0.120)
 # HERE rather than on the front view's end circle -- see the GD&T block below.
 SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    # x=0.030, not the bbox-derived 0.017: horizontal text made this callout
-    # ~25 mm wide ("+0.00/-0.02"), so centred that far left it ran over the
-    # 12.7 mm zone margin. 0.030 clears the margin on the left and stops short
-    # of the end circle at x=0.049 on the right.
-    "ShaftDia": (0.030, 0.220),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
-}
+FRONT_KEEP = frozenset({"ShaftDia"})
+RIGHT_KEEP = frozenset({"Depth"})
 DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02", "Depth": "+/-0.25"}
 
 

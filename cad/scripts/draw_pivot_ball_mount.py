@@ -74,12 +74,9 @@ def _front_y(model_y: float) -> float:
 # The elevation carries the shared sphere/bore center height and bore diameter.
 # The turned diameters use explicit leadered feature callouts below rather than
 # displaying radial sketch dimensions as ambiguous pseudo-diameters.
-FRONT_KEEP = {
-    "BallRise": (FRONT_CENTER[0] - 0.050, _front_y(BALL_CENTER_H / 2.0)),
-    "ShaftBoreDia": (FRONT_CENTER[0] + 0.052, _front_y(BALL_CENTER_H)),
-}
+FRONT_KEEP = frozenset({"BallRise", "ShaftBoreDia"})
 # No second orthographic view carries dimensions; keep the test contract honest.
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+TOP_KEEP = frozenset()
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "+0.00/-0.05 THRU",
 }
@@ -291,7 +288,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum A is the seat face. Datum B is derived from the cylindrical stem,
     # making the sphere, pad, and cross-bore controls inspectable from one DRF.
     _bore_r = BORE_DIA / 2.0 * _S
-    seat_edge = (FRONT_CENTER[0] + 0.008, _front_y(0.0))
     seat_entity, bore_entity = _front_entities(adapter, front)
     add_datum_feature(
         adapter,

@@ -25,7 +25,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from wheel_axle_spec import (
     COLLAR_DIA,
-    COLLAR_LEN,
     FLANGE_DIA,
     FLANGE_LEN,
     STUD_DIA,
@@ -71,34 +70,8 @@ def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - _TOTAL_LEN / 2.0) * _K
 
 
-FRONT_KEEP = {
-    "FlangeLength": (
-        FRONT_CENTER[0] - FLANGE_DIA / 2.0 * _K - 0.018,
-        _front_y(FLANGE_LEN / 2.0),
-    ),
-    "StudLength": (
-        FRONT_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.030,
-        _front_y(FLANGE_LEN + STUD_LEN / 2.0),
-    ),
-    "CollarLength": (
-        FRONT_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.012,
-        _front_y(_TOTAL_LEN - COLLAR_LEN / 2.0),
-    ),
-}
-END_KEEP = {
-    "FlangeDia": (
-        END_CENTER[0] - FLANGE_DIA / 2.0 * _K - 0.012,
-        END_CENTER[1] + 0.045,
-    ),
-    "CollarDia": (
-        END_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.015,
-        END_CENTER[1] + 0.028,
-    ),
-    "StudDia": (
-        END_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.015,
-        END_CENTER[1] - 0.028,
-    ),
-}
+FRONT_KEEP = frozenset({"FlangeLength", "StudLength", "CollarLength"})
+END_KEEP = frozenset({"FlangeDia", "CollarDia", "StudDia"})
 # The magnifying wheel's O5 bore rides the stud: unilateral-minus keeps a
 # 0.02..0.05 running clearance against the nominal-on-nominal bore.
 DIMENSION_CALLOUTS = {"StudDia": "-0.02/-0.05"}
@@ -135,12 +108,6 @@ def _view_center_delta(
         f"({intended[0]:.4f}, {intended[1]:.4f})"
     )
     return cx - intended[0], cy - intended[1]
-
-
-def _shift(
-    points: dict[str, tuple[float, float]], dx: float, dy: float
-) -> dict[str, tuple[float, float]]:
-    return {name: (x + dx, y + dy) for name, (x, y) in points.items()}
 
 
 def _find_edge(
@@ -243,10 +210,10 @@ async def build(adapter: Any) -> dict[str, str]:
         return (x + edx, y + edy)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=_shift(FRONT_KEEP, fdx, fdy), view_label="front"
+        adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     end_annotations = curate_view_dimensions(
-        adapter, end, keep=_shift(END_KEEP, edx, edy), view_label="end"
+        adapter, end, keep=END_KEEP, view_label="end"
     )
     set_dimension_callouts(
         adapter, [*front_annotations, *end_annotations], DIMENSION_CALLOUTS

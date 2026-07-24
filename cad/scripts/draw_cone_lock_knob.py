@@ -30,7 +30,7 @@ from cone_lock_knob_spec import (
     STUD_LEN,
     STUD_THREAD,
     WASHER_DIA,
-    WASHER_T,
+    WASHER_T,  # noqa: F401 - drawing contract re-export
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -74,54 +74,17 @@ def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - _MID_Y) * _S + _FRONT_Y_OFFSET
 
 
-FRONT_KEEP = {
-    # Anchored ABOVE the flange's top face, not at its mid-height.  The flange is
-    # 1.5 mm thick, so at 3:1 its two extension lines are just 4.5 mm apart
-    # (measured 2026-07-16 at x=0.115, clear of the text: y=0.1437 and y=0.1392).
-    # `_front_y(WASHER_T / 2.0)` put the text INSIDE that 4.5 mm gap, and the text
-    # is a two-line block ~9.4 mm tall ("1.50" over the "+/-0.10" callout) -- it
-    # cannot fit, so the dimension printed through itself: at x=0.1305 the upper
-    # extension line reappears at y=0.1437..0.1439, dead through the middle of
-    # "1.50" (glyphs y=0.1417..0.1451), the lower line at y=0.1392 clips the top of
-    # "+/-0.10", and the vertical dim line at x=0.130 crosses both.  SolidWorks has
-    # already flipped the arrows outside the gap (y=0.1472 / 0.1357); only the text
-    # was left behind.
-    #
-    # `_front_y(WASHER_T) + 0.013` tracks the flange's TOP FACE (y=0.14305, which
-    # the measured 0.1437 extension line confirms) rather than freezing a literal,
-    # and 13 mm of standoff clears the upper arrowhead by 4.1 mm.  The band above
-    # is empty: probed x=0.105..0.152 at y=0.152/0.156/0.160 -- no ink at all.
-    "WasherT": (
-        FRONT_CENTER[0] + WASHER_DIA * _S / 2.0 + 0.028,
-        _front_y(WASHER_T) + 0.013,
-    ),
-    "BodyTop": (
-        FRONT_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.024,
-        _front_y(BODY_TOP / 2.0),
-    ),
-    "StudLen": (
-        FRONT_CENTER[0] - WASHER_DIA * _S / 2.0 - 0.024,
-        _front_y(-STUD_LEN / 2.0),
-    ),
-    "DomeR": (
-        FRONT_CENTER[0] + BODY_DIA * _S / 2.0 + 0.026,
-        _front_y(BODY_TOP) + 0.012,
-    ),
-}
-# x=0.030 for the two leadered diameters, not the old washer-derived 0.018: a
-# horizontal "O13.00" is ~19 mm wide and CENTRED on its anchor, so 0.018 ran its
-# text out to x=0.008 -- across the border rule at ~0.0126.  The layout audit
-# cannot see this: it boxes a dim as a nominal 4 mm half-square
-# (_NOMINAL_DIM_HALF_M), which at 0.018 still cleared the 12.7 mm zone margin.
-# 0.030 puts the text at ~0.021..0.039: inside the frame, outside the view.
-TOP_KEEP = {
-    "WasherDia": (0.030, TOP_CENTER[1] - 0.016),
-    "BodyDia": (0.030, TOP_CENTER[1] + 0.018),
-    "StudDia": (
-        TOP_CENTER[0] + WASHER_DIA * _S / 2.0 + 0.026,
-        TOP_CENTER[1] - 0.012,
-    ),
-}
+FRONT_KEEP = (
+    "WasherT",
+    "BodyTop",
+    "StudLen",
+    "DomeR",
+)
+TOP_KEEP = (
+    "WasherDia",
+    "BodyDia",
+    "StudDia",
+)
 DIMENSION_CALLOUTS = {
     "StudDia": f"{STUD_THREAD} UNC-2A",
     "WasherT": "+/-0.10",
@@ -142,15 +105,6 @@ def _outline_center(adapter: Any, view: Any) -> tuple[float, float]:
         float(v) for v in adapter._get_attr_or_call(view, "GetOutline")
     )
     return ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-
-
-def _shifted(
-    positions: dict[str, tuple[float, float]], delta: tuple[float, float]
-) -> dict[str, tuple[float, float]]:
-    return {
-        name: (x + delta[0], y + delta[1])
-        for name, (x, y) in positions.items()
-    }
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -210,10 +164,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=_shifted(FRONT_KEEP, front_delta), view_label="front"
+        adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     top_annotations = curate_view_dimensions(
-        adapter, top, keep=_shifted(TOP_KEEP, top_delta), view_label="top"
+        adapter, top, keep=TOP_KEEP, view_label="top"
     )
     annotations = [*front_annotations, *top_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)

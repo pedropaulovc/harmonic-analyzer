@@ -20,7 +20,7 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (6.0, 1.0)
-END_KEEP = {"HeadDiaDim": (0.028, 0.176)}
+END_KEEP = frozenset({"HeadDiaDim"})
 DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Swing Stop Screw Manufacturing Drawing",

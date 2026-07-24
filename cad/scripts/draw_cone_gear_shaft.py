@@ -3,7 +3,6 @@ r"""Create the curated machinist drawing for the stepped cone gear shaft."""
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -61,19 +60,19 @@ ISO_CENTER = (0.360, 0.200)
 
 # Axial step stations (extrude depths Sec{i}End), all measured from the
 # large-end datum face: baseline dimensioning, shortest nearest the part.
-SIDE_KEEP = {
-    "Sec0End": (0.190, 0.196),
-    "Sec1End": (0.175, 0.184),
-    "Sec2End": (0.160, 0.172),
-    "Sec3End": (0.145, 0.160),
-}
+SIDE_KEEP = (
+    "Sec0End",
+    "Sec1End",
+    "Sec2End",
+    "Sec3End",
+)
 # Section seat/journal diameters, staggered right of the end view.
-END_KEEP = {
-    "Sec0Dia": (0.105, 0.132),
-    "Sec1Dia": (0.105, 0.120),
-    "Sec2Dia": (0.105, 0.108),
-    "Sec3Dia": (0.105, 0.096),
-}
+END_KEEP = (
+    "Sec0Dia",
+    "Sec1Dia",
+    "Sec2Dia",
+    "Sec3Dia",
+)
 DIMENSION_CALLOUTS = {name: "+0.00/-0.02" for name in END_KEEP}
 # The four diameters are exact inch conversions (0.375/0.25/0.125/0.03125 in);
 # 3 decimals so the view matches the notes (9.525, not 9.53).
@@ -203,15 +202,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    # Sheet geometry the GD&T picks attach to (meters). The end view shows the
-    # Ø9.525 pivot journal as its outermost circle; the side view's tip journal
-    # silhouette hugs the axis line (half-height 0.79 mm x scale / 2).
-    pivot_circle = (
-        END_CENTER[0]
-        + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
-        END_CENTER[1]
-        + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
-    )
+    # Sheet geometry the GD&T picks attach to (meters). The side view's tip
+    # journal silhouette hugs the axis line (half-height 0.79 mm x scale / 2).
     pivot_edge = _outer_end_edge(adapter, end)
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)

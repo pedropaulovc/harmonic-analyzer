@@ -63,11 +63,8 @@ ISO_CENTER = (0.320, 0.095)
 _HALF_LEN = BAR_LENGTH * SHEET_SCALE[0] / 2000.0
 LEFT_END = FRONT_CENTER[0] - _HALF_LEN
 
-FRONT_KEEP = {
-    "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.030),
-    "Side": (LEFT_END - 0.020, FRONT_CENTER[1]),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = frozenset({"Length", "Side"})
+RIGHT_KEEP = frozenset()
 
 RIGHT_HALF_Z = BAR_DEPTH * SHEET_SCALE[0] / 2000.0
 RIGHT_HALF_Y = BAR_SIDE * SHEET_SCALE[0] / 2000.0

@@ -61,17 +61,8 @@ ISO_CENTER = (0.345, 0.145)
 # HERE rather than on the front view's end circle -- see the GD&T block below.
 ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    # Offset kept tight (-0.010, not the fulcrum -0.025): the toleranced text
-    # is wide and a further-left anchor runs it across the sheet border.
-    "RodDia": (
-        FRONT_CENTER[0] - ROD_DIA * END_VIEW_SCALE / 1000.0 - 0.010,
-        FRONT_CENTER[1] + 0.008,
-    ),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
-}
+FRONT_KEEP = frozenset({"RodDia"})
+RIGHT_KEEP = frozenset({"Depth"})
 DIMENSION_CALLOUTS = {"RodDia": "+0.00/-0.02"}
 # The length tolerance rides its own dimension (codex machinist review: a
 # detached "LENGTH +/-0.25" UOS note is ambiguous about which length it bounds).

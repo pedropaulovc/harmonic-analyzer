@@ -61,16 +61,12 @@ END_CENTER = (0.095, 0.100)
 CUP_CENTER = (0.190, 0.100)
 ISO_CENTER = (0.300, 0.160)
 
-FRONT_KEEP = {
-    "BodyLenDim": (FRONT_CENTER[0] - 0.045, FRONT_CENTER[1]),
-    "BodyDiaDim": (FRONT_CENTER[0] + 0.060, FRONT_CENTER[1] + 0.010),
-}
-END_KEEP = {
-    "SlotWDim": (END_CENTER[0] + 0.055, END_CENTER[1] - 0.015),
-}
-CUP_KEEP = {
-    "CupDiaDim": (CUP_CENTER[0] + 0.050, CUP_CENTER[1]),
-}
+FRONT_KEEP = (
+    "BodyLenDim",
+    "BodyDiaDim",
+)
+END_KEEP = ("SlotWDim",)
+CUP_KEEP = ("CupDiaDim",)
 DIMENSION_CALLOUTS = {
     "BodyDiaDim": f"{THREAD} UNC-2A",
     "BodyLenDim": "+/-0.10",

@@ -57,9 +57,7 @@ ISO_CENTER = (0.300, 0.170)
 
 # Per-view survivor of the marked-dimension import: the run length only (the
 # Ø0.8 diameter is a note -- a 0.8 mm circle is below the view's ink width).
-FRONT_KEEP = {
-    "Depth": (0.078, 0.155),
-}
+FRONT_KEEP = frozenset({"Depth"})
 
 
 async def build(adapter: Any) -> dict[str, str]:

@@ -34,7 +34,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_gooseneck_clamp import BLOCK_HALF_X, BLOCK_HEIGHT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -70,13 +69,11 @@ ISO_CENTER = (0.345, 0.150)
 # at y=0.080, interleaving with the notes block raised for the border fix --
 # audit-blind because the note is view-owned), Height to its left, the bore Ø
 # leadered to the upper-right of the top view.
-FRONT_KEEP = {
-    "Width": (FRONT_CENTER[0], FRONT_CENTER[1] + BLOCK_HEIGHT / 2.0 * _M + 0.011),
-    "Height": (FRONT_CENTER[0] - BLOCK_HALF_X * _M - 0.014, FRONT_CENTER[1]),
-}
-TOP_KEEP = {
-    "BoreDia": (TOP_CENTER[0] + BLOCK_HALF_X * _M + 0.014, TOP_CENTER[1] + 0.012),
-}
+FRONT_KEEP = (
+    "Width",
+    "Height",
+)
+TOP_KEEP = ("BoreDia",)
 
 
 async def build(adapter: Any) -> dict[str, str]:

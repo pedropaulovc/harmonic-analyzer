@@ -77,10 +77,7 @@ DATUM_C_SYMBOL_XY = (0.210, 0.105)
 
 # Per-view survivors of the marked-dimension import. Width/Depth are the straight
 # rail outside profile, not the boss envelope; note 2 states both explicitly.
-TOP_KEEP = {
-    "Width": (TOP_CENTER[0], TOP_CENTER[1] + OUTER_Z * VIEW_SCALE / 1000.0 + 0.012),
-    "Depth": (TOP_CENTER[0] + OUTER_X * VIEW_SCALE / 1000.0 + 0.016, TOP_CENTER[1]),
-}
+TOP_KEEP = frozenset({"Width", "Depth"})
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:

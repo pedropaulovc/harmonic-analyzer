@@ -68,9 +68,7 @@ END_CENTER = (0.330, 0.095)
 
 # Per-view survivor: overall axis length only. Axis-relative end offsets in the
 # notes define both asymmetric end widths without redundant chained dimensions.
-TOP_KEEP = {
-    "PlateLenDim": (0.048, TOP_CENTER[1]),
-}
+TOP_KEEP = ("PlateLenDim",)
 
 
 def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:

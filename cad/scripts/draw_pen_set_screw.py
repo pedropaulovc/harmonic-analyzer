@@ -20,7 +20,7 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (5.0, 1.0)
-END_KEEP = {"KnobDia": (0.028, 0.176)}
+END_KEEP = frozenset({"KnobDia"})
 DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Pen Set Screw Manufacturing Drawing",

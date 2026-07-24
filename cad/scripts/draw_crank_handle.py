@@ -87,14 +87,12 @@ def _front_y(model_y_mm: float) -> float:
 
 COLLAR_R_SHEET = COLLAR_R * SHEET_SCALE[0] / 1000.0
 
-FRONT_KEEP = {
-    "HandleLength": (0.150, 0.128),
-    "CollarLength": (0.070, 0.222),
-    "PeakStation": (0.150, 0.242),
-}
-RIGHT_KEEP = {
-    "PivotBoreDia": (0.360, 0.220),
-}
+FRONT_KEEP = (
+    "HandleLength",
+    "CollarLength",
+    "PeakStation",
+)
+RIGHT_KEEP = ("PivotBoreDia",)
 DIMENSION_CALLOUTS = {
     "HandleLength": "+0.00/-0.25 OVERALL",
     "PivotBoreDia": (

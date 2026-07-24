@@ -71,9 +71,7 @@ CONE_FLANK = (
     FRONT_CENTER[1] + _HALF_DIA / 2.0,
 )
 
-FRONT_KEEP = {
-    "ConeH": (APEX[0] + 0.005, FRONT_CENTER[1] - 0.030),
-}
+FRONT_KEEP = frozenset({"ConeH"})
 
 
 def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:

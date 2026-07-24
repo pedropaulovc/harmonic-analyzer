@@ -53,11 +53,9 @@ TOP_CENTER = (0.220, 0.150)  # square-section end view (4:1)
 ISO_CENTER = (0.330, 0.140)
 
 
-FRONT_KEEP = {
-    "BarLength": (0.075, FRONT_CENTER[1]),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = ("BarLength",)
+RIGHT_KEEP: tuple[str, ...] = ()
+TOP_KEEP: tuple[str, ...] = ()
 
 
 async def build(adapter: Any) -> dict[str, str]:

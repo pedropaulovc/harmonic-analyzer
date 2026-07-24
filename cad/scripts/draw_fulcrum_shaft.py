@@ -65,12 +65,8 @@ ISO_SCALE = (1, 2)
 # ~0.0126.  The layout audit cannot catch that: it boxes a dim as a nominal 4 mm
 # half-square (_NOMINAL_DIM_HALF_M), far narrower than the real text, and even
 # that box cleared the 12.7 mm zone margin at 0.0173.
-FRONT_KEEP = {
-    "ShaftDia": (0.030, FRONT_CENTER[1]),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
-}
+FRONT_KEEP = ("ShaftDia",)
+RIGHT_KEEP = ("Depth",)
 DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
 
 

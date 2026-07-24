@@ -87,12 +87,9 @@ def _fy(model_y_mm: float) -> float:
 # Per-view survivors of the marked-dimension import (all Front-plane sketch dims):
 # the block width, the strap bottom/top widths and the strap rise.  Positioned to
 # the left / top of the tall narrow view, clear of the mid-band notes.
-FRONT_KEEP = {
-    "StrapTopRun": (FRONT_CENTER[0], _fy(STRAP_TOP_Y) + 0.012),
-    "StrapTaperDy": (_fx(_BBOX_X[0]) - 0.018, FRONT_CENTER[1]),
-    "StrapBotWidth": (_fx(_BBOX_X[0]) - 0.014, _fy(BLOCK_HALF) + 0.006),
-    "BlockWidth": (FRONT_CENTER[0], _fy(-BLOCK_HALF) - 0.012),
-}
+FRONT_KEEP = frozenset(
+    {"StrapTopRun", "StrapTaperDy", "StrapBotWidth", "BlockWidth"}
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:

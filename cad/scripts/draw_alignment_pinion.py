@@ -60,9 +60,7 @@ HALF_FACE = FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 LEFT_END_X = RIGHT_CENTER[0] - HALF_FACE
 RIGHT_END_X = RIGHT_CENTER[0] + HALF_FACE
 
-FRONT_KEEP = {
-    "ArborBoreDia": (FRONT_CENTER[0] - 0.050, FRONT_CENTER[1] - 0.030),
-}
+FRONT_KEEP = ("ArborBoreDia",)
 DIMENSION_CALLOUTS = {
     # Light press under the MHA-102 arbor's Ø8.00 +0.00/-0.02 journal: bore
     # 7.96..7.98 vs shaft 7.98..8.00 guarantees 0.00..0.04 interference. Also

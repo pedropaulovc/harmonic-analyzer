@@ -97,19 +97,9 @@ def _front_y(model_y_mm: float) -> float:
 
 BORE_R_SHEET = TUBE_ID * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    "GripDia": (0.045, 0.196),
-    "TubeOd": (0.045, 0.116),
-    "TubeId": (0.075, 0.096),
-    "RodSpan": (0.115, 0.245),
-}
-RIGHT_KEEP = {
-    "GripLen": (0.205, 0.078),
-    "TubeLen": (0.165, 0.118),
-}
-TOP_KEEP = {
-    "RodDia": (0.300, 0.092),
-}
+FRONT_KEEP = frozenset({"GripDia", "TubeOd", "TubeId", "RodSpan"})
+RIGHT_KEEP = frozenset({"GripLen", "TubeLen"})
+TOP_KEEP = frozenset({"RodDia"})
 DIMENSION_CALLOUTS = {
     "TubeId": (
         f"NOMINAL REF ONLY\nFINAL REAM LIMITS\n{fit_limits(TUBE_ID, REAM_SLIDE)}\nRa 1.6"

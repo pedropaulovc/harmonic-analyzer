@@ -50,25 +50,8 @@ RIGHT_CENTER = (0.140, 0.150)
 TOP_CENTER = (0.070, 0.245)
 ISO_CENTER = (0.340, 0.195)
 
-FRONT_KEEP = {
-    "Length": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
-    # x offset -0.034 (the Depth spelling below), NOT the view centre: Section
-    # measures the 5 mm square across, so at 1:1 its two extension lines land
-    # 4.7 mm apart (measured x=0.0679 and x=0.0726) while the toleranced text
-    # renders 24.5 mm wide. Centred on FRONT_CENTER[0] the text spanned
-    # 0.0580..0.0820, so BOTH extension lines ran through it and struck out
-    # "+0.00/-0.05". text_xy is the text CENTRE, so -0.034 puts the run at
-    # 0.0238..0.0483: clear of the left extension line by 19.6 mm and of the
-    # drawn border rule (gray, x=~0.0126) by ~11.2 mm. No gate sees this -- a
-    # dimension exposes no GetExtent, so only the render shows it.
-    "Section": (
-        FRONT_CENTER[0] - 0.034,
-        FRONT_CENTER[1] - ROD_LENGTH / 2000.0 - 0.012,
-    ),
-}
-TOP_KEEP = {
-    "Depth": (TOP_CENTER[0] - 0.034, TOP_CENTER[1]),
-}
+FRONT_KEEP = frozenset({"Length", "Section"})
+TOP_KEEP = frozenset({"Depth"})
 # No-oversize on BOTH functional slide faces: Section (front, X width) and Depth
 # (top, Z width) are the two 5 mm faces the rod rides on in the v-block, so each
 # is controlled +0.00/-0.05 rather than leaning on the general SECTION +/-0.05.
@@ -134,7 +117,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the wire hole")
 
     front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
-    front_top = (FRONT_CENTER[0], FRONT_CENTER[1] + ROD_LENGTH / 2000.0)
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
     front_far_side = (FRONT_CENTER[0] + 0.0025, FRONT_CENTER[1])
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0

@@ -43,6 +43,48 @@ def _has_precomputed_placements(tree: ast.AST) -> bool:
     )
 
 
+def _top_level_assignments(tree: ast.Module) -> dict[str, ast.expr]:
+    assignments: dict[str, ast.expr] = {}
+    for statement in tree.body:
+        if isinstance(statement, ast.AnnAssign) and isinstance(
+            statement.target, ast.Name
+        ):
+            if statement.value is not None:
+                assignments[statement.target.id] = statement.value
+            continue
+        if not isinstance(statement, ast.Assign):
+            continue
+        for target in statement.targets:
+            if isinstance(target, ast.Name):
+                assignments[target.id] = statement.value
+    return assignments
+
+
+def _dimension_names(
+    expression: ast.expr, assignments: dict[str, ast.expr]
+) -> tuple[str, ...]:
+    if isinstance(expression, ast.Name):
+        assert expression.id in assignments, f"unresolved keep collection {expression.id}"
+        return _dimension_names(assignments[expression.id], assignments)
+    if isinstance(expression, (ast.Set, ast.List, ast.Tuple)):
+        assert all(
+            isinstance(element, ast.Constant) and isinstance(element.value, str)
+            for element in expression.elts
+        ), "dimension keep collections may contain names only"
+        return tuple(str(element.value) for element in expression.elts)
+    if isinstance(expression, ast.Call) and isinstance(expression.func, ast.Name):
+        assert expression.func.id in {"frozenset", "set", "tuple", "list"}
+        if not expression.args:
+            assert not expression.keywords
+            return ()
+        assert len(expression.args) == 1 and not expression.keywords
+        return _dimension_names(expression.args[0], assignments)
+    raise AssertionError(
+        "dimension keep must be a literal name collection, not a coordinate mapping: "
+        f"{ast.dump(expression, include_attributes=False)}"
+    )
+
+
 @pytest.mark.parametrize("spec", PART_DRAWINGS, ids=lambda spec: spec.name)
 def test_part_drawing_keeps_explicit_placements_and_default_visuals(
     spec: DrawingSpec,
@@ -61,6 +103,83 @@ def test_part_drawing_keeps_explicit_placements_and_default_visuals(
         f"{spec.name} overrides SolidWorks drawing visuals: "
         f"{sorted(calls & VISUAL_OVERRIDE_CALLS)}"
     )
+
+
+@pytest.mark.parametrize("spec", PART_DRAWINGS, ids=lambda spec: spec.name)
+def test_dimension_curation_keeps_names_without_coordinate_maps(
+    spec: DrawingSpec,
+) -> None:
+    tree = ast.parse(spec.script.read_text(encoding="utf-8"), filename=str(spec.script))
+    assignments = _top_level_assignments(tree)
+    for call in (
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and _call_name(node) == "curate_view_dimensions"
+    ):
+        keep = next(keyword.value for keyword in call.keywords if keyword.arg == "keep")
+        names = _dimension_names(keep, assignments)
+        assert len(names) == len(set(names)), f"{spec.name} repeats a dimension name"
+
+
+def test_curate_view_dimensions_deletes_only_and_never_repositions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    keep = SimpleNamespace(name="Keep")
+    drop = SimpleNamespace(name="Drop")
+    curate_calls: list[tuple[str, ...]] = []
+
+    monkeypatch.setattr(
+        drawing_common, "_prepare_view_for_annotation_authoring", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        drawing_common,
+        "insert_marked_dimensions",
+        lambda *_args: [keep, drop],
+    )
+    monkeypatch.setattr(
+        drawing_common,
+        "delete_unnamed_imports",
+        lambda _adapter, annotations: annotations,
+    )
+    monkeypatch.setattr(
+        drawing_common,
+        "dimension_name",
+        lambda _adapter, annotation: annotation.name,
+    )
+
+    def curate(_adapter, annotations, *, delete):
+        curate_calls.append(delete)
+        return [annotation for annotation in annotations if annotation.name not in delete]
+
+    monkeypatch.setattr(drawing_common, "curate_dimensions", curate)
+
+    curated = drawing_common.curate_view_dimensions(
+        object(), object(), keep={"Keep"}, view_label="front"
+    )
+
+    assert curated == [keep]
+    assert curate_calls == [("Drop",)]
+    assert "reposition" not in inspect.getsource(drawing_common.curate_view_dimensions)
+
+
+def test_curate_view_dimensions_still_rejects_missing_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        drawing_common, "_prepare_view_for_annotation_authoring", lambda *_args: None
+    )
+    monkeypatch.setattr(drawing_common, "insert_marked_dimensions", lambda *_args: [])
+    monkeypatch.setattr(
+        drawing_common,
+        "delete_unnamed_imports",
+        lambda _adapter, annotations: annotations,
+    )
+    monkeypatch.setattr(drawing_common, "curate_dimensions", lambda *_args, **_kwargs: [])
+
+    with pytest.raises(RuntimeError, match=r"missing model dimensions: \['Required'\]"):
+        drawing_common.curate_view_dimensions(
+            object(), object(), keep={"Required"}, view_label="front"
+        )
 
 
 def test_hidden_edges_are_temporary_authoring_input_not_saved_visuals(

@@ -58,13 +58,11 @@ ISO_CENTER = (0.335, 0.170)
 # Per-view survivors of the marked-dimension import.  Rise + ArmRun live on the
 # Front-plane path (front view); the wire diameter lives on the Top-plane
 # profile (top view).
-FRONT_KEEP = {
-    "Rise": (0.076, 0.150),
-    "ArmRun": (0.118, 0.196),
-}
-TOP_KEEP = {
-    "RodDia": (0.156, 0.238),
-}
+FRONT_KEEP = (
+    "Rise",
+    "ArmRun",
+)
+TOP_KEEP = ("RodDia",)
 
 
 async def build(adapter: Any) -> dict[str, str]:

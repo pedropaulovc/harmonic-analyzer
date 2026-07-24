@@ -36,11 +36,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         pen_v_block_spec.BLOCK_HEIGHT,
         pen_v_block_spec.BLOCK_DEPTH,
     )
-    assert (drawing.BORE_X, drawing.SLIT_LENGTH, drawing.SCREW_HOLE_XY) == (
-        pen_v_block_spec.BORE_X,
-        pen_v_block_spec.SLIT_LENGTH,
-        pen_v_block_spec.SCREW_HOLE_XY,
-    )
+    assert drawing.BORE_X == pen_v_block_spec.BORE_X
 
 
 def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:

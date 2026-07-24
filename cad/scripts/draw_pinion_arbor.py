@@ -63,23 +63,8 @@ ISO_CENTER = (0.345, 0.145)
 # HERE rather than on the front view's end circle -- see the GD&T block below.
 SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    # x=0.030, not the bbox-derived 0.014: horizontal text made this callout
-    # ~25 mm wide ("+0.00/-0.02"), so centred on 0.014 it ran over the 12.7 mm
-    # zone margin (the border gate measured 2.7 mm). 0.030 clears the margin on
-    # the left and stops short of the end circle at x=0.047 on the right.
-    "ShaftDia": (0.030, 0.220),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
-    # Held 20 mm clear of the view's left end, not the old 4 mm: horizontal text
-    # makes "SR7.27 CROWN" ~35 mm wide, so a 4 mm offset ran the text's right
-    # half back over the crown dimension's own extension lines.
-    "CapSagDim": (
-        RIGHT_CENTER[0] - OVERALL_LEN / 2000.0 - 0.020,
-        RIGHT_CENTER[1] + 0.022,
-    ),
-}
+FRONT_KEEP = frozenset({"ShaftDia"})
+RIGHT_KEEP = frozenset({"Depth", "CapSagDim"})
 DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
 CAP_CALLOUTS = {"CapSagDim": f"SR{CAP_R:.2f} CROWN"}
 

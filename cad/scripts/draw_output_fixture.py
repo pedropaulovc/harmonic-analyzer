@@ -63,13 +63,8 @@ ISO_CENTER = (0.340, 0.175)
 # Per-view survivors of the marked-dimension import.  The end (top) view carries
 # the collar OD + rod bore; the side (front) view carries the cross-hole
 # diameter and its mid-height station.  The keep union == the marked set.
-TOP_KEEP = {
-    "CollarDiaDim": (0.070, 0.238),
-    "RodBoreDiaDim": (0.185, 0.210),
-}
-FRONT_KEEP = {
-    "CrossHoleDiaDim": (0.185, 0.110),
-}
+TOP_KEEP = frozenset({"CollarDiaDim", "RodBoreDiaDim"})
+FRONT_KEEP = frozenset({"CrossHoleDiaDim"})
 
 
 async def build(adapter: Any) -> dict[str, str]:

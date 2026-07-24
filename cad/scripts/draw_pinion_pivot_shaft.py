@@ -71,12 +71,8 @@ ISO_CENTER = (0.355, 0.205)
 # a scale callout keeps the title block honest.
 ISO_SCALE = (1, 2)
 
-FRONT_KEEP = {
-    "ShaftDia": (0.055, 0.167),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
-}
+FRONT_KEEP = frozenset({"ShaftDia"})
+RIGHT_KEEP = frozenset({"Depth"})
 DIMENSION_CALLOUTS = {
     "ShaftDia": (
         "NOMINAL REF ONLY\nFINAL LIMITS\n"

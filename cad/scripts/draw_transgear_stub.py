@@ -89,14 +89,9 @@ def _fy(y_mm: float) -> float:
 # extent for ANY Ra placement -- and note text is not a COM primitive, so
 # GetLineAtIndex will not show it to you either; only the render will.
 _LENGTH_CHAIN_X = 0.176
-FRONT_KEEP = {
-    "BaseDia": (0.052, _fy(BASE_LEN / 2.0)),
-    "SeatDia": (0.052, _fy(BASE_LEN + 3.0)),
-    "CollarDia": (0.052, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
-    "BaseLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN / 2.0)),
-    "SeatLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN + SEAT_LEN / 2.0)),
-    "CollarLength": (_LENGTH_CHAIN_X, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
-}
+FRONT_KEEP = frozenset(
+    {"BaseDia", "SeatDia", "CollarDia", "BaseLength", "SeatLength", "CollarLength"}
+)
 DIMENSION_CALLOUTS = {"BaseDia": "+0.00/-0.05", "SeatDia": "+0.00/-0.02"}
 # The base is a 3/8" conversion: display 9.525, not a false-precision 9.53.
 DIMENSION_PRECISION = {"BaseDia": 3}

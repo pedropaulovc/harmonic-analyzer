@@ -76,18 +76,15 @@ _JUNCTION_Y = _side_y(0.0)  # head/shank step
 _SHANK_END_Y = _side_y(-SHANK_LEN)  # shank tip (bottom)
 
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
-END_DIM_X = 0.040
-END_KEEP = {
-    "HeadDia": (END_DIM_X, END_CENTER[1] + 0.024),
-}
+END_KEEP = ("HeadDia",)
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
 # Side view: the head-height and under-head length as model dimensions, stacked
 # to the right of the profile clear of the geometry.
-SIDE_KEEP = {
-    "HeadHt": (SIDE_CENTER[0] + 0.052, (_HEAD_END_Y + _JUNCTION_Y) / 2.0),
-    "ShankLg": (SIDE_CENTER[0] + 0.052, (_JUNCTION_Y + _SHANK_END_Y) / 2.0),
-}
+SIDE_KEEP = (
+    "HeadHt",
+    "ShankLg",
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:

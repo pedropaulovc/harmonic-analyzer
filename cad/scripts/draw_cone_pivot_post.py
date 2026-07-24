@@ -72,14 +72,12 @@ def _front_y(model_y: float) -> float:
 
 # Front elevation carries the column height, the journal-bore station and the
 # journal bore diameter; the plan carries the round Ø24.
-FRONT_KEEP = {
-    "BlockHt": (FRONT_CENTER[0] - 0.045, FRONT_CENTER[1]),
-    "BoreZ": (FRONT_CENTER[0] - 0.030, _front_y(BORE_HEIGHT / 2.0)),
-    "BoreDia": (FRONT_CENTER[0] + 0.040, _front_y(BORE_HEIGHT)),
-}
-TOP_KEEP = {
-    "BlockDia": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
-}
+FRONT_KEEP = (
+    "BlockHt",
+    "BoreZ",
+    "BoreDia",
+)
+TOP_KEEP = ("BlockDia",)
 DIMENSION_CALLOUTS = {
     "BlockDia": "+/-0.05",
     "BoreDia": "+0.005/-0.005 THRU",
@@ -87,6 +85,20 @@ DIMENSION_CALLOUTS = {
 # 3/8 in = 9.525 exactly; the sheet default of 2 decimals prints 9.53, a false
 # contradiction of the DIA 9.525 the note and the mating cone shaft are built on.
 DIMENSION_PRECISION = {"BoreDia": 3}
+
+
+def _dimension_position(
+    adapter: Any, annotations: list[Any], name: str
+) -> tuple[float, float]:
+    for raw_annotation in annotations:
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if dimension_name(adapter, annotation) != name:
+            continue
+        position = annotation.GetPosition()
+        if not position or len(position) < 2:
+            raise RuntimeError(f"dimension {name!r} has no sheet position")
+        return float(position[0]), float(position[1])
+    raise RuntimeError(f"dimension {name!r} is not present in the curated view")
 
 
 def _circular_edge(
@@ -311,6 +323,7 @@ async def build(adapter: Any) -> dict[str, str]:
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
+    block_dia_position = _dimension_position(adapter, top_annotations, "BlockDia")
     set_dimension_callouts(
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
@@ -391,7 +404,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=TOP_KEEP["BlockDia"],
+        edge_xy=block_dia_position,
         frame_xy=(0.160, 0.220),
         characteristic="perpendicularity",
         tolerance="0.05",

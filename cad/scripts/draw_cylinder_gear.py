@@ -64,9 +64,7 @@ BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 
 
-FRONT_KEEP = {
-    "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
-}
+FRONT_KEEP = ("BoreDia",)
 DIMENSION_CALLOUTS = {
     # The 9.525 +0.03/+0.05 reamed bore against the arbor's
     # 9.525 +0.00/-0.02 journal guarantees 0.03..0.07 diametral clearance,

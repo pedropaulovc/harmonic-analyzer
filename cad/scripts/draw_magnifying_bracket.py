@@ -61,14 +61,14 @@ ISO_CENTER = (0.340, 0.130)
 # The four plan dimensions ride the TOP view (both extruded rectangles lie on the
 # part's Top plane).  Arm/flange dim names are disambiguated in the build
 # (ArmWidth/ArmDepth vs FlangeWidth/FlangeDepth) so this keep map is unambiguous.
-TOP_KEEP = {
-    "ArmWidth": (0.088, 0.170),
-    "ArmDepth": (0.142, 0.182),
-    "FlangeWidth": (0.110, 0.216),
-    "FlangeDepth": (0.089, 0.205),
-}
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+TOP_KEEP = (
+    "ArmWidth",
+    "ArmDepth",
+    "FlangeWidth",
+    "FlangeDepth",
+)
+FRONT_KEEP: tuple[str, ...] = ()
+RIGHT_KEEP: tuple[str, ...] = ()
 # Blind-review round 1: the four plan values read unattached at a glance --
 # label each with the feature it controls.
 DIMENSION_CALLOUTS = {

@@ -95,19 +95,10 @@ HALF_THICK_SHEET = THICKNESS * SHEET_SCALE[0] / 2000.0
 # position.  The bore-to-bore centre distance runs vertically LEFT of the view;
 # the leadered diameters land in the clear sheet RIGHT of the strap; the pin
 # seat's size + section carry on the right view.
-FRONT_KEEP = {
-    "ArborBoreCz": (0.070, 0.150),
-    "ArborBoreDia": (0.156, 0.196),
-    "PivotBoreDia": (0.162, 0.130),
-    "BottomCapRadius": (0.098, 0.076),
-    "PinSeatCy": (0.058, 0.128),
-}
-RIGHT_KEEP = {
-    "Depth": (0.190, 0.068),
-    "PinSeatDia": (0.282, 0.132),
-    # Locates the pin seat through the thickness (mid-plane) in the section view.
-    "PinSeatCz": (0.245, 0.190),
-}
+FRONT_KEEP = frozenset(
+    {"ArborBoreCz", "ArborBoreDia", "PivotBoreDia", "BottomCapRadius", "PinSeatCy"}
+)
+RIGHT_KEEP = frozenset({"Depth", "PinSeatDia", "PinSeatCz"})
 DIMENSION_CALLOUTS = {
     "ArborBoreCz": "+/-0.10",
     "PivotBoreDia": (

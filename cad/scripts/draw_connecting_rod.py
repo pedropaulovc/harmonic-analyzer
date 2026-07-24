@@ -82,13 +82,13 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
-FRONT_KEEP = {
-    "RingOuterDia": (0.185, 0.070),
-    "StrapBoreDia": (0.190, 0.052),
-    "ShankWidthDim": (0.180, 0.150),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = (
+    "RingOuterDia",
+    "StrapBoreDia",
+    "ShankWidthDim",
+)
+RIGHT_KEEP: tuple[str, ...] = ()
+TOP_KEEP: tuple[str, ...] = ()
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)

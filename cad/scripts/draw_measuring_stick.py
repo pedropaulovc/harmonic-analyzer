@@ -57,10 +57,10 @@ ISO_CENTER = (0.300, 0.130)
 
 # Per-view survivors of the marked-dimension import: the bar envelope only.  The
 # length reads 200 (above the bar), the width 8 (right of the right end).
-FRONT_KEEP = {
-    "BodyLength": (0.122, 0.234),
-    "BodyWidth": (0.250, 0.215),
-}
+FRONT_KEEP = (
+    "BodyLength",
+    "BodyWidth",
+)
 
 SCALE_LABEL_Y = 0.201
 SCALE_LABEL_X0 = FRONT_CENTER[0] - 0.040

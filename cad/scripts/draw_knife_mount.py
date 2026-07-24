@@ -66,12 +66,12 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - _BLOCK_CY) * SHEET_SCALE[0] / 1000.0
 
 
-FRONT_KEEP = {
-    "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
-    "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
-}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = (
+    "BlockWidth",
+    "BlockHeight",
+    "BoreDia",
+)
+RIGHT_KEEP: tuple[str, ...] = ()
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
 }

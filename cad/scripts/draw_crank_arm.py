@@ -103,15 +103,15 @@ DATUM_B_SYMBOL = (
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Leadered diameters sit above the arm at each feature's station;
 # the linear chain stacks below the view, smallest span nearest the geometry.
-FRONT_KEEP = {
-    "ArmEndX": (0.190, 0.086),
-    "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.112),
-    "BossRadius": (0.052, 0.162),
-    "ShaftBoreDia": (_sheet_x(0.0), 0.172),
-    "DimpleDia": (_sheet_x(DIMPLE_X), 0.172),
-}
-RIGHT_KEEP = {"Depth": (0.300, 0.108)}
-TOP_KEEP = {}
+FRONT_KEEP = (
+    "ArmEndX",
+    "DimpleX",
+    "BossRadius",
+    "ShaftBoreDia",
+    "DimpleDia",
+)
+RIGHT_KEEP = ("Depth",)
+TOP_KEEP = ()
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "THRU - REAM 3/8 IN\n+0.05/-0.00",
     "DimpleDia": "0.5 DEEP",

@@ -90,18 +90,8 @@ _PIN_CENTER = (
     _SIDE_BOTTOM + PIN_HOLE_HEIGHT / 1000.0,
 )
 
-FRONT_KEEP = {
-    "ShaftDiaDim": (
-        max(
-            0.030,
-            FRONT_CENTER[0] - SHAFT_DIA * END_VIEW_SCALE / 1000.0 - 0.022,
-        ),
-        FRONT_CENTER[1] + 0.008,
-    ),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1]),
-}
+FRONT_KEEP = ("ShaftDiaDim",)
+RIGHT_KEEP = ("Depth",)
 DIMENSION_CALLOUTS = {"ShaftDiaDim": "+0.00/-0.02"}
 
 

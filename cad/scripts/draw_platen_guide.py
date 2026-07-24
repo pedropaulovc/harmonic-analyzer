@@ -165,12 +165,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Keep only overall length; hole coordinates live in the native hole table.
     curate_view_dimensions(
-        adapter, front, keep={"Length": (FRONT_VIEW_X_M, 0.135)}, view_label="front"
+        adapter, front, keep=frozenset({"Length"}), view_label="front"
     )
     curate_view_dimensions(
         adapter,
         right,
-        keep={"Depth": (0.370, 0.095), "Height": (0.385, 0.110)},
+        keep=frozenset({"Depth", "Height"}),
         view_label="right",
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

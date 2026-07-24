@@ -52,19 +52,11 @@ END_CENTER = (0.085, 0.190)
 SIDE_CENTER = (0.190, 0.190)
 ISO_CENTER = (0.315, 0.205)
 
-END_KEEP = {
-    "ODDim": (
-        END_CENTER[0] - 0.035,
-        END_CENTER[1] + 0.010,
-    ),
-    "BoreDiaDim": (
-        END_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 1000.0 + 0.005,
-        END_CENTER[1] - 0.010,
-    ),
-}
-SIDE_KEEP = {
-    "Depth": (SIDE_CENTER[0] + 0.036, SIDE_CENTER[1]),
-}
+END_KEEP = (
+    "ODDim",
+    "BoreDiaDim",
+)
+SIDE_KEEP = ("Depth",)
 DIMENSION_CALLOUTS = {
     "BoreDiaDim": "1/32 IN THRU\n+0.05/-0.00",
     "Depth": "+/-0.03",

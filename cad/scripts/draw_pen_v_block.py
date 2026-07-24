@@ -43,10 +43,6 @@ from pen_v_block_spec import (
     BLOCK_HEIGHT,
     BLOCK_LENGTH,
     BORE_X,
-    CHAMFER,
-    SCREW_HOLE_XY,
-    SLIT_LENGTH,
-    SLIT_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -92,26 +88,20 @@ def _front_y(model_y_mm: float) -> float:
 # position.  The linear chain stacks below the front view, smallest span nearest
 # the geometry; the slit band dims sit left of the view; the screw-hole group
 # sits right, between the front and right views.
-FRONT_KEEP = {
-    "Length": (_sheet_x(BLOCK_LENGTH / 2.0), 0.058),
-    "SlitLength": (_sheet_x(SLIT_LENGTH / 2.0), 0.070),
-    "SlitY0": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[0] / 2.0)),
-    "SlitWidth": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[1] + 2.0)),
-    "Chamfer2dx": (_sheet_x(BLOCK_LENGTH - CHAMFER / 2.0), _front_y(BLOCK_HEIGHT) + 0.012),
-    "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] - 5.0), _front_y(BLOCK_HEIGHT) + 0.026),
-    # +0.012 keeps this vertical dimension's line (drawn at the text's x, from the
-    # block bottom up to the hole centre) out of datum C's box in the crowded
-    # corridor between the front and right views; its text still clears the front
-    # view's right edge (x=0.194) by ~3 mm.
-    "ScrewHoleCz": (_sheet_x(BLOCK_LENGTH) + 0.012, _front_y(SCREW_HOLE_XY[1])),
-    "ScrewHoleDiaDim": (_sheet_x(BLOCK_LENGTH) + 0.024, _front_y(16.0)),
-}
-TOP_KEEP = {
-    "Bore0X": (_sheet_x(BORE_X[0] / 2.0), TOP_CENTER[1] - 0.042),
-    "Bore1X": (_sheet_x(BORE_X[1] / 2.0), TOP_CENTER[1] - 0.052),
-    "Bore0Dia": (_sheet_x(BORE_X[0]) + 0.030, TOP_CENTER[1] + 0.042),
-}
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.068)}
+FRONT_KEEP = frozenset(
+    {
+        "Length",
+        "SlitLength",
+        "SlitY0",
+        "SlitWidth",
+        "Chamfer2dx",
+        "ScrewHoleCx",
+        "ScrewHoleCz",
+        "ScrewHoleDiaDim",
+    }
+)
+TOP_KEEP = frozenset({"Bore0X", "Bore1X", "Bore0Dia"})
+RIGHT_KEEP = frozenset({"Depth"})
 
 # Right-view half extents at 4:1: the 16 (Z) x 18 (Y) stock section.
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0

@@ -50,19 +50,8 @@ RIGHT_CENTER = (
 )
 ISO_CENTER = (0.315, 0.205)
 
-FRONT_KEEP = {
-    "OuterDia": (
-        FRONT_CENTER[0] - 0.035,
-        FRONT_CENTER[1] + 0.010,
-    ),
-    "BoreDia": (
-        FRONT_CENTER[0] + OUTER_DIA * SHEET_SCALE[0] / 1000.0 + 0.005,
-        FRONT_CENTER[1] - 0.010,
-    ),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
-}
+FRONT_KEEP = frozenset({"OuterDia", "BoreDia"})
+RIGHT_KEEP = frozenset({"Depth"})
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU - REAM\n+0.03/-0.00",
     "Depth": "+/-0.03",

@@ -89,12 +89,8 @@ def _front_y(model_y_mm: float) -> float:
 
 
 _FOOT_MID_X = (FOOT_END[0] + FOOT_TAN[0]) / 2.0
-FRONT_KEEP = {
-    "FootLen": (_front_x(_FOOT_MID_X), 0.088),
-    "BendR": (0.036, 0.120),
-    "KinkR": (0.070, 0.215),
-}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP = frozenset({"FootLen", "BendR", "KinkR"})
+TOP_KEEP = frozenset()
 DIMENSION_CALLOUTS: dict[str, str] = {
     "FootLen": "+/-0.10 TRUE LENGTH\nFREE END TO BEND TANGENCY",
     "BendR": "+/-0.10 INSIDE RADIUS",
@@ -152,7 +148,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if TOP_KEEP:
         curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     else:
-        curate_view_dimensions(adapter, top, keep={}, view_label="top")
+        curate_view_dimensions(adapter, top, keep=frozenset(), view_label="top")
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     terminal_mid = (
         (KINK_EXIT[0] + FLAT_TIP[0]) / 2.0,

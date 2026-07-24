@@ -2,6 +2,7 @@ r"""Shared sheet assembly for the uniform PR 358 fastener drawings."""
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping
@@ -32,9 +33,9 @@ class FastenerSheet:
     side_center: tuple[float, float]
     end_center: tuple[float, float]
     iso_center: tuple[float, float]
-    end_keep: Mapping[str, tuple[float, float]]
+    end_keep: Collection[str]
     dimension_callouts: Mapping[str, str]
-    side_keep: Mapping[str, tuple[float, float]] | None = None
+    side_keep: Collection[str] | None = None
     side_dimension_callouts: Mapping[str, str] | None = None
     note_xy: tuple[float, float] = (0.020, 0.115)
     end_note_xy: tuple[float, float] = (0.050, 0.220)
@@ -137,7 +138,7 @@ async def build_fastener_sheet(
 
     if recipe.side_keep:
         side_annotations = curate_view_dimensions(
-            adapter, side, keep=dict(recipe.side_keep), view_label="side"
+            adapter, side, keep=recipe.side_keep, view_label="side"
         )
         set_dimension_callouts(
             adapter,

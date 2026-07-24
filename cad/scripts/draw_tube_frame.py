@@ -66,17 +66,10 @@ END_VIEW_SCALE = 2.0
 LENGTH_CENTER = (0.065, 0.150)
 END_CENTER = (0.300, 0.195)
 
-# Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position (meters).  Diameters live on the end view, the length on the tube view.
-END_KEEP = {
-    "OuterDia": (
-        END_CENTER[0] - OUTER_DIA * END_VIEW_SCALE / 1000.0 - 0.024,
-        END_CENTER[1] + 0.010,
-    ),
-}
-LENGTH_KEEP = {
-    "Depth": (LENGTH_CENTER[0] + 0.028, LENGTH_CENTER[1]),
-}
+# Named survivors of the marked-dimension import. Diameters live on the end
+# view, the length on the tube view; SolidWorks owns their callout placement.
+END_KEEP = frozenset({"OuterDia"})
+LENGTH_KEEP = frozenset({"Depth"})
 
 
 async def build(adapter: Any) -> dict[str, str]:

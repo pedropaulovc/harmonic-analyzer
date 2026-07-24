@@ -20,7 +20,7 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (7.0, 1.0)
-END_KEEP: dict[str, tuple[float, float]] = {}
+END_KEEP: tuple[str, ...] = ()
 DIMENSION_CALLOUTS: dict[str, str] = {}
 RECIPE = FastenerSheet(
     title="Hanger Screw Manufacturing Drawing",

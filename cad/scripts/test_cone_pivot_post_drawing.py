@@ -89,7 +89,8 @@ def test_datum_and_notes_control_the_journal_bore() -> None:
     assert 'characteristic="flatness"' in source
     assert 'characteristic="cylindricity"' in source
     assert 'characteristic="perpendicularity"' in source
-    assert 'edge_xy=TOP_KEEP["BlockDia"]' in source
+    assert '_dimension_position(adapter, top_annotations, "BlockDia")' in source
+    assert "edge_xy=block_dia_position" in source
     assert 'entity_type="DIMENSION"' in source
     assert "leader=False" not in source
     assert drawing.DIMENSION_CALLOUTS["BlockDia"] == "+/-0.05"

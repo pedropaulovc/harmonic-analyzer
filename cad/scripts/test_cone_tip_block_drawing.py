@@ -83,7 +83,10 @@ def test_datum_and_position_controls_are_present() -> None:
     assert 'datum="B"' in source
     assert 'symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024)' in source
     assert source.count("position_tolerance_m=0.001") == 2
-    assert 'symbol_xy=TOP_KEEP["Depth"]' in source
+    assert '_dimension_position(adapter, front_annotations, "Width")' in source
+    assert '_dimension_position(adapter, top_annotations, "Depth")' in source
+    assert "edge_xy=width_position" in source
+    assert "symbol_xy=depth_position" in source
     assert 'datum="C"' in source
     assert 'datum="D"' in source
     assert 'datum="E"' in source

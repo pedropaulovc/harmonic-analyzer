@@ -90,16 +90,8 @@ def _front_y(model_y_mm: float) -> float:
 BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    "BoreDia": (0.045, 0.165),
-    "CollarOd": (0.025, 0.120),
-    "CollarCy": (0.170, 0.135),
-}
-TOP_KEEP = {
-    "Depth": (0.100, 0.195),
-    "BossDia": (0.180, 0.225),
-    "BossCz": (0.155, 0.200),
-}
+FRONT_KEEP = frozenset({"BoreDia", "CollarOd", "CollarCy"})
+TOP_KEEP = frozenset({"Depth", "BossDia", "BossCz"})
 DIMENSION_CALLOUTS = {
     "BoreDia": f"FINAL REAM LIMITS\n{fit_limits(BORE, BORE_BAND)} THRU",
     "CollarOd": "+/-0.05",
