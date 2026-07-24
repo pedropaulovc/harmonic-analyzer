@@ -30,14 +30,12 @@ SHEETS = (
 )
 
 DOCUMENTATION_SHEETS = tuple(
-    drawing for drawing in SHEETS if drawing is not draw_paper_drive_assembly
+    drawing
+    for drawing in SHEETS
+    if drawing not in (draw_drive_train_assembly, draw_paper_drive_assembly)
 )
 
-ORDINARY_SHEETS = tuple(
-    drawing
-    for drawing in DOCUMENTATION_SHEETS
-    if drawing is not draw_drive_train_assembly
-)
+ORDINARY_SHEETS = DOCUMENTATION_SHEETS
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "ALL DIMENSIONS",
@@ -182,7 +180,6 @@ def test_top_level_bom_uses_released_subassembly_numbers() -> None:
 def test_configured_variants_remain_visible_after_bom_row_collapse() -> None:
     cone_description = "CONE GEAR, T006-T120 BY 6; 1 EACH"
     sprocket_description = "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
-    assert draw_drive_train_assembly.BOM_COMPONENTS["cone-gear"] == cone_description
     assert _config.parts("cone-gear")["description"] == cone_description
     assert _config.parts("transgear-removable")["description"] == sprocket_description
 
@@ -240,31 +237,13 @@ def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
             assert source.count("add_component_bom_balloons(") == 1
 
 
-def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
+def test_drive_train_is_a_non_blocking_three_view_reference_sheet() -> None:
     source = Path(draw_drive_train_assembly.__file__).read_text(encoding="utf-8")
-    assert draw_drive_train_assembly.SHEET_NAMES == (
-        "GENERAL ASSEMBLY",
-        "PARTS LIST",
-        "GEAR-TRAIN ITEM IDENTIFICATION",
-        "CONCEALED ITEM IDENTIFICATION",
-        "GEAR-TRAIN SETUP",
-        "PINION ITEM IDENTIFICATION",
-        "PINION SETUP AND ACCEPTANCE",
-    )
-    assert set().union(
-        *draw_drive_train_assembly.EXTERIOR_VIEW_STEMS
-    ) == set(draw_drive_train_assembly.BOM_COMPONENTS) - set(
-        draw_drive_train_assembly.CONCEALED_BALLOON_ITEMS
-    )
-    assert len(draw_drive_train_assembly.GEAR_PAIR_ROWS) == 20
-    assert draw_drive_train_assembly.PINION_PARAMETER_ROWS
-    assert draw_drive_train_assembly.ACCEPTANCE_ROWS
-    assert "_add_component_balloons(" in source
-    assert "_isolate_balloon_components(" in source
-    assert "insert_identified_bom_table(" in source
-    assert "part_numbers=BOM_PART_NUMBERS" in source
-    assert "HorizontalAutoSplit(" not in source
-    assert "_format_drive_train_bom(adapter, bom_table)" in source
-    assert "_create_drive_train_sheets(adapter)" in source
-    assert "expected_sheet_names=SHEET_NAMES" in source
-    assert "SETUP_IDENTIFICATION_VIEW_SCALE" not in source
+    assert source.count("place_view(") == 3
+    assert "for view in (front, right, iso):" in source
+    assert "set_hidden_lines_removed(adapter, view)" in source
+    assert "insert_identified_bom_table(" not in source
+    assert "isolate_balloon_components" not in source
+    assert "add_component_bom_balloons(" not in source
+    assert "add_auto_balloons(" not in source
+    assert "create_blank_drawing_sheets(" not in source
