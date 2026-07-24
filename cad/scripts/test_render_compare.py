@@ -3,8 +3,29 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import render_compare
+
+
+def test_solidworks_sidecar_uses_content_fit_registration(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(render_compare.composite, "COMP", tmp_path)
+    pair = {
+        "id": "pair",
+        "camera": {"zoom": 1.0},
+        "reference": {"path": "reference.png"},
+        "align": {"scale": 1.0, "dx_px": 0, "dy_px": 0},
+    }
+    model = tmp_path / "model.SLDASM"
+    model.touch()
+    sidecar = render_compare.composite.sidecar_path(pair["id"])
+    sidecar.parent.mkdir(parents=True)
+
+    render_compare.write_sidecar(pair, model, (100, 200))
+
+    assert json.loads(sidecar.read_text())["registration"] == "content_fit"
 
 
 def test_stale_only_refreshes_align_without_connecting_to_solidworks(

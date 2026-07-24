@@ -350,7 +350,7 @@ async def capture(adapter: Any, out_img: Path, width: int, height: int) -> None:
 # --- staleness ---------------------------------------------------------------
 
 def _sidecar(pair_id: str) -> Path:
-    return COMP / "render" / f"{pair_id}.meta.json"
+    return composite.sidecar_path(pair_id)
 
 
 def pair_size(ref_png: Path, max_side: int) -> tuple[int, int]:
@@ -374,6 +374,7 @@ def write_sidecar(pair: dict, mpath: Path, size: tuple[int, int]) -> None:
                     "align": pair.get("align"),
                     "size": list(size), "model_mtime": mpath.stat().st_mtime,
                     "engine": "solidworks",
+                    "registration": "content_fit",
                     # captures run under force_plain_white_background --
                     # composite._content_mask seeds its knockout flood from it
                     "render_bg": "white"}),

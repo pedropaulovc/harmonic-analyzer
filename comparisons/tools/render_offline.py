@@ -7,8 +7,9 @@
 Consumes the STL/boxes render cache written by cad/scripts/export_models.py
 and the same manifest cameras as cad/scripts/render_compare.py. One Blender
 headless invocation per model renders all of its pairs; outputs are
-white-composited, content-trimmed, and stored exactly like the SolidWorks
-captures (same sidecars), then composites/scores are refreshed.
+composited onto the reference background and stored with camera-frame metadata
+so the gallery preserves Pose Studio's target and zoom. Composites/scores are
+then refreshed.
 
     uv run comparisons/tools/render_offline.py [--only id,..] [--model m]
                                                [--stale-only]
@@ -282,7 +283,9 @@ def main() -> int:
                           "sidecar": _sidecar(pair["id"])}
                 paths["render"].parent.mkdir(parents=True, exist_ok=True)
                 bg.save(paths["render"], **composite.JPEG_OPTS)
-                if not args.no_trim:
+                registration = "camera_frame" \
+                    if args.no_trim or out_root is None else "content_fit"
+                if registration == "content_fit":
                     composite.trim_render_file(
                         paths["render"],
                         background=pair["reference"].get("background", "black"))
@@ -291,6 +294,7 @@ def main() -> int:
                     "align": pair.get("align"),
                     "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
                     "engine": "blender",
+                    "registration": registration,
                     # exact uniform colour behind the render's pixels --
                     # composite._content_mask seeds its knockout flood from it
                     "render_bg": pair["reference"].get("background", "black"),

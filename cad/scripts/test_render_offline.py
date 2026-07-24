@@ -6,6 +6,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+from PIL import Image, ImageDraw
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPO_ROOT / "comparisons" / "tools" / "render_offline.py"
@@ -86,6 +88,60 @@ def test_align_change_stales_the_pair(monkeypatch, tmp_path: Path) -> None:
 
     assert renderer.composite.stale_stage(pair, src.stat().st_mtime) is None
     assert not renderer.is_stale(pair, src)
+
+
+def test_legacy_trimmed_blender_render_is_stale(monkeypatch, tmp_path: Path) -> None:
+    renderer = _load_render_offline()
+    monkeypatch.setattr(renderer.composite, "COMP", tmp_path)
+    pair = {
+        "id": "pair",
+        "camera": {"zoom": 1.0},
+        "reference": {"path": "reference.png"},
+        "align": {"scale": 1.0, "dx_px": 0, "dy_px": 0},
+    }
+    src = tmp_path / "model.stl"
+    src.touch()
+    paths = renderer.composite.pair_paths(pair["id"])
+    for name in ("render", "cad", "blend"):
+        paths[name].parent.mkdir(parents=True, exist_ok=True)
+        paths[name].touch()
+    renderer.composite.sidecar_path(pair["id"]).write_text(json.dumps({
+        "camera": pair["camera"],
+        "reference": pair["reference"],
+        "align": pair["align"],
+        "model_mtime": src.stat().st_mtime,
+        "engine": "blender",
+    }))
+
+    assert renderer.composite.stale_stage(pair, src.stat().st_mtime) == "render"
+
+
+def test_camera_frame_metadata_preserves_authored_framing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    renderer = _load_render_offline()
+    monkeypatch.setattr(renderer.composite, "COMP", tmp_path)
+    pair_id = "pair"
+    render = renderer.composite.pair_paths(pair_id)["render"]
+    render.parent.mkdir(parents=True)
+    image = Image.new("RGB", (100, 100), "black")
+    ImageDraw.Draw(image).rectangle((40, 40, 59, 59), fill="white")
+    image.save(render)
+    renderer.composite.sidecar_path(pair_id).write_text(json.dumps({
+        "engine": "blender",
+        "registration": "camera_frame",
+        "render_bg": "black",
+    }))
+
+    _render, mask, offset = renderer.composite._fitted_render(
+        pair_id,
+        (50, 50),
+        {"scale": 1.0, "dx_px": 0, "dy_px": 0},
+    )
+
+    assert offset == (0, 0)
+    assert mask.size == (50, 50)
+    assert mask.getbbox() == (20, 20, 30, 30)
 
 
 def test_stale_only_refreshes_align_without_launching_blender(
