@@ -119,10 +119,13 @@ def test_crank_pair_runout_uses_tooth_tip_silhouette_topology() -> None:
     helper_source = Path(_gear_drawing_entities.__file__).read_text(
         encoding="utf-8"
     )
+    assert '"SILHOUETTE",' in helper_source
+    assert "_is_tooth_tip(points, target_radius_m)" in helper_source
     assert "GetVisibleEntities2(c, 4)" in helper_source
     for module in CRANK_PAIR_MODULES:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "tooth_tip_silhouette = visible_tooth_tip_silhouette(" in source
+        assert "pick_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_OD)" in source
         assert "entity=tooth_tip_silhouette" in source
 
 
