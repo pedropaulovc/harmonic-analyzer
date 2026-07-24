@@ -83,13 +83,17 @@
       "camera": {
         "mode": "euler",
         "roll_deg": 0.0,
-        "zoom": 1.0,
-        "target_mm": null,
+        "zoom": 1.149,
+        "target_mm": [
+          -8.06,
+          485.69,
+          -26.34
+        ],
         "perspective": {
-          "focal_length_mm": 104.44
+          "focal_length_mm": 50.0
         },
-        "az_deg": 272.0,
-        "el_deg": 2.0
+        "az_deg": -89.2,
+        "el_deg": 8.8
       },
       "align": {
         "scale": 1.13,
@@ -112,14 +116,18 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 0.0,
-        "zoom": 1.0,
-        "target_mm": null,
+        "roll_deg": -0.0,
+        "zoom": 1.12,
+        "target_mm": [
+          5.97,
+          511.12,
+          -25.71
+        ],
         "perspective": {
-          "focal_length_mm": 100.0
+          "focal_length_mm": 50.0
         },
-        "az_deg": -23.0,
-        "el_deg": 5.0
+        "az_deg": -27.4,
+        "el_deg": 7.8
       },
       "align": {
         "scale": 1.08,
@@ -142,14 +150,18 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 0.0,
-        "zoom": 1.0,
-        "target_mm": null,
+        "roll_deg": -0.0,
+        "zoom": 1.138,
+        "target_mm": [
+          -2.64,
+          494.45,
+          -45.18
+        ],
         "perspective": {
-          "focal_length_mm": 100.0
+          "focal_length_mm": 50.0
         },
-        "az_deg": -1.0,
-        "el_deg": 4.0
+        "az_deg": 1.0,
+        "el_deg": 4.3
       },
       "align": {
         "scale": 1.13,
@@ -262,18 +274,18 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 10.0,
-        "zoom": 5.2,
+        "roll_deg": 6.03,
+        "zoom": 4.531,
         "target_mm": [
-          -108.0,
-          105.0,
-          0.0
+          -85.31,
+          105.41,
+          -1.1
         ],
         "perspective": {
-          "focal_length_mm": 100.0
+          "focal_length_mm": 50.0
         },
-        "az_deg": 5.0,
-        "el_deg": 76.0
+        "az_deg": -1.99,
+        "el_deg": 63.68
       },
       "align": {
         "scale": 1.0,
@@ -301,17 +313,17 @@
       "camera": {
         "mode": "euler",
         "roll_deg": 0.0,
-        "zoom": 4.7,
+        "zoom": 5.691,
         "target_mm": [
-          -45.0,
-          190.0,
-          -40.0
+          0.2,
+          156.23,
+          -3.92
         ],
         "perspective": {
-          "focal_length_mm": 100.0
+          "focal_length_mm": 100.76
         },
-        "az_deg": -4.0,
-        "el_deg": -6.0
+        "az_deg": -10.4,
+        "el_deg": 0.8
       },
       "align": {
         "scale": 1.0,
@@ -449,17 +461,17 @@
       "camera": {
         "mode": "euler",
         "roll_deg": 0.0,
-        "zoom": 17.0,
+        "zoom": 10.8,
         "target_mm": [
-          -45.0,
-          270.0,
-          -152.0
+          -13.84,
+          273.76,
+          -140.71
         ],
         "perspective": {
           "focal_length_mm": 100.0
         },
-        "az_deg": 203.0,
-        "el_deg": 58.0
+        "az_deg": -159.4,
+        "el_deg": 77.2
       },
       "align": {
         "scale": 1.0,
@@ -486,17 +498,17 @@
       "camera": {
         "mode": "euler",
         "roll_deg": 0.0,
-        "zoom": 8.0,
+        "zoom": 12.903,
         "target_mm": [
-          85.0,
-          380.0,
-          -143.0
+          29.08,
+          361.08,
+          -172.02
         ],
         "perspective": {
           "focal_length_mm": 100.0
         },
-        "az_deg": 210.0,
-        "el_deg": 12.0
+        "az_deg": -157.2,
+        "el_deg": 19.6
       },
       "align": {
         "scale": 1.0,
@@ -524,17 +536,17 @@
       "camera": {
         "mode": "euler",
         "roll_deg": 0.0,
-        "zoom": 2.7,
+        "zoom": 3.3,
         "target_mm": [
-          10.0,
-          290.0,
-          0.0
+          -50.35,
+          366.57,
+          86.13
         ],
         "perspective": {
-          "focal_length_mm": 45.0
+          "focal_length_mm": 11.34
         },
-        "az_deg": 328.0,
-        "el_deg": 25.0
+        "az_deg": -27.6,
+        "el_deg": 14.8
       },
       "align": {
         "scale": 1.0,
@@ -560,18 +572,18 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 15.0,
-        "zoom": 13.0,
+        "roll_deg": 2.02,
+        "zoom": 12.955,
         "target_mm": [
-          24.0,
-          1030.0,
-          -10.0
+          26.01,
+          1018.63,
+          -5.85
         ],
         "perspective": {
-          "focal_length_mm": 24.0
+          "focal_length_mm": 95.56
         },
-        "az_deg": 163.0,
-        "el_deg": -35.0
+        "az_deg": 160.24,
+        "el_deg": -40.0
       },
       "align": {
         "scale": 1.0,
@@ -597,18 +609,18 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 0.0,
-        "zoom": 17.0,
+        "roll_deg": -0.0,
+        "zoom": 12.684,
         "target_mm": [
-          -50.0,
-          1000.0,
-          -20.0
+          -2.64,
+          1000.17,
+          10.99
         ],
         "perspective": {
-          "focal_length_mm": 100.0
+          "focal_length_mm": 101.29
         },
-        "az_deg": 207.0,
-        "el_deg": -12.0
+        "az_deg": -166.6,
+        "el_deg": -31.6
       },
       "align": {
         "scale": 1.0,
