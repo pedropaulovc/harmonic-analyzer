@@ -50,6 +50,11 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     assert source.count("add_feature_control_frame(") == 1
     assert source.count("add_surface_finish(") == 1
     assert "edge_xy=bore_top" in source
+    assert "gear_faces = gear_model_faces(" in source
+    assert "entity=gear_faces.end" in source
+    assert "entity=gear_faces.bore" in source
+    assert 'entity_type="MODEL_FACE"' in source
+    assert "edge_xy=(LEFT_END_X" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

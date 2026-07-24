@@ -133,7 +133,7 @@ def test_coordinate_selection_fails_without_expensive_rebuild(
     assert drawing.rebuilds == 0
 
 
-def test_visible_cylindrical_face_uses_exact_radius_and_largest_area(
+def test_referenced_model_cylindrical_face_uses_exact_radius_and_largest_area(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     wrong = _FakeFace(4.0, 100.0)
@@ -143,29 +143,29 @@ def test_visible_cylindrical_face_uses_exact_radius_and_largest_area(
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, *_args: value)
     monkeypatch.setattr(
         _drawing_common,
-        "visible_view_entities",
+        "referenced_model_faces",
         lambda *_args, **_kwargs: [wrong, small, large, planar],
     )
 
-    selected = _drawing_common.visible_cylindrical_face(
+    selected = _drawing_common.referenced_model_cylindrical_face(
         _FakeAttemptAdapter(), object(), 6.35, label="shoulder"
     )
 
     assert selected is large
 
 
-def test_visible_cylindrical_face_reports_candidate_radii(
+def test_referenced_model_cylindrical_face_reports_candidate_radii(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, *_args: value)
     monkeypatch.setattr(
         _drawing_common,
-        "visible_view_entities",
+        "referenced_model_faces",
         lambda *_args, **_kwargs: [_FakeFace(4.0, 1.0)],
     )
 
     with pytest.raises(RuntimeError, match=r"radius 3\.1750 mm; candidates=4\.0000"):
-        _drawing_common.visible_cylindrical_face(
+        _drawing_common.referenced_model_cylindrical_face(
             _FakeAttemptAdapter(), object(), 6.35, label="shoulder"
         )
 

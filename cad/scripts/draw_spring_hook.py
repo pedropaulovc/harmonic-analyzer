@@ -27,7 +27,7 @@ from _drawing_common import (
     read_required_view_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
-    visible_cylindrical_face,
+    referenced_model_cylindrical_face,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from spring_hook_spec import ROD_DIA
@@ -118,10 +118,10 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # Attach Ra to the largest visible O1.4 cylindrical face: the straight
-    # seating shank.  Face identity avoids repeatedly selecting projected
-    # silhouette edges as the swept-wire view resolves.
-    shank_face = visible_cylindrical_face(
+    # Attach Ra to the largest source-model O1.4 cylindrical face: the straight
+    # seating shank. Source identity avoids resolving projected silhouette
+    # edges as the swept-wire drawing view settles.
+    shank_face = referenced_model_cylindrical_face(
         adapter, front, ROD_DIA, label="spring-hook seating shank"
     )
     add_surface_finish(

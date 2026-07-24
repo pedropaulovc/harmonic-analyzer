@@ -30,7 +30,7 @@ from _drawing_common import (
     read_required_view_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
-    visible_cylindrical_face,
+    referenced_model_cylindrical_face,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H
@@ -198,7 +198,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    barrel_face = visible_cylindrical_face(
+    barrel_face = referenced_model_cylindrical_face(
         adapter,
         front,
         BARREL_DIA,

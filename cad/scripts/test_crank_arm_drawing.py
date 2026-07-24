@@ -168,9 +168,10 @@ def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
     assert "annotation.SetLeader3(" in common
     assert "_LEADER_BENT," in common
     assert "gtol.SetLeader(True, 0, False, False)" not in common
-    # DIMENSION-attach entity registration is flow-dependent (0 or 1 depending
-    # on insertion order), so the check accepts either; edge attachments stay 1.
-    assert 'expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}' in common
+    # DIMENSION and source MODEL_FACE registration are flow-dependent (0 or 1
+    # depending on insertion order); drawing edges/faces still register as 1.
+    assert 'indirect_entity_types = {"DIMENSION", "MODEL_FACE"}' in common
+    assert "entity_type in indirect_entity_types" in common
     assert "not bool(gtol.IsAttached())" in common
     assert "int(gtol.GetLeaderCount()) != 1" in common
 

@@ -15,17 +15,18 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
+    cylindrical_face,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_view_properties,
+    referenced_model_faces,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
 from pivot_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -201,15 +202,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # renders ABOVE the arm and to its RIGHT, spanning ~0.131..0.157 at y~0.224:
     # clear of the O6.50 callout below (its text tops out at y=0.201), of the
     # runout frame above, and of the right view starting at x=0.174.
-    # Resolve the modeled circle by radius instead of selecting its exact
-    # 3-o'clock sheet coordinate.  A cold fleet rebuild proved that coordinate
-    # pick intermittent even though the unchanged drawing passed immediately
-    # afterward in the same SolidWorks session.
-    bore_finish_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    # Resolve the source-model bore face by radius without asking the drawing
+    # view to project every visible edge. A cold fleet rebuild proved the old
+    # 3-o'clock coordinate pick intermittent, and visible-entity enumeration
+    # needlessly resolves hidden-line geometry.
+    source_faces = referenced_model_faces(adapter, front, label="bushing front")
+    bore_finish_face = cylindrical_face(
+        adapter, source_faces, BORE_DIA, label="bushing bore finish"
+    )
     add_surface_finish(
         adapter,
         front,
-        edge_entity=bore_finish_edge,
+        entity=bore_finish_face,
+        entity_type="MODEL_FACE",
         symbol_xy=(0.118, 0.210),
         roughness_ra="1.6",
         label="bushing bore finish",

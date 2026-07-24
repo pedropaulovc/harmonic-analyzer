@@ -61,8 +61,9 @@ def test_native_gdt_controls_bushing_functional_surfaces() -> None:
     assert "characteristic=\"circular_runout\"" in source
     assert "characteristic=\"parallelism\"" in source
     assert source.count("add_surface_finish(") == 1
-    assert "bore_finish_edge = visible_circle_edge(adapter, front, BORE_DIA)" in source
-    assert "edge_entity=bore_finish_edge" in source
+    assert 'referenced_model_faces(adapter, front, label="bushing front")' in source
+    assert "entity=bore_finish_face" in source
+    assert 'entity_type="MODEL_FACE"' in source
     assert source.count("add_view_centerline(") == 1
 
 

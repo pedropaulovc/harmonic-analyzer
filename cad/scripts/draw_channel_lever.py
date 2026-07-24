@@ -29,17 +29,18 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
+    cylindrical_face,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_view_properties,
+    referenced_model_faces,
     set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
 from channel_lever_spec import (
     BAR_PIN_X,
     BAR_TALL,
@@ -117,8 +118,14 @@ def _add_tip_arc_center_mark(adapter: Any, view: Any) -> None:
     if not drawing_doc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate channel-lever front view")
     draw.ClearSelection2(True)
-    tip_edge = visible_circle_edge(adapter, view, 2.0 * TIP_RADIUS)
-    if not view.SelectEntity(tip_edge, False):
+    source_faces = referenced_model_faces(adapter, view, label="channel-lever front")
+    tip_face = cylindrical_face(
+        adapter,
+        source_faces,
+        2.0 * TIP_RADIUS,
+        label="channel-lever tip R3 arc",
+    )
+    if not view.SelectEntity(tip_face, False):
         raise RuntimeError("failed to select channel-lever tip R3 arc")
     center_mark = drawing_doc.InsertCenterMark3(2, False, False)
     draw.ClearSelection2(True)

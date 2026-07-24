@@ -631,8 +631,12 @@ def add_feature_control_frame(
     # in the annotation's model-entity array is flow-dependent (0 on the
     # pre-merge insertion order, 1 on the current one), so accept either.
     # Ordinary edge/silhouette attachments must register exactly one entity.
-    expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}
-    if entity_type != "DIMENSION" and int(annotation.GetAttachedEntityCount3()) != 1:
+    indirect_entity_types = {"DIMENSION", "MODEL_FACE"}
+    expected_entities = {0, 1} if entity_type in indirect_entity_types else {1}
+    if (
+        entity_type not in indirect_entity_types
+        and int(annotation.GetAttachedEntityCount3()) != 1
+    ):
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
@@ -2153,24 +2157,41 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     return entities
 
 
-@_telemetry.traced("drawing.visible_cylindrical_face", label_param="label")
-def visible_cylindrical_face(
+@_telemetry.traced("drawing.referenced_model_faces", label_param="label")
+def referenced_model_faces(adapter: Any, view: Any, *, label: str) -> list[Any]:
+    """Faces from the part referenced by ``view``, without resolving drawing HLR.
+
+    ``IView.SelectEntity`` accepts entities from the source model directly.
+    Walking the source bodies therefore avoids ``GetVisibleEntities2``, whose
+    hidden-line projection of dense gear teeth can take minutes.
+    """
+    drawing_view = _early_bound(view, "IView", "ReferencedDocument")
+    model = adapter._get_attr_or_call(drawing_view, "ReferencedDocument")
+    if model is None:
+        raise RuntimeError(f"{label}: drawing view has no referenced model")
+    part = _early_bound(model, "IPartDoc", "GetBodies2")
+    bodies = adapter._attempt(lambda: part.GetBodies2(0, False), default=None) or ()
+    faces: list[Any] = []
+    for raw_body in bodies:
+        body = _early_bound(raw_body, "IBody2", "GetFaces")
+        faces.extend(adapter._attempt(lambda b=body: b.GetFaces(), default=None) or ())
+    if not faces:
+        raise RuntimeError(f"{label}: referenced part has no solid-body faces")
+    return faces
+
+
+def cylindrical_face(
     adapter: Any,
-    view: Any,
+    faces: Sequence[Any],
     diameter_mm: float,
     *,
     label: str,
 ) -> Any:
-    """Return the largest visible cylindrical face at ``diameter_mm``.
-
-    Sheet-coordinate face picks depend on the current drawing display state.
-    A visible model face carries stable drawing-view identity, so annotations
-    and centerlines should select that entity directly instead.
-    """
+    """Largest cylindrical source-model face matching ``diameter_mm``."""
     target_radius_mm = diameter_mm / 2.0
     candidates: list[tuple[float, Any]] = []
     seen_radii: list[float] = []
-    for raw_face in visible_view_entities(view, 3, label=label):
+    for raw_face in faces:
         face = _early_bound(raw_face, "IFace2")
         surface = face.GetSurface()
         if surface is None:
@@ -2187,10 +2208,48 @@ def visible_cylindrical_face(
     if not candidates:
         radii = ", ".join(f"{radius:.4f}" for radius in sorted(seen_radii)) or "none"
         raise RuntimeError(
-            f"{label}: no visible cylindrical face matches radius "
+            f"{label}: no cylindrical face matches radius "
             f"{target_radius_mm:.4f} mm; candidates={radii}"
         )
     return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+def planar_face(adapter: Any, faces: Sequence[Any], *, label: str) -> Any:
+    """Largest planar source-model face."""
+    candidates: list[tuple[float, Any]] = []
+    for raw_face in faces:
+        face = _early_bound(raw_face, "IFace2")
+        surface = face.GetSurface()
+        if surface is None:
+            continue
+        surface = _early_bound(surface, "ISurface")
+        if surface.IsPlane():
+            area = float(
+                adapter._attempt(lambda f=face: f.GetArea(), default=0.0) or 0.0
+            )
+            candidates.append((area, face))
+    if not candidates:
+        raise RuntimeError(f"{label}: referenced part has no planar face")
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+@_telemetry.traced("drawing.referenced_model_cylindrical_face", label_param="label")
+def referenced_model_cylindrical_face(
+    adapter: Any,
+    view: Any,
+    diameter_mm: float,
+    *,
+    label: str,
+) -> Any:
+    """Return the largest source-model cylindrical face at ``diameter_mm``.
+
+    Sheet-coordinate face picks depend on the current drawing display state.
+    ``IView.SelectEntity`` accepts a face from the referenced model directly,
+    so annotations and centerlines should use that stable source identity
+    without resolving the drawing's hidden-line projection.
+    """
+    faces = referenced_model_faces(adapter, view, label=label)
+    return cylindrical_face(adapter, faces, diameter_mm, label=label)
 
 
 @_telemetry.traced("drawing.arc_center_endpoints", label_param="label")

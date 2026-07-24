@@ -18,7 +18,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
-    visible_cylindrical_face,
+    referenced_model_cylindrical_face,
 )
 from _drawing_registry import DrawingCategory
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -128,7 +128,7 @@ async def build_fastener_sheet(
     set_hidden_lines_removed(adapter, end)
 
     if recipe.side_centerline_diameter_mm is not None:
-        centerline_face = visible_cylindrical_face(
+        centerline_face = referenced_model_cylindrical_face(
             adapter,
             side,
             recipe.side_centerline_diameter_mm,

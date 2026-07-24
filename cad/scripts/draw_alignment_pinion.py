@@ -30,7 +30,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
+from _gear_drawing_entities import gear_model_faces
 from alignment_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -130,7 +130,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    gear_faces = gear_model_faces(
+        adapter,
+        front,
+        BORE_DIA,
+        label="alignment pinion source faces",
+    )
 
     # No coordinate-picked face-length dimension on the drum profile: every
     # pick pair tried snaps to the long horizontal tooth silhouettes (exact
@@ -151,8 +156,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        right,
-        edge_xy=(LEFT_END_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
+        front,
+        entity=gear_faces.end,
+        entity_type="MODEL_FACE",
+        leader_attach_xy=(
+            FRONT_CENTER[0] + HALF_OD * 0.55,
+            FRONT_CENTER[1] + HALF_OD * 0.55,
+        ),
         frame_xy=(LEFT_END_X - 0.030, RIGHT_CENTER[1] + HALF_OD + 0.014),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -165,7 +175,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.050),
         roughness_ra="1.6",
         label="drum bore finish",
-        entity=bore_edge,
+        entity=gear_faces.bore,
+        entity_type="MODEL_FACE",
     )
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
