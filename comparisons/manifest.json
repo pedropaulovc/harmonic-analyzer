@@ -218,19 +218,23 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 0.0,
-        "zoom": 1.0,
-        "target_mm": null,
+        "roll_deg": -0.0,
+        "zoom": 1.121,
+        "target_mm": [
+          16.01,
+          491.26,
+          -2.68
+        ],
         "perspective": {
-          "focal_length_mm": 100.0
+          "focal_length_mm": 50.0
         },
         "az_deg": 90.0,
         "el_deg": 3.0
       },
       "align": {
-        "scale": 1.12,
-        "dx_px": 47,
-        "dy_px": -233
+        "scale": 1.0,
+        "dx_px": 0,
+        "dy_px": 0
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -248,19 +252,23 @@
       },
       "camera": {
         "mode": "euler",
-        "roll_deg": 0.0,
-        "zoom": 1.0,
-        "target_mm": null,
+        "roll_deg": -0.0,
+        "zoom": 1.145,
+        "target_mm": [
+          33.53,
+          535.72,
+          -73.61
+        ],
         "perspective": {
-          "focal_length_mm": 100.0
+          "focal_length_mm": 50.0
         },
-        "az_deg": 154.0,
-        "el_deg": 4.0
+        "az_deg": 152.0,
+        "el_deg": 5.6
       },
       "align": {
-        "scale": 1.07,
-        "dx_px": -7,
-        "dy_px": -180
+        "scale": 1.0,
+        "dx_px": 0,
+        "dy_px": 0
       },
       "component_focus": [
         "harmonic_analyzer"
