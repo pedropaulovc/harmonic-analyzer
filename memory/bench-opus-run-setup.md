@@ -43,6 +43,22 @@ Running `comparisons/bench` (pose-presentation benchmark, docs/pose-presentation
 - **Read-only opus-5 cells run 20–152 s** (p50 ~50 s at concurrency 16), ~2× the
   archived opus-4.8 p50 of 25 s, so its timeout is **420 s** not 240 — the
   archived timeout would truncate the slow tail and bias the column.
+- **THE CELL'S cwd WAS THE ANSWER KEY (and every archived column carries it).**
+  The sandbox was named for the cell key, so a T1 cell ran in a directory
+  ending `+az+3` — and Claude Code puts the working directory in prompt
+  context. A probe cell quoted its own path back, read "az+3" out of it, and
+  volunteered that the directory looked like an eval harness. Name sandboxes by
+  the **opaque id** the stimulus files already carry (T3 keys name the
+  delta-pair, T2 keys the starting perturbation — all three leaked), and keep
+  the root OUT of the repo (`$TMPDIR/pose-bench-sandbox`) so a relative walk
+  can't reach `cases.jsonl`. The archived `codex`/`opus` columns were collected
+  before both fixes, so `run.py` refuses those subject ids without
+  `--allow-archived-subject` rather than mixing harnesses under one cell key.
+- **Two contamination checks worth running on any new subject**, both cheap and
+  both caught real defects here: ask a cell what instruction files it sees
+  (should answer NONE), and ask it to quote its cwd (should be opaque). Scan
+  the cell transcripts under `~/.claude/projects/*<sandbox>*` for tool use to
+  confirm what the subject actually did.
 - **Comparability pin.** Regenerating stimuli on current `main` is NOT
   comparable: `comparisons/manifest.json`, `tools/composite.py` and
   `render_offline.py` all drifted (camera-pose refreshes). Pin geometry to the
