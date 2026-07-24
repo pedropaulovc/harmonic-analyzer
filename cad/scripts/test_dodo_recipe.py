@@ -1069,6 +1069,7 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_drawing_marks.py",
         "test_cone_drawing_batch_contract.py",
         "test_fastener_catalog.py",
+        "test_pose_manifest.py",
     } <= {Path(argument).name for argument in pytest_command}
 
     command = recipe["actions"][0][1][0]

@@ -1715,6 +1715,7 @@ def task_check():
         SCRIPTS_DIR / "test_dodo_recipe.py",
         SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_export_models.py",
+        SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
