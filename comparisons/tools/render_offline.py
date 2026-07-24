@@ -7,9 +7,9 @@
 Consumes the STL/boxes render cache written by cad/scripts/export_models.py
 and the same manifest cameras as cad/scripts/render_compare.py. One Blender
 headless invocation per model renders all of its pairs; outputs are
-composited onto the reference background and stored with camera-frame metadata
-so the gallery preserves Pose Studio's target and zoom. Composites/scores are
-then refreshed.
+composited onto the reference background and stored with registration metadata.
+Concrete Pose Studio targets preserve their camera frame; legacy target-less
+turntable poses retain content-fit. Composites/scores are then refreshed.
 
     uv run comparisons/tools/render_offline.py [--only id,..] [--model m]
                                                [--stale-only]
@@ -284,8 +284,12 @@ def main() -> int:
                           "sidecar": _sidecar(pair["id"])}
                 paths["render"].parent.mkdir(parents=True, exist_ok=True)
                 bg.save(paths["render"], **composite.JPEG_OPTS)
-                registration = "camera_frame" \
-                    if args.no_trim or out_root is None else "content_fit"
+                if args.no_trim:
+                    registration = "camera_frame"
+                elif out_root is None:
+                    registration = composite.blender_registration(pair)
+                else:
+                    registration = "content_fit"
                 if registration == "content_fit":
                     composite.trim_render_file(
                         paths["render"],

@@ -56,6 +56,17 @@ def sidecar_path(pair_id: str) -> Path:
     return COMP / "render" / f"{pair_id}.meta.json"
 
 
+def blender_registration(pair: dict) -> str:
+    """Choose framing from pose completeness, not pair-specific tuning.
+
+    Pose Studio saves a concrete target. Legacy turntable poses leave it null
+    and depend on content-fit plus the manifest's 2D alignment.
+    """
+    if pair.get("camera", {}).get("target_mm") is not None:
+        return "camera_frame"
+    return "content_fit"
+
+
 def stale_stage(pair: dict, model_mtime: float) -> StaleStage | None:
     """Return the cheapest gallery stage needed to refresh ``pair``."""
     paths = pair_paths(pair["id"])
@@ -72,7 +83,7 @@ def stale_stage(pair: dict, model_mtime: float) -> StaleStage | None:
         or meta.get("model_mtime") != model_mtime
         or (
             meta.get("engine") == "blender"
-            and meta.get("registration") != "camera_frame"
+            and meta.get("registration") != blender_registration(pair)
         )
     ):
         return "render"

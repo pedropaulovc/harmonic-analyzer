@@ -116,6 +116,15 @@ def test_legacy_trimmed_blender_render_is_stale(monkeypatch, tmp_path: Path) -> 
     assert renderer.composite.stale_stage(pair, src.stat().st_mtime) == "render"
 
 
+def test_blender_registration_comes_from_pose_completeness() -> None:
+    renderer = _load_render_offline()
+    legacy = {"camera": {"zoom": 1.0, "target_mm": None}}
+    authored = {"camera": {"zoom": 1.0, "target_mm": [0.0, 500.0, 0.0]}}
+
+    assert renderer.composite.blender_registration(legacy) == "content_fit"
+    assert renderer.composite.blender_registration(authored) == "camera_frame"
+
+
 def test_camera_frame_metadata_preserves_authored_framing(
     monkeypatch, tmp_path: Path
 ) -> None:
