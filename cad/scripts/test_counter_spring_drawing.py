@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+import _drawing_common
 import counter_spring_notes
 import counter_spring_spec
 import draw_counter_spring as drawing
@@ -25,6 +28,19 @@ def test_spec_sheet_has_no_graphical_marked_dimensions() -> None:
     assert counter_spring_notes.DRAWING_DIMENSIONS == {}
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == set()
+
+
+def test_empty_dimension_contract_skips_whole_model_import(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_import(*_args, **_kwargs):
+        raise AssertionError("empty dimension set must not scan model annotations")
+
+    monkeypatch.setattr(_drawing_common, "insert_marked_dimensions", fail_import)
+
+    assert _drawing_common.curate_view_dimensions(
+        object(), object(), keep={}, view_label="counter spring"
+    ) == []
 
 
 def test_spring_data_matches_the_build() -> None:

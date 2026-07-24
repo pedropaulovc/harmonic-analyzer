@@ -74,9 +74,10 @@ def test_native_gdt_and_finish_present() -> None:
     assert source.count("annotation.Color = 0") == 1
     assert "annotation.LayerOverride" in source
     assert "InsertCenterMark3(2, False, False)" in source
-    assert 'referenced_model_faces(adapter, view, label="channel-lever front")' in source
+    assert "referenced_model_circular_edge(" in source
     assert "2.0 * TIP_RADIUS" in source
-    assert "view.SelectEntity(tip_face, False)" in source
+    assert "view.SelectEntity(tip_edge, False)" in source
+    assert "GetVisibleEntities2" not in source
     assert source.count("add_feature_control_frame(") == 5
     assert source.count('characteristic="position"') == 2
     assert source.count('datums=("A", "B", "C")') == 3

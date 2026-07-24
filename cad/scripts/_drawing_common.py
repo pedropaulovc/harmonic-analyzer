@@ -1810,6 +1810,12 @@ def curate_view_dimensions(
     missing expected dimension fails loud — the print must carry every
     manufacturing dimension the recipe promises.
     """
+    if not keep:
+        # A new view has no imported model dimensions until
+        # InsertModelAnnotations3 is called. Importing the entire model only to
+        # delete every result is a pure no-op, and on detailed coils/gears it
+        # makes SolidWorks scan and resolve substantial source topology.
+        return []
     annotations = delete_unnamed_imports(
         adapter, insert_marked_dimensions(adapter, view)
     )
@@ -2214,6 +2220,38 @@ def cylindrical_face(
     return max(candidates, key=lambda candidate: candidate[0])[1]
 
 
+def circular_edge(
+    adapter: Any,
+    faces: Sequence[Any],
+    diameter_mm: float,
+    *,
+    label: str,
+) -> Any:
+    """First circular source-model edge matching ``diameter_mm`` exactly."""
+    target_radius_mm = diameter_mm / 2.0
+    seen_radii: list[float] = []
+    for raw_face in faces:
+        face = _early_bound(raw_face, "IFace2", "GetEdges")
+        edges = adapter._attempt(lambda f=face: f.GetEdges(), default=None) or ()
+        for raw_edge in edges:
+            edge = _early_bound(raw_edge, "IEdge", "GetCurve")
+            curve = edge.GetCurve()
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            radius_mm = float(curve.CircleParams[6]) * 1000.0
+            seen_radii.append(radius_mm)
+            if abs(radius_mm - target_radius_mm) <= 0.01:
+                return edge
+    radii = ", ".join(f"{radius:.4f}" for radius in sorted(set(seen_radii))) or "none"
+    raise RuntimeError(
+        f"{label}: no circular edge matches radius {target_radius_mm:.4f} mm; "
+        f"candidates={radii}"
+    )
+
+
 def planar_face(adapter: Any, faces: Sequence[Any], *, label: str) -> Any:
     """Largest planar source-model face."""
     candidates: list[tuple[float, Any]] = []
@@ -2250,6 +2288,19 @@ def referenced_model_cylindrical_face(
     """
     faces = referenced_model_faces(adapter, view, label=label)
     return cylindrical_face(adapter, faces, diameter_mm, label=label)
+
+
+@_telemetry.traced("drawing.referenced_model_circular_edge", label_param="label")
+def referenced_model_circular_edge(
+    adapter: Any,
+    view: Any,
+    diameter_mm: float,
+    *,
+    label: str,
+) -> Any:
+    """Resolve a circular source edge without drawing visible-entity scans."""
+    faces = referenced_model_faces(adapter, view, label=label)
+    return circular_edge(adapter, faces, diameter_mm, label=label)
 
 
 @_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
@@ -4361,7 +4412,14 @@ async def finalize_drawing(
     # A large drawing can reopen view-only even when its referenced views report
     # loaded; SolidWorks then rejects PDF SaveAs3 with 0x1001. The SLDDRW is
     # still reopened below and validated as the persisted source artifact.
-    artifacts = save_drawing(adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf))
+    with _telemetry.span(
+        "drawing.save_export",
+        drawing=str(outputs.slddrw),
+        pdf=str(outputs.pdf),
+    ):
+        artifacts = save_drawing(
+            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
+        )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
     drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
