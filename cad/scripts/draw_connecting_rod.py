@@ -199,6 +199,10 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(bore_left[0] - 0.020, bore_left[1]),
         datum="A",
         label="strap bore axis",
+        # The circular-edge attachment is normalized 1.02 um from the requested
+        # point by SolidWorks. Keep a narrow 5 um persistence allowance while
+        # retaining the shared 1 um bound for freely positioned annotations.
+        position_tolerance_m=0.000005,
     )
     # Datum B: the shank's left flank.  A alone leaves rotation about the bore
     # axis unconstrained, so the pin-hole position (and the 147.67 direction)

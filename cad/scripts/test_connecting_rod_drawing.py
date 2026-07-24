@@ -79,6 +79,7 @@ def test_native_gdt_and_finish_present() -> None:
     # A = strap bore axis, B = shank left flank (clocking); the pin-hole
     # position frame references both and the bore carries a fit callout.
     assert source.count("add_datum_feature(") == 2
+    assert source.count("position_tolerance_m=0.000005") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert 'datums=("A", "B")' in source
     assert 'characteristic="position"' in source
