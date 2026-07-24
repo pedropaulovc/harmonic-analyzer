@@ -93,6 +93,13 @@ def test_finalize_exports_once_without_layout_or_reopen_cycles():
     assert "render_pdf_png" in source
 
 
+def test_new_drawing_only_normalizes_viewport_for_coordinate_selection():
+    source = getsource(drawing_common.new_project_drawing)
+    assert source.count("ViewZoomtofit2()") == 1
+    assert "ForceRebuild3" not in source
+    assert "EditRebuild3" not in source
+
+
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):
     return LayoutElement(label, kind, x0, y0, x1, y1, scope=scope, owner=owner)
 

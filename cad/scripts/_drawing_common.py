@@ -1163,6 +1163,11 @@ def new_project_drawing(
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
+    # Sheet-coordinate entity picks use a pixel tolerance mapped through the
+    # editor viewport.  Fit once so selection is independent of the zoom state
+    # saved in the binary template; this changes only the interactive viewport,
+    # not the drawing's views, placements, or exported appearance.
+    draw.ViewZoomtofit2()
     return draw, sheet
 
 
