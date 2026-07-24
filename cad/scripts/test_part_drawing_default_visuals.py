@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import ast
+from types import SimpleNamespace
 
 import pytest
 
+import _drawing_common as drawing_common
 from _drawing_registry import DRAWINGS, DrawingSpec
 
 
@@ -58,3 +60,65 @@ def test_part_drawing_keeps_explicit_placements_and_default_visuals(
         f"{spec.name} overrides SolidWorks drawing visuals: "
         f"{sorted(calls & VISUAL_OVERRIDE_CALLS)}"
     )
+
+
+def test_hidden_edges_are_temporary_authoring_input_not_saved_visuals(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeView:
+        def __init__(self) -> None:
+            self.mode = 2
+            self.calls: list[tuple[bool, int, bool, bool, bool]] = []
+
+        def GetUseParentDisplayMode(self) -> bool:
+            return True
+
+        def GetDisplayMode2(self) -> int:
+            return self.mode
+
+        def GetFacettedHlrDisplay(self) -> bool:
+            return False
+
+        def GetDisplayEdgesInShadedMode(self) -> bool:
+            return True
+
+        def GetCThreadQuality(self) -> bool:
+            return True
+
+        def SetDisplayMode4(
+            self,
+            use_parent: bool,
+            mode: int,
+            faceted: bool,
+            edges: bool,
+            cosmetic_threads_high_quality: bool,
+        ) -> bool:
+            self.calls.append(
+                (
+                    use_parent,
+                    mode,
+                    faceted,
+                    edges,
+                    cosmetic_threads_high_quality,
+                )
+            )
+            self.mode = mode
+            return True
+
+    view = FakeView()
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _name: value)
+    monkeypatch.setattr(drawing_common, "view_name", lambda _adapter, _view: "Front")
+    drawing_common._AUTHORING_VIEW_DISPLAYS.clear()
+
+    drawing_common._prepare_view_for_annotation_authoring(
+        SimpleNamespace(), view
+    )
+    drawing_common._prepare_view_for_annotation_authoring(
+        SimpleNamespace(), view
+    )
+    assert view.calls == [(False, 1, False, True, True)]
+
+    drawing_common._restore_default_view_displays()
+    assert view.calls[-1] == (True, 2, False, True, True)
+    assert view.mode == 2
+    assert not drawing_common._AUTHORING_VIEW_DISPLAYS

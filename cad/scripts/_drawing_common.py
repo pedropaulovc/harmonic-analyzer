@@ -82,6 +82,28 @@ _GDT_IFACE = {
     _ANNOT_GTOL: "IGtol",
     _ANNOT_SFSYM: "ISFSymbol",
 }
+
+
+@dataclass(frozen=True)
+class _AuthoringViewDisplay:
+    """A view's untouched SolidWorks display settings.
+
+    Part recipes author annotations against hidden manufacturing features.  We
+    expose those edges only while annotations are being created, then restore
+    the exact display state SolidWorks chose before saving.  Presentation is
+    therefore owned by the template/SolidWorks defaults, not by each recipe.
+    """
+
+    view: Any
+    name: str
+    use_parent: bool
+    mode: int
+    faceted: bool
+    edges: bool
+    cosmetic_threads_high_quality: bool
+
+
+_AUTHORING_VIEW_DISPLAYS: dict[str, _AuthoringViewDisplay] = {}
 # Fallback only, for an annotation whose geometry cannot be read. Every GD&T
 # symbol that CAN be measured is (see _measured_gdt_box) -- a fixed square is
 # wrong for an FCF by construction, since its width tracks its compartments.
@@ -1150,6 +1172,7 @@ def create_blank_drawing_sheets(
     """Rename the initial blank sheet and duplicate it into a checked package."""
     if not sheet_names or len(sheet_names) != len(set(sheet_names)):
         raise ValueError(f"{label}: sheet names must be nonempty and unique")
+    _AUTHORING_VIEW_DISPLAYS.clear()
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     sheet = ddoc.GetCurrentSheet()
@@ -1625,6 +1648,7 @@ def curate_view_dimensions(
     missing expected dimension fails loud — the print must carry every
     manufacturing dimension the recipe promises.
     """
+    _prepare_view_for_annotation_authoring(adapter, view)
     annotations = delete_unnamed_imports(
         adapter, insert_marked_dimensions(adapter, view)
     )
@@ -1641,6 +1665,57 @@ def curate_view_dimensions(
             f"available={sorted(present)}"
         )
     return curate_dimensions(adapter, curated, reposition=dict(keep))
+
+
+def _prepare_view_for_annotation_authoring(adapter: Any, view: Any) -> None:
+    """Temporarily expose hidden edges needed by native annotation commands."""
+    drawing_view = _early_bound(view, "IView")
+    name = view_name(adapter, drawing_view)
+    if not name:
+        raise RuntimeError("drawing view has no name for authoring display state")
+    if name in _AUTHORING_VIEW_DISPLAYS:
+        return
+    state = _AuthoringViewDisplay(
+        view=drawing_view,
+        name=name,
+        use_parent=bool(drawing_view.GetUseParentDisplayMode()),
+        mode=int(drawing_view.GetDisplayMode2()),
+        faceted=bool(drawing_view.GetFacettedHlrDisplay()),
+        edges=bool(drawing_view.GetDisplayEdgesInShadedMode()),
+        cosmetic_threads_high_quality=bool(drawing_view.GetCThreadQuality()),
+    )
+    _AUTHORING_VIEW_DISPLAYS[name] = state
+    if not drawing_view.SetDisplayMode4(
+        False,
+        1,  # swDisplayMode_e.swHIDDEN_GREYED
+        state.faceted,
+        state.edges,
+        state.cosmetic_threads_high_quality,
+    ):
+        raise RuntimeError(f"failed to expose hidden edges while authoring {name!r}")
+
+
+def _restore_default_view_displays() -> None:
+    """Restore every temporary authoring view to its original SW-selected mode."""
+    try:
+        for state in _AUTHORING_VIEW_DISPLAYS.values():
+            if not state.view.SetDisplayMode4(
+                state.use_parent,
+                state.mode,
+                state.faceted,
+                state.edges,
+                state.cosmetic_threads_high_quality,
+            ):
+                raise RuntimeError(
+                    f"failed to restore SolidWorks display defaults for {state.name!r}"
+                )
+            if int(state.view.GetDisplayMode2()) != state.mode:
+                raise RuntimeError(
+                    f"SolidWorks display mode drifted for {state.name!r}: "
+                    f"{state.view.GetDisplayMode2()} != {state.mode}"
+                )
+    finally:
+        _AUTHORING_VIEW_DISPLAYS.clear()
 
 
 def set_dimension_callouts(
@@ -3931,6 +4006,7 @@ async def finalize_drawing(
     expected_sheet_names: tuple[str, ...] | None = None,
 ) -> dict[str, str]:
     """Validate the sheet contract and export SLDDRW, PDF, and rendered PNG."""
+    _restore_default_view_displays()
     drawing_model = adapter.currentModel
     ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
@@ -3952,6 +4028,10 @@ async def finalize_drawing(
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
         if sheet is None:
             raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+        if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+            raise RuntimeError(
+                f"failed to pin final drawing sheet {sheet_name!r} scale"
+            )
         assert_asme_b_sheet(
             adapter, sheet, phase=f"before save {sheet_name}", scale=scale
         )

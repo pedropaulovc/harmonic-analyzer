@@ -85,6 +85,7 @@ class _FakeAdapter:
 def test_finalize_exports_once_without_layout_or_reopen_cycles():
     source = getsource(drawing_common.finalize_drawing)
     assert source.count("save_drawing(") == 1
+    assert source.count("sheet.SetScale(") == 1
     assert "reopen_drawing" not in source
     assert "check_drawing_layout" not in source
     assert "GetSaveFlag" not in source
