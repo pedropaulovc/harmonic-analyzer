@@ -24,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Literal
 
 from PIL import Image
 
@@ -80,6 +81,7 @@ def resolve_blender(override: str | None = None) -> str:
 
 
 STL_DIR = CAD_OUT / "stl"
+StaleStage = Literal["render", "composite"]
 
 
 def _stale(path: Path, src: Path, what: str) -> None:
@@ -87,6 +89,17 @@ def _stale(path: Path, src: Path, what: str) -> None:
         raise FileNotFoundError(f"{path} missing — run cad/scripts/export_models.py")
     if path.stat().st_mtime < src.stat().st_mtime:
         raise RuntimeError(f"{what} older than {src.name} — re-run export_models.py")
+
+
+def model_source(model: str) -> Path:
+    dashed = model.replace("_", "-")
+    asm = CAD_OUT / "sldasm" / f"{dashed}.SLDASM"
+    prt = CAD_OUT / "sldprt" / f"{dashed}.SLDPRT"
+    if asm.exists():
+        return asm
+    if prt.exists():
+        return prt
+    raise FileNotFoundError(f"no artefact for {model}")
 
 
 def model_paths(model: str) -> tuple[Path, dict]:
@@ -97,11 +110,10 @@ def model_paths(model: str) -> tuple[Path, dict]:
     against its own SLDPRT).
     """
     dashed = model.replace("_", "-")
-    asm = CAD_OUT / "sldasm" / f"{dashed}.SLDASM"
-    prt = CAD_OUT / "sldprt" / f"{dashed}.SLDPRT"
-    if asm.exists():
+    src = model_source(model)
+    if src.suffix.lower() == ".sldasm":
         scene = CAD_OUT / "boxes" / f"{dashed}.json"
-        _stale(scene, asm, scene.name)
+        _stale(scene, src, scene.name)
         data = json.loads(scene.read_text(encoding="utf-8"))
         comps = data.get("components") or []
         if not comps or any("mesh" not in c for c in comps):
@@ -109,34 +121,54 @@ def model_paths(model: str) -> tuple[Path, dict]:
         for stem, mesh in {(c["part"], c["mesh"]) for c in comps}:
             part_src = CAD_OUT / "sldprt" / f"{stem}.SLDPRT"
             _stale(STL_DIR / f"{mesh}.STL", part_src, f"{mesh}.STL")
-        return asm, {"scene": str(scene), "parts_dir": str(STL_DIR)}
-    if not prt.exists():
-        raise FileNotFoundError(f"no artefact for {model}")
+        return src, {"scene": str(scene), "parts_dir": str(STL_DIR)}
     stl = STL_DIR / f"{dashed}.STL"
-    _stale(stl, prt, stl.name)
+    _stale(stl, src, stl.name)
     colors_file = STL_DIR / "colors.json"
     colors = json.loads(colors_file.read_text(encoding="utf-8")) if colors_file.exists() else {}
-    return prt, {"stl": str(stl), "rgb": colors.get(dashed)}
+    return src, {"stl": str(stl), "rgb": colors.get(dashed)}
 
 
 def _sidecar(pair_id: str) -> Path:
     return composite.COMP / "render" / f"{pair_id}.meta.json"
 
 
-def is_stale(pair: dict, src: Path) -> bool:
+def _stale_stage(pair: dict, src: Path) -> StaleStage | None:
+    """Return the cheapest stage needed to refresh ``pair``."""
     img = composite.pair_paths(pair["id"])["render"]
     sc = _sidecar(pair["id"])
     if not img.exists() or not sc.exists():
-        return True
+        return "render"
     try:
         meta = json.loads(sc.read_text(encoding="utf-8"))
     except ValueError:
-        return True  # truncated sidecar (interrupted run) -> re-render heals it
-    return (
+        return "render"  # truncated sidecar (interrupted run) -> re-render heals it
+    if (
         meta.get("camera") != pair["camera"]
         or meta.get("reference") != pair["reference"]
         or meta.get("model_mtime") != src.stat().st_mtime
-    )
+    ):
+        return "render"
+    paths = composite.pair_paths(pair["id"])
+    if (
+        meta.get("align") != pair.get("align")
+        or not paths["cad"].exists()
+        or not paths["blend"].exists()
+    ):
+        return "composite"
+    return None
+
+
+def is_stale(pair: dict, src: Path) -> bool:
+    return _stale_stage(pair, src) is not None
+
+
+def _record_composite_align(pair: dict) -> None:
+    """Stamp a composite-only refresh without rewriting the raw render."""
+    sidecar = _sidecar(pair["id"])
+    meta = json.loads(sidecar.read_text(encoding="utf-8"))
+    meta["align"] = pair.get("align")
+    sidecar.write_text(json.dumps(meta), encoding="utf-8")
 
 
 def pair_size(ref_img: Path, max_side: int) -> tuple[int, int]:
@@ -205,16 +237,27 @@ def main() -> int:
         else composite.load_manifest()
     max_side = int(manifest.get("defaults", {}).get("width", 1600))
     by_model: dict[str, list[dict]] = {}
+    composite_only: dict[str, dict] = {}
     for pair in manifest["pairs"]:
         if only and pair["id"] not in only:
             continue
         if args.model and pair["model"] != args.model:
             continue
-        src, _geom = model_paths(pair["model"])
-        if args.stale_only and not out_root and not is_stale(pair, src):
-            continue
+        src = model_source(pair["model"])
+        if args.stale_only and not out_root:
+            stage = _stale_stage(pair, src)
+            if stage is None:
+                continue
+            if stage == "composite":
+                composite_only[pair["id"]] = pair
+                continue
         by_model.setdefault(pair["model"], []).append(pair)
     if not by_model:
+        if composite_only and not args.skip_composites:
+            composite.regenerate(set(composite_only))
+            for pair in composite_only.values():
+                _record_composite_align(pair)
+            return 0
         print("nothing to render")
         return 0
 
@@ -281,6 +324,7 @@ def main() -> int:
                         background=pair["reference"].get("background", "black"))
                 paths["sidecar"].write_text(json.dumps({
                     "camera": pair["camera"], "reference": pair["reference"],
+                    "align": pair.get("align"),
                     "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
                     "engine": "blender",
                     # exact uniform colour behind the render's pixels --
@@ -291,7 +335,9 @@ def main() -> int:
                 print(f"  OK  {pair['id']}", flush=True)
 
     if not args.skip_composites and not out_root:
-        composite.regenerate(rendered)
+        composite.regenerate(rendered | set(composite_only))
+        for pair in composite_only.values():
+            _record_composite_align(pair)
     return 0
 
 
