@@ -1080,6 +1080,9 @@ def _rendered_pair_ids(lines: list[str]) -> set[str]:
     rendered: set[str] = set()
     for line in lines:
         text = line.strip()
+        if text.startswith("REFRESHED  "):
+            rendered.add(text.removeprefix("REFRESHED  ").strip())
+            continue
         if not text.startswith("OK  "):
             continue
         pair_id = text[4:].strip()

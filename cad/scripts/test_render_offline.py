@@ -145,7 +145,7 @@ def test_camera_frame_metadata_preserves_authored_framing(
 
 
 def test_stale_only_refreshes_align_without_launching_blender(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, capsys
 ) -> None:
     renderer = _load_render_offline()
     monkeypatch.setattr(renderer.composite, "COMP", tmp_path)
@@ -191,3 +191,4 @@ def test_stale_only_refreshes_align_without_launching_blender(
     assert renderer.main() == 0
     assert refreshed == [{pair["id"]}]
     assert json.loads(sidecar.read_text())["align"] == pair["align"]
+    assert "REFRESHED  pair" in capsys.readouterr().out

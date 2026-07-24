@@ -458,8 +458,23 @@ def test_current_gallery_skips_redundant_composite_and_index(
     assert (comparisons / "scores.json").stat().st_mtime > old_mtime
     assert (comparisons / "index.html").stat().st_mtime > old_mtime
 
+    calls.clear()
+
+    def _run_composite_refresh(cmd: list[str], _tag: str) -> list[str]:
+        calls.append(cmd)
+        if Path(cmd[2]).name == "render_offline.py":
+            return ["  REFRESHED  sample"]
+        return []
+
+    monkeypatch.setattr(export_models, "_run_tool", _run_composite_refresh)
+    assert export_models.refresh_comparison_gallery()
+    assert [Path(cmd[2]).name for cmd in calls] == [
+        "render_offline.py", "gallery.py",
+    ]
+
     export_models.GALLERY_STAMP.unlink()
     calls.clear()
+    monkeypatch.setattr(export_models, "_run_tool", _run)
     assert export_models.refresh_comparison_gallery()
     assert [Path(cmd[2]).name for cmd in calls] == [
         "render_offline.py", "composite.py", "gallery.py",
@@ -525,9 +540,10 @@ def test_rendered_pair_parser_ignores_composite_progress() -> None:
     assert export_models._rendered_pair_ids([
         "  OK  pair-a",
         "  OK  [1/2] pair-a: score 88.2 (1s)",
+        "  REFRESHED  pair-c",
         "  OK  pair-b",
         "composites done",
-    ]) == {"pair-a", "pair-b"}
+    ]) == {"pair-a", "pair-b", "pair-c"}
 
 
 def test_routine_view_cleanup_preserves_configuration_renders(tmp_path: Path) -> None:

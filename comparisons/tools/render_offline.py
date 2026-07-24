@@ -222,6 +222,7 @@ def main() -> int:
             composite.regenerate(set(composite_only))
             for pair in composite_only.values():
                 composite.record_composite_align(pair)
+                print(f"  REFRESHED  {pair['id']}", flush=True)
             return 0
         print("nothing to render")
         return 0
@@ -306,6 +307,7 @@ def main() -> int:
         composite.regenerate(rendered | set(composite_only))
         for pair in composite_only.values():
             composite.record_composite_align(pair)
+            print(f"  REFRESHED  {pair['id']}", flush=True)
     return 0
 
 
