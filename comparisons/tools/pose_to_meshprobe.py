@@ -462,7 +462,15 @@ def _orbit_line(mp: list[str], session: str, cvt: dict) -> str:
 
 def _render_line(mp: list[str], session: str, cvt: dict, out_dir: str) -> str:
     out_png = str(Path(out_dir) / f"{cvt['id']}.png")
-    return _fmt([*mp, "-s", session, "render-image", "--style", "shaded_edges",
+    # screen_edges is meshprobe's own default: a GPU depth/normal edge pass that runs
+    # on the graphics device (EEVEE, device=graphics_hardware in the render receipt).
+    # Swap to shaded_edges for extra fidelity — Freestyle traces geometry-aware lines
+    # and separates same-colour adjacent parts far better — but it is CPU-bound and
+    # SINGLE-THREADED, and its cost scales with the visible component count, not the
+    # output resolution. Measured on the full machine at 945x2240: screen_edges 7.3 s
+    # vs shaded_edges 31.8 s per frame (plain shaded, no edges at all, 6.8 s) — so the
+    # GPU edge pass is ~free and Freestyle is ~25 s of view-map computation per frame.
+    return _fmt([*mp, "-s", session, "render-image", "--style", "screen_edges",
                  "--width", str(cvt["canvas"][0]), "--height", str(cvt["canvas"][1]),
                  "--output", out_png])
 
