@@ -97,7 +97,7 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert "edge_xy=DATUM_A_RIGHT" in source
     assert "entity=shaft_datum_edge" not in source
     assert "shoulder=True" not in source
-    assert "position_tolerance_m=0.0001" in source
+    assert "position_tolerance_m=0.001" in source
     assert "annotation=shaft_dia_annotation" not in source
     assert "symbol_xy=(0.205, 0.145)" in source
     assert "frame_xy=(0.100, 0.055)" in source

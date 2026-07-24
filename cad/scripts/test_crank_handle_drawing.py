@@ -102,6 +102,8 @@ def test_pivot_interface_is_fully_released_for_manufacture() -> None:
 def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
+    assert "expected_position_xy=(RIGHT_CENTER[0], 0.245)" in source
+    assert source.count("position_tolerance_m=0.001") == 1
     assert source.count("add_feature_control_frame(") == 3
     assert 'characteristic="perpendicularity"' in source
     assert 'quantity="DATUM B FACE"' in source

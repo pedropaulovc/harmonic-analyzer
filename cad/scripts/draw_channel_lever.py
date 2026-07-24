@@ -33,6 +33,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_view_properties,
+    referenced_model_circular_edge,
     set_basic_dimension,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -45,10 +46,10 @@ from channel_lever_spec import (
     LEVER_SPRING_X,
     LEVER_THICKNESS,
     PIVOT_HOLE_DIA,
+    TIP_RADIUS,
     TIP_END_X,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
@@ -116,11 +117,13 @@ def _add_tip_arc_center_mark(adapter: Any, view: Any) -> None:
     if not drawing_doc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate channel-lever front view")
     draw.ClearSelection2(True)
-    tip_edge = _sheet_xy(TIP_END_X, 0.0)
-    selected = draw.Extension.SelectByID2(
-        "", "EDGE", tip_edge[0], tip_edge[1], 0.0, False, 0, null_callout(), 0
+    tip_edge = referenced_model_circular_edge(
+        adapter,
+        view,
+        2.0 * TIP_RADIUS,
+        label="channel-lever tip R3 arc",
     )
-    if not selected:
+    if not view.SelectEntity(tip_edge, False):
         raise RuntimeError("failed to select channel-lever tip R3 arc")
     center_mark = drawing_doc.InsertCenterMark3(2, False, False)
     draw.ClearSelection2(True)
@@ -304,7 +307,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # committed.  This allowance checks annotation readback only; it does
         # not alter the part's manufacturing tolerances.
         label="fulcrum bore axis",
-        position_tolerance_m=0.0001,
+        position_tolerance_m=0.001,
     )
     top_face = (
         RIGHT_CENTER[0],

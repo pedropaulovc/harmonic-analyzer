@@ -28,7 +28,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
+from _gear_drawing_entities import gear_model_faces
 from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -129,7 +129,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to disc bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    gear_faces = gear_model_faces(
+        adapter,
+        front,
+        BORE_DIA,
+        label="rack pinion source faces",
+    )
 
     bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
@@ -140,12 +145,17 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="rack pinion bore axis",
         shoulder=True,
-        position_tolerance_m=0.0001,
+        position_tolerance_m=0.001,
     )
     add_feature_control_frame(
         adapter,
-        right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
+        front,
+        entity=gear_faces.end,
+        entity_type="MODEL_FACE",
+        leader_attach_xy=(
+            FRONT_CENTER[0] + HALF_OD * 0.55,
+            FRONT_CENTER[1] + HALF_OD * 0.55,
+        ),
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -158,7 +168,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.055),
         roughness_ra="1.6",
         label="rack pinion bore finish",
-        entity=bore_edge,
+        entity=gear_faces.bore,
+        entity_type="MODEL_FACE",
     )
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)

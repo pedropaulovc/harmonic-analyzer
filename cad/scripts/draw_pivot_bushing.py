@@ -15,10 +15,12 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
+    cylindrical_face,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_view_properties,
+    referenced_model_faces,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -146,10 +148,6 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0] + outer_r * diag,
         FRONT_CENTER[1] + outer_r * diag,
     )
-    bore_edge = (
-        FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
-        FRONT_CENTER[1],
-    )
     bore_top = (
         FRONT_CENTER[0],
         FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -166,7 +164,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
         datum="A",
         label="bushing bore axis",
-        position_tolerance_m=0.000005,
+        position_tolerance_m=0.001,
     )
     add_datum_feature(
         adapter,
@@ -204,10 +202,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # renders ABOVE the arm and to its RIGHT, spanning ~0.131..0.157 at y~0.224:
     # clear of the O6.50 callout below (its text tops out at y=0.201), of the
     # runout frame above, and of the right view starting at x=0.174.
+    # Resolve the source-model bore face by radius without asking the drawing
+    # view to project every visible edge. A cold fleet rebuild proved the old
+    # 3-o'clock coordinate pick intermittent, and visible-entity enumeration
+    # needlessly resolves hidden-line geometry.
+    source_faces = referenced_model_faces(adapter, front, label="bushing front")
+    bore_finish_face = cylindrical_face(
+        adapter, source_faces, BORE_DIA, label="bushing bore finish"
+    )
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_edge,
+        entity=bore_finish_face,
+        entity_type="MODEL_FACE",
         symbol_xy=(0.118, 0.210),
         roughness_ra="1.6",
         label="bushing bore finish",

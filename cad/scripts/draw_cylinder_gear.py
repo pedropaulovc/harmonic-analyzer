@@ -15,7 +15,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -32,7 +32,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
+from _gear_drawing_entities import gear_model_faces
 from cylinder_gear_spec import BORE_DIA, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -75,24 +75,6 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "THRU - REAM\n+0.05/+0.03",
 }
 DIMENSION_PRECISION = {"BoreDia": 3}
-
-
-def _largest_visible_planar_face(adapter: Any, view: Any) -> Any:
-    """Return the largest visible planar face in ``view``."""
-    candidates: list[tuple[float, Any]] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        faces = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 3), default=()
-        ) or ()
-        for face in faces:
-            face = _early_bound(face, "IFace2")
-            surface = _early_bound(face.GetSurface(), "ISurface")
-            if surface.IsPlane():
-                candidates.append((float(face.GetArea()), face))
-    if not candidates:
-        raise RuntimeError("front view has no visible planar model face")
-    return max(candidates, key=lambda item: item[0])[1]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -152,11 +134,14 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-    gear_face = _largest_visible_planar_face(adapter, front)
+    gear_faces = gear_model_faces(
+        adapter,
+        front,
+        BORE_DIA,
+        label="cylinder gear",
+    )
 
-    # Datum A: the bore axis (front view, 12 o'clock pick with the symbol above,
-    # the draw_pivot_bushing spelling so the standoff is honoured).
+    # Datum A: the bore axis (front view, 45-degree pick with the symbol above).
     datum_radial = math.sqrt(0.5)
     bore_top = (
         FRONT_CENTER[0] + BORE_R * datum_radial,
@@ -179,34 +164,36 @@ async def build(adapter: Any) -> dict[str, str]:
         position_tolerance_m=0.008,
     )
     # Gear face perpendicular to the bore axis (datum A), attached directly to
-    # the largest visible planar gear face instead of a tooth-tip silhouette.
+    # the source-model axial end face instead of resolving drawing HLR.
     half_od = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
     add_feature_control_frame(
         adapter,
         front,
+        entity=gear_faces.end,
+        entity_type="MODEL_FACE",
+        leader_attach_xy=(
+            FRONT_CENTER[0] - HALF_OD * 0.55,
+            FRONT_CENTER[1] - HALF_OD * 0.55,
+        ),
         frame_xy=(0.175, RIGHT_CENTER[1] + half_od + 0.010),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
         label="gear face squareness to bore",
-        entity_type="FACE",
-        entity=gear_face,
     )
-    # Bore finish: attaches by model identity (the batch contract) at the
-    # circle edge's canonical vertex, which lands at (FRONT_CENTER-0.0038,
-    # FRONT_CENTER+... ) -- the bore's lower-left, invariant across runs. Two
-    # other invariant leader corridors converge there (the datum's 45-degree
-    # run y = x - 0.05 just below the attach, and the face-FCF's vertical run
-    # at x 0.201..0.208), so route the SF leader STRAIGHT DOWN from a symbol
-    # directly above the attach: x = 0.2212 clears the FCF corridor on the
-    # right, and the vertical span stops 0.9 mm above the 45-degree segment.
+    # Bore finish attaches directly to the source-model cylindrical face.
     add_surface_finish(
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] - 0.0038, FRONT_CENTER[1] + 0.035),
         roughness_ra="1.6",
         label="cylinder gear bore finish",
-        entity=bore_edge,
+        entity=gear_faces.bore,
+        entity_type="MODEL_FACE",
+        leader_attach_xy=(
+            FRONT_CENTER[0],
+            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
+        ),
     )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS)

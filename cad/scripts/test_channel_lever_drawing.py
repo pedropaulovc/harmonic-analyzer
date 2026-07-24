@@ -66,15 +66,18 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'set_basic_dimension(adapter, bar_height, label="bar height from datum C")' in source
     assert source.count("add_datum_feature(") == 3
     assert (
-        'label="fulcrum bore axis",\n        position_tolerance_m=0.0001'
+        'label="fulcrum bore axis",\n        position_tolerance_m=0.001'
         in source
     )
-    assert source.count("position_tolerance_m=0.0001") == 1
+    assert source.count("position_tolerance_m=0.001") == 1
     assert source.count("_force_dimension_black(") == 3
     assert source.count("annotation.Color = 0") == 1
     assert "annotation.LayerOverride" in source
     assert "InsertCenterMark3(2, False, False)" in source
-    assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
+    assert "referenced_model_circular_edge(" in source
+    assert "2.0 * TIP_RADIUS" in source
+    assert "view.SelectEntity(tip_edge, False)" in source
+    assert "GetVisibleEntities2" not in source
     assert source.count("add_feature_control_frame(") == 5
     assert source.count('characteristic="position"') == 2
     assert source.count('datums=("A", "B", "C")') == 3

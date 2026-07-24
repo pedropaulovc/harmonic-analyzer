@@ -18,6 +18,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    referenced_model_cylindrical_face,
 )
 from _drawing_registry import DrawingCategory
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -39,7 +40,7 @@ class FastenerSheet:
     side_dimension_callouts: Mapping[str, str] | None = None
     note_xy: tuple[float, float] = (0.020, 0.115)
     end_note_xy: tuple[float, float] = (0.050, 0.220)
-    side_centerline_face_xy: tuple[float, float] | None = None
+    side_centerline_diameter_mm: float | None = None
     end_center_mark: Literal["required", "not_applicable"] = "not_applicable"
     decorate: Callable[[Any, Any, Any, Any], None] | None = None
 
@@ -126,11 +127,17 @@ async def build_fastener_sheet(
     # adds no manufacturing information; the thread callout owns that feature.
     set_hidden_lines_removed(adapter, end)
 
-    if recipe.side_centerline_face_xy is not None:
+    if recipe.side_centerline_diameter_mm is not None:
+        centerline_face = referenced_model_cylindrical_face(
+            adapter,
+            side,
+            recipe.side_centerline_diameter_mm,
+            label=f"{property_view} side-view centerline face",
+        )
         add_view_centerline(
             adapter,
             side,
-            face_xy=recipe.side_centerline_face_xy,
+            face=centerline_face,
             label=f"{property_view} side-view axis centerline",
         )
     if recipe.end_center_mark == "required" and not auto_center_marks(

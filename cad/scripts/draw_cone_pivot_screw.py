@@ -219,7 +219,7 @@ RECIPE = FastenerSheet(
     side_dimension_callouts=SIDE_DIMENSION_CALLOUTS,
     note_xy=(0.020, 0.105),
     end_note_xy=(0.020, 0.245),
-    side_centerline_face_xy=(0.190, 0.145),
+    side_centerline_diameter_mm=SHOULDER_DIA,
     decorate=_decorate,
 )
 

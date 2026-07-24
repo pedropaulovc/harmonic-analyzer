@@ -250,11 +250,31 @@ def _select_view_entity(
         else:
             selected = bool(view.SelectEntity(entity, False))
     elif xy is not None:
-        selected = bool(
-            draw.Extension.SelectByID2(
-                "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
+        # One redraw may materialize view geometry that SelectByID2 could not
+        # see on its first pass.  Never escalate an annotation pick to a full
+        # EditRebuild3: dense gear projections can spend minutes regenerating
+        # only to reject the same ambiguous coordinate again.  A second miss
+        # fails fast so the recipe can replace the coordinate with topology.
+        for attempt in range(1, 3):
+            selected = bool(
+                draw.Extension.SelectByID2(
+                    "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
+                )
             )
-        )
+            if selected:
+                if attempt > 1:
+                    _telemetry.info(
+                        f"recovered {label} {entity_type.lower()} coordinate "
+                        f"selection on attempt {attempt}",
+                        drawing_selection_recovered=True,
+                        drawing_label=label,
+                        entity_type=entity_type,
+                        selection_attempt=attempt,
+                    )
+                break
+            draw.ClearSelection2(True)
+            if attempt == 1:
+                draw.GraphicsRedraw2()
     if not selected:
         where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
         raise RuntimeError(
@@ -320,7 +340,7 @@ def add_datum_feature(
     entity: Any | None = None,
     annotation: Any | None = None,
     shoulder: bool = False,
-    position_tolerance_m: float = 1e-6,
+    position_tolerance_m: float = 0.001,
     callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
@@ -328,11 +348,39 @@ def add_datum_feature(
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges. Restricted datum tags
     can apply a deterministic normalization to ``symbol_xy``; when live
-    readback proves one, ``expected_position_xy`` keeps the persistence guard
-    tight around that normalized point without pretending the raw request is
-    what SolidWorks stores.
+    readback proves one, ``expected_position_xy`` bounds the persistence guard
+    around that normalized point without pretending the raw request is what
+    SolidWorks stores. Datum readback is session-dependent at micron scale, so
+    the default automation tolerance is 1 mm; this does not alter drawing or
+    manufacturing tolerances.
     """
     draw = adapter.currentModel
+    if annotation is not None:
+        selection_mode = "annotation"
+    elif entity is not None:
+        selection_mode = "entity"
+    elif edge_entity is not None:
+        selection_mode = "edge_entity"
+    else:
+        selection_mode = "sheet_coordinate"
+    selection_fields = {
+        "datum_position_signal": "drawing.datum_selection_request",
+        "datum": datum,
+        "drawing_label": label,
+        "selection_mode": selection_mode,
+        "entity_type": entity_type,
+        "edge_x_m": edge_xy[0] if edge_xy else None,
+        "edge_y_m": edge_xy[1] if edge_xy else None,
+        "requested_x_m": symbol_xy[0],
+        "requested_y_m": symbol_xy[1],
+    }
+    _telemetry.event("drawing.datum_selection_request", **selection_fields)
+    _telemetry.info(
+        f"datum {datum} selection request ({label}): "
+        f"mode={selection_mode}, entity_type={entity_type}, edge={edge_xy}, "
+        f"requested={symbol_xy}",
+        **selection_fields,
+    )
     if annotation is None:
         _select_annotation_entity(
             adapter,
@@ -407,14 +455,48 @@ def add_datum_feature(
             float(actual_position[1]) - expected_position[1],
         )
     )
+    actual_xy = (
+        None
+        if not actual_position
+        else (float(actual_position[0]), float(actual_position[1]))
+    )
+    position_fields = {
+        "datum_position_signal": "drawing.datum_position_readback",
+        "datum": datum,
+        "drawing_label": label,
+        "selection_mode": selection_mode,
+        "entity_type": entity_type,
+        "edge_x_m": edge_xy[0] if edge_xy else None,
+        "edge_y_m": edge_xy[1] if edge_xy else None,
+        "requested_x_m": symbol_xy[0],
+        "requested_y_m": symbol_xy[1],
+        "expected_x_m": expected_position[0],
+        "expected_y_m": expected_position[1],
+        "actual_x_m": actual_xy[0] if actual_xy else None,
+        "actual_y_m": actual_xy[1] if actual_xy else None,
+        "position_error_mm": (
+            position_error * 1000.0 if math.isfinite(position_error) else None
+        ),
+        "position_tolerance_mm": position_tolerance_m * 1000.0,
+        "normalized_expectation": expected_position_xy is not None,
+    }
+    _telemetry.event("drawing.datum_position_readback", **position_fields)
+    position_message = (
+        f"datum {datum} position readback ({label}): "
+        f"requested={symbol_xy}, expected={expected_position}, actual={actual_xy}, "
+        f"error={position_error * 1000.0:.6f} mm, "
+        f"limit={position_tolerance_m * 1000.0:.6f} mm"
+    )
     if position_error > position_tolerance_m:
+        _telemetry.warn(position_message, **position_fields)
         raise RuntimeError(
             f"datum {datum} position did not persist ({label}): "
-            f"{tuple(actual_position[:2]) if actual_position else None}; "
+            f"{actual_xy}; "
             f"requested={symbol_xy}, expected={expected_position}, "
             f"error={position_error:.6g} m, "
             f"limit={position_tolerance_m:.6g} m"
         )
+    _telemetry.info(position_message, **position_fields)
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
     if callout_below and not tag.SetText(4, callout_below):
@@ -549,8 +631,12 @@ def add_feature_control_frame(
     # in the annotation's model-entity array is flow-dependent (0 on the
     # pre-merge insertion order, 1 on the current one), so accept either.
     # Ordinary edge/silhouette attachments must register exactly one entity.
-    expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}
-    if entity_type != "DIMENSION" and int(annotation.GetAttachedEntityCount3()) != 1:
+    indirect_entity_types = {"DIMENSION", "MODEL_FACE"}
+    expected_entities = {0, 1} if entity_type in indirect_entity_types else {1}
+    if (
+        entity_type not in indirect_entity_types
+        and int(annotation.GetAttachedEntityCount3()) != 1
+    ):
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
@@ -1724,6 +1810,12 @@ def curate_view_dimensions(
     missing expected dimension fails loud — the print must carry every
     manufacturing dimension the recipe promises.
     """
+    if not keep:
+        # A new view has no imported model dimensions until
+        # InsertModelAnnotations3 is called. Importing the entire model only to
+        # delete every result is a pure no-op, and on detailed coils/gears it
+        # makes SolidWorks scan and resolve substantial source topology.
+        return []
     annotations = delete_unnamed_imports(
         adapter, insert_marked_dimensions(adapter, view)
     )
@@ -2069,6 +2161,147 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
             drawing_view.GetVisibleEntities2(component, entity_kind) or []
         )
     return entities
+
+
+@_telemetry.traced("drawing.referenced_model_faces", label_param="label")
+def referenced_model_faces(adapter: Any, view: Any, *, label: str) -> list[Any]:
+    """Faces from the part referenced by ``view``, without resolving drawing HLR.
+
+    ``IView.SelectEntity`` accepts entities from the source model directly.
+    Walking the source bodies therefore avoids ``GetVisibleEntities2``, whose
+    hidden-line projection of dense gear teeth can take minutes.
+    """
+    drawing_view = _early_bound(view, "IView", "ReferencedDocument")
+    model = adapter._get_attr_or_call(drawing_view, "ReferencedDocument")
+    if model is None:
+        raise RuntimeError(f"{label}: drawing view has no referenced model")
+    part = _early_bound(model, "IPartDoc", "GetBodies2")
+    bodies = adapter._attempt(lambda: part.GetBodies2(0, False), default=None) or ()
+    faces: list[Any] = []
+    for raw_body in bodies:
+        body = _early_bound(raw_body, "IBody2", "GetFaces")
+        faces.extend(adapter._attempt(lambda b=body: b.GetFaces(), default=None) or ())
+    if not faces:
+        raise RuntimeError(f"{label}: referenced part has no solid-body faces")
+    return faces
+
+
+@_telemetry.traced("drawing.cylindrical_face", label_param="label")
+def cylindrical_face(
+    adapter: Any,
+    faces: Sequence[Any],
+    diameter_mm: float,
+    *,
+    label: str,
+) -> Any:
+    """Largest cylindrical source-model face matching ``diameter_mm``."""
+    target_radius_mm = diameter_mm / 2.0
+    candidates: list[tuple[float, Any]] = []
+    seen_radii: list[float] = []
+    for raw_face in faces:
+        face = _early_bound(raw_face, "IFace2")
+        surface = face.GetSurface()
+        if surface is None:
+            continue
+        surface = _early_bound(surface, "ISurface")
+        if not surface.IsCylinder():
+            continue
+        radius_mm = float(surface.CylinderParams[6]) * 1000.0
+        seen_radii.append(radius_mm)
+        if abs(radius_mm - target_radius_mm) > 0.01:
+            continue
+        area = float(adapter._attempt(lambda f=face: f.GetArea(), default=0.0) or 0.0)
+        candidates.append((area, face))
+    if not candidates:
+        radii = ", ".join(f"{radius:.4f}" for radius in sorted(seen_radii)) or "none"
+        raise RuntimeError(
+            f"{label}: no cylindrical face matches radius "
+            f"{target_radius_mm:.4f} mm; candidates={radii}"
+        )
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+def circular_edge(
+    adapter: Any,
+    faces: Sequence[Any],
+    diameter_mm: float,
+    *,
+    label: str,
+) -> Any:
+    """First circular source-model edge matching ``diameter_mm`` exactly."""
+    target_radius_mm = diameter_mm / 2.0
+    seen_radii: list[float] = []
+    for raw_face in faces:
+        face = _early_bound(raw_face, "IFace2", "GetEdges")
+        edges = adapter._attempt(lambda f=face: f.GetEdges(), default=None) or ()
+        for raw_edge in edges:
+            edge = _early_bound(raw_edge, "IEdge", "GetCurve")
+            curve = edge.GetCurve()
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            radius_mm = float(curve.CircleParams[6]) * 1000.0
+            seen_radii.append(radius_mm)
+            if abs(radius_mm - target_radius_mm) <= 0.01:
+                return edge
+    radii = ", ".join(f"{radius:.4f}" for radius in sorted(set(seen_radii))) or "none"
+    raise RuntimeError(
+        f"{label}: no circular edge matches radius {target_radius_mm:.4f} mm; "
+        f"candidates={radii}"
+    )
+
+
+def planar_face(adapter: Any, faces: Sequence[Any], *, label: str) -> Any:
+    """Largest planar source-model face."""
+    candidates: list[tuple[float, Any]] = []
+    for raw_face in faces:
+        face = _early_bound(raw_face, "IFace2")
+        surface = face.GetSurface()
+        if surface is None:
+            continue
+        surface = _early_bound(surface, "ISurface")
+        if surface.IsPlane():
+            area = float(
+                adapter._attempt(lambda f=face: f.GetArea(), default=0.0) or 0.0
+            )
+            candidates.append((area, face))
+    if not candidates:
+        raise RuntimeError(f"{label}: referenced part has no planar face")
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+@_telemetry.traced("drawing.referenced_model_cylindrical_face", label_param="label")
+def referenced_model_cylindrical_face(
+    adapter: Any,
+    view: Any,
+    diameter_mm: float,
+    *,
+    label: str,
+) -> Any:
+    """Return the largest source-model cylindrical face at ``diameter_mm``.
+
+    Sheet-coordinate face picks depend on the current drawing display state.
+    ``IView.SelectEntity`` accepts a face from the referenced model directly,
+    so annotations and centerlines should use that stable source identity
+    without resolving the drawing's hidden-line projection.
+    """
+    faces = referenced_model_faces(adapter, view, label=label)
+    return cylindrical_face(adapter, faces, diameter_mm, label=label)
+
+
+@_telemetry.traced("drawing.referenced_model_circular_edge", label_param="label")
+def referenced_model_circular_edge(
+    adapter: Any,
+    view: Any,
+    diameter_mm: float,
+    *,
+    label: str,
+) -> Any:
+    """Resolve a circular source edge without drawing visible-entity scans."""
+    faces = referenced_model_faces(adapter, view, label=label)
+    return circular_edge(adapter, faces, diameter_mm, label=label)
 
 
 @_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
@@ -2831,7 +3064,11 @@ def _create_auto_balloons(
     allow_empty: bool = False,
     layout: int = 1,
 ) -> list[Any]:
-    """Create item-number balloons for one selected view without repositioning."""
+    """Create item-number balloons for one selected view without repositioning.
+
+    Selecting the view is sufficient.  Forcing a display-geometry refresh here
+    neither cured empty ``AutoBalloon5`` results nor came for free.
+    """
     if layout not in range(1, 7):
         raise ValueError(f"{label}: invalid auto-balloon layout {layout}")
     _activate_and_select_view(adapter, view, label=label)
@@ -4176,7 +4413,14 @@ async def finalize_drawing(
     # A large drawing can reopen view-only even when its referenced views report
     # loaded; SolidWorks then rejects PDF SaveAs3 with 0x1001. The SLDDRW is
     # still reopened below and validated as the persisted source artifact.
-    artifacts = save_drawing(adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf))
+    with _telemetry.span(
+        "drawing.save_export",
+        drawing=str(outputs.slddrw),
+        pdf=str(outputs.pdf),
+    ):
+        artifacts = save_drawing(
+            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
+        )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
     drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)

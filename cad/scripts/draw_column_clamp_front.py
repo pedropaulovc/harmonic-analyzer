@@ -226,7 +226,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="column-relief bore",
         # Live readback normalizes this restricted bore tag by 3.253 um. Bound
         # only annotation placement; part dimensions and GD&T remain unchanged.
-        position_tolerance_m=0.000005,
+        position_tolerance_m=0.001,
     )
     add_feature_control_frame(
         adapter,

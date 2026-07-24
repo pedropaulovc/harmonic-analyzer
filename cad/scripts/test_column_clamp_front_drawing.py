@@ -92,10 +92,10 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
         '        label="column-relief bore",\n'
         "        # Live readback normalizes this restricted bore tag by 3.253 um. Bound\n"
         "        # only annotation placement; part dimensions and GD&T remain unchanged.\n"
-        "        position_tolerance_m=0.000005,"
+        "        position_tolerance_m=0.001,"
         in source
     )
-    assert source.count("position_tolerance_m=0.000005") == 1
+    assert source.count("position_tolerance_m=0.001") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source

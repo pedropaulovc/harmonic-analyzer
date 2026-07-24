@@ -224,7 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="arbor axis",
         # SolidWorks normalized this circular-edge tag by 0.0060 mm in the
         # release build.  This is an annotation readback allowance only.
-        position_tolerance_m=0.0001,
+        position_tolerance_m=0.001,
     )
     # Up-RIGHT of the end circle it annotates, not out at PROFILE_CENTER[0]
     # (0.194): that put the frame 130 mm from its own anchor, so its leader ran

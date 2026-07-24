@@ -108,6 +108,11 @@ def _component(adapter: Any, name: str) -> Any:
     return comp
 
 
+def require_component(adapter: Any, name: str) -> Any:
+    """Resolve one known component name directly, without enumerating the tree."""
+    return _component(adapter, name)
+
+
 def component_mate_count(adapter: Any, name: str) -> int:
     """How many mates reference this component -- ONE ``IComponent2::GetMates``
     call (the API docs' own remedy for the slow mate-list iteration; the

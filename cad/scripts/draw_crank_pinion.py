@@ -28,7 +28,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge, visible_tooth_tip_silhouette
+from _gear_drawing_entities import gear_model_faces
 from crank_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -128,13 +128,19 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-    tooth_tip_silhouette = visible_tooth_tip_silhouette(adapter, right, OUTSIDE_DIA)
+    gear_faces = gear_model_faces(
+        adapter,
+        front,
+        BORE_DIA,
+        label="crank pinion",
+        tooth_tip_diameter_mm=OUTSIDE_DIA,
+    )
 
     add_datum_feature(
         adapter,
         front,
-        entity=bore_edge,
+        entity=gear_faces.bore,
+        entity_type="MODEL_FACE",
         symbol_xy=(FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + 0.033),
         datum="A",
         label="crank pinion bore axis",
@@ -143,8 +149,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
+        front,
+        entity=gear_faces.end,
+        entity_type="MODEL_FACE",
+        leader_attach_xy=(
+            FRONT_CENTER[0] + HALF_OD * 0.55,
+            FRONT_CENTER[1] + HALF_OD * 0.55,
+        ),
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -155,14 +166,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        entity=tooth_tip_silhouette,
+        entity=gear_faces.tooth_tip,
         frame_xy=(0.330, 0.220),
         characteristic="circular_runout",
         tolerance="0.05",
         datums=("A",),
         quantity="TOOTH TIPS",
         label="pinion tooth-tip circular runout",
-        entity_type="SILHOUETTE",
+        entity_type="MODEL_FACE",
     )
     add_surface_finish(
         adapter,
@@ -170,7 +181,8 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.017, FRONT_CENTER[1] - 0.060),
         roughness_ra="1.6",
         label="crank pinion bore finish",
-        entity=bore_edge,
+        entity=gear_faces.bore,
+        entity_type="MODEL_FACE",
         leader_attach_xy=(
             FRONT_CENTER[0],
             FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,

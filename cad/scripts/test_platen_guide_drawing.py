@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -150,9 +151,76 @@ def test_drawing_uses_native_hole_table_and_sheet_scale() -> None:
     assert "add_hole_group_tags" not in drawing_source
     assert "scale=(3, 1)" not in drawing_source
     assert "scale=(1, 4)" not in drawing_source
+    assert "def _hole_table_entities(" in drawing_source
+    assert "datum_entity=datum_vertex" in drawing_source
+    assert "hole_entities=hole_entities" in drawing_source
+    assert "edge.GetStartVertex(), edge.GetEndVertex()" in drawing_source
+    assert 'view, 1, label="platen-guide hole-table circles"' in drawing_source
     # (The sheet-scale property link now lives inside the hand-made
     # category DRWDOT binaries -- not greppable; verified by eye on the
     # rendered sheets.)
+
+
+def test_hole_table_topology_classification_has_named_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans: list[tuple[str, dict[str, object]]] = []
+
+    @contextmanager
+    def capture_span(name: str, **attributes: object):
+        spans.append((name, attributes))
+        yield None
+
+    class Vertex:
+        def __init__(self, point: tuple[float, float, float]) -> None:
+            self._point = point
+
+        def GetPoint(self) -> tuple[float, float, float]:
+            return self._point
+
+    class DatumEdge:
+        def GetStartVertex(self) -> Vertex:
+            return Vertex((0.0, 0.0, 0.0))
+
+        def GetEndVertex(self) -> Vertex:
+            return Vertex((guide.GUIDE_LENGTH / 1000.0, 0.0, 0.0))
+
+    class Circle:
+        def __init__(self, station_mm: float) -> None:
+            self.CircleParams = (
+                station_mm / 1000.0,
+                guide.GUIDE_HEIGHT / 2000.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                drawing.THREAD_TAP_DRILL_MM / 2000.0,
+            )
+
+        def IsCircle(self) -> bool:
+            return True
+
+    class CircleEdge:
+        def __init__(self, station_mm: float) -> None:
+            self._curve = Circle(station_mm)
+
+        def GetCurve(self) -> Circle:
+            return self._curve
+
+    stations = (10.0, 20.0)
+    circle_edges = [CircleEdge(station) for station in stations]
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(
+        drawing,
+        "visible_view_entities",
+        lambda *_args, **_kwargs: circle_edges,
+    )
+    monkeypatch.setattr(drawing._telemetry, "span", capture_span)
+
+    selected = drawing._hole_table_entities(object(), stations, DatumEdge())
+
+    assert selected[1:] == tuple(circle_edges)
+    assert spans == [("drawing.hole_table_entities", {})]
 
 
 def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
@@ -169,10 +237,10 @@ def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
     assert (
-        'label="guide bottom edge",\n        position_tolerance_m=0.0001'
+        'label="guide bottom edge",\n        position_tolerance_m=0.001'
         in source
     )
-    assert source.count("position_tolerance_m=0.0001") == 1
+    assert source.count("position_tolerance_m=0.001") == 1
     assert source.count("add_feature_control_frame(") == 3
     assert "characteristic=\"flatness\"" in source
     assert "characteristic=\"parallelism\"" in source

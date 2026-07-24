@@ -89,12 +89,14 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert source.count("add_datum_feature(") == 4
     assert source.count("add_feature_control_frame(") == 2
     assert (
-        'symbol_xy=(0.085, 0.105),\n        datum="B",\n'
+        'symbol_xy=(0.085, 0.105),\n'
+        '        expected_position_xy=(0.08615498326870875, 0.10781527172509928),\n'
+        '        datum="B",\n'
         '        label="cam final bore axis",\n'
-        "        position_tolerance_m=0.003,"
+        "        position_tolerance_m=0.001,"
         in source
     )
-    assert source.count("position_tolerance_m=0.003") == 1
+    assert source.count("position_tolerance_m=0.001") == 2
     assert (
         'symbol_xy=(0.155, 0.105),\n        datum="C",\n'
         '        label="cam OD datum axis",\n'
@@ -103,12 +105,13 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     )
     assert source.count("position_tolerance_m=0.019") == 1
     assert (
-        'symbol_xy=(0.192, 0.170),\n        datum="D",\n'
+        'symbol_xy=(0.192, 0.170),\n'
+        '        expected_position_xy=(0.19595148576383914, 0.17098280543184766),\n'
+        '        datum="D",\n'
         '        label="cam boss OD axis",\n'
-        "        position_tolerance_m=0.0025,"
+        "        position_tolerance_m=0.001,"
         in source
     )
-    assert source.count("position_tolerance_m=0.0025") == 1
     assert "set_basic_dimension(" in source
     assert 'datums=("A", "B", "C")' in source
     assert 'datums=("D",)' in source

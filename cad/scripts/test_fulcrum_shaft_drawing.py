@@ -45,7 +45,7 @@ def test_linked_notes_define_remaining_bearing_shaft_operations() -> None:
 def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
-    assert "position_tolerance_m=0.0001" in source
+    assert "position_tolerance_m=0.001" in source
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"cylindricity\"" in source
     assert source.count("characteristic=\"perpendicularity\"") == 1

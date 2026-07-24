@@ -39,7 +39,9 @@ def test_native_dimensions_cover_diameter_and_overall_length() -> None:
     assert '("VERTEX", APEX)' in source
     assert "<MOD-DIAM>" in source
     assert source.count("_display_as_diameter(") == 2  # def + the barrel dim
-    assert "_add_axis_centerline(adapter, front" in source
+    assert "referenced_model_cylindrical_face(" in source
+    assert "face=barrel_face" in source
+    assert "_add_axis_centerline" not in source
 
 
 def test_cone_geometry_matches_the_notes() -> None:

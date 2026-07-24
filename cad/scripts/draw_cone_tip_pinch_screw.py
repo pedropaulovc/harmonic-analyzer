@@ -11,6 +11,7 @@ from _common import CAD_ROOT, run_build
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
+from cone_tip_pinch_screw_spec import SHANK_DIA
 
 
 SPEC = DRAWINGS_BY_NAME["cone_tip_pinch_screw"]
@@ -33,7 +34,7 @@ RECIPE = FastenerSheet(
     iso_center=(0.310, 0.170),
     end_keep=END_KEEP,
     dimension_callouts=DIMENSION_CALLOUTS,
-    side_centerline_face_xy=(0.185, 0.160),
+    side_centerline_diameter_mm=SHANK_DIA,
     end_center_mark="required",
 )
 

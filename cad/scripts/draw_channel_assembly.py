@@ -23,6 +23,7 @@ from _common import run_build
 from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons_across_views,
+    add_component_bom_balloons,
     finalize_drawing,
     new_project_drawing,
     read_required_view_properties,
@@ -78,6 +79,13 @@ BOM_COMPONENTS = {
     "channel-spring-installed": "CHANNEL RETURN SPRING",
     "spring-hook": "SPRING-HOOK FASTENER",
 }
+
+ISOMETRIC_BALLOONS = (
+    ("pivot-shaft", "1"),
+    ("fulcrum-shaft", "2"),
+    ("spring-hook", "11"),
+)
+
 BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 
 ASSEMBLY_NOTES = "\n".join(
@@ -96,7 +104,7 @@ ASSEMBLY_NOTES = "\n".join(
 # above the bottom border).
 FRONT_CENTER = (0.060, 0.150)
 RIGHT_CENTER = (0.130, 0.150)
-ISO_CENTER = (0.225, 0.140)
+ISO_CENTER = (0.205, 0.140)
 # Top-left BOM anchor, top-right of the sheet above the title block, bounded by
 # the sheet ZONE band (0.2667); refined against the render.
 BOM_ANCHOR = (0.248, 0.265)
@@ -163,14 +171,25 @@ async def build(adapter: Any) -> dict[str, str]:
         label="channel assembly",
     )
     # No single view exposes all eleven component families in the dense bank.
-    # Cover the BOM across the three projections and validate every item number.
+    # AutoBalloon5 is deterministic for the two orthographic views, but live
+    # repros show that it intermittently returns no notes for the isometric view.
+    # Attach the three isometric-only families explicitly, then validate their
+    # union with the native orthographic balloons against the complete BOM.
     # Items 4 and 7 attach in a tight vertical cluster in the right view. Use
     # SolidWorks' native circular layout so their order follows the view ring;
     # the measured-radius spread and final layout audit remain the proof that
     # balloon circles and leaders clear one another.
+    isometric_balloons = add_component_bom_balloons(
+        adapter,
+        iso,
+        items=ISOMETRIC_BALLOONS,
+        label="channel assembly isometric balloons",
+        margin=0.006,
+    )
     add_auto_balloons_across_views(
-        adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
+        adapter, (front, right), expected=len(BOM_COMPONENTS),
         label="channel assembly balloons",
+        existing_balloons=isometric_balloons,
         margin=0.006,
         layout=2,
     )
