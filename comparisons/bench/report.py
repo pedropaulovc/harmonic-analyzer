@@ -242,6 +242,8 @@ def load_raw(task: str, model: str, harness: str = HARNESS) -> list[dict]:
         if not line.strip():
             continue
         r = json.loads(line)
+        if r.get("harness", LEGACY_HARNESS) != harness:
+            continue
         if r["task"] == task and r["model"] == model:
             out.append(r)
     return out
@@ -326,13 +328,18 @@ def markdown(model: str, t1: dict, t3: dict, comp: dict | None = None) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", help="codex|codex-sol|opus|opus-5|opus-5-tools (default: all present)")
-    ap.add_argument("--harness", default=HARNESS,
-                    help="harness generation to score for non-archived subjects")
+    ap.add_argument("--harness", default=None,
+                    help="harness generation to score (default: current for new "
+                         "subjects, legacy for the archived codex/opus columns)")
     args = ap.parse_args()
     models = [args.model] if args.model else ["codex", "codex-sol", "opus", "opus-5", "opus-5-tools"]
     # Archived columns predate the harness stamp; score them as their own
     # generation instead of dropping them from a report of a mixed file.
-    gen = {m: (LEGACY_HARNESS if m in ("codex", "codex-sol", "opus") else args.harness)
+    # Archived subjects DEFAULT to the legacy generation, but an explicit
+    # --harness wins: `run.py --allow-archived-subject` stamps its new rows with
+    # the current generation, and those rows have to be reportable.
+    gen = {m: (args.harness if args.harness
+               else LEGACY_HARNESS if m in ("codex", "codex-sol", "opus") else HARNESS)
            for m in models}
     summary, md = {}, ["# Pose-presentation benchmark - results\n"]
     for model in models:
