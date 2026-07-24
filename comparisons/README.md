@@ -18,12 +18,12 @@ submodule).
 
 | path | tracked? | content |
 |---|---|---|
-| `manifest.json` | tracked | source of truth: pair id → reference, model, camera pose, 2D align, tier, status |
+| `manifest.json` | tracked | source of truth: pair id → reference, model, camera pose, legacy content-fit 2D align, tier, status |
 | `ATTRIBUTION.md` | tracked | CC BY credits/licensing for the reference photos (ships in every release bundle) |
 | `ref/<id>.jpg` | regen | prepared reference (cropped/rotated, ≤1600 px) — re-derived from the `references` submodule by `prepare_reference` |
 | `index.html` | regen | inspection gallery (tier + text filters; drag the ref⇆cad reveal slider) — `uv run comparisons/tools/gallery.py` |
-| `render/<id>.jpg` | regen | raw CAD render, content-trimmed, black background (+ `.meta.json` staleness/engine sidecar) |
-| `composite/<id>_cad.jpg` | regen | render fitted into the reference frame (same scale/offset as the blend layer) — the slider's top image |
+| `render/<id>.jpg` | regen | raw CAD render (+ `.meta.json` staleness/engine/registration sidecar); Blender preserves concrete Pose Studio camera frames, while legacy target-less poses and SolidWorks captures are content-fit |
+| `composite/<id>_cad.jpg` | regen | render registered from sidecar metadata into the reference frame (same scale/offset as the blend layer) — the slider's top image |
 | `composite/<id>_blend.jpg` | regen | red-tinted render over grayscale ref — misalignment is instantly visible |
 | `scores.json` | regen | pair → RMS shape score (regression trend only; compare across commits, same engine) |
 | `findings/iter_NNN.json` | — | per-iteration vision findings |

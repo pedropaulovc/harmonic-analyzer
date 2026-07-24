@@ -62,9 +62,9 @@
         "el_deg": 6.8
       },
       "align": {
-        "scale": 1.08,
-        "dx_px": -7,
-        "dy_px": -193
+        "scale": 1.0,
+        "dx_px": 0,
+        "dy_px": 0
       },
       "component_focus": [
         "harmonic_analyzer"
@@ -164,9 +164,9 @@
         "el_deg": 4.3
       },
       "align": {
-        "scale": 1.13,
-        "dx_px": 20,
-        "dy_px": -247
+        "scale": 1.0,
+        "dx_px": 0,
+        "dy_px": 0
       },
       "component_focus": [
         "harmonic_analyzer"

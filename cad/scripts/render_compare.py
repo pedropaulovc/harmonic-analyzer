@@ -350,7 +350,7 @@ async def capture(adapter: Any, out_img: Path, width: int, height: int) -> None:
 # --- staleness ---------------------------------------------------------------
 
 def _sidecar(pair_id: str) -> Path:
-    return COMP / "render" / f"{pair_id}.meta.json"
+    return composite.sidecar_path(pair_id)
 
 
 def pair_size(ref_png: Path, max_side: int) -> tuple[int, int]:
@@ -365,23 +365,16 @@ def pair_size(ref_png: Path, max_side: int) -> tuple[int, int]:
 
 
 def is_stale(pair: dict, mpath: Path) -> bool:
-    img = composite.pair_paths(pair["id"])["render"]
-    sc = _sidecar(pair["id"])
-    if not img.exists() or not sc.exists():
-        return True
-    meta = json.loads(sc.read_text(encoding="utf-8"))
-    return (
-        meta.get("camera") != pair["camera"]
-        or meta.get("reference") != pair["reference"]
-        or meta.get("model_mtime") != mpath.stat().st_mtime
-    )
+    return composite.stale_stage(pair, mpath.stat().st_mtime) is not None
 
 
 def write_sidecar(pair: dict, mpath: Path, size: tuple[int, int]) -> None:
     _sidecar(pair["id"]).write_text(
         json.dumps({"camera": pair["camera"], "reference": pair["reference"],
+                    "align": pair.get("align"),
                     "size": list(size), "model_mtime": mpath.stat().st_mtime,
                     "engine": "solidworks",
+                    "registration": "content_fit",
                     # captures run under force_plain_white_background --
                     # composite._content_mask seeds its knockout flood from it
                     "render_bg": "white"}),
@@ -464,16 +457,26 @@ def main() -> int:
     only = set(args.only.split(",")) if args.only else None
 
     by_model: dict[str, list[dict]] = {}
+    composite_only: dict[str, dict] = {}
     for pair in manifest["pairs"]:
         if only and pair["id"] not in only:
             continue
         if args.model and pair["model"] != args.model:
             continue
         mpath = model_path(pair["model"])
-        if args.stale_only and not is_stale(pair, mpath):
-            continue
+        if args.stale_only:
+            stage = composite.stale_stage(pair, mpath.stat().st_mtime)
+            if stage is None:
+                continue
+            if stage == "composite":
+                composite_only[pair["id"]] = pair
+                continue
         by_model.setdefault(pair["model"], []).append(pair)
 
+    if composite_only:
+        composite.regenerate(set(composite_only))
+        for pair in composite_only.values():
+            composite.record_composite_align(pair)
     if not by_model:
         _telemetry.info("nothing to render")
         return 0

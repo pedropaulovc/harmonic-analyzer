@@ -11,9 +11,9 @@ standalone with uv to regenerate composites/scores without SolidWorks:
 
 Per pair (see ../manifest.json):
     ref/<id>.jpg                prepared reference (cropped/rotated copy)
-    render/<id>.jpg             raw CAD render (content-trimmed)
-    composite/<id>_cad.jpg      render fitted into the reference frame (same
-                                scale/offset as the blend layer, black
+    render/<id>.jpg             raw CAD render (registration in sidecar)
+    composite/<id>_cad.jpg      render registered into the reference frame
+                                (same scale/offset as the blend layer, black
                                 background) — the gallery's reveal-slider top
     composite/<id>_blend.jpg    overlay: grayscale ref under red-tinted render
                                 (render background knocked out)
@@ -24,6 +24,7 @@ import argparse
 import json
 import time
 from pathlib import Path
+from typing import Literal
 
 from PIL import Image, ImageOps
 
@@ -31,6 +32,7 @@ COMP = Path(__file__).resolve().parents[1]
 REPO = COMP.parent
 MANIFEST = COMP / "manifest.json"
 SCORES = COMP / "scores.json"
+StaleStage = Literal["render", "composite"]
 
 def load_manifest(path: Path = MANIFEST) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -48,6 +50,61 @@ def pair_paths(pair_id: str) -> dict[str, Path]:
         "cad": COMP / "composite" / f"{pair_id}_cad.jpg",
         "blend": COMP / "composite" / f"{pair_id}_blend.jpg",
     }
+
+
+def sidecar_path(pair_id: str) -> Path:
+    return COMP / "render" / f"{pair_id}.meta.json"
+
+
+def blender_registration(pair: dict) -> str:
+    """Choose framing from pose completeness, not pair-specific tuning.
+
+    Pose Studio saves a concrete target. Legacy turntable poses leave it null
+    and depend on content-fit plus the manifest's 2D alignment.
+    """
+    if pair.get("camera", {}).get("target_mm") is not None:
+        return "camera_frame"
+    return "content_fit"
+
+
+def stale_stage(pair: dict, model_mtime: float) -> StaleStage | None:
+    """Return the cheapest gallery stage needed to refresh ``pair``."""
+    paths = pair_paths(pair["id"])
+    sidecar = sidecar_path(pair["id"])
+    if not paths["render"].exists() or not sidecar.exists():
+        return "render"
+    try:
+        meta = json.loads(sidecar.read_text(encoding="utf-8"))
+    except ValueError:
+        return "render"
+    if (
+        meta.get("camera") != pair["camera"]
+        or meta.get("reference") != pair["reference"]
+        or meta.get("model_mtime") != model_mtime
+        or (
+            meta.get("engine") == "blender"
+            and meta.get("registration") != blender_registration(pair)
+        )
+    ):
+        return "render"
+    if (
+        (
+            meta.get("registration") != "camera_frame"
+            and meta.get("align") != pair.get("align")
+        )
+        or not paths["cad"].exists()
+        or not paths["blend"].exists()
+    ):
+        return "composite"
+    return None
+
+
+def record_composite_align(pair: dict) -> None:
+    """Stamp a composite-only refresh without rewriting the raw render."""
+    sidecar = sidecar_path(pair["id"])
+    meta = json.loads(sidecar.read_text(encoding="utf-8"))
+    meta["align"] = pair.get("align")
+    sidecar.write_text(json.dumps(meta), encoding="utf-8")
 
 
 def prepare_reference(pair: dict, max_px: int = 1600, out: Path | None = None) -> Path:
@@ -153,6 +210,14 @@ def trim_render_file(path: Path, margin_frac: float = 0.01,
             time.sleep(0.25)
 
 
+def render_metadata(pair_id: str) -> dict:
+    sidecar = sidecar_path(pair_id)
+    try:
+        return json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
 def render_bg(pair_id: str) -> str | None:
     """The uniform colour behind the render's pixels, recorded by the renderer
     in its sidecar (``render_bg``). Fallbacks for pre-key sidecars: an
@@ -162,10 +227,8 @@ def render_bg(pair_id: str) -> str | None:
     always under force_plain_white_background) — so it reads as white rather
     than degrading to the model-corner-eating unconditional flood. Only a
     missing/unreadable sidecar returns None (unconditional flood)."""
-    sc = pair_paths(pair_id)["render"].with_name(f"{pair_id}.meta.json")
-    try:
-        meta = json.loads(sc.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    meta = render_metadata(pair_id)
+    if not meta:
         return None
     if "render_bg" in meta:
         return meta["render_bg"]
@@ -175,19 +238,26 @@ def render_bg(pair_id: str) -> str | None:
 
 
 def _fitted_render(pair_id: str, ref_size: tuple[int, int], align: dict | None):
-    """Content-trimmed render scaled to fit the ref frame.
+    """Place a render in the reference frame according to its sidecar contract.
 
-    Returns (render RGB, content mask, paste offset). The capture fills only
-    part of the viewport (zoom-to-fit margins), while references mostly fill
-    their frame — so content-fit first, then apply the manifest's 2D
-    fine-alignment (scale about centre + pixel offset).
+    Blender renders tagged ``camera_frame`` preserve the exact frame authored
+    in Pose Studio, including its target and zoom. SolidWorks captures retain
+    the legacy content-fit path because their window-aspect margins are not a
+    camera-frame contract. Only content-fit captures use the legacy manifest
+    2D fine-alignment; applying it to a camera frame would transform the pose a
+    second time.
     """
     align = align or {}
     ren = Image.open(pair_paths(pair_id)["render"])
     mask = _content_mask(ren, background=render_bg(pair_id))
+    rw, rh = ref_size
+    if render_metadata(pair_id).get("registration") == "camera_frame":
+        ren = ren.resize((rw, rh), Image.Resampling.LANCZOS)
+        mask = mask.resize((rw, rh), Image.Resampling.NEAREST)
+        return ren, mask, (0, 0)
+
     bbox = mask.getbbox() or (0, 0, ren.width, ren.height)
     ren, mask = ren.crop(bbox), mask.crop(bbox)
-    rw, rh = ref_size
     s = min(rw / ren.width, rh / ren.height) * align.get("scale", 1.0)
     w, h = max(1, round(ren.width * s)), max(1, round(ren.height * s))
     ren = ren.resize((w, h), Image.Resampling.LANCZOS)
