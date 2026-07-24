@@ -54,8 +54,22 @@ RESULTS = OUT / "results.jsonl"
 # non-jpg reads across 168 transcripts), but the isolation should not rest on
 # the subject's good manners. An opaque temp root also means a relative escape
 # finds nothing worth reading. Override with HARMONIC_BENCH_SANDBOX.
+# ...and it is namespaced per CHECKOUT: a machine-global root would let two
+# worktrees running the same cells (say one pinned to the archived v0.19/
+# c8efcf1e assets and one on current assets) land on the same <sandbox_id> leaf
+# and overwrite each other's stimulus while a subject is mid-read. The per-
+# process collision guard cannot see across processes; distinct roots make it
+# structurally impossible. The hash keeps the parent as opaque as the leaf.
 SANDBOX_ROOT = Path(os.environ.get("HARMONIC_BENCH_SANDBOX")
-                    or Path(tempfile.gettempdir()) / "pose-bench-sandbox")
+                    or Path(tempfile.gettempdir())
+                    / f"pose-bench-{sha256(str(BENCH).encode()).hexdigest()[:8]}")
+# Harness generation. Rows are stamped with it and `done_keys` counts ONLY the
+# current one: cell keys did not change across the fixes, so a seat still
+# holding a gitignored results.jsonl from the pre-fix run (cwd leaking the
+# delta, ambient CLAUDE.md in context) would otherwise resume as if those cells
+# were done and publish the mixture. Bump this on any change to what a subject
+# sees or is told.
+HARNESS = "h2-safemode-opaque-cwd"
 SCHEMA_DIR = OUT / "schemas"
 SALT = "pose-bench-v1"
 ARMS = P.ARMS
@@ -229,13 +243,23 @@ def _sandbox(oid: str) -> Path:
 def done_keys() -> set:
     if not RESULTS.exists():
         return set()
-    keys = set()
+    keys, stale = set(), 0
     for line in RESULTS.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         r = json.loads(line)
+        # A row from an older harness is NOT done: it answered a differently
+        # posed question (see HARNESS). Cell keys are stable across generations,
+        # so without this a stale local results.jsonl silently resumes as if the
+        # contaminated cells were finished.
+        if r.get("harness") != HARNESS:
+            stale += 1
+            continue
         if r.get("response") is not None:   # only successful cells count as done;
             keys.add(r["cell_key"])         # errored cells retry on rerun
+    if stale:
+        print(f"!! ignoring {stale} row(s) from an older harness generation "
+              f"(current: {HARNESS}) -- those cells will be re-run", flush=True)
     return keys
 
 
@@ -354,6 +378,14 @@ def run_opus(prompt: str, images: list[Path], sandbox: Path,
                 tokens = u.get("input_tokens", 0) + u.get("output_tokens", 0)
             if not model_id and e.get("message", {}).get("model"):
                 model_id = e["message"]["model"]
+            # Third source, last: the result event's modelUsage is keyed by the
+            # model that actually served the turn, so it survives a system event
+            # that never arrives. (Measured on CLI 2.1.219 the system event is
+            # always present -- 29/29 rows carried a model_id -- but the pinned
+            # -model guard turns a missing id into a rejected cell, so it is
+            # worth a belt-and-braces read rather than a stalled rerun.)
+            if not model_id and e.get("type") == "result" and e.get("modelUsage"):
+                model_id = next(iter(e["modelUsage"]), "")
     except ValueError:
         text = proc.stdout
     data = _extract_json(text)
@@ -466,7 +498,8 @@ def exec_t1(cases, cell, model):
     t0 = time.monotonic()
     data, tokens, err, mid = invoke(model, prompt, imgs, T1_SCHEMA, sb)
     return {
-        "task": "t1", "cell_key": cell_key, "model": model, "model_id": mid,
+        "task": "t1", "cell_key": cell_key, "harness": HARNESS,
+        "model": model, "model_id": mid,
         "case_id": cid, "pair_id": row["pair_id"], "arm": arm, "repeat": rep,
         "grid": grid, "side": side % 2, "tier": row["tier"], "delta": row["delta"],
         "response": data, "tokens": tokens, "error": err,
@@ -498,7 +531,8 @@ def exec_t3(cases, cell, model):
     t0 = time.monotonic()
     data, tokens, err, mid = invoke(model, prompt, imgs, T3_SCHEMA, sb)
     return {
-        "task": "t3", "cell_key": cell_key, "model": model, "model_id": mid,
+        "task": "t3", "cell_key": cell_key, "harness": HARNESS,
+        "model": model, "model_id": mid,
         "pair_id": pid, "delta_class": dclass, "arm": arm, "repeat": rep,
         "order": order, "side": side, "correct": correct,
         "response": data, "tokens": tokens, "error": err,
@@ -609,7 +643,8 @@ def exec_t2(cases, cell, model, server):
     # response=None on an error-break so done_keys retries the cell (a genuine
     # non-converged loop that ran its rounds keeps response=rounds and counts done).
     return {
-        "task": "t2", "cell_key": cell_key, "model": model, "model_id": mid,
+        "task": "t2", "cell_key": cell_key, "harness": HARNESS,
+        "model": model, "model_id": mid,
         "pair_id": pid, "start": start_key, "arm": arm,
         "response": None if err_break else rounds, "error": err_break,
         "rounds": rounds, "n_rounds": len(rounds), "converged": converged,

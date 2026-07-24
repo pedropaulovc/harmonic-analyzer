@@ -24,6 +24,12 @@ from pathlib import Path
 
 BENCH = Path(__file__).resolve().parent
 OUT = BENCH / "out"
+# Harness generation to score. Mirrors run.py's HARNESS; rows written before the
+# stamp existed (the archived codex/opus columns) read as LEGACY_HARNESS, so a
+# mixed results.jsonl scores each generation separately instead of averaging a
+# pre-fix column into a post-fix one.
+HARNESS = "h2-safemode-opaque-cwd"
+LEGACY_HARNESS = "h1-legacy"
 RESULTS = OUT / "results.jsonl"
 PARAMS = ["az", "el", "roll", "target_x", "target_y", "zoom"]
 DKEY = {"az": "az_deg", "el": "el_deg", "roll": "roll_deg",
@@ -51,7 +57,7 @@ def gt_bucket(param: str, delta: dict) -> str | None:
     return "small" if v <= 8 else "medium" if v <= 25 else "large"
 
 
-def load(task: str, model: str) -> list[dict]:
+def load(task: str, model: str, harness: str = HARNESS) -> list[dict]:
     if not RESULTS.exists():
         return []
     rows = []
@@ -59,8 +65,16 @@ def load(task: str, model: str) -> list[dict]:
         if not line.strip():
             continue
         r = json.loads(line)
-        if r["task"] == task and r["model"] == model and r.get("response"):
-            rows.append(r)
+        if r["task"] != task or r["model"] != model or not r.get("response"):
+            continue
+        # Never score a row from an older harness generation next to a current
+        # one -- they answered differently-posed questions (pre-fix cells had
+        # the delta in their cwd and the seat's CLAUDE.md in context). The
+        # archived codex/opus columns predate the stamp entirely, so they are
+        # scored as their own generation rather than silently dropped.
+        if r.get("harness", LEGACY_HARNESS) != harness:
+            continue
+        rows.append(r)
     return rows
 
 
@@ -151,8 +165,8 @@ def bootstrap_ci(rows: list[dict], stat, n_boot: int = 400, seed: int = 0):
     return (vals[int(0.025 * len(vals))], vals[int(0.975 * len(vals))])
 
 
-def t1_report(model: str) -> dict:
-    rows = load("t1", model)
+def t1_report(model: str, harness: str = HARNESS) -> dict:
+    rows = load("t1", model, harness)
     arms = sorted({r["arm"] for r in rows}, key=lambda a: int(a[1:]))
     table = {}
     for arm in arms:
@@ -173,8 +187,8 @@ def t1_report(model: str) -> dict:
     return {"table": table, "ranking": ranking}
 
 
-def t3_report(model: str) -> dict:
-    rows = load("t3", model)
+def t3_report(model: str, harness: str = HARNESS) -> dict:
+    rows = load("t3", model, harness)
     arms = sorted({r["arm"] for r in rows}, key=lambda a: int(a[1:]))
     table = {}
     for arm in arms:
@@ -198,10 +212,10 @@ def _median(xs: list[float]) -> float:
     return s[len(s) // 2] if s else float("nan")
 
 
-def t2_report(model: str) -> dict:
+def t2_report(model: str, harness: str = HARNESS) -> dict:
     """Closed-loop convergence per arm. Non-converged rounds censored at 7
     (max+1) so divergence can only lengthen a median, never shrink it."""
-    rows = [r for r in load_raw("t2", model) if r.get("response") is not None]
+    rows = [r for r in load_raw("t2", model, harness) if r.get("response") is not None]
     arms = sorted({r["arm"] for r in rows}, key=lambda a: int(a[1:]))
     table = {}
     for arm in arms:
@@ -220,7 +234,7 @@ def t2_report(model: str) -> dict:
     return {"table": table, "ranking": ranking, "n_total": len(rows)}
 
 
-def load_raw(task: str, model: str) -> list[dict]:
+def load_raw(task: str, model: str, harness: str = HARNESS) -> list[dict]:
     if not RESULTS.exists():
         return []
     out = []
@@ -312,17 +326,24 @@ def markdown(model: str, t1: dict, t3: dict, comp: dict | None = None) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", help="codex|codex-sol|opus|opus-5|opus-5-tools (default: all present)")
+    ap.add_argument("--harness", default=HARNESS,
+                    help="harness generation to score for non-archived subjects")
     args = ap.parse_args()
     models = [args.model] if args.model else ["codex", "codex-sol", "opus", "opus-5", "opus-5-tools"]
+    # Archived columns predate the harness stamp; score them as their own
+    # generation instead of dropping them from a report of a mixed file.
+    gen = {m: (LEGACY_HARNESS if m in ("codex", "codex-sol", "opus") else args.harness)
+           for m in models}
     summary, md = {}, ["# Pose-presentation benchmark - results\n"]
     for model in models:
-        t1 = t1_report(model)
-        t3 = t3_report(model)
-        t2 = t2_report(model)
+        t1 = t1_report(model, gen[model])
+        t3 = t3_report(model, gen[model])
+        t2 = t2_report(model, gen[model])
         if not t1["table"] and not t3["table"] and not t2["table"]:
             continue
         comp = completeness(t1, t3, t2)
-        summary[model] = {"t1": t1, "t3": t3, "t2": t2, "completeness": comp}
+        summary[model] = {"t1": t1, "t3": t3, "t2": t2, "completeness": comp,
+                          "harness": gen[model]}
         md.append(markdown(model, t1, t3, comp))
     # STRICT json: the default encoder writes bare NaN/Infinity for an
     # unavailable CI or control-FP rate, which json.loads accepts but JSON.parse
