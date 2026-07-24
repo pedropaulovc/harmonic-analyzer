@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -19,12 +19,8 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    set_arc_endpoints_to_center,
     set_basic_dimension,
     stamp_drawing_summary,
-    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -36,7 +32,6 @@ from top_crossbar_spec import (
     BAR_LENGTH,
     BAR_WIDTH,
     STUD_HOLE_DIA,
-    STUD_HOLE_Z,
 )
 
 
@@ -71,32 +66,6 @@ FRONT_KEEP = {
     # starts right of the top view (which ends at x~0.100).
     "Height": (FRONT_CENTER[0] - 0.047, FRONT_CENTER[1]),
 }
-
-
-@_telemetry.traced("drawing.top_crossbar_stud_hole_scan")
-def _stud_hole_edge(adapter: Any, view: Any) -> Any:
-    """Return the model edge for the lone top-view stud hole by radius."""
-    candidates: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label="crossbar stud-hole edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        curve = edge.GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-        candidates.append((params[6], edge))
-    if not candidates:
-        raise RuntimeError("top view has no circular stud-hole model edge")
-    radius, edge = min(
-        candidates, key=lambda item: abs(item[0] - STUD_HOLE_DIA / 2.0)
-    )
-    if abs(radius - STUD_HOLE_DIA / 2.0) > 0.01:
-        raise RuntimeError(
-            f"no top-view circle matches stud-hole radius {STUD_HOLE_DIA / 2.0:.3f} mm"
-        )
-    return edge
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -143,10 +112,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (top, iso):
-        set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, front)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
@@ -154,17 +120,13 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to top-view stud hole")
 
     hole_radius_sheet = STUD_HOLE_DIA / 4000.0
-    hole_center_y = TOP_CENTER[1] + STUD_HOLE_Z / 2000.0
     length_location = add_edge_dimension(
         adapter,
         top,
         p0=(TOP_CENTER[0], TOP_CENTER[1] - BAR_LENGTH / 4000.0),
-        p1=(TOP_CENTER[0], hole_center_y - hole_radius_sheet),
+        p1=(TOP_CENTER[0], TOP_CENTER[1] - hole_radius_sheet),
         text_xy=(TOP_CENTER[0] + 0.030, TOP_CENTER[1] - 0.025),
         label="stud-hole length location",
-    )
-    set_arc_endpoints_to_center(
-        adapter, length_location, label="stud-hole length location"
     )
     set_basic_dimension(adapter, length_location, label="stud-hole length location")
 
@@ -178,7 +140,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     lower_end = (TOP_CENTER[0], TOP_CENTER[1] - BAR_LENGTH / 4000.0)
     upper_end = (TOP_CENTER[0], TOP_CENTER[1] + BAR_LENGTH / 4000.0)
-    hole_edge = _stud_hole_edge(adapter, top)
+    hole_edge = (
+        TOP_CENTER[0] + STUD_HOLE_DIA / 4000.0,
+        TOP_CENTER[1],
+    )
     add_datum_feature(
         adapter,
         front,
@@ -218,8 +183,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_entity=hole_edge,
-        frame_xy=(0.020, 0.235),
+        edge_xy=hole_edge,
+        frame_xy=(0.112, 0.235),
         characteristic="position",
         tolerance="0.20",
         datums=("A", "B", "C"),
@@ -260,7 +225,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         top,
-        edge=hole_edge,
+        edge_xy=hole_edge,
         callout_xy=(0.125, TOP_CENTER[1] - 0.010),
         label="crossbar stud hole",
     )

@@ -32,8 +32,6 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -51,7 +49,6 @@ from pinion_lever_spec import (
     ROD_Y0,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
 )
@@ -153,12 +150,9 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, iso)
-    set_hidden_lines_visible(adapter, front)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     hub_center = (FRONT_CENTER[0], _front_y(0.0))
     side = place_view(adapter, str(SOURCE), "*Right", *SECTION_CENTER, scale=(1, 1))
-    set_hidden_lines_visible(adapter, side)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -287,7 +281,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_note(adapter, "HUB LONGITUDINAL VIEW - HIDDEN LINES SHOWN", 0.155, 0.095)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.085)
 
     return await finalize_drawing(

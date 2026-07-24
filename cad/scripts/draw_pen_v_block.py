@@ -35,8 +35,6 @@ from _drawing_common import (
     read_required_properties,
     set_basic_dimension,
     set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -170,13 +168,9 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(4, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    for view in (right, iso):
-        set_hidden_lines_removed(adapter, view)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     # The front view carries the vertical pen bores as hidden lines; the top
     # view exposes the slit band and the screw hole crossing the depth.
-    for view in (front, top):
-        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"

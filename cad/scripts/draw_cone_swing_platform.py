@@ -32,7 +32,6 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -237,10 +236,8 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(1, 2))
-    for view in (top, iso, end):
-        set_hidden_lines_removed(adapter, view)
 
     top_annotations = curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     set_dimension_callouts(adapter, top_annotations, {"PlateLenDim": "+/-0.25"})

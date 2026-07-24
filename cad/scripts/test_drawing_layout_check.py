@@ -82,18 +82,14 @@ class _FakeAdapter:
         return member() if callable(member) else member
 
 
-def test_finalize_exports_pdf_before_reopen_and_skips_clean_save():
+def test_finalize_exports_once_without_layout_or_reopen_cycles():
     source = getsource(drawing_common.finalize_drawing)
-    first_reopen = source.index("reopen_drawing")
-    pdf_export = source.index("pdf_path=str(outputs.pdf)")
-    assert pdf_export < first_reopen
-    # The dirty-scale branch saves a NEWER SLDDRW after that first export, so
-    # it must re-export the PDF to match the persisted drawing (codex review
-    # #361); the clean path keeps the single early export.
-    assert source.count("save_drawing(") == 2
-    assert source.rindex("save_drawing(") > source.index("if sheet_scale_dirty:")
-    assert '"GetSaveFlag"' in source
-    assert "save skipped" in source
+    assert source.count("save_drawing(") == 1
+    assert "reopen_drawing" not in source
+    assert "check_drawing_layout" not in source
+    assert "GetSaveFlag" not in source
+    assert "sanitize_pdf_metadata" in source
+    assert "render_pdf_png" in source
 
 
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):

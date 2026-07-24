@@ -23,7 +23,6 @@ from _drawing_common import (
     set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -289,15 +288,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    # The hold-down hole sits behind the upright in this pictorial direction;
-    # HLV keeps that manufactured feature visible instead of contradicting plan.
-    set_hidden_lines_visible(adapter, iso)
-    # The elevation carries the arbor bore as a hidden circle and the flange
-    # hold-down hole; the plan shows the foot with the bore + screw crossing it.
-    for view in (front, top):
-        set_hidden_lines_visible(adapter, view)
-
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
