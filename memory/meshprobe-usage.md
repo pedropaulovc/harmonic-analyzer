@@ -21,7 +21,13 @@ GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93�
   `{"mode":"perspective","focal_length_mm":100,"sensor_fit":"vertical","sensor_height_mm":23.6,"sensor_width_mm":15.8}`
   reproduces the book's DX + 100 mm camera; `--target` is world-space **mm**;
   `--aspect-ratio` must match render width/height by hand.
-- Renders: `render-image --style shaded_edges` (Freestyle) for crisp CAD edges;
+- Renders: keep meshprobe's DEFAULT `--style screen_edges` (GPU depth/normal edge pass).
+  `--style shaded_edges` is Freestyle: crisper, geometry-aware, better at separating
+  same-colour adjacent parts — but CPU-bound and single-threaded, and its cost scales
+  with VISIBLE COMPONENT COUNT, not resolution. Full machine at 945x2240: screen_edges
+  7.3 s vs shaded_edges 31.8 s (shaded, no edges, 6.8 s). Reserve Freestyle for final
+  confirmation; the GPU is used either way (receipt: `device=graphics_hardware`,
+  engine eevee, `renderer` = the actual card — a slow render is NOT a CPU fallback);
   `illumination-set high_key --background-rgb 1 1 1` for SW-exported PBR metals (they
   render near-black under the default preset).
 - Session state lands in `.meshprobe/` under the workspace — **gitignored** since
