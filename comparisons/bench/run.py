@@ -176,6 +176,40 @@ def opaque(*parts) -> str:
     return sha256((SALT + ":" + ":".join(str(p) for p in parts)).encode()).hexdigest()[:16]
 
 
+def sandbox_id(cell) -> str:
+    """The cell's opaque sandbox id -- MUST be unique per cell.
+
+    Two cells sharing a sandbox share filenames, so sibling cells running
+    concurrently overwrite each other's stimulus while a subject is reading it,
+    and an answer gets scored against a delta the subject never saw. T3 is the
+    trap: three `az` and two `ty` entries in T3_PAIRS share a dclass, so keying
+    on the class collapses five cells into two directories (the same collision
+    that bit `cell_key` in #257 -- see memory/bench-opus-run-setup.md). Key on
+    the delta-PAIR. Hashing keeps it opaque, so naming the pair here does not
+    put it back in the subject's cwd. `check_sandbox_ids` enforces the
+    uniqueness at run start.
+    """
+    task = cell[0]
+    if task == "t1":
+        _t, cid, arm, rep, grid = cell
+        return opaque("t1", cid, arm, rep, grid)
+    if task == "t3":
+        _t, pid, dclass, (c1, c2), arm, rep = cell
+        return opaque("t3", pid, dclass, c1, c2, arm, rep)
+    _t, pid, start_key, _sd, arm = cell
+    return opaque("t2", pid, start_key, arm)
+
+
+def check_sandbox_ids(cells) -> None:
+    ids = [sandbox_id(c) for c in cells]
+    if len(set(ids)) != len(ids):
+        dup = next(i for i in ids if ids.count(i) > 1)
+        clash = [c for c in cells if sandbox_id(c) == dup]
+        raise SystemExit(f"xx sandbox id collision ({len(ids) - len(set(ids))} cells): "
+                         f"{clash[:2]} -- sibling cells would overwrite each other's "
+                         "stimulus mid-read")
+
+
 def _sandbox(oid: str) -> Path:
     """The cell's cwd, named by its OPAQUE id -- never by the cell key.
 
@@ -423,7 +457,7 @@ def exec_t1(cases, cell, model):
     cell_key = f"t1:{model}:{cid}:{arm}:{rep}:{int(grid)}"
     side = crc(cid, arm) + rep
     oid = opaque("t1", cid, arm, rep, grid)
-    sb = _sandbox(oid)
+    sb = _sandbox(sandbox_id(cell))
     imgs = P.build_stimulus(row, arm, sb, oid, grid=grid, side=side % 2, order=side % 2)
     prompt = (T1_CONVENTIONS + f"\n\nThe stimulus is {ARM_ENCODING[arm]}\n\n"
               "Return a JSON object with keys az, el, roll, target_x, target_y, zoom, "
@@ -444,13 +478,15 @@ def exec_t3(cases, cell, model):
     _t, pid, dclass, (c1, c2), arm, rep = cell
     cell_key = t3_key(model, cell)
     # opaque cwd -- a t3 cell key names the delta-pair tag (the answer)
-    sb = _sandbox(opaque("t3", pid, dclass, arm, rep))
+    sb = _sandbox(sandbox_id(cell))
     order = (crc(pid, arm, "t3", dclass) + rep) % 2   # which delta is shown first
     side = crc(pid, arm) % 2                          # arm-internal layout (base-pair keyed)
     first_cid, second_cid = (c1, c2) if order == 0 else (c2, c1)
     imgs = []
     for slot, cid in (("1", first_cid), ("2", second_cid)):
-        oid = opaque("t3", pid, dclass, arm, rep, slot)
+        # c1/c2 in the id: sibling pairs share a dclass, so omitting them
+        # collides the stimulus filenames as well as the sandbox.
+        oid = opaque("t3", pid, dclass, c1, c2, arm, rep, slot)
         for im in P.build_stimulus(cases[cid], arm, sb, oid, grid=False, side=side, order=side):
             imgs.append(im)
     # correct answer: the smaller-delta case (c1) = better aligned
@@ -541,7 +577,7 @@ def exec_t2(cases, cell, model, server):
     bg, align = meta.get("background", "black"), meta.get("align") or {}
     cell_key = f"t2:{model}:{pid}:{start_key}:{arm}"
     # opaque cwd -- a t2 cell key names the starting perturbation
-    sb = _sandbox(opaque("t2", pid, start_key, arm))
+    sb = _sandbox(sandbox_id(cell))
     sd = cases[f"{pid}+mix1"]["delta"] if start_delta == "M1" else start_delta
     cur = gc._apply(base, target0, r0, u0, sd, zoom0)
     row_syn = {"pair_id": pid, "case_id": f"{pid}+ctrl", "align": align, "background": bg}
@@ -633,6 +669,7 @@ def main() -> int:
         server = RenderServer()
         runner = lambda cs, c, m: exec_t2(cs, c, m, server)  # noqa: E731
 
+    check_sandbox_ids(cells)
     done = done_keys()
     todo = []
     for c in cells:
