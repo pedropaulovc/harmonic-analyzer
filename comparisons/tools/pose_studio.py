@@ -113,6 +113,7 @@ from mathutils import Matrix, Vector  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import blender_worker as bw  # noqa: E402
+import pose_manifest  # noqa: E402
 
 # The built scene lives in SolidWorks' Y-up frame (blender_worker imports STL raw
 # and camera_axes treats +Y as world up). Blender's viewport turntable orbits
@@ -762,22 +763,32 @@ class HAC_OT_save_manifest(bpy.types.Operator):
         if pair is None:
             self.report({"ERROR"}, f"pair {props.pair_id!r} not in manifest")
             return {"CANCELLED"}
-        c = pair.setdefault("camera", {})
-        c["mode"] = "euler"
-        c["az_deg"] = round(props.az_deg, 2)
-        c["el_deg"] = round(props.el_deg, 2)
-        c["roll_deg"] = round(props.roll_deg, 2)
-        c["zoom"] = round(props.zoom, 3)
-        c["target_mm"] = ([round(props.target_x, 2), round(props.target_y, 2),
-                           round(props.target_z, 2)] if props.free_target else None)
-        c["perspective"] = {"focal_length_mm": round(props.focal_mm, 2)} if props.perspective else None
         # The studio previews an EXPLICIT euler target/zoom (it never applies
         # frame_components). Drop that seed-time auto-frame hint so the offline
         # render reproduces what was posed here, instead of silently re-deriving
-        # target/zoom from the components and discarding these edits.
-        dropped = c.pop("frame_components", None)
+        # target/zoom from the components and discarding these edits. It also
+        # previews the reference at native scale/offset, so reset any legacy 2-D
+        # transform rather than applying a second zoom/pan in the gallery.
+        dropped_frame, reset_align = pose_manifest.update_pair_pose(
+            pair,
+            az_deg=props.az_deg,
+            el_deg=props.el_deg,
+            roll_deg=props.roll_deg,
+            zoom=props.zoom,
+            target_mm=(
+                [props.target_x, props.target_y, props.target_z]
+                if props.free_target
+                else None
+            ),
+            focal_length_mm=props.focal_mm if props.perspective else None,
+        )
         path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        note = "  (cleared frame_components)" if dropped else ""
+        changes = []
+        if dropped_frame:
+            changes.append("cleared frame_components")
+        if reset_align:
+            changes.append("reset 2-D align")
+        note = f"  ({', '.join(changes)})" if changes else ""
         self.report({"INFO"}, f"saved pose -> {path.name} ({props.pair_id}){note}")
         return {"FINISHED"}
 
