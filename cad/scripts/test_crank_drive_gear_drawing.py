@@ -112,8 +112,11 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
     assert "tooth_tip_silhouette = visible_tooth_tip_silhouette(" in source
+    assert "gear_face = visible_planar_face(adapter, front" in source
     assert "entity=bore_edge" in source
+    assert "entity=gear_face" in source
     assert "entity=tooth_tip_silhouette" in source
+    assert 'entity_type="FACE"' in source
     assert 'label="gear tooth-tip circular runout"' in source
     assert 'entity_type="SILHOUETTE"' in source
     assert "shoulder=True" in source

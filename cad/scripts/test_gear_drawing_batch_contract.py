@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import _config
 import _gear_drawing_entities
@@ -124,6 +125,46 @@ def test_crank_pair_runout_uses_tooth_tip_silhouette_topology() -> None:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "tooth_tip_silhouette = visible_tooth_tip_silhouette(" in source
         assert "entity=tooth_tip_silhouette" in source
+
+
+def test_crank_pair_end_face_control_uses_planar_face_topology() -> None:
+    for module in CRANK_PAIR_MODULES:
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "gear_face = visible_planar_face(adapter, front" in source
+        assert "entity=gear_face" in source
+        assert 'entity_type="FACE"' in source
+        assert "edge_xy=(FRONT_FACE_X" not in source
+
+
+def test_visible_planar_face_chooses_largest_planar_candidate(monkeypatch) -> None:
+    class Face:
+        def __init__(self, area: float, *, planar: bool) -> None:
+            self.area = area
+            self.surface = SimpleNamespace(IsPlane=lambda: planar)
+
+        def GetArea(self) -> float:
+            return self.area
+
+        def GetSurface(self):
+            return self.surface
+
+    small = Face(1.0, planar=True)
+    large = Face(2.0, planar=True)
+    cylinder = Face(100.0, planar=False)
+    view = SimpleNamespace(
+        GetVisibleComponents=lambda: (object(),),
+        GetVisibleEntities2=lambda _component, _kind: (small, large, cylinder),
+    )
+    adapter = SimpleNamespace(_attempt=lambda call, default=None: call())
+    monkeypatch.setattr(
+        _gear_drawing_entities, "_early_bound", lambda value, *_args: value
+    )
+
+    selected = _gear_drawing_entities.visible_planar_face(
+        adapter, view, label="test front"
+    )
+
+    assert selected is large
 
 
 def test_tooth_runout_is_stated_against_the_bore_axis_datum() -> None:

@@ -15,7 +15,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, run_build
+from _common import CAD_ROOT, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -32,7 +32,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
+from _gear_drawing_entities import visible_circle_edge, visible_planar_face
 from cylinder_gear_spec import BORE_DIA, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -75,24 +75,6 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "THRU - REAM\n+0.05/+0.03",
 }
 DIMENSION_PRECISION = {"BoreDia": 3}
-
-
-def _largest_visible_planar_face(adapter: Any, view: Any) -> Any:
-    """Return the largest visible planar face in ``view``."""
-    candidates: list[tuple[float, Any]] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        faces = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 3), default=()
-        ) or ()
-        for face in faces:
-            face = _early_bound(face, "IFace2")
-            surface = _early_bound(face.GetSurface(), "ISurface")
-            if surface.IsPlane():
-                candidates.append((float(face.GetArea()), face))
-    if not candidates:
-        raise RuntimeError("front view has no visible planar model face")
-    return max(candidates, key=lambda item: item[0])[1]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -153,7 +135,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-    gear_face = _largest_visible_planar_face(adapter, front)
+    gear_face = visible_planar_face(adapter, front, label="cylinder gear front")
 
     # Datum A: the bore axis (front view, 45-degree pick with the symbol above).
     datum_radial = math.sqrt(0.5)

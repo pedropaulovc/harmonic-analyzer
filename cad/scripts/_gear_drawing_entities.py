@@ -42,6 +42,25 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     return edge
 
 
+def visible_planar_face(adapter: Any, view: Any, *, label: str) -> Any:
+    """Return the largest visible planar model face in ``view``."""
+    candidates: list[tuple[float, Any]] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        faces = adapter._attempt(
+            lambda c=component: view.GetVisibleEntities2(c, 3), default=()
+        ) or ()
+        for raw_face in faces:
+            face = _early_bound(raw_face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if surface.IsPlane():
+                candidates.append((float(face.GetArea()), face))
+
+    if not candidates:
+        raise RuntimeError(f"{label} view has no visible planar model face")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
 def visible_tooth_tip_silhouette(
     adapter: Any, view: Any, outside_diameter_mm: float
 ) -> Any:

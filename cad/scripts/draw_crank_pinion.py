@@ -28,7 +28,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge, visible_tooth_tip_silhouette
+from _gear_drawing_entities import (
+    visible_circle_edge,
+    visible_planar_face,
+    visible_tooth_tip_silhouette,
+)
 from crank_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -129,6 +133,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    gear_face = visible_planar_face(adapter, front, label="crank pinion front")
     tooth_tip_silhouette = visible_tooth_tip_silhouette(adapter, right, OUTSIDE_DIA)
 
     add_datum_feature(
@@ -143,8 +148,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
+        front,
+        entity=gear_face,
+        entity_type="FACE",
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
         tolerance="0.05",
