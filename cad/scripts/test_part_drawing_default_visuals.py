@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import inspect
 from types import SimpleNamespace
 
 import pytest
@@ -122,3 +123,9 @@ def test_hidden_edges_are_temporary_authoring_input_not_saved_visuals(
     assert view.calls[-1] == (True, 2, False, True, True)
     assert view.mode == 2
     assert not drawing_common._AUTHORING_VIEW_DISPLAYS
+
+
+def test_datum_auto_layout_is_observed_without_rejecting_solidworks_choice() -> None:
+    source = inspect.getsource(drawing_common.add_datum_feature)
+    assert '"drawing.annotation_auto_layout"' in source
+    assert "position did not persist" not in source

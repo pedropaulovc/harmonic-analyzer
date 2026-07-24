@@ -415,11 +415,20 @@ def add_datum_feature(
         )
     )
     if position_error > position_tolerance_m:
-        raise RuntimeError(
-            f"datum {datum} position did not persist ({label}): "
-            f"{tuple(actual_position[:2]) if actual_position else None}; "
-            f"requested={symbol_xy}, error={position_error:.6g} m, "
-            f"limit={position_tolerance_m:.6g} m"
+        _telemetry.event(
+            "drawing.annotation_auto_layout",
+            annotation="datum",
+            label=label,
+            requested_x_m=symbol_xy[0],
+            requested_y_m=symbol_xy[1],
+            actual_x_m=(
+                float(actual_position[0]) if actual_position else math.nan
+            ),
+            actual_y_m=(
+                float(actual_position[1]) if actual_position else math.nan
+            ),
+            position_error_m=position_error,
+            former_limit_m=position_tolerance_m,
         )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
