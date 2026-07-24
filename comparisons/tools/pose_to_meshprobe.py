@@ -20,7 +20,7 @@ Coordinate frames — pose_studio/blender_worker is the source of truth:
 Under that rotation the orbit angles fall out exactly:
     azimuth   = az_deg - 90   (world +X toward +Y about +Z)
     elevation = el_deg        (above the world XY plane toward +Z)
-    roll      = roll_deg      (right-hand rule about forward; sign eyeball-checked)
+    roll      = -roll_deg     (OPPOSITE sense to Blender's; MEASURED, see convert())
     target_mm(world) = (tx, -tz, ty)   from the model-space framing centre
     distance_mm      = blender_worker's fitted cam_dist (reproduced below)
 
@@ -314,7 +314,14 @@ def convert(pair: dict, bbox, w: int, h: int) -> dict:
         "target_mm": [round(v, 3) for v in target_world],
         "azimuth_deg": round(azimuth, 4),
         "elevation_deg": round(elevation, 4),
-        "roll_deg": round(cam["roll_deg"], 4),
+        # NEGATED: meshprobe's view-orbit --roll turns the camera the opposite way
+        # to blender_worker's roll_deg, so passing it through tilts the image the
+        # wrong way (a post leans by 2x roll vs the Blender render). Measured on
+        # ch11-p002-img05 (roll_deg=-1.81): the dominant vertical-line tilt reads
+        # +1.812 deg in comparisons/render/<pair>.jpg and -1.813 deg in the
+        # meshprobe render of the un-negated pose. Re-check with the Radon scan in
+        # test_pose_to_meshprobe.py if either renderer's convention changes.
+        "roll_deg": round(-cam["roll_deg"], 4),
         "distance_mm": round(f["cam_dist"], 3),
         "aspect_ratio": round(w / h, 5),
         "canvas": [w, h],
