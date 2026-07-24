@@ -138,7 +138,6 @@ from _assembly import (
     check_no_interference,
     coincident_mate,
     collected_dof_specs,
-    component_names,
     component_transform,
     concentric_mate,
     delete_assembly_feature,
@@ -163,6 +162,7 @@ from _cwm import (
     external_mate_rows,
     mates_with_owners,
     put_component_pose,
+    require_component,
     resolve_entity,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
@@ -339,9 +339,16 @@ def z_station(j: int) -> float:
     return Z0 + PITCH * j
 
 
+def _component_instance_number(name: str, prefix: str) -> int:
+    stem, separator, suffix = name.rpartition("-")
+    if separator != "-" or stem != prefix or not suffix.isdigit():
+        raise RuntimeError(f"unexpected {prefix} component name: {name!r}")
+    return int(suffix)
+
+
 def _verify_pattern_z(
-    adapter, prefix: str, expected: list[float], label: str
-) -> None:
+    adapter, names: list[str], expected: list[float], label: str
+) -> list[str]:
     """Assert a patterned family's instances sit on the expected Z planes.
 
     A LocalLinearPattern's direction sense is taken from the reference entity;
@@ -351,37 +358,31 @@ def _verify_pattern_z(
     channel/gap planes.
     """
     got = sorted(
-        component_transform(adapter, n)[11] * 1000.0
-        for n in component_names(adapter)
-        if n.rsplit("-", 1)[0] == prefix
+        (component_transform(adapter, name)[11] * 1000.0, name) for name in names
     )
-    want = sorted(expected)
+    want = sorted((station, index) for index, station in enumerate(expected))
     if len(got) != len(want):
         raise RuntimeError(
             f"{label}: {len(got)} instances, expected {len(want)}"
         )
-    for g, w in zip(got, want):
+    ordered = [""] * len(expected)
+    for (g, name), (w, index) in zip(got, want, strict=True):
         if abs(g - w) > 0.05:
             raise RuntimeError(
                 f"{label}: instance at z={g:.2f} off plane z={w:.2f}"
                 " -- pattern direction sense flipped?"
             )
-    log(f"{label}: {len(got)} instances on-plane (z {got[0]:.1f}..{got[-1]:.1f})")
-
-
-def _instance_at_z(adapter, prefix: str, z_mm: float) -> str:
-    """Name of the ``prefix`` instance whose origin sits on the ``z_mm`` plane."""
-    for n in component_names(adapter):
-        if n.rsplit("-", 1)[0] != prefix:
-            continue
-        if abs(component_transform(adapter, n)[11] * 1000.0 - z_mm) < 0.05:
-            return n
-    raise RuntimeError(f"no {prefix} instance at z={z_mm:.2f}")
+        ordered[index] = name
+    log(
+        f"{label}: {len(got)} instances on-plane "
+        f"(z {got[0][0]:.1f}..{got[-1][0]:.1f})"
+    )
+    return ordered
 
 
 async def _pattern_bank(
     adapter, seed: str, prefix: str, axis_name: str, gap_planes: list[float],
-) -> None:
+) -> list[str]:
     """Replicate a seated bank seed down the spine by a LocalLinearPattern.
 
     The direction reference is EXPLICIT reference geometry (the BankZ datum
@@ -394,11 +395,14 @@ async def _pattern_bank(
     deterministic in at most two solves, never inference-trusting.
     """
     count = len(gap_planes)
+    seed_number = _component_instance_number(seed, prefix)
+    names = [f"{prefix}-{seed_number + offset}" for offset in range(count)]
     if count < 2:
         # One gap (CHANNELS == 2): the seated seed IS the whole bank; a
         # count=1 LocalLinearPattern is invalid/pointless (codex #219).
-        _verify_pattern_z(adapter, prefix, gap_planes, f"{prefix} bank (seed only)")
-        return
+        return _verify_pattern_z(
+            adapter, names, gap_planes, f"{prefix} bank (seed only)"
+        )
     # Flip seed TRUE: diag_pattern_sense (2026-07-09, 5/5 reps) measured the
     # Top∩Right axis pick resolving +Z deterministically, so FlipDir1=True
     # lands the copies down-spine in ONE solve; the untried value stays as
@@ -416,8 +420,9 @@ async def _pattern_bank(
             ),
         )
         try:
-            _verify_pattern_z(adapter, prefix, gap_planes, f"{prefix} pattern")
-            return
+            return _verify_pattern_z(
+                adapter, names, gap_planes, f"{prefix} pattern"
+            )
         except RuntimeError as exc:
             if attempt == len(attempts) - 1:
                 raise
@@ -1068,6 +1073,7 @@ async def build(adapter) -> dict[str, str]:
     # (pattern instances are real components; their names map to gaps by
     # transform Z).
     pivot_bushing_by_gap: dict[int, str] = {}
+    bushing_bank_instances: dict[str, list[str]] = {}
     if CHANNELS > 1:
         gap_planes = [
             z_station(j) + ARM_MID_DZ - PITCH / 2.0 for j in range(1, CHANNELS)
@@ -1091,9 +1097,11 @@ async def build(adapter) -> dict[str, str]:
                 label=f"{part} seed gap {CHANNELS - 2:02d}/{CHANNELS - 1:02d}",
             )
             await _seat_bushing_on_shaft(adapter, seed, od_pt, xy, od_r)
-            await _pattern_bank(adapter, seed, part, bank_axis, gap_planes)
-        for j, z_gap in enumerate(gap_planes, start=1):
-            pivot_bushing_by_gap[j] = _instance_at_z(adapter, "pivot-bushing", z_gap)
+            bushing_bank_instances[part] = await _pattern_bank(
+                adapter, seed, part, bank_axis, gap_planes
+            )
+        for j, name in enumerate(bushing_bank_instances["pivot-bushing"], start=1):
+            pivot_bushing_by_gap[j] = name
 
     # Per-channel chain: the four moving parts are inserted on-solution
     # (ground=False) and joined by revolutes whose spin/axial dims are the
@@ -1402,18 +1410,25 @@ async def build(adapter) -> dict[str, str]:
     seed_by_amp: dict[float, tuple[int, dict[str, str]]] = {}
     slots_by_seed: dict[int, tuple[int, int, dict[str, list[float]]]] = {}
     copied: list[dict[str, Any]] = []
-    # Component enumeration is a growing assembly-tree walk. Keep the last
-    # proven snapshot and take only one new snapshot after each copy; scanning
-    # both before and after every CopyWithMates2 made 36 walks for 18 copies.
-    # Nothing else inserts a component between these calls, and every delta is
-    # still checked below for exactly one instance of every CHAIN_PART.
-    known_components: set[str] | None = None
+    # SolidWorks names each newly copied family instance monotonically. Track
+    # those suffixes from the authored channels and resolve each expected copy
+    # directly with GetComponentByName; enumerating the growing component tree
+    # once per CopyWithMates2 dominated the operation at 20 channels.
+    last_chain_instance = {part: 0 for part in CHAIN_PARTS}
     for j in range(CHANNELS):
         st = solve_state(amplitudes[j])  # this channel's bar/lever pose
         amp_key = round(amplitudes[j], 6)
         seed = seed_by_amp.get(amp_key) if j >= 2 else None
         if seed is None:
             comps = await _author_channel(j, st)
+            for part, name in comps.items():
+                number = _component_instance_number(name, part)
+                if number <= last_chain_instance[part]:
+                    raise RuntimeError(
+                        f"{part} instance sequence regressed: {name!r} after "
+                        f"{last_chain_instance[part]}"
+                    )
+                last_chain_instance[part] = number
             if j >= 1:
                 seed_by_amp[amp_key] = (j, comps)
             continue
@@ -1440,28 +1455,16 @@ async def build(adapter) -> dict[str, str]:
             adapter, named_ref(f"Front Plane@{own_bushing}", "PLANE"))
         flips = [False] * n_slice
         flips[dim_slot] = slice_info["dim_flip"]
-        if known_components is None:
-            with _telemetry.span("cwm.comp_names", channel=j, phase="seed"):
-                known_components = set(component_names(adapter))
         copy_with_mates(
             adapter, [seed_comps[p] for p in CHAIN_PARTS], n_slice, values,
             flips=flips, repeat=repeat, new_entities=new_ents)
-        with _telemetry.span("cwm.comp_names", channel=j, phase="after"):
-            after_components = set(component_names(adapter))
-        new_comps = sorted(after_components - known_components)
-        comps = {}
-        for name in new_comps:
-            part = name.rsplit("-", 1)[0]
-            if part not in CHAIN_PARTS or part in comps:
-                raise RuntimeError(
-                    f"ch{j:02d} copy: unexpected new component {name!r}"
-                    f" (full new set {new_comps})")
-            comps[part] = name
-        if len(comps) != len(CHAIN_PARTS):
-            raise RuntimeError(
-                f"ch{j:02d} copy created {len(comps)}/{len(CHAIN_PARTS)} chain"
-                f" parts: {new_comps}")
-        known_components = after_components
+        comps = {
+            part: f"{part}-{last_chain_instance[part] + 1}"
+            for part in CHAIN_PARTS
+        }
+        for part, name in comps.items():
+            require_component(adapter, name)
+            last_chain_instance[part] += 1
         # Land the copy on its DESIGN pose by pinning its 3 operational DOF
         # with TRANSIENT drivers, then deleting them. The chain's DOF are
         # genuinely free, so the copied mates pin the copy only up to the
@@ -1733,8 +1736,18 @@ async def build(adapter) -> dict[str, str]:
         z_gap_planes = [
             z_station(k) + ARM_MID_DZ + PITCH / 2.0 for k in range(CHANNELS - 1)
         ]
-        _verify_pattern_z(adapter, "pivot-bushing", z_gap_planes, "pivot-bushing bank")
-        _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing bank")
+        _verify_pattern_z(
+            adapter,
+            bushing_bank_instances["pivot-bushing"],
+            z_gap_planes,
+            "pivot-bushing bank",
+        )
+        _verify_pattern_z(
+            adapter,
+            bushing_bank_instances["lever-bushing"],
+            z_gap_planes,
+            "lever-bushing bank",
+        )
 
     # Free kinematic model: the per-channel operational DOF (rocker swing +
     # rod follow + bar amplitude) are FREE -- their drivers were recorded into

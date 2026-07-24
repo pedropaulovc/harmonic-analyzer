@@ -151,6 +151,10 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         entity=gear_face,
         entity_type="FACE",
+        leader_attach_xy=(
+            FRONT_CENTER[0] + HALF_OD * 0.55,
+            FRONT_CENTER[1] + HALF_OD * 0.55,
+        ),
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
         tolerance="0.05",

@@ -52,6 +52,15 @@ CRANK_PAIR_MODULES = (
     draw_crank_pinion,
 )
 
+PLANAR_FACE_MODULES = (
+    draw_cone_gear,
+    draw_crank_drive_gear,
+    draw_crank_pinion,
+    draw_cylinder_gear,
+    draw_transgear_feed_pinion,
+    draw_transgear_pinion,
+)
+
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
     "ALL DIMENSIONS",
     "BREAK EDGES",
@@ -100,7 +109,7 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
         if module in CRANK_PAIR_MODULES:
             assert "edge_xy=bore_top" not in source, module.__name__
             assert source.count("entity=bore_edge") == 2, module.__name__
-            assert source.count("leader_attach_xy=(") == 1, module.__name__
+            assert source.count("leader_attach_xy=(") == 2, module.__name__
             assert "position_tolerance_m=0.080" in source, module.__name__
             assert "shoulder=True" in source, module.__name__
             continue
@@ -127,13 +136,15 @@ def test_crank_pair_runout_uses_tooth_tip_silhouette_topology() -> None:
         assert "entity=tooth_tip_silhouette" in source
 
 
-def test_crank_pair_end_face_control_uses_planar_face_topology() -> None:
-    for module in CRANK_PAIR_MODULES:
+def test_gear_end_face_controls_use_planar_face_topology() -> None:
+    for module in PLANAR_FACE_MODULES:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "gear_face = visible_planar_face(adapter, front" in source
         assert "entity=gear_face" in source
         assert 'entity_type="FACE"' in source
         assert "edge_xy=(FRONT_FACE_X" not in source
+        if module is not draw_cylinder_gear:
+            assert "leader_attach_xy=(" in source
 
 
 def test_visible_planar_face_chooses_largest_planar_candidate(monkeypatch) -> None:

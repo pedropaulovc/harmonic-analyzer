@@ -117,6 +117,7 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     assert "entity=gear_face" in source
     assert "entity=tooth_tip_silhouette" in source
     assert 'entity_type="FACE"' in source
+    assert "leader_attach_xy=(" in source
     assert 'label="gear tooth-tip circular runout"' in source
     assert 'entity_type="SILHOUETTE"' in source
     assert "shoulder=True" in source

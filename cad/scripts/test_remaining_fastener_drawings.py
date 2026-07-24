@@ -89,13 +89,10 @@ class _RetryDrawing:
         self.rebuilds += 1
 
 
-@pytest.mark.parametrize(("failures", "rebuilds"), ((1, 0), (2, 1)))
-def test_coordinate_selection_recovers_after_redraw_and_rebuild(
+def test_coordinate_selection_recovers_after_one_redraw(
     monkeypatch: pytest.MonkeyPatch,
-    failures: int,
-    rebuilds: int,
 ) -> None:
-    drawing = _RetryDrawing(failures)
+    drawing = _RetryDrawing(1)
     adapter = SimpleNamespace(currentModel=drawing)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, *_args: value)
     monkeypatch.setattr(_drawing_common, "view_name", lambda *_args: "Drawing View1")
@@ -109,9 +106,31 @@ def test_coordinate_selection_recovers_after_redraw_and_rebuild(
     )
 
     assert selected is drawing.SelectionManager.selected
-    assert drawing.Extension.calls == failures + 1
-    assert drawing.redraws == failures
-    assert drawing.rebuilds == rebuilds
+    assert drawing.Extension.calls == 2
+    assert drawing.redraws == 1
+    assert drawing.rebuilds == 0
+
+
+def test_coordinate_selection_fails_without_expensive_rebuild(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    drawing = _RetryDrawing(2)
+    adapter = SimpleNamespace(currentModel=drawing)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(_drawing_common, "view_name", lambda *_args: "Drawing View1")
+
+    with pytest.raises(RuntimeError, match="failed to select bore datum edge"):
+        _drawing_common._select_view_entity(
+            adapter,
+            object(),
+            "EDGE",
+            (0.15, 0.189),
+            label="bore datum",
+        )
+
+    assert drawing.Extension.calls == 2
+    assert drawing.redraws == 1
+    assert drawing.rebuilds == 0
 
 
 def test_visible_cylindrical_face_uses_exact_radius_and_largest_area(

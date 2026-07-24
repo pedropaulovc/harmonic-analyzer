@@ -250,7 +250,12 @@ def _select_view_entity(
         else:
             selected = bool(view.SelectEntity(entity, False))
     elif xy is not None:
-        for attempt in range(1, 4):
+        # One redraw may materialize view geometry that SelectByID2 could not
+        # see on its first pass.  Never escalate an annotation pick to a full
+        # EditRebuild3: dense gear projections can spend minutes regenerating
+        # only to reject the same ambiguous coordinate again.  A second miss
+        # fails fast so the recipe can replace the coordinate with topology.
+        for attempt in range(1, 3):
             selected = bool(
                 draw.Extension.SelectByID2(
                     "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
@@ -268,9 +273,8 @@ def _select_view_entity(
                     )
                 break
             draw.ClearSelection2(True)
-            if attempt == 2:
-                draw.EditRebuild3()
-            draw.GraphicsRedraw2()
+            if attempt == 1:
+                draw.GraphicsRedraw2()
     if not selected:
         where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
         raise RuntimeError(

@@ -85,6 +85,16 @@ def test_bom_covers_every_placed_component() -> None:
         assert f'"{component}"' in source, f"{component} not placed by the build"
 
 
+def test_channel_replication_never_enumerates_the_component_tree() -> None:
+    source = (Path(__file__).parent / "build_channel_assembly.py").read_text(
+        encoding="utf-8"
+    )
+    assert "component_names" not in source
+    assert "cwm.comp_names" not in source
+    assert "require_component(adapter, name)" in source
+    assert "last_chain_instance" in source
+
+
 def test_assembly_stamps_title_block_properties() -> None:
     source = (Path(__file__).parent / "build_channel_assembly.py").read_text(
         encoding="utf-8"
