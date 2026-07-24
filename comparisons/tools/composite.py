@@ -24,6 +24,7 @@ import argparse
 import json
 import time
 from pathlib import Path
+from typing import Literal
 
 from PIL import Image, ImageOps
 
@@ -31,6 +32,7 @@ COMP = Path(__file__).resolve().parents[1]
 REPO = COMP.parent
 MANIFEST = COMP / "manifest.json"
 SCORES = COMP / "scores.json"
+StaleStage = Literal["render", "composite"]
 
 def load_manifest(path: Path = MANIFEST) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -48,6 +50,43 @@ def pair_paths(pair_id: str) -> dict[str, Path]:
         "cad": COMP / "composite" / f"{pair_id}_cad.jpg",
         "blend": COMP / "composite" / f"{pair_id}_blend.jpg",
     }
+
+
+def sidecar_path(pair_id: str) -> Path:
+    return COMP / "render" / f"{pair_id}.meta.json"
+
+
+def stale_stage(pair: dict, model_mtime: float) -> StaleStage | None:
+    """Return the cheapest gallery stage needed to refresh ``pair``."""
+    paths = pair_paths(pair["id"])
+    sidecar = sidecar_path(pair["id"])
+    if not paths["render"].exists() or not sidecar.exists():
+        return "render"
+    try:
+        meta = json.loads(sidecar.read_text(encoding="utf-8"))
+    except ValueError:
+        return "render"
+    if (
+        meta.get("camera") != pair["camera"]
+        or meta.get("reference") != pair["reference"]
+        or meta.get("model_mtime") != model_mtime
+    ):
+        return "render"
+    if (
+        meta.get("align") != pair.get("align")
+        or not paths["cad"].exists()
+        or not paths["blend"].exists()
+    ):
+        return "composite"
+    return None
+
+
+def record_composite_align(pair: dict) -> None:
+    """Stamp a composite-only refresh without rewriting the raw render."""
+    sidecar = sidecar_path(pair["id"])
+    meta = json.loads(sidecar.read_text(encoding="utf-8"))
+    meta["align"] = pair.get("align")
+    sidecar.write_text(json.dumps(meta), encoding="utf-8")
 
 
 def prepare_reference(pair: dict, max_px: int = 1600, out: Path | None = None) -> Path:

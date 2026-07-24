@@ -24,7 +24,6 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Literal
 
 from PIL import Image
 
@@ -81,7 +80,6 @@ def resolve_blender(override: str | None = None) -> str:
 
 
 STL_DIR = CAD_OUT / "stl"
-StaleStage = Literal["render", "composite"]
 
 
 def _stale(path: Path, src: Path, what: str) -> None:
@@ -130,45 +128,11 @@ def model_paths(model: str) -> tuple[Path, dict]:
 
 
 def _sidecar(pair_id: str) -> Path:
-    return composite.COMP / "render" / f"{pair_id}.meta.json"
-
-
-def _stale_stage(pair: dict, src: Path) -> StaleStage | None:
-    """Return the cheapest stage needed to refresh ``pair``."""
-    img = composite.pair_paths(pair["id"])["render"]
-    sc = _sidecar(pair["id"])
-    if not img.exists() or not sc.exists():
-        return "render"
-    try:
-        meta = json.loads(sc.read_text(encoding="utf-8"))
-    except ValueError:
-        return "render"  # truncated sidecar (interrupted run) -> re-render heals it
-    if (
-        meta.get("camera") != pair["camera"]
-        or meta.get("reference") != pair["reference"]
-        or meta.get("model_mtime") != src.stat().st_mtime
-    ):
-        return "render"
-    paths = composite.pair_paths(pair["id"])
-    if (
-        meta.get("align") != pair.get("align")
-        or not paths["cad"].exists()
-        or not paths["blend"].exists()
-    ):
-        return "composite"
-    return None
+    return composite.sidecar_path(pair_id)
 
 
 def is_stale(pair: dict, src: Path) -> bool:
-    return _stale_stage(pair, src) is not None
-
-
-def _record_composite_align(pair: dict) -> None:
-    """Stamp a composite-only refresh without rewriting the raw render."""
-    sidecar = _sidecar(pair["id"])
-    meta = json.loads(sidecar.read_text(encoding="utf-8"))
-    meta["align"] = pair.get("align")
-    sidecar.write_text(json.dumps(meta), encoding="utf-8")
+    return composite.stale_stage(pair, src.stat().st_mtime) is not None
 
 
 def pair_size(ref_img: Path, max_side: int) -> tuple[int, int]:
@@ -245,7 +209,7 @@ def main() -> int:
             continue
         src = model_source(pair["model"])
         if args.stale_only and not out_root:
-            stage = _stale_stage(pair, src)
+            stage = composite.stale_stage(pair, src.stat().st_mtime)
             if stage is None:
                 continue
             if stage == "composite":
@@ -256,7 +220,7 @@ def main() -> int:
         if composite_only and not args.skip_composites:
             composite.regenerate(set(composite_only))
             for pair in composite_only.values():
-                _record_composite_align(pair)
+                composite.record_composite_align(pair)
             return 0
         print("nothing to render")
         return 0
@@ -337,7 +301,7 @@ def main() -> int:
     if not args.skip_composites and not out_root:
         composite.regenerate(rendered | set(composite_only))
         for pair in composite_only.values():
-            _record_composite_align(pair)
+            composite.record_composite_align(pair)
     return 0
 
 

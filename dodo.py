@@ -1716,6 +1716,7 @@ def task_check():
         SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
+        SCRIPTS_DIR / "test_render_compare.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
@@ -1738,6 +1739,9 @@ def task_check():
     recipe_test_deps = sorted({
         *(str(path.resolve()) for path in recipe_tests),
         *(dep for path in recipe_tests for dep in module_deps_of(path)),
+        str((REPO_ROOT / "comparisons" / "tools" / "composite.py").resolve()),
+        str((REPO_ROOT / "comparisons" / "tools" / "pose_manifest.py").resolve()),
+        str((REPO_ROOT / "comparisons" / "tools" / "render_offline.py").resolve()),
     })
     specs = {
         "math": {

@@ -77,14 +77,14 @@ def test_align_change_stales_the_pair(monkeypatch, tmp_path: Path) -> None:
         "model_mtime": src.stat().st_mtime,
     }))
 
-    assert renderer._stale_stage(pair, src) == "composite"
+    assert renderer.composite.stale_stage(pair, src.stat().st_mtime) == "composite"
     assert renderer.is_stale(pair, src)
 
     meta = json.loads(sidecar.read_text())
     meta["align"] = pair["align"]
     sidecar.write_text(json.dumps(meta))
 
-    assert renderer._stale_stage(pair, src) is None
+    assert renderer.composite.stale_stage(pair, src.stat().st_mtime) is None
     assert not renderer.is_stale(pair, src)
 
 
