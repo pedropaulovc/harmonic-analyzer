@@ -25,6 +25,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
 from pivot_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -146,10 +147,6 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0] + outer_r * diag,
         FRONT_CENTER[1] + outer_r * diag,
     )
-    bore_edge = (
-        FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
-        FRONT_CENTER[1],
-    )
     bore_top = (
         FRONT_CENTER[0],
         FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -204,10 +201,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # renders ABOVE the arm and to its RIGHT, spanning ~0.131..0.157 at y~0.224:
     # clear of the O6.50 callout below (its text tops out at y=0.201), of the
     # runout frame above, and of the right view starting at x=0.174.
+    # Resolve the modeled circle by radius instead of selecting its exact
+    # 3-o'clock sheet coordinate.  A cold fleet rebuild proved that coordinate
+    # pick intermittent even though the unchanged drawing passed immediately
+    # afterward in the same SolidWorks session.
+    bore_finish_edge = visible_circle_edge(adapter, front, BORE_DIA)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_edge,
+        edge_entity=bore_finish_edge,
         symbol_xy=(0.118, 0.210),
         roughness_ra="1.6",
         label="bushing bore finish",
