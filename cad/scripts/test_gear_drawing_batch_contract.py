@@ -209,6 +209,8 @@ def test_gear_model_faces_uses_axial_end_and_right_view_top_tip(monkeypatch) -> 
 
         def GetClosestPointOn(self, x: float, y: float, z: float):
             self.closest_queries.append((x, y, z))
+            if self.closest is None:
+                return None
             return (*self.closest, 0.0, 0.0)
 
     lower_tip = Face(
@@ -221,6 +223,11 @@ def test_gear_model_faces_uses_axial_end_and_right_view_top_tip(monkeypatch) -> 
         edges=(Edge((0.0, 0.0085, 0.0), (0.0, 0.0085, 0.010)),),
         closest=(0.0, 0.0085, 0.005),
     )
+    closer_flank = Face(
+        Surface("other"),
+        edges=(Edge((0.0, 0.0085, 0.0), (0.0, 0.0075, 0.010)),),
+        closest=(0.0, 0.0085, 0.0),
+    )
     axial_small = Face(Surface("plane"), area=0.001)
     axial_large = Face(Surface("plane", normal=(0.0, 0.0, -1.0)), area=0.002)
     bore = Face(Surface("cylinder", 3.0))
@@ -228,6 +235,7 @@ def test_gear_model_faces_uses_axial_end_and_right_view_top_tip(monkeypatch) -> 
     faces = [
         lower_tip,
         top_tip,
+        closer_flank,
         axial_small,
         axial_large,
         bore,
@@ -254,8 +262,10 @@ def test_gear_model_faces_uses_axial_end_and_right_view_top_tip(monkeypatch) -> 
     assert selected.bore is bore
     assert selected.end is axial_large
     assert selected.tooth_tip is top_tip
-    assert lower_tip.closest_queries == [(0.0, 0.0085, 0.005)]
-    assert top_tip.closest_queries == [(0.0, 0.0085, 0.005)]
+    expected_query = (0.0, 0.0085, 0.0)
+    assert lower_tip.closest_queries == [expected_query]
+    assert top_tip.closest_queries == [expected_query]
+    assert closer_flank.closest_queries == [expected_query]
 
 
 def test_gear_model_faces_fails_before_an_unbounded_face_scan(monkeypatch) -> None:
