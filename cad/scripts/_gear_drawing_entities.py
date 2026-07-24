@@ -11,8 +11,14 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+import _telemetry
 from _common import _early_bound
 from _drawing_common import referenced_model_faces
+
+
+_SOURCE_FACE_SCAN_LIMIT = 512
+_AXIAL_NORMAL_TOLERANCE = 1e-6
+_RADIUS_TOLERANCE_MM = 0.01
 
 
 @dataclass(frozen=True)
@@ -22,8 +28,8 @@ class GearModelFaces:
     tooth_tip: Any | None
 
 
-def _face_vertex_radii(adapter: Any, face: Any) -> list[float]:
-    radii: list[float] = []
+def _face_vertex_points(adapter: Any, face: Any) -> list[tuple[float, float, float]]:
+    points: list[tuple[float, float, float]] = []
     edges = adapter._attempt(lambda: face.GetEdges(), default=None) or ()
     for raw_edge in edges:
         edge = _early_bound(raw_edge, "IEdge", "GetStartVertex", "GetEndVertex")
@@ -31,10 +37,11 @@ def _face_vertex_radii(adapter: Any, face: Any) -> list[float]:
             if vertex is None:
                 continue
             point = _early_bound(vertex, "IVertex", "GetPoint").GetPoint()
-            radii.append(math.hypot(float(point[0]), float(point[1])) * 1000.0)
-    return radii
+            points.append(tuple(float(value) for value in point[:3]))
+    return points
 
 
+@_telemetry.traced("drawing.gear_model_faces", label_param="label")
 def gear_model_faces(
     adapter: Any,
     view: Any,
@@ -50,40 +57,65 @@ def gear_model_faces(
     the bore, axial end and optional tooth-tip controls share one traversal.
     """
     faces = referenced_model_faces(adapter, view, label=label)
+    if len(faces) > _SOURCE_FACE_SCAN_LIMIT:
+        raise RuntimeError(
+            f"{label}: {len(faces)} source faces exceed the bounded "
+            f"classification limit {_SOURCE_FACE_SCAN_LIMIT}"
+        )
     bore_radius = bore_diameter_mm / 2.0
     tip_radius = None if tooth_tip_diameter_mm is None else tooth_tip_diameter_mm / 2.0
     bore = None
-    end = None
-    # The final modeling operations own the bore and axial end faces. Walk
-    # backward and stop as soon as both identities are proven; do not classify
-    # hundreds of patterned tooth faces.
+    axial_ends: list[tuple[float, Any]] = []
+    tooth_tips: list[tuple[float, Any]] = []
+    # The gear axis is +Z in every source part. The standard *Right drawing
+    # projection looks along X and has +Y at the top, so the source face nearest
+    # (0, +outside-radius, mid-face Z) is the visible top tooth-tip envelope.
     for raw_face in reversed(faces):
-        face = _early_bound(raw_face, "IFace2", "GetEdges")
+        face = _early_bound(
+            raw_face,
+            "IFace2",
+            "GetArea",
+            "GetClosestPointOn",
+            "GetEdges",
+        )
         surface = face.GetSurface()
         if surface is None:
             continue
         surface = _early_bound(surface, "ISurface")
-        if end is None and surface.IsPlane():
-            end = face
-        if bore is None and surface.IsCylinder():
-            radius_mm = float(surface.CylinderParams[6]) * 1000.0
-            if abs(radius_mm - bore_radius) <= 0.01:
-                bore = face
-        if bore is not None and end is not None:
-            break
+        if surface.IsPlane():
+            plane = tuple(float(value) for value in surface.PlaneParams)
+            if len(plane) >= 3 and abs(abs(plane[2]) - 1.0) <= _AXIAL_NORMAL_TOLERANCE:
+                area = float(
+                    adapter._attempt(lambda f=face: f.GetArea(), default=0.0) or 0.0
+                )
+                axial_ends.append((area, face))
+            continue
+        if not surface.IsCylinder():
+            continue
+        radius_mm = float(surface.CylinderParams[6]) * 1000.0
+        if bore is None and abs(radius_mm - bore_radius) <= _RADIUS_TOLERANCE_MM:
+            bore = face
+        if tip_radius is None or abs(radius_mm - tip_radius) > _RADIUS_TOLERANCE_MM:
+            continue
+        points = _face_vertex_points(adapter, face)
+        if not points:
+            continue
+        z_mid = (
+            min(point[2] for point in points) + max(point[2] for point in points)
+        ) / 2.0
+        target = (0.0, tip_radius / 1000.0, z_mid)
+        closest = adapter._attempt(
+            lambda f=face, p=target: f.GetClosestPointOn(*p), default=None
+        )
+        if closest is None or len(closest) < 3:
+            continue
+        distance = math.dist(target, tuple(float(value) for value in closest[:3]))
+        tooth_tips.append((distance, face))
 
-    tooth_tip = None
-    if tip_radius is not None:
-        # A patterned gear starts with one tooth's root/fillet/flank/tip face
-        # group. Check only that bounded seed neighborhood. A tip face has all
-        # boundary vertices on the requested outside radius; flank and fillet
-        # faces span inward and cannot pass this predicate.
-        for raw_face in faces[:32]:
-            face = _early_bound(raw_face, "IFace2", "GetEdges")
-            radii = _face_vertex_radii(adapter, face)
-            if radii and max(abs(radius - tip_radius) for radius in radii) <= 0.05:
-                tooth_tip = face
-                break
+    end = max(axial_ends, key=lambda candidate: candidate[0])[1] if axial_ends else None
+    tooth_tip = (
+        min(tooth_tips, key=lambda candidate: candidate[0])[1] if tooth_tips else None
+    )
 
     if bore is None:
         raise RuntimeError(f"{label}: no bore face at radius {bore_radius:.4f} mm")

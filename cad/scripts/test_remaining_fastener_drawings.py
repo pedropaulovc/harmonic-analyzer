@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
@@ -44,6 +45,28 @@ class _FakeAttemptAdapter:
             return call()
         except Exception:
             return default
+
+
+def test_cylindrical_face_topology_classification_has_named_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans: list[tuple[str, dict[str, object]]] = []
+
+    @contextmanager
+    def capture_span(name: str, **attributes: object):
+        spans.append((name, attributes))
+        yield None
+
+    face = _FakeFace(3.175, 2.0)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(_drawing_common._telemetry, "span", capture_span)
+
+    selected = _drawing_common.cylindrical_face(
+        _FakeAttemptAdapter(), [face], 6.35, label="shoulder"
+    )
+
+    assert selected is face
+    assert spans == [("drawing.cylindrical_face", {"label": "shoulder"})]
 
 
 class _RetryExtension:

@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import _config
 import _gear_drawing_entities
 import alignment_pinion_spec
@@ -118,10 +120,9 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
 
 
 def test_crank_pair_runout_uses_source_model_tooth_tip_face() -> None:
-    helper_source = Path(_gear_drawing_entities.__file__).read_text(
-        encoding="utf-8"
-    )
-    assert "faces[:32]" in helper_source
+    helper_source = Path(_gear_drawing_entities.__file__).read_text(encoding="utf-8")
+    assert "_SOURCE_FACE_SCAN_LIMIT" in helper_source
+    assert "GetClosestPointOn" in helper_source
     for module in CRANK_PAIR_MODULES:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "tooth_tip_diameter_mm=OUTSIDE_DIA" in source
@@ -130,9 +131,7 @@ def test_crank_pair_runout_uses_source_model_tooth_tip_face() -> None:
 
 
 def test_all_gear_annotations_avoid_drawing_visible_entity_walks() -> None:
-    helper_source = Path(_gear_drawing_entities.__file__).read_text(
-        encoding="utf-8"
-    )
+    helper_source = Path(_gear_drawing_entities.__file__).read_text(encoding="utf-8")
     assert "GetVisibleComponents" not in helper_source
     assert "GetVisibleEntities2" not in helper_source
     for module in DRAWING_MODULES:
@@ -144,11 +143,17 @@ def test_all_gear_annotations_avoid_drawing_visible_entity_walks() -> None:
             assert "leader_attach_xy=(" in source
 
 
-def test_gear_model_faces_resolves_bore_end_and_seed_tooth_tip(monkeypatch) -> None:
+def test_gear_model_faces_uses_axial_end_and_right_view_top_tip(monkeypatch) -> None:
     class Surface:
-        def __init__(self, kind: str, radius_mm: float = 0.0) -> None:
+        def __init__(
+            self,
+            kind: str,
+            radius_mm: float = 0.0,
+            normal: tuple[float, float, float] = (0.0, 0.0, 1.0),
+        ) -> None:
             self.kind = kind
             self.CylinderParams = (0, 0, 0, 0, 0, 0, radius_mm / 1000.0)
+            self.PlaneParams = (*normal, 0.0, 0.0, 0.0)
 
         def IsPlane(self) -> bool:
             return self.kind == "plane"
@@ -157,16 +162,20 @@ def test_gear_model_faces_resolves_bore_end_and_seed_tooth_tip(monkeypatch) -> N
             return self.kind == "cylinder"
 
     class Vertex:
-        def __init__(self, x_mm: float, y_mm: float) -> None:
-            self.point = (x_mm / 1000.0, y_mm / 1000.0, 0.0)
+        def __init__(self, point: tuple[float, float, float]) -> None:
+            self.point = point
 
         def GetPoint(self):
             return self.point
 
     class Edge:
-        def __init__(self, radius_mm: float) -> None:
-            self.start = Vertex(radius_mm, 0.0)
-            self.end = Vertex(0.0, radius_mm)
+        def __init__(
+            self,
+            start: tuple[float, float, float],
+            end: tuple[float, float, float],
+        ) -> None:
+            self.start = Vertex(start)
+            self.end = Vertex(end)
 
         def GetStartVertex(self):
             return self.start
@@ -175,9 +184,19 @@ def test_gear_model_faces_resolves_bore_end_and_seed_tooth_tip(monkeypatch) -> N
             return self.end
 
     class Face:
-        def __init__(self, surface: Surface, edges=()) -> None:
+        def __init__(
+            self,
+            surface: Surface,
+            *,
+            area: float = 0.0,
+            edges=(),
+            closest: tuple[float, float, float] | None = None,
+        ) -> None:
             self.surface = surface
+            self.area = area
             self.edges = edges
+            self.closest = closest
+            self.closest_queries: list[tuple[float, float, float]] = []
 
         def GetSurface(self):
             return self.surface
@@ -185,11 +204,35 @@ def test_gear_model_faces_resolves_bore_end_and_seed_tooth_tip(monkeypatch) -> N
         def GetEdges(self):
             return self.edges
 
-    tooth_tip = Face(Surface("other"), (Edge(8.5),))
-    irrelevant = Face(Surface("cylinder", 2.0))
-    end = Face(Surface("plane"))
+        def GetArea(self):
+            return self.area
+
+        def GetClosestPointOn(self, x: float, y: float, z: float):
+            self.closest_queries.append((x, y, z))
+            return (*self.closest, 0.0, 0.0)
+
+    lower_tip = Face(
+        Surface("cylinder", 8.5),
+        edges=(Edge((0.006, 0.006, 0.0), (0.006, 0.006, 0.010)),),
+        closest=(0.006, 0.006, 0.005),
+    )
+    top_tip = Face(
+        Surface("cylinder", 8.5),
+        edges=(Edge((0.0, 0.0085, 0.0), (0.0, 0.0085, 0.010)),),
+        closest=(0.0, 0.0085, 0.005),
+    )
+    axial_small = Face(Surface("plane"), area=0.001)
+    axial_large = Face(Surface("plane", normal=(0.0, 0.0, -1.0)), area=0.002)
     bore = Face(Surface("cylinder", 3.0))
-    faces = [tooth_tip, irrelevant, end, bore]
+    misleading_plane = Face(Surface("plane", normal=(1.0, 0.0, 0.0)), area=100.0)
+    faces = [
+        lower_tip,
+        top_tip,
+        axial_small,
+        axial_large,
+        bore,
+        misleading_plane,
+    ]
     adapter = SimpleNamespace(_attempt=lambda call, default=None: call())
     monkeypatch.setattr(
         _gear_drawing_entities, "_early_bound", lambda value, *_args: value
@@ -209,8 +252,24 @@ def test_gear_model_faces_resolves_bore_end_and_seed_tooth_tip(monkeypatch) -> N
     )
 
     assert selected.bore is bore
-    assert selected.end is end
-    assert selected.tooth_tip is tooth_tip
+    assert selected.end is axial_large
+    assert selected.tooth_tip is top_tip
+    assert lower_tip.closest_queries == [(0.0, 0.0085, 0.005)]
+    assert top_tip.closest_queries == [(0.0, 0.0085, 0.005)]
+
+
+def test_gear_model_faces_fails_before_an_unbounded_face_scan(monkeypatch) -> None:
+    faces = [object()] * (_gear_drawing_entities._SOURCE_FACE_SCAN_LIMIT + 1)
+    monkeypatch.setattr(
+        _gear_drawing_entities,
+        "referenced_model_faces",
+        lambda _adapter, _view, *, label: faces,
+    )
+
+    with pytest.raises(RuntimeError, match="exceed the bounded classification limit"):
+        _gear_drawing_entities.gear_model_faces(
+            SimpleNamespace(), object(), 6.0, label="oversized gear"
+        )
 
 
 def test_tooth_runout_is_stated_against_the_bore_axis_datum() -> None:

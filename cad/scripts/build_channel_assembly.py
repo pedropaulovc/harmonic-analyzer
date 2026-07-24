@@ -380,6 +380,39 @@ def _verify_pattern_z(
     return ordered
 
 
+def _pattern_attempt_names(
+    adapter, seed: str, prefix: str, count: int
+) -> list[str]:
+    """Resolve the live component names created by one pattern attempt.
+
+    SolidWorks allocates component suffixes monotonically even after deleting
+    a failed pattern. Probe names directly instead of enumerating the growing
+    component tree; the two-attempt pattern contract bounds the search to the
+    first allocation plus one deleted allocation range.
+    """
+    require_component(adapter, seed)
+    if count == 1:
+        return [seed]
+
+    seed_number = _component_instance_number(seed, prefix)
+    names = [seed]
+    max_probes = 2 * (count - 1)
+    for offset in range(1, max_probes + 1):
+        candidate = f"{prefix}-{seed_number + offset}"
+        try:
+            require_component(adapter, candidate)
+        except RuntimeError:
+            continue
+        names.append(candidate)
+        if len(names) == count:
+            return names
+
+    raise RuntimeError(
+        f"{prefix} pattern created {len(names) - 1} resolvable copies; "
+        f"expected {count - 1} within {max_probes} suffix probes"
+    )
+
+
 async def _pattern_bank(
     adapter, seed: str, prefix: str, axis_name: str, gap_planes: list[float],
 ) -> list[str]:
@@ -395,13 +428,11 @@ async def _pattern_bank(
     deterministic in at most two solves, never inference-trusting.
     """
     count = len(gap_planes)
-    seed_number = _component_instance_number(seed, prefix)
-    names = [f"{prefix}-{seed_number + offset}" for offset in range(count)]
     if count < 2:
         # One gap (CHANNELS == 2): the seated seed IS the whole bank; a
         # count=1 LocalLinearPattern is invalid/pointless (codex #219).
         return _verify_pattern_z(
-            adapter, names, gap_planes, f"{prefix} bank (seed only)"
+            adapter, [seed], gap_planes, f"{prefix} bank (seed only)"
         )
     # Flip seed TRUE: diag_pattern_sense (2026-07-09, 5/5 reps) measured the
     # Top∩Right axis pick resolving +Z deterministically, so FlipDir1=True
@@ -420,6 +451,7 @@ async def _pattern_bank(
             ),
         )
         try:
+            names = _pattern_attempt_names(adapter, seed, prefix, count)
             return _verify_pattern_z(
                 adapter, names, gap_planes, f"{prefix} pattern"
             )

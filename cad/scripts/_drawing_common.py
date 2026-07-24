@@ -2186,6 +2186,7 @@ def referenced_model_faces(adapter: Any, view: Any, *, label: str) -> list[Any]:
     return faces
 
 
+@_telemetry.traced("drawing.cylindrical_face", label_param="label")
 def cylindrical_face(
     adapter: Any,
     faces: Sequence[Any],

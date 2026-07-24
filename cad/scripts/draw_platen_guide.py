@@ -99,6 +99,7 @@ def _bottom_surface_edge(view: Any) -> Any:
     return edge
 
 
+@_telemetry.traced("drawing.hole_table_entities")
 def _hole_table_entities(
     view: Any, stations: tuple[float, ...], datum_edge: Any
 ) -> tuple[Any, ...]:
