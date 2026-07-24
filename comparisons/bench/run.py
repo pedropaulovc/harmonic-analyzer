@@ -18,6 +18,7 @@ scorer but NEVER shown to a subject.
     uv run comparisons/bench/run.py --task t1 --model codex-sol --limit 10 --arms P1,P2  # smoke
     uv run comparisons/bench/run.py --task t3 --model codex-sol
     uv run comparisons/bench/run.py --task t1 --model opus                # after codex
+    uv run comparisons/bench/run.py --task t1 --model opus-5              # pinned claude-opus-5
 
 Resume is automatic: rerun the same command; done cells are skipped.
 """
@@ -245,11 +246,12 @@ def run_codex(prompt: str, images: list[Path], schema_path: Path, sandbox: Path,
 
 
 def run_opus(prompt: str, images: list[Path], sandbox: Path,
+             claude_model: str = "opus",
              timeout: int = 240) -> tuple[dict | None, int, str, str]:
     imgs = ", ".join(f"./{im.name}" for im in images)
     full = (prompt + f"\n\nThe stimulus image(s) are in this directory: {imgs}. "
             "Use the Read tool to view each, then respond with ONLY the JSON object.")
-    cmd = ["claude", "-p", "--model", "opus", "--effort", "high",
+    cmd = ["claude", "-p", "--model", claude_model, "--effort", "high",
            "--output-format", "json",
            "--permission-mode", "bypassPermissions", full]
     try:
@@ -287,6 +289,15 @@ CODEX_MODELS = {
     "codex": "gpt-5.5",          # incumbent second subject
     "codex-sol": "gpt-5.6-sol",  # added subject
 }
+# Claude subjects, all at --effort high. The alias "opus" floats with whatever
+# `claude --model opus` resolves to on the day (it recorded claude-opus-4-8 for
+# the archived column), so a NEW generation gets its own pinned id rather than
+# silently reusing that key -- the recorded model_id on each row is what makes a
+# column reproducible.
+CLAUDE_MODELS = {
+    "opus": "opus",              # archived column (resolved claude-opus-4-8)
+    "opus-5": "claude-opus-5",   # pinned successor subject
+}
 
 
 def invoke(model: str, prompt: str, images: list[Path], schema: dict, sandbox: Path):
@@ -294,7 +305,7 @@ def invoke(model: str, prompt: str, images: list[Path], schema: dict, sandbox: P
         sp = write_schema("t_" + opaque(prompt)[:8], schema)
         data, tokens, err = run_codex(prompt, images, sp, sandbox, CODEX_MODELS[model])
         return data, tokens, err, CODEX_MODELS[model]
-    data, tokens, err, mid = run_opus(prompt, images, sandbox)
+    data, tokens, err, mid = run_opus(prompt, images, sandbox, CLAUDE_MODELS[model])
     return data, tokens, err, mid
 
 
@@ -499,7 +510,8 @@ def exec_t2(cases, cell, model, server):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", required=True, choices=["t1", "t3", "t2"])
-    ap.add_argument("--model", required=True, choices=["codex", "codex-sol", "opus"])
+    ap.add_argument("--model", required=True,
+                    choices=["codex", "codex-sol", "opus", "opus-5"])
     ap.add_argument("--arms", help="comma list, default all 11")
     ap.add_argument("--pairs", help="comma list, default 6 first-pass")
     ap.add_argument("--n", type=int, default=3)

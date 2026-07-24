@@ -266,9 +266,9 @@ def markdown(model: str, t1: dict, t3: dict) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", help="codex|codex-sol|opus (default: all present)")
+    ap.add_argument("--model", help="codex|codex-sol|opus|opus-5 (default: all present)")
     args = ap.parse_args()
-    models = [args.model] if args.model else ["codex", "codex-sol", "opus"]
+    models = [args.model] if args.model else ["codex", "codex-sol", "opus", "opus-5"]
     summary, md = {}, ["# Pose-presentation benchmark - results\n"]
     for model in models:
         t1 = t1_report(model)
