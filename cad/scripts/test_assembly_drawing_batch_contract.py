@@ -1,297 +1,182 @@
-"""Cross-sheet offline contracts for the seven assembly drawings."""
+"""Cross-drawing contract for the eight simple assembly drawings."""
 
 from __future__ import annotations
 
-import re
+import asyncio
+import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
-import _config
-import _grouped_bom_properties
+import _assembly_drawing
 import draw_channel_assembly
 import draw_drive_train_assembly
 import draw_frame_assembly
 import draw_harmonic_analyzer_assembly
 import draw_magnifier_assembly
 import draw_paper_drive_assembly
+import draw_pen_assembly
 import draw_summing_assembly
-from _drawing_common import _bom_identity_map
-from _grouped_bom_properties import apply_grouped_bom_properties
+from _drawing_common import DrawingOutputs
+from _drawing_registry import DRAWINGS
 
 
-SHEETS = (
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dodo():
+    spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+ASSEMBLY_DRAWINGS = (
+    draw_pen_assembly,
     draw_channel_assembly,
     draw_drive_train_assembly,
     draw_frame_assembly,
-    draw_harmonic_analyzer_assembly,
     draw_magnifier_assembly,
     draw_paper_drive_assembly,
     draw_summing_assembly,
-)
-
-# Sheets that carry a BOM, balloons and assembly notes. The two exclusions are
-# ARRANGEMENT DIAGRAMS -- three views and nothing else -- so they define none of
-# the ``ASSEMBLY_NOTES`` / ``BOM_COMPONENTS`` / ``BOM_PART_NUMBERS`` attributes
-# the contracts below read. paper-drive is a mechanism still changing; channel
-# was reduced 2026-07-25 because AutoBalloon5 cannot place its item 4/7 cluster
-# without crossing leaders (see draw_channel_assembly's module docstring) and
-# will be restored when it regains deterministic balloon placement.
-DIAGRAM_SHEETS = (draw_channel_assembly, draw_paper_drive_assembly)
-
-DOCUMENTATION_SHEETS = tuple(
-    drawing for drawing in SHEETS if drawing not in DIAGRAM_SHEETS
-)
-
-ORDINARY_SHEETS = tuple(
-    drawing
-    for drawing in DOCUMENTATION_SHEETS
-    if drawing is not draw_drive_train_assembly
-)
-
-TITLE_BLOCK_OWNED_NOTE_TEXT = (
-    "ALL DIMENSIONS",
-    "BREAK ALL",
-    "BREAK SHARP",
-    "BURR",
-    "DEBUR",
-    "DIMENSIONS IN",
-    "DRAWING UNITS",
-    "EDGE BREAK",
-    "FINISH:",
-    "GENERAL TOLER",
-    "MATERIAL:",
-    "REMOVE BURR",
-    "SHARP EDGE",
-    "UNLESS OTHERWISE SPECIFIED",
-    "UNITS:",
-    " UOS",
+    draw_harmonic_analyzer_assembly,
 )
 
 
-def test_grouped_bom_identity_is_persisted_on_every_configuration(monkeypatch) -> None:
-    configurations = {name: SimpleNamespace() for name in ("T12", "T18", "T24")}
-    model = SimpleNamespace(GetConfigurationByName=configurations.get)
-    adapter = SimpleNamespace(currentModel=model)
+def test_registry_contains_exactly_the_eight_simple_assembly_drawings() -> None:
+    registered = tuple(spec for spec in DRAWINGS if spec.source_kind == "assembly")
+    assert {spec.script for spec in registered} == {
+        Path(drawing.__file__).resolve() for drawing in ASSEMBLY_DRAWINGS
+    }
+
+
+def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -> None:
+    dodo = _load_dodo()
+    tasks = {task["name"]: task for task in dodo.task_drawing()}
+    for drawing in ASSEMBLY_DRAWINGS:
+        spec = drawing.SPEC
+        assert spec.name in tasks
+        assert set(tasks[spec.name]["targets"]) == {
+            str(path) for path in spec.outputs.values()
+        }
+        deps = dodo._drawing_file_deps(spec.name)
+        assert str(spec.source) in deps
+        assert dodo._assembly_execution_token(spec.part) in deps
+        assert str(Path(_assembly_drawing.__file__).resolve()) in deps
+
+
+def test_each_recipe_is_only_a_precomputed_shared_builder_call() -> None:
+    prohibited = (
+        "add_auto_balloons",
+        "add_component_bom_balloons",
+        "add_note(",
+        "create_blank_drawing_sheets",
+        "insert_bom_table",
+        "insert_identified_bom_table",
+        "set_hidden_lines_",
+        "stamp_drawing_summary",
+        "ViewDisplay",
+    )
+    for drawing in ASSEMBLY_DRAWINGS:
+        source = Path(drawing.__file__).read_text(encoding="utf-8")
+        assert "return await build_simple_three_view_drawing(" in source
+        assert "place_view(" not in source
+        assert "SHEET_NAMES" not in source
+        assert "BOM_" not in source
+        assert "ASSEMBLY_NOTES" not in source
+        assert not any(token in source for token in prohibited), drawing.ARTIFACT_STEM
+
+
+def test_each_three_view_layout_has_distinct_left_to_right_centers() -> None:
+    for drawing in ASSEMBLY_DRAWINGS:
+        front_x, _front_y = drawing.FRONT_CENTER
+        right_x, _right_y = drawing.RIGHT_CENTER
+        iso_x, _iso_y = drawing.ISO_CENTER
+        assert front_x < right_x < iso_x, drawing.ARTIFACT_STEM
+        assert right_x - front_x >= 0.065, drawing.ARTIFACT_STEM
+        assert iso_x - right_x >= 0.065, drawing.ARTIFACT_STEM
+
+
+def test_shared_builder_uses_default_visuals_and_three_named_views() -> None:
+    source = Path(_assembly_drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("place_view(") == 1
+    assert '("*Front", front_center)' in source
+    assert '("*Right", right_center)' in source
+    assert '("*Isometric", iso_center)' in source
+    assert "scale=sheet_scale" in source
+    for token in (
+        "set_hidden_lines_",
+        "ViewDisplay",
+        "DisplayMode",
+        "add_note(",
+        "balloon",
+        "bom_table",
+        "create_blank_drawing_sheets",
+    ):
+        assert token not in source
+
+
+def test_shared_builder_places_exactly_front_right_and_isometric(
+    monkeypatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "assembly.SLDASM"
+    source.touch()
+    outputs = DrawingOutputs(
+        slddrw=tmp_path / "assembly.SLDDRW",
+        pdf=tmp_path / "assembly.pdf",
+        png=tmp_path / "assembly.png",
+    )
+    adapter = SimpleNamespace(open_model=lambda _path: None)
+
+    async def open_model(path: str) -> bool:
+        calls.append(("open", path))
+        return True
+
+    calls: list[tuple[object, ...]] = []
+    adapter.open_model = open_model
     monkeypatch.setattr(
-        _grouped_bom_properties,
-        "_early_bound",
-        lambda config, _interface: config,
+        _assembly_drawing,
+        "check",
+        lambda _label, result: result,
+    )
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "new_project_drawing",
+        lambda _adapter, *, scale: calls.append(("new", scale)),
+    )
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "place_view",
+        lambda _adapter, path, name, x, y, *, scale: calls.append(
+            ("view", path, name, x, y, scale)
+        ),
     )
 
-    apply_grouped_bom_properties(
-        adapter,
-        tuple(configurations),
-        part_number="MHA-081",
-        description="CHAIN SPROCKET, T12/T18/T24; 1 EACH",
-    )
+    async def finalize(_adapter, actual_outputs, *, pdf_title, scale):
+        calls.append(("finalize", actual_outputs, pdf_title, scale))
+        return {"pdf": str(actual_outputs.pdf)}
 
-    for config in configurations.values():
-        assert config.BOMPartNoSource == 8
-        assert config.AlternateName == "MHA-081"
-        assert config.UseAlternateNameInBOM is True
-        assert config.Description == "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
-        assert config.UseDescriptionInBOM is True
+    monkeypatch.setattr(_assembly_drawing, "finalize_drawing", finalize)
 
-
-def test_grouped_bom_metadata_is_authored_by_both_part_builders() -> None:
-    for script in ("build_transgear_removable.py", "build_cone_gear.py"):
-        source = (Path(__file__).parent / script).read_text(encoding="utf-8")
-        assert source.count("apply_grouped_bom_properties(") == 1, script
-
-
-def test_bom_identity_map_accepts_stems_and_released_number_aliases() -> None:
-    identities = _bom_identity_map(
-        ("cone-gear", "pinion-cam-pin"),
-        {"MHA-013": "cone-gear", "MHA-116": "pinion-cam-pin"},
-    )
-    assert identities["cone-gear"] == "cone-gear"
-    assert identities["mha-013"] == "cone-gear"
-    assert identities["pinion-cam-pin"] == "pinion-cam-pin"
-    assert identities["mha-116"] == "pinion-cam-pin"
-
-
-def test_diagram_sheets_really_are_bare_three_view_diagrams() -> None:
-    """The exclusion above must stay honest in both directions.
-
-    Without this, a sheet could be parked in DIAGRAM_SHEETS to duck the
-    documentation contracts while still carrying a half-built BOM.
-    """
-    for drawing in DIAGRAM_SHEETS:
-        for attribute in ("ASSEMBLY_NOTES", "BOM_COMPONENTS", "BOM_PART_NUMBERS"):
-            assert not hasattr(drawing, attribute), (
-                f"{drawing.ARTIFACT_STEM} defines {attribute} -- it is classified "
-                "as an arrangement diagram, so move it back to the documentation "
-                "sheets rather than half-restoring its parts list"
-            )
-        source = Path(drawing.__file__).read_text(encoding="utf-8")
-        assert source.count("place_view(") == 3, drawing.ARTIFACT_STEM
-        assert "insert_identified_bom_table(" not in source, drawing.ARTIFACT_STEM
-        assert "add_auto_balloons" not in source, drawing.ARTIFACT_STEM
-        assert "add_note(" not in source, drawing.ARTIFACT_STEM
-
-
-def test_assembly_notes_do_not_repeat_title_block_metadata() -> None:
-    for drawing in DOCUMENTATION_SHEETS:
-        notes = drawing.ASSEMBLY_NOTES.upper()
-        for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
-            assert duplicate not in notes, f"{drawing.ARTIFACT_STEM}: {duplicate}"
-
-
-def test_assembly_notes_are_numbered_in_order() -> None:
-    for drawing in DOCUMENTATION_SHEETS:
-        lines = drawing.ASSEMBLY_NOTES.splitlines()
-        assert lines[0] == "ASSEMBLY NOTES", drawing.ARTIFACT_STEM
-        assert len(lines) >= 4, drawing.ARTIFACT_STEM
-        expected_number = 1
-        for line in lines[1:]:
-            if line.startswith("   "):
-                assert expected_number > 1, drawing.ARTIFACT_STEM
-                assert line.strip(), drawing.ARTIFACT_STEM
-                continue
-            assert line.startswith(f"{expected_number}. "), (
-                f"{drawing.ARTIFACT_STEM}: {line}"
-            )
-            expected_number += 1
-        assert expected_number >= 4, drawing.ARTIFACT_STEM
-
-
-def test_each_sheet_has_a_complete_bom_contract() -> None:
-    for drawing in DOCUMENTATION_SHEETS:
-        assert drawing.BOM_COMPONENTS, drawing.ARTIFACT_STEM
-        assert all(drawing.BOM_COMPONENTS.values()), drawing.ARTIFACT_STEM
-        assert len(drawing.BOM_COMPONENTS) == len(set(drawing.BOM_COMPONENTS.values())), (
-            drawing.ARTIFACT_STEM
+    result = asyncio.run(
+        _assembly_drawing.build_simple_three_view_drawing(
+            adapter,
+            source=source,
+            outputs=outputs,
+            sheet_scale=(1.0, 4.0),
+            front_center=(0.1, 0.2),
+            right_center=(0.2, 0.2),
+            iso_center=(0.3, 0.2),
+            pdf_title="Assembly Drawing",
         )
-        assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS), (
-            drawing.ARTIFACT_STEM
-        )
-        assert len(drawing.BOM_PART_NUMBERS) == len(
-            set(drawing.BOM_PART_NUMBERS.values())
-        ), drawing.ARTIFACT_STEM
-        assert all(
-            re.fullmatch(r"MHA-(?:\d{3}|A\d{2})", number)
-            for number in drawing.BOM_PART_NUMBERS.values()
-        ), drawing.ARTIFACT_STEM
-
-
-def test_part_bom_numbers_come_from_the_part_registry() -> None:
-    for drawing in DOCUMENTATION_SHEETS:
-        if drawing is draw_harmonic_analyzer_assembly:
-            continue
-        assert drawing.BOM_PART_NUMBERS == {
-            stem: _config.parts(stem)["number"]
-            for stem in drawing.BOM_COMPONENTS
-        }, drawing.ARTIFACT_STEM
-
-
-def test_part_registry_numbers_are_globally_unique() -> None:
-    numbers = {
-        stem: record["number"]
-        for stem, record in _config.parts().items()
-    }
-    assert len(numbers) == len(set(numbers.values()))
-    assert numbers["lever-wire"] == "MHA-115"
-    assert numbers["pen-wire"] == "MHA-100"
-    assert numbers["pinion-cam-pin"] == "MHA-116"
-
-
-def test_top_level_bom_uses_released_subassembly_numbers() -> None:
-    assert draw_harmonic_analyzer_assembly.BOM_PART_NUMBERS == {
-        "frame": "MHA-A04",
-        "drive-train": "MHA-A03",
-        "channel": "MHA-A02",
-        "summing": "MHA-A07",
-        "magnifier": "MHA-A05",
-        "pen": "MHA-A01",
-        "paper-drive": "MHA-A06",
-        "measuring-stick": "MHA-046",
-    }
-
-
-def test_configured_variants_remain_visible_after_bom_row_collapse() -> None:
-    cone_description = "CONE GEAR, T006-T120 BY 6; 1 EACH"
-    sprocket_description = "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
-    assert draw_drive_train_assembly.BOM_COMPONENTS["cone-gear"] == cone_description
-    assert _config.parts("cone-gear")["description"] == cone_description
-    assert _config.parts("transgear-removable")["description"] == sprocket_description
-
-
-def test_unresolved_assembly_inputs_are_release_holds_not_guessed_details() -> None:
-    assert "HARDENED KNIFE SEATS" in draw_summing_assembly.ASSEMBLY_NOTES
-    assert "MOUNT-TO-CROSSBAR FASTENERS" in draw_summing_assembly.ASSEMBLY_NOTES
-    assert "LEVER-WIRE TERMINATIONS" in draw_magnifier_assembly.ASSEMBLY_NOTES
-    assert "WHEEL HUB/RIM" in draw_magnifier_assembly.ASSEMBLY_NOTES
-    top_notes = draw_harmonic_analyzer_assembly.ASSEMBLY_NOTES
-    assert "INSTALL IN ORDER" in top_notes
-    assert "ALIGN ASSEMBLY ORIGINS" in top_notes
-    assert "ADD NO TOP-LEVEL FASTENERS" in top_notes
-    assert "RELEASE HOLD" not in top_notes
-
-
-def test_ordinary_sheets_use_three_hlr_views_bom_and_balloons() -> None:
-    for drawing in ORDINARY_SHEETS:
-        source = Path(drawing.__file__).read_text(encoding="utf-8")
-        expected_views = {
-            draw_magnifier_assembly: 5,
-            draw_harmonic_analyzer_assembly: 6,
-        }.get(drawing, 3)
-        assert source.count("place_view(") == expected_views, drawing.ARTIFACT_STEM
-        if drawing is draw_frame_assembly:
-            assert "for view in (general_front, general_right):" in source
-            assert "set_hidden_lines_removed(adapter, iso)" in source
-        elif drawing is draw_magnifier_assembly:
-            assert "for view in (general_front, general_right, general_iso):" in source
-            assert "for view in (iso, front):" in source
-        elif drawing is draw_harmonic_analyzer_assembly:
-            assert "for view in (general_front, general_right, general_iso):" in source
-            assert "for view in (front, right, iso):" in source
-        else:
-            assert "for view in (front, right, iso):" in source, (
-                drawing.ARTIFACT_STEM
-            )
-        assert "set_hidden_lines_removed(adapter, view)" in source, (
-            drawing.ARTIFACT_STEM
-        )
-        assert source.count("insert_identified_bom_table(") == 1, (
-            drawing.ARTIFACT_STEM
-        )
-        assert "part_numbers=BOM_PART_NUMBERS" in source, drawing.ARTIFACT_STEM
-        if drawing is draw_harmonic_analyzer_assembly:
-            balloon_calls = source.count("add_component_bom_balloons(")
-            expected_balloon_calls = 3
-        else:
-            balloon_calls = source.count("add_auto_balloons(") + source.count(
-                "add_auto_balloons_across_views("
-            )
-            expected_balloon_calls = 1
-        assert balloon_calls == expected_balloon_calls, drawing.ARTIFACT_STEM
-
-
-def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
-    source = Path(draw_drive_train_assembly.__file__).read_text(encoding="utf-8")
-    assert draw_drive_train_assembly.SHEET_NAMES == (
-        "GENERAL ASSEMBLY",
-        "PARTS LIST",
-        "GEAR-TRAIN ITEM IDENTIFICATION",
-        "CONCEALED ITEM IDENTIFICATION",
-        "GEAR-TRAIN SETUP",
-        "PINION ITEM IDENTIFICATION",
-        "PINION SETUP AND ACCEPTANCE",
     )
-    assert set().union(
-        *draw_drive_train_assembly.EXTERIOR_VIEW_STEMS
-    ) == set(draw_drive_train_assembly.BOM_COMPONENTS) - set(
-        draw_drive_train_assembly.CONCEALED_BALLOON_ITEMS
-    )
-    assert len(draw_drive_train_assembly.GEAR_PAIR_ROWS) == 20
-    assert draw_drive_train_assembly.PINION_PARAMETER_ROWS
-    assert draw_drive_train_assembly.ACCEPTANCE_ROWS
-    assert "_add_component_balloons(" in source
-    assert "_isolate_balloon_components(" in source
-    assert "insert_identified_bom_table(" in source
-    assert "part_numbers=BOM_PART_NUMBERS" in source
-    assert "HorizontalAutoSplit(" not in source
-    assert "_format_drive_train_bom(adapter, bom_table)" in source
-    assert "_create_drive_train_sheets(adapter)" in source
-    assert "expected_sheet_names=SHEET_NAMES" in source
-    assert "SETUP_IDENTIFICATION_VIEW_SCALE" not in source
+
+    view_calls = [call for call in calls if call[0] == "view"]
+    assert [call[2] for call in view_calls] == ["*Front", "*Right", "*Isometric"]
+    assert [call[3:5] for call in view_calls] == [
+        (0.1, 0.2),
+        (0.2, 0.2),
+        (0.3, 0.2),
+    ]
+    assert all(call[5] == (1.0, 4.0) for call in view_calls)
+    assert result == {"pdf": str(outputs.pdf)}

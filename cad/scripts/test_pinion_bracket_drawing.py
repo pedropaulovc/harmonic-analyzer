@@ -156,14 +156,5 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert int(spec["quantity"]) == 2  # the book uses two swing brackets
 
 
-def test_shared_template_edge_break_is_metric_and_not_duplicated() -> None:
-    import _drawing_common
-
-    assert _drawing_common._METRIC_EDGE_BREAK_NOTE == (
-        "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
-    )
-    common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
-    assert "_normalize_metric_edge_break_note(adapter, ddoc)" in common_source
+def test_part_notes_do_not_duplicate_template_edge_break_instruction() -> None:
     assert "REMOVE BURRS" not in pinion_bracket_spec.DRAWING_NOTES
-
-

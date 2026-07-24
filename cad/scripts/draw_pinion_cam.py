@@ -32,8 +32,6 @@ from _drawing_common import (
     read_required_properties,
     set_basic_dimension,
     set_dimension_callouts,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -188,10 +186,7 @@ async def build(adapter: Any) -> dict[str, str]:
     bottom = place_view(
         adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1)
     )
-    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.350, 0.185, scale=(2, 1))
-    set_hidden_lines_removed(adapter, iso)
-    for view in (front, top, bottom):
-        set_hidden_lines_visible(adapter, view)
+    place_view(adapter, str(SOURCE), "*Isometric", 0.350, 0.185, scale=(2, 1))
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"

@@ -114,7 +114,6 @@ def test_feature_requirements_use_datum_based_full_length_controls() -> None:
     assert drawing.RIGHT_KEEP["PivotBoreDia"] == (0.360, 0.220)
     assert "frame_xy=(0.350, 0.263)" in source
     assert "frame_xy=(0.180, 0.263)" in source
-    assert "SetDisplayTangentEdges2(0)" in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

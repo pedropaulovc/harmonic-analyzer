@@ -27,7 +27,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -203,9 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     # Lathe convention: axis horizontal. Model +Y (the pen axis) points up in
     # *Front; -90 deg turns it to +X so the tip apex lands on the LEFT. The
     # rotation does not pivot about the geometry center, so re-pin the center
