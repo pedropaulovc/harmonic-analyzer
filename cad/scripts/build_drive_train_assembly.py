@@ -2683,10 +2683,11 @@ async def build(adapter) -> dict[str, str]:
     # Every copy's axial slot re-points at the SEED's Front Plane, laddered
     # j * Z_PITCH -- ONE resolve_entity for the whole drum (re-resolving the
     # previous station per copy measured ~1.5 s x 19, half the ladder's win)
-    # The face-centred Ry180 reverses the seed Front-plane normal, so the old
-    # FlipDimension=True side is reversed too: False now ladders the copies in
-    # machine +Z.  A wrong side lands 2 * the dim off and fails the pose assert
-    # below.
+    # The face-centred Ry180 reverses BOTH the seed and copy Front-plane normals,
+    # so their relative distance side remains the pre-v2 FlipDimension=True.
+    # This deliberately preserves the live failing state: the repointed seed
+    # reference has the opposite alignment, but CopyWithMates2 receives no
+    # FlipAlignment override, producing a red Distance mate (error 47).
     seed_front = resolve_entity(
         adapter, named_ref(f"Front Plane@{seed_cyl}", "PLANE"))
     pending_cylinder_puts: list[tuple[str, list[float]]] = []
@@ -2695,7 +2696,7 @@ async def build(adapter) -> dict[str, str]:
         for j in range(1, _config.active_count()):
             copy_with_mates(
                 adapter, [seed_cyl], 2, [0.0, j * Z_PITCH / 1000.0],
-                flips=[False, False], repeat=[True, False],
+                flips=[False, True], repeat=[True, False],
                 new_entities=[None, seed_front])
             new_name = f"cylinder-gear-{j + 1}"
             if _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(new_name) is None:

@@ -491,7 +491,6 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "cone pivot screw datum Y",
     "cone pivot screw datum Z",
     "cone platform height",
-    "cone shaft axial",
     "crank wheel axial",
     "crankshaft axial (on the plate)",
     "cylinder gear axial anchor",
