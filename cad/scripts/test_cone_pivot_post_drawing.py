@@ -130,9 +130,28 @@ def test_part_exposes_semantic_mating_references() -> None:
         assert f'"{name}"' in source
     assert 'mode="cylindrical_face"' in source
     assert '(("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X))' in source
-    assert part.CRANK_BORE_DX == spec.CRANK_BORE_OFFSET == 0.0
-    assert part.CRANK_BORE_Y == spec.CRANK_BORE_HEIGHT == 72.7
+    assert not hasattr(part, "CRANK_BORE_DX")
+    assert not hasattr(part, "CRANK_BORE_Y")
     assert "HARVESTED_VOLUME_MM3" in source
+
+
+def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert part.ATTACHMENT_HOLE_SPEC.kind == "counterbore_fillister"
+    assert part.ATTACHMENT_HOLE_SPEC.size == "1/4"
+    assert part.ATTACHMENT_HOLE_SPEC.overrides_mm == {
+        "HoleDiameter": spec.ATTACHMENT_THRU_DIA,
+        "CounterBoreDiameter": spec.ATTACHMENT_CBORE_DIA,
+        "CounterBoreDepth": spec.ATTACHMENT_CBORE_DEPTH,
+    }
+    assert "_revolved_cylinder" not in source
+    assert "create_revolve" not in source
+    assert source.count("both_directions=True") == 2
+    assert source.count('create_sketch("ConeShaftNormal")') == 2
+    assert 'HoleSpec(\n    "counterbore_fillister",\n    "1/4"' in source
+    assert source.count("wizard_holes(") == 1
+    assert "attachment_cut.placement_drive_jobs" in source
+    assert 'name="AttachmentScrewHoles"' in source
 
 
 def test_native_datums_and_controls_are_present() -> None:
