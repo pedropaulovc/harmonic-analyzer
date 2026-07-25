@@ -73,6 +73,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _visibility import blank_reference_geometry
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -606,6 +607,27 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "End View Note": END_VIEW_NOTE,
         },
+    )
+    blank_reference_geometry(
+        adapter,
+        (
+            ("GearReliefNorth", "PLANE"),
+            ("Plane2", "PLANE"),
+            ("Plane3", "PLANE"),
+            ("CrankAxisVert", "PLANE"),
+            ("CrankAxisHigh", "PLANE"),
+            ("CrankAxisSeat", "PLANE"),
+            ("Plane7", "PLANE"),
+            ("Plane8", "PLANE"),
+            ("Plane9", "PLANE"),
+            ("Plane10", "PLANE"),
+            ("PlateTop", "PLANE"),
+            ("swing pivot", "AXIS"),
+            ("crank anchor (vertical)", "AXIS"),
+            ("crank axis", "AXIS"),
+            ("post mount west", "AXIS"),
+            ("post mount east", "AXIS"),
+        ),
     )
     return await save_part_and_images(adapter, PART_NAME)
 
