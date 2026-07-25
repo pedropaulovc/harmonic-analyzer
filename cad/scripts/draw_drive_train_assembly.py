@@ -43,6 +43,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
+from pinion_spring_geometry import BLADE_TILT_DEG as PINION_PARK_ANGLE_DEG
 
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
@@ -173,7 +174,7 @@ _SETUP_NOTE_LINES = (
         "   DRUM ARBOR AXIS AND ITEM 1 CYLINDER DRUM ARBOR AXIS.",
         "9. AT DISENGAGED PARK, SET THE LINE JOINING ITEM 15",
         "   TORQUE-SHAFT AXIS AND ITEM 22 DRUM-ARBOR AXIS",
-        "   12.38 DEG TOWARD MACHINE WEST FROM +Y VERTICAL.",
+        f"   {PINION_PARK_ANGLE_DEG:.2f} DEG TOWARD MACHINE WEST FROM +Y VERTICAL.",
         "   SET BOTH ITEM 13 STRAPS PARALLEL.",
         "10. SET 0.25 MM AXIAL CLEARANCE BETWEEN EACH ITEM 12",
         "   DRUM END FACE AND ADJACENT ITEM 13 INNER FACE.",
@@ -417,7 +418,7 @@ PINION_PARAMETER_ROWS = (
     ),
     (
         "ITEM 13 PARK ANGLE",
-        "12.38° WEST OF +Y; STRAPS PARALLEL",
+        f"{PINION_PARK_ANGLE_DEG:.2f}° WEST OF +Y; STRAPS PARALLEL",
         "—",
         "ITEM 15-22 AXIS-CENTER LINE TO +Y",
     ),

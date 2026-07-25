@@ -12,18 +12,18 @@ MM_PER_IN = 25.4
 # is the drawing's single source of the marked dimensions.
 BLOCK_X = 14.0  # plan width across the shaft
 BLOCK_Z = 12.0  # plan depth along the shaft
-BLOCK_HEIGHT = 55.0  # block height, foot to top
-ADJUSTER_AXIS_HEIGHT = 47.65  # adjuster axis above the foot
+BLOCK_HEIGHT = 40.718  # v2 post cascade: preserve the 1.000-mm crown above slit
+ADJUSTER_AXIS_HEIGHT = 33.368  # coaxial with cone-pivot-post-v2 journal
 ADJUSTER_THREAD = "5/16-18"  # blind tapped hole from the far (north) face
 ADJUSTER_DEPTH = 8.0
 # Non-bearing clearance passage from the south face into the adjuster bore. Its
 # diameter matches the already-defined adjuster cup, so the shaft tip has one
 # continuous envelope without reviving the removed fictional journal fit.
 PINCH_THREAD = "#3-48"  # cross-bore tapped hole that squeezes the top slit
-PINCH_HEIGHT = 53.2
+PINCH_HEIGHT = 38.918
 PINCH_CLEARANCE_DIA = 2.946
 SLIT_W = 1.2  # top clamp slit width
-SLIT_DEPTH = 8.0  # slit cut down from the top face (BLOCK_HEIGHT 55.0 -> 47.0)
+SLIT_DEPTH = 8.0  # slit cut down from the top face to 32.718
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Width", "Depth"},
@@ -49,7 +49,7 @@ DRAWING_NOTES = "\n".join(
         f"IN SAME SETUP TAP {PINCH_THREAD} UNC-2B THRU OPPOSITE JAW; APPLY",
         "POSITION FRAME TO BOTH COAXIAL FEATURES AS A SIMULTANEOUS REQT.",
         "PINCH FEATURE MAY OPEN INTO TOP SLOT; 0.25 MIN TOP LIGAMENT.",
-        # Machinist round-2 disposition: the 53.20/47.65 axis stack leaves only
+        # Machinist round-2 disposition: the 38.918/33.368 axis stack leaves only
         # a 0.11 nominal wall between the pinch passage and the adjuster
         # thread crest (5.55 - 2.946/2 - 7.938/2), which the stated tolerances
         # cannot hold as "no breakthrough" — but the passage can never reach

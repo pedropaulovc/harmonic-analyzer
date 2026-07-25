@@ -8,7 +8,7 @@ Photo reads at 9.45 px/mm against the Ø6.35 rods: collar OD ~9.5, a
 ~Ø3.2 set-pin dome proud of the OD (locks the collar to the rod and
 stops axial drift -- review item 8b), pin-on-collar tangency at park.
 
-Eccentricity 1.0 (photo-consistent): full lift 2.0 vs the 1.08 the
+Eccentricity 1.4 after the v2 drive-line closure: full lift 2.8 provides the
 4.1-deg engage swing needs (15 * tan 4.1 -- the pin rides 15 west of
 the pivot), and the thin side keeps a 0.575 wall over the bore.
 

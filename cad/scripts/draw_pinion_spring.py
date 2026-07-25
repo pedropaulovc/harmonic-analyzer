@@ -2,7 +2,7 @@ r"""Create the curated machinist drawing for the pinion return leaf spring.
 
 NOT a coil spring: a bent brass leaf.  A 0.8 x 4.0 half-hard brass strip formed
 as a flat screw-down foot (31 long, with a #4 foot-screw clearance hole), an R2
-bend up to a blade leaning 12.38 deg off the foot plane, then a subtle R1.5 kink
+bend up to a blade following the parked 49.86 deg strap, then a subtle R1.5 kink
 (~20 deg back) to a short free flat.  The profile sketches on the Front plane so
 every marked dimension (foot length, both bend radii, the flat) imports into the
 front profile view; the top view shows the 4.0-wide foot and the screw hole.

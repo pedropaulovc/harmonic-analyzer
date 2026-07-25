@@ -3,9 +3,8 @@ r"""Reproduction script: crank pinion (book ch. 11/12, pp. 16, 20).
 The pinion on the crankshaft that meshes the dark steel crank-drive gear
 at the cone set's large end (`build_crank_drive_gear.py`), implementing
 the book-stated 4:1 crank-to-cone reduction (p. 16). Tooth count/DP per
-the Appendix C #9 split at the 62.2-OD re-anchor: 16T at DP 26.57
-(PD 15.30, OD 17.2 -- photo-ratified 2026-07-14: the pinion reads
-~0.72x the O24 green column in ch12 p.18/p.19). A plain straight spur
+the Appendix C #9 split, with DP 24.74 now fixed by the manually
+rederived v2 post's cast-in crank axis. A plain straight spur
 with a root-relieved floor; the crossed-mesh accommodation lives on the
 64T (see its docstring for the full rederivation).
 
@@ -56,11 +55,7 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine.yaml (low)
 PA_DEG = 14.5
-FACE_WIDTH = 10.8  # mm, re-derived 2026-07-14: fills the pivot-post
-# casting-face -> T120 span (0.32 wall / 0.30 T120-rim clearance; span-fit
-# assert in build_drive_train_assembly scans the T120's TRUE inclined-rim
-# arc minimum). ch12 page002_img06: the pinion stands proud of the casting
-# face, spanning the 64T row (~94% -- the rim overhang caps it at ~94.5%).
+FACE_WIDTH = 10.8  # mm: spans the 64T row north of the v2 crank boss.
 # (The old 12.0 "slightly wider than the drive gear's 10" was a low-
 # confidence read; 11.0 fit the line-of-centres overhang model but grazed
 # the true rim minimum at the tight 2026-07-14 fit.)

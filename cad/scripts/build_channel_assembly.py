@@ -31,7 +31,7 @@ Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
 cylinder-gear notches +Y (cosine alignment), integral cam lobes +Y (UP,
 the top of the stroke -- the ch14 end views show the 0-crank tip row
 dead level at the stroke top), rod rings concentric on the cams at
-(-54.474, 113.437, z_j + 3.3) - the cam centre carries the gears'
+(-54.474, 99.155, z_j + 3.3) - the cam centre carries the gears'
 +1.5 deg tooth-phase rotation. Everything downstream is SOLVED here, not
 hard-coded: the rod-pin point is the intersection of the r 127.58 lever
 circle about the pivot with the r ROD_C2C circle about the ring centre
@@ -232,11 +232,12 @@ GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
 # centre, not a point straight north of the arbor. CAM_ECC is imported above.
 RING_CENTER = (
     -(54.7 - CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG))),
-    104.8 + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # phased cam centre at ECC 8.64: machine (-54.474, 113.437). The drum sits at
+    90.518 + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
+)  # phased cam centre at ECC 8.64: machine (-54.474, 99.155). The drum sits at
 # machine -54.7 (build_drive_train X_DRUM, crank side -X); y off the ch30 GT drive
-# height 104.8 (was 126.8). MUST stay in sync with X_DRUM/Y_DRIVE.
-# ROD_C2C (imported above from connecting_rod_spec.CENTER_DISTANCE, 147.6655):
+# height 90.518, fixed by cone-pivot-post-v2. MUST stay in sync with
+# build_drive_train_assembly.Y_DRIVE.
+# ROD_C2C (imported above from connecting_rod_spec.CENTER_DISTANCE, 161.9475):
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
 # its cam -- the pin (ROD_HOLE_X 127.3738 out from the mid-seesaw pivot) sits
 # directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14

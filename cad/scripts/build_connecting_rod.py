@@ -5,12 +5,12 @@ arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
 integral with each cylinder gear), a thin flat shank, and a rounded
 TOMBSTONE head (the Y-shaped upper end of the ch14 fan photo) pinned (Ø2)
 to the rocker arm's rod-pin hole near the arm's rod-side tip. Centre
-distance 147.6655: the rod hangs PLUMB with the arm LEVEL -- the ch30
+distance 161.9475: the rod hangs PLUMB with the arm LEVEL after the v2 post
 photos show every rod dropping vertically from the arm tip onto its cam,
 the ch14 end views show the 0-crank tip row dead level (cos-mode home =
 top of stroke, cam lobe UP), so the pin (127.37 out from the mid-seesaw
 pivot) sits directly above the phased lobe centre at machine
-(-54.474, 113.437) and the rod length closes that vertical link. The head
+(-54.474, 99.155) and the rod length closes that vertical link. The head
 is SHORTER than the 16 mm arm depth (10.5 crown-to-shoulder), 10 wide,
 crown 2.4 above the pin, angled shoulders narrowing into the 8 shank --
 proportions read off the ch14 fan photo against the 16 mm arm-depth
@@ -66,48 +66,51 @@ from _drawing_marks import (
 from _saved_part_guard import require_saved_drawing_properties
 from connecting_rod_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
 from connecting_rod_notes import DRAWING_DIMENSIONS
+from connecting_rod_spec import (
+    CENTER_DISTANCE,
+    HEAD_CROWN_ABOVE_PIN,
+    HEAD_HEIGHT,
+    HEAD_THICKNESS,
+    HEAD_WIDTH,
+    RING_BORE_DIA,
+    RING_THICKNESS,
+    RING_WALL,
+    SHANK_THICKNESS,
+    SHANK_WIDTH,
+)
 
 import _telemetry
 
 PART_NAME = "connecting-rod"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-CENTER_DISTANCE = 147.6655  # cam ring centre -> rocker pin, VERTICAL rod: the
+# Cam ring centre -> rocker pin, VERTICAL rod: the
 # pin rides the arm's rod-pin hole 127.3738 out from the pivot -- directly
-# above the phased cam LOBE (authored (54.474, 113.437) = drum (54.7, 104.8) +
+# above the phased cam LOBE (authored (54.474, 99.155) = drum (54.7, 90.518) +
 # ECC 8.64 rotated by the +1.5 deg tooth phase, lobe UP at the cos-mode home;
 # ch30 photos + GT rocker-corner triangulation put the arm's rod-side end over
 # the drum). Solved so the rocker rests LEVEL (arm tilt 0 -- the ch14 end views
 # show the 0-crank tip row flat at the TOP of the stroke) with the rod plumb
 # (rod tilt 0 by construction). Supersedes 144.75, the same closure at the
 # pre-ROM-fit lobe-down phase and -7.82 deg tilt. build_channel_assembly
-# imports this as ROD_C2C (imported, NOT copied).
-RING_BORE_DIA = 30.8  # ch13 rods: cam OD 30.6 + 0.1 clearance per side; the p.25
-# overlay's dashed bore reads Ø29.83 at the (weak) gear-OD scale -- confirms
-RING_WALL = 5.0  # ch13 rods: radial strap wall, kept (scaled)
-RING_THICKNESS = 3.0  # ch13 rods: sandwich budget (scaled)
-SHANK_WIDTH = 8.0  # ch13 rods: silhouette vs 7 mm gear face (scaled)
-SHANK_THICKNESS = 2.5  # ch13 rods: thinner than the ring (scaled)
+# imports this as ROD_C2C (imported, NOT copied). Nominal geometry lives in
+# connecting_rod_spec so the part, channel and drawing move as one recipe.
 # Tombstone head (the "Y" upper end): proportions from the ch14 fan photo
 # scaled by the 16 mm arm-depth callout in the same frame. Rounded crown
 # (radius = half width), short vertical cheeks, angled shoulders narrowing
 # into the shank. The head is SHORTER than the arm depth and the pin sits
 # HIGH in the head / LOW in the arm (crown only 2.4 above the pin).
-HEAD_WIDTH = 10.0  # across the cheeks (photo ~10.0)
-HEAD_HEIGHT = 10.5  # crown top -> shoulder root (photo ~10.5 < arm depth 16)
-HEAD_CROWN_ABOVE_PIN = 2.4  # crown top above the pin centre (photo ~2.4)
 HEAD_SHOULDER_RISE = 1.2  # shoulder taper height (width 8 -> 10, photo ~1.2)
-HEAD_THICKNESS = 2.5  # = arm thickness: pin joint stacks beside the arm (M6.3)
 # rocker-arm rod-end pin hole (ch14): was Ø2.0 drill, now #47 (Ø1.994) native
-# Hole Wizard feature
+# Hole Wizard feature; diameter is imported from connecting_rod_spec.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > any local thickness
 
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
 SHANK_START_Y = RING_BORE_DIA / 2.0 - 0.5  # overlaps the strap annulus
-HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # crown top (150.07)
-HEAD_START_Y = HEAD_TOP_Y - HEAD_HEIGHT  # shoulder root: shank ends here (139.57)
-HEAD_CROWN_CY = HEAD_TOP_Y - HEAD_WIDTH / 2.0  # crown arc centre (145.07)
-SHOULDER_TOP_Y = HEAD_START_Y + HEAD_SHOULDER_RISE  # cheeks start here (140.77)
+HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN
+HEAD_START_Y = HEAD_TOP_Y - HEAD_HEIGHT
+HEAD_CROWN_CY = HEAD_TOP_Y - HEAD_WIDTH / 2.0
+SHOULDER_TOP_Y = HEAD_START_Y + HEAD_SHOULDER_RISE
 
 
 async def build(adapter) -> dict[str, str]:

@@ -48,7 +48,7 @@ from _assembly import (
 )
 
 # drive-train cam (build_drive_train_assembly / build_cylinder_gear)
-X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = -54.7, 104.8, -67.1, 7.0568
+X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = -54.7, 90.518, -67.1, 7.0568
 DRUM_FACE = 3.0
 GEAR_PHASE_DEG = 1.5
 CAM_R = 25.4  # cam lobe OD radius (Ø50.8)
@@ -147,7 +147,7 @@ async def build(adapter):
     # Fixed structure: pivot-shaft, fulcrum-shaft, and the cam (cylinder-gear)
     # whose bore is pinned by a concentric to an assembly axis so only its spin
     # is free for the motor.
-    pivot = await place_component(
+    await place_component(
         adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], 0.0], [0, 0, 0],
         [[1, 0, 0], [0, 1, 0], [0, 0, 1]], label="pivot-shaft")
     cam = await place_component(

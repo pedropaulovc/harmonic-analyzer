@@ -17,10 +17,12 @@ R_BEND = 2.0
 R_KINK = 1.5
 KINK_DEG = 20.0
 FLAT_LEN = 2.0
-BLADE_TILT_DEG = 12.38
+BLADE_TILT_DEG = 49.86395995847213
 
-PIVOT_LX = 1.16 - 9.04
-PIVOT_LY = 62.8 - 50.8
+# The spring part owns a convenient local frame; the assembly translates this
+# local pivot onto the live strap pivot.  These are not machine coordinates.
+PIVOT_LX = -7.88
+PIVOT_LY = 12.0
 AXIS_OFFSET = 10.1
 KINK_T = 32.0
 FOOT_Y = 0.8
