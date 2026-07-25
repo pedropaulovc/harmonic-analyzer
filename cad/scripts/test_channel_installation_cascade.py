@@ -9,6 +9,7 @@ import build_channel_assembly as channel
 import connecting_rod_spec
 import fulcrum_shaft_spec
 import pivot_shaft_spec
+from _assembly import _seed_flip
 from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MACHINE_Z_SHIFT
 
 
@@ -52,3 +53,9 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     fulcrum_max = channel.FULCRUM_SHAFT_Z + fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
     assert fulcrum_min < row_min < row_max < fulcrum_max
     assert fulcrum_min < channel.LEVER_MOUNT_Z[0] < channel.LEVER_MOUNT_Z[1] < fulcrum_max
+
+
+def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
+    assert _seed_flip(
+        "fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z
+    )
