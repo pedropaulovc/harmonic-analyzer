@@ -33,8 +33,10 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         spec.CRANK_BORE_HEIGHT,
         spec.CRANK_BORE_OFFSET,
     ) == (21.93, 11.438, 72.7, 0.0)
+    assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
+    assert round(spec.CRANK_BOSS_LENGTH, 4) == 72.0344
     assert round(spec.CRANK_BOSS_START_Z, 4) == -21.3753
-    assert round(spec.CRANK_BOSS_END_Z, 4) == 51.0367
+    assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
     assert (spec.CONE_BOSS_DIA, spec.BORE_DIA, spec.BORE_HEIGHT) == (
         17.2,
         12.2808,
@@ -47,8 +49,8 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
     ) == (26.88704, 7.14248, 11.50874, 6.0198)
-    assert spec.HARVESTED_VOLUME_MM3 == 112_406.7676
-    assert spec.HARVESTED_MASS_KG == 0.809328727
+    assert spec.HARVESTED_VOLUME_MM3 == 112_302.9406
+    assert spec.HARVESTED_MASS_KG == 0.808581173
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
