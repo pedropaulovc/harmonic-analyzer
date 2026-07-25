@@ -9,10 +9,11 @@ head shows as a small square nub on the casting flank in the ch30 p003 view.
 
 Layout: authored axis-along-X so the summing assembly seats it at IDENTITY on
 the frame's -X outer rail face. The under-head plane is the ORIGIN plane:
-square head x -6..0, shank x 0..+8.5 -- long enough to reach the socket wall
-(rail half-width 17 minus the Ø17 socket's 8.5 radius) and stop there, leaving
-the 0.5 slip between socket and Ø16 post as the interference margin rather than
-driving the tip into the post.
+square head x -6..0, shank x 0..+8.75: through the rail (half-width 17) and
+0.25 PAST the Ø17 socket's near wall, stopping 0.25 clear of the Ø16 post it
+pinches. Stopping exactly ON the socket wall (8.5) instead would leave the tip
+face tangent to the bore cylinder -- a 0.00 contact the interference gate reads
+as a sliver (memory/solidworks-modeling-pitfalls).
 
 Run (SolidWorks already open)::
 
@@ -51,10 +52,12 @@ MATERIAL = SPEC.material
 SHANK_DIA = SPEC.model_diameter_mm  # 6.35 (1/4-20 major, threads not modeled)
 HEAD_HALF = 5.0  # 10 x 10 square head (ch19 p.44, vs the Ø16 post beside it)
 HEAD_T = 6.0  # head thickness
-# Shank stops ON the socket wall: rail half-width minus the socket radius.
+# Shank reaches 0.25 short of the post, NOT just to the socket wall (a tip face
+# tangent to the bore cylinder is a 0.00 sliver for the interference gate).
 from frame_anchors import RAIL_HALF
-SOCKET_R = 17.0 / 2.0  # build_top_frame GOOSENECK_BORE_DIA / 2
-SHANK_LEN = RAIL_HALF - SOCKET_R  # 8.5
+POST_R = 16.0 / 2.0  # build_gooseneck TUBE_DIA / 2
+TIP_GAP = 0.25  # repo sliver-flag margin
+SHANK_LEN = RAIL_HALF - POST_R - TIP_GAP  # 8.75
 assert abs(SHANK_LEN - SPEC.length_mm) < 1e-9, (
     f"catalog length {SPEC.length_mm} != geometric {SHANK_LEN}")
 

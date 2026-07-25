@@ -120,7 +120,7 @@ FASTENERS: dict[str, FastenerSpec] = {
         HeadStyle.FILLISTER, DriveStyle.SLOT, Finish.BLACK,
     ),
     "gooseneck-screw": _steel(
-        "gooseneck-screw", "1/4-20", 8.5, 6.35,
+        "gooseneck-screw", "1/4-20", 8.75, 6.35,
         HeadStyle.SQUARE, DriveStyle.EXTERNAL_HEX, Finish.POLISHED,
     ),
     "hanger-screw": _steel(
