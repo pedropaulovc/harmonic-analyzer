@@ -74,8 +74,10 @@ def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
+    assert drawing.END_VIEW_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(3, 1)") == 3
+    assert source.count("scale=(3, 1)") == 2
+    assert "scale=END_VIEW_SCALE" in source
 
 
 def test_end_view_anchor_keeps_default_dimensions_inside_sheet() -> None:

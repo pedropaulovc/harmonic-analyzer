@@ -53,15 +53,16 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 _K = SHEET_SCALE[0] / 1000.0  # model mm -> sheet meters
+END_VIEW_SCALE = (2.0, 1.0)
+_END_K = END_VIEW_SCALE[0] / END_VIEW_SCALE[1] / 1000.0
 _TOTAL_LEN = FLANGE_LEN + STUD_LEN
 
 # Front view: the profile (axle axis vertical, flange at the bottom).
 # End view: the tip-side circles, third-angle above the front view.
 FRONT_CENTER = (0.105, 0.100)
-# The O35 flange at 3:1 makes this view a 105 mm circle. y=0.208 cleared the
-# geometry but SolidWorks' default O5/O9/O35 dimension text still crossed the
-# top sheet border. Moving the complete end-view stack down 18 mm keeps its
-# third-angle relationship and gives the auto-placed text the missing margin.
+# The O35 flange at the sheet's 3:1 scale leaves no room for SolidWorks' default
+# O5/O9/O35 dimension text above it. Keep the third-angle centreline alignment,
+# but use a precomputed 2:1 end-view scale so the default callouts stay on-sheet.
 END_CENTER = (0.105, 0.190)
 ISO_CENTER = (0.310, 0.185)
 
@@ -195,7 +196,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
-    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(3, 1))
+    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=END_VIEW_SCALE)
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(3, 1))
     # The O5 stud hides under the O9 collar from the tip side; show it greyed
     # so its diameter and GD&T attach to a real circle.
@@ -228,12 +229,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     stud_circle_top = _find_edge(
         adapter, end,
-        ept(END_CENTER[0], END_CENTER[1] + STUD_DIA / 2.0 * _K),
+        ept(END_CENTER[0], END_CENTER[1] + STUD_DIA / 2.0 * _END_K),
         axis="y", label="stud circle top pick",
     )
     collar_circle_left = _find_edge(
         adapter, end,
-        ept(END_CENTER[0] - COLLAR_DIA / 2.0 * _K, END_CENTER[1]),
+        ept(END_CENTER[0] - COLLAR_DIA / 2.0 * _END_K, END_CENTER[1]),
         axis="x", label="collar circle left pick",
     )
     add_datum_feature(
@@ -272,8 +273,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # the +-1.5 mm band.
     stud_circle_at_datum_b = _find_edge(
         adapter, end,
-        ept(END_CENTER[0] + STUD_DIA / 2.0 * _K * math.cos(_DATUM_B_ANGLE),
-            END_CENTER[1] + STUD_DIA / 2.0 * _K * math.sin(_DATUM_B_ANGLE)),
+        ept(END_CENTER[0] + STUD_DIA / 2.0 * _END_K * math.cos(_DATUM_B_ANGLE),
+            END_CENTER[1] + STUD_DIA / 2.0 * _END_K * math.sin(_DATUM_B_ANGLE)),
         axis="y", label="stud circle datum-B pick",
     )
     # Live readback normalizes this restricted tag by 13.776 um; this bound
