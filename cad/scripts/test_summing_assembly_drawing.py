@@ -11,6 +11,7 @@ import pytest
 import build_summing_assembly as assembly
 import draw_summing_assembly as drawing
 import top_crossbar_spec
+from _assembly import _seed_flip
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME
 from cone_pivot_post_installation import MACHINE_Z_SHIFT, SUMMING_Z
 
@@ -106,6 +107,10 @@ def test_summing_chain_shares_the_v2_world_anchor() -> None:
     assert 'list(SPRING_POS)' in source
     assert '[COLUMN_X, 1210.0, SUMMING_Z]' in source
     assert '[COLUMN_X, 1040.7, SUMMING_Z]' in source
+
+
+def test_positive_summing_station_uses_the_relearned_axial_mate_side() -> None:
+    assert _seed_flip("summing-lever axial", SUMMING_Z)
 
 
 def test_crossbar_body_and_stud_use_distinct_world_anchors() -> None:
