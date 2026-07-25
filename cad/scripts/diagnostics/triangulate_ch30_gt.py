@@ -7,7 +7,7 @@ benchmark/ground_truth/`. Solves, jointly:
 * one pinhole camera per view (position, yaw/pitch/roll, focal shared per image
   group: the 4 tall views vs the 4 three-quarter views);
 * the top-frame casting outer silhouette extents (TX, TY_top, TZ) as free global
-  parameters (the model's nominal 208/1040.7/123 looked too small against the
+  parameters (the pre-2026-07-24 nominal 208/1040.7/123 looked too small against the
   pixels — measure, don't assume);
 * the 3D machine positions of the drive-train features (crank sprocket, cone
   big-end, alignment-pinion ends, cylinder-drum ends).
@@ -107,8 +107,10 @@ FEATURE_INIT = {  # world frame (x<0 = drive side)
     "cyl_front": [-54.0, 126.8, -98.0],
     "cyl_back": [-54.0, 126.8, 78.0],
 }
-TOP_INIT = [208.0, 1040.7, 123.0]  # model nominal (build_top_frame.py)
-COL_INIT = [197.0, 112.0]  # column centres (±X, ±Z), model nominal
+TOP_INIT = [220.8, 1074.6, 134.5]  # model nominal (build_top_frame.py) -- the
+# 2026-07-24 re-anchor ADOPTED this solve's own answer, so the init now starts
+# from it (was the pre-adoption 208 / 1040.7 / 123)
+COL_INIT = [203.8, 117.5]  # column centres (±X, ±Z), model nominal
 TUBE_R = 25.4 / 2.0  # column OD 25.4 (M6.11)
 
 # Tube-silhouette observations: (view, image row v, [(sx, sz) tube signs], a, b)
@@ -152,7 +154,8 @@ MODEL_NOW = {
     # deferred with the north bearing / helical end gears)
     "pinion_front": (-10.38, 104.8, -144.0),  # tee-handle hub (HANDLE_Z)
     "pinion_back": (-10.38, 104.8, 91.25),  # back stub free end
-    "top_frame": (208.0, 1040.7, 123.0),
+    "top_frame": (220.8, 1074.6, 134.5),  # OUTER rail silhouette (the solve's
+    # TX/TY/TZ), = the adopted machine/frame.yaml stations + the 17 rail half
 }
 
 
@@ -391,9 +394,9 @@ def main() -> int:
     print(f"focals: tall {f['tall']:.0f}px  quarter {f['quarter']:.0f}px")
     print(f"top frame solved: TX ±{top[0]:.1f}±{top_sig[0]:.1f}  "
           f"TY {top[1]:.1f}±{top_sig[1]:.1f}  TZ ±{top[2]:.1f}±{top_sig[2]:.1f}"
-          f"   (model nominal ±208 / 1040.7 / ±123)")
+          f"   (model nominal ±{TOP_INIT[0]:.1f} / {TOP_INIT[1]:.1f} / ±{TOP_INIT[2]:.1f})")
     print(f"columns solved: X ±{col[0]:.1f}±{col_sig[0]:.1f}  Z ±{col[1]:.1f}±{col_sig[1]:.1f}"
-          f"   (model nominal ±197 / ±112)"
+          f"   (model nominal ±{COL_INIT[0]:.1f} / ±{COL_INIT[1]:.1f})"
           f"   tube-run rms {np.sqrt((tube_res**2).mean()):.1f} px")
     for v in prob.view_names:
         c = cams[v]
@@ -448,7 +451,7 @@ def main() -> int:
                 (col[0], col[1]), (col[0], -col[1]),
                 (-col[0], col[1]), (-col[0], -col[1]),
             ):
-                a, b = prj([cx_, 50.8, cz_]), prj([cx_, 1040.7, cz_])
+                a, b = prj([cx_, 50.8, cz_]), prj([cx_, TOP_INIT[1], cz_])
                 dr.line([*a, *b], fill=(0, 100, 255), width=3)
             a, b = prj([-54.7, 104.8, -90.0]), prj([-54.7, 104.8, 78.0])
             dr.line([*a, *b], fill=(255, 140, 0), width=3)  # model drum axis
