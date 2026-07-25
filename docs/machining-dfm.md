@@ -79,7 +79,7 @@ geometry is casting-shaped, not milling-shaped.
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face 6.5, OD = (N+2)/DP·25.4 at DP 49.82 → **~4.08 (T006) → ~62.2 (T120)** (same DP/OD as the 120T cylinder gear it meshes); tip gears T006–T024 harder yellow metal | 1 central through-bore, **soldered, no key**; bore Ø by config (T006 **0.79**/1/32″, T012 3.18, T018 6.35, T024+ 9.53); 6–120 involute teeth PA14.5°, 2.5D through-cut (DXF profile) | **T006 wall 0.49 mm** (headline); all small gears sub-1 mm; T006 whole gear tiny → brutal workholding; sharp internal corner at flank↔base-chord (wire-EDM/broach = outsource, or accept a corner radius) | ~2 (lathe OD/face/bore; teeth) | **self-made Eureka form cutter, indexed** (in-house; wire-EDM = outsource); T006 = hardest part — on enlarging tip gears see gap #5 (DP caveat) |
-| **`cone-gear-shaft`** ×1 | stepped steel bar ~202; steps 3/8→1/4→1/8→1/32″ | 4 turned diameter steps; **no keyseat** (gears soldered) | **Ø0.79×~34 tip journal in steel, 43:1** → whip; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on the tip |
+| **`cone-gear-shaft`** ×1 | stepped steel bar ~252; integral Ø12.2308 post journal then 3/8→1/4→1/8→1/32″ | 5 turned diameter steps; **no keyseat** (gears soldered); finish the Ø12.2308 journal for 0.05 diametral clearance in the v2 post bore | **Ø0.79×~34 tip journal in steel, 43:1** → whip; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on both bearing journals |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
 

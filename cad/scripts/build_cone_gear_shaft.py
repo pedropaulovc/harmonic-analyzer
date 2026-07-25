@@ -14,17 +14,19 @@ shows solder blobs at the small gears) -- no keyseat, the shaft steps are
 plain; the four yellow tip gears (T006..T024) are a harder high-zinc
 yellow metal soldered on.
 
-Sections, FRONT STUB end at z = 0 (the big end runs 12.3 past the old
-pivot-end origin, through the pivot post's journal, ending just proud
-of the post's south flank -- see FRONT_STUB). M6.7
+Sections, FRONT STUB end at z = 0.  The v2 post puts that end at cone
+station -61.9068609979, 1.0 mm proud of the post front face.  An integral
+Ø12.2308 journal runs to z = 43.011 in the post's Ø12.2808 bore, then
+steps to the existing 3/8 in gear-seat shaft. M6.7
 (true-cone mesh, see the assembly docstring): gear seats at the
 exact-tracking stack pitch 6.8889 mm (= drum z-pitch 7.0565 x
 cos 12.52 deg), seat centres at FRONT_STUB + 28.25 + 6.8889 j, gear
 faces 6.5 -- each step lands in the ~0.39 mm air gap between adjacent
 gear faces (stations below quoted from the legacy pivot end):
 
-* 3/8 in x 141.9 -- pivot journal 25 (64T at stations 14.9..24.9) +
-  seats T120..T024
+* 12.2308 mm x 43.011 -- v2 pivot-post bearing journal, 0.05 diametral
+  running clearance
+* 3/8 in x 141.9 -- 64T at stations 14.9..24.9 + seats T120..T024
 * 1/4 in x 148.8 -- T018 seat
 * 1/8 in x 155.7 -- T012 seat
 * 1/32 in x 190.0 -- T006 seat + thin tip reaching the adjuster cup.
@@ -33,12 +35,11 @@ gear faces (stations below quoted from the legacy pivot end):
   flagged for Phase 3 rebuild validation; a real builder would more
   likely keep the tip gears larger (i.e. the 62.2 reading may be low).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 12" -- base dia legacy (med),
-length 190 = pivot journal + stack + thin tip reaching the external spacer
-and adjuster cup at station 185 (derived, low), step diameters = gear bores
-(Appendix C #7).
+Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
+manually rederived v2 post bore and its 42.011 axial body; the gear-seat
+stations and diameters remain the legacy/derived stack (Appendix C #7).
 
-Build: four coaxial Front-plane circles extruded +Z to each section's end
+Build: five coaxial Front-plane circles extruded +Z to each section's end
 station with ``merge_result`` -- each smaller cylinder is contained in
 its larger neighbour over the shared length, so the union is exactly the
 stepped shaft (volume check is exact per section, no offset planes
@@ -92,18 +93,12 @@ from cone_gear_shaft_spec import (
 PART_NAME = "cone-gear-shaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-PIVOT_JOURNAL = 25.0  # mm, large-end journal into the pivot block (low)
-
-# FRONT_STUB = 12.3: the 3/8" big end runs ON past the old pivot-end origin,
-# through the pivot post's journal (post plan flank at station -10.85), ending
-# ~1.5 proud of the post's south flank. NOTE the GT cone_front point (world
-# (-127, 101, -123)) is a DOCUMENTED DEVIATION now: the old nested-pedestal
-# story ran the stub out to machine z -123, but the platform architecture
-# (p.18 top-down) ends it at the post -- the boss the photos show belongs to
-# the crank pedestal region, not this shaft.
-# The part origin is this FRONT END; the old pivot-end stations below are
-# all shifted by FRONT_STUB, and the assembly places the shaft at
-# cone_station(-12.3) (build_drive_train_assembly SHAFT_FRONT_STATION).
+# FRONT_STUB = 61.9068609979: with the final coupled-layout post centred at
+# cone station -39.90136099793 and spanning 42.011 along that axis, the shaft begins 1.0 mm
+# proud of the front face.  The Ø12.2308 integral journal occupies local
+# 0..43.011 in the post's Ø12.2808 bore; downstream 3/8-in and smaller gear
+# seats retain their world stations because every old local end receives the
+# 49.6068609979 stub delta.
 
 # SECTIONS (diameter in inches, section end station in mm from the FRONT STUB
 # end) now lives in cone_gear_shaft_spec.py -- the pure-data contract the
@@ -127,8 +122,8 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations): one diameter + one end station per
     # section. The mm suffix is load-bearing -- this is an INCH document and the
     # equation manager reads BARE numbers in document units. The section diameters
-    # come from SECTIONS in inches (converted to mm here so a single global drives
-    # the on-axis circle's diameter dim). The end stations are extrude DEPTHS
+    # come from SECTIONS in inches (the first is the metric v2 journal converted
+    # to inches by the pure-data spec). The end stations are extrude DEPTHS
     # (feature parameters); each is named Sec{i}End and driven by its SecEnd{i}
     # global below, so the knobs really reshape the shaft AND the stations are
     # markable manufacturing dimensions for the drawing.
@@ -147,7 +142,12 @@ async def build(adapter) -> dict[str, str]:
         sec = SketchDims()
         check(f"create_sketch {label}", await adapter.create_sketch("Front"))
         await define_circle(
-            adapter, 0.0, 0.0, dia_in * IN / 2.0, label, dims=sec,
+            adapter,
+            0.0,
+            0.0,
+            dia_in * IN / 2.0,
+            label,
+            dims=sec,
             names=(f"Sec{i}Cx", f"Sec{i}Cz", f"Sec{i}Dia"),
             drives=(None, None, f'"SecDia{i}"'),
         )
@@ -172,7 +172,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven cone-gear shaft (equations neutral)", volume, 0.005 * volume)
+    await volume_check(
+        adapter, "driven cone-gear shaft (equations neutral)", volume, 0.005 * volume
+    )
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).

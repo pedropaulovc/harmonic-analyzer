@@ -27,7 +27,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_gear_shaft_spec import SECTION_DIAS, SHAFT_LENGTH
+from cone_gear_shaft_spec import JOURNAL_DIA, SECTION_DIAS, SHAFT_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -48,14 +48,13 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 END_VIEW_SCALE = 4.0
-# Side (silhouette) view: the full 202.3 mm stepped profile at 1:1, axis
-# horizontal. The end view shows all four seat diameters as concentric
-# circles (the tip is nearest the *Front camera), enlarged so the 0.79 mm
-# tip circle is legible. SIDE_CENTER x is 0.155, not the original 0.115: the
-# 202.3 mm profile at 1:1 spans +/-0.101 m about its centre, so at 0.115 its
-# tip end reached x~0.014 and the padded view outline crossed the left zone
-# border (audit: "left by 1.4 mm"). 0.155 lands the span at x 0.054..0.256 --
-# clear of the left border and short of the title block / iso on the right.
+# Side (silhouette) view: the full 251.91 mm stepped profile at 1:1, axis
+# horizontal. The end view shows the journal and four seat diameters as
+# concentric circles (the tip is nearest the *Front camera), enlarged so the
+# 0.79 mm tip circle is legible. SIDE_CENTER x is 0.155: the
+# profile spans +/-0.127 m about its centre.  At x=0.155 it lands at
+# x~0.028..0.282, clear of the left border and high enough to stay above the
+# bottom-right title block.  The end view enlarges the tiny tip diameter.
 SIDE_CENTER = (0.155, 0.215)
 END_CENTER = (0.055, 0.105)
 ISO_CENTER = (0.360, 0.200)
@@ -63,22 +62,24 @@ ISO_CENTER = (0.360, 0.200)
 # Axial step stations (extrude depths Sec{i}End), all measured from the
 # large-end datum face: baseline dimensioning, shortest nearest the part.
 SIDE_KEEP = {
-    "Sec0End": (0.190, 0.196),
-    "Sec1End": (0.175, 0.184),
-    "Sec2End": (0.160, 0.172),
-    "Sec3End": (0.145, 0.160),
+    "Sec0End": (0.205, 0.208),
+    "Sec1End": (0.190, 0.196),
+    "Sec2End": (0.175, 0.184),
+    "Sec3End": (0.160, 0.172),
+    "Sec4End": (0.145, 0.160),
 }
 # Section seat/journal diameters, staggered right of the end view.
 END_KEEP = {
-    "Sec0Dia": (0.105, 0.132),
-    "Sec1Dia": (0.105, 0.120),
-    "Sec2Dia": (0.105, 0.108),
-    "Sec3Dia": (0.105, 0.096),
+    "Sec0Dia": (0.105, 0.144),
+    "Sec1Dia": (0.105, 0.132),
+    "Sec2Dia": (0.105, 0.120),
+    "Sec3Dia": (0.105, 0.108),
+    "Sec4Dia": (0.105, 0.096),
 }
 DIMENSION_CALLOUTS = {name: "+0.00/-0.02" for name in END_KEEP}
-# The four diameters are exact inch conversions (0.375/0.25/0.125/0.03125 in);
-# 3 decimals so the view matches the notes (9.525, not 9.53).
-DIMENSION_PRECISION = {name: 3 for name in END_KEEP}
+# The bearing journal is a metric 12.2308 fit dimension and needs four decimal
+# places; the other four are exact inch conversions and display three.
+DIMENSION_PRECISION = {name: 4 if name == "Sec0Dia" else 3 for name in END_KEEP}
 
 
 def _outer_end_edge(adapter: Any, view: Any) -> Any:
@@ -123,9 +124,7 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     if not candidates:
         raise RuntimeError("side view has no visible cylindrical faces")
     target_radius = diameter_mm / 2.0
-    radius_mm, face = min(
-        candidates, key=lambda item: abs(item[0] - target_radius)
-    )
+    radius_mm, face = min(candidates, key=lambda item: abs(item[0] - target_radius))
     if abs(radius_mm - target_radius) > 0.01:
         raise RuntimeError(
             f"no cylindrical face matches radius {target_radius:.4f} mm; "
@@ -185,8 +184,8 @@ async def build(adapter: Any) -> dict[str, str]:
             lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
         )
         _telemetry.info(f"PROBE {label} outline={outline}")
-    pivot_face = _cylindrical_face(adapter, side, SECTION_DIAS[0])
-    tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[3])
+    pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
+    tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[-1])
     add_view_centerline(
         adapter,
         side,
@@ -207,20 +206,18 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
     # Sheet geometry the GD&T picks attach to (meters). The end view shows the
-    # Ø9.525 pivot journal as its outermost circle; the side view's tip journal
-    # silhouette hugs the axis line (half-height 0.79 mm x scale / 2).
+    # Ø12.2308 pivot journal as its outermost circle; the side view's tip
+    # journal silhouette hugs the axis line (half-height 0.79 mm x scale / 2).
     pivot_circle = (
-        END_CENTER[0]
-        + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
-        END_CENTER[1]
-        + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
+        END_CENTER[0] + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
+        END_CENTER[1] + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
     )
     pivot_edge = _outer_end_edge(adapter, end)
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
     tip_top = (
         SIDE_CENTER[0] - SHAFT_LENGTH / 2000.0 + 0.016,
-        SIDE_CENTER[1] + SECTION_DIAS[3] / 2000.0,
+        SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
     )
     add_datum_feature(
         adapter,
