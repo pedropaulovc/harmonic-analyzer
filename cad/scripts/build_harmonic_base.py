@@ -105,18 +105,17 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # frame and these holes matched its NEGATED x -- the sign was interference-
 # gate proven: holes at the wrong x left both screws in solid base, 190.0 +
 # 75.4 mm^3, exactly the two embedded shank volumes.)
-PIVOT_SCREW_XZ = (-79.69, 103.29)
+PIVOT_SCREW_XZ = (-79.6886620349, 103.292512276)
 # pivot seat: blind #10-24 UNC-2B tap.  The screw's ground shoulder stops on
 # the base top; only its distinct threaded tail enters this seat.
-STOP_SCREW_XZ = (-130.433, 9.735)  # past the DISENGAGED east taper edge. The
-# centre sits one stop-screw shank RADIUS outside the swung edge, so the
-# US-customary shank resize (O4.0 -> 3.15, #8-32 tap-drill - 0.3) moved it
-# 0.425 mm along the disengaged east-edge outward normal N_M
-# (-0.933521, 0.358523): old (-130.830, 9.887) + N_M * (3.15 - 4.0)/2.
-# PR8 west-tip trim moved this only via the DISENGAGE angle (the notch mouth
-# is on the WEST edge, so the exit travel shortened); the contact edge itself
-# is the EAST taper line, unchanged at HALF_WIDTH_N 12. (An earlier PR8 pass
-# wrongly fed the west width into the east-edge derivation -- Codex catch.)
+STOP_SCREW_XZ = (-128.84976346326022, 8.739805835063942)
+# Past the DISENGAGED east taper edge, one O3.15 stop-shank radius outward.
+# The v2-post cascade lengthened/widened the platform to 266 / east-half 24,
+# which changes BOTH contributors in the drive-train derivation: the shallower
+# west taper shortens notch exit travel to 5.350066, hence disengage to
+# 4.887456 deg, while the contact line at local z -105 now has east half-width
+# 17.052632.  The exact formula is reproduced by the offline base drawing test;
+# it also proves 8.9518 mm signed clearance in the engaged pose.
 # Disengage swing sweeps the plate EAST (machine -x); the first
 # derivation sat 19 inside the engaged plate -- interference-gate proven.
 # stop seat: #20 drill (O4.089, wizard) -- stop-screw O3.15 shank clearance
