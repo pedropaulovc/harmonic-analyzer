@@ -20,7 +20,7 @@ STRAP_T = 10.0  # strap depth; far face is coplanar with the foot far face
 TOP_RADIUS = 10.0  # dome radius = strap half-width at the top
 DOME_DIA = 2.0 * TOP_RADIUS  # 20.0: the round head around the clamp bore
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525: the 3/8 in cylinder-arbor journal
-BORE_HEIGHT = 54.0  # arbor axis above the foot seat (drive height)
+BORE_HEIGHT = 39.718  # v2 post journal axis: 6.35 platform + 33.368 boss height
 SCREW_THREAD = "#4"  # flange hold-down clearance hole
 # The #4 NORMAL clearance the wizard ACTUALLY cuts on this seat: the created
 # feature's ThruHoleDiameter reads 3.2512 (build log "1x #4 clearance

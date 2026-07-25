@@ -47,7 +47,7 @@ from pinion_pivot_block_spec import (
     BORE_DIA,
     BORE_HALF_SPACING,
     FRONT_BBOX_CY,
-    LIFT_BORE_DROP,
+    LIFT_BORE_RISE,
     SCREW_HALF_SPACING,
     SCREW_HOLE_DIA,
 )
@@ -270,7 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     lift_edge = (
         _front_x(-BORE_HALF_SPACING),
-        _front_y(-LIFT_BORE_DROP) + BORE_R_SHEET,
+        _front_y(LIFT_BORE_RISE) + BORE_R_SHEET,
     )
     add_feature_control_frame(
         adapter,

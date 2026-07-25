@@ -135,7 +135,7 @@ FASTENERS: dict[str, FastenerSpec] = {
         HeadStyle.KNURLED_THUMB, DriveStyle.KNURLED,
     ),
     "slotted-screw": _steel(
-        "slotted-screw", "#8-32", 18.0, 3.15,
+        "slotted-screw", "#8-32", 22.0, 3.15,
         HeadStyle.FILLISTER, DriveStyle.SLOT,
     ),
     "swing-stop-screw": _steel(

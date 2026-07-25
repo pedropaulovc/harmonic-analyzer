@@ -54,13 +54,16 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_spring_spec.DRAWING_NOTES
-    assert "TANGENT LENGTH 39.64" in notes
+    assert f"TANGENT LENGTH {pinion_spring_spec.BLADE_STRAIGHT_LEN:.2f}" in notes
     assert "INSIDE-SURFACE PATH" in notes
     assert "MID-THICKNESS" not in notes
     assert "FROM EITHER" not in notes
     assert "FROM R1.50 KINK EXIT TO FREE TIP" in notes
     assert "0.80 STRIP END FACE" in notes
-    assert "97.62+/-1 DEG CCW FROM FOOT INSIDE PATH" in (
+    terminal_angle = (
+        90.0 - pinion_spring_spec.BLADE_TILT_DEG + pinion_spring_spec.KINK_DEG
+    )
+    assert f"{terminal_angle:.2f}+/-1 DEG CCW FROM FOOT INSIDE PATH" in (
         pinion_spring_spec.TERMINAL_CALLOUT
     )
     assert "NEAR-VERTICAL" not in pinion_spring_spec.TERMINAL_CALLOUT

@@ -3,13 +3,10 @@ r"""Reproduction script: crank-drive gear (book ch. 12, p. 20).
 The dark steel gear at the cone set's large end, annotated "This gear
 engages the crank" (p. 20): together with a pinion on the crankshaft
 (`build_crank_pinion.py`) it implements the book-stated 4:1 crank-to-cone
-reduction (p. 16). Tooth-count/DP split per the Appendix C #9 estimate,
-re-anchored on the 62.2 cylinder OD: DP 26.57, 64T (pitch r 30.59 = the
-cone T120's, restoring the p.20 "same OD as the 120T" read), mating a
-16T pinion. The 4:1 ratio itself is book-stated and fixed; the split is
-ratified by the p.18/p.19/p.20 photos (2026-07-14 rederive: pitch ~1.9x
-coarser than the train beside the 120T, pinion OD ~0.72x the O24 green
-column).
+reduction (p. 16). The 64T:16T count split preserves that stated ratio;
+DP 24.74 is fixed by the cone-pivot-post-v2 casting's crank-axis location
+at the checked 0.25-mm mesh slack. This supersedes the former DP26.57
+equal-radius inference.
 
 CROSSED-MESH CUT (2026-07-14 rederive, "crank-pinion and crank-drive gear
 are not meshing"): the 64T rides the cone shaft, inclined 12.52 deg IN

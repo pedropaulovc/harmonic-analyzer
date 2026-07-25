@@ -139,19 +139,18 @@ TUBE_OBS = [
 ]
 
 # current model positions (machine world frame) for the comparison table
-# (2026-07-14 mesh rederive: drive plane y 104.8, crank (-122.8, 143.34) -- the
-# engaged-c2c Y_CRANK, GT 0.85 sigma -- chain plane z -155,
-# alignment pinion restored -- build_drive_train_assembly)
+# (2026-07-24 v2 post rederive: the manual casting fixes the drive and crank
+# axes; the GT observations remain evidence but the physical bores are harder.)
 MODEL_NOW = {
-    "crank_sprocket": (-122.8, 143.34, -155.0),  # T12 chain-wheel mid-plane
-    "cone_front": (-116.05, 104.8, -60.47),  # T120 big-end centre
-    "cone_back": (-80.99, 104.8, 97.44),  # shaft tip (station 190; GT wants
+    "crank_sprocket": (-131.09338, 129.85, -155.0),  # v2 boss / T12 axis
+    "cone_front": (-116.05, 90.518, -60.47),  # T120 big-end centre
+    "cone_back": (-80.99, 90.518, 97.44),  # shaft tip (station 190; GT wants
     # z ~101.8 -- deferred to the portal/back-frame re-layout)
-    "cyl_front": (-54.7, 104.8, -90.0),  # arbor south end (ARBOR_SOUTH_Z)
-    "cyl_back": (-54.7, 104.8, 78.0),  # arbor north end (GT wants ~91.5 --
+    "cyl_front": (-54.7, 90.518, -90.0),  # arbor south end (ARBOR_SOUTH_Z)
+    "cyl_back": (-54.7, 90.518, 78.0),  # arbor north end (GT wants ~91.5 --
     # deferred with the north bearing / helical end gears)
-    "pinion_front": (-10.38, 104.8, -144.0),  # tee-handle hub (HANDLE_Z)
-    "pinion_back": (-10.38, 104.8, 91.25),  # back stub free end
+    "pinion_front": (-10.38, 90.518, -144.0),  # tee-handle hub (HANDLE_Z)
+    "pinion_back": (-10.38, 90.518, 91.25),  # back stub free end
     "top_frame": (208.0, 1040.7, 123.0),
 }
 
@@ -450,7 +449,7 @@ def main() -> int:
             ):
                 a, b = prj([cx_, 50.8, cz_]), prj([cx_, 1040.7, cz_])
                 dr.line([*a, *b], fill=(0, 100, 255), width=3)
-            a, b = prj([-54.7, 104.8, -90.0]), prj([-54.7, 104.8, 78.0])
+            a, b = prj([-54.7, 90.518, -90.0]), prj([-54.7, 90.518, 78.0])
             dr.line([*a, *b], fill=(255, 140, 0), width=3)  # model drum axis
             for view, target, u, gv in prob.obs:
                 if view != v:

@@ -256,7 +256,7 @@ def test_sheet_seven_uses_state_and_acceptance_tables_with_a_parked_view() -> No
     for required in (
         "2.00 MM",
         "41.30 MM",
-        "12.38 DEG",
+        f"{drawing.PINION_PARK_ANGLE_DEG:.2f} DEG",
         "0.25 MM",
         "7.00 MM",
         "0.10-0.25 MM",
@@ -298,7 +298,7 @@ def test_assembly_notes_preserve_the_source_backed_manufacturing_contract() -> N
         "22.90 + j(7.0565) MM",
         "2.00 MM CLEARANCE",
         "41.30 MM C-C",
-        "12.38 DEG",
+        f"{drawing.PINION_PARK_ANGLE_DEG:.2f} DEG",
         "0.25 MM AXIAL CLEARANCE",
         "7.00 MM",
         "0.10-0.25 MM MINIMUM SURFACE",

@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion lift cam.
 
-An eccentric steel collar: the Ø6.37 bore is offset 1.0 mm from the Ø9.2 OD
+An eccentric steel collar: the Ø6.37 bore is offset 1.4 mm from the Ø9.2 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
 offset explicitly, per the cam-note precedent).  The collar/bore sketches live
 on the Front plane (front view carries OD/bore/eccentricity); the boss and the
