@@ -16,8 +16,8 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   disengage DOF; pivoting at the tip gives the big gears (which need
   the most working-depth separation) the largest throw.
 * cylinder drum: 20 identical 120T gears spinning freely on the stationary
-  arbor along Z at (-53.216, 90.518), carried by pedestals at both ends. The
-  complete arbor/support bank follows the v2 rearward installation shift;
+  arbor along Z at (-60.394, 90.518), carried by pedestals at both ends. The
+  complete arbor/support bank follows the fixed-post mechanism recenter;
   each asymmetric gear/cam sandwich is turned end-for-end while its local +Y
   cosine phase remains up (pp. 66-67).
 * crankshaft along Z in the merged green column (cone-pivot-post: big-end
@@ -48,7 +48,7 @@ NOTE: the worked numbers in this docstring (incline 21.1 deg, radius step
 2.54, z-pitch 7.5, seat 6.5839, DP 30, 50.8 radii) illustrate the METHOD
 at the retired DP-30 geometry. The live values are computed from config
 at OD 62.2 / DP 49.82 (incline 12.5188 deg, step 1.5295, seat 6.889, 64T
-crank pair at DP 24.74); the alignment pinion is RESTORED (ch30 GT) at the
+crank pair at DP 25.7311); the alignment pinion is RESTORED (ch30 GT) at the
 level-inboard placement (see the constants block).
 
 * a centre-x grid stepping by the PROJECTED radius step 2.54*cos(i),
@@ -362,7 +362,7 @@ R16 = (16.0 / DP_CRANK) * 25.4 / 2.0
 # engaged centre distance (2026-07-14 rederive, "crank-pinion and crank-drive
 # gear are not meshing"): the crossed pair (crank machine-z, 64T plane on the
 # 12.52-deg inclined shaft) engages at depth because the 64T's teeth are a
-# TRUE helix at the incline angle (boss-swept with twist, _gear.py) with a
+# TRUE 12.0-degree helix (boss-swept with twist, _gear.py) with a
 # 0.15 backlash allowance (build_crank_drive_gear.py) -- matching the engaged
 # pair in the ch12 closeups (page002_img02/img06). C2C = R64 + R16 + slack;
 # slack 0.25 keeps a 1.0-deg zero-collision seed window over a full
@@ -536,12 +536,6 @@ from build_cone_swing_platform import (  # noqa: E402
     CRANK_AXIS_OFF as PLAT_CRANK_OFF,
     CRANK_AXIS_Y as PLAT_CRANK_Y,
     EAST_HALF_S as PLAT_EAST_S,
-    GEAR_RELIEF_AXIS_Y as PLAT_GEAR_RELIEF_AXIS_Y,
-    GEAR_RELIEF_CLEARANCE as PLAT_GEAR_RELIEF_CLEARANCE,
-    GEAR_RELIEF_CENTER_Z as PLAT_GEAR_RELIEF_CENTER_Z,
-    GEAR_RELIEF_RADIUS as PLAT_GEAR_RELIEF_RADIUS,
-    GEAR_RELIEF_RESIDUAL_THICKNESS as PLAT_GEAR_RELIEF_RESIDUAL,
-    GEAR_RELIEF_WIDTH as PLAT_GEAR_RELIEF_WIDTH,
     HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
     # the lock-slot side keeps its full seat; feeds the stop-screw/containment
     # east-edge math)
@@ -831,18 +825,6 @@ if abs(_PPOST[0] - X_CRANK) > 1e-9:
     raise AssertionError("v2 crank boss no longer shares the post body centre x")
 if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
-if abs(PLAT_GEAR_RELIEF_AXIS_Y - (Y_DRIVE - Y_BASE_TOP)) > 1e-9:
-    raise AssertionError("platform gear-relief axis drifted from the v2 cone axis")
-if abs(PLAT_GEAR_RELIEF_CENTER_Z - (
-    GEAR64_STATION + GEAR_AXIS_SHIFT - PIVOT_STATION
-)) > 1e-9:
-    raise AssertionError("platform gear-relief station drifted from the 64T gear")
-if PLAT_GEAR_RELIEF_RADIUS < R64 + ADD16 + PLAT_GEAR_RELIEF_CLEARANCE - 1e-9:
-    raise AssertionError("platform gear relief no longer covers the 64T swept OD")
-if PLAT_GEAR_RELIEF_WIDTH < GEAR64_FACE + 2.0 * PLAT_GEAR_RELIEF_CLEARANCE - 1e-9:
-    raise AssertionError("platform gear relief no longer covers the 64T face")
-if PLAT_GEAR_RELIEF_RESIDUAL < 5.0:
-    raise AssertionError("platform gear relief leaves less than 5 mm of plate")
 # Axial closure around the v2 boss after the casting's exact Ry(180).  The turn
 # reverses local Z, so the harvested asymmetric boss now runs from
 # post.z - (start + length) to post.z - start.  The photo-anchored T12 remains

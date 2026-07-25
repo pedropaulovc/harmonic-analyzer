@@ -50,7 +50,7 @@ Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
 across Z, straddling the 2.5 arm / 3.0 lever; the spring's end-hook ring
 lies perpendicular to the lever face. Channel
-stations: z_j = -31.685 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
+stations: z_j = -64.0124 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
 cam/rod plane z_j - 3.25 (rod tip strap face-flush against the arm).
 
 Mated-DOF strategy: nothing is grounded except the pivot-shaft seed (the
@@ -249,7 +249,7 @@ RING_CENTER = (
 )  # The drum sits at machine X_DRUM (crank side -X); y is the ch30 GT drive
 # height 90.518, fixed by cone-pivot-post-v2. MUST stay in sync with
 # build_drive_train_assembly.Y_DRIVE.
-# ROD_C2C (imported above from connecting_rod_spec.CENTER_DISTANCE, 161.9475):
+# ROD_C2C (imported from connecting_rod_spec.CENTER_DISTANCE, 163.1010):
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
 # its cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits
 # directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14

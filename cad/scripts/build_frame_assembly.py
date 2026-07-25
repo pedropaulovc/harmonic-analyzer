@@ -11,11 +11,10 @@ axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
 depth):
 
 * harmonic-base fixed at the origin, top face at Y = 50.8.
-* tube-frame x4 standing on the base top face near the top-plate corners.
-  The front pair stays at z -112 while the rear pair moves to z +147.415
-  with the v2 support/channel envelope; x remains +/-197.
+* tube-frame x4 standing on the base top face near the top-plate corners at
+  x +/-197, z +/-112 -- the original symmetric placement.
 * rocker-arm-support x1 (the windowed trapezoidal NORTH support,
-  build_rocker_arm_support.py) at (X, Z) = (+72.9, +35.415), foot seated on the
+  build_rocker_arm_support.py) at (X, Z) = (+72.9, 0), foot seated on the
   base top. A 177.8 x 177.8 cast plate, 63.5 thick (tapering to 16.94 at the
   apex), with the central rounded window; its apex carries the north pivot ball
   mount (channel.SLDASM, at machine z +116.915) and the rocker-pivot SHAFT runs
@@ -32,8 +31,8 @@ depth):
   -> machine Z, local Y (height) -> machine Y. The part origin is at the casting
   centre (bbox +/-88.9 in X and Y), so the turned wall spans machine
   Y 50.8..228.6 (foot on the base top, apex at the pivot height) and machine
-  Z -53.485..124.315 after the +35.415 rear translation. The north pivot ball
-  mount (channel.SLDASM) follows that same shift to z +116.915, so its narrowed
+  Z -88.9..88.9 at its original location. The north pivot ball
+  mount (channel.SLDASM) is recentered to z +84.588, so its narrowed
   O13 footprint remains fully seated inside the wall's rear edge -- no cantilever.
   Seat Y = base-top 50.8 + 88.9 (half-height) = 139.7. The pivot x = 72.9, the
   rocker seesaw's mid-span (ch30 GT arm-end triangulation midpoint +72.5; the
@@ -157,7 +156,7 @@ TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 # (local -Z) drops onto the base top. The placed point is the part origin CORNER
 # (decorated face, x=0/y=0): Y 52.3 lays the decorated face on top with the 1.5
 # body resting on the base top (50.8); Z 50 centres the 100 mm line at z 0 between
-# the east columns (z -112/+147.415); X 214.25 sets the plate's east edge ~8 mm in from
+# the east columns (z +/-112); X 214.25 sets the plate's east edge ~8 mm in from
 # the top-plate east edge (x 222.25), span x 159.25..214.25 -- east of the
 # rocker-arm-support (x 28..117) and clear of the east columns (which sit at
 # both column stations, away from the plate's z -50..50), so it grounds 0-DOF,

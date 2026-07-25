@@ -12,7 +12,7 @@ SHAFT_LENGTH = 187.0  # ch13 stack + journals; installed -54.585..+132.415:
 # standing north clamp restored; the pedestal foot sits just clear of the
 # rocker-arm-support footprint). Was 168, clear of the old solid
 # rocker-arm-support north upright (shortened from 200, 2026-06-19); south end
-# The v2 post installation translates the former -90..+97 envelope rearward
+# The fixed-post recenter moves the former -90..+97 envelope slightly rearward
 # as a unit; the south end still stops inside its pedestal bore. See
 # build_drive_train_assembly.ARBOR_LENGTH / ARBOR_SOUTH_Z.
 

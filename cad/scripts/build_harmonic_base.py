@@ -1,9 +1,9 @@
 r"""Reproduction script: harmonic analyzer base (book ch. 6 / legacy part).
 
 Two-plate welded construction based on the legacy 18.0 x 11.0 x 0.5 in
-flange and 17.5 x 10.5 x 1.5 in pad.  The v2 cone-post cascade preserves
-their front edges and extends both plates 35.415 mm rearward so the translated
-support and rear column remain fully seated.
+flange and 17.5 x 10.5 x 1.5 in pad. The v2 post/carrier fit preserves their
+front edges and extends both plates 35.415 mm rearward for its swing envelope;
+the rocker support and frame columns retain their original locations.
 
 Deferred: the legacy 0.125"/0.0625" edge fillets are cosmetic and need
 edge-selection tooling — re-added with the M4 finishing pass.

@@ -1618,8 +1618,8 @@ def verify_base_footprint(report: Report) -> None:
         # sweep, so it stays conservative. The lock notch is open-ended, so
         # the disengaged pose is the plate swung until its edge clears the
         # knob washer (train.DISENGAGE_DEG, derived from the notch geometry)
-        # -- sweep every corner at BOTH poses. The v2 Ry180 installation moves
-        # this complete carrier rearward by 35.415 mm. The base keeps its
+        # -- sweep every corner at BOTH poses. The v2 Ry180 installation keeps
+        # this carrier at the ch30-fitted +35.415-mm post station. The base keeps its
         # photographed front edge and extends only at the rear, so every load
         # centre and swept corner must now remain inside the asymmetric pad.
         # (The post and tip block ride the PLATE; their plate containment is

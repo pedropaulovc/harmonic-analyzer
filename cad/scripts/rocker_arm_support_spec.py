@@ -27,8 +27,8 @@ SUPPORT_HALF_MACHINE_Z = 88.9
 
 # The casting's four 9/16-12 foot taps are fixed in its local frame.  Turning
 # it +90 degrees about machine Y maps local +/-60.32 to machine Z and local
-# +/-17.46 to machine X; translating the casting rearward therefore moves only
-# the world-Z coordinates.  Base and frame import this one transformed pattern.
+# +/-17.46 to machine X. The casting remains at its original world station;
+# base and frame import this one transformed pattern.
 HOLD_DOWN_LOCAL_HALF_X = 60.32
 HOLD_DOWN_LOCAL_HALF_Z = 17.46
 SUPPORT_HOLD_DOWN_XZ = (

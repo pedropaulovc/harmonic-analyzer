@@ -85,9 +85,9 @@ PART_NAME = "connecting-rod"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 # Cam ring centre -> rocker pin, VERTICAL rod: the
-# pin rides the arm's rod-pin hole 127.3738 out from the pivot -- directly
-# above the phased cam LOBE (installed machine centre (-52.990, 99.155) =
-# drum (-53.216, 90.518) + ECC 8.64 rotated by the +1.5 deg tooth phase,
+# pin rides the arm's rod-pin hole 133.067 out from the pivot -- directly
+# above the phased cam LOBE (installed machine centre (-60.167, 99.155) =
+# drum (-60.394, 90.518) + ECC 8.64 rotated by the +1.5 deg tooth phase,
 # lobe UP at the cos-mode home; the Ry180 axial flip preserves local +Y;
 # ch30 photos + GT rocker-corner triangulation put the arm's rod-side end over
 # the drum). Solved so the rocker rests LEVEL (arm tilt 0 -- the ch14 end views

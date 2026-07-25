@@ -8,8 +8,8 @@ MM_PER_IN = 25.4
 SHAFT_DIA = 0.375 * MM_PER_IN  # 9.525: ch11 legacy ShaftDiameter, uncontradicted
 SHAFT_LENGTH = 150.0  # re-anchored v2 post: reaches the rear-shifted 16T seat
 
-# The installed v2 pivot post is turned end-for-end and its origin is shifted
-# rearward with the cone/drum anchor.  Its Ø11.438 bore therefore spans world
+# The installed v2 pivot post is turned end-for-end and remains fixed at its
+# ch30-fitted world placement. Its Ø11.438 bore therefore spans world
 # z -142.244894428..-70.210494428.  The crank/chain plane stays photo-anchored
 # at the existing world z=-175 shaft origin, so the integral running journal
 # occupies these local stations.  The

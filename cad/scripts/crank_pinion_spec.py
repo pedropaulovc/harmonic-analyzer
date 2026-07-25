@@ -13,7 +13,7 @@ import math
 MM_PER_IN = 25.4
 
 TEETH = 16
-DIAMETRAL_PITCH = 24.74           # fixed by cone-pivot-post-v2 crank axis
+DIAMETRAL_PITCH = 25.73110354953376  # fixed-post recentered mesh
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
@@ -67,7 +67,7 @@ GEAR_DATA = gear_data_note(
         ("TOOTH-FLANK ACCURACY", "ISO 1328-1:2013 GRADE 10; PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK"),
         ("PAIR GEOMETRY", "CUSTOM NONCONJUGATE"),
         ("PAIR SHAFT ANGLE", "12.52 +/-0.10 DEG"),
-        ("MID-FACE TRANSVERSE C2C (mm)", "41.317 +/-0.050"),
+        ("MID-FACE TRANSVERSE C2C (mm)", "39.735 +/-0.050"),
         ("FACE MIDPLANE OFFSET (mm)", "0.000 +/-0.100"),
         ("MATING GEAR", "64T (MHA-021)"),
     ]

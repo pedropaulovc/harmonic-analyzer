@@ -84,7 +84,7 @@ FLANGE_X = (-20.0, 5.0)  # mounting flange, machine x +20..+45. The collar sits
 # wraps the collar. (At -11 the flange stopped at x +29, touching the plate only at
 # a 0.45-wide corner sliver -> it read as floating in the top view.) The west tab
 # remains on the unchanged front-column/output side. The re-anchored channel
-# spring bank now starts at z -31.685, still well rear of this flange.
+# spring bank now starts at z -64.012, still clear of this flange.
 FLANGE_Y = (-2.54, 2.54)  # spans the plate's FULL height: with the collar/rod now
 # at the plate centreline (machine 990, see build_magnifier_assembly LEVER_ROD_Y), the
 # flange butts the plate FRONT FACE rather than tucking under it -- machine

@@ -41,7 +41,6 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
-import math
 import sys
 
 import _config

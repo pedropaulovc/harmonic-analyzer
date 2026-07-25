@@ -3,11 +3,11 @@ r"""Reproduction script: top frame ring (ch. 30 eight-views; NEW part, 1 used).
 Green cast rectangular ring clamping the four brass columns just below
 their tops: rails 22 wide x 41 tall, corner bosses Ø48 bored Ø25.5 around
 the Ø25.4 columns (OD rederived from the ch30 8-views, M6.11) at x +/-197,
-front z -112 and rear z +147.415. In the machine it sits
+front z -112 and rear z +112. In the machine it sits
 at y 999.7..1040.7; its west rail carries the two ball mounts of the
 top-lever fulcrum shaft (seat 1040.7 + ball rise 25.2 = axis 1065.9) and
 the summing lever hangs below it (M6.4). One rail carries a Ø17 clearance
-bore at z +35.415 for the translated counter-spring gooseneck post, which slides
+bore at z +3.088 for the recentered counter-spring gooseneck post, which slides
 through and drops below the plate (ch. 19; the real corner casting is bored
 for the post). Summing places the post at machine x -197 (COLUMN_X, with a
 composed Ry(180)), so the bore is cut at part x -197 to meet it (M6.12).
@@ -18,9 +18,9 @@ continuing above to their caps); no book chapter covers it directly.
 Dimensions: cad/DIMENSIONS.md "Channel & top-frame layout" (med; boss OD
 scaled, low).
 
-Layout: plan profile in XZ keeps its front edge and expands rearward around
-the asymmetric front/rear column stations; its plan centre is therefore
-z=+17.7075. The ring mid-plane is extruded both ways in Y (y -20.5..+20.5)
+Layout: plan profile in XZ is symmetric around the original front/rear column
+stations, with plan centre z=0. The ring mid-plane is extruded both ways in Y
+(y -20.5..+20.5)
 and the assembly lifts it to 1020.2. Build
 order: outer slab, window cut, THEN corner bosses, then column bores -
 bosses after the window so the full Ø48 cylinder survives at the window

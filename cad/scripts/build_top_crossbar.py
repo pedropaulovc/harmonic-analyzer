@@ -4,12 +4,12 @@ The green cast bar spanning the top-frame ring front-to-back (along Z)
 at the machine's x mid-line: it carries the knife-mount stud that hangs
 the summing-lever knife bar. Same 22 x 41 section as the ring rails
 (build_top_frame.py), 237.415 long after the v2 rear-frame re-anchor: its
-ends sit face-flush on the ring window at z -101 / +136.415 (the M6.4 372 span used
+ends sit face-flush on the ring window at z -101 / +101 (the M6.4 372 span used
 the ring's inner X span by mistake and buried both ends in the rails).
-A O8.2 vertical hole at machine z +35.415 passes the O8 stud.
+A O8.2 vertical hole at machine z +3.088 passes the O8 stud.
 
-Layout: the part origin is at the asymmetric frame span centre; the stud
-hole is +17.7075 in part Z. Dimensions: cad/DIMENSIONS.md
+Layout: the part origin is at the symmetric frame span centre; the stud
+hole is +3.0876 in part Z. Dimensions: cad/DIMENSIONS.md
 ch. 18 (rail section med, hole low).
 
 Run (SolidWorks already open)::

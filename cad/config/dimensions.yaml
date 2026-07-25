@@ -329,9 +329,9 @@ sections:
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
-        - '64T at DP 24.74: PD 65.72 mm, OD 67.77 mm; mates a 16T pinion (4:1, PD 16.43, OD 18.48). The tooth-count ratio remains book-stated; cone-pivot-post-v2''s cast-in crank axis now fixes the module at the checked 0.25 mm c2c slack, overriding the former DP26.57 equal-radius inference. Cut as a true 12.52° helix with 0.15 transverse tooth thinning + root-relieved floors.'
+        - '64T at DP 25.7311: PD 63.176 mm, OD 65.151 mm; mates a 16T pinion (4:1, PD 15.794, OD 17.768). The fixed v2 post keeps both bore axes; the 64T/cone stack moves 33.115 mm toward it along the inclined shaft and the pair is reclosed at 39.735 mm c2c with 0.25 mm slack. Cut as a true 12.00° helix with 0.15 transverse tooth thinning + root-relieved floors.'
         - —
-        - 'p.20 supplies the 4:1 reduction and the visibly coarser pair; the manually rederived v2 post supplies the harder geometric constraint. Its cast-in crank bore closes the 16T:64T axes at c2c 41.317, so DP = 24.74 at the retained 0.25 mm slack. This supersedes the 2026-07-14 DP26.57 equal-radius estimate: the 64T no longer has to match the cone T120 radius. The crossed-axis evidence remains, so the 64T keeps the true 12.52° helix accommodation.'
+        - 'p.20 supplies the 4:1 reduction and the visibly coarser pair; the manually rederived v2 post supplies the harder geometric constraint. With its world placement and both bores fixed, the recentered 64T station closes the axes at c2c 39.735, so DP = 25.7311 at the retained 0.25 mm slack. The exact-solid phase sweep rederives the tooth inclination to 12.00°.'
         - scaled
         - low
   - prose: |2
@@ -525,15 +525,15 @@ sections:
         - 'M6.7: a perpendicular gear''s contact tooth sits r·sin i along-shaft south of its centre, so each centre rides r_j·sin i NORTH of its drum plane. The +55 ± 5 photo blob NO LONGER agrees in x (the smaller cone pulled the big-end inboard to +13.9) — flagged consequence of the 62.2 anchor'
         - low
       - - 64T drive gear
-        - perpendicular on the 3/8" pivot journal at shaft station 19.9, centre (x, z) = (−116.374, −33.206), 0.1 air to the T120 south face
-        - p.20 (directly beside the 120T); DP 24.74 (r 32.85) is fixed by the v2 crank-axis c2c, so equality with the cone-T120 radius is retired; contact-row centre z = −31.025
+        - perpendicular on the 3/8" pivot journal at effective shaft station −13.215, centre (x, z) = (−123.552, −65.533), 0.1 air to the T120 south face
+        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the recentered v2 crank-axis c2c; contact-row centre z = −64.560 and the gear face retains 0.681 mm axial air to the post boss
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −84.702 − (30.59 − 1.5295j)·cos i, z_j = −31.685 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 90.518; ALL 20 perpendicular to the shaft (true cone, p.18)
         - 'M6.7 exact tracking: the 20 mesh-derived centres are collinear iff sin i = 1.5295/7.0565 (asserted in `build_drive_train_assembly.py`); elegance check: tan(cone half-angle) = 1.5295/6.889 = tan i, so the drum-side generator runs parallel to the drum axis — the p.18 seam'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −53.216, y = 90.518 (v2-derived drive height), along Z, spans z −54.585..+132.415 (length 187): the complete arbor and two pedestal seats translate rearward with the v2 installation.'
+        - 'x = −60.394, y = 90.518 (v2-derived drive height), along Z, spans z −86.912..+100.088 (length 187): the arbor follows the recentered gear/channel family while the post remains fixed.'
         - ch30 GT triangulation (cyl_front/cyl_back); the cone grid is derived FROM the drum (X_PITCH + exact tracking); the book's "oblique partial engagement, distinct wear" (ch. 12) is modeled literally (M6.7)
         - high (GT)
       - - Cylinder gear j
@@ -541,7 +541,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - along Z at (x, y) = (−129.336, 129.850), the Ry180-installed v2 casting's straight crank bore; 16T:64T c2c 41.317 = radii + 0.25 slack at DP24.74. The 150-mm shaft keeps T12 at z −155 while the pinion moves to z −31.025; the 2.8360-in boss spans z −142.245..−70.210, leaving 10.255 mm to T12 and 33.785 mm to the pinion.
+        - along Z at (x, y) = (−129.336, 129.850), the Ry180-installed v2 casting's unchanged straight crank bore; 16T:64T c2c 39.735 = radii + 0.25 slack at DP25.7311. The 150-mm shaft keeps T12 at z −155 while its pinion seat moves to z −64.560; the 2.8360-in boss spans z −142.245..−70.210, leaving 10.255 mm to T12 and 0.250 mm to the pinion.
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, but its uncertainty and feature-centre ambiguity no longer override the manually rederived cast-in bore. The crossed-helical accommodation and 0.25 mm mesh slack remain.'
         - high (GT + mesh)
       - - Chain run
@@ -575,7 +575,7 @@ sections:
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
         - 'v2 green cast body: Ø42.011 × 86.0 tall, with a subtly enlarged Ø42.7506 × 26.6 upper collar (y 59.4..86); straight crank/sprocket boss Ø21.93 with Ø11.438 bore on the body centreline at y 72.7, length 2.8360 in (72.0344 mm); inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, its axis yawed 12.5182° about the vertical body axis; 2× vertical ANSI-inch 1/4 fillister counterbores on 26.88704 centres (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
-        - 'stands on the cone swing platform at exact Ry180, cross-pairing the two mounting-hole axes and putting the crank boss outside the machine. The installed post/cone family is translated +1.484 in X and +35.415 in Z relative to the former derivation. The one casting carries the cone journal, crank journal and both mounting holes with the plate; all downstream stations follow this installation contract.'
+        - 'stands on the cone swing platform at exact Ry180, cross-pairing the two mounting-hole axes and putting the crank boss outside the machine. The post and carrier retain the ch30-fitted +1.484 X / +35.415 Z world placement. The working cone/cylinder/channel family is independently recentered 33.115 mm toward the post along its unchanged inclined bore; the post fit is not a machine-wide translation.'
         - 'manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png); proportions from ch11 references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg and page002_img06.jpeg; exact feature dimensions harvested from cone-pivot-post-v2.SLDPRT'
         - 'med (86 mm height and proportions photo-derived; v2 feature dimensions exact)'
       - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
@@ -626,9 +626,9 @@ sections:
       - confidence
       rows:
       - - Centre distance (cam ring → rocker pin)
-        - 161.9475 mm
+        - 163.1010 mm
         - '5.81'
-        - 'v2-post cascade of the ch30 vertical-rod closure: the fixed rocker pin remains y 261.103 while the phased cam centre moves with the drive line to (−54.474, 99.155), hence 161.9475 = 261.103 − 99.155. The rod remains plumb and the arm level by construction.'
+        - 'fixed-post recenter closure: the phased cam centre moves to (−60.167, 99.155); the longer rocker lever puts its level pin at y 262.256, hence 163.101 = 262.256 − 99.155. The rod remains plumb and the arm level by construction.'
         - derived
         - high
       - - Cam ring bore
@@ -718,7 +718,7 @@ sections:
       - - Rod-pin hole
         - Ø2 at +127.37 from the pivot, rod side, LOW in the strap (5.3 above the bottom arc; 5.3 inboard of the bottom-arc end)
         - '5.01'
-        - 'ch30 GT closure + ch14 ROM re-derive, cascaded through v2: the rods hang PLUMB onto the cam centre at machine x −52.990 from the drum axis −53.216. The frame/support chain moves rearward 35.415 mm, while the post rotation shifts the drum 1.484 mm in X; the rocker''s part-local rod hole therefore moves from 127.3738 to 125.8898 so the arm remains level and the 161.9475-mm rod remains plumb. The pin stays low in the strap at 5.533 above its bottom edge.'
+        - 'ch30 GT closure + ch14 ROM re-derive with the post fixed: the rods hang PLUMB onto the cam centre at machine x −60.167 from drum axis −60.394. The rocker support stays at its old location; the part-local rod hole moves to x 133.067 / y 16.456 so the arm remains level and the 163.101-mm rod remains plumb.'
         - derived
         - high
       - - Pivot pin hole
@@ -738,17 +738,17 @@ sections:
       - confidence
       rows:
       - - Pivot shaft
-        - Ø6.35 × 228.6 (9") along Z at (x, y) = (+72.9, 253.8), shaft centre z +22.715
-        - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The v2 cascade moves the drum to x −53.216, shortens the rocker''s rod-side lever by 1.484, and translates the complete support/shaft/channel family +35.415 in Z.'
+        - Ø6.35 × 228.6 (9") along Z at (x, y) = (+72.9, 253.8), shaft centre z −9.612
+        - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The fixed support remains at its old world location while the channel bank recenters to z +3.088 and the longer rocker lever reaches drum x −60.394.'
         - med (x, y photo + frame; dia low)
       - - Support casting ×1 (windowed rocker-arm support)
-        - 'green 177.8 × 177.8 windowed casting, 63.5 thick tapering to 16.94 at the apex, authored window-normal local Z and installed Ry+90 at machine (+72.9, +35.415). The complete support translates rearward with the channel bank. Three measured p2 reliefs clear the translated rear pivot block, return-spring foot and its screw while retaining 2.4/2.5-mm minimum ligaments to the source-replayed 9/16-12 hold-down taps.'
+        - 'green 177.8 × 177.8 windowed casting, 63.5 thick tapering to 16.94 at the apex, authored window-normal local Z and installed Ry+90 at its original machine location (+72.9, 0). Three measured p2 reliefs follow the recentered pivot rig while retaining the guarded ligaments to the source-replayed 9/16-12 hold-down taps.'
         - 'front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6. M6.9 REINSTATED the windowed-frame reading M6.3/M6.5 refuted: ch30 p008 (+x side, brightened) plainly shows the windowed portal frame (~184 wide, ~127 window). The p008 uprights read ~28–40 deep and near-uniform → side depth 40 → 20 (supersedes the legacy 63.5 → 16.9 strong taper). M6.5''s refutation of a second free-standing SOUTH frustum stands (the calibrated v3 side view shows ONE frustum at the back, z +69..+134 footprint; the south ball is gripped by the clevis). M6.12: photo Z-scale is perspective-compressed, so the casting''s Z geometry stays anchored on the mechanically-locked neighbours (both pivot balls, the channel grid, the parked stick z ≤ −118; the "ch25 handle z ≥ −98" pin is OBSOLETE — the restored ch30-GT alignment pinion carries its tee handle at z −144, well south of the plate — the band now rests on the stick + photo read alone).'
         - photo + legacy height
         - med
       - - Support position
-        - casting centre (x, z) = (+72.9, +35.415), foot on base top; window spans z −53.485..+124.315
-        - exact +35.415 frame-level translation; apex top at y = 228.6
+        - casting centre (x, z) = (+72.9, 0), foot on base top; window spans z −88.9..+88.9
+        - original support placement retained; apex top at y = 228.6
         - med
       - - Hold-down lag screws ×4 (M6.10)
         - '9/16-12 screws rise through the base into the support''s source-replayed four-tap pattern at machine (x, z) = (55.44 or 90.36, −24.905 or +95.735); base holes and counterbores consume this shared transformed contract.'
@@ -756,7 +756,7 @@ sections:
         - low
       - - Ball mounts ×2
         - clevis + Ø19 ball, ball centre 25.2 above its seat; Ø6.5 shaft cross-bore
-        - apex/saddle top 228.6 + 25.2 = 253.8 = pivot axis; rocker mounts at z −75.585/+116.915 after the +35.415 support/channel translation; same style at the lever rail (ch. 17)
+        - apex/saddle top 228.6 + 25.2 = 253.8 = pivot axis; rocker mounts at z −107.912/+84.588 around the recentered bank; same style at the lever rail (ch. 17)
         - scaled
         - low
       - - Pivot spacer bushings ×19
@@ -991,7 +991,7 @@ sections:
         - derived
         - med
       - - Lever fulcrum
-        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`) along Z at (x, y, centre-z) = (+199.9, 1065.9, +35.415), with ball mounts on the top-frame west rail at z −49.585/+120.415; Ø12 × 4.0565 spacer bushings ×19'
+        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`) along Z at (x, y, centre-z) = (+199.9, 1065.9, +3.088), with ball mounts on the top-frame west rail at z −81.912/+88.088; Ø12 × 4.0565 spacer bushings ×19'
         - —
         - p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1065.9 − 25.2 = 1040.7
         - derived
@@ -1032,11 +1032,11 @@ sections:
         - ch. 17 rows
         - med
       - - Top frame (NEW part)
-        - 'green cast asymmetric rectangular ring around the 4 columns: front pair z −112 retained, rear pair z +147.415; column pitch 394 × 259.415 and plan centre z +17.7075. Rails are 22 wide × 41 tall (y 999.7…1040.7), outer z −123..+158.415 and inner z −101..+136.415; corner bosses Ø48 bored Ø25.5. The counter-spring/gooseneck bore follows the summing chain to z +35.415.'
-        - 'eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120. The v2 installation keeps the photographed front/output column pair at z −112 and extends only the rear pair to +147.415; X and height remain the previously modeled ±197 and 1040.7 top.'
+        - 'green cast symmetric rectangular ring around the 4 columns at z ±112; column pitch 394 × 224 and plan centre z 0. Rails are 22 wide × 41 tall (y 999.7…1040.7), outer z ±123 and inner z ±101; corner bosses Ø48 bored Ø25.5. The counter-spring/gooseneck bore follows the recentered summing chain to z +3.088.'
+        - 'eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120. The original front/rear column locations are retained; X and height remain ±197 and 1040.7 top.'
         - med (GT flag pending)
       - - Ball mounts ×4
-        - 'rocker pair at seats y 228.6: z −75.585 and +116.915; lever pair on the top-frame west rail (seat y 1040.7): z −49.585 and +120.415. All four stations are the former pair positions translated +35.415 with the channel/support bank.'
+        - 'rocker pair at seats y 228.6: z −107.912 and +84.588; lever pair on the top-frame west rail (seat y 1040.7): z −81.912 and +88.088. The channel/summing families share the +3.088 recentered residual while the support and columns retain their original stations.'
         - ch. 14 / ch. 17; lever z from boss-bore clearance
         - med
       - - Amplitude bars (default)
@@ -1048,7 +1048,7 @@ sections:
         - ch. 17/18 + assembly solve (level rest pose)
         - med
       - - Default mechanism state
-        - 'gear notches near +Y with the drive-train''s preserved +1.5° local-Y tooth phase → cam centres at (−52.990, 99.155) = drum (−53.216, 90.518) + 8.64·(sin 1.5°, cos 1.5°). The asymmetric cylinder bodies are Ry180 end-for-end, putting each cam plane at z_j −3.25; 161.9475 rods reach the level-arm pins. 0 cranks = cos mode reading +1 on every channel.'
+        - 'gear notches near +Y with the drive-train''s preserved +1.5° local-Y tooth phase → cam centres at (−60.167, 99.155) = drum (−60.394, 90.518) + 8.64·(sin 1.5°, cos 1.5°). The asymmetric cylinder bodies are Ry180 end-for-end, putting each cam plane at z_j −3.25; 163.101 rods reach the level-arm pins. 0 cranks = cos mode reading +1 on every channel.'
         - ch. 13/14 end views + ch. 25 + assembly solve (ch14 ROM re-derive 2026-07-02)
         - derived
   - prose: |2
@@ -2000,9 +2000,10 @@ sections:
          pinion on the crankshaft; neither part is in any legacy source. Teeth
          are visibly ~1.5–2× coarser than the train and not countable in the
          available photos. The 4:1 ratio fixes the 64T:16T tooth split.
-         Cone-pivot-post-v2 now fixes DP 24.74 from its cast-in crank-axis
-         location at 0.25 mm c2c slack (64T PD 65.72, 16T PD 16.43),
-         superseding the old DP26.57 equal-radius estimate.
+         With cone-pivot-post-v2 fixed in world space, the 64T/cone stack
+         recenters 33.115 mm along its unchanged bore. The resulting 39.735
+         mm c2c fixes DP 25.7311 at 0.25 mm slack (64T PD 63.176, 16T PD
+         15.794), superseding the intermediate DP24.74 layout.
          **M6.2 ratification — RESOLVED by the ch30 GT (2026-07-02):** the
          "broken" +55-derived vs +122-photo crank position was a false
          dichotomy. The old derivation assumed the 16T meshes the 64T
@@ -2021,12 +2022,12 @@ sections:
          vs the 12.52°-inclined 64T plane), and straight uniform teeth
          CANNOT engage across it (±1.08 mm lateral flank misregistration vs
          ≤0.70 available clearance — why the backoff existed). The 64T's
-         teeth are now a TRUE 12.52° helix (gear helix = shaft angle: a
-         crossed-helical pair with the straight 16T; one involute tooth
+         teeth are now a TRUE 12.00° helix (exact-solid rederive at the
+         recentered station with the straight 16T; one involute tooth
          boss-swept with twist, patterned — smooth helicoid flanks) + 0.15
          backlash + root relief on both. **V2 casting override (2026-07-24):**
-         the exact rederived bores move the drive line to y 90.518 and crank
-         axis to (−129.336, 129.850), closing the DP24.74 pair at c2c 41.317
+         the exact rederived bores keep the drive line at y 90.518 and crank
+         axis at (−129.336, 129.850), closing the DP25.7311 pair at c2c 39.735
          (0.25 slack; zero collision must be rechecked over
          a full crank-pitch phase sweep with ±0.4° seed margin —
          `diagnostics/crossed_mesh_study.py`; the fit re-arbitrated

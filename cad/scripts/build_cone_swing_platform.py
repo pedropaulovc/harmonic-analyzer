@@ -78,16 +78,6 @@ from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
-    GEAR_RELIEF_AXIS_Y,
-    GEAR_RELIEF_CENTER_Z,
-    GEAR_RELIEF_CLEARANCE,
-    GEAR_RELIEF_DIAMETER,
-    GEAR_RELIEF_MAX_DEPTH,
-    GEAR_RELIEF_NORTH_Z,
-    GEAR_RELIEF_RADIUS,
-    GEAR_RELIEF_RESIDUAL_THICKNESS,
-    GEAR_RELIEF_SOUTH_Z,
-    GEAR_RELIEF_WIDTH,
     ISOMETRIC_VIEW_NOTE,
     PLATE_THICKNESS,
     PLAN_VIEW_NOTE,
@@ -162,24 +152,6 @@ if POST_FOOT_CONTAINMENT < 0.25:
     )
 if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
     raise AssertionError("v2 post mount taps fall outside the casting foot")
-if GEAR_RELIEF_MAX_DEPTH <= 0.0:
-    raise AssertionError("crank gear no longer reaches the platform relief")
-if GEAR_RELIEF_CLEARANCE < 0.25:
-    raise AssertionError("crank-gear relief lost the 0.25-mm air margin")
-if abs(GEAR_RELIEF_NORTH_Z - GEAR_RELIEF_SOUTH_Z - GEAR_RELIEF_WIDTH) > 1e-9:
-    raise AssertionError("crank-gear relief axial limits disagree with its width")
-if abs((GEAR_RELIEF_NORTH_Z + GEAR_RELIEF_SOUTH_Z) / 2.0 - GEAR_RELIEF_CENTER_Z) > 1e-9:
-    raise AssertionError("crank-gear relief axial limits disagree with its centre")
-if GEAR_RELIEF_RESIDUAL_THICKNESS < 5.0:
-    raise AssertionError("crank-gear relief leaves less than 5 mm of platform")
-
-
-def _circular_segment_area(radius: float, depth: float) -> float:
-    """Area of a radius-*radius* circular cap of height *depth*."""
-    return (
-        radius * radius * math.acos((radius - depth) / radius)
-        - (radius - depth) * math.sqrt(2.0 * radius * depth - depth * depth)
-    )
 
 # --- lock notch (the v4_t00411 clamp knob rides this) ------------------------
 # The open-ended lock notch cuts from the engaged stud seat straight out
@@ -309,8 +281,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PostLocalZ", f"{POST_LOCAL_Z}mm")
     await set_global(adapter, "PostMountX", f"{POST_MOUNT_X}mm")
     await set_global(adapter, "PostMountDZ", f"{POST_MOUNT_DZ}mm")
-    await set_global(adapter, "GearReliefAxisY", f"{GEAR_RELIEF_AXIS_Y}mm")
-    await set_global(adapter, "GearReliefDia", f"{GEAR_RELIEF_DIAMETER}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -463,43 +433,6 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "LockNotchCapE")
     volume = await volume_check(adapter, "notch cap E", volume - v_cap, 0.02 * v_cap)
 
-    # Shallow cylindrical scallop under the 64T crank-drive gear.  The v2
-    # post fixes its axis only 33.368 above the plate top, 0.512 below the
-    # DP24.74 tooth tips.  Cutting the full swept-OD cylinder plus 0.25 air
-    # clears every gear phase while retaining 5.588 mm of plate.  Sketch on
-    # the north axial limit; a Front-parallel cut runs opposite its normal
-    # through the 10.5-mm gear-face band.
-    check(
-        "create_plane GearReliefNorth",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Front Plane", offset=GEAR_RELIEF_NORTH_Z,
-        )),
-    )
-    name_last_feature(adapter, "GearReliefNorth")
-    relief = SketchDims()
-    check("create_sketch crank gear relief", await adapter.create_sketch("GearReliefNorth"))
-    await define_circle(
-        adapter, 0.0, GEAR_RELIEF_AXIS_Y, GEAR_RELIEF_RADIUS,
-        "crank gear swept-OD relief", dims=relief,
-        names=("GearReliefCx", "GearReliefCy", "GearReliefDia"),
-        drives=(None, '"GearReliefAxisY"', '"GearReliefDia"'),
-    )
-    await ensure_fully_defined(adapter, "crank gear relief sketch")
-    check("exit_sketch crank gear relief", await adapter.exit_sketch())
-    name_last_feature(adapter, "GearReliefProfile")
-    drive_jobs += relief.apply(adapter, "GearReliefProfile")
-    check(
-        "cut crank gear swept-OD relief",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=GEAR_RELIEF_WIDTH)),
-    )
-    name_last_feature(adapter, "CrankGearRelief")
-    v_relief = _circular_segment_area(
-        GEAR_RELIEF_RADIUS, GEAR_RELIEF_MAX_DEPTH
-    ) * GEAR_RELIEF_WIDTH
-    volume = await volume_check(
-        adapter, "crank gear swept-OD relief", volume - v_relief, 0.02 * v_relief
-    )
-
     # Vertical swing axis through the pivot hole -- Axis1 ("swing pivot").
     swing_axis = await name_bore_axis(
         adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot"
@@ -614,7 +547,6 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(
         adapter,
         (
-            ("GearReliefNorth", "PLANE"),
             ("Plane2", "PLANE"),
             ("Plane3", "PLANE"),
             ("CrankAxisVert", "PLANE"),

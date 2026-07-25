@@ -3,7 +3,7 @@ r"""Reproduction script: crank pinion (book ch. 11/12, pp. 16, 20).
 The pinion on the crankshaft that meshes the dark steel crank-drive gear
 at the cone set's large end (`build_crank_drive_gear.py`), implementing
 the book-stated 4:1 crank-to-cone reduction (p. 16). Tooth count/DP per
-the Appendix C #9 split, with DP 24.74 now fixed by the manually
+the Appendix C #9 split, with DP 25.7311 fixed by the manually
 rederived v2 post's cast-in crank axis. A plain straight spur
 with a root-relieved floor; the crossed-mesh accommodation lives on the
 64T (see its docstring for the full rederivation).

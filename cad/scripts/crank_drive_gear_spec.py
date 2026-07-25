@@ -13,7 +13,7 @@ import math
 MM_PER_IN = 25.4
 
 TEETH = 64
-DIAMETRAL_PITCH = 24.74           # fixed by cone-pivot-post-v2 crank axis
+DIAMETRAL_PITCH = 25.73110354953376  # fixed-post recentered mesh
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
@@ -21,7 +21,7 @@ BASE_DIA = PITCH_DIA * math.cos(math.radians(PRESSURE_ANGLE_DEG))
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
-HELIX_ANGLE_DEG = 12.52           # crossed-axis accommodation (build docstring)
+HELIX_ANGLE_DEG = 12.0            # recentered crossed-axis accommodation
 BACKLASH_MM = 0.15
 
 BORE_DIA = 0.375 * MM_PER_IN       # 9.525 (3/8" cone-shaft journal)
@@ -84,7 +84,7 @@ GEAR_DATA = gear_data_note(
         ("TOOTH-FLANK ACCURACY", "ISO 1328-1:2013 GRADE 10; PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK"),
         ("PAIR GEOMETRY", "CUSTOM NONCONJUGATE"),
         ("PAIR SHAFT ANGLE", "12.52 +/-0.10 DEG"),
-        ("MID-FACE TRANSVERSE C2C (mm)", "41.317 +/-0.050"),
+        ("MID-FACE TRANSVERSE C2C (mm)", "39.735 +/-0.050"),
         ("FACE MIDPLANE OFFSET (mm)", "0.000 +/-0.100"),
         ("MATING PINION", "16T (MHA-025)"),
     ]
