@@ -169,7 +169,7 @@ from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_eule
 from cone_pivot_post_installation import (
     CHANNEL_Z0,
     DRUM_X,
-    MACHINE_Z_SHIFT,
+    MECHANISM_Z_SHIFT,
 )
 from solidworks_mcp.adapters.base import (
     ComponentLinearPatternParameters,
@@ -285,7 +285,7 @@ LEVER_THICKNESS = 3.0
 
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
-CHANNEL_BANK_REAR_SHIFT = MACHINE_Z_SHIFT
+CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 SUPPORT_Z = 81.5 + CHANNEL_BANK_REAR_SHIFT  # 116.915 north rocker mount
 AFRAME_MOUNT_Z = -111.0 + CHANNEL_BANK_REAR_SHIFT  # -75.585 south rocker mount
 # Keep the proven 203.2-mm shaft and support overhangs, translated with the bank.

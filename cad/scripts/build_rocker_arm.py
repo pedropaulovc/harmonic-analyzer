@@ -54,7 +54,7 @@ from __future__ import annotations
 import math
 import sys
 
-from cone_pivot_post_installation import MACHINE_X_SHIFT
+from cone_pivot_post_installation import MECHANISM_X_SHIFT
 
 from _common import (
     SketchDims,
@@ -95,7 +95,7 @@ BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
 # rod pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
-ROD_HOLE_X = 127.3738 - MACHINE_X_SHIFT  # keeps machine pin X on the shifted cam
+ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
 # bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
 # lobe (machine X is DRUM_X + ECC*sin(1.5 deg), lobe UP at the
 # cos-mode home pose) with the pivot at the seesaw mid-span (+72.9) and the arm

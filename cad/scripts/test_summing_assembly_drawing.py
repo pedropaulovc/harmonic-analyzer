@@ -13,7 +13,7 @@ import draw_summing_assembly as drawing
 import top_crossbar_spec
 from _assembly import _seed_flip
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME
-from cone_pivot_post_installation import MACHINE_Z_SHIFT, SUMMING_Z
+from cone_pivot_post_installation import MECHANISM_Z_SHIFT, SUMMING_Z
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -94,8 +94,8 @@ def test_bom_covers_every_placed_component() -> None:
 
 
 def test_summing_chain_shares_the_v2_world_anchor() -> None:
-    """The whole lever/knife/counter family moves +35.415 as one chain."""
-    assert SUMMING_Z == MACHINE_Z_SHIFT == 35.415
+    """The lever/knife/counter family follows the recentered mechanism."""
+    assert SUMMING_Z == MECHANISM_Z_SHIFT
     assert assembly.BOSS_HOOK_POS[2] == SUMMING_Z
     assert assembly.SPRING_POS[2] == SUMMING_Z
 
@@ -115,8 +115,8 @@ def test_positive_summing_station_uses_the_relearned_axial_mate_side() -> None:
 
 def test_crossbar_body_and_stud_use_distinct_world_anchors() -> None:
     """The asymmetric bar centre must not drag the summing stud off-axis."""
-    assert top_crossbar_spec.BAR_CENTER_Z == pytest.approx(17.7075)
-    assert top_crossbar_spec.STUD_HOLE_Z == pytest.approx(17.7075)
+    assert top_crossbar_spec.BAR_CENTER_Z == pytest.approx(0.0)
+    assert top_crossbar_spec.STUD_HOLE_Z == pytest.approx(SUMMING_Z)
     assert top_crossbar_spec.BAR_CENTER_Z + top_crossbar_spec.STUD_HOLE_Z == pytest.approx(SUMMING_Z)
 
     source = Path(assembly.__file__).read_text(encoding="utf-8")

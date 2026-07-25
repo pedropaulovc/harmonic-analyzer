@@ -120,7 +120,7 @@ from rocker_arm_support_spec import (
     P2_SPRING_SLOT_MIN_LIGAMENT,
     SUPPORT_HALF_MACHINE_Z,
 )
-from cone_pivot_post_installation import MACHINE_X_SHIFT
+from cone_pivot_post_installation import MECHANISM_X_SHIFT
 
 PART_NAME = "rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -639,7 +639,7 @@ async def build(adapter) -> dict[str, str]:
     # The rig's +1.484 X re-anchor widens this open rectangular cut by the same
     # amount; height and depth are unchanged because the support and rig share
     # the full Z translation.
-    back_x_cut_delta = MACHINE_X_SHIFT * (
+    back_x_cut_delta = MECHANISM_X_SHIFT * (
         P2_BACK_LOCAL_TOP_Y + HALF_Y + _RELIEF_FACE_OVERSHOOT
     ) * P2_BACK_DEPTH
     volume = await volume_check(
@@ -698,7 +698,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "P2SpringSlot")
     cut_dim = name_dimensions(adapter, "P2SpringSlot", ["Depth"])
     drive_jobs.append((cut_dim[0], '"P2SpringDepth"'))
-    spring_x_cut_delta = MACHINE_X_SHIFT * (
+    spring_x_cut_delta = MECHANISM_X_SHIFT * (
         P2_SPRING_LOCAL_Y_MAX - P2_SPRING_LOCAL_Y_MIN
     ) * P2_SPRING_DEPTH
     volume = await volume_check(

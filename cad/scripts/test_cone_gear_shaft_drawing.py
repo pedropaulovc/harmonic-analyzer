@@ -48,11 +48,15 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 0.79375))
     assert cone_gear_shaft_spec.FRONT_STUB == pytest.approx(61.9068609979)
     assert cone_gear_shaft_spec.SHAFT_LENGTH == cone_gear_shaft_spec.FRONT_STUB + 190.0
-    # The old 12.3 mm stub becomes 61.9068609979; adding the delta to every
-    # downstream end preserves all gear world stations when the origin moves.
+    # The fixed journal/tip endpoints stay put while the three gear-seat
+    # shoulders follow the recentered stack along the shaft.
     stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
     assert ends[1:] == pytest.approx(
-        tuple(old_end + stub_delta for old_end in (154.2, 161.1, 168.0, 202.3))
+        tuple(
+            old_end + stub_delta + cone_gear_shaft_spec.GEAR_AXIS_SHIFT
+            for old_end in (154.2, 161.1, 168.0)
+        )
+        + (202.3 + stub_delta,)
     )
     # Every seat diameter gets a snug-fit callout and exact-conversion display.
     assert drawing.DIMENSION_CALLOUTS == {

@@ -13,7 +13,7 @@ import connecting_rod_spec
 import fulcrum_shaft_spec
 import pivot_shaft_spec
 from _assembly import _seed_flip
-from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MACHINE_Z_SHIFT
+from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
 
 
 def test_machine_config_and_channel_interface_share_one_installation_contract() -> None:
@@ -38,7 +38,7 @@ def test_rocker_and_rod_reclose_the_level_plumb_neutral_pose() -> None:
 
 
 def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
-    assert channel.CHANNEL_BANK_REAR_SHIFT == MACHINE_Z_SHIFT
+    assert channel.CHANNEL_BANK_REAR_SHIFT == MECHANISM_Z_SHIFT
 
     row_min = channel.z_station(0) + channel.ARM_MID_DZ - channel.LEVER_THICKNESS / 2.0
     row_max = (

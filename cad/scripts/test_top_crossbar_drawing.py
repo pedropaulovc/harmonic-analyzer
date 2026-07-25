@@ -36,23 +36,23 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
     assert drawing.STUD_HOLE_Z == top_crossbar_spec.STUD_HOLE_Z
     assert top_crossbar_spec.BAR_FRONT_Z == -101.0
-    assert top_crossbar_spec.BAR_REAR_Z == 136.415
+    assert top_crossbar_spec.BAR_REAR_Z == 101.0
 
 
-def test_asymmetric_frame_span_and_off_centre_stud_contract() -> None:
+def test_symmetric_frame_span_and_off_centre_stud_contract() -> None:
     """The bar follows the frame while its stud stays on the summing axis."""
     assert FRAME_FRONT_COLUMN_Z == -112.0
-    assert FRAME_REAR_COLUMN_Z == 147.415
+    assert FRAME_REAR_COLUMN_Z == 112.0
     assert top_crossbar_spec.BAR_FRONT_Z == -101.0
-    assert top_crossbar_spec.BAR_REAR_Z == 136.415
+    assert top_crossbar_spec.BAR_REAR_Z == 101.0
     assert top_crossbar_spec.BAR_CENTER_Z == FRAME_COLUMN_Z_CENTER
-    assert top_crossbar_spec.BAR_CENTER_Z == pytest.approx(17.7075)
-    assert top_crossbar_spec.BAR_HALF_Z == pytest.approx(118.7075)
-    assert top_crossbar_spec.BAR_LENGTH == pytest.approx(237.415)
+    assert top_crossbar_spec.BAR_CENTER_Z == pytest.approx(0.0)
+    assert top_crossbar_spec.BAR_HALF_Z == pytest.approx(101.0)
+    assert top_crossbar_spec.BAR_LENGTH == pytest.approx(202.0)
     assert top_crossbar_spec.BAR_CENTER_Z - top_crossbar_spec.BAR_HALF_Z == pytest.approx(-101.0)
-    assert top_crossbar_spec.BAR_CENTER_Z + top_crossbar_spec.BAR_HALF_Z == pytest.approx(136.415)
+    assert top_crossbar_spec.BAR_CENTER_Z + top_crossbar_spec.BAR_HALF_Z == pytest.approx(101.0)
 
-    assert top_crossbar_spec.STUD_HOLE_Z == pytest.approx(17.7075)
+    assert top_crossbar_spec.STUD_HOLE_Z == pytest.approx(SUMMING_Z)
     assert top_crossbar_spec.BAR_CENTER_Z + top_crossbar_spec.STUD_HOLE_Z == pytest.approx(SUMMING_Z)
 
 

@@ -5,7 +5,7 @@ arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
 integral with each cylinder gear), a thin flat shank, and a rounded
 TOMBSTONE head (the Y-shaped upper end of the ch14 fan photo) pinned (Ø2)
 to the rocker arm's rod-pin hole near the arm's rod-side tip. Centre
-distance 161.9475: the rod hangs PLUMB with the arm LEVEL after the v2 post
+distance 163.10103: the rod hangs PLUMB with the arm LEVEL after the fixed-post
 photos show every rod dropping vertically from the arm tip onto its cam,
 the ch14 end views show the 0-crank tip row dead level (cos-mode home =
 top of stroke, cam lobe UP), so the pin (127.37 out from the mid-seesaw

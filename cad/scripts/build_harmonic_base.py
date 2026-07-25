@@ -67,7 +67,12 @@ from harmonic_base_spec import (
     TOP_THICKNESS,
     TOP_WIDTH,
 )
-from cone_pivot_post_installation import MACHINE_X_SHIFT, MACHINE_Z_SHIFT
+from cone_pivot_post_installation import (
+    MECHANISM_X_SHIFT,
+    MECHANISM_Z_SHIFT,
+    POST_X_SHIFT,
+    POST_Z_SHIFT,
+)
 from cone_pivot_screw_spec import (
     THREAD as PIVOT_THREAD,
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
@@ -105,15 +110,15 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # 75.4 mm^3, exactly the two embedded shank volumes.)
 _FORMER_PIVOT_SCREW_XZ = (-79.6886620349, 103.292512276)
 PIVOT_SCREW_XZ = (
-    _FORMER_PIVOT_SCREW_XZ[0] + MACHINE_X_SHIFT,
-    _FORMER_PIVOT_SCREW_XZ[1] + MACHINE_Z_SHIFT,
+    _FORMER_PIVOT_SCREW_XZ[0] + POST_X_SHIFT,
+    _FORMER_PIVOT_SCREW_XZ[1] + POST_Z_SHIFT,
 )
 # pivot seat: blind #10-24 UNC-2B tap.  The screw's ground shoulder stops on
 # the base top; only its distinct threaded tail enters this seat.
 _FORMER_STOP_SCREW_XZ = (-128.84976346326022, 8.739805835063942)
 STOP_SCREW_XZ = (
-    _FORMER_STOP_SCREW_XZ[0] + MACHINE_X_SHIFT,
-    _FORMER_STOP_SCREW_XZ[1] + MACHINE_Z_SHIFT,
+    _FORMER_STOP_SCREW_XZ[0] + POST_X_SHIFT,
+    _FORMER_STOP_SCREW_XZ[1] + POST_Z_SHIFT,
 )
 # Past the DISENGAGED east taper edge, one O3.15 stop-shank radius outward.
 # The v2-post cascade lengthened/widened the platform to 266 / east-half 24,
@@ -144,7 +149,7 @@ _FORMER_BLOCK_SCREW_XZ = (
     (42.24053046000287, 82.0),     # back block, west screw
 )
 BLOCK_SCREW_XZ = tuple(
-    (x + MACHINE_X_SHIFT, z + MACHINE_Z_SHIFT)
+    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT)
     for x, z in _FORMER_BLOCK_SCREW_XZ
 )
 # block seats: #8-32 tap drill -- the slotted screws thread into the base
@@ -158,7 +163,7 @@ _FORMER_FOOT_SCREW_XZ = (
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
 )
 FOOT_SCREW_XZ = tuple(
-    (x + MACHINE_X_SHIFT, z + MACHINE_Z_SHIFT)
+    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT)
     for x, z in _FORMER_FOOT_SCREW_XZ
 )
 # foot seats: #4-40 tap drill -- the foot screws thread into the base

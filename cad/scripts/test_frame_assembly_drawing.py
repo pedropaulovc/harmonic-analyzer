@@ -130,7 +130,7 @@ def test_frame_uses_the_asymmetric_rear_reanchor_contract() -> None:
     assert frame.FRONT_COLUMN_Z == FRAME_FRONT_COLUMN_Z
     assert frame.REAR_COLUMN_Z == FRAME_REAR_COLUMN_Z
     assert frame.SUPPORT_Z == ROCKER_SUPPORT_Z
-    assert math.isclose(frame.REAR_COLUMN_Z - frame.FRONT_COLUMN_Z, 259.415)
+    assert math.isclose(frame.REAR_COLUMN_Z - frame.FRONT_COLUMN_Z, 224.0)
     assert {z for _, z in frame.LAG_SCREW_XZ} == {
         ROCKER_SUPPORT_Z - 60.32,
         ROCKER_SUPPORT_Z + 60.32,

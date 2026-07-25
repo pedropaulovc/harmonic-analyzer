@@ -44,7 +44,7 @@ def test_v2_post_journal_recloses_the_hardware_seats() -> None:
     assert -175.0 + crankshaft_spec.JOURNAL_END == -70.210494428
     assert (part.SEAT_T12, part.SEAT_PINION, part.SEAT_ARM) == (
         17.5,
-        138.5747966757,
+        105.039505572,
         8.0,
     )
     source = Path(part.__file__).read_text(encoding="utf-8")

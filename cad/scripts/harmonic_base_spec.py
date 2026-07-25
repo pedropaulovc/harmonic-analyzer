@@ -10,7 +10,7 @@ silently drift.
 
 from __future__ import annotations
 
-from cone_pivot_post_installation import MACHINE_Z_SHIFT
+from cone_pivot_post_installation import POST_Z_SHIFT
 
 
 MM_PER_IN = 25.4
@@ -20,22 +20,22 @@ MM_PER_IN = 25.4
 BOTTOM_LENGTH = 18.0 * MM_PER_IN  # 457.2 (46 cm callout)
 FORMER_BOTTOM_WIDTH = 11.0 * MM_PER_IN  # 279.4 (28 cm callout)
 BOTTOM_FRONT_Z = -FORMER_BOTTOM_WIDTH / 2.0
-BOTTOM_REAR_Z = FORMER_BOTTOM_WIDTH / 2.0 + MACHINE_Z_SHIFT
+BOTTOM_REAR_Z = FORMER_BOTTOM_WIDTH / 2.0 + POST_Z_SHIFT
 BOTTOM_WIDTH = BOTTOM_REAR_Z - BOTTOM_FRONT_Z
 BOTTOM_CENTER_Z = (BOTTOM_FRONT_Z + BOTTOM_REAR_Z) / 2.0
 BOTTOM_THICKNESS = 0.5 * MM_PER_IN  # 12.7
 TOP_LENGTH = 17.5 * MM_PER_IN   # 444.5 (0.25 in reveal per side)
 FORMER_TOP_WIDTH = 10.5 * MM_PER_IN  # 266.7
 TOP_FRONT_Z = -FORMER_TOP_WIDTH / 2.0
-TOP_REAR_Z = FORMER_TOP_WIDTH / 2.0 + MACHINE_Z_SHIFT
+TOP_REAR_Z = FORMER_TOP_WIDTH / 2.0 + POST_Z_SHIFT
 TOP_WIDTH = TOP_REAR_Z - TOP_FRONT_Z
 TOP_CENTER_Z = (TOP_FRONT_Z + TOP_REAR_Z) / 2.0
 TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
 STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8
 
-if abs(BOTTOM_CENTER_Z - MACHINE_Z_SHIFT / 2.0) > 1e-12:
+if abs(BOTTOM_CENTER_Z - POST_Z_SHIFT / 2.0) > 1e-12:
     raise AssertionError("rear-extended lower base is not correctly recentered")
-if abs(TOP_CENTER_Z - MACHINE_Z_SHIFT / 2.0) > 1e-12:
+if abs(TOP_CENTER_Z - POST_Z_SHIFT / 2.0) > 1e-12:
     raise AssertionError("rear-extended upper base is not correctly recentered")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

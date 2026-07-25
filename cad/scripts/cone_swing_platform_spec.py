@@ -11,12 +11,13 @@ from __future__ import annotations
 from cone_pivot_post_spec import BORE_HEIGHT as POST_CONE_BORE_HEIGHT
 from crank_drive_gear_spec import FACE_WIDTH as CRANK_GEAR_FACE_WIDTH
 from crank_drive_gear_spec import OUTSIDE_DIA as CRANK_GEAR_OUTSIDE_DIA
+from cone_pivot_post_installation import GEAR_AXIS_SHIFT
 
 
 PLATE_THICKNESS = 6.35
 
 # The v2 post fixes the cone/64T axis only 33.368 mm above the platform top,
-# while the reclosed DP24.74 gear has a 33.880-mm outside radius.  A shallow
+# while the reclosed DP25.742 gear has its derived outside radius. A shallow
 # cylindrical scallop follows the gear's complete swept-OD envelope with the
 # repo's standard 0.25-mm interference margin.  It is a finite axial cut, not
 # phase-specific tooth pockets, so every crank angle clears while 5.588 mm of
@@ -25,7 +26,7 @@ GEAR_RELIEF_CLEARANCE = 0.25
 GEAR_RELIEF_RADIUS = CRANK_GEAR_OUTSIDE_DIA / 2.0 + GEAR_RELIEF_CLEARANCE
 GEAR_RELIEF_DIAMETER = 2.0 * GEAR_RELIEF_RADIUS
 GEAR_RELIEF_AXIS_Y = PLATE_THICKNESS + POST_CONE_BORE_HEIGHT
-GEAR_RELIEF_CENTER_Z = -176.1
+GEAR_RELIEF_CENTER_Z = -176.1 + GEAR_AXIS_SHIFT
 GEAR_RELIEF_WIDTH = CRANK_GEAR_FACE_WIDTH + 2.0 * GEAR_RELIEF_CLEARANCE
 GEAR_RELIEF_NORTH_Z = GEAR_RELIEF_CENTER_Z + GEAR_RELIEF_WIDTH / 2.0
 GEAR_RELIEF_SOUTH_Z = GEAR_RELIEF_CENTER_Z - GEAR_RELIEF_WIDTH / 2.0
@@ -63,9 +64,10 @@ DRAWING_NOTES = "\n".join(
         "   FROM END TANGENCIES THROUGH THE WEST PROFILE; OPEN THROUGH EDGE.",
         "6. PLAN CORNER RADII: NE R10.00, NW R8.00, SW R10.00, SE R12.00.",
         "   LONG STRAIGHT PLAN-EDGE FORM: SEE STRAIGHTNESS FCF.",
-        "7. CRANK-GEAR RELIEF: CYLINDRICAL SCALLOP R34.130 +/-0.05, AXIS",
-        "   39.718 BASIC ABOVE A AND 176.100 BASIC SOUTH OF PIVOT; 10.50",
-        "   +/-0.10 WIDE ALONG CONE AXIS. LEAVE 5.588 MIN PLATE THICKNESS.",
+        f"7. CRANK-GEAR RELIEF: CYLINDRICAL SCALLOP R{GEAR_RELIEF_RADIUS:.3f} +/-0.05, AXIS",
+        f"   {GEAR_RELIEF_AXIS_Y:.3f} BASIC ABOVE A AND {-GEAR_RELIEF_CENTER_Z:.3f} BASIC SOUTH",
+        f"   OF PIVOT; {GEAR_RELIEF_WIDTH:.2f} +/-0.10 WIDE ALONG CONE AXIS.",
+        f"   LEAVE {GEAR_RELIEF_RESIDUAL_THICKNESS:.3f} MIN PLATE THICKNESS.",
         "8. MACHINE BOTH BROAD FACES; FINISHED THICKNESS 6.35 +/-0.10.",
         "   DATUM A FLATNESS AND OPPOSITE-FACE PARALLELISM: SEE END VIEW.",
     )

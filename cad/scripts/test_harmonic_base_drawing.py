@@ -10,7 +10,12 @@ import build_harmonic_base as part
 import build_cone_swing_platform as platform
 import draw_harmonic_base as drawing
 import harmonic_base_spec
-from cone_pivot_post_installation import MACHINE_X_SHIFT, MACHINE_Z_SHIFT
+from cone_pivot_post_installation import (
+    MECHANISM_X_SHIFT,
+    MECHANISM_Z_SHIFT,
+    POST_X_SHIFT,
+    POST_Z_SHIFT,
+)
 from cone_lock_knob_spec import WASHER_DIA as KNOB_WASHER_DIA
 from _drawing_registry import DRAWINGS_BY_NAME
 from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
@@ -42,14 +47,14 @@ def test_plate_geometry_is_single_sourced() -> None:
     assert harmonic_base_spec.BOTTOM_LENGTH == 18.0 * 25.4
     assert harmonic_base_spec.TOP_LENGTH == 17.5 * 25.4
     assert harmonic_base_spec.BOTTOM_FRONT_Z == -(11.0 * 25.4) / 2.0
-    assert harmonic_base_spec.BOTTOM_REAR_Z == (11.0 * 25.4) / 2.0 + MACHINE_Z_SHIFT
+    assert harmonic_base_spec.BOTTOM_REAR_Z == (11.0 * 25.4) / 2.0 + POST_Z_SHIFT
     assert math.isclose(
         harmonic_base_spec.BOTTOM_WIDTH,
-        11.0 * 25.4 + MACHINE_Z_SHIFT,
+        11.0 * 25.4 + POST_Z_SHIFT,
     )
     assert math.isclose(
         harmonic_base_spec.TOP_WIDTH,
-        10.5 * 25.4 + MACHINE_Z_SHIFT,
+        10.5 * 25.4 + POST_Z_SHIFT,
     )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("bbox_extent_check(") == 2
@@ -130,12 +135,12 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     """Mirror the drive-train formula without importing its COM-heavy graph."""
     pivot_x, pivot_z = part.PIVOT_SCREW_XZ
     assert part.PIVOT_SCREW_XZ == (
-        -79.6886620349 + MACHINE_X_SHIFT,
-        103.292512276 + MACHINE_Z_SHIFT,
+        -79.6886620349 + POST_X_SHIFT,
+        103.292512276 + POST_Z_SHIFT,
     )
     assert part.STOP_SCREW_XZ == (
-        -128.84976346326022 + MACHINE_X_SHIFT,
-        8.739805835063942 + MACHINE_Z_SHIFT,
+        -128.84976346326022 + POST_X_SHIFT,
+        8.739805835063942 + POST_Z_SHIFT,
     )
     east_slope = (
         platform.EAST_HALF_S - platform.HALF_WIDTH_N
@@ -202,11 +207,11 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
         (-54.7, 102.5),
     )
     assert part.BLOCK_SCREW_XZ == tuple(
-        (x + MACHINE_X_SHIFT, z + MACHINE_Z_SHIFT)
+        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT)
         for x, z in former_blocks
     )
     assert part.FOOT_SCREW_XZ == tuple(
-        (x + MACHINE_X_SHIFT, z + MACHINE_Z_SHIFT)
+        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT)
         for x, z in former_feet
     )
 

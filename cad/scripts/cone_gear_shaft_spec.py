@@ -2,6 +2,8 @@ r"""Pure-data dimensional contract shared by the cone gear shaft and drawing."""
 
 from __future__ import annotations
 
+from cone_pivot_post_installation import GEAR_AXIS_SHIFT
+
 
 MM_PER_IN = 25.4
 
@@ -27,9 +29,9 @@ FRONT_STUB = 61.9068609979
 # Phase 3 rebuild validation. It is drawn faithfully, not "fixed" here.
 SECTIONS: tuple[tuple[float, float], ...] = (
     (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
-    (0.375, FRONT_STUB + 141.9),  # unchanged 64T + T120..T024 world stations
-    (0.25, FRONT_STUB + 148.8),  # T018 seat
-    (0.125, FRONT_STUB + 155.7),  # T012 seat
+    (0.375, FRONT_STUB + 141.9 + GEAR_AXIS_SHIFT),
+    (0.25, FRONT_STUB + 148.8 + GEAR_AXIS_SHIFT),
+    (0.125, FRONT_STUB + 155.7 + GEAR_AXIS_SHIFT),
     (0.03125, FRONT_STUB + 190.0),  # T006 seat + thin-tip journal
 )
 

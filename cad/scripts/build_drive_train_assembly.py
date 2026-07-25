@@ -165,7 +165,8 @@ from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 from cone_pivot_post_installation import (
     CHANNEL_Z0,
     DRUM_X,
-    MACHINE_Z_SHIFT,
+    GEAR_AXIS_SHIFT,
+    MECHANISM_Z_SHIFT,
     POST_ROTATION_Y_DEG,
 )
 from _assembly import (
@@ -232,11 +233,11 @@ WORKING_DEPTH = 2.0 * ADDENDUM  # 1.020: full tooth interleave depth
 RADIUS_STEP = 3.0 * 25.4 / DP_TRAIN  # 1.5295: pitch-radius step per 6 teeth
 CONE_T120_PITCH_R = (120.0 / DP_TRAIN) * 25.4 / 2.0  # 30.59: largest cone gear pitch radius
 
-# Shared machine grid: the v2 installation contract moves the drum planes and
-# the dependent gates/cams/rockers/bars as one frame-level cascade.
+# Shared machine grid: the working train is recentered independently of the
+# fixed post/carrier, along the post's unchanged inclined journal.
 _DRUM_SEAT_NOMINAL = _config.machine("cone_incline", "drum_seat_nominal_mm")  # 7.2204 (OD 62.2)
 Z_PITCH = _DRUM_SEAT_NOMINAL * math.cos(math.asin(RADIUS_STEP / _DRUM_SEAT_NOMINAL))  # 7.0566: drum z-pitch
-X_DRUM = DRUM_X  # -53.216: shared v2 installation re-anchor
+X_DRUM = DRUM_X
 if POST_ROTATION_Y_DEG != 180.0:
     raise AssertionError("v2 post installation must preserve the exact Ry180 journal line")
 # (ch30 p004 post fit).  The cone seats are derived from this same anchor, so
@@ -249,12 +250,11 @@ if POST_ROTATION_Y_DEG != 180.0:
 # The whole cone/64T/crank train cascades rigidly off this (DRUM_TIP_X -> X_PITCH ...).
 # The cone/crank cluster extends EAST of the drum (machine east = -x, the
 # crank side), so every radial x-extent in the cascade below SUBTRACTS.
-Z_DRUM0 = _config.machine("channels", "station_z0_mm")  # -31.685: former -67.1 + 35.415
-# shared station anchor.  Moving only the cone would destroy every drum mesh;
-# the channel config therefore translates the cone seats and cylinder faces as
-# one rigid family, without re-indexing the j-to-j gear pairs.
+Z_DRUM0 = _config.machine("channels", "station_z0_mm")
+# Shared station anchor. Cone seats, cylinder faces, and channels translate as
+# one rigid family without re-indexing the j-to-j pairs.
 if abs(Z_DRUM0 - CHANNEL_Z0) > 1e-9:
-    raise AssertionError("channel station_z0 does not carry the v2 rearward shift")
+    raise AssertionError("channel station_z0 does not carry the fixed-post recenter")
 
 # True-cone incline (M6.7, exact tracking -- see module docstring). Values are
 # at the OD-62.2 / DP 49.82 re-anchor (was 21.10 deg at the retired DP 30).
@@ -305,10 +305,17 @@ def cone_seat(j: int) -> tuple[float, float]:
 # shaft now runs FRONT_STUB further south (ch30 GT), so the part -- authored
 # from its front stub end -- is PLACED at SHAFT_FRONT_STATION instead.
 SHAFT_T120_STATION = 25.0 + CONE_FACE / 2.0  # 28.25
-CONE_ORIGIN = [
+_GEAR_CONE_ORIGIN = [
     cone_seat(0)[0] - SHAFT_T120_STATION * SIN_I,
     Y_DRIVE,
     cone_seat(0)[1] - SHAFT_T120_STATION * COS_I,
+]
+# The post/carrier axis remains at its ch30-fitted world placement.  The gear
+# family is translated GEAR_AXIS_SHIFT along that same infinite line.
+CONE_ORIGIN = [
+    _GEAR_CONE_ORIGIN[0] - GEAR_AXIS_SHIFT * SIN_I,
+    Y_DRIVE,
+    _GEAR_CONE_ORIGIN[2] - GEAR_AXIS_SHIFT * COS_I,
 ]
 SHAFT_FRONT_STATION = -61.90686099792956
 # = -build_cone_gear_shaft FRONT_STUB (asserted below). The enlarged integral
@@ -335,14 +342,16 @@ POST_STATION = -39.90136099792956
 # Exact-tracking self-check: the 20 mesh-derived seats lie on the shaft.
 for _j in range(20):
     _x, _z = cone_seat(_j)
-    _p = cone_station(SHAFT_T120_STATION + _j * SEAT_PITCH)
+    _p = cone_station(
+        SHAFT_T120_STATION + GEAR_AXIS_SHIFT + _j * SEAT_PITCH
+    )
     if abs(_p[0] - _x) > 1e-9 or abs(_p[2] - _z) > 1e-9:
         raise AssertionError(f"cone seat {_j} off the shaft line: {(_x, _z)} vs {_p}")
 
 # 64T crank-drive gear: perpendicular on the pivot journal, 0.1 air to
 # the T120 south face (p.20: directly beside).
 GEAR64_STATION = SHAFT_T120_STATION - (CONE_FACE + GEAR64_FACE) / 2.0 - 0.1  # 19.9
-GEAR64_SEAT = cone_station(GEAR64_STATION)  # (-117.44, , -68.62)
+GEAR64_SEAT = cone_station(GEAR64_STATION + GEAR_AXIS_SHIFT)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
 R16 = (16.0 / DP_CRANK) * 25.4 / 2.0
 
@@ -370,7 +379,7 @@ R16 = (16.0 / DP_CRANK) * 25.4 / 2.0
 # helix + backlash do).
 ADD16 = 25.4 / DP_CRANK  # crank-pinion addendum
 MESH16_C2C_SLACK = _config.fit("crank_mesh", "c2c_slack_mm")  # 0.25, tolerances.yaml
-MESH16_C2C = R64 + R16 + MESH16_C2C_SLACK  # 41.317: v2-axis engaged mesh
+MESH16_C2C = R64 + R16 + MESH16_C2C_SLACK
 TIP16_C2C = R64 + R16 + 2.0 * ADD16
 CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C
 # Depth band: above ~1.2*ADD (really engaged), below 2*ADD minus the root
@@ -400,9 +409,9 @@ ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))
 _GEAR64_CONTACT_Z = (
     GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
 )
-PINION_TOOTH_Z = -66.44020332430648 + MACHINE_Z_SHIFT  # -31.0252033243
-# The pinion alone follows the rearward cone/64T row.  The photo-anchored
-# crank arm and T12 chain plane remain at their existing stations below.
+PINION_TOOTH_Z = _GEAR64_CONTACT_Z
+# The pinion follows the recentered cone/64T row while the photo-anchored crank
+# arm and T12 chain plane remain at their existing stations below.
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
 # keyed at its authored phase (a tooth centred at azimuth 0 -- for the helical
 # teeth that is the MID-FACE azimuth, the twist's symmetry plane), so its
@@ -420,14 +429,14 @@ _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
 # The v2 post changed the crank-pair DP and therefore the tooth count's phase at
 # the new line of centres.  Re-arbitrated against the exact solid study and the
-# live minimal-pair interference body: -3.60 centres the clean [-4.00, -3.20]
-# window (the retired DP26.57 geometry used -1.50).
-MESH_WINDOW_CENTRE_DEG = -3.60
+# exact-solid phase sweep: -1.50 centres the recentered DP25.742 / 12-degree
+# helix window with +-0.40-degree authoring margin.
+MESH_WINDOW_CENTRE_DEG = -1.50
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (R64 / R16) - 22.5 / 2.0
 ) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
 
-ARBOR_SOUTH_Z = -90.0 + MACHINE_Z_SHIFT  # -54.585: follows drum bank
+ARBOR_SOUTH_Z = -90.0 + MECHANISM_Z_SHIFT
 # end stops INSIDE the arbor-pedestal bore, blind-bearing look; was -98, poking
 # 8 clear through the block). = cylinder-gear-shaft origin, placed by its south
 # end.
@@ -458,9 +467,9 @@ REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
 # (-134.5..-137.5) by 15; the arm sits 9.5 SOUTH of the wheel so the rotating
 # arm/handle never crosses it. The small removable gear is the chain wheel
 # (ch. 23 -- bead chain on its m2 teeth; v2_gears_010).
-ARBOR_PEDESTAL_Z = 90.5 - MACHINE_Z_SHIFT  # SOUTH pedestal at z -55.085
+ARBOR_PEDESTAL_Z = 90.5 - MECHANISM_Z_SHIFT
 # Its complete footing follows the translated cylinder/arbor family.
-ARBOR_PEDESTAL_NORTH_Z = 97.5 + MACHINE_Z_SHIFT  # NORTH at z +132.915
+ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
 # real machine's base-standing north clamp) -- the SAME casting rotated 180
 # about Y so its strap looks SOUTH at the drum: strap band z 89.5..99.5
 # (face 89.5), exposed flange band 99.5..105.5 carrying the foot screw at
@@ -824,7 +833,9 @@ if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
 if abs(PLAT_GEAR_RELIEF_AXIS_Y - (Y_DRIVE - Y_BASE_TOP)) > 1e-9:
     raise AssertionError("platform gear-relief axis drifted from the v2 cone axis")
-if abs(PLAT_GEAR_RELIEF_CENTER_Z - (GEAR64_STATION - PIVOT_STATION)) > 1e-9:
+if abs(PLAT_GEAR_RELIEF_CENTER_Z - (
+    GEAR64_STATION + GEAR_AXIS_SHIFT - PIVOT_STATION
+)) > 1e-9:
     raise AssertionError("platform gear-relief station drifted from the 64T gear")
 if PLAT_GEAR_RELIEF_RADIUS < R64 + ADD16 + PLAT_GEAR_RELIEF_CLEARANCE - 1e-9:
     raise AssertionError("platform gear relief no longer covers the 64T swept OD")
@@ -847,11 +858,10 @@ _BOSS_SOUTH_GAP = _POST_BOSS_SOUTH - _T12_NORTH
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 if min(_BOSS_SOUTH_GAP, _BOSS_NORTH_GAP) < 0.25:
     raise AssertionError("v2 crank boss does not clear its axial hardware")
-# Keep both independently derived gaps visible to import-time geometry checks:
-# about 10.26 mm at the T12 side and 33.79 mm at the moved pinion side.
+# Keep both independently derived gaps visible to import-time geometry checks.
 if not 10.0 < _BOSS_SOUTH_GAP < 10.5:
     raise AssertionError("v2 crank boss south/T12 clearance left its derived band")
-if not 33.5 < _BOSS_NORTH_GAP < 34.1:
+if not 0.24 < _BOSS_NORTH_GAP < 1.0:
     raise AssertionError("v2 crank boss north/pinion clearance left its derived band")
 if abs(PINION_TOOTH_Z - _GEAR64_CONTACT_Z) > 0.05:
     raise AssertionError("16T is no longer centred on the 64T contact row")
@@ -859,7 +869,7 @@ if abs(PINION_TOOTH_Z - _GEAR64_CONTACT_Z) > 0.05:
 # The relocated v2 crank axis also clears the inclined T120 rim radially. Keep
 # the exact arc scan as a tripwire: if a later diameter/station change restores
 # radial overlap, the pinion's north face must retain 0.25 mm axial air.
-_T120_SEAT = cone_station(SHAFT_T120_STATION)
+_T120_SEAT = cone_station(SHAFT_T120_STATION + GEAR_AXIS_SHIFT)
 _TIP120 = CONE_T120_PITCH_R + ADDENDUM
 _T120_SOUTH = math.inf  # no radial overlap -> no T120 bound at all
 for _k in range(7200):
@@ -1075,7 +1085,7 @@ APINION_X = X_DRUM + (TIP_DRUM120 + TIP_APINION + APINION_GAP)  # -10.38: INBOAR
 # tip circles backed off to the parked gap at Delta-y = 0 (axis dead level)
 APINION_Y = Y_DRIVE
 APINION_DRUM_LEN = 143.2  # build_alignment_pinion FACE_WIDTH
-APINION_Z_FRONT = -75.0 + MACHINE_Z_SHIFT  # -39.585, follows cylinder bank
+APINION_Z_FRONT = -75.0 + MECHANISM_Z_SHIFT
 APINION_Z_BACK = APINION_Z_FRONT + APINION_DRUM_LEN  # +103.615
 PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot block bore height
 # Bracket thickness, end radius and pivot-to-arbor spacing come from the
@@ -1100,13 +1110,13 @@ LIFT_X = PIVOT_X + 2.0 * BLOCK_BORE_HALF_SPACING  # lift rod in the blocks' WEST
 LIFT_Y = PIVOT_Y + LIFT_BORE_RISE  # v2 closure: the steep strap carries its
 # follower contact above the pivot at the WEST cam station.  The eccentric cam
 # collars still meet the pins from below; the pins rest on the collar ODs.
-PIVOT_SHAFT_Z0 = -104.0 + MACHINE_Z_SHIFT  # -68.585; p2 axial cascade
+PIVOT_SHAFT_Z0 = -104.0 + MECHANISM_Z_SHIFT
 # Ø6.35 x 192 remains flush with the translated block outer faces.
-LIFT_ROD_Z0 = -114.0 + MACHINE_Z_SHIFT  # -78.585; back end +123.415,
+LIFT_ROD_Z0 = -114.0 + MECHANISM_Z_SHIFT
 # front end proud 10 south of the translated front block -- lever hub seat
 BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
-BLOCK_FRONT_Z0 = -104.0 + MACHINE_Z_SHIFT
-BLOCK_BACK_Z0 = 76.0 + MACHINE_Z_SHIFT
+BLOCK_FRONT_Z0 = -104.0 + MECHANISM_Z_SHIFT
+BLOCK_BACK_Z0 = 76.0 + MECHANISM_Z_SHIFT
 LEVER_TILT_DEG = 40.0  # from vertical, leaning east (p.68). The p002-fitted
 # 32 was measured with the lever rooted EAST of the pivot (pre-PR5); from the
 # west root that tilt swept the shaft through the pinion's front arbor stub
@@ -1118,10 +1128,10 @@ LEVER_TILT_DEG = 40.0  # from vertical, leaning east (p.68). The p002-fitted
 # Ø6.35 stub with the arbor on the same axis).
 LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 # PR7 -- the PR6 98 was img08's perspective-inflated read)
-LEVER_Z = -111.0 + MACHINE_Z_SHIFT  # hub centre; blind bore floor (local -3)
+LEVER_Z = -111.0 + MECHANISM_Z_SHIFT
 # seats on the translated lift-rod front end; north face stays 2 off the block.
 HANDLE_TILT_DEG = 65.0  # cross rod from vertical
-HANDLE_Z = -144.0 + MACHINE_Z_SHIFT  # -108.585: tee-handle cross-rod plane
+HANDLE_Z = -144.0 + MECHANISM_Z_SHIFT
 # translated with the p2 arbor. The hub is a blind tubular cap
 # (PR7 item 14): its bore floor at local +9 lands on -99.585, where the
 # steel arbor's flat front tip seats flush (build_pinion_arbor)
@@ -1505,10 +1515,10 @@ if _LEV_Z[0] < _TEE_HUB_Z[1] + 0.25:
 # The steel Ø8 arbor replaced the drum's integral stubs: it presses through
 # the drum, journals in both straps' top bores, and its flat front tip seats
 # flush on the tee handle's blind-cap bore floor.
-ARBOR_Z0 = -135.0 + MACHINE_Z_SHIFT  # front tip; back end +126.665
+ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
 if abs((HANDLE_Z + HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T) - ARBOR_Z0) > 1e-9:
     raise AssertionError("arbor front tip off the handle cap's bore floor")
-if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MACHINE_Z_SHIFT)) > 0.01:
+if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
     raise AssertionError("arbor back end off the translated p2 station")
 if not (ARBOR_DIA == DRUM_BORE_DIA == HANDLE_TUBE_ID == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum bore/handle tube/strap bore")
@@ -1993,7 +2003,8 @@ async def build(adapter) -> dict[str, str]:
         [0.0, INCLINE_DEG, 0.0], ROT_Y_INCLINE, ground=False,
     )
     gear64 = await _place_on_shaft(
-        adapter, "crank-drive-gear", GEAR64_STATION, GEAR64_FACE,
+        adapter, "crank-drive-gear", GEAR64_STATION + GEAR_AXIS_SHIFT,
+        GEAR64_FACE,
         label="crank-drive-gear (perpendicular, journal seat)",
     )
     # The full 20-gear cone stack is ALWAYS built (it is one rigid keyed cluster
@@ -2006,7 +2017,8 @@ async def build(adapter) -> dict[str, str]:
     # each copy is re-pointed at its own T-configuration post-copy.
     seed_teeth = _config.cone_teeth(0)
     seed_cg = await _place_on_shaft(
-        adapter, "cone-gear", SHAFT_T120_STATION, CONE_FACE,
+        adapter, "cone-gear", SHAFT_T120_STATION + GEAR_AXIS_SHIFT,
+        CONE_FACE,
         configuration=f"T{seed_teeth:03d}", label=f"cone-gear T{seed_teeth:03d}",
     )
     cone_gears: list[tuple[int, str]] = [(seed_teeth, seed_cg)]
@@ -2589,7 +2601,10 @@ async def build(adapter) -> dict[str, str]:
              (1 - _c) * _u[2] * _u[1] + _s * _u[0],
              _c + (1 - _c) * _u[2] * _u[2]],
         ]  # w' = R w: Rodrigues, CCW about +u
-        _p0 = [v / 1000.0 for v in cone_station(GEAR64_STATION)]  # axis pt (m)
+        _p0 = [
+            v / 1000.0
+            for v in cone_station(GEAR64_STATION + GEAR_AXIS_SHIFT)
+        ]  # axis point at the recentered 64T (m)
         _sh = [_p0[k] - sum(_R[k][j] * _p0[j] for j in range(3))
                for k in range(3)]
 

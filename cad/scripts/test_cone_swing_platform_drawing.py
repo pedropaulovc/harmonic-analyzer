@@ -10,6 +10,7 @@ import cone_swing_platform_spec
 import draw_cone_swing_platform as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_common import _gtol_frame_xml
+from cone_pivot_post_installation import GEAR_AXIS_SHIFT
 
 
 def test_required_drawing_paths() -> None:
@@ -56,7 +57,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "NE R10.00, NW R8.00, SW R10.00, SE R12.00" in notes
     assert "CRANK-GEAR RELIEF: CYLINDRICAL SCALLOP R34.130" in notes
     assert "39.718 BASIC ABOVE A" in notes
-    assert "176.100 BASIC SOUTH OF PIVOT" in notes
+    assert f"{-part.GEAR_RELIEF_CENTER_Z:.3f} BASIC SOUTH" in notes
     assert "LEAVE 5.588 MIN PLATE THICKNESS" in notes
     assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
     assert "OPPOSITE-FACE PARALLELISM: SEE END VIEW" in notes
@@ -138,7 +139,11 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
 
 
 def test_v2_crank_gear_relief_covers_the_swept_envelope() -> None:
-    assert math.isclose(part.GEAR_RELIEF_CENTER_Z, -176.1, abs_tol=1e-12)
+    assert math.isclose(
+        part.GEAR_RELIEF_CENTER_Z,
+        -176.1 + GEAR_AXIS_SHIFT,
+        abs_tol=1e-12,
+    )
     assert math.isclose(part.GEAR_RELIEF_WIDTH, 10.5, abs_tol=1e-12)
     assert math.isclose(part.GEAR_RELIEF_AXIS_Y, 39.718, abs_tol=1e-12)
     assert math.isclose(part.GEAR_RELIEF_MAX_DEPTH, 0.762355699, abs_tol=1e-6)

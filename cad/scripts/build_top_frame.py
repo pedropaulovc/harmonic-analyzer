@@ -76,7 +76,7 @@ from cone_pivot_post_installation import (
     FRAME_COLUMN_Z_SPAN,
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
-    MACHINE_Z_SHIFT,
+    SUMMING_Z,
 )
 
 PART_NAME = "top-frame"
@@ -101,7 +101,7 @@ GOOSENECK_X = -COLUMN_X  # The counter-spring post body sits at machine
 # with the post body. At +COLUMN_X it bored the opposite rail and the post
 # drilled solid casting (full Ø16x41 = 8243 mm^3 top-level interference,
 # M6.12).
-GOOSENECK_Z = MACHINE_Z_SHIFT  # follows the shifted summing/counter-spring chain
+GOOSENECK_Z = SUMMING_Z
 
 OUTER_X = COLUMN_X + RAIL_WIDTH / 2.0  # 208
 OUTER_FRONT_Z = FRONT_COLUMN_Z - RAIL_WIDTH / 2.0

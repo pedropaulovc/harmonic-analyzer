@@ -14,8 +14,8 @@ from __future__ import annotations
 import math
 
 from cone_pivot_post_installation import (
-    MACHINE_X_SHIFT,
-    MACHINE_Z_SHIFT,
+    MECHANISM_X_SHIFT,
+    MECHANISM_Z_SHIFT,
     ROCKER_SUPPORT_Z,
 )
 
@@ -54,21 +54,21 @@ P2_CLEARANCE = 0.25
 
 # Back pivot block plus its two #4 hold-down screws.  This pocket is open
 # through the casting's low-X and north (+Z) faces.
-P2_BACK_X_MAX = 46.99053046000287 + MACHINE_X_SHIFT
+P2_BACK_X_MAX = 46.99053046000287 + MECHANISM_X_SHIFT
 P2_BACK_Y_MAX = 72.30
-P2_BACK_Z_MIN = 75.75 + MACHINE_Z_SHIFT
+P2_BACK_Z_MIN = 75.75 + MECHANISM_Z_SHIFT
 
 # Brass return-spring foot: a shallow slot at the mounting-seat surface.
-P2_SPRING_X_MAX = 52.08610240207359 + MACHINE_X_SHIFT
+P2_SPRING_X_MAX = 52.08610240207359 + MECHANISM_X_SHIFT
 P2_SPRING_Y_MIN = 50.55
 P2_SPRING_Y_MAX = 51.85
-P2_SPRING_Z_MIN = 68.70 + MACHINE_Z_SHIFT
-P2_SPRING_Z_MAX = 73.20 + MACHINE_Z_SHIFT
+P2_SPRING_Z_MIN = 68.70 + MECHANISM_Z_SHIFT
+P2_SPRING_Z_MAX = 73.20 + MECHANISM_Z_SHIFT
 
 # The spring-foot screw needs a separate vertical pocket; keeping it round
 # preserves more ligament to the support's nearest 9/16-12 hold-down tap.
-P2_FOOT_SCREW_X = 48.73610240207359 + MACHINE_X_SHIFT
-P2_FOOT_SCREW_Z = 70.95 + MACHINE_Z_SHIFT
+P2_FOOT_SCREW_X = 48.73610240207359 + MECHANISM_X_SHIFT
+P2_FOOT_SCREW_Z = 70.95 + MECHANISM_Z_SHIFT
 P2_FOOT_SCREW_DIA = 6.00
 P2_FOOT_SCREW_Y_MIN = 50.55
 P2_FOOT_SCREW_Y_MAX = 54.05

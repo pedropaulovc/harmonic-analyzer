@@ -10,7 +10,7 @@ import top_frame_spec
 from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
-    MACHINE_Z_SHIFT,
+    SUMMING_Z,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -91,14 +91,14 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
 
 def test_asymmetric_rear_column_and_ring_envelope_are_single_sourced() -> None:
     assert part.FRONT_COLUMN_Z == FRAME_FRONT_COLUMN_Z == -112.0
-    assert part.REAR_COLUMN_Z == FRAME_REAR_COLUMN_Z == 147.415
-    assert part.GOOSENECK_Z == MACHINE_Z_SHIFT == 35.415
+    assert part.REAR_COLUMN_Z == FRAME_REAR_COLUMN_Z == 112.0
+    assert part.GOOSENECK_Z == SUMMING_Z
     assert part.OUTER_FRONT_Z == -123.0
-    assert part.OUTER_REAR_Z == 158.415
+    assert part.OUTER_REAR_Z == 123.0
     assert part.INNER_FRONT_Z == -101.0
-    assert part.INNER_REAR_Z == 136.415
-    assert abs(2.0 * part.OUTER_Z - 281.415) < 1e-12
-    assert abs(2.0 * part.INNER_Z - 237.415) < 1e-12
+    assert part.INNER_REAR_Z == 101.0
+    assert abs(2.0 * part.OUTER_Z - 246.0) < 1e-12
+    assert abs(2.0 * part.INNER_Z - 202.0) < 1e-12
 
 
 def test_view_scales_are_explicit() -> None:

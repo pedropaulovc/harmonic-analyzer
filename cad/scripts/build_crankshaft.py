@@ -88,7 +88,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # arm seats at SEAT_ARM. build_drive_train asserts these match its
 # REMOVABLE_Z0 / PINION_TOOTH_Z / arm-placement derivations.
 SEAT_T12 = 17.5
-SEAT_PINION = 138.5747966757
+SEAT_PINION = 105.039505572
 # = -31.0252033243 - 10.8/2 - (-175): rear-shifted 16T centred on the 64T row.
 SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's placed pose composes a
 # Ry(180), which keeps its 8-thick plate at station 0..8 but puts the

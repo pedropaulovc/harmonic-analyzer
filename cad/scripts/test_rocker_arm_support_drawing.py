@@ -8,7 +8,7 @@ from pathlib import Path
 import draw_rocker_arm_support as drawing
 import build_rocker_arm_support as support
 import rocker_arm_support_spec as placement
-from cone_pivot_post_installation import MACHINE_X_SHIFT, MACHINE_Z_SHIFT
+from cone_pivot_post_installation import MECHANISM_X_SHIFT, MECHANISM_Z_SHIFT
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -48,16 +48,16 @@ def test_hole_table_covers_every_foot_hole() -> None:
 
 
 def test_v2_support_and_p2_reliefs_share_the_installation_contract() -> None:
-    assert placement.SUPPORT_WORLD_Z == MACHINE_Z_SHIFT
+    assert placement.SUPPORT_WORLD_Z == 0.0
     assert {z for _, z in placement.SUPPORT_HOLD_DOWN_XZ} == {
-        MACHINE_Z_SHIFT - 60.32,
-        MACHINE_Z_SHIFT + 60.32,
+        -60.32,
+        60.32,
     }
     assert math.isclose(
         placement.P2_BACK_X_MAX,
-        46.99053046000287 + MACHINE_X_SHIFT,
+        46.99053046000287 + MECHANISM_X_SHIFT,
     )
-    assert math.isclose(placement.P2_BACK_Z_MIN, 75.75 + MACHINE_Z_SHIFT)
+    assert math.isclose(placement.P2_BACK_Z_MIN, 75.75 + MECHANISM_Z_SHIFT)
     assert placement.P2_SPRING_SLOT_LIGAMENT >= 2.4
     assert placement.P2_FOOT_SCREW_LIGAMENT >= 2.5
 
