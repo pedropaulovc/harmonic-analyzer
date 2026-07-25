@@ -166,7 +166,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
         datum="A",
         label="pinion pivot cylindrical-body axis",
-        position_tolerance_m=0.0001,
     )
     crown_axial = CAP_SAG / 2.0
     crown_radial = math.sqrt(

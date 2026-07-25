@@ -259,7 +259,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-width median plane",
         entity_type="DIMENSION",
         annotation=width_annotation,
-        position_tolerance_m=0.001,
     )
     add_datum_feature(
         adapter,
@@ -272,7 +271,6 @@ async def build(adapter: Any) -> dict[str, str]:
         # crowded lane; keep the accepted placement error well below that gap so
         # a SolidWorks snap-back onto the edge is caught rather than silently
         # passing (a 20 mm tolerance admitted the full 18 mm collapse).
-        position_tolerance_m=0.010,
     )
     add_datum_feature(
         adapter,
@@ -290,8 +288,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-depth median plane",
         entity_type="DIMENSION",
         annotation=depth_annotation,
-        shoulder=True,
-        position_tolerance_m=0.001,
     )
     passage_entity = _circle_entity(
         adapter,

@@ -246,7 +246,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(_front_x(BORE_HALF_SPACING) + 0.0145, _front_y(0.0) - 0.026),
         datum="B",
         label="pivot bore axis",
-        position_tolerance_m=0.003,
     )
     right_half_depth = BLOCK_DEPTH * SHEET_SCALE[0] / 2000.0
     add_datum_feature(

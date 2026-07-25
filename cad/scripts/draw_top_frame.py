@@ -240,15 +240,15 @@ async def build(adapter: Any) -> dict[str, str]:
     datum_a_edge = _visible_front_datum_a(adapter, front)
     add_datum_feature(
         adapter, front, symbol_xy=(0.285, 0.125), datum="A",
-        label="finished bottom-face datum", entity=datum_a_edge, shoulder=True,
+        label="finished bottom-face datum", entity=datum_a_edge,
     )
     add_datum_feature(
         adapter, top, symbol_xy=(0.020, 0.175), datum="B",
-        label="left outer rail-face datum", entity=datum_b_edge, shoulder=True,
+        label="left outer rail-face datum", entity=datum_b_edge,
     )
     add_datum_feature(
         adapter, top, symbol_xy=DATUM_C_SYMBOL_XY, datum="C",
-        label="lower outer rail-face datum", entity=datum_c_edge, shoulder=True,
+        label="lower outer rail-face datum", entity=datum_c_edge,
     )
     add_feature_control_frame(
         adapter, top, frame_xy=(0.175, 0.150), characteristic="position",

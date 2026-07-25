@@ -177,7 +177,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="axle bore axis",
         entity_type="EDGE",
-        position_tolerance_m=0.0035,
     )
     add_feature_control_frame(
         adapter,

@@ -132,8 +132,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.039),
         datum="A",
         label="crank-drive gear bore axis",
-        shoulder=True,
-        position_tolerance_m=0.080,
     )
     add_feature_control_frame(
         adapter,

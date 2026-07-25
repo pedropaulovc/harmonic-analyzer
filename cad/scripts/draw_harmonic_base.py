@@ -34,7 +34,6 @@ from _drawing_common import (
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
-    restore_default_view_display,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -310,8 +309,6 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
-    restore_default_view_display(adapter, top)
-
     datum_entity, hole_entities, datum_b_edge, datum_c_edge = (
         _visible_hole_table_entities(adapter, top)
     )
@@ -341,7 +338,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="machined underside datum",
         entity=datum_a_edge,
-        shoulder=True,
     )
     add_datum_feature(
         adapter,
@@ -350,7 +346,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="machined long-side datum",
         entity=datum_b_edge,
-        shoulder=True,
     )
     add_datum_feature(
         adapter,
@@ -359,7 +354,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="machined left-end datum",
         entity=datum_c_edge,
-        shoulder=True,
     )
     add_feature_control_frame(
         adapter,

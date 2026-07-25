@@ -311,7 +311,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.027, FRONT_CENTER[1]),
         datum="A",
         label="shaft OD datum axis",
-        position_tolerance_m=0.0001,
     )
     add_datum_feature(
         adapter,

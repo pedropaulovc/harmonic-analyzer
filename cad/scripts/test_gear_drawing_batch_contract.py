@@ -110,13 +110,8 @@ def test_bore_annotations_use_explicit_nonconflicting_selectors() -> None:
         assert "entity=bore_edge" not in source, module.__name__
         assert source.count("edge_xy=bore_top") == 2, module.__name__
         assert "leader_attach_xy=" not in source, module.__name__
-        expected_tolerance = "position_tolerance_m=0.0001"
-        if module in CRANK_PAIR_MODULES:
-            expected_tolerance = "position_tolerance_m=0.080"
-        if module is draw_cylinder_gear:
-            expected_tolerance = "position_tolerance_m=0.008"
-        assert expected_tolerance in source, module.__name__
-        assert "shoulder=True" in source, module.__name__
+        assert "position_tolerance_m=" not in source, module.__name__
+        assert "shoulder=True" not in source, module.__name__
 
 
 def test_crank_pair_runout_uses_typed_precomputed_tooth_top_pick() -> None:

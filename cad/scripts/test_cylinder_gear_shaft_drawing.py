@@ -66,7 +66,6 @@ def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
     assert source.count("add_datum_feature(") == 1
     assert "edge_xy=end_top" in source
     assert "symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.024)" in source
-    assert "position_tolerance_m=0.0001" in source
     assert source.count("add_feature_control_frame(") == 2
     assert source.count('characteristic="cylindricity"') == 1
     assert source.count('characteristic="perpendicularity"') == 1

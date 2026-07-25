@@ -200,7 +200,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         datum="B",
         label="stud bearing axis",
-        position_tolerance_m=0.00002,
     )
     add_feature_control_frame(
         adapter,

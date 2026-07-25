@@ -16,6 +16,8 @@ PART_DRAWINGS = tuple(spec for spec in DRAWINGS if spec.source_kind == "part")
 FORBIDDEN_PLACEMENT_KEYWORDS = {
     "char_height",
     "leader_attach_xy",
+    "position_tolerance_m",
+    "shoulder",
 }
 VISUAL_OVERRIDE_CALLS = {
     "SetDisplayMode4",

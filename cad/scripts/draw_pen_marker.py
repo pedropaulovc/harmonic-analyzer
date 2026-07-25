@@ -37,7 +37,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     set_view_position,
     view_name,
-    view_outline,
 )
 
 
@@ -204,10 +203,6 @@ async def build(adapter: Any) -> dict[str, str]:
     _rotate_view(adapter, front, -math.pi / 2.0, label="pen-marker profile")
     if not set_view_position(adapter, front, *FRONT_CENTER):
         raise RuntimeError("failed to re-center the rotated pen-marker profile")
-    _telemetry.info(
-        f"pen-marker profile outline after rotate: {view_outline(adapter, front)}"
-    )
-
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     _add_axis_centerline(adapter, front, label="pen-marker")
 

@@ -218,7 +218,6 @@ async def build(adapter: Any) -> dict[str, str]:
         # upward when the symbol is committed.  Accept that measured native
         # readback shift; this is an automation check, not a part tolerance.
         label="guide bottom edge",
-        position_tolerance_m=0.0001,
     )
     # Dropped to y=0.098 from FRONT_HOLE_Y_M (0.1111): level with the edge, the
     # box is UNAVOIDABLY struck through. `insert_hole_table` gives no control over

@@ -84,10 +84,8 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
         "        symbol_xy=(_front_x(BORE_HALF_SPACING) + 0.0145, _front_y(0.0) - 0.026),\n"
         '        datum="B",\n'
         '        label="pivot bore axis",\n'
-        "        position_tolerance_m=0.003,"
         in source
     )
-    assert source.count("position_tolerance_m=0.003") == 1
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source
     assert "add_surface_finish(" in source

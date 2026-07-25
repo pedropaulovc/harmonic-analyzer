@@ -78,7 +78,6 @@ def test_datum_and_position_controls_are_present() -> None:
     assert 'datum="A"' in source
     assert 'datum="B"' in source
     assert "symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024)" in source
-    assert source.count("position_tolerance_m=0.001") == 2
     assert "_dimension_position" not in source
     assert "GetPosition" not in source
     assert 'width_annotation = front_by_name["Width"]' in source
@@ -90,7 +89,6 @@ def test_datum_and_position_controls_are_present() -> None:
     assert 'datum="C"' in source
     assert 'datum="D"' in source
     assert 'datum="E"' in source
-    assert "shoulder=True" in source
     assert source.count('characteristic="position"') == 3
     assert source.count("set_basic_dimension(") == 2
     assert 'label="pinch-axis height"' in source

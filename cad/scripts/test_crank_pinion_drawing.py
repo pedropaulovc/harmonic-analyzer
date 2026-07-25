@@ -98,8 +98,8 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     assert "visible_tooth_tip_silhouette" not in source
     assert source.count("edge_xy=bore_top") == 2
     assert "edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_OD)" in source
-    assert "shoulder=True" in source
-    assert "position_tolerance_m=0.080" in source
+    assert "shoulder=True" not in source
+    assert "position_tolerance_m=" not in source
     assert 'quantity="2X AXIAL END FACES"' in source
     assert source.count('characteristic="perpendicularity"') == 1
     assert source.count("add_feature_control_frame(") == 2

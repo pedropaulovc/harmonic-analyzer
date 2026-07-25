@@ -307,7 +307,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="stem cylindrical datum feature",
         entity_type="SILHOUETTE",
-        position_tolerance_m=0.020,
     )
     add_feature_control_frame(
         adapter,

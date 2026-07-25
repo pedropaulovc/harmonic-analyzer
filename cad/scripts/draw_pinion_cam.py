@@ -222,7 +222,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.085, 0.105),
         datum="B",
         label="cam final bore axis",
-        position_tolerance_m=0.003,
     )
     # The OD-axis datum is constrained more strongly: live readback places its
     # tag 18.197 mm from the requested sheet point.  Keep the intended anchor
@@ -234,7 +233,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.155, 0.105),
         datum="C",
         label="cam OD datum axis",
-        position_tolerance_m=0.019,
     )
     # Datum D attaches on the boss's LEFT flank, opposite the two position
     # frames on the right, so its leader unambiguously lands on the boss OD
@@ -248,7 +246,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.192, 0.170),
         datum="D",
         label="cam boss OD axis",
-        position_tolerance_m=0.0025,
     )
     add_feature_control_frame(
         adapter,

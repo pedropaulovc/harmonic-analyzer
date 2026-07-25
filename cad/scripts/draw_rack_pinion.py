@@ -129,8 +129,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.026),
         datum="A",
         label="rack pinion bore axis",
-        shoulder=True,
-        position_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,

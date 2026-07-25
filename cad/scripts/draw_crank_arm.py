@@ -349,8 +349,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=DATUM_B_SYMBOL,
         datum="B",
         label="crank shaft axis",
-        shoulder=True,
-        position_tolerance_m=0.0001,
     )
     # Station moved off ARM_C2C*0.75 (sheet x=0.176) to the flat stretch between
     # the pivot centre and the arm end.  A datum feature symbol may be tagged

@@ -129,8 +129,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + 0.033),
         datum="A",
         label="crank pinion bore axis",
-        shoulder=True,
-        position_tolerance_m=0.080,
     )
     add_feature_control_frame(
         adapter,

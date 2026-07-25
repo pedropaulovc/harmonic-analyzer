@@ -84,7 +84,6 @@ def test_linked_notes_and_fit_callouts() -> None:
 def test_native_gdt_controls_seat_form_runout_and_finish() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 1
-    assert source.count("position_tolerance_m=0.003") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert 'characteristic="cylindricity"' in source
     assert 'characteristic="circular_runout"' in source

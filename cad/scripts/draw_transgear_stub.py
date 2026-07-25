@@ -165,7 +165,6 @@ async def build(adapter: Any) -> dict[str, str]:
         # The native circular-edge attachment retains a legal point 2.343 mm
         # inward along this radial leader.  Bound that normalization locally;
         # the shared persistence check remains strict for unconstrained tags.
-        position_tolerance_m=0.003,
     )
     # The stud is a revolve: its side outlines are SILHOUETTE entities (no
     # model edge runs along a cylinder side), so every front-view attachment

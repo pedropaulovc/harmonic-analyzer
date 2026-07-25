@@ -351,7 +351,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="column outside diameter",
         entity=post_od_entity,
-        position_tolerance_m=0.016,
     )
     post_side_xy = (
         FRONT_CENTER[0] + BLOCK_DIA / 2.0 * _S,
@@ -401,7 +400,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         datum="C",
         label="journal-bore clocking axis",
-        position_tolerance_m=0.016,
     )
     crank_entity, _ = _crank_bore_edge(adapter, front)
     add_attached_note(

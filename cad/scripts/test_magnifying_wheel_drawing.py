@@ -66,12 +66,10 @@ def test_native_gdt_and_axial_dims() -> None:
         '        datum="A",\n'
         '        label="axle bore axis",\n'
         '        entity_type="EDGE",\n'
-        "        position_tolerance_m=0.0035,"
         in source
     )
     assert "FRONT_CENTER[0] + _BORE_R * 0.707" in source
     assert "FRONT_CENTER[1] + _BORE_R * 0.707" in source
-    assert source.count("position_tolerance_m=0.0035") == 1
     assert 'characteristic="circular_runout"' in source
     assert source.count("add_surface_finish(") == 1
     # hub + rim axial widths added across the section.

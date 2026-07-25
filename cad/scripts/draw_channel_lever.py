@@ -276,7 +276,6 @@ async def build(adapter: Any) -> dict[str, str]:
         # committed.  This allowance checks annotation readback only; it does
         # not alter the part's manufacturing tolerances.
         label="fulcrum bore axis",
-        position_tolerance_m=0.0001,
     )
     top_face = (
         RIGHT_CENTER[0],

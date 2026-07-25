@@ -165,7 +165,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
         datum="A",
         label="bushing bore axis",
-        position_tolerance_m=0.0001,
     )
     add_datum_feature(
         adapter,

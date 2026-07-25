@@ -74,10 +74,8 @@ def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
     assert source.count("add_surface_finish(") == 1
     assert (
         'symbol_xy=(0.128, 0.255),\n        datum="A",\n'
-        '        label="knob body axis",\n'
-        "        position_tolerance_m=0.0035," in source
+        '        label="knob body axis",\n' in source
     )
-    assert source.count("position_tolerance_m=0.0035") == 1
 
 
 def test_annotation_targets_use_precomputed_coordinates() -> None:

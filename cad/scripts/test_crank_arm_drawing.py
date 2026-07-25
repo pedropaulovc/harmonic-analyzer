@@ -115,8 +115,8 @@ def test_shaft_axis_datum_pick_is_radial_with_its_symbol() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "edge_xy=DATUM_B_RIM" in source
     assert "symbol_xy=DATUM_B_SYMBOL" in source
-    assert "shoulder=True" in source
-    assert "position_tolerance_m=0.0001" in source
+    assert "shoulder=True" not in source
+    assert "position_tolerance_m=" not in source
 
 
 def test_handle_pivot_has_basic_transverse_location_from_datum_c() -> None:
@@ -161,18 +161,11 @@ def test_gtol_annotations_are_migrated_to_current_xml_format() -> None:
     assert common.index("SetFrameSymbols2") < common.index("ConvertFormat()")
     assert "if not migrated and not frame.SetSymbolXml(xml)" in common
     assert "annotation.SetAttachedEntities(dispatch_array([edge]))" in common
-    # Bent, not straight: a straight leader runs at whatever angle the
-    # anchor-to-frame vector takes, which is what drove the Ra symbol's leader
-    # across two views. IGtol::SetLeader cannot ask for bent, so the ordinary
-    # path goes through IAnnotation::SetLeader3 and checks its int status.
+    # Semantic leader materialization preserves SolidWorks-selected visuals.
     assert "annotation.SetLeader3(" in common
-    assert "_LEADER_BENT," in common
+    assert "int(annotation.GetLeaderStyle())," in common
+    assert "_LEADER_BENT" not in common
     assert "gtol.SetLeader(True, 0, False, False)" not in common
-    # DIMENSION-attach entity registration is flow-dependent (0 or 1 depending
-    # on insertion order), so the check accepts either; edge attachments stay 1.
-    assert 'expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}' in common
-    assert "not bool(gtol.IsAttached())" in common
-    assert "int(gtol.GetLeaderCount()) != 1" in common
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

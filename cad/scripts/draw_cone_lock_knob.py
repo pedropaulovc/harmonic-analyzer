@@ -196,7 +196,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.128, 0.255),
         datum="A",
         label="knob body axis",
-        position_tolerance_m=0.0035,
     )
     add_feature_control_frame(
         adapter,

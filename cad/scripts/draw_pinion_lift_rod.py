@@ -155,7 +155,6 @@ async def build(adapter: Any) -> dict[str, str]:
         # SolidWorks normalizes this circular-edge datum 16.83 um along the
         # permitted circumference. Bound that measured API read-back locally;
         # all unrestricted datum placements retain the 1 um default.
-        position_tolerance_m=0.00002,
     )
     # Cylindricity and the bearing finish both control the rod's CYLINDRICAL
     # face, which the side view shows edge-on -- so both anchor to its flank

@@ -162,11 +162,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         datum="A",
         label="cylinder gear bore axis",
-        shoulder=True,
         # This shoulder-constrained tag retains a point 7.186 mm inward on the
         # same radial.  The bounded call-site tolerance admits that native
         # normalization; the layout audit still rejects a collapsed leader.
-        position_tolerance_m=0.008,
     )
     # Gear face perpendicular to the bore axis (datum A), attached directly to
     # the largest visible planar gear face instead of a tooth-tip silhouette.
