@@ -73,11 +73,12 @@ SHEET_SCALE = (3.0, 1.0)
 FRONT_BBOX_CY = (
     (CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))
 ) / 2.0
-FRONT_CENTER = (0.105, 0.150)
+FRONT_CENTER = (0.105, 0.120)
 # At y=0.232 SolidWorks' default placement put the rotated BossDia/BossCz
 # import through the top sheet border. The view and all of its derived picks
-# move together; 42 mm down leaves the default-owned dimension layout intact.
-TOP_CENTER = (0.100, 0.190)
+# move together. The front import also carries a long rotated bore callout, so
+# both authored view centres sit low enough for their default text to clear.
+TOP_CENTER = (0.100, 0.185)
 ISO_CENTER = (0.230, 0.185)
 BOTTOM_CENTER = (0.270, 0.195)
 

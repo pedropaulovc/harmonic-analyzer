@@ -63,7 +63,8 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 
 
 def test_top_view_anchor_keeps_default_dimensions_inside_sheet() -> None:
-    assert drawing.TOP_CENTER == (0.100, 0.190)
+    assert drawing.FRONT_CENTER == (0.105, 0.120)
+    assert drawing.TOP_CENTER == (0.100, 0.185)
     assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
 
 
