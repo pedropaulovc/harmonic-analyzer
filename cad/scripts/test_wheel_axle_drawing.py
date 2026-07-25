@@ -78,6 +78,12 @@ def test_view_scales_are_explicit() -> None:
     assert source.count("scale=(3, 1)") == 3
 
 
+def test_end_view_anchor_keeps_default_dimensions_inside_sheet() -> None:
+    assert drawing.END_CENTER == (0.105, 0.190)
+    assert drawing.END_CENTER[0] == drawing.FRONT_CENTER[0]
+    assert drawing.END_CENTER[1] > drawing.FRONT_CENTER[1]
+
+
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source

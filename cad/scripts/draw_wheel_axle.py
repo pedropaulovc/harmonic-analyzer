@@ -58,11 +58,11 @@ _TOTAL_LEN = FLANGE_LEN + STUD_LEN
 # Front view: the profile (axle axis vertical, flange at the bottom).
 # End view: the tip-side circles, third-angle above the front view.
 FRONT_CENTER = (0.105, 0.100)
-# The O35 flange at 3:1 makes this view a 105 mm circle, so y=0.215 ran its
-# outline 3.4 mm into the top zone band. 0.208 clears it by ~3.6 mm and keeps
-# the third-angle stack (end view above front, both on x=0.105) intact; the gap
-# to the front view's upper dimensions is ~27 mm, so nothing crowds below.
-END_CENTER = (0.105, 0.208)
+# The O35 flange at 3:1 makes this view a 105 mm circle. y=0.208 cleared the
+# geometry but SolidWorks' default O5/O9/O35 dimension text still crossed the
+# top sheet border. Moving the complete end-view stack down 18 mm keeps its
+# third-angle relationship and gives the auto-placed text the missing margin.
+END_CENTER = (0.105, 0.190)
 ISO_CENTER = (0.310, 0.185)
 
 

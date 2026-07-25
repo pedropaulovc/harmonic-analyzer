@@ -75,7 +75,10 @@ VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-
 # pattern; the front elevation (1:4) shows the stepped stack; the hole
 # table sits upper-right and the notes fill the lower-left.  The plan runs at the
 # sheet's 1:2; only the 1:4 isometric carries a scale note.
-TOP_CENTER = (0.130, 0.170)
+# The 457.2 mm plan nearly fills the space left of the hole table.  Keep its
+# centre far enough right for SolidWorks' automatic overall-width dimension and
+# the derived lower-left datum/origin annotations to remain inside the border.
+TOP_CENTER = (0.143, 0.170)
 SIDE_CENTER = (0.345, 0.075)
 
 # Named survivors of the marked-dimension import. Only the bottom plate's

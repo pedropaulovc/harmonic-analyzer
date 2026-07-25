@@ -70,7 +70,7 @@ def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     assert "X.XX" not in notes
     assert "BREAK EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'adapter, "Manufacturing Notes", 0.020, 0.088' in source
+    assert 'adapter, "Manufacturing Notes", 0.020, 0.110' in source
     assert "char_height=" not in source
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PinchClearance"' in part_source

@@ -73,7 +73,7 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
     assert "X.XX" not in data
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'adapter, "Gear Data"' in source
-    assert 'adapter, "Manufacturing Notes"' in source
+    assert 'adapter, "Manufacturing Notes", 0.018, 0.130' in source
 
 
 def test_gear_data_block_is_inset_from_the_zone_border() -> None:

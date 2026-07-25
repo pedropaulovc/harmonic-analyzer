@@ -62,6 +62,11 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
+def test_top_view_anchor_keeps_default_dimensions_inside_sheet() -> None:
+    assert drawing.TOP_CENTER == (0.100, 0.212)
+    assert drawing.TOP_CENTER[1] > drawing.FRONT_CENTER[1]
+
+
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "SLIDING FIT" not in notes

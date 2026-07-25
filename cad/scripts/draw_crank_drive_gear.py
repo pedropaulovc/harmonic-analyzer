@@ -168,7 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.102)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.130)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

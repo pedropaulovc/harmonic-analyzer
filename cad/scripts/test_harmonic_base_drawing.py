@@ -103,6 +103,16 @@ def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     assert drawing.HOLE_TABLE_ANCHOR[0] >= 0.274
 
 
+def test_plan_has_left_annotation_clearance_without_crowding_hole_table() -> None:
+    half_length = drawing.BOTTOM_LENGTH * drawing.VIEW_SCALE / 2000.0
+    plan_left = drawing.TOP_CENTER[0] - half_length
+    plan_right = drawing.TOP_CENTER[0] + half_length
+
+    assert drawing._DATUM_XY[0] == plan_left
+    assert plan_left >= 0.028
+    assert drawing.HOLE_TABLE_ANCHOR[0] - plan_right >= 0.016
+
+
 def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:
     for spec in (part.STOP_SEAT_SPEC, part.BLOCK_SEAT_SPEC, part.FOOT_SEAT_SPEC):
         thread_depth = spec.overrides_mm["ThreadDepth"]
