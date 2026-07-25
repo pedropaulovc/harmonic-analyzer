@@ -399,11 +399,15 @@ async def build(adapter) -> dict[str, str]:
     # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
     # shaft, the arbor bore (Axis2) journals the pinion. The p2 swing group keys
     # off these (concentric to the shaft + lock the pinion in -- build_drive_train).
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pivot bore")
-    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", C2C, "arbor bore")
+    pivot_axis = await name_bore_axis(
+        adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pivot bore"
+    )
+    arbor_axis = await name_bore_axis(
+        adapter, "Right Plane", 0.0, "Top Plane", C2C, "arbor bore"
+    )
     # Pin seat axis (along X): Front @ mid-thickness x Top @ -PIN_DROP. The
     # follower pin mates coaxial to this in the assembly, riding the swing.
-    await name_bore_axis(
+    pin_seat_axis = await name_bore_axis(
         adapter, "Front Plane", THICKNESS / 2.0, "Top Plane", -PIN_DROP, "pin seat"
     )
 
@@ -440,9 +444,9 @@ async def build(adapter) -> dict[str, str]:
             ("Plane2", "PLANE"),
             ("Plane3", "PLANE"),
             ("Plane4", "PLANE"),
-            ("pivot bore", "AXIS"),
-            ("arbor bore", "AXIS"),
-            ("pin seat", "AXIS"),
+            (pivot_axis, "AXIS"),
+            (arbor_axis, "AXIS"),
+            (pin_seat_axis, "AXIS"),
         ),
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
