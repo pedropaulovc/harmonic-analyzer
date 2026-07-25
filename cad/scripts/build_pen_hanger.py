@@ -15,9 +15,9 @@ the bar FROM BEHIND (the magnifying wheel's rim back face passes 1.0 in
 front of the strap, so no front-side head fits); the tip sits 0.5
 behind the strap front face.
 
-Layout: origin at the guide block centre (machine (+3, 505, -151.5));
+Layout: origin at the guide block centre (machine (+3, 505, -157.0));
 block z -4..+12.6 (back face flush with the bar front at machine
-z -138.9), strap in the z = 9.6..12.6 band rising +Y to the bar band
+z -144.4), strap in the z = 9.6..12.6 band rising +Y to the bar band
 (machine y 560..570). The part is authored MACHINE-handed and placed
 IDENTITY, so local axes are machine axes (the strap's sideways lean, its
 only x-asymmetric feature, runs toward machine east = local -x).

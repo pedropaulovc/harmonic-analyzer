@@ -62,12 +62,11 @@ VIEW_SCALE = (1, 5)
 # property, and a blank column reads as an unreleased sheet).
 BOM_COMPONENTS = {
     "knife-mount": "KNIFE-EDGE BEARING SUPPORT",
-    "top-crossbar": "LEVER HANGER CROSSBAR",
     "summing-lever": "SUMMING LEVER",
     "boss-hook": "COUNTER-SPRING LEVER HOOK",
     "counter-spring": "COUNTER-BALANCE SPRING",
     "gooseneck": "COUNTER-SPRING SUPPORT POST",
-    "gooseneck-clamp": "GOOSENECK COLUMN CLAMP",
+    "gooseneck-screw": "GOOSENECK PINCH SCREW",
 }
 BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 

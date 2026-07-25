@@ -82,7 +82,7 @@ BOM_PART_NUMBERS = {
 FRONT_BALLOON_ITEMS = (
     ("harmonic-base", "1"),
     ("rocker-arm", "3"),
-    ("top-crossbar", "4"),
+    ("top-frame", "4"),
     ("magnifying-wheel", "5"),
     ("pen-rod", "6"),
 )

@@ -22,7 +22,7 @@ ROD_DIA = 6.0  # round brass rod (low)
 # summing bar and pivots WITH it about the knife-edge ridge (engineerguy video
 # 2/4 + 4/4; the tip draws a ~6 mm arc, and the clamp's position along the rod --
 # the radius from this pivot -- is what sets the <=4x magnification). The ridge
-# line runs along Z at machine (pre-mirror) (15, 995.134); in lever-local coords
+# line runs along Z at machine (pre-mirror) (15, 1018.484); in lever-local coords
 # (assembly placement (-200, 990, -85), rod along +X) that is (215, 5.134).
 # Duplicated literals -- build_magnifier_assembly asserts them against
 # build_summing_assembly's KNIFE/KNIFE_CONTACT_Y and its own placement.

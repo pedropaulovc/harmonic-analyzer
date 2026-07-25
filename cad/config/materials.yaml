@@ -35,10 +35,8 @@ cone_tip_gear_configs: [T006, T012, T018, T024]
 casting_green_parts:
   - arbor-pedestal
   - cone-pivot-post  # absorbed the old crank-pedestal (merged column, 2026-07-03)
-  - gooseneck-clamp
   - harmonic-base
   - rocker-arm-support
-  - top-crossbar
   - top-frame
   - summing-lever  # ch17/ch18 macros: same green paint as the frame (2026-07-08)
   - pen-v-block    # ch24 macro: green-painted cradle over the brass mass model

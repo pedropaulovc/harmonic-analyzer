@@ -75,6 +75,7 @@ from _chain import (
     centreline_distance,
     loop_point_tangent,
 )
+import _config
 from _common import (
     IN,
     apply_custom_properties,
@@ -138,8 +139,9 @@ from build_transgear_bracket import (  # noqa: E402
     SCREW_HOLE_DX as BRACKET_SCREW_DX,
 )
 
-COLUMN_X = 197.0
-COLUMN_Z = -112.0
+from frame_anchors import COLUMN_X, COLUMN_Z as _COLUMN_ABS_Z  # machine/frame.yaml
+
+COLUMN_Z = -_COLUMN_ABS_Z  # -117.5
 # Depth chain: the front arc's front face (-129.9) carries the bar's back
 # face; the bar's front face (-138.9) carries the platen's back face.
 BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
@@ -642,7 +644,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label="support-bar (the platen bar)",
     )
-    # Machine columns at +-197 (west first, to match the pose ledger's -1/-2).
+    # Machine columns at +-COLUMN_X (west first, to match the pose ledger's -1/-2).
     for sx in (1.0, -1.0):
         # Ry(+90): the arcs' local +X (their depth axis) faces machine -Z.
         for arc in ("column-clamp-front", "column-clamp-back"):

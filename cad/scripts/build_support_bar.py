@@ -9,7 +9,7 @@ transgear bracket (build_transgear_bracket.py). Cross-section 22 tall x
 run ~29 past each column (ch30 p002).
 
 Holes (all along local Z, the machine front-back axis):
-* 4x clamp-screw counterbores flanking each column (x +-197 -+ 17.5):
+* 4x clamp-screw counterbores flanking each column (x +-203.8 -+ 17.5):
   the screw heads sit sub-flush in the BAR's front face so the refitted platen
   can slide across the east clamp, and thread into the back clamp arc.
 * 2x O4.0 bracket-screw holes at MACHINE x -10 / +10 (the two large slotted
@@ -33,6 +33,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     SketchDims,
     apply_material,
@@ -57,7 +58,8 @@ BAR_HEIGHT = 22.0  # tall (Y) -- ch22 back-side wear band (low)
 BAR_DEPTH = 9.0  # deep (Z) -- front face rubs the platen back (low)
 BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
 
-COLUMN_X = 197.0  # frame column line (frame assembly)
+from frame_anchors import COLUMN_X  # 203.8: frame column line
+# (machine/frame.yaml; the ch30 re-anchor moved it out from 197)
 CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
 # The O3.9 clamp-screw shanks pass through #8 clearance holes. Their Ø8 heads
 # are recessed 0.2 below the bar front: the right-shifted platen now travels

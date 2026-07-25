@@ -34,8 +34,8 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # FREE geom module, so a print-note edit cannot enter the assembly recipe.
     import wheel_bar_geom as geom
 
-    assert (geom.BAR_SIDE, geom.BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.0, 234.0)
-    assert geom.CLAMP_HOLE_X == (70.5, 105.5)
+    assert (geom.BAR_SIDE, geom.BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.0, 240.8)
+    assert geom.CLAMP_HOLE_X == (73.9, 108.9)
     assembly = Path(part.__file__).with_name("build_magnifier_assembly.py").read_text(
         encoding="utf-8"
     )

@@ -30,31 +30,34 @@ CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
 # line -- this wire, the wheel, the rim wire, the pen rod -- as ONE plumb
 # vertical at the machine front. The old lever depth (z -85) hung the hook 50
 # behind the wheel plane, an ~8 deg lean the photo refutes. A PERFECTLY planar
-# wire is impossible (the rim ring z -142.9..-150.9 blocks every straight
+# wire is impossible (the rim ring z -148.4..-156.4 blocks every straight
 # in-band approach, and the hub pokes only 1.0 past the rim per side), so the
 # real wire leans SLIGHTLY, ducking behind the rim's back face into the hub's
 # back groove band. Solving the clearance system (>= 0.25 surface everywhere;
 # rim back-face bound at radius 43.35, axle-flange bound inside radius 17.9,
-# spoke fronts at -144.9) gives the hook/hub-end pair below: a 10 mm z drop
+# spoke fronts at -150.4) gives the hook/hub-end pair below: a 10 mm z drop
 # over the ~363 run = 1.6 deg, visually plumb.
 CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 # The wire TIES through the fixture's cross hole and hangs beside the vertical
 # rod, just under the collar's bottom face: wire r + 0.25 below it in y, and
 # off the rod axis in -z by rod r 2.5 + wire r 0.4 + 0.25 = 3.15 (the front
-# face of the rod). So HOOK_Z = VROD_Z - 3.15 with VROD_Z = -134.8
-# (LEVER_ROD_Z -128.3 -- the ONLY depth window: the top-frame ring rail
-# (z -101..-123, y >= 999.7) forces the thumb-screw head band deeper than
-# -128.25 and the front column forces the rod deeper than -127.95, while the
-# wire's rim-duck feasibility caps the hook at ~-137.96).
+# face of the rod). So HOOK_Z = VROD_Z - 3.15 with VROD_Z = -140.3
+# (LEVER_ROD_Z -133.8 -- the depth window: the top-frame ring rail
+# no longer reaches down to the clamp stack after the 2026-07-24 re-anchor,
+# so the window is the front column (rod deeper than -133.45) against the
+# wire's rim-duck feasibility, which caps the hook at ~-143.46).
+# Every station here rides the FRONT COLUMN (bar -> clamp arc -> column), so
+# the re-anchor's column move (z -112 -> -117.5) carried the whole line 5.5
+# forward as one rigid group -- the platen and the pen line with it.
 HOOK_Y = 925.35  # FIXTURE_Y0 926 - wire r 0.4 - 0.25 (under the collar bottom)
-HOOK_Z = -137.95
+HOOK_Z = -143.45
 WHEEL_X = 53.0  # magnifying-wheel centre
 WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
 HUB_DIA = 20.0  # ch. 21 annotated (build_magnifying_wheel.HUB_DIA)
 # Hub-end Z: in the hub's back groove band, between the rim-duck bound
-# (z >= -142.25 while the run is radially inside the rim ring) and the
-# axle-flange bound (<= -142.55 wherever radius < 17.9).
-HUB_END_Z = -142.77
+# (z >= -147.75 while the run is radially inside the rim ring) and the
+# axle-flange bound (<= -148.05 wherever radius < 17.9).
+HUB_END_Z = -148.27
 
 # XY tangent from the hook to the hub circle inflated by wire r + clearance,
 # on the west (hook) side: the wire grazes the groove and the wrap is implied.
@@ -78,7 +81,7 @@ WIRE_LEN = round(math.dist(WIRE_START, WIRE_END), 3)
 # the wheel's mid-plane (machine z -146.9). Its XY radial offset from the wire
 # end is perpendicular to the wire axis by tangency, so only the z step feeds
 # the YokePlane offset below.
-WHEEL_MID_Z = -146.9  # wheel mid-plane (build_magnifier_assembly.WHEEL_MID_Z)
+WHEEL_MID_Z = -152.4  # wheel mid-plane (build_magnifier_assembly.WHEEL_MID_Z)
 YOKE_PITCH_R = HUB_DIA / 2.0 + WIRE_DIA / 2.0  # 10.4: wire-centreline pitch
 YOKE_POINT = (
     WHEEL_X + YOKE_PITCH_R * math.cos(_THETA),

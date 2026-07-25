@@ -59,6 +59,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     apply_custom_properties,
     apply_summary_info,
@@ -102,11 +103,14 @@ ASM_NAME = "magnifier"
 WHEEL_BAR_Y = 575.7  # ch30 p002 front-view re-anchor (2026-07-17): the wheel
 # + bar + column clamps sit 10.7 higher than the old 565.0 -- the photo shows
 # the rim clearing the platen box top, which 565.0 left overlapped
-COLUMN_X = 197.0  # the WEST column (machine +x is west; the crank side -x is east)
-COLUMN_Z = -112.0
+from frame_anchors import COLUMN_X, COLUMN_Z as _COLUMN_ABS_Z, UNDERSIDE_Y
+
+# COLUMN_X 203.8: the WEST column (machine +x is west; the crank side -x is
+# east). Stations from the ch30 bundle solve (machine/frame.yaml), 2026-07-24.
+COLUMN_Z = -_COLUMN_ABS_Z  # -117.5
 # Depth chain -- the SAME two-piece clamp seat as the platen support bar
 # (paper-drive PR #196 E2): the front arc's front face (-129.9) carries the
-# bar's back face; the bar's front face lands on the shared -138.9 plane, so
+# bar's back face; the bar's front face lands on the shared -144.4 plane, so
 # the wheel/axle/wire/pen line is untouched by the clamp swap.
 from _clamp_arc import EAR_HOLE_Z as CLAMP_EAR_DX  # noqa: E402
 from column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
@@ -115,26 +119,45 @@ from wheel_bar_geom import (  # noqa: E402
     CLAMP_HOLE_X as BAR_CLAMP_HOLE_LOCAL_X,
 )
 
-BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9
-BAR_FRONT_Z = BAR_BACK_Z - WHEEL_BAR_DEPTH  # -138.9: bar front = platen-back plane
-BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
+BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -135.4
+BAR_FRONT_Z = BAR_BACK_Z - WHEEL_BAR_DEPTH  # -144.4: bar front = platen-back plane
+BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -139.9 bar centre
 
 # --- magnifying group --------------------------------------------------------
-# Rod at the plate centreline (990) so it is coplanar with the coefficients plate
-# (raised from 985); the bracket flange butts the plate front face. The clamp +
-# vertical rod ride up with it (CLAMP_POS and VROD_TOP_Y derive from LEVER_ROD_Y).
-LEVER_ROD_Y = 990.0
+# Rod at the plate centreline so it is coplanar with the coefficients plate; the
+# bracket flange butts the plate front face. The clamp + vertical rod ride up
+# with it (CLAMP_POS and VROD_TOP_Y derive from LEVER_ROD_Y). DERIVED from the
+# summing knife line, not restated: the rod extends FROM the summing bar and
+# pivots with it, so a knife move (e.g. the 2026-07-24 frame re-anchor, +23.6)
+# carries the whole magnifying group without a second edit here.
+from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
+
+LEVER_ROD_Y = KNIFE[1]  # 1013.35
+# Tallest thing riding the rod: the backed-out thumb screw (tip tangent to the
+# rod top, so this is as LOW as it models) -- rod r 3 + shank 12 + head 5. It
+# sits under the top frame's front rail in Z (the whole output line is at the
+# machine front, ch30 p.4) and cannot be moved out from under it, so its
+# clearance has to come from the knife drop; assert it here rather than let the
+# interference gate discover a 0.00 graze.
+THUMB_HEAD_TOP_Y = LEVER_ROD_Y + 3.0 + 12.0 + 5.0
+assert THUMB_HEAD_TOP_Y <= UNDERSIDE_Y - 0.25, (
+    f"thumb-screw head {THUMB_HEAD_TOP_Y} fouls the top-frame underside "
+    f"{UNDERSIDE_Y}: drop the summing knife line (build_summing_assembly)")
 # DEPTH RE-ANCHOR (2026-07-04): the ch30 p.4 side view shows the whole output
 # line (fixture wire, wheel, rim wire, pen rod) as ONE plumb vertical at the
 # machine front -- the old z -85 (M6.4, low) hung the wire hook 50 behind the
-# wheel plane, an ~8 deg lean the photo refutes. -128.3 is the ONLY window:
-# the thumb-screw head (top y 1010, pokes above the top-frame ring bottom
-# 999.7) must clear the ring's front rail z -101..-123 (=> <= -128.25), the
-# lever rod must clear the front column surface -124.7 (=> <= -127.95), and
-# the lever-wire's rim-duck route caps the hook at ~-137.96 (=> >= -128.31).
-# VROD_Z = -134.8 (clamp's 6.5 skew bore); wire hook -137.95; the bracket arm
+# wheel plane, an ~8 deg lean the photo refutes. Two live bounds: the lever rod
+# must clear the front column surface -130.2 (=> <= -133.45) and the lever-wire's
+# rim-duck route caps the hook at ~-143.46 (=> >= -133.81). -133.8 sits in that
+# 0.36-wide window -- and is the old -128.3 carried rigidly forward by the
+# 2026-07-24 column move (z -112 -> -117.5), so the whole front line (bar, wheel,
+# both wires, platen, pen) keeps its solved internal geometry.
+# The ring rail no longer bounds it: the re-anchor dropped the thumb-screw head
+# top (1033.35) BELOW the rail underside (1033.6), where the old head poked 10.3
+# above it and had to be pushed in front of the rail.
+# VROD_Z = -140.3 (clamp's 6.5 skew bore); wire hook -143.45; the bracket arm
 # reaches back to the unchanged plate flange (build_magnifying_bracket).
-LEVER_ROD_Z = -128.3
+LEVER_ROD_Z = -133.8
 LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 # placed Ry(180) so the part's local +x runs east toward the summing knife)
 
@@ -144,7 +167,6 @@ LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 # The ridge is the summing sub's knife line; assert the lever part's local
 # KnifeAxis lands exactly on it, so a knife move fails loud here.
 from magnifying_lever_geom import KNIFE_LOCAL_X, KNIFE_LOCAL_Y  # noqa: E402
-from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # The lever is placed Ry(180) (local +x -> machine -x), so the knife lands at
 # LEVER_X0 - KNIFE_LOCAL_X.
@@ -164,13 +186,15 @@ CLAMP_POS = (
     LEVER_ROD_Y - CLAMP_BORE_Y,
     LEVER_ROD_Z,
 )
-VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -134.8 (local +x -> machine -z)
+VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -140.3 (local +x -> machine -z)
 VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
 FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
 
 # --- wheel -------------------------------------------------------------------
 WHEEL_X = 53.0
-WHEEL_BAR_X0 = 109.0  # wheel-bar centre: span -8 .. +226 (29 past the west column)
+WHEEL_BAR_X0 = 112.4  # wheel-bar centre: span -8 .. +232.8 (29 past the west
+# column). The free end is base-anchored (pen hanger), so the 2026-07-24 frame
+# re-anchor moved only the clamped end out with the column.
 # Clamp screws flank the column line, closing the stack bar -> front arc ->
 # back arc with heads on the bar's front face (ch30 p002 / support-bar idiom).
 # (west screw first -- keeps the component instance order of the mirrored-era
@@ -184,7 +208,7 @@ assert sorted(
     "wheel-bar clamp holes drifted off the column clamp-screw lines"
 from build_wheel_axle import FLANGE_LEN, STUD_LEN  # noqa: E402
 
-WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
+WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -152.4:
 # the 10-wide hub sits flush between the flange face and the tip collar
 
 # --- amplification wire 1 (fixture -> hub) -----------------------------------
@@ -397,7 +421,7 @@ async def build(adapter) -> dict[str, str]:
     # form).
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
     tscrew = await place_component(adapter, "thumb-screw",
-                                   [CLAMP_X, LEVER_ROD_Y + 3.0 + 12.0 + 5.0, LEVER_ROD_Z],
+                                   [CLAMP_X, THUMB_HEAD_TOP_Y, LEVER_ROD_Z],
                                    [180.0, 0.0, -90.0], _rz90_ry180, ground=False,
                                    label="thumb-screw (clamp)")
     await lock_mate(adapter, named_ref(f"Front Plane@{tscrew}", "PLANE"),

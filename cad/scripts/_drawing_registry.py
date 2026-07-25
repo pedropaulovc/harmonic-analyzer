@@ -111,12 +111,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_pivot_shaft.py",
     ),
     DrawingSpec(
-        name="top_crossbar",
-        part="top_crossbar",
-        artifact_stem="top-crossbar",
-        script_name="draw_top_crossbar.py",
-    ),
-    DrawingSpec(
         name="pen_assembly",
         part="pen",
         artifact_stem="pen-assembly",
@@ -380,12 +374,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="gooseneck",
         artifact_stem="gooseneck",
         script_name="draw_gooseneck.py",
-    ),
-    DrawingSpec(
-        name="gooseneck_clamp",
-        part="gooseneck_clamp",
-        artifact_stem="gooseneck-clamp",
-        script_name="draw_gooseneck_clamp.py",
     ),
     DrawingSpec(
         name="measuring_stick",

@@ -16,6 +16,7 @@ _THREADED_BUILDERS = {
     "cone-tip-pinch-screw",
     "fillister-screw",
     "foot-screw",
+    "gooseneck-screw",
     "hanger-screw",
     "hex-bolt",
     "lag-screw",

@@ -3,7 +3,7 @@ r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 Static structure of the machine: the two-plate cast base, four smooth
 polished columns at the corners, the rocker-arm-support that carries the
 rocker-pivot shaft, and the top-frame ring capping the columns
--- column tops flush with the ring's top face at 1040.7 (M6.8 8-view pass:
+-- column tops flush with the casting's top face at 1074.6 (M6.8 8-view pass:
 no stub above).
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
@@ -12,8 +12,9 @@ depth):
 
 * harmonic-base fixed at the origin, top face at Y = 50.8.
 * tube-frame x4 standing on the base top face near the top-plate corners,
-  centres at (+/-197, +/-112) — 25.25/21.35 mm inset from the top-plate
-  edges (eight views: columns sit at the extreme corners).
+  centres at (+/-203.8, +/-117.5) — the ch30 bundle solve (machine/frame.yaml),
+  18.45/15.35 mm inset from the top-plate edges (eight views: columns sit at
+  the extreme corners).
 * rocker-arm-support x1 (the windowed trapezoidal NORTH support,
   build_rocker_arm_support.py) at (X, Z) = (+72.9, +44.45), foot seated on the
   base top. A 177.8 x 177.8 cast plate, 63.5 thick (tapering to 16.94 at the
@@ -42,9 +43,10 @@ depth):
   rod-pin hole 127.37 out reaches the cam drum at -54.7, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
-* top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
-  41, y 999.7..1040.7), corner bosses bored around the four columns; its
-  west rail seats the top-lever ball mounts (channel.SLDASM).
+* top-frame x1: the green casting at band mid-plane Y = 1054.1 (webbed rails
+  34 wide x 41 tall, y 1033.6..1074.6), corner pads bored around the four
+  columns; its west rail seats the top-lever ball mounts (channel.SLDASM) and
+  its cast-in cross rib hangs the summing lever (summing.SLDASM).
 * nameplate x1: the maker's plate (book ch. 26), laid FLAT on the base top
   face on the EAST (+X) side, decorated side up, centred front-back between the
   two east columns and read by an operator at that face. Cosmetic; constrained
@@ -76,6 +78,7 @@ from __future__ import annotations
 
 import sys
 
+import _config
 from _common import (
     OUT_SLDPRT,
     apply_custom_properties,
@@ -102,8 +105,9 @@ from _transforms import ROT_Y_POS90
 ASM_NAME = "frame"
 
 BASE_TOP_Y = 50.8  # harmonic-base: 0.5 in bottom + 1.5 in top plate
-COLUMN_X = 197.0  # column centres, from the ch. 6 / ch. 30 corner placement
-COLUMN_Z = 112.0
+from frame_anchors import COLUMN_X, COLUMN_Z  # 203.8 / 117.5
+# Column stations: the ch30 bundle solve (machine/frame.yaml), which superseded
+# the ch. 6 / ch. 30 corner-placement eyeball at (+/-197, +/-112).
 SUPPORT_X = 72.9  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
 # triangulation midpoint +72.5; M6.8 mirror). Rod-side tip reaches the drum.
 # The support's z position is NOT a constant: it is CENTRED on the base z-axis by
@@ -135,7 +139,11 @@ SUPPORT_ROWS = ROT_Y_POS90
 LAG_SCREW_XZ = ((55.44, 60.32), (55.44, -60.32), (90.36, 60.32), (90.36, -60.32))
 LAG_SCREW_UNDER_HEAD_Y = 6.5
 
-TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
+from frame_anchors import MID_Y as TOP_FRAME_MID_Y, TOP_FACE_Y as TOP_FRAME_TOP_Y
+
+# TOP_FRAME_MID_Y 1054.1: the casting
+# is authored about its own mid-height, so the placement point is the band centre
+# (rails y 1033.6..1074.6).
 
 # Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
 # on the base top, decorated side up, on the EAST (+X) face -- read off the in-situ
@@ -311,7 +319,7 @@ async def build(adapter) -> dict[str, str]:
         "lag-screw hold-down grid",
     )
 
-    # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
+    # Top-frame casting clamped around the four columns, mid-plane y 1054.1.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=top_frame_path, position=target)

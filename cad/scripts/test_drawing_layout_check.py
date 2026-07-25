@@ -849,7 +849,7 @@ def _gdt_with_geometry(x, y, kind, label, lines=(), triangles=()):
 def test_control_frame_is_measured_from_its_rendered_lines():
     """An FCF's box is its real geometry, NOT a square around its anchor.
 
-    The numbers are top-crossbar's position frame as the COM probe read it
+    The numbers are a crossbar-era position frame as the COM probe read it
     (2026-07-16): five 7.0mm-tall compartment rectangles spanning x
     0.1200..0.1616 off anchor (0.1200, 0.0900), plus a leader shoulder and a
     diagonal leader. Independently confirmed against the render, which measured

@@ -18,12 +18,12 @@ CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
 WHEEL_X = 53.0  # magnifying-wheel centre (build_magnifier_assembly.WHEEL_X)
 WHEEL_BAR_Y = 575.7  # wheel axis height = the vertical-tangent point's y
 RIM_DIA = 100.0  # ch. 21 annotated (build_magnifying_wheel.RIM_OUTER_DIA)
-WHEEL_MID_Z = -146.9  # rim groove mid-plane (wheel mid-plane)
+WHEEL_MID_Z = -152.4  # rim groove mid-plane (wheel mid-plane)
 WIRE_HOLE_Y = 513.0  # pen-rod wire hole: PEN_ROD_POS y 398 + local 115
 
 # Hanging run: 0.25 off the rim surface at the pen-rod-side tangent, straight
 # down to the wire-hole level (the wire passes 1.7 clear in front of the
-# rod's z -149 front face -- the tie-off through the hole is implied).
+# rod's z -154.5 front face -- the tie-off through the hole is implied).
 WIRE_X = WHEEL_X - RIM_DIA / 2.0 - WIRE_DIA / 2.0 - CLEARANCE  # 2.35
 WIRE_BOTTOM = (WIRE_X, WIRE_HOLE_Y, WHEEL_MID_Z)
 WIRE_LEN = WHEEL_BAR_Y - WIRE_HOLE_Y  # 62.7

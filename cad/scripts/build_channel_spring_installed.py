@@ -11,15 +11,15 @@ lead is a normal short hook lead (symmetric with the top), not a plate-spanning
 one, and the bottom eye sits above the plate:
 
     top eye centre    1062.52  (lever spring hole 1065.89 - drop 3.37)
-    bottom eye centre  996.54  (on the hook arm; its O5.5 ring bottom 993.29
-                                clears the plate top 992.54 by 0.75)
+    bottom eye centre 1019.89  (on the hook arm; its O5.5 ring bottom 1016.64
+                                clears the plate top 1015.89 by 0.75)
     coil body bottom   998.54  (bottom eye + 2.0 bottom lead)
     body = 1062.52 - 2.0 (top lead) - 998.54             = 61.98
     bottom lead                                          = 2.0
 
-    The plate is the coplanar .cs casting (top 992.54, see build_summing_lever).
+    The plate is the coplanar .cs casting (top 1015.89, see build_summing_lever).
     The top eye is the LIVE neutral lever spring hole (level rest pose, ch14 ROM
-    re-derive): the lever pivots about FULCRUM=(-199.9, 1065.9) with the spring
+    re-derive): the lever pivots about FULCRUM=(-206.7, 1099.8) with the spring
     hole 177.8 out along the arm, and the level rocker rest pose leaves the
     neutral lever tilt at -0.002 deg -- the hole sits essentially at the fulcrum
     height, 1065.89, NOT the tilted-era 1066.52/1066.62. build_channel_assembly is

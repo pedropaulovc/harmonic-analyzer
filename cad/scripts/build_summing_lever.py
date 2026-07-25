@@ -139,12 +139,13 @@ CHANNEL_PITCH = 7.0565
 HOLE_Z_OFFSET = 0.8  # coaxial with the spring axis (z_j + 0.8): no lead threads
 # the bore anymore, so the old -2.75 lead offset is dropped (hook shank is on-axis)
 # The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
-# placed at the knife line y=990 it spans 987.46..992.54, so the top registers at
-# machine 992.54 (NOT the old M6.4 998). The channel springs + magnifying bracket
+# placed at the knife line y=1013.35 it spans 1010.81..1015.89, so the top
+# registers at machine 1015.89 (the 2026-07-24 frame re-anchor carried the whole
+# summing group up +23.6 with the cross rib's underside). The channel springs + magnifying bracket
 # were dropped to meet it (build_channel_*: PLATE_TOP_Y/PLATE_EYE_Y;
 # build_magnifying_bracket: FLANGE_Y). Consumed at PLACEMENT (the part is
 # pivot-centred), not by any extrude here.
-PLATE_TOP_Y = 992.54
+PLATE_TOP_Y = 1015.89
 
 # --- hex knife-edge protrusions (NEW; LOW confidence -- tune vs ch30) -------
 # TWO trunnion stubs, one PROTRUDING BEYOND each body end (not flush inside):

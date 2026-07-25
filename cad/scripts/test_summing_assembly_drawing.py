@@ -84,7 +84,7 @@ def test_bom_covers_every_placed_component() -> None:
         assert f'"{component}"' in source, f"{component} not placed by the build"
     placed = re.findall(r'place_component\(\s*adapter,\s*"([a-z0-9-]+)"', source)
     assert set(placed) == set(drawing.BOM_COMPONENTS)
-    assert len(placed) == 8  # knife-mount placed twice (front + back support)
+    assert len(placed) == 7  # knife-mount placed twice (front + back support)
 
 
 def test_assembly_stamps_title_block_properties() -> None:

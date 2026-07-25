@@ -8,20 +8,22 @@ crossbar, and counter-balanced from above by the boss-hook / counter-
 spring / gooseneck chain.
 
 * knife-mount x2 -- the bearing supports, one per hex trunnion (|z| ~ 87).
-* top-crossbar -- hangs the lever from the top-frame ring.
+* the lever hangs from the top frame's cast-in cross rib (frame.SLDASM).
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study. The rock is the sub's single FREED operational DOF: its
   drive spec is recorded into the DOF manifest, never authored, so the
   saved model rocks on the knife edge.
 * boss-hook (keyed to the lever's anchor eye) + counter-spring + gooseneck +
-  gooseneck-clamp -- the counter-balance hung from the east column.
+  gooseneck-screw -- the counter-balance hung from the east column. The post
+  runs in a socket cast into the top frame, pinched by the square-head screw;
+  there is no separate clamp block on the machine.
 
 Cross-subassembly fits (checked at the top level): the channel springs
 (channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
-analytically by build_channel_assembly._assert_plate_threading; the crossbar
-ends face-flush on the top-frame ring rail inner faces (frame.SLDASM) and the
-gooseneck-clamp wraps the east column.
+analytically by build_channel_assembly._assert_plate_threading; the knife
+mounts hang from the top frame's cross rib and the gooseneck runs in that same
+casting's socket (frame.SLDASM).
 
 Fix-all strategy (M6.2): every structural component inserted at its exact
 final transform and fixed; the summing lever + boss-hook are left free and
@@ -37,6 +39,8 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+
+import _config
 
 from _common import (
     apply_custom_properties,
@@ -66,13 +70,25 @@ from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90
 ASM_NAME = "summing"
 
 # --- machine anchors ---------------------------------------------------------
-KNIFE = (-15.0, 990.0)  # summing-lever knife-edge line (x, y), along Z
-COLUMN_X = -197.0  # east column (the crank side is machine -X)
+KNIFE = (-15.0, 1013.35)  # summing-lever knife-edge line (x, y), along Z:
+# 20.25 below the top frame's cross-rib underside (1033.6). The drop is SET BY
+# the tallest thing riding the magnifying-lever rod (which extends from this
+# lever, so it hangs at the knife line): the magnifying clamp's backed-out
+# thumb-screw head reaches rod + 3 + 12 + 5, so 20 alone would land its top
+# EXACTLY on the rail underside -- a 0.00 graze the interference gate treats as
+# a sliver. 20.25 buys the repo's standard margin; build_magnifier_assembly
+# asserts it. (Before the 2026-07-24 re-anchor the drop was 20.0 flat, against
+# a separate top-crossbar that stood 10.3 PROUD of the ring; the integral,
+# flush-topped cross rib put its underside on the rail underside instead, so
+# the whole summing group moved +23.35 while the frame top moved +33.9.)
+from frame_anchors import COLUMN_X as _COLUMN_ABS_X, MID_Y, RAIL_HALF
+
+COLUMN_X = -_COLUMN_ABS_X  # -203.8: east column
 
 # --- knife bearing supports (build_knife_mount) -----------------------------
 from summing_lever_spec import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
 
-KNIFE_CONTACT_Y = KNIFE[1] + HEX_H / 2.0  # knife-edge contact ridge line (995.13)
+KNIFE_CONTACT_Y = KNIFE[1] + HEX_H / 2.0  # knife-edge contact ridge line (1018.48)
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
 # --- counter-spring chain (boss_hook_geom / counter_spring_spec) ------------
@@ -86,9 +102,20 @@ from counter_spring_spec import (  # noqa: E402
     WIRE_DIA as CS_WIRE_DIA,
 )
 
-BOSS_HOOK_POS = (-90.5, 1000.0, 0.0)
-SPRING_POS = (-95.0, 1052.1, 0.0)  # coil-bottom origin; ring at y 1012.1
-# (y 1052.0 left the hook rod poking 0.05 past the ring inner top)
+# --- gooseneck socket (build_top_frame) -------------------------------------
+GOOSENECK_SCREW_Y = MID_Y  # 1054.1  # the tapped passage is on the rail mid-height
+GOOSENECK_SCREW_STANDOFF = RAIL_HALF  # outer rail face, |x| = COLUMN_X + 17
+
+# The post SLIDES in its socket -- that is what the set screw is for -- so the
+# gooseneck is set by the counter-spring hang, not by the frame: it rides the
+# summing group (+23.35), NOT the frame top (+33.9). Pinch height is then just
+# wherever the screw lands on the post.
+GOOSENECK_Y = 1233.35
+
+BOSS_HOOK_POS = (-90.5, 1023.35, 0.0)
+SPRING_POS = (-95.0, 1075.45, 0.0)  # coil-bottom origin; ring at y 1035.45
+# (0.1 lower left the hook rod poking past the ring inner top). The whole
+# counter-spring chain rides the summing lever, so it moved with it (+23.35).
 
 
 def _assert_counter_spring_hang() -> None:
@@ -98,7 +125,7 @@ def _assert_counter_spring_hang() -> None:
     we model a 0..0.5 air gap instead so the interference check stays
     zero (the original sense -- rod top ABOVE the ring inner top -- was
     inverted and encoded a 0.05 wire/rod overlap)."""
-    ring_y = SPRING_POS[1] - CS_BOTTOM_LEAD  # 1012.1
+    ring_y = SPRING_POS[1] - CS_BOTTOM_LEAD  # 1035.7
     ring_inner_top = ring_y + (CS_COIL_OD - CS_WIRE_DIA) / 2.0 - CS_WIRE_DIA / 2.0
     rod_top = BOSS_HOOK_POS[1] + SHANK_RISE + ELBOW_R + HOOK_ROD_DIA / 2.0
     gap = ring_inner_top - rod_top
@@ -128,11 +155,8 @@ async def build(adapter) -> dict[str, str]:
     await place_component(adapter, "knife-mount",
                           [KNIFE[0], KNIFE_CONTACT_Y, -HEX_Z_MID],
                           [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (back)")
-    # Crossbar band y 1010..1051: 0.5 above the summing-lever tube top
-    # (1009.5), ends face-flush on the ring rail inner faces (y to 1040.7),
-    # stud pokes 14 above for the nut seat.
-    await place_component(adapter, "top-crossbar", [KNIFE[0], 1010.0, 0.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    # (No crossbar component: the bar that hangs this lever is the top frame's
+    # own cast-in CROSS RIB -- see build_top_frame. It lives in frame.SLDASM.)
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,
     # leaving the rock DOF -- the sub's freed operational DOF (its drive spec
@@ -186,10 +210,16 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 90.0, 0.0], ROT_Y_POS90)
     # Ry(180), like the boss-hook: the gooseneck's overhang arm reaches from
     # the east column toward the machine centre.
-    await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, 0.0],
+    await place_component(adapter, "gooseneck", [COLUMN_X, GOOSENECK_Y, 0.0],
                           [0.0, 180.0, 0.0], ROT_Y_180)
-    await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
-                          [0.0, 0.0, 0.0], IDENTITY)
+    # Square-head set screw pinching the post in its socket (ch. 19 p.45). There
+    # is no clamp BLOCK: the socket and its tapped passage are cast into the top
+    # frame, so the screw seats against that frame's outer rail face. The screw
+    # is authored axis-along-+X (head behind the under-head plane, shank ahead of
+    # it), so it seats on that -X outer face at IDENTITY.
+    await place_component(adapter, "gooseneck-screw",
+                          [COLUMN_X - GOOSENECK_SCREW_STANDOFF, GOOSENECK_SCREW_Y, 0.0],
+                          [0.0, 0.0, 0.0], IDENTITY, label="gooseneck set screw")
 
     # Certify the AS-BUILT model. Necessity only: the freed lever rock is
     # genuinely free; the lock-mated boss-hook MUST read under-constrained

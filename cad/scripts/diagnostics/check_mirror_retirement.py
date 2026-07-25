@@ -51,12 +51,13 @@ import build_summing_assembly as s
 
 expect("summing", "knife-mount-1", [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.HEX_Z_MID], IDENTITY, "knife-mount front")
 expect("summing", "knife-mount-2", [s.KNIFE[0], s.KNIFE_CONTACT_Y, -s.HEX_Z_MID], IDENTITY, "knife-mount back")
-expect("summing", "top-crossbar-1", [s.KNIFE[0], 1010.0, 0.0], IDENTITY, "top-crossbar")
 expect("summing", "summing-lever-1", [s.KNIFE[0], s.KNIFE[1], 0.0], IDENTITY, "summing-lever")
 expect("summing", "boss-hook-1", list(s.BOSS_HOOK_POS), ROT_Y_180, "boss-hook")
 expect("summing", "counter-spring-1", list(s.SPRING_POS), ROT_Y_POS90, "counter-spring")
-expect("summing", "gooseneck-1", [s.COLUMN_X, 1210.0, 0.0], ROT_Y_180, "gooseneck")
-expect("summing", "gooseneck-clamp-1", [s.COLUMN_X, 1040.7, 0.0], IDENTITY, "gooseneck-clamp")
+expect("summing", "gooseneck-1", [s.COLUMN_X, s.GOOSENECK_Y, 0.0], ROT_Y_180, "gooseneck")
+expect("summing", "gooseneck-screw-1",
+       [s.COLUMN_X - s.GOOSENECK_SCREW_STANDOFF, s.GOOSENECK_SCREW_Y, 0.0],
+       IDENTITY, "gooseneck-screw")
 
 # ---- pen ------------------------------------------------------------------
 import build_pen_assembly as p

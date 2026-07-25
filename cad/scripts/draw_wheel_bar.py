@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the magnifying-wheel bar.
 
-A 10 x 9 steel bar, 234 long, carrying the wheel axle and the pen-hanger strap.
+A 10 x 9 steel bar, 240.8 long, carrying the wheel axle and the pen-hanger strap.
 Three bores run along the depth (front-back), so the FRONT view (looking down the
 bore axis) shows them as circles: 2x #8 clamp-screw clearance holes flanking the
 column and 1x #6 pen-hanger hole at the free end.  The bar length + section ride

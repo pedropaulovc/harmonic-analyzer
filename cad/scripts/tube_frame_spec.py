@@ -17,7 +17,8 @@ MM_PER_IN = 25.4
 OUTER_DIA = 1.0 * MM_PER_IN       # 25.4
 WALL_THICKNESS = 0.12 * MM_PER_IN  # 3.048
 INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS  # 19.304
-COLUMN_LENGTH = 989.9  # top flush with the top-frame ring top face
+COLUMN_LENGTH = 1023.8  # top flush with the top-frame top face
+# (machine/frame.yaml top_frame_top_y_mm 1074.6 - base top 50.8)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_tube_frame`` marks exactly these; ``draw_tube_frame`` keeps

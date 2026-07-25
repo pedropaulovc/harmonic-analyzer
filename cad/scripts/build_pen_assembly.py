@@ -82,30 +82,32 @@ WHEEL_BAR_Y = 575.7  # the wheel-bar the pen-hanger clamps (magnifier.SLDASM)
 
 # --- pen ---------------------------------------------------------------------
 PEN_ROD_X = 3.0
-PEN_Z_MID = -151.5  # pen-rod / v-block bore plane (v-block back face -143.5
-# clears the plate front -142.9 by 0.6)
+PEN_Z_MID = -157.0  # pen-rod / v-block bore plane (v-block back face -149.0
+# clears the plate front -148.4 by 0.6). The whole pen line is PLATEN-relative
+# and the platen hangs off the front columns, so the 2026-07-24 re-anchor
+# (column z -112 -> -117.5) carried it 5.5 forward intact.
 HANGER_POS = (PEN_ROD_X, 505.0, PEN_Z_MID)
 PEN_ROD_POS = (PEN_ROD_X, 398.0, PEN_Z_MID - 2.5)  # rod z -154..-149
 # Ry(180): the v-block is modeled bores-toward-local-+x/+z; turned about Y its
-# back face (the local z 0 wall, now at world z -143.5) clears the plate front
-# and the rod bore (local x 21, z 8) lands at (3, -151.5).
-VBLOCK_POS = (24.0, 390.0, -143.5)
+# back face (the local z 0 wall, now at world z -149.0) clears the plate front
+# and the rod bore (local x 21, z 8) lands at (3, -157.0).
+VBLOCK_POS = (24.0, 390.0, -149.0)
 MARKER_X = 13.0  # marker bore (local x 11)
 MARKER_TIP_Y = 368.0
 # Frame flat on the v-block top (y 408), long axis along X so its window
-# (machine x -7..+25, z -161..-147) spans the marker barrel (+9..+17,
-# z -155.5..-147.5) and the pen rod (+0.5..+5.5, z -154..-149). Mapping:
+# (machine x -7..+25, z -166.5..-152.5) spans the marker barrel (+9..+17,
+# z -161..-153) and the pen rod (+0.5..+5.5, z -159.5..-154.5). Mapping:
 # machine x = 29 - local y, machine y = 408 + local z, machine z =
-# -143 - local x; the ring's near rail is trimmed to local x 0.75
-# (build_pen_frame TRIM_NEAR) so its edge (z -143.75) clears the recording
-# paper's front face (-143.4) by 0.35. The screw hole (local x 11, z 5)
-# lands at machine (y 413, z -154), axis along X through the east end rail.
-FRAME_POS = (29.0, 408.0, -143.0)
+# -148.5 - local x; the ring's near rail is trimmed to local x 0.75
+# (build_pen_frame TRIM_NEAR) so its edge (z -149.25) clears the recording
+# paper's front face (-148.9) by 0.35. The screw hole (local x 11, z 5)
+# lands at machine (y 413, z -159.5), axis along X through the east end rail.
+FRAME_POS = (29.0, 408.0, -148.5)
 FRAME_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 # Set screw turned Ry(180) so its own axis presses east (-X) through the
 # frame's east end-rail hole: knob x +33..+38, shank tip at x +18, 1 short
 # of the marker barrel's east face (+17).
-SET_SCREW_POS = (38.0, 413.0, -154.0)
+SET_SCREW_POS = (38.0, 413.0, -159.5)
 
 # --- amplification wire 2 (rim -> pen rod) -----------------------------------
 # Endpoints + length live in pen_wire_geom (the part's length IS the run);
@@ -129,10 +131,10 @@ assert math.isclose(
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar (the wheel rim passes 1.0 in front
 # of the strap, so no front-side head fits): AF-7 head on the bar back
-# face (-129.9 -- the 9-deep support-bar stock seated on the clamp arc,
+# face (-135.4 -- the 9-deep support-bar stock seated on the clamp arc,
 # build_magnifier_assembly BAR_BACK_Z), O3.5 shank through the bar + strap
-# holes, tip 0.5 behind the strap front face (-141.9).
-HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, -129.9)
+# holes, tip 0.5 behind the strap front face (-147.4).
+HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, -135.4)
 
 
 async def build(adapter) -> dict[str, str]:

@@ -4,7 +4,7 @@ The ball-end pillar that carries each pivot shaft end: a short pedestal
 rising from its seat to a Ø13 ball whose centre sits 25.2 above the seat,
 cross-bored Ø6.5 for the Ø6.35 shaft. Two seat on the rocker-support
 apexes (seat y 228.6 -> pivot axis 253.8); two on the top-frame west rail
-(seat y 1040.7 -> fulcrum axis 1065.9). The book's clevis-and-ball detail
+(seat y 1074.6 -> fulcrum axis 1099.8). The book's clevis-and-ball detail
 (p. 40) is simplified to a monolithic base + stem + ball - the clamping
 hardware is not modeled.
 

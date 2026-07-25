@@ -4,6 +4,7 @@ frame:
   column_z_mm: 117.5               # column centre stations, machine |z|
   top_frame_top_y_mm: 1074.6       # top-frame casting TOP face (= column tops)
   top_frame_height_mm: 41.0        # rail band height (top face - bottom face)
+  top_frame_rail_width_mm: 34.0    # rail width in plan = corner-pad diameter
   source: "ch30 eight-views bundle solve (triangulate_ch30_gt.py), base-anchored"
   confidence: med
   notes: >-
@@ -13,6 +14,10 @@ frame:
     lever, counter-spring gooseneck) derives its station from these — read them
     through _config.machine("frame", ...) rather than re-pasting a literal, so a
     future re-anchor cannot leave a fossil behind.
+
+    rail_width is an INTERFACE, not just top-frame internals: the outer rail
+    face is where the gooseneck set screw seats, and the corner-pad radius sets
+    the top-lever ball mounts' z clearance.
 
     Measured 2026-07-24 by re-running the ch30 bundle adjustment
     (cad/scripts/diagnostics/triangulate_ch30_gt.py), whose ONLY fixed-scale

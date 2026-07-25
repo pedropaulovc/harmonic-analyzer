@@ -15,7 +15,9 @@ from __future__ import annotations
 MM_PER_IN = 25.4
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 15"). ---
-BAR_LENGTH = 32.0 * MM_PER_IN  # 812.8, ~80 cm / legacy 32"
+BAR_LENGTH = 846.7  # 846.7: the bar hangs PLUMB from the base-anchored rocker arm to the top
+# lever, so the 2026-07-24 frame re-anchor (+33.9 on the lever bank) grew it
+# from the legacy 32" / 812.8. Still inside ch15's stated "~80 cm" (84.7).
 BAR_WIDTH = 0.25 * MM_PER_IN  # 6.35 square section
 BAR_DEPTH = 0.25 * MM_PER_IN  # 6.35
 BOTTOM_NOTCH_WIDTH = 0.125 * MM_PER_IN  # 3.175

@@ -1,7 +1,7 @@
 r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
 The cast bearing block that suspends the summing lever's knife edge from the
-top crossbar. The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
+top frame's cross rib. The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
 
@@ -17,10 +17,10 @@ There are TWO supports, one per trunnion (placed front/back in the assembly at
 |z| ~ 87). This single part is built once and placed twice.
 
 Layout (part-local): origin = the **knife-edge contact line** = the hex top
-vertex ridge (placed at machine (15, 995.13, +-87)); local Z = the bore/trunnion
+vertex ridge (placed at machine (15, 1018.48, +-87)); local Z = the bore/trunnion
 axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
-block rises from below the bore up to the top-crossbar lower face (held there).
+block rises from below the bore up to the cross-rib lower face (held there).
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@summing-lever``) coincident to
@@ -89,11 +89,13 @@ BLK_HALF_X = 17.0  # bore wall + flank
 WALL = 4.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -29.15
 
-# Mount: the block top abuts the top-crossbar lower face (held to the top frame).
-KNIFE_Y = 990.0  # machine y of the pivot centreline (build_summing_assembly KNIFE)
-CROSSBAR_BOTTOM_Y = 1010.0  # top-crossbar lower face (build_summing_assembly)
-MOUNT_GAP = 0.25  # design clearance to the crossbar (sliver-flag margin)
-CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (995.13)
+# Mount: the block top abuts the top frame's cast-in CROSS RIB (the rib the old
+# separate top-crossbar part became -- build_top_frame CrossRib, whose underside
+# is the rail underside since the rib is flush-topped and full depth).
+KNIFE_Y = 1013.35  # machine y of the pivot centreline (build_summing_assembly KNIFE)
+CROSSBAR_BOTTOM_Y = 1033.6  # cross-rib lower face = top-frame rail underside
+MOUNT_GAP = 0.25  # design clearance to the rib (sliver-flag margin)
+CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (1018.48)
 BLK_TOP = CROSSBAR_BOTTOM_Y - CONTACT_Y - MOUNT_GAP  # local top (14.62)
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions

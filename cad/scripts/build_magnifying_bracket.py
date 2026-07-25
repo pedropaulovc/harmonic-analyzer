@@ -5,7 +5,7 @@ lever: a flange butted against the coefficients plate's front edge FACE
 and a forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps
 into. The collar/rod sit at the plate centreline (machine y 990) so the
 rod is coplanar with the plate; the flange spans the plate's full height
-(987.46..992.54). The current source model is an UNDRILLED blank. The older
+(1010.81..1015.89). The current source model is an UNDRILLED blank. The older
 mounting-screw description predates the butt-flange orientation and conflicts
 on the screw axis/stations, so no hole geometry is asserted here.
 
@@ -85,9 +85,9 @@ FLANGE_X = (-20.0, 5.0)  # mounting flange, machine x +20..+45. The collar sits
 # a 0.45-wide corner sliver -> it read as floating in the top view.) The west tab
 # clears channel spring j=0 (z -67.1) -- the flange sits at z <= -76.45, well south.
 FLANGE_Y = (-2.54, 2.54)  # spans the plate's FULL height: with the collar/rod now
-# at the plate centreline (machine 990, see build_magnifier_assembly LEVER_ROD_Y), the
-# flange butts the plate FRONT FACE rather than tucking under it -- machine
-# 987.46..992.54 = the coplanar .cs plate band
+# at the plate centreline (machine 1013.35, see build_magnifier_assembly
+# LEVER_ROD_Y), the flange butts the plate FRONT FACE rather than tucking under
+# it -- machine 1010.81..1015.89 = the coplanar .cs plate band
 FLANGE_Z = (47.3, 51.85)  # SAME machine band as ever (-81..-76.45): north face
 # at machine -76.45 = 0.25 south of the plate's real FRONT (-Z) face at -76.2
 # (the plate is the Top-rect z +-76.2, centred on the pivot -- NOT -70, an

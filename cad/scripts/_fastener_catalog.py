@@ -20,6 +20,7 @@ class HeadStyle(StrEnum):
     ROUND = "round"
     SET_SCREW = "set-screw"
     SHOULDER = "shoulder"
+    SQUARE = "square"
 
 
 class DriveStyle(StrEnum):
@@ -117,6 +118,10 @@ FASTENERS: dict[str, FastenerSpec] = {
     "foot-screw": _steel(
         "foot-screw", "#4-40", 8.0, 2.0,
         HeadStyle.FILLISTER, DriveStyle.SLOT, Finish.BLACK,
+    ),
+    "gooseneck-screw": _steel(
+        "gooseneck-screw", "1/4-20", 8.5, 6.35,
+        HeadStyle.SQUARE, DriveStyle.EXTERNAL_HEX, Finish.POLISHED,
     ),
     "hanger-screw": _steel(
         "hanger-screw", "#6-32", 11.5, 2.4,

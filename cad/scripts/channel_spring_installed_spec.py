@@ -24,15 +24,15 @@ COIL_COUNT = 28
 # Installed (in-machine) eye anchor heights -- the assembly-facing placement
 # contract (build_channel_assembly imports these; moved here from
 # build_channel_spring_installed so the assembly needs no builder import).
-LEVER_EYE_Y = 1062.5234  # LIVE neutral top eye = lever spring hole 1065.89 -
+LEVER_EYE_Y = 1096.4234  # LIVE neutral top eye = lever spring hole 1099.79 -
 # drop 3.37 (ch14 ROM re-derive: the LEVEL rocker rest pose flattens the neutral
-# lever tilt to -0.002 deg, dropping the eye 0.73; was 1063.25 at the ch30 GT
-# re-anchor's 0.231 deg tilt). The assembly's solve_state is the authority --
+# lever tilt to -0.002 deg, dropping the eye 0.73). Carried +33.9 by the
+# 2026-07-24 upper-frame re-anchor, with the lever bank it hangs from. The assembly's solve_state is the authority --
 # verify:math spring:neutral-body-canonical guards this value.
-PLATE_EYE_Y = 996.54  # bottom eye centre, ABOVE the .cs plate (top 992.54) on the
-# spring-hook arm: plate bottom 987.44 + hook arm height (SHANK_RISE 7.6 + ELBOW_R
-# 1.5 = 9.1). High enough that the eye's O5.5 ring clears the plate (its bottom
-# 993.29 > 992.54). The spring no longer threads the plate -- the hook bridges it.
+PLATE_EYE_Y = 1019.89  # bottom eye centre, ABOVE the .cs plate (top 1015.89) on
+# the spring-hook arm: plate bottom 1010.79 + hook arm height (SHANK_RISE 7.6 +
+# ELBOW_R 1.5 = 9.1). High enough that the eye's O5.5 ring clears the plate (its
+# bottom 1016.64 > 1015.89). The spring no longer threads the plate -- the hook bridges it.
 
 COIL_ID = COIL_OD - 2.0 * WIRE_DIA  # 4.5
 MEAN_DIA = COIL_OD - WIRE_DIA  # 5.5

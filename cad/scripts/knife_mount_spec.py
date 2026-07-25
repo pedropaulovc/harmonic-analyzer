@@ -23,7 +23,9 @@ from __future__ import annotations
 R_BORE = 12.7  # Ø25.4 knife-bearing bore
 BLK_HALF_X = 17.0  # block half-width (34 across)
 SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
-BLK_TOP = 14.62  # local block top (abuts the top-crossbar lower face)
+BLK_TOP = 14.87  # local block top (abuts the top frame's cast-in cross-rib
+# underside; 2026-07-24 re-anchor: the rib is flush-topped and full depth, so
+# that face is the rail underside 1033.6 and the block spans the 0.25 more)
 BLK_BOT = -29.15  # local block bottom
 BORE_CY = -12.45  # bore centre below the ridge origin (TopClear - R_BORE)
 

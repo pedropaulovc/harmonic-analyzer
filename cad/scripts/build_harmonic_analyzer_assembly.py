@@ -14,8 +14,9 @@ Cross-subassembly fits proven by the top-level interference check:
   summing-lever plate's O4.5 holes (summing.SLDASM), each presenting its arm
   just above the plate where the spring's bottom eye links on -- gated
   analytically by build_channel_assembly._assert_hook_fastener;
-* top-crossbar ends face-flush on the top-frame ring rail inner faces
-  (frame.SLDASM), gooseneck-clamp around the east column (all summing.SLDASM);
+* the lever-hanger crossbar and the gooseneck socket are CAST INTO the top
+  frame (frame.SLDASM), so the summing sub hangs its knife mounts off that
+  rib and runs its post in that socket;
 * column-clamps (magnifier + paper-drive) ride the Ø25.4 columns (frame) with
   a 25.6 bore;
 * the pen-hanger (pen.SLDASM) clamps the wheel-bar (magnifier.SLDASM), and the

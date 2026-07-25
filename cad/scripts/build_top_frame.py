@@ -76,7 +76,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import TAP_DRILL_MM
+from _fastener_catalog import fastener
 from top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -89,13 +89,17 @@ PART_NAME = "top-frame"
 MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
 
 # --- machine anchors (machine/frame.yaml, ch30 bundle solve) ----------------
-COLUMN_X = float(_config.machine("frame", "column_x_mm"))  # 203.8
-COLUMN_Z = float(_config.machine("frame", "column_z_mm"))  # 117.5
-RING_HEIGHT = float(_config.machine("frame", "top_frame_height_mm"))  # 41.0
+from frame_anchors import (  # 203.8 / 117.5 / 41.0 / 17.0
+    COLUMN_X,
+    COLUMN_Z,
+    RAIL_HALF,
+    RAIL_HEIGHT as RING_HEIGHT,
+)
+
 HALF_H = RING_HEIGHT / 2.0
 
 # --- rail section ----------------------------------------------------------
-RAIL_HALF = 17.0  # rail half-width = corner radius (ch30 p002 corner Ø34.2)
+# RAIL_HALF 17.0 = the corner radius too (ch30 p002 reads the corner at Ø34.2)
 WEB_HALF = 8.0  # web half-thickness -> 9 recessed per face
 TOP_FLANGE = 10.0  # ch30 p008 outer-face step at y 1063.7 vs top 1073.7
 BOT_FLANGE = 5.0  # step at 1036.0 vs bottom 1032.7 (ch19 p.44 proportions)
@@ -133,10 +137,12 @@ GOOSENECK_Z = 0.0  # rail mid-span: the gooseneck is a planar bend in z 0
 GOOSENECK_BORE_DIA = 17.0  # clearance for the Ø16 post sliding through
 BOSS_HALF_Z = 17.0  # the socket boss keeps the FULL rail section over
 # z ±17, so the Ø17 bore never breaks into the web recess (web is only 16 thick)
-PASSAGE_DIA = TAP_DRILL_MM["1/4-20"]  # 5.105: square-head set screw, tapped
-# radially through the outer face into the bore ("pinches the post in its
-# socket", ch. 19 p.45). Cut at the tap drill so the native CAD carries the
-# drawing's DRILL + TAP requirement, exactly as the retired clamp block did.
+PASSAGE_DIA = fastener("gooseneck-screw").model_diameter_mm + 0.1  # 6.45
+# The square-head set screw threads in radially and "pinches the post in its
+# socket" (ch. 19 p.45). The passage is modeled at the screw's SHANK size with a
+# 0.1 slip -- the same idiom as the Ø25.5-on-Ø25.4 column bores -- so the
+# assembled screw is a clean fit rather than a thread interference; the real
+# DRILL Ø5.11 + TAP 1/4-20 requirement rides in the drawing note.
 PASSAGE_Y = 0.0  # screw axis on the rail's mid-height plane
 
 THROUGH = 2.0 * (RING_HEIGHT + PAD_DROP)  # mid-plane total for through cuts

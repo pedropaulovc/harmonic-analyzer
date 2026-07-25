@@ -6,28 +6,29 @@ line, a 90-DEGREE bend (R 51) at the top, and a horizontal arm reaching
 west over the summing-lever boss, carrying the spring pin under its end.
 (M6.8 ch30 8-view pass: 90 degrees, not the earlier 180 candy-cane --
 user-confirmed against the ch. 19 photos; the ch30 plates crop below the
-bend.) Tension is set by sliding the tube in its clamp
-(build_gooseneck_clamp.py).
+bend.) Tension is set by sliding the tube in its socket -- cast into the top
+frame itself and pinched by the square-head set screw (build_gooseneck_screw);
+there is no separate clamp block on the machine.
 
-Geometry: vertical leg at machine x 197 (east column line), y 880 -- the
+Geometry: vertical leg at machine x 203.8 (east column line), y 903.35 -- the
 post passes through a clearance bore in the east rail (build_top_frame
-gooseneck bore) and drops ~120 below the rail underside (999.7), so the
+gooseneck socket) and drops ~130 below the rail underside (1033.6), so the
 support extends well below the top plate. The free lower tip is visible,
 clear of the columns, in the ch. 7 back-left three-quarter view
-(page001_img17): tip at machine 880 by the frame-height vertical scale,
-cross-checked by the post's Ø16 silhouette. Up to the bend start 1335;
-quarter bend to the horizontal arm at centreline
-y 1386, running west to its end face at machine x 85; the spring lug
-hangs under the arm end so the pin stays at machine (95, 1373) --
+(page001_img17): tip read at the frame-height vertical scale, then carried
+with the post by the counter-spring hang (below). Up to the bend start
+1358.35; quarter bend to the horizontal arm at centreline
+y 1409.35, running west to its end face at machine x 85; the spring lug
+hangs under the arm end so the pin stays at machine (95, 1396.35) --
 directly above the summing-lever boss hook, counter spring hanging
-plumb, loop top 1376.9 clearing the arm underside 1378. The book's tip
+plumb, loop top 1400.25 clearing the arm underside 1401.35. The book's tip
 "slotted screw" is modeled as a lug + O4 X-pin for the spring's top
 loop to encircle (simplification).
 
 Layout: part origin at the vertical leg's MID-height of the OLD 180 lay
-(machine (197, 1210, 0), placement preserved): leg y -330..+125, bend
-arc centre (-51, +125), arm centreline y +176 from x -51 to -112, lug
-x -109..-103.5 rising y 159..169.5 into the arm's 2 mm wall (underside
+(machine (203.8, 1233.35, 0), placement preserved): leg y -330..+125, bend
+arc centre (-51, +125), arm centreline y +176 from x -51 to -118.8, lug
+x -115.8..-110.3 rising y 159..169.5 into the arm's 2 mm wall (underside
 min 168), pin along X at (y 163, z 0). The tube is HOLLOW -- O16 x 2.0
 wall, matching the drawing's tube stock -- so every profile is an
 annulus. Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
@@ -83,22 +84,28 @@ MATERIAL = "Plain Carbon Steel"
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 WALL_T = 2.0  # tube wall: the drawing ships O16 x 2.0 WALL tube stock, so the
 # native CAD is the same hollow tube, not solid bar (codex review #361)
-LEG_TOP = 125.0  # bend start = machine 1335 (derived: arm y - bend R)
-LEG_BOTTOM = -330.0  # leg bottom = machine 880: the post passes through a
-# clearance bore in the east rail (build_top_frame gooseneck bore) and drops
-# ~120 below the rail underside (999.7). Measured from the ch. 7 back-left
+LEG_TOP = 125.0  # bend start = machine 1358.35 (derived: arm y - bend R)
+LEG_BOTTOM = -330.0  # leg bottom = machine 903.35: the post passes through a
+# clearance bore in the east rail (build_top_frame gooseneck socket) and drops
+# ~130 below the rail underside (1033.6). Measured from the ch. 7 back-left
 # three-quarter view (page001_img17): the post candy-canes, descends through
 # the top frame and ends in a free rounded tip (image y 491), clear of the
-# columns -- machine 880 by the frame-height vertical scale (41 mm / 26 px =
-# 1.58 mm/px), cross-checked by the post's own Ø16 silhouette (10 px). Was
-# -169 (machine 1041, at the rail top), then -250 (a front-view guess while
+# columns -- read at the frame-height vertical scale (41 mm / 26 px =
+# 1.58 mm/px), cross-checked by the post's own Ø16 silhouette (10 px); the
+# 2026-07-24 re-anchor then carried the whole post +23.35 with the
+# counter-spring chain it hangs (NOT +33.9 with the frame -- the post slides
+# in its socket, so the spring hang sets its height). Was
+# -169 (at the rail top), then -250 (a front-view guess while
 # the lower end was occluded by the coincident east column)
 BEND_R = 51.0  # 90-degree bend (med)
-ARM_Y = LEG_TOP + BEND_R  # 176: arm centreline = machine 1386; underside
-# 168 = machine 1378, 1.1 above the spring loop top 1376.9
-ARM_END_X = -112.0  # arm end face = machine 85: covers the lug with margin
+ARM_Y = LEG_TOP + BEND_R  # 176: arm centreline = machine 1409.35; underside
+# 168 = machine 1401.35, 1.1 above the spring loop top 1400.25
+ARM_END_X = -118.8  # arm end face = machine 85: covers the lug with margin.
+# The 2026-07-24 re-anchor moved the socket 6.8 further out (column |x| 197 ->
+# 203.8) while the lug/pin/spring targets on the summing lever stayed put, so
+# every local X station below reaches 6.8 further
 ARM_RUN = -ARM_END_X - BEND_R  # 61: straight run after the bend exit
-LUG_X = (-109.0, -103.5)  # lug plate, machine x 88..93.5 (derived: clear
+LUG_X = (-115.8, -110.3)  # lug plate, machine x 88..93.5 (derived: clear
 # of the spring loop's wire band x 94.1..95.9)
 LUG_Y = (159.0, 169.5)  # rises 1.5 past the arm underside (168) so the prism
 # merges into the round tube (a curved face needs real overlap) while staying
@@ -106,9 +113,9 @@ LUG_Y = (159.0, 169.5)  # rises 1.5 past the arm underside (168) so the prism
 # 170.0..170.19) -- a taller lug would poke through into the hollow bore
 LUG_HALF_Z = 1.5
 PIN_DIA = 4.0  # spring-loop pin (low)
-PIN_Y = 163.0  # machine 1373: loop centre 1370.6 + (loop mean r 5.35
+PIN_Y = 163.0  # machine 1396.35: loop centre 1393.95 + (loop mean r 5.35
 # - wire r 0.9 - pin r 2.0) hanging contact (derived)
-PIN_X = (-109.0, -98.0)  # cantilevers past the loop band to machine x 99
+PIN_X = (-115.8, -104.8)  # cantilevers past the loop band to machine x 99
 
 TUBE_R = TUBE_DIA / 2.0
 TUBE_IR = TUBE_R - WALL_T  # hollow bore radius (6.0)

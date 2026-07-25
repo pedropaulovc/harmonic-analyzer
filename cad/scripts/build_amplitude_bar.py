@@ -68,7 +68,9 @@ import _telemetry
 PART_NAME = "amplitude-bar"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-BAR_LENGTH = 32.0 * IN  # 812.8  DIMENSIONS.md ch15: ~80 cm stated; legacy 32" (high)
+BAR_LENGTH = 846.7  # 846.7: the bar hangs PLUMB from the base-anchored rocker arm to the top
+# lever, so the 2026-07-24 frame re-anchor (+33.9 on the lever bank) grew it
+# from the legacy 32" / 812.8. Still inside ch15's stated "~80 cm" (84.7).
 BAR_WIDTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: annotated (high)
 BAR_DEPTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: legacy, square section (med)
 BOTTOM_NOTCH_WIDTH = 0.125 * IN  # 3.175  DIMENSIONS.md ch15: legacy (med)

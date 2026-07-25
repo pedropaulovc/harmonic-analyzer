@@ -8,10 +8,11 @@ Diameter: REDERIVED from the ch30 8-view set (supersedes the legacy
 four quarter views (p003/p005/p007/p009) resolve the frame into four
 isolated single columns; under the manifest's orthographic cameras a
 vertical cylinder's apparent width = diameter x scale, with the per-view
-scale fit from the known column corner stations (±197, ±112) and azimuth
+scale fit from the then-assumed column corner stations (±197, ±112; the
+ch30 bundle solve later moved them to ±203.8/±117.5) and azimuth
 (R^2 0.94-0.99) and cross-checked against the base plate (460 mm -> ~1500
 px in the front view, matching the column-spacing scale and confirming
-the ±197 stations). Seven isolated-column reads gave Ø23.8 ± 1.0 mm;
+those stations). Seven isolated-column reads gave Ø23.8 ± 1.0 mm;
 rounded to the standard 1 in tube stock the machine (1896 Gaertner & Co.)
 would have used. The wall is the uncontradicted legacy 0.12 in (no
 view-based interior numeric). See cad/DIMENSIONS.md tube-frame row.
@@ -21,8 +22,8 @@ The M4 fluting (16 grooves, photogrammetry estimate) is retired: every
 ch30 plate shows plain reflective columns, and the groove edges also
 painted the columns black at capture scale.
 
-Length: 989.9 so the column top lands flush with the top-frame ring's
-top face (1040.7 = base top 50.8 + 989.9) - all eight ch30 plates show
+Length: 1023.8 so the column top lands flush with the top-frame's
+top face (1074.6 = base top 50.8 + 1023.8; machine/frame.yaml) - all eight ch30 plates show
 the columns capped by the ring's corner bosses, with NO stub above
 (user-confirmed; supersedes the ch. 6 "107 cm" reading, which matches
 the overall frame height, not the bare column).
@@ -153,7 +154,7 @@ async def build(adapter) -> dict[str, str]:
     # Verify the photo-locked column height via the solid bounding box (the
     # end-annulus face pair was screen-projected and collapsed to one face).
     await bbox_extent_check(
-        adapter, "column length (top-frame flush 989.9)", "y", COLUMN_LENGTH
+        adapter, "column length (top-frame flush 1023.8)", "y", COLUMN_LENGTH
     )
 
     await report_mass_properties(adapter)

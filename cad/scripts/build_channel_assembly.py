@@ -11,7 +11,7 @@ Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
 
 * pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z, centred z 0)
-  + fulcrum-shaft x1 (lever bank at (199.9, 1065.9), 182 long - the
+  + fulcrum-shaft x1 (lever bank at (206.7, 1099.8), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
 * pivot-ball-mount x4 (rocker pair: north on the rocker-support apex at
   (72.9, 228.6, +101.6), south on the A-FRAME clevis saddle at
@@ -246,7 +246,9 @@ RING_CENTER = (
 
 # --- amplitude bars ---------------------------------------------------------
 BAR_WIDTH = 6.35
-BAR_LENGTH = 812.8
+BAR_LENGTH = 846.7  # +33.9 with the 2026-07-24 frame re-anchor: the bar
+# feet ride the base-anchored rocker arms while the top pin follows the
+# lever bank up to the new rail top.
 BAR_FOOT_NOTCH = 2.381
 BAR_TOP_PIN_DROP = 6.35
 # The bar foot-notch roof rests on the rocker's top-edge arc. In the legacy
@@ -261,11 +263,31 @@ BAR_TOP_PIN_DROP = 6.35
 BAR_CONTACT_GAP = _config.fit("cam_follower_contact", "contact_gap_mm")  # cad/config/tolerances.yaml
 
 # --- lever bank -------------------------------------------------------------
-FULCRUM = (199.9, 1065.9)  # lever fulcrum shaft axis (x, y); machine frame
-LEVER_BAR_PIN_X = 127.0
-LEVER_SPRING_X = 177.8  # 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
-# the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
-# springs must reach the summing plate at x ~ -22..-27)
+# The fulcrum rides the top frame's west rail: 2.9 OUTBOARD of the column line
+# (the ball mount's own offset) and BALL_RISE above the rail top face. Both
+# followed the 2026-07-24 ch30 re-anchor, which moved the column line out 6.8
+# and the rail top up 33.9.
+FULCRUM_OUTBOARD = 2.9
+BALL_RISE = 25.2  # ball centre above the mount seat (build_pivot_ball_mount)
+from frame_anchors import COLUMN_X as _FRAME_COLUMN_X, TOP_FACE_Y as RAIL_TOP_Y
+
+FULCRUM = (
+    _FRAME_COLUMN_X + FULCRUM_OUTBOARD,  # 206.7
+    RAIL_TOP_Y + BALL_RISE,  # 1099.8
+)
+# The amplitude bars hang PLUMB from the rocker arms, which are base-anchored at
+# x 72.9 -- so the lever's bar-pin arm is whatever the fulcrum's new station
+# leaves, not a preserved 127.
+BAR_PIN_X_ABS = 72.9  # rocker seesaw pivot line (build_frame_assembly SUPPORT_X)
+LEVER_BAR_PIN_X = FULCRUM[0] - BAR_PIN_X_ABS  # 133.8 (was 127.0 at the old station)
+# The spring tab hands off to the summing-lever plate's hook column, which is
+# registered on the machine channel bank and did NOT move -- so the tab stays at
+# machine x -22.10 and the lever grows with the fulcrum instead. (The 177.8 = 7"
+# c2c it had at the old station was a design read, not a measured length; the
+# 254 "2:1" guess is photo-refuted -- M6.4: the lever bank ends at x ~ -30 in the
+# ch. 30 front view and the 32 mm springs must reach the plate at x ~ -22..-27.)
+LEVER_SPRING_TAB_X_ABS = 22.10  # summing-lever hook column (build_summing_lever)
+LEVER_SPRING_X = FULCRUM[0] - LEVER_SPRING_TAB_X_ABS  # 184.6 (was 177.8)
 LEVER_TAB_HALF = 3.0  # spring hole sits in the lever's 6.0-tall end tab
 LEVER_THICKNESS = 3.0
 
@@ -278,8 +300,9 @@ AFRAME_MOUNT_Z_ABS = 111.0  # south mount on the A-frame clevis (frame.SLDASM)
 # Pivot shaft placed off-centre so its north end lands at the support edge
 # (z +88.9) while the south end (z -114.3) still reaches the A-frame mount.
 PIVOT_SHAFT_Z = -12.7  # = (88.9 - 114.3) / 2; the 203.2-long shaft spans ±101.6
-RAIL_TOP_Y = 1040.7
-LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
+LEVER_MOUNT_Z = 85.0  # clears the top-frame corner pads: the Ø16 mount base
+# must clear the Ø25.5 pad bores -- need sqrt(2.9^2 + dz^2) >= 17 + 8 -> dz >= 24.8
+# from the pad at z 117.5; z 85 gives 32.5. (The old Ø48 boss needed dz >= 20.5.)
 
 # --- spring (channel_spring_installed_spec) ---------------------------------
 from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
@@ -319,10 +342,11 @@ from build_lever_bushing import OUTER_DIA as LEVER_BUSHING_OD  # noqa: E402  (Ø
 
 # --- summing-lever plate interface (build_summing_lever.py) ------------------
 # The corrected .cs lever is a coplanar casting: the plate is mid-plane ON the
-# pivot (knife line y=990), so its top is 992.54 -- 5.46 BELOW the old M6.4 998.
-# The 20 channel springs were dropped to meet it (PLATE_EYE_Y, below) and so they
-# elongate 5.46 against the fixed channel-lever tabs at 1063.65.
-PLATE_TOP_Y = 992.54
+# pivot (knife line y=1013.35), so its top is 1015.89. The 2026-07-24 frame
+# re-anchor moved this group +23.6 (it hangs off the cross-rib underside) while
+# the lever bank went +33.9 (it sits on the frame TOP face), so the 20 channel
+# springs elongate a further 10.3 against the lever tabs, now at 1097.55.
+PLATE_TOP_Y = 1015.89
 PLATE_THICKNESS = 5.1
 PLATE_HOLE_DIA = 2.0  # snug bore for the O1.4 hook shank (build_summing_lever.HOLE_DIA)
 
@@ -432,8 +456,11 @@ ROCKER_ROD_BORE_LOCAL = [ARM_ROD_HOLE_X, ARM_ROD_PIN_LOCAL_Y, 0.0]  # rocker Axi
 ROD_STRAP_BORE_LOCAL = [0.0, 0.0, 0.0]  # rod Axis1 (cam ring centre = origin)
 ROD_PIN_BORE_LOCAL = [0.0, ROD_C2C, 0.0]  # rod Axis2 (rocker pin = swing pivot)
 LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
-BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (swing pivot)
-BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~806 mm arm)
+BAR_TOP_PIN_LOCAL = [3.175, BAR_LENGTH - BAR_TOP_PIN_DROP, 3.175]  # bar Axis1
+# (swing pivot). DERIVED, not restated: this station IS amplitude_bar_spec's
+# TOP_PIN_Y, so a bar-length change (the 2026-07-24 re-anchor lengthened it to
+# 846.7) cannot leave the kinematic solve reading the old 806.45 arm.
+BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~840 mm arm)
 
 # --- CopyWithMates2 slice replication (PR #220 probes -> production) ---------
 # A channel's 4 moving parts + their 9 mates are one repeatable SLICE: author
@@ -557,7 +584,7 @@ async def _seat_bushing_on_shaft(
 
 # Top-pin-to-foot span of the rigid bar (Axis1 local y - Axis2 local y); the
 # amplitude swing pivots the bar about its top pin over this lever arm.
-BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 806.45
+BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 840.35
 # Foot-axis -> notch-roof contact offset in the bar's UNtilted (vertical) XY
 # frame: the roof sits at the bar's +X edge (+BAR_WIDTH/2) and BAR_FOOT_NOTCH up,
 # lifted BAR_CONTACT_GAP off the arc. (Machine frame: the amplitude foot slides
@@ -867,7 +894,7 @@ def _assert_hook_fastener(eye_y: float) -> None:
     if shank_poke < 0.1 or abs(seat_drop) > 0.5:
         raise RuntimeError(
             f"hook shank does not seat the bore: poke-above {shank_poke:.3f},"
-            f" base-vs-bore-mouth {seat_drop:+.3f} (want shank to fill 987.44..992.54)"
+            f" base-vs-bore-mouth {seat_drop:+.3f} (want shank to fill 1010.79..1015.89)"
         )
     if bore_clear < 0.05 or ring_clear < 0.05:
         raise RuntimeError(

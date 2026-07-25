@@ -65,8 +65,9 @@ RAIL_SIDE = 4.0  # long-side rails (local X): read thinner in the photo; the
 # the M6.4 flat-on-the-v-block layout
 RAIL_END = 5.0  # end rails (local Y); the screw rail keeps thread depth
 TRIM_NEAR = 0.75  # local x = 0 edge pulled back: that rail faces the platen
-# (machine z = -143 - local x) and must clear the recording paper's front
-# face at -143.4 by the 0.25+ margin (M6.8 platen-paper)
+# (machine z = -148.5 - local x) and must clear the recording paper's front
+# face at -148.9 by the 0.25+ margin (M6.8 platen-paper; the platen rides the
+# front columns, so the 2026-07-24 re-anchor moved both 5.5 forward)
 FRAME_DEPTH = 10.0  # Z
 # The set screw threads INTO the bottom rail, so its hole is a #4-40 tapped
 # Hole Wizard hole (tap drill Ø2.261; was a plain Ø3.0 cut) drilled up from the
