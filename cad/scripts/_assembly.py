@@ -530,6 +530,7 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     # disc" in the PR #196 real-train rework; same mate, same learned side.
     # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
     "reducer disc axial",
+    "rod swing @npn",
     "slotted screw datum X",
     "slotted screw datum Y",
     "slotted screw datum Z",
