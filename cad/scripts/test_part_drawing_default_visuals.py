@@ -13,7 +13,10 @@ from _drawing_registry import DRAWINGS, DrawingSpec
 
 
 PART_DRAWINGS = tuple(spec for spec in DRAWINGS if spec.source_kind == "part")
-FORBIDDEN_PLACEMENT_KEYWORDS = {"char_height", "leader_attach_xy"}
+FORBIDDEN_PLACEMENT_KEYWORDS = {
+    "char_height",
+    "leader_attach_xy",
+}
 VISUAL_OVERRIDE_CALLS = {
     "SetDisplayMode4",
     "SetDisplayTangentEdges2",
@@ -159,9 +162,6 @@ def test_curate_view_dimensions_deletes_only_and_never_repositions(
     adapter = SimpleNamespace(currentModel=draw)
 
     monkeypatch.setattr(
-        drawing_common, "_prepare_view_for_annotation_authoring", lambda *_args: None
-    )
-    monkeypatch.setattr(
         drawing_common,
         "insert_marked_dimensions",
         lambda *_args: [keep, drop],
@@ -197,9 +197,6 @@ def test_curate_view_dimensions_deletes_only_and_never_repositions(
 def test_curate_view_dimensions_still_rejects_missing_names(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        drawing_common, "_prepare_view_for_annotation_authoring", lambda *_args: None
-    )
     monkeypatch.setattr(drawing_common, "insert_marked_dimensions", lambda *_args: [])
     monkeypatch.setattr(
         drawing_common,
@@ -217,68 +214,20 @@ def test_curate_view_dimensions_still_rejects_missing_names(
         )
 
 
-def test_hidden_edges_are_temporary_authoring_input_not_saved_visuals(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class FakeView:
-        def __init__(self) -> None:
-            self.mode = 2
-            self.calls: list[tuple[bool, int, bool, bool, bool]] = []
-
-        def GetUseParentDisplayMode(self) -> bool:
-            return True
-
-        def GetDisplayMode2(self) -> int:
-            return self.mode
-
-        def GetFacettedHlrDisplay(self) -> bool:
-            return False
-
-        def GetDisplayEdgesInShadedMode(self) -> bool:
-            return True
-
-        def GetCThreadQuality(self) -> bool:
-            return True
-
-        def SetDisplayMode4(
-            self,
-            use_parent: bool,
-            mode: int,
-            faceted: bool,
-            edges: bool,
-            cosmetic_threads_high_quality: bool,
-        ) -> bool:
-            self.calls.append(
-                (
-                    use_parent,
-                    mode,
-                    faceted,
-                    edges,
-                    cosmetic_threads_high_quality,
-                )
-            )
-            self.mode = mode
-            return True
-
-    view = FakeView()
-    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _name: value)
-    monkeypatch.setattr(drawing_common, "view_name", lambda _adapter, _view: "Front")
-    drawing_common._AUTHORING_VIEW_DISPLAYS.clear()
-
-    drawing_common._prepare_view_for_annotation_authoring(SimpleNamespace(), view)
-    drawing_common._prepare_view_for_annotation_authoring(SimpleNamespace(), view)
-    assert view.calls == [(False, 1, False, True, True)]
-
-    drawing_common._restore_default_view_displays()
-    assert view.calls[-1] == (True, 2, False, True, True)
-    assert view.mode == 2
-    assert not drawing_common._AUTHORING_VIEW_DISPLAYS
+def test_dimension_curation_never_mutates_view_display() -> None:
+    source = inspect.getsource(drawing_common.curate_view_dimensions)
+    assert "_prepare_view_for_annotation_authoring" not in source
+    assert not hasattr(drawing_common, "_prepare_view_for_annotation_authoring")
+    assert not hasattr(drawing_common, "restore_default_view_display")
+    assert "SetDisplayMode4" not in inspect.getsource(drawing_common)
 
 
-def test_datum_auto_layout_is_observed_without_rejecting_solidworks_choice() -> None:
+def test_datum_uses_precomputed_position_without_readback() -> None:
+    parameters = inspect.signature(drawing_common.add_datum_feature).parameters
+    assert "position_tolerance_m" not in parameters
     source = inspect.getsource(drawing_common.add_datum_feature)
-    assert '"drawing.annotation_auto_layout"' in source
-    assert "position did not persist" not in source
+    assert "GetPosition" not in source
+    assert "drawing.annotation_auto_layout" not in source
 
 
 @pytest.mark.parametrize(
@@ -290,6 +239,7 @@ def test_datum_auto_layout_is_observed_without_rejecting_solidworks_choice() -> 
                 "leader_attach_xy",
                 "SetLeaderAttachmentPointAtIndex",
                 "GetLeaderPointsAtIndex",
+                "_LEADER_BENT",
             },
         ),
         (
@@ -299,6 +249,8 @@ def test_datum_auto_layout_is_observed_without_rejecting_solidworks_choice() -> 
                 "SetLeaderAttachmentPointAtIndex",
                 "GetLeaderPointsAtIndex",
                 "SetPosition2",
+                "_LEADER_BENT",
+                "swNO_ARROWHEAD",
             },
         ),
         (drawing_common.add_native_hole_callout, {"SetPosition2"}),
@@ -318,6 +270,14 @@ def test_shared_annotation_helpers_keep_solidworks_default_visuals(
         f"{getattr(helper, '__name__', helper)!s} restores visual overrides: "
         f"{sorted(restored)}"
     )
+
+
+def test_surface_finish_uses_document_neutral_required_enums() -> None:
+    assert drawing_common._LEADER_STRAIGHT == 1
+    assert drawing_common._ARROW_OPEN == 0
+    source = inspect.getsource(drawing_common.add_surface_finish)
+    assert "_LEADER_STRAIGHT" in source
+    assert "_ARROW_OPEN" in source
 
 
 def test_auto_center_marks_uses_document_defaults_and_neutral_style_args() -> None:
@@ -366,6 +326,16 @@ def test_dimension_attached_fcf_materializes_only_requested_all_around() -> None
     assert len(leader_calls) == 1
     assert isinstance(leader_calls[0].args[4], ast.Name)
     assert leader_calls[0].args[4].id == "all_around"
+    leader_style = leader_calls[0].args[0]
+    assert isinstance(leader_style, ast.Call)
+    assert _call_name(leader_style) == "int"
+    assert _call_name(leader_style.args[0]) == "GetLeaderStyle"
+    source = inspect.getsource(drawing_common.add_feature_control_frame)
+    assert "SetAttachedEntities" in source
+    methods = {
+        _call_name(node) for node in ast.walk(tree) if isinstance(node, ast.Call)
+    }
+    assert methods.isdisjoint({"IsAttached", "GetLeaderCount"})
 
 
 def test_dimension_attached_fcf_accepts_annotation_objects() -> None:

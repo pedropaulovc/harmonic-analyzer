@@ -29,6 +29,7 @@ def _called_methods(function: Callable[..., object]) -> set[str]:
 def test_simple_common_annotation_helpers_do_not_rebuild() -> None:
     helpers = (
         drawing_common.add_datum_feature,
+        drawing_common.add_feature_control_frame,
         drawing_common.add_surface_finish,
         drawing_common.add_view_centerline,
         drawing_common.add_native_hole_callout,

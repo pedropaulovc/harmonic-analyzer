@@ -92,26 +92,6 @@ _GDT_IFACE = {
 }
 
 
-@dataclass(frozen=True)
-class _AuthoringViewDisplay:
-    """A view's untouched SolidWorks display settings.
-
-    Part recipes author annotations against hidden manufacturing features.  We
-    expose those edges only while annotations are being created, then restore
-    the exact display state SolidWorks chose before saving.  Presentation is
-    therefore owned by the template/SolidWorks defaults, not by each recipe.
-    """
-
-    view: Any
-    name: str
-    use_parent: bool
-    mode: int
-    faceted: bool
-    edges: bool
-    cosmetic_threads_high_quality: bool
-
-
-_AUTHORING_VIEW_DISPLAYS: dict[str, _AuthoringViewDisplay] = {}
 # Fallback only, for an annotation whose geometry cannot be read. Every GD&T
 # symbol that CAN be measured is (see _measured_gdt_box) -- a fixed square is
 # wrong for an FCF by construction, since its width tracks its compartments.
@@ -130,7 +110,7 @@ _NOMINAL_GDT_HALF_M = 0.008
 # Measured independently on 3+ sheets by three agents; every sample draws
 # up-right regardless of which side the target sits on (a leader running
 # up-LEFT out of the vertex does not mirror the body), so the offsets are
-# orientation-stable for ``add_surface_finish``'s native bent-leader insertion.
+# orientation-stable for ``add_surface_finish``'s native insertion.
 # LEFT keeps the old 8 mm rather than the measured 7: strictly no less
 # conservative than what it replaces, on every side.
 _SF_BOX_LEFT_M = 0.008
@@ -150,11 +130,11 @@ _SF_BOX_DOWN_M = 0.0
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
 
-# swLeaderStyle_e.swBENT / swLeaderSide_e.swLS_SMART. Every leadered annotation
-# is bent: a straight leader runs at whatever angle its anchor-to-text vector
-# happens to take, which is what drove the old Ra symbol's leader diagonally
-# across two views. A bent leader lands its elbow horizontally at the text.
-_LEADER_BENT = 2
+# InsertSurfaceFinishSymbol3 requires explicit enum values even though visual
+# policy belongs to the document. Use the documented baseline enum members,
+# not project-specific bent/no-arrow choices.
+_LEADER_STRAIGHT = 1  # swLeaderStyle_e.swSTRAIGHT
+_ARROW_OPEN = 0  # swArrowStyle_e.swOPEN_ARROWHEAD
 
 # A circular 2-character BOM balloon renders ~10-12 mm across at the template
 # font; its GetExtent is leader-polluted (see _note_element), so it gets this
@@ -383,7 +363,6 @@ def add_datum_feature(
     entity: Any | None = None,
     annotation: Any | None = None,
     shoulder: bool = False,
-    position_tolerance_m: float = 1e-6,
     callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
@@ -425,31 +404,10 @@ def add_datum_feature(
     if shoulder:
         tag.Shoulder = True
     tag_annotation = _sw_type_info.early_bound_or_flag(
-        tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
+        tag.GetAnnotation(), "IAnnotation", "SetPosition2"
     )
     if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
-    actual_position = tag_annotation.GetPosition()
-    position_error = (
-        math.inf
-        if not actual_position
-        else math.hypot(
-            float(actual_position[0]) - symbol_xy[0],
-            float(actual_position[1]) - symbol_xy[1],
-        )
-    )
-    if position_error > position_tolerance_m:
-        _telemetry.event(
-            "drawing.annotation_auto_layout",
-            annotation="datum",
-            label=label,
-            requested_x_m=symbol_xy[0],
-            requested_y_m=symbol_xy[1],
-            actual_x_m=(float(actual_position[0]) if actual_position else math.nan),
-            actual_y_m=(float(actual_position[1]) if actual_position else math.nan),
-            position_error_m=position_error,
-            former_limit_m=position_tolerance_m,
-        )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
     if callout_below and not tag.SetText(4, callout_below):
@@ -510,8 +468,6 @@ def add_feature_control_frame(
         "GetFrame",
         "GetAnnotation",
         "SetLeader",
-        "IsAttached",
-        "GetLeaderCount",
     )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
@@ -588,28 +544,17 @@ def add_feature_control_frame(
         "GetLeaderPerpendicular",
         "GetDashedLeader",
     )
-    # A GTol inserted from a selected display dimension reports its association
-    # through IGtol.IsAttached/GetLeaderCount; whether the dimension ALSO lands
-    # in the annotation's model-entity array is flow-dependent (0 on the
-    # pre-merge insertion order, 1 on the current one), so accept either.
-    # Ordinary edge/silhouette attachments must register exactly one entity.
-    expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}
     if entity_type != "DIMENSION" and int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # A dimension-attached GTol reports IsAttached=False until SolidWorks is
-    # told to materialize its supported bent leader. Preserve every other
-    # SolidWorks-selected leader characteristic; edge-attached FCFs need no
-    # post-insertion styling. The all-around bit is drawing content, not style.
+    # told to materialize its leader. Preserve every SolidWorks-selected leader
+    # characteristic; edge-attached FCFs need no post-insertion styling. The
+    # all-around bit is drawing content, not style.
     if entity_type == "DIMENSION" or all_around:
-        leader_style = (
-            _LEADER_BENT
-            if entity_type == "DIMENSION"
-            else int(annotation.GetLeaderStyle())
-        )
         leader_status = int(
             annotation.SetLeader3(
-                leader_style,
+                int(annotation.GetLeaderStyle()),
                 int(annotation.GetLeaderSide()),
                 bool(annotation.GetSmartArrowHeadStyle()),
                 bool(annotation.GetLeaderPerpendicular()),
@@ -624,19 +569,6 @@ def add_feature_control_frame(
             )
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
-    draw.EditRebuild3()
-    if (
-        int(annotation.GetAttachedEntityCount3()) not in expected_entities
-        or not bool(gtol.IsAttached())
-        or int(gtol.GetLeaderCount()) != 1
-    ):
-        raise RuntimeError(
-            f"feature-control frame attachment mismatch ({label}): "
-            f"entities={annotation.GetAttachedEntityCount3()}, "
-            f"expected in {sorted(expected_entities)}; "
-            f"attached={bool(gtol.IsAttached())}; "
-            f"leaders={gtol.GetLeaderCount()}, expected=1"
-        )
     draw.ClearSelection2(True)
     return gtol
 
@@ -674,12 +606,12 @@ def add_surface_finish(
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
-        _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
+        _LEADER_STRAIGHT,
         symbol_xy[0],
         symbol_xy[1],
         0.0,
         0,  # swSFLaySym_e.swSFNone
-        10,  # swArrowStyle_e.swNO_ARROWHEAD
+        _ARROW_OPEN,
         "",
         "",
         "",
@@ -1146,7 +1078,6 @@ def create_blank_drawing_sheets(
     """Rename the initial blank sheet and duplicate it into a checked package."""
     if not sheet_names or len(sheet_names) != len(set(sheet_names)):
         raise ValueError(f"{label}: sheet names must be nonempty and unique")
-    _AUTHORING_VIEW_DISPLAYS.clear()
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     sheet = ddoc.GetCurrentSheet()
@@ -1554,7 +1485,6 @@ def curate_view_dimensions(
     must carry every manufacturing dimension the recipe promises.
     """
     expected = set(keep)
-    _prepare_view_for_annotation_authoring(adapter, view)
     annotations = delete_unnamed_imports(
         adapter, insert_marked_dimensions(adapter, view)
     )
@@ -1585,69 +1515,6 @@ def curate_view_dimensions(
             f"available={sorted(present)}"
         )
     return curated
-
-
-def _prepare_view_for_annotation_authoring(adapter: Any, view: Any) -> None:
-    """Temporarily expose hidden edges needed by native annotation commands."""
-    drawing_view = _early_bound(view, "IView")
-    name = view_name(adapter, drawing_view)
-    if not name:
-        raise RuntimeError("drawing view has no name for authoring display state")
-    if name in _AUTHORING_VIEW_DISPLAYS:
-        return
-    state = _AuthoringViewDisplay(
-        view=drawing_view,
-        name=name,
-        use_parent=bool(drawing_view.GetUseParentDisplayMode()),
-        mode=int(drawing_view.GetDisplayMode2()),
-        faceted=bool(drawing_view.GetFacettedHlrDisplay()),
-        edges=bool(drawing_view.GetDisplayEdgesInShadedMode()),
-        cosmetic_threads_high_quality=bool(drawing_view.GetCThreadQuality()),
-    )
-    _AUTHORING_VIEW_DISPLAYS[name] = state
-    if not drawing_view.SetDisplayMode4(
-        False,
-        1,  # swDisplayMode_e.swHIDDEN_GREYED
-        state.faceted,
-        state.edges,
-        state.cosmetic_threads_high_quality,
-    ):
-        raise RuntimeError(f"failed to expose hidden edges while authoring {name!r}")
-
-
-def _restore_authoring_view_state(state: _AuthoringViewDisplay) -> None:
-    if not state.view.SetDisplayMode4(
-        state.use_parent,
-        state.mode,
-        state.faceted,
-        state.edges,
-        state.cosmetic_threads_high_quality,
-    ):
-        raise RuntimeError(
-            f"failed to restore SolidWorks display defaults for {state.name!r}"
-        )
-    if int(state.view.GetDisplayMode2()) != state.mode:
-        raise RuntimeError(
-            f"SolidWorks display mode drifted for {state.name!r}: "
-            f"{state.view.GetDisplayMode2()} != {state.mode}"
-        )
-
-
-def restore_default_view_display(adapter: Any, view: Any) -> None:
-    """End temporary hidden-edge authoring and restore this view's SW default."""
-    name = view_name(adapter, view)
-    state = _AUTHORING_VIEW_DISPLAYS.pop(name, None)
-    if state is not None:
-        _restore_authoring_view_state(state)
-
-
-def _restore_default_view_displays() -> None:
-    """Restore every temporary authoring view to its original SW-selected mode."""
-    try:
-        for state in tuple(_AUTHORING_VIEW_DISPLAYS.values()):
-            _restore_authoring_view_state(state)
-    finally:
-        _AUTHORING_VIEW_DISPLAYS.clear()
 
 
 def set_dimension_callouts(
@@ -3871,7 +3738,6 @@ async def finalize_drawing(
     expected_sheet_names: tuple[str, ...] | None = None,
 ) -> dict[str, str]:
     """Validate the sheet contract and export SLDDRW, PDF, and rendered PNG."""
-    _restore_default_view_displays()
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
