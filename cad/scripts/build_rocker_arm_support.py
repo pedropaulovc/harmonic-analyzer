@@ -596,11 +596,14 @@ async def build(adapter) -> dict[str, str]:
 
     back = SketchDims()
     check("sketch p2 back pocket", await adapter.create_sketch("P2BackPocketPlane"))
+    # A negative-offset Right plane reverses its sketch-horizontal basis:
+    # sketch +X maps to part-local -Z.  The p2 rig occupies local -Z (machine
+    # -X after SUPPORT_ROWS), so mirror the local-Z bounds into sketch space.
     back_rect = [
-        (-WIDE - _RELIEF_FACE_OVERSHOOT, -HALF_Y - _RELIEF_FACE_OVERSHOOT),
-        (P2_BACK_LOCAL_INNER_Z, -HALF_Y - _RELIEF_FACE_OVERSHOOT),
-        (P2_BACK_LOCAL_INNER_Z, P2_BACK_LOCAL_TOP_Y),
-        (-WIDE - _RELIEF_FACE_OVERSHOOT, P2_BACK_LOCAL_TOP_Y),
+        (WIDE + _RELIEF_FACE_OVERSHOOT, -HALF_Y - _RELIEF_FACE_OVERSHOOT),
+        (-P2_BACK_LOCAL_INNER_Z, -HALF_Y - _RELIEF_FACE_OVERSHOOT),
+        (-P2_BACK_LOCAL_INNER_Z, P2_BACK_LOCAL_TOP_Y),
+        (WIDE + _RELIEF_FACE_OVERSHOOT, P2_BACK_LOCAL_TOP_Y),
     ]
     back_lines = await add_line_chain(adapter, back_rect)
     await define_rectilinear_chain(
@@ -624,7 +627,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut p2 back pocket",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=P2_BACK_DEPTH, reverse_direction=True)
+            ExtrusionParameters(depth=P2_BACK_DEPTH)
         ),
     )
     name_last_feature(adapter, "P2BackPocket")
@@ -653,10 +656,10 @@ async def build(adapter) -> dict[str, str]:
     spring = SketchDims()
     check("sketch p2 spring slot", await adapter.create_sketch("P2SpringSlotPlane"))
     spring_rect = [
-        (-WIDE - _RELIEF_FACE_OVERSHOOT, P2_SPRING_LOCAL_Y_MIN),
-        (P2_SPRING_LOCAL_INNER_Z, P2_SPRING_LOCAL_Y_MIN),
-        (P2_SPRING_LOCAL_INNER_Z, P2_SPRING_LOCAL_Y_MAX),
-        (-WIDE - _RELIEF_FACE_OVERSHOOT, P2_SPRING_LOCAL_Y_MAX),
+        (WIDE + _RELIEF_FACE_OVERSHOOT, P2_SPRING_LOCAL_Y_MIN),
+        (-P2_SPRING_LOCAL_INNER_Z, P2_SPRING_LOCAL_Y_MIN),
+        (-P2_SPRING_LOCAL_INNER_Z, P2_SPRING_LOCAL_Y_MAX),
+        (WIDE + _RELIEF_FACE_OVERSHOOT, P2_SPRING_LOCAL_Y_MAX),
     ]
     spring_lines = await add_line_chain(adapter, spring_rect)
     await define_rectilinear_chain(
@@ -680,7 +683,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut p2 spring slot",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=P2_SPRING_DEPTH, reverse_direction=True)
+            ExtrusionParameters(depth=P2_SPRING_DEPTH)
         ),
     )
     name_last_feature(adapter, "P2SpringSlot")
@@ -709,7 +712,7 @@ async def build(adapter) -> dict[str, str]:
     await define_circle(
         adapter,
         P2_FOOT_SCREW_LOCAL_X,
-        P2_FOOT_SCREW_LOCAL_Z,
+        -P2_FOOT_SCREW_LOCAL_Z,
         P2_FOOT_SCREW_DIA / 2.0,
         "p2 foot-screw pocket",
         dims=screw,
@@ -723,7 +726,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut p2 foot-screw pocket",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=P2_FOOT_SCREW_DEPTH, reverse_direction=True)
+            ExtrusionParameters(depth=P2_FOOT_SCREW_DEPTH)
         ),
     )
     name_last_feature(adapter, "P2FootScrewPocket")
@@ -739,7 +742,7 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations now that the whole model + a rebuild
     # exist, so every named-dim target resolves. Each equation evaluates to the
     # value just built, so the geometry must not move -- the re-check below is
-    # the proof (same final volume as RimChamfer above).
+    # the proof (same final relief volume as immediately above).
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
