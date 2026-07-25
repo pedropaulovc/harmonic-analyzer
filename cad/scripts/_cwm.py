@@ -13,8 +13,11 @@ pinned rules this module encodes:
 * ``Values``/flip slots enumerate the slice's EXTERNAL mates only (mates
   referencing an entity outside the copied set), tree-ordered among
   themselves; INTERNAL mates are re-bound between the copies and inherit
-  their dims. Every external dim slot must carry its REAL value -- a 0.0
-  re-values the copied dim to zero.
+  their dimension values, but SolidWorks can reset an internal distance
+  mate's ``Flipped`` side to false. Match that side to the seed explicitly
+  through the documented writable ``IMate2::Flipped`` property. Every
+  external dim slot must carry its REAL value -- a 0.0 re-values the copied
+  dim to zero.
 * FlipDimension is honoured per slot ONLY where that slot is copied with
   Repeat=False + a NewEntityToMateTo entity. On the Repeat=True path a
   re-valued dim's FlipDimension RESETS to False (the seed's state is not
@@ -477,6 +480,100 @@ def component_mate_dump(adapter: Any, name: str) -> list[dict]:
             "mm": mm,
         })
     return out
+
+
+def _component_distance_mate(
+    adapter: Any, name: str, distance_mm: float, *, tolerance_mm: float = 0.01,
+) -> Any:
+    """Return one uniquely-sized distance mate on ``name``.
+
+    ``IComponent2::GetMates`` is the cheap component-local lookup. Matching
+    the driving value makes this independent of the mate array's order, which
+    differs between an authored seed and its CopyWithMates2 copy.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    comp = _component(adapter, name)
+    _flag_only(comp, "GetMates")
+    matches: list[Any] = []
+    for mate in adapter._attempt(lambda: comp.GetMates(), default=None) or []:
+        if int(_read_member(mate, "Type") or -1) != 5:  # swMateDISTANCE
+            continue
+        _flag_only(mate, "DisplayDimension2")
+        display = adapter._attempt(
+            lambda m=mate: m.DisplayDimension2(0), default=None)
+        dim = _read_member(display, "GetDimension") if display is not None else None
+        value = _read_member(dim, "SystemValue") if dim is not None else None
+        if value is None:
+            continue
+        if abs(float(value) * 1000.0 - distance_mm) <= tolerance_mm:
+            matches.append(mate)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{name}: found {len(matches)} distance mates at {distance_mm:.3f} mm;"
+            " expected exactly one"
+        )
+    return matches[0]
+
+
+def component_distance_mate_flip(
+    adapter: Any, name: str, distance_mm: float, *, tolerance_mm: float = 0.01,
+) -> bool:
+    """Read the side of one uniquely-sized distance mate on ``name``."""
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    mate = _component_distance_mate(
+        adapter, name, distance_mm, tolerance_mm=tolerance_mm)
+    return bool(_read_member(mate, "Flipped"))
+
+
+def ensure_component_distance_mate_flip(
+    adapter: Any,
+    name: str,
+    distance_mm: float,
+    expected: bool,
+    *,
+    tolerance_mm: float = 0.01,
+) -> bool:
+    """Make one copied distance mate use the seed's side.
+
+    Returns ``True`` only when a write was needed. The official API exposes
+    ``IMate2::Flipped`` as a writable property, so this repairs the copied
+    INTERNAL mate directly without deleting/re-authoring it or walking the
+    assembly's MateGroup tree.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    mate = _component_distance_mate(
+        adapter, name, distance_mm, tolerance_mm=tolerance_mm)
+    current = bool(_read_member(mate, "Flipped"))
+    if current == expected:
+        return False
+    if not bool(_read_member(mate, "CanBeFlipped")):
+        raise RuntimeError(
+            f"{name}: {distance_mm:.3f} mm mate is not flippable"
+        )
+    with _telemetry.span(
+        "assembly.copy_internal_mate_flip",
+        component=name,
+        distance_mm=distance_mm,
+        from_flip=current,
+        to_flip=expected,
+    ):
+        mate.Flipped = bool(expected)
+    readback = bool(_read_member(mate, "Flipped"))
+    if readback != expected:
+        raise RuntimeError(
+            f"{name}: internal distance mate flip readback {readback} != {expected}"
+        )
+    _telemetry.event(
+        "cwm.internal_mate_flip_corrected",
+        component=name,
+        distance_mm=distance_mm,
+        from_flip=current,
+        to_flip=expected,
+    )
+    return True
 
 
 def put_component_pose(adapter: Any, name: str, array16: list[float]) -> None:

@@ -155,9 +155,11 @@ from _assembly import (
 )
 from _cwm import (
     component_constrained_status,
+    component_distance_mate_flip,
     component_mate_count,
     component_mate_dump,
     copy_with_mates,
+    ensure_component_distance_mate_flip,
     external_mate_rows,
     mates_with_owners,
     put_component_pose,
@@ -1442,6 +1444,11 @@ async def build(adapter) -> dict[str, str]:
         # drivers that land each copy on the design pose.
         return {
             "n": len(rows), "dim_slot": slot, "dim_flip": bool(dim["flip"]),
+            "rod_axial_flip": component_distance_mate_flip(
+                adapter,
+                seed_comps["connecting-rod"],
+                abs(CAM_DZ - ARM_MID_DZ),
+            ),
             "arrays": arrays,
             "mate_counts": mate_counts,
             "rocker_off": world_point(
@@ -1503,6 +1510,12 @@ async def build(adapter) -> dict[str, str]:
             adapter, [seed_comps[p] for p in CHAIN_PARTS], n_slice, values,
             flips=flips, repeat=repeat, new_entities=new_ents)
         comps = _copied_chain_instances(adapter, j)
+        ensure_component_distance_mate_flip(
+            adapter,
+            comps["connecting-rod"],
+            abs(CAM_DZ - ARM_MID_DZ),
+            slice_info["rod_axial_flip"],
+        )
         # Land the copy on its DESIGN pose by pinning its 3 operational DOF
         # with TRANSIENT drivers, then deleting them. The chain's DOF are
         # genuinely free, so the copied mates pin the copy only up to the
@@ -1578,6 +1591,17 @@ async def build(adapter) -> dict[str, str]:
                     verify=(bar_c, _tgt_mm("amplitude-bar")))
                 drives.append(mate["name"])
                 _put_all_copies()
+                if _CWM_DEBUG and j == copied[0]["j"]:
+                    seed_comps = seed_by_amp[round(amplitudes[j], 6)][1]
+                    for part in CHAIN_PARTS:
+                        log(
+                            f"  DEBUG pre-J2 mates seed {seed_comps[part]}: "
+                            f"{component_mate_dump(adapter, seed_comps[part])}"
+                        )
+                        log(
+                            f"  DEBUG pre-J2 mates copy {comps[part]}: "
+                            f"{component_mate_dump(adapter, comps[part])}"
+                        )
                 mate = await spin_driver(
                     adapter, named_ref(f"Axis1@{rod_c}", "AXIS"),
                     (pin[0], pin[1]), (ring[0], ring[1]),

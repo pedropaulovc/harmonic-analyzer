@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import math
 
+import pytest
+
 import _config
+import _cwm
 import build_channel_assembly as channel
 import connecting_rod_spec
 import fulcrum_shaft_spec
@@ -61,9 +64,20 @@ def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
     )
 
 
-def test_copied_rod_orientation_uses_the_relearned_spin_side() -> None:
-    assert not _seed_flip(
-        "J2 rod ch02 swing -> ring -53.0,99.2",
-        channel.RING_CENTER[0],
-        " @npn",
+def test_copied_internal_rod_axial_mate_is_reset_to_the_seed_side(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Mate:
+        Flipped = False
+        CanBeFlipped = True
+
+    mate = Mate()
+    monkeypatch.setattr(_cwm, "_component_distance_mate", lambda *_a, **_kw: mate)
+
+    assert _cwm.ensure_component_distance_mate_flip(
+        object(), "connecting-rod-3", 4.05, True
+    )
+    assert mate.Flipped is True
+    assert not _cwm.ensure_component_distance_mate_flip(
+        object(), "connecting-rod-3", 4.05, True
     )
