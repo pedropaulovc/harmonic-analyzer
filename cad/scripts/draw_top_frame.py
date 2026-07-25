@@ -5,7 +5,7 @@ profile dimensions, datum-controlled bores, and manufacturing notes; every share
 import, curation, and export behavior lives in ``_drawing_common``.
 
 The finished envelope is 442 x 272 x 41 with a 416 x 246 rectangular rail
-outside profile, four Ø48 corner bosses bored Ø25.5 to clamp the columns, and
+outside profile, four Ø34 corner pads bored Ø25.5 to clamp the columns, and
 a Ø17 gooseneck bore through one rail. The sheet runs 1:2; the front elevation
 drops to 1:4.
 
@@ -38,7 +38,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_top_frame import (
     BORE_DIA,
-    BOSS_DIA,
+    PAD_DIA,
     COLUMN_X,
     COLUMN_Z,
     GOOSENECK_BORE_DIA,
@@ -70,14 +70,14 @@ SHEET_SCALE = (1.0, 2.0)   # 1:2 whole sheet (442 mm finished envelope)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5
 
 # Sheet layout (meters). The plan defines the profile and bore pattern; the
-# front elevation makes the full 41 mm rail/boss thickness and datum A visible.
+# front elevation makes the full 41 mm rail thickness and datum A visible.
 TOP_CENTER = (0.135, 0.175)
 FRONT_CENTER = (0.345, 0.150)
 DATUM_C_SYMBOL_XY = (0.210, 0.105)
 
 
 # Per-view survivors of the marked-dimension import. Width/Depth are the straight
-# rail outside profile, not the boss envelope; note 2 states both explicitly.
+# rail outside profile, not the pad envelope; note 2 states both explicitly.
 TOP_KEEP = {
     "Width": (TOP_CENTER[0], TOP_CENTER[1] + OUTER_Z * VIEW_SCALE / 1000.0 + 0.012),
     "Depth": (TOP_CENTER[0] + OUTER_X * VIEW_SCALE / 1000.0 + 0.016, TOP_CENTER[1]),
@@ -121,7 +121,7 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
         ]
         if not matches or (len(matches) != 1 and not allow_coincident):
             raise RuntimeError(f"top-frame plan expected one visible {label}, got {len(matches)}")
-        # A boss projects both coincident end rims in the plan view. They are
+        # A pad projects both coincident end rims in the plan view. They are
         # the same cylindrical feature at the same model coordinates, so either
         # visible rim is a valid annotation attachment.
         return matches[0]
@@ -145,7 +145,7 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
         _circle(
             -COLUMN_X,
             -COLUMN_Z,
-            BOSS_DIA,
+            PAD_DIA,
             "column boss OD",
             allow_coincident=True,
         ),
@@ -238,7 +238,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     (
         column_bore,
-        column_boss,
+        column_pad,
         gooseneck_bore,
         datum_b_edge,
         datum_c_edge,
@@ -265,8 +265,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter, top, frame_xy=(0.130, 0.220), characteristic="position",
         tolerance="0.20", datums=("A", "B", "C"), diameter=True,
-        quantity="4X BOSS ODS", label="column-boss true position",
-        entity=column_boss,
+        quantity="4X PAD ODS", label="corner-pad true position",
+        entity=column_pad,
     )
     add_feature_control_frame(
         adapter, top, frame_xy=(0.080, 0.165), characteristic="position",

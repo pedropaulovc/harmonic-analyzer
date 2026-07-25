@@ -24,7 +24,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
 
 
-def test_notes_carry_the_pitch_rail_and_boss() -> None:
+def test_notes_carry_the_pitch_rail_web_and_socket() -> None:
     notes = top_frame_spec.DRAWING_NOTES
     inspection = top_frame_spec.INSPECTION_NOTES
     inspection_flat = " ".join(inspection.split())
@@ -33,14 +33,24 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "GREEN ENAMEL" not in notes
     assert "UOS" not in notes
     assert "MACHINE FROM SOLID STOCK" in notes
-    assert "442.00 +/-0.25 X 272.00 +/-0.25" in notes
-    assert "416.00 X 246.00" in notes
-    assert "372.00 X 202.00 CLEAR OPENING" in notes
-    assert "STRAIGHT INNER-RAIL-FACE SPACING ONLY" in notes
-    assert "CORNER BOSSES INTRUDE" in notes
+    assert "441.60 +/-0.25 X 269.00 +/-0.25" in notes
+    assert "441.60 X 269.00" in notes
+    assert "373.60 X 201.00 CLEAR" in notes
+    assert "RAILS 34.00 +/-0.10 WIDE" in notes
+    assert "R17.00 TANGENT TO BOTH" in notes
     assert "NO BLENDS OR" in notes
-    assert "CHAMFERS AT BOSS/RAIL INTERSECTIONS" in notes
-    assert "394.00 X 224.00" in notes
+    assert "CHAMFERS AT CORNER/RAIL INTERSECTIONS" in notes
+    # the webbed section is the whole point of the 2026-07-24 rederive
+    assert "WEBBED RAIL SECTION" in notes
+    assert "10.00 TOP FLANGE AND 5.00 BOTTOM FLANGE" in notes
+    assert "26.00 WEB 16.00 THICK, RELIEVED 9.00 PER FACE" in notes
+    assert "STOPS 8.00 CLEAR OF EACH CORNER PAD" in notes
+    # the cross rib is part of THIS casting, not a separate top-crossbar
+    assert "CROSS RIB INTEGRAL WITH THE RING" in notes
+    assert "22.00 WIDE, FULL 41.00 DEEP" in notes
+    assert "FLUSH WITH THE RAIL TOP" in notes
+    assert "IT CARRIES THE KNIFE MOUNT" in notes
+    assert "407.60 X 235.00" in notes
     assert "25.50 +0.05/0" in notes
     assert "POSITION <MOD-DIAM>0.20 A|B|C" in notes
     assert "MAX-MIN RADIAL WALL THICKNESS" in inspection_flat
@@ -60,10 +70,12 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "LEFT COLUMN-BORE CENTRELINE" in notes
     assert "MIDWAY BETWEEN LEFT BORE AXES" in notes
     assert "ALL BORES Ra 1.6" in notes
+    # the set screw lives in THIS part now (the gooseneck-clamp block is gone)
+    assert "TAP 1/4-20 UNC THRU THE OUTER RAIL" in notes
     assert "MASK DATUM A/B/C FACES, ALL BORES" in notes
-    assert "4X BOSS ANNULI" in notes
-    assert "BOTH PLANAR END" in notes
-    assert "4X CYLINDRICAL ODS OF THE BOSSES" in notes
+    assert "4X PAD ANNULI" in notes
+    assert "BOTH PLANAR END LANDS" in notes
+    assert "4X CYLINDRICAL ODS OF THE PADS" in notes
     assert "EXEMPT FROM" in notes and "0.25 MAX ROOT RADIUS" in notes
     assert "CYLINDRICAL ODS" in notes
     assert "-0.00" not in notes
@@ -77,7 +89,7 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert 'label="lower outer rail-face datum", entity=datum_c_edge' in source
     assert drawing.DATUM_C_SYMBOL_XY[0] < drawing.TOP_CENTER[0] + part.OUTER_X / 2000.0
     assert 'quantity="4X COLUMN BORES"' in source
-    assert 'quantity="4X BOSS ODS"' in source
+    assert 'quantity="4X PAD ODS"' in source
     assert 'allow_coincident=True' in source
     assert "-COLUMN_Z" in source
     assert 'quantity="GOOSENECK BORE"' in source

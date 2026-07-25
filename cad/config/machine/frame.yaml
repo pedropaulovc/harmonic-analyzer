@@ -1,0 +1,36 @@
+
+frame:
+  column_x_mm: 203.8               # column centre stations, machine |x|
+  column_z_mm: 117.5               # column centre stations, machine |z|
+  top_frame_top_y_mm: 1074.6       # top-frame casting TOP face (= column tops)
+  top_frame_height_mm: 41.0        # rail band height (top face - bottom face)
+  source: "ch30 eight-views bundle solve (triangulate_ch30_gt.py), base-anchored"
+  confidence: med
+  notes: >-
+    The upper frame's four independent anchors. Every column-clamped part (top
+    frame, column clamps, support bar, wheel bar, pen frame) and everything the
+    top frame carries (top-lever fulcrum + bank, amplitude-bar tops, summing
+    lever, counter-spring gooseneck) derives its station from these — read them
+    through _config.machine("frame", ...) rather than re-pasting a literal, so a
+    future re-anchor cannot leave a fossil behind.
+
+    Measured 2026-07-24 by re-running the ch30 bundle adjustment
+    (cad/scripts/diagnostics/triangulate_ch30_gt.py), whose ONLY fixed-scale
+    landmarks are the four base-slab bottom corners at (±228.6, 0, ±139.7) —
+    the ch6-annotated 457.2 × 279.4 base. The solve floats the top-frame outer
+    silhouette (TX, TY, TZ) and the column stations against the human corner
+    annotations plus the column tube-silhouette runs:
+
+      TX ±221.5 ±1.1   TY 1074.6 ±2.7   TZ ±137.4 ±0.8
+      columns X ±203.8 ±0.9   Z ±117.5 ±0.7
+
+    Cross-checks read straight off the calibrated views: the p002 front view
+    puts the front-left corner boss at centre x 206.0, Ø34.2, outer face
+    x 223.1; the p008 side view puts the casting's top face at y 1073.7 and its
+    z half-extent at 139.3. Rail height 41.0 (1073.7 − 1032.7) — the one number
+    the pre-2026-07-24 model already had right.
+
+    Supersedes the legacy (±197, ±112) / 1040.7 stations, which were a ch6
+    corner-placement eyeball. The gap was carried as a FLAG in dimensions.yaml
+    ("a ~3–7% global stretch of the whole upper frame; deferred to a dedicated
+    frame re-anchor pass") from 2026-07-02 until this pass adopted it.
