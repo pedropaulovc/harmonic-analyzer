@@ -55,6 +55,18 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 # are enumerated separately via IView.GetTableAnnotations.
 _ANNOT_NOTE = 6
 _DIMENSION_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
+
+# The checked-in DRWDOT currently carries the inch-origin ``.01`` edge-break
+# value even though generated sheets declare millimetres.  Normalize only that
+# semantic content on the instantiated drawing; do not alter the template
+# note's format, size, position, or leader behavior.
+_INCH_EDGE_BREAK_NOTE = (
+    "REMOVE BURRS AND BREAK SHARP EDGES R.01 OR CHAMFER .01 MAX"
+)
+_METRIC_EDGE_BREAK_NOTE = (
+    "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
+)
+
 # swInsertAnnotation_e flags used by the curated model-item import. Hole Wizard
 # placement dimensions live on an absorbed sketch and require their dedicated
 # flag; MarkedForDrawing alone does not make them importable.
@@ -587,7 +599,7 @@ def add_feature_control_frame(
                 int(annotation.GetLeaderSide()),
                 bool(annotation.GetSmartArrowHeadStyle()),
                 bool(annotation.GetLeaderPerpendicular()),
-                True,
+                all_around,
                 bool(annotation.GetDashedLeader()),
             )
         )
@@ -1094,6 +1106,7 @@ def new_project_drawing(
     # format and view geometry is inert (all typed SelectByID2 picks fail).
     # EditSheet() drops back to the sheet layer; idempotent when already there.
     ddoc.EditSheet()
+    _normalize_metric_edge_break_note(adapter, ddoc)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
@@ -1307,6 +1320,58 @@ def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
         )
     finally:
         ddoc.EditSheet()
+
+
+@_telemetry.traced("drawing.normalize_edge_break")
+def _normalize_metric_edge_break_note(adapter: Any, ddoc: Any) -> None:
+    """Replace the instantiated template's inch edge-break value with mm."""
+    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
+    if sheet_view is None:
+        raise RuntimeError("drawing template has no sheet view for note normalization")
+    annotations = adapter._attempt(
+        lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
+    ) or []
+    matched = 0
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
+        )
+        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
+            continue
+        note = adapter._attempt(
+            lambda a=annotation: adapter._get_attr_or_call(
+                a, "GetSpecificAnnotation"
+            )
+        )
+        if note is None:
+            continue
+        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetText", "SetText")
+        normalized = " ".join(
+            str(adapter._get_attr_or_call(note, "GetText") or "").upper().split()
+        )
+        if normalized not in {_INCH_EDGE_BREAK_NOTE, _METRIC_EDGE_BREAK_NOTE}:
+            continue
+        matched += 1
+        if normalized == _METRIC_EDGE_BREAK_NOTE:
+            continue
+        if not adapter._attempt(
+            lambda n=note: n.SetText(_METRIC_EDGE_BREAK_NOTE), default=False
+        ):
+            raise RuntimeError("failed to replace drawing edge-break note")
+        applied = " ".join(
+            str(adapter._get_attr_or_call(note, "GetText") or "").upper().split()
+        )
+        if applied != _METRIC_EDGE_BREAK_NOTE:
+            raise RuntimeError(
+                "drawing edge-break note replacement did not persist: "
+                f"{applied!r}"
+            )
+    if matched != 1:
+        raise RuntimeError(
+            "drawing template must contain exactly one recognized edge-break "
+            f"note, found {matched}"
+        )
+    _telemetry.event("drawing.edge_break_normalized", value_mm=0.25)
 
 
 def assert_asme_b_sheet(

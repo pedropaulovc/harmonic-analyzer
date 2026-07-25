@@ -99,6 +99,10 @@ def test_each_three_view_layout_has_distinct_left_to_right_centers() -> None:
 
 def test_shared_builder_uses_default_visuals_and_three_named_views() -> None:
     source = Path(_assembly_drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        '@_telemetry.traced("drawing.assembly.simple_three_view", '
+        'label_param="pdf_title")' in source
+    )
     assert source.count("place_view(") == 1
     assert '("*Front", front_center)' in source
     assert '("*Right", right_center)' in source

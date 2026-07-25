@@ -303,6 +303,19 @@ def test_shared_annotation_helpers_keep_solidworks_default_visuals(
     )
 
 
+def test_dimension_attached_fcf_materializes_only_requested_all_around() -> None:
+    tree = ast.parse(inspect.getsource(drawing_common.add_feature_control_frame))
+    leader_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and _call_name(node) == "SetLeader3"
+    ]
+
+    assert len(leader_calls) == 1
+    assert isinstance(leader_calls[0].args[4], ast.Name)
+    assert leader_calls[0].args[4].id == "all_around"
+
+
 def test_dormant_layout_override_helpers_stay_deleted() -> None:
     assert not hasattr(drawing_common, "offset_dimension_text")
     assert not hasattr(drawing_common, "isolate_drawing_view_components")

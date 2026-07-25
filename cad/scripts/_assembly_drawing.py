@@ -5,11 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import _telemetry
 from _common import check
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
+@_telemetry.traced("drawing.assembly.simple_three_view", label_param="pdf_title")
 async def build_simple_three_view_drawing(
     adapter: Any,
     *,
