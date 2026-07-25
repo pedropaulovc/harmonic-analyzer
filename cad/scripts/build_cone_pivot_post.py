@@ -115,7 +115,10 @@ async def build(adapter: Any) -> dict[str, str]:
             CreatePlaneParameters(
                 mode="angle",
                 base_plane="Front Plane",
-                angle=INCLINE_DEG,
+                # The harvested v2 plane reports ReverseDirection=true.  The
+                # signed helper maps the negative angle to that alternate
+                # solution while retaining the positive 12.5182° magnitude.
+                angle=-INCLINE_DEG,
                 pivot_axis="swing pivot",
             )
         ),
