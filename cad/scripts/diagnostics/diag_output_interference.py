@@ -48,8 +48,8 @@ async def main() -> int:
     if asm is None:
         _telemetry.error("No ActiveDoc -- the output assembly is not open.")
         return 1
-    title = str(_read_member(asm, "GetTitle") if not callable(getattr(asm, "GetTitle", None)) else asm.GetTitle())
-    dtype = int(asm.GetType())
+    title = str(_read_member(asm, "GetTitle"))
+    dtype = int(_read_member(asm, "GetType"))
     _telemetry.info(f"ActiveDoc: title={title!r} type={dtype} (2=assembly)")
     if dtype != 2:
         _telemetry.error("ActiveDoc is not an assembly -- aborting.")

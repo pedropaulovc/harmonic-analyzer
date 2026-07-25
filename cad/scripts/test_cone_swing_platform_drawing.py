@@ -54,6 +54,10 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "LONG STRAIGHT PLAN-EDGE FORM: SEE STRAIGHTNESS FCF" in notes
     assert "OPEN THROUGH EDGE" in notes
     assert "NE R10.00, NW R8.00, SW R10.00, SE R12.00" in notes
+    assert "CRANK-GEAR RELIEF: CYLINDRICAL SCALLOP R34.130" in notes
+    assert "39.718 BASIC ABOVE A" in notes
+    assert "176.100 BASIC SOUTH OF PIVOT" in notes
+    assert "LEAVE 5.588 MIN PLATE THICKNESS" in notes
     assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
     assert "OPPOSITE-FACE PARALLELISM: SEE END VIEW" in notes
     assert "AS MODELLED" not in notes
@@ -127,9 +131,20 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
 
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PostMountHoles"' in source
+    assert 'name_last_feature(adapter, "CrankGearRelief")' in source
     assert 'name_last_feature(adapter, axis_name)' in source
     assert '("post mount west", POST_MOUNT_WEST_XZ)' in source
     assert '("post mount east", POST_MOUNT_EAST_XZ)' in source
+
+
+def test_v2_crank_gear_relief_covers_the_swept_envelope() -> None:
+    assert math.isclose(part.GEAR_RELIEF_CENTER_Z, -176.1, abs_tol=1e-12)
+    assert math.isclose(part.GEAR_RELIEF_WIDTH, 10.5, abs_tol=1e-12)
+    assert math.isclose(part.GEAR_RELIEF_AXIS_Y, 39.718, abs_tol=1e-12)
+    assert math.isclose(part.GEAR_RELIEF_MAX_DEPTH, 0.762355699, abs_tol=1e-6)
+    assert part.GEAR_RELIEF_RESIDUAL_THICKNESS > 5.5
+    assert part.GEAR_RELIEF_SOUTH_Z < part.GEAR_RELIEF_CENTER_Z
+    assert part.GEAR_RELIEF_NORTH_Z > part.GEAR_RELIEF_CENTER_Z
 
 
 def test_straightness_uses_native_gdt_symbol() -> None:
