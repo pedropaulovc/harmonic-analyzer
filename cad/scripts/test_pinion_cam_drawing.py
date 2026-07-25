@@ -140,7 +140,7 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     bore_callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
     assert "6.375 MAX" in bore_callout
     assert "6.360 MIN" in bore_callout
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 1
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 3
     assert "*Bottom" in source
     assert "BOSS END VIEW SCALE 2:1" in source
     assert "A TO BOSS / TAP AXIS" in drawing.DIMENSION_CALLOUTS["BossCz"]
