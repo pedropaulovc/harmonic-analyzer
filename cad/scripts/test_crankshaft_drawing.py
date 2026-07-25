@@ -33,7 +33,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert drawing.JOURNAL_LENGTH == crankshaft_spec.JOURNAL_LENGTH
 
 
-def test_v2_post_journal_preserves_all_legacy_seats() -> None:
+def test_v2_post_journal_recloses_the_hardware_seats() -> None:
     assert crankshaft_spec.JOURNAL_BORE_DIA == 11.438
     assert crankshaft_spec.JOURNAL_CLEARANCE == 0.05
     assert crankshaft_spec.JOURNAL_DIA == 11.388
@@ -42,7 +42,11 @@ def test_v2_post_journal_preserves_all_legacy_seats() -> None:
     assert crankshaft_spec.JOURNAL_LENGTH == 72.412
     assert -175.0 + crankshaft_spec.JOURNAL_START == -148.376094428
     assert -175.0 + crankshaft_spec.JOURNAL_END == -75.964094428
-    assert (part.SEAT_T12, part.SEAT_PINION, part.SEAT_ARM) == (17.5, 100.7, 8.0)
+    assert (part.SEAT_T12, part.SEAT_PINION, part.SEAT_ARM) == (
+        17.5,
+        103.1597966757,
+        8.0,
+    )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'await set_global(adapter, "JournalDia"' in source
     assert 'await adapter.create_sketch("JournalStartPlane")' in source
