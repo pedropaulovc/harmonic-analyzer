@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import pinion_cam_pin_spec
 import draw_pinion_cam_pin as drawing
 import build_pinion_cam_pin as pin
@@ -40,6 +42,15 @@ def test_sheet_runs_at_4_to_1_with_8_to_1_end_view() -> None:
     assert pinion_cam_pin_spec.END_VIEW_NOTE == "END VIEW SCALE 8:1"
 
 
+def test_silhouette_picks_are_precomputed_in_sheet_space() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "model_point_in_view" not in source
+    assert drawing.SEATED_FLAT_FACE_XY == pytest.approx((0.1866, 0.208032))
+    assert drawing.OUTER_CROWN_FACE_XY == pytest.approx(
+        (0.125, 0.2059005518385995)
+    )
+
+
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_pin_spec.DRAWING_NOTES
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -61,10 +72,8 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
         "        symbol_xy=(0.105, 0.228),\n"
         '        datum="A",\n'
         '        label="cam-pin cylindrical-shank datum axis",\n'
-        "        position_tolerance_m=0.0065,"
         in source
     )
-    assert source.count("position_tolerance_m=0.0065") == 1
     assert "add_surface_finish(" not in source
     assert "4.020 MAX / 4.012 MIN" in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "NOMINAL REF ONLY" not in drawing.DIMENSION_CALLOUTS["PinDia"]

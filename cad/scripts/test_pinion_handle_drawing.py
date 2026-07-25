@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import pinion_handle_spec
 import draw_pinion_handle as drawing
 import build_pinion_handle as handle
@@ -49,6 +51,13 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
+def test_top_view_picks_are_precomputed_in_sheet_space() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "model_point_in_view" not in source
+    assert drawing.CROSS_HOLE_RIM_XY == pytest.approx((0.270, 0.1239825))
+    assert drawing.DATUM_B_END_EDGE_XY == pytest.approx((0.270, 0.092))
+
+
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_handle_spec.DRAWING_NOTES
     assert "SPHERICAL CROWN" in notes
@@ -86,11 +95,6 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
     assert source.count("add_feature_control_frame(") == 4
-    assert (
-        'label="handle final bore axis",\n        position_tolerance_m=0.0001'
-        in source
-    )
-    assert source.count("position_tolerance_m=0.0001") == 1
     assert "add_surface_finish(" not in source
     assert {"GripLen", "TubeLen", "RodSpan"} <= set().union(
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()

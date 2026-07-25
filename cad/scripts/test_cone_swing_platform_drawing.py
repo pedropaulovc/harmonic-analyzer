@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_cone_swing_platform as part
 import cone_swing_platform_spec
 import draw_cone_swing_platform as drawing
@@ -57,7 +59,9 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "_add_cone_axis_centerline(adapter, top)" in source
-    assert "model_point_in_view(" in source
+    assert "model_point_in_view" not in source
+    assert drawing.CONE_AXIS_NORTH_XY == pytest.approx((0.115, 0.154))
+    assert drawing.CONE_AXIS_SOUTH_XY == pytest.approx((0.115, 0.266))
     assert "view.GetVisibleEntities2" in source
     assert "blind_cut_dia_mm(PIVOT_HOLE_SPEC)" in source
     assert "curve.CircleParams" in source
@@ -74,14 +78,6 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert drawing.DATUM_B_SYMBOL_XY == (0.101, 0.160)
     assert "symbol_xy=DATUM_B_SYMBOL_XY" in source
     assert "entity=pivot_edge" in source
-    assert "shoulder=True" in source
-    assert (
-        '        label="pivot-hole cylindrical datum feature",\n'
-        "        entity=pivot_edge,\n"
-        "        shoulder=True,\n"
-        "        position_tolerance_m=0.004," in source
-    )
-    assert source.count("position_tolerance_m=0.004") == 1
     assert "annotation=pivot_callout.GetAnnotation()" not in source
     assert 'datum="C"' in source and "entity=north_edge" in source
     assert "symbol_xy=(0.100, 0.135)" in source

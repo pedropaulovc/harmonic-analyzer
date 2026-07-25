@@ -29,7 +29,6 @@ from _drawing_common import (
     add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -101,6 +100,27 @@ DIMENSION_CALLOUTS = {
     "RodTipY": "+/-0.25 FROM HUB AXIS",
 }
 
+_SIDE_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
+_SIDE_BBOX_CENTER_Z_MM = -CAP_SAG / 2.0
+_CROWN_AXIAL_MM = CAP_SAG / 2.0
+_CROWN_RADIAL_MM = math.sqrt(
+    CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + _CROWN_AXIAL_MM) ** 2
+)
+FLAT_FACE_XY = (
+    SECTION_CENTER[0]
+    - (HUB_LEN - _SIDE_BBOX_CENTER_Z_MM) * _SIDE_VIEW_SCALE / 1000.0,
+    SECTION_CENTER[1]
+    + (HUB_OD / 2.0 - FRONT_BBOX_CY) * _SIDE_VIEW_SCALE / 1000.0,
+)
+CROWN_FACE_XY = (
+    SECTION_CENTER[0]
+    - (-(HUB_LEN / 2.0 + _CROWN_AXIAL_MM) - _SIDE_BBOX_CENTER_Z_MM)
+    * _SIDE_VIEW_SCALE
+    / 1000.0,
+    SECTION_CENTER[1]
+    + (_CROWN_RADIAL_MM - FRONT_BBOX_CY) * _SIDE_VIEW_SCALE / 1000.0,
+)
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -161,12 +181,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     bore_left = (hub_center[0] - BORE_R_SHEET, hub_center[1])
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
-    flat_face = model_point_in_view(
-        adapter,
-        side,
-        (0.0, HUB_OD / 2000.0, HUB_LEN / 2000.0),
-        label="lever flat end face",
-    )
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
     # SolidWorks restricts this axis-attached tag and live readback normalizes
     # the intended sheet point by 4.664 mm.  Bound only annotation placement;
@@ -178,13 +192,12 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(bore_left[0] - 0.022, bore_left[1] + 0.018),
         datum="A",
         label="lever final bore axis",
-        position_tolerance_m=0.005,
     )
     add_datum_feature(
         adapter,
         side,
-        edge_xy=flat_face,
-        symbol_xy=(flat_face[0] - 0.025, flat_face[1]),
+        edge_xy=FLAT_FACE_XY,
+        symbol_xy=(FLAT_FACE_XY[0] - 0.025, FLAT_FACE_XY[1]),
         datum="B",
         label="lever flat end face",
         entity_type="SILHOUETTE",
@@ -202,7 +215,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         side,
-        edge_xy=flat_face,
+        edge_xy=FLAT_FACE_XY,
         frame_xy=(0.145, 0.165),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -233,20 +246,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lever conical grip size",
         entity_type="SILHOUETTE",
     )
-    crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(
-        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
-    )
-    crown_face = model_point_in_view(
-        adapter,
-        side,
-        (
-            0.0,
-            crown_radial / 1000.0,
-            -(HUB_LEN / 2.0 + crown_axial) / 1000.0,
-        ),
-        label="lever spherical crown face",
-    )
     add_attached_note(
         adapter,
         side,
@@ -255,7 +254,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{HUB_LEN:.2f} REF B TO CROWN ROOT PLANE\n"
             f"({CAP_SAG:.2f}) REF AXIAL HEIGHT ROOT TO APEX"
         ),
-        entity_xy=crown_face,
+        entity_xy=CROWN_FACE_XY,
         note_xy=(0.300, 0.240),
         label="lever spherical crown definition",
         entity_type="SILHOUETTE",
@@ -263,7 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         side,
-        edge_xy=crown_face,
+        edge_xy=CROWN_FACE_XY,
         frame_xy=(0.315, 0.205),
         characteristic="circular_runout",
         tolerance="0.05",

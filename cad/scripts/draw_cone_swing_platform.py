@@ -32,7 +32,6 @@ from _drawing_common import (
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -80,26 +79,22 @@ TOP_KEEP = ("PlateLenDim",)
 # requested anchor while leaving the resulting leader geometry to SolidWorks.
 DATUM_B_SYMBOL_XY = (0.101, 0.160)
 _CENTERLINE_OVERRUN_MM = 5.0
+_TOP_VIEW_SCALE = 1.0 / 2.0
+_CENTERLINE_HALF_SPAN_M = (
+    (PLATE_LEN / 2.0 + _CENTERLINE_OVERRUN_MM) * _TOP_VIEW_SCALE / 1000.0
+)
+CONE_AXIS_NORTH_XY = (
+    TOP_CENTER[0],
+    TOP_CENTER[1] - _CENTERLINE_HALF_SPAN_M,
+)
+CONE_AXIS_SOUTH_XY = (
+    TOP_CENTER[0],
+    TOP_CENTER[1] + _CENTERLINE_HALF_SPAN_M,
+)
 
 
 def _add_cone_axis_centerline(adapter: Any, view: Any) -> Any:
-    """Draw the cone axis from fixed model-space endpoints."""
-    north = model_point_in_view(
-        adapter,
-        view,
-        (0.0, 0.0, (NORTH_OVERHANG + _CENTERLINE_OVERRUN_MM) / 1000.0),
-        label="cone-platform axis north endpoint",
-    )
-    south = model_point_in_view(
-        adapter,
-        view,
-        (
-            0.0,
-            0.0,
-            (NORTH_OVERHANG - PLATE_LEN - _CENTERLINE_OVERRUN_MM) / 1000.0,
-        ),
-        label="cone-platform axis south endpoint",
-    )
+    """Draw the cone axis from its precomputed 1:2 plan-view endpoints."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     model = adapter.currentModel
     # IDrawingDoc.EditSheet explicitly makes subsequently created geometry
@@ -108,7 +103,10 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> Any:
     drawing.EditSheet()
     sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
     centerline = sketch_manager.CreateCenterLine(
-        north[0], north[1], 0.0, south[0], south[1], 0.0
+        *CONE_AXIS_NORTH_XY,
+        0.0,
+        *CONE_AXIS_SOUTH_XY,
+        0.0,
     )
     if centerline is None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
@@ -283,8 +281,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="pivot-hole cylindrical datum feature",
         entity=pivot_edge,
-        shoulder=True,
-        position_tolerance_m=0.004,
     )
     add_datum_feature(
         adapter,
@@ -325,7 +321,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="lower broad face",
         entity=datum_a_edge,
-        shoulder=True,
     )
     add_feature_control_frame(
         adapter,

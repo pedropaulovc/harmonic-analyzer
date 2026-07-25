@@ -30,7 +30,6 @@ from _drawing_common import (
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -81,6 +80,24 @@ DIMENSION_CALLOUTS = {
     ),
     "Depth": "+/-0.05\nSEATED FLAT END TO CROWN ROOT",
 }
+
+_RIGHT_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
+_RIGHT_BBOX_CENTER_Z_MM = (PIN_LEN + CAP_SAG) / 2.0
+_CROWN_AXIAL_MM = CAP_SAG / 2.0
+_CROWN_RADIAL_MM = math.sqrt(
+    CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + _CROWN_AXIAL_MM) ** 2
+)
+SEATED_FLAT_FACE_XY = (
+    RIGHT_CENTER[0] - (0.0 - _RIGHT_BBOX_CENTER_Z_MM) * _RIGHT_VIEW_SCALE / 1000.0,
+    RIGHT_CENTER[1] + PIN_DIA * _RIGHT_VIEW_SCALE / 2000.0,
+)
+OUTER_CROWN_FACE_XY = (
+    RIGHT_CENTER[0]
+    - (PIN_LEN + _CROWN_AXIAL_MM - _RIGHT_BBOX_CENTER_Z_MM)
+    * _RIGHT_VIEW_SCALE
+    / 1000.0,
+    RIGHT_CENTER[1] + _CROWN_RADIAL_MM * _RIGHT_VIEW_SCALE / 1000.0,
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -165,18 +182,11 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.105, 0.228),
         datum="A",
         label="cam-pin cylindrical-shank datum axis",
-        position_tolerance_m=0.0065,
-    )
-    seated_flat_face = model_point_in_view(
-        adapter,
-        right,
-        (0.0, PIN_DIA / 2000.0, 0.0),
-        label="cam-pin seated flat end",
     )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=seated_flat_face,
+        edge_xy=SEATED_FLAT_FACE_XY,
         frame_xy=(0.220, 0.210),
         characteristic="flatness",
         tolerance="0.05",
@@ -184,24 +194,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cam-pin seated-end flatness",
         entity_type="SILHOUETTE",
     )
-    crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(
-        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
-    )
-    outer_crown_face = model_point_in_view(
-        adapter,
-        right,
-        (
-            0.0,
-            crown_radial / 1000.0,
-            (PIN_LEN + crown_axial) / 1000.0,
-        ),
-        label="pinion cam-pin outer crown face",
-    )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=outer_crown_face,
+        edge_xy=OUTER_CROWN_FACE_XY,
         frame_xy=(0.245, 0.235),
         characteristic="profile_surface",
         tolerance="0.05",
@@ -218,7 +214,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"({CAP_SAG:.2f}) REF AXIAL HEIGHT\n"
             "CROWN ROOT PLANE TO APEX"
         ),
-        entity_xy=outer_crown_face,
+        entity_xy=OUTER_CROWN_FACE_XY,
         note_xy=(0.250, 0.175),
         label="cam-pin crown size and height",
         entity_type="SILHOUETTE",

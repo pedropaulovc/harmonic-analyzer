@@ -31,7 +31,6 @@ from _drawing_common import (
     dimension_name,
     finalize_drawing,
     new_project_drawing,
-    model_point_in_view,
     read_required_properties,
     set_dimension_callouts,
     set_basic_dimension,
@@ -116,6 +115,20 @@ DIMENSION_CALLOUTS = {
     ),
 }
 
+_TOP_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
+_Z_MIN_MM = -GRIP_LEN / 2.0 - CAP_SAG
+_Z_MAX_MM = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
+_Z_CENTER_MM = (_Z_MIN_MM + _Z_MAX_MM) / 2.0
+CROSS_HOLE_RIM_XY = (
+    TOP_CENTER[0],
+    TOP_CENTER[1]
+    - (ROD_DIA / 2.0 - _Z_CENTER_MM) * _TOP_VIEW_SCALE / 1000.0,
+)
+DATUM_B_END_EDGE_XY = (
+    TOP_CENTER[0],
+    TOP_CENTER[1] - (_Z_MAX_MM - _Z_CENTER_MM) * _TOP_VIEW_SCALE / 1000.0,
+)
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -195,31 +208,16 @@ async def build(adapter: Any) -> dict[str, str]:
         bore_center[0] + TUBE_OD * SHEET_SCALE[0] / 2000.0,
         bore_center[1],
     )
-    z_min = -GRIP_LEN / 2.0 - CAP_SAG
-    z_max = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
-    z_center = (z_min + z_max) / 2.0
     # Common-X picks: the Top view maps model Z (the axial station) onto sheet
     # Y, so the B-to-hole-axis dimension must be VERTICAL between picks that
     # share sheet X (codex #359: a horizontal dim here measured the rim's X
     # offset, not the 19 mm station). The circular-rim pick snaps the
     # dimension to the hole CENTER, i.e. the axis.
-    cross_hole_rim = model_point_in_view(
-        adapter,
-        top,
-        (0.0, 0.0, ROD_DIA / 2000.0),
-        label="handle cross-hole rim",
-    )
-    datum_b_edge = model_point_in_view(
-        adapter,
-        top,
-        (0.0, TUBE_OD / 2000.0, z_max / 1000.0),
-        label="handle datum-B end edge",
-    )
     cross_hole_station = add_edge_dimension(
         adapter,
         top,
-        p0=cross_hole_rim,
-        p1=datum_b_edge,
+        p0=CROSS_HOLE_RIM_XY,
+        p1=DATUM_B_END_EDGE_XY,
         text_xy=(0.300, 0.145),
         label="datum B to body cross-hole axis",
         orientation="vertical",
@@ -228,9 +226,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, cross_hole_station, label="datum B to body cross-hole axis"
     )
     top_rod_center_y = (
-        TOP_CENTER[1] - (0.0 - z_center) * SHEET_SCALE[0] / 1000.0
+        TOP_CENTER[1] - (0.0 - _Z_CENTER_MM) * _TOP_VIEW_SCALE / 1000.0
     )
-    flat_end_x = RIGHT_CENTER[0] - (z_max - z_center) * SHEET_SCALE[0] / 1000.0
+    flat_end_x = (
+        RIGHT_CENTER[0]
+        - (_Z_MAX_MM - _Z_CENTER_MM) * _TOP_VIEW_SCALE / 1000.0
+    )
     flat_end = (flat_end_x, bore_center[1])
     flat_end_face = (
         flat_end_x,
@@ -245,7 +246,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(bore_center[0], bore_center[1] + 0.032),
         datum="A",
         label="handle final bore axis",
-        position_tolerance_m=0.0001,
     )
     add_datum_feature(
         adapter,

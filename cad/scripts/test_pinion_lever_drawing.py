@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import pinion_lever_spec
 import draw_pinion_lever as drawing
 import build_pinion_lever as lever
@@ -81,10 +83,8 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
         "        symbol_xy=(bore_left[0] - 0.022, bore_left[1] + 0.018),\n"
         '        datum="A",\n'
         '        label="lever final bore axis",\n'
-        "        position_tolerance_m=0.005,"
         in source
     )
-    assert source.count("position_tolerance_m=0.005") == 1
     assert source.count('entity_type="SILHOUETTE"') == 5
     assert source.count('entity_type="FACE"') == 0
     assert 'characteristic="circular_runout"' in source
@@ -100,9 +100,11 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "({CAP_SAG:.2f}) REF AXIAL HEIGHT" in source
     assert "create_section_view(" not in source
     assert 'place_view(adapter, str(SOURCE), "*Right"' in source
-    assert source.count("model_point_in_view(") == 2
-    assert "ModelToViewTransform" in common_source
-    assert "(0.0, HUB_OD / 2000.0, HUB_LEN / 2000.0)" in source
+    assert "model_point_in_view" not in source
+    assert drawing.FLAT_FACE_XY == pytest.approx((0.17925, 0.15175))
+    assert drawing.CROWN_FACE_XY == pytest.approx(
+        (0.195, 0.1499069840025493)
+    )
     assert "section_hub_y" not in source
     assert "def create_section_view(" not in common_source
 
