@@ -79,6 +79,18 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
+def test_long_limit_callouts_wrap_without_losing_machining_content() -> None:
+    bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert bore.splitlines() == ["FINAL REAM", "6.375 MAX", "6.360 MIN", "THRU"]
+    boss = drawing.DIMENSION_CALLOUTS["BossDia"]
+    assert boss.splitlines() == [
+        "+/-0.05",
+        "PROJ 3.20 +/-0.05",
+        "BEYOND",
+        "DIA 9.20 OD",
+    ]
+
+
 def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes

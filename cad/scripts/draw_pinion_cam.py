@@ -96,13 +96,14 @@ CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = frozenset({"BoreDia", "CollarOd", "CollarCy"})
 TOP_KEEP = frozenset({"Depth", "BossDia", "BossCz"})
+BORE_LIMIT_LINES = fit_limits(BORE, BORE_BAND).replace(" / ", "\n")
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"FINAL REAM LIMITS\n{fit_limits(BORE, BORE_BAND)} THRU",
+    "BoreDia": f"FINAL REAM\n{BORE_LIMIT_LINES}\nTHRU",
     "CollarOd": "+/-0.05",
     "CollarCy": "+/-0.05 BOTH END FACES",
     "Depth": "+/-0.05",
     "BossDia": (
-        f"+/-0.05\nPROJECTION {BOSS_PROUD:.2f}+/-0.05\nBEYOND DIA {CAM_OD:.2f} OD"
+        f"+/-0.05\nPROJ {BOSS_PROUD:.2f} +/-0.05\nBEYOND\nDIA {CAM_OD:.2f} OD"
     ),
     "BossCz": "A TO BOSS / TAP AXIS",
 }
