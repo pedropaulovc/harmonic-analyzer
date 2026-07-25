@@ -59,6 +59,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
+from _visibility import blank_reference_geometry
 from pinion_bracket_geometry import (
     ARBOR_BORE,
     CAM_RELIEF_ENGAGED_CENTER,
@@ -431,6 +432,18 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
+    )
+    blank_reference_geometry(
+        adapter,
+        (
+            ("PinSeatPlane", "PLANE"),
+            ("Plane2", "PLANE"),
+            ("Plane3", "PLANE"),
+            ("Plane4", "PLANE"),
+            ("pivot bore", "AXIS"),
+            ("arbor bore", "AXIS"),
+            ("pin seat", "AXIS"),
+        ),
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
