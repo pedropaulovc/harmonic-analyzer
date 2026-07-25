@@ -25,6 +25,7 @@ import math
 import sys
 from typing import Any
 
+import _telemetry
 from _common import (
     CASTING_GREEN,
     SketchDims,
@@ -95,6 +96,7 @@ BORE_RADIUS = BORE_DIA / 2.0
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
+_JOURNAL_AXIS_PICK_INSET = 0.2
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -216,7 +218,32 @@ async def build(adapter: Any) -> dict[str, str]:
     ) * HEAD_HEIGHT
     await volume_check(adapter, "v2 head collar", head_volume, 0.001 * head_volume)
 
-    # 3. Straight crank boss and bore along +Z from the head tangent plane.
+    # 3. Preserve the harvested attachment feature as ONE native ANSI-inch Hole
+    # Wizard counterbore with two driven placement points.  Drill while the
+    # casting is still prismatic: the later transverse boss booleans change the
+    # first body's face topology and make this top face undiscoverable through
+    # COM even though the final geometry still has a top surface.
+    attachment_cut = wizard_holes(
+        adapter,
+        ATTACHMENT_HOLE_SPEC,
+        [
+            [ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
+            [-ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
+        ],
+        (0.0, 1.0, 0.0),
+        "mounting counterbores (1/4 fillister)",
+        name="AttachmentScrewHoles",
+        expect_dia_mm=ATTACHMENT_THRU_DIA,
+        placement_dims=[
+            (("MountWestX", '"MountSpacing" / 2'), (None, None)),
+            # Horizontal-distance dimensions are unsigned; the authored point
+            # retains the east/west side.
+            (("MountEastX", '"MountSpacing" / 2'), (None, None)),
+        ],
+    )
+    drive_jobs += attachment_cut.placement_drive_jobs
+
+    # 4. Straight crank boss and bore along +Z from the head tangent plane.
     check(
         "create CrankInterfacePlane",
         await adapter.create_plane(
@@ -282,7 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     name_last_feature(adapter, "CrankBore")
 
-    # 4. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
+    # 5. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
     # are mid-plane extrusions from the harvested ConeShaftNormal reference.
     # Do not substitute an on-axis revolve here: that SolidWorks topology is
     # known to make later Boolean features fail on this class of casting.
@@ -293,13 +320,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     await define_circle(
         adapter,
+        -BORE_HEIGHT,
         0.0,
-        BORE_HEIGHT,
         CONE_BOSS_DIA / 2.0,
         "inclined cone boss",
         dims=cone_boss,
-        names=("ConeBossX", "JournalAxisY", "ConeBossDia"),
-        drives=(None, '"JournalAxisY"', '"ConeBossDia"'),
+        names=("JournalAxisY", "ConeBossY", "ConeBossDia"),
+        # ConeShaftNormal's local X axis points down the model's -Y axis.
+        # The horizontal distance is unsigned; the authored point retains the
+        # negative side that places the bore at world Y=+JournalAxisY.
+        drives=('"JournalAxisY"', None, '"ConeBossDia"'),
     )
     await ensure_fully_defined(adapter, "ConeBossProfile")
     check("exit sketch ConeBossProfile", await adapter.exit_sketch())
@@ -320,13 +350,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     await define_circle(
         adapter,
+        -BORE_HEIGHT,
         0.0,
-        BORE_HEIGHT,
         BORE_RADIUS,
         "inclined journal bore",
         dims=journal_bore,
-        names=("JournalBoreX", "JournalBoreY", "JournalBoreDia"),
-        drives=(None, '"JournalAxisY"', '"JournalBoreDia"'),
+        names=("JournalAxisY", "JournalBoreY", "JournalBoreDia"),
+        drives=('"JournalAxisY"', None, '"JournalBoreDia"'),
     )
     await ensure_fully_defined(adapter, "JournalBoreProfile")
     check("exit sketch JournalBoreProfile", await adapter.exit_sketch())
@@ -339,26 +369,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ConeShaftBore")
-
-    # 5. Preserve the harvested attachment feature as ONE native ANSI-inch
-    # Hole Wizard counterbore with two driven placement points.
-    attachment_cut = wizard_holes(
-        adapter,
-        ATTACHMENT_HOLE_SPEC,
-        [
-            [ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
-            [-ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
-        ],
-        (0.0, 1.0, 0.0),
-        "mounting counterbores (1/4 fillister)",
-        name="AttachmentScrewHoles",
-        expect_dia_mm=ATTACHMENT_THRU_DIA,
-        placement_dims=[
-            (("MountWestX", '"MountSpacing" / 2'), (None, None)),
-            (("MountEastX", '-"MountSpacing" / 2'), (None, None)),
-        ],
-    )
-    drive_jobs += attachment_cut.placement_drive_jobs
 
     # Apply all neutral equations only after every referenced dimension exists.
     await force_rebuild(adapter)
@@ -380,7 +390,15 @@ async def build(adapter: Any) -> dict[str, str]:
         await adapter.create_axis(
             CreateAxisParameters(
                 mode="cylindrical_face",
-                face_point=[0.0, BORE_HEIGHT + BORE_RADIUS, 0.0],
+                # Pick the exposed outer journal-pad wall, not the internal
+                # bore wall hidden behind the casting in the default view.
+                # Both cylinders are coaxial; the small axial inset avoids
+                # landing on the pad's circular end edge.
+                face_point=[
+                    (BLOCK_RADIUS - _JOURNAL_AXIS_PICK_INSET) * _SIN_I,
+                    BORE_HEIGHT + CONE_BOSS_DIA / 2.0,
+                    (BLOCK_RADIUS - _JOURNAL_AXIS_PICK_INSET) * _COS_I,
+                ],
             )
         ),
     )
@@ -402,7 +420,49 @@ async def build(adapter: Any) -> dict[str, str]:
         PART_NAME,
         {"Manufacturing Notes": DRAWING_NOTES},
     )
+    _blank_reference_geometry(
+        adapter,
+        (
+            ("ConeShaftNormal", "PLANE"),
+            ("HeadBasePlane", "PLANE"),
+            ("CrankInterfacePlane", "PLANE"),
+            ("Plane4", "PLANE"),
+            ("Plane5", "PLANE"),
+            ("swing pivot", "AXIS"),
+            ("journal axis", "AXIS"),
+            ("mount west", "AXIS"),
+            ("mount east", "AXIS"),
+        ),
+    )
     return await save_part_and_images(adapter, PART_NAME)
+
+
+@_telemetry.traced("appearance.hide_reference_geometry")
+def _blank_reference_geometry(
+    adapter: Any, references: tuple[tuple[str, str], ...]
+) -> None:
+    """Keep mating references selectable but out of the saved part render."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    for index, (name, kind) in enumerate(references):
+        selected = model.Extension.SelectByID2(
+            name,
+            kind,
+            0,
+            0,
+            0,
+            index > 0,
+            0,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
+    _telemetry.success(f"blanked {len(references)} reference entities")
 
 
 if __name__ == "__main__":
