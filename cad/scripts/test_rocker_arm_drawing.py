@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import rocker_arm_notes
@@ -9,6 +10,7 @@ import rocker_arm_spec
 import draw_rocker_arm as drawing
 import build_rocker_arm as arm
 from _drawing_registry import DRAWINGS_BY_NAME
+from cone_pivot_post_installation import MACHINE_X_SHIFT
 
 
 def test_required_drawing_paths() -> None:
@@ -41,6 +43,17 @@ def test_draw_view_math_matches_the_spec() -> None:
     assert rocker_arm_spec.BOT_ARC_LEN == arm.BOT_ARC_LEN
     assert rocker_arm_spec.TIP_FACE == arm.TIP_FACE
     assert rocker_arm_spec.ROD_HOLE_X == arm.ROD_HOLE_X
+
+
+def test_rod_pin_follows_the_shifted_cam_without_moving_the_neutral_y() -> None:
+    assert math.isclose(
+        rocker_arm_spec.ROD_HOLE_X,
+        127.3738 - MACHINE_X_SHIFT,
+        abs_tol=1e-12,
+    )
+    assert math.isclose(rocker_arm_spec.ROD_HOLE_Y, 15.30253407745754, abs_tol=1e-12)
+    assert rocker_arm_spec.ROD_HOLE_ABOVE_BOTTOM == arm.ROD_HOLE_ABOVE_BOTTOM
+    assert rocker_arm_spec.ROD_HOLE_Y == arm.ROD_HOLE_Y
 
 
 def test_sheet_runs_at_1_to_2() -> None:

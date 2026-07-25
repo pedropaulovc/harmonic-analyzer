@@ -117,6 +117,7 @@ from _transforms import (  # noqa: E402
     rot_z_rows,
     rows_from_euler,
 )
+from cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
 
 ASM_NAME = "paper-drive"
 
@@ -139,7 +140,7 @@ from build_transgear_bracket import (  # noqa: E402
 )
 
 COLUMN_X = 197.0
-COLUMN_Z = -112.0
+COLUMN_Z = FRAME_FRONT_COLUMN_Z
 # Depth chain: the front arc's front face (-129.9) carries the bar's back
 # face; the bar's front face (-138.9) carries the platen's back face.
 BAR_BACK_Z = COLUMN_Z - ARC_FRONT_DEPTH  # -129.9

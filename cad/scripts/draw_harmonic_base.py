@@ -5,8 +5,8 @@ overall footprint dimensions, the mounting-hole table, and manufacturing notes; 
 shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The base is machined from one-piece gray-iron stock: an 18 x 11 in lower flange with a
-centred 17.5 x 10.5 in upper pad (a 6.35 mm reveal per long side), four counterbored
+The base is machined from one-piece gray-iron stock: the legacy lower flange and
+upper pad retain their front edges and extend 35.415 mm rearward, with four counterbored
 lag-screw mounting holes, and nine assembly-drilled hardware seats.  The plate
 is 457 mm long, so the whole sheet runs 1:2; the front elevation drops to 1:4.
 
@@ -50,7 +50,13 @@ from build_harmonic_base import (
     STOP_SCREW_HOLE_DIA,
     STOP_SCREW_XZ,
 )
-from harmonic_base_spec import BOTTOM_LENGTH, BOTTOM_WIDTH, STACK_HEIGHT
+from harmonic_base_spec import (
+    BOTTOM_FRONT_Z,
+    BOTTOM_LENGTH,
+    BOTTOM_REAR_Z,
+    BOTTOM_WIDTH,
+    STACK_HEIGHT,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -72,6 +78,9 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 2.0)          # 1:2 whole sheet (457 mm plate)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-mm
 
+if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
+    raise AssertionError("base drawing extents disagree with the overall depth")
+
 # Sheet layout (meters).  The plan (top) carries the footprint + the hole
 # pattern; the front elevation (1:4) shows the stepped stack; the hole
 # table sits upper-right and the notes fill the lower-left.  The plan runs at the
@@ -82,7 +91,12 @@ SIDE_CENTER = (0.345, 0.075)
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).  Only the bottom plate's overall footprint is marked.
 TOP_KEEP = {
-    "BottomLen": (TOP_CENTER[0], TOP_CENTER[1] + BOTTOM_WIDTH * VIEW_SCALE / 2000.0 + 0.008),
+    "BottomLen": (
+        TOP_CENTER[0],
+        TOP_CENTER[1]
+        + max(abs(BOTTOM_FRONT_Z), abs(BOTTOM_REAR_Z)) * VIEW_SCALE / 1000.0
+        + 0.008,
+    ),
     "BottomWid": (TOP_CENTER[0] + BOTTOM_LENGTH * VIEW_SCALE / 2000.0 + 0.017, TOP_CENTER[1]),
 }
 
@@ -91,7 +105,7 @@ TOP_KEEP = {
 # hole's real Ø13 THRU / counterbore callout and its X/Y station from the datum.
 _DATUM_XY = (
     TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
-    TOP_CENTER[1] - BOTTOM_WIDTH * VIEW_SCALE / 2000.0,
+    TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
 )
 HOLE_TABLE_ANCHOR = (0.274, 0.256)
 
@@ -218,7 +232,7 @@ def _visible_hole_table_entities(
     datum_b_candidates = [
         edge
         for parameters, edge in lines
-        if abs(parameters[2] - BOTTOM_WIDTH / 2000.0) <= 2e-6
+        if abs(parameters[2] - BOTTOM_REAR_Z / 1000.0) <= 2e-6
         and abs(parameters[3]) >= 0.99
     ]
     datum_c_candidates = [

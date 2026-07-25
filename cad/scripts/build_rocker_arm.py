@@ -54,6 +54,8 @@ from __future__ import annotations
 import math
 import sys
 
+from cone_pivot_post_installation import MACHINE_X_SHIFT
+
 from _common import (
     SketchDims,
     anchor_point_to_origin,
@@ -93,9 +95,9 @@ BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, PERPENDICULAR to the top edge (ch.30 sketch)
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft (DIMENSIONS.md ch14, derived)
 # rod pin hole: was Ø2.0 drill, now #47 (Ø1.994) native Hole Wizard feature
-ROD_HOLE_X = 127.3738  # rod pin near the +X (rod-side) tip, 5.4 inboard of the
+ROD_HOLE_X = 127.3738 - MACHINE_X_SHIFT  # keeps machine pin X on the shifted cam
 # bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
-# lobe (machine -54.474 = drum -54.7 + ECC 8.64 x sin 1.5 deg, lobe UP at the
+# lobe (machine X is DRUM_X + ECC*sin(1.5 deg), lobe UP at the
 # cos-mode home pose) with the pivot at the seesaw mid-span (+72.9) and the arm
 # LEVEL -- the ch30 photos show every connecting rod hanging PLUMB from the arm
 # tip onto its cam, the ch14 end views show the 0-crank tip row dead level, and
@@ -103,11 +105,9 @@ ROD_HOLE_X = 127.3738  # rod pin near the +X (rod-side) tip, 5.4 inboard of the
 # (bottom-arc end predicts -59.9 at the level pose). Supersedes 127.49, the
 # same plumb solve at the pre-ROM-fit lobe-down phase (ring x 54.78), and
 # M6.3's 25.4 ("1 inch from the pivot", pre-ch30 arbor-47.5 layout).
-ROD_HOLE_ABOVE_BOTTOM = 5.3  # rod-pin hole centre above the arm's BOTTOM edge:
-# the ch14 fan photo (p.26, 16 mm callout scale) puts the pin in the arm's lower
-# third -- 10.7 below the top edge = 5.3 above the bottom -- with the rod's
-# tombstone head lapping the face below the top edge. Supersedes the mid-depth
-# (8.0-equivalent) placement.
+ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the old 15.302534 world/local Y
+# after the X re-anchor moves along the curved bottom edge. This keeps the
+# unchanged-length rod plumb and the neutral arm level.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness
 
 # Arc centre sits ARM_DEPTH above the pivot's bottom edge: bottom edge is an

@@ -35,8 +35,9 @@ KNOB_CENTRE = (42.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
 # stud (0, 266.2007) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
 # mesh). The 2026-07-23 platen refit raises the bar-hung reducer 11.134 mm
 # with the resized platen/support geometry.
-# The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_CRANK)
-# (the ch30 GT crank axis, ABOVE the drive line since the 2026-07-02 re-anchor).
+# The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_CRANK).
+# The v2 casting's exact Ry180 installation moves this axis 1.484 mm in machine
+# X while the photo-anchored T12 axial plane remains at z -155.
 # Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from
 # build_drive_train_assembly. _chain feeds the leaf chain-link PARTS through
 # _chain_link, and a leaf part must not transitively depend on _assembly
@@ -46,7 +47,7 @@ KNOB_CENTRE = (42.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
 # drive-train (X_CRANK, Y_CRANK) and fails loud on drift, so a stale literal can
 # never silently mis-anchor the chain over the relocated 64T/cone. The cleaner
 # split (leaf-safe geometry vs assembly-time layout, no literal) is issue #86.
-CRANK_CENTRE = (130.82030593573418, 129.85)
+CRANK_CENTRE = (129.33630593573418, 129.85)
 # drive-train -X_CRANK, Y_CRANK: cone-pivot-post-v2's cast-in crank axis.
 # The chain count and droop below are re-solved from this centre automatically.
 
@@ -69,7 +70,7 @@ SAG_NOMINAL = 14.0  # slack-run droop seed (p006 crop read 18; was trimmed
 # from 18 to clear the cone-pivot-post top, but the ch30 GT re-anchor retired
 # that constraint: the post (now the p1 swing bracket at machine z -113..-87)
 # no longer shares a z corridor with the chain plane (z -155). 14 kept
-# conservatively -- every M6.8/M6.9 clearance was tuned near this droop.
+# conservatively -- exact 66-link closure now resolves to 16.471 mm droop.
 # The BUILT droop is SAG below: solved off this seed so the loop closes on an
 # integer number of standard-pitch links (a real chain's length is quantised;
 # the sag is the underdefined member that absorbs the slack).

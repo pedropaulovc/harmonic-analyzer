@@ -3,13 +3,13 @@ r"""Reproduction script: top crossbar (book ch. 18, pp. 42-43).
 The green cast bar spanning the top-frame ring front-to-back (along Z)
 at the machine's x mid-line: it carries the knife-mount stud that hangs
 the summing-lever knife bar. Same 22 x 41 section as the ring rails
-(build_top_frame.py), 202 long: its ends sit face-flush on the ring
-window's north/south faces at z +/-101 (INNER_Z; the M6.4 372 span used
+(build_top_frame.py), 237.415 long after the v2 rear-frame re-anchor: its
+ends sit face-flush on the ring window at z -101 / +136.415 (the M6.4 372 span used
 the ring's inner X span by mistake and buried both ends in the rails).
-A O8.2 vertical hole at its centre passes the O8 stud.
+A O8.2 vertical hole at machine z +35.415 passes the O8 stud.
 
-Layout: origin on the stud-hole axis at the bar's bottom face (machine
-(15, 999.7, 0)); bar +Y 41, +-Z 186. Dimensions: cad/DIMENSIONS.md
+Layout: the part origin is at the asymmetric frame span centre; the stud
+hole is +17.7075 in part Z. Dimensions: cad/DIMENSIONS.md
 ch. 18 (rail section med, hole low).
 
 Run (SolidWorks already open)::
@@ -56,6 +56,7 @@ from top_crossbar_spec import (
     ISOMETRIC_VIEW_NOTE,
     STUD_HOLE_FIT,
     STUD_HOLE_SIZE,
+    STUD_HOLE_Z,
     TOP_VIEW_NOTE,
 )
 
@@ -81,6 +82,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BarHalfX", f"{BAR_HALF_X}mm")
     await set_global(adapter, "BarHeight", f"{BAR_HEIGHT}mm")
     await set_global(adapter, "BarHalfZ", f"{BAR_HALF_Z}mm")
+    await set_global(adapter, "StudHoleZ", f"{STUD_HOLE_Z}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -117,13 +119,13 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Bar", ["Depth"])
     drive_jobs += [(depth_dim[0], '2 * "BarHalfZ"')]
 
-    # Stud hole on the bar axis (origin): ONE native Hole Wizard 5/16 clearance
+    # Stud hole on the shifted summing axis: ONE native Hole Wizard 5/16 clearance
     # feature, through-all along Y, drilled from the bar's bottom face (y=0)
     # while the bar is a plain prism.
     hole_dia = blind_cut_dia_mm(HOLE_SPEC)
     wizard_holes(
         adapter, HOLE_SPEC,
-        [[0.0, 0.0, 0.0]],
+        [[0.0, 0.0, STUD_HOLE_Z]],
         (0.0, -1.0, 0.0), "knife-mount stud hole (5/16 clearance)", name="StudHole",
     )
 

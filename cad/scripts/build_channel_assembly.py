@@ -10,16 +10,14 @@ the lever tips, each caught at the plate by a little open hook fastener.
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
 
-* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z, centred z 0)
+* pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z, centred z 22.715)
   + fulcrum-shaft x1 (lever bank at (199.9, 1065.9), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
-* pivot-ball-mount x4 (rocker pair: north on the rocker-support apex at
-  (72.9, 228.6, +101.6), south on the A-FRAME clevis saddle at
-  (72.9, 228.6, -111) - M6.5 photo audit: there is no south frustum,
+* pivot-ball-mount x4 (rocker pair translated with the channel bank: north
+  at (72.9, 228.6, +116.915), south at (72.9, 228.6, -75.585),
   the front stand is the rocker-arm-support's transgear-A-frame leg
   (frame.SLDASM) whose ears flank this mount's O16 base; lever pair on the top-frame west rail,
-  seats (199.9, 1040.7, +/-85) - z 85 keeps the O16 base clear of the
-  O35 corner-boss bores)
+  seats (199.9, 1040.7, -49.585/+120.415))
 * rocker-arm x20, pivot-bushing x19, connecting-rod x20,
   amplitude-bar x20, channel-lever x20, lever-bushing x19,
   channel-spring-installed x20 (M6.4: the stretched in-machine spring --
@@ -30,8 +28,8 @@ the M6.8 mirror layer is gone).
 Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
 cylinder-gear notches +Y (cosine alignment), integral cam lobes +Y (UP,
 the top of the stroke -- the ch14 end views show the 0-crank tip row
-dead level at the stroke top), rod rings concentric on the cams at
-(-54.474, 99.155, z_j + 3.3) - the cam centre carries the gears'
+dead level at the stroke top), rod rings concentric on the cams at the
+phased ``(RING_CENTER.x, RING_CENTER.y, z_j - 3.25)`` centres - the cam carries the gears'
 +1.5 deg tooth-phase rotation. Everything downstream is SOLVED here, not
 hard-coded: the rod-pin point is the intersection of the r 127.58 lever
 circle about the pivot with the r ROD_C2C circle about the ring centre
@@ -52,8 +50,8 @@ Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
 across Z, straddling the 2.5 arm / 3.0 lever; the spring's end-hook ring
 lies perpendicular to the lever face. Channel
-stations: z_j = -67.1 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
-cam/rod plane z_j + 3.3 (rod tip strap face-flush against the arm).
+stations: z_j = -31.685 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
+cam/rod plane z_j - 3.25 (rod tip strap face-flush against the arm).
 
 Mated-DOF strategy: nothing is grounded except the pivot-shaft seed (the
 lone SolidWorks auto-fix). Every other part is held by SEMANTIC, contact-
@@ -166,6 +164,11 @@ from _cwm import (
     resolve_entity,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
+from cone_pivot_post_installation import (
+    CHANNEL_Z0,
+    DRUM_X,
+    MACHINE_Z_SHIFT,
+)
 from solidworks_mcp.adapters.base import (
     ComponentLinearPatternParameters,
     CreateAxisParameters,
@@ -205,8 +208,12 @@ CHANNELS = int(os.environ.get("CHANNEL_COUNT", str(_config.active_count())))
 
 Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plane (machine.yaml)
 PITCH = _config.machine("channels", "station_pitch_mm")
+if abs(Z0 - CHANNEL_Z0) > 1e-9:
+    raise AssertionError(
+        f"channels.station_z0_mm {Z0:g} != installation contract {CHANNEL_Z0:g}"
+    )
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
-CAM_DZ = 3.3  # cam / rod-ring mid-plane at z_j + 3.3
+CAM_DZ = -3.25  # end-for-end cylinder gear: cam / rod-ring plane at z_j - 3.25
 
 # --- rocker bank ------------------------------------------------------------
 PIVOT = (72.9, 253.8)  # rocker pivot shaft axis (x, y); machine frame (crank at -X)
@@ -216,7 +223,7 @@ PIVOT = (72.9, 253.8)  # rocker pivot shaft axis (x, y); machine frame (crank at
 # +X) must come OFF the solved pin azimuth to get the arm tilt (see
 # _arc_geometry) -- at this lever the rise is 7.30 mm, so ignoring beta is no
 # longer a 0.4 mm nudge but a 7 mm catastrophe.
-_LEVER_DX = ARM_ROD_HOLE_X  # 127.3738
+_LEVER_DX = ARM_ROD_HOLE_X
 _LEVER_DY = ARM_ROD_PIN_LOCAL_Y - ARM_PIVOT_LOCAL_Y  # 7.3025
 ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)  # 127.5830
 ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))  # 3.2813
@@ -229,17 +236,20 @@ GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
 # build_drive_train_assembly.py). The integral cam (local (0, +CAM_ECC) -- lobe
 # UP at notch-up, the cos-mode top of stroke per the ch14 end views) swings
 # with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
-# centre, not a point straight north of the arbor. CAM_ECC is imported above.
+# centre, not a point straight north of the arbor. The end-for-end gear flip
+# reverses local Z only; local +Y and therefore this phased XY centre stay put.
+# CAM_ECC is imported above.
+X_DRUM = DRUM_X
+Y_DRIVE = 90.518
 RING_CENTER = (
-    -(54.7 - CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG))),
-    90.518 + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # phased cam centre at ECC 8.64: machine (-54.474, 99.155). The drum sits at
-# machine -54.7 (build_drive_train X_DRUM, crank side -X); y off the ch30 GT drive
+    X_DRUM + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
+    Y_DRIVE + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
+)  # The drum sits at machine X_DRUM (crank side -X); y is the ch30 GT drive
 # height 90.518, fixed by cone-pivot-post-v2. MUST stay in sync with
 # build_drive_train_assembly.Y_DRIVE.
 # ROD_C2C (imported above from connecting_rod_spec.CENTER_DISTANCE, 161.9475):
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
-# its cam -- the pin (ROD_HOLE_X 127.3738 out from the mid-seesaw pivot) sits
+# its cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits
 # directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14
 # end views show the 0-crank tip row flat, and the GT rocker-corner
 # triangulation lands the arm's rod-side end at machine x -60 -- the level-pose
@@ -273,15 +283,17 @@ LEVER_THICKNESS = 3.0
 
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
-SUPPORT_Z = 81.5  # north mount, seated FULLY on the support: with the Ø13 ball
-# its z-footprint [75.0, 88.0] clears the channel-19 amplitude bar (z 74.1) and
-# stays inside the support north edge (z 88.9). Was 101.6 (cantilevered 12.7).
-AFRAME_MOUNT_Z_ABS = 111.0  # south mount on the A-frame clevis (frame.SLDASM)
-# Pivot shaft placed off-centre so its north end lands at the support edge
-# (z +88.9) while the south end (z -114.3) still reaches the A-frame mount.
-PIVOT_SHAFT_Z = -12.7  # = (88.9 - 114.3) / 2; the 203.2-long shaft spans ±101.6
+CHANNEL_BANK_REAR_SHIFT = MACHINE_Z_SHIFT
+SUPPORT_Z = 81.5 + CHANNEL_BANK_REAR_SHIFT  # 116.915 north rocker mount
+AFRAME_MOUNT_Z = -111.0 + CHANNEL_BANK_REAR_SHIFT  # -75.585 south rocker mount
+# Keep the proven 203.2-mm shaft and support overhangs, translated with the bank.
+PIVOT_SHAFT_Z = -12.7 + CHANNEL_BANK_REAR_SHIFT  # 22.715; span -78.885..124.315
 RAIL_TOP_Y = 1040.7
-LEVER_MOUNT_Z = 85.0  # clears the top-frame boss bores (DIMENSIONS.md)
+FULCRUM_SHAFT_Z = CHANNEL_BANK_REAR_SHIFT
+LEVER_MOUNT_Z = (
+    -85.0 + CHANNEL_BANK_REAR_SHIFT,
+    85.0 + CHANNEL_BANK_REAR_SHIFT,
+)  # (-49.585, 120.415), translated with the lever bank
 
 # --- spring (channel_spring_installed_spec) ---------------------------------
 from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
@@ -1073,7 +1085,8 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY, ground=False, label="pivot-shaft (rocker, seed)",
     )
     fulcrum = await place_component(
-        adapter, "fulcrum-shaft", [FULCRUM[0], FULCRUM[1], 0.0], [0.0, 0.0, 0.0],
+        adapter, "fulcrum-shaft", [FULCRUM[0], FULCRUM[1], FULCRUM_SHAFT_Z],
+        [0.0, 0.0, 0.0],
         IDENTITY, ground=False, label="fulcrum-shaft (lever bank)",
     )
     await _locate_to_datum(adapter, fulcrum)
@@ -1087,7 +1100,7 @@ async def build(adapter) -> dict[str, str]:
     # idiom. The rocker pair is asymmetric (M6.5): north seats on the
     # rocker-support apex, south on the A-frame clevis saddle (both tops at
     # y 228.6).
-    for mount_z in (-AFRAME_MOUNT_Z_ABS, SUPPORT_Z):
+    for mount_z in (AFRAME_MOUNT_Z, SUPPORT_Z):
         mount = await place_component(
             adapter, "pivot-ball-mount",
             [PIVOT[0], SUPPORT_APEX_Y, mount_z],
@@ -1095,12 +1108,12 @@ async def build(adapter) -> dict[str, str]:
             label=f"ball-mount rocker z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
-    for sz in (-1.0, 1.0):
+    for mount_z in LEVER_MOUNT_Z:
         mount = await place_component(
             adapter, "pivot-ball-mount",
-            [FULCRUM[0], RAIL_TOP_Y, sz * LEVER_MOUNT_Z],
+            [FULCRUM[0], RAIL_TOP_Y, mount_z],
             [0.0, 0.0, 0.0], IDENTITY, ground=False,
-            label=f"ball-mount lever z{sz * LEVER_MOUNT_Z:+.0f}",
+            label=f"ball-mount lever z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
 

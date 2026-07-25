@@ -1,9 +1,9 @@
 r"""Reproduction script: harmonic analyzer base (book ch. 6 / legacy part).
 
-Two-plate welded construction: bottom plate 18.0 x 11.0 x 0.5 in with a
-17.5 x 10.5 x 1.5 in top plate centered on it. Re-authors the legacy
-HarmonicBase.cs; the book's p.3 photo callouts (46 x 28 cm = 18.1 x 11.0 in)
-confirm the legacy footprint, so the legacy inch dims are kept.
+Two-plate welded construction based on the legacy 18.0 x 11.0 x 0.5 in
+flange and 17.5 x 10.5 x 1.5 in pad.  The v2 cone-post cascade preserves
+their front edges and extends both plates 35.415 mm rearward so the translated
+support and rear column remain fully seated.
 
 Deferred: the legacy 0.125"/0.0625" edge fillets are cosmetic and need
 edge-selection tooling — re-added with the M4 finishing pass.
@@ -11,9 +11,10 @@ edge-selection tooling — re-added with the M4 finishing pass.
 Dimensions: cad/DIMENSIONS.md "Chapter 6" — annotated (high) footprint,
 legacy thicknesses (photo-verify note).
 
-Layout: plates centered on the origin, Top-plane sketches (sketch x,y ->
-global X,-Z), stacked along +Y. Top plate boss starts at the bottom plate's
-upper face via extrude_at_offset (raw-COM stopgap until MCP Phase 3).
+Layout: plates stay centred in X but are recentered +17.7075 in machine Z by
+the rear-only extension.  Top-plane sketches map sketch x,y -> global X,-Z and
+stack along +Y. Top plate boss starts at the bottom plate's upper face via
+extrude_at_offset (raw-COM stopgap until MCP Phase 3).
 
 Run (SolidWorks already open)::
 
@@ -28,11 +29,12 @@ import sys
 from _common import (
     CASTING_GREEN,
     SketchDims,
+    add_line_chain,
     apply_color,
     apply_material,
     bbox_extent_check,
     check,
-    define_centered_rectangle,
+    define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
@@ -51,20 +53,26 @@ from _drawing_marks import (
 )
 from _holes import HoleSpec, blind_cut_dia_mm, blind_hole_volume_mm3, wizard_holes
 from harmonic_base_spec import (
+    BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
+    BOTTOM_REAR_Z,
     BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     SIDE_VIEW_NOTE,
+    TOP_FRONT_Z,
     TOP_LENGTH,
+    TOP_REAR_Z,
     TOP_THICKNESS,
     TOP_WIDTH,
 )
+from cone_pivot_post_installation import MACHINE_X_SHIFT, MACHINE_Z_SHIFT
 from cone_pivot_screw_spec import (
     THREAD as PIVOT_THREAD,
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
 )
+from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 
 import _telemetry
 
@@ -78,21 +86,11 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 IN = 25.4
 
 # Rocker-support hold-down holes (machine = part-local: frame.SLDASM places the
-# base unrotated at the origin). Four through-drilled O13 clearance holes laid out
-# to MATCH the rocker-arm-support foot's 9/16-12 tapped pattern (build_rocker_arm_
-# support.py FootTappedHoles, local X +/-60.32 Z +/-17.46 -> after the part's
-# +90deg-Y turn, machine x 72.9 -/+ 17.46 = 55.44/90.36, z +/-60.32). Every hole
-# gets an O23 x 6.5 head counterbore up from the underside for the recessed lag-
-# screw head, so the four 9/16-12 lag screws (build_lag_screw.py) come up through
-# the base into the foot's tapped holes. The old portal-era pattern (south foot-
-# rail hex-bolts + north lag screws) is gone with the portal it served.
+# base unrotated at the origin).  The support contract transforms its unchanged
+# four-hole foot pattern through the +90-degree installation and the v2 rear
+# shift.  Base, support, and frame therefore cannot carry three drifting copies.
 HOLE_DIA = 13.0  # 9/16 lag-screw shank O12 clearance
-HOLE_XZ = (
-    (55.44, 60.32),   # support foot, west pair
-    (55.44, -60.32),
-    (90.36, 60.32),   # support foot, east pair
-    (90.36, -60.32),
-)
+HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 CBORE_DIA = 23.0  # lag head O22, recessed
 CBORE_DEPTH = 6.5  # lag head 22 x 6 recessed 0.5
 CBORE_XZ = HOLE_XZ  # all four heads counterbored
@@ -105,10 +103,18 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # frame and these holes matched its NEGATED x -- the sign was interference-
 # gate proven: holes at the wrong x left both screws in solid base, 190.0 +
 # 75.4 mm^3, exactly the two embedded shank volumes.)
-PIVOT_SCREW_XZ = (-79.6886620349, 103.292512276)
+_FORMER_PIVOT_SCREW_XZ = (-79.6886620349, 103.292512276)
+PIVOT_SCREW_XZ = (
+    _FORMER_PIVOT_SCREW_XZ[0] + MACHINE_X_SHIFT,
+    _FORMER_PIVOT_SCREW_XZ[1] + MACHINE_Z_SHIFT,
+)
 # pivot seat: blind #10-24 UNC-2B tap.  The screw's ground shoulder stops on
 # the base top; only its distinct threaded tail enters this seat.
-STOP_SCREW_XZ = (-128.84976346326022, 8.739805835063942)
+_FORMER_STOP_SCREW_XZ = (-128.84976346326022, 8.739805835063942)
+STOP_SCREW_XZ = (
+    _FORMER_STOP_SCREW_XZ[0] + MACHINE_X_SHIFT,
+    _FORMER_STOP_SCREW_XZ[1] + MACHINE_Z_SHIFT,
+)
 # Past the DISENGAGED east taper edge, one O3.15 stop-shank radius outward.
 # The v2-post cascade lengthened/widened the platform to 266 / east-half 24,
 # which changes BOTH contributors in the drive-train derivation: the shallower
@@ -131,21 +137,29 @@ STOP_SCREW_DRILL_DEPTH = 9.0
 # z = block z0 + depth/2 -- asserted directly at drive-train import) and two
 # Ø3.2 holes under the black foot screws (build_foot_screw): the spring foot
 # and the arbor-pedestal flange.
-BLOCK_SCREW_XZ = (
+_FORMER_BLOCK_SCREW_XZ = (
     (15.240530460002873, -98.0),   # front block, east screw
     (42.24053046000287, -98.0),    # front block, west screw
     (15.240530460002873, 82.0),    # back block, east screw
     (42.24053046000287, 82.0),     # back block, west screw
 )
+BLOCK_SCREW_XZ = tuple(
+    (x + MACHINE_X_SHIFT, z + MACHINE_Z_SHIFT)
+    for x, z in _FORMER_BLOCK_SCREW_XZ
+)
 # block seats: #8-32 tap drill -- the slotted screws thread into the base
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 22 shank - 18.75 block = 3.25 buried + 0.25 air
 BLOCK_SCREW_DRILL_DEPTH = 7.0
-FOOT_SCREW_XZ = (
+_FORMER_FOOT_SCREW_XZ = (
     (48.73610240207359, 70.95),  # spring foot (build_pinion_spring hole: the west foot
     # crosses under the lift rod so its screw lands west of the moving rig)
     (-54.7, -95.5),   # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
     (-54.7, 102.5),   # NORTH arbor-pedestal flange (PR8, ch12 img09: the
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
+)
+FOOT_SCREW_XZ = tuple(
+    (x + MACHINE_X_SHIFT, z + MACHINE_Z_SHIFT)
+    for x, z in _FORMER_FOOT_SCREW_XZ
 )
 # foot seats: #4-40 tap drill -- the foot screws thread into the base
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
@@ -186,6 +200,45 @@ async def _volume(adapter) -> float:
     return res.data.volume if res.is_success and res.data else float("nan")
 
 
+async def _define_rear_extended_rectangle(
+    adapter,
+    *,
+    half_x: float,
+    front_z: float,
+    rear_z: float,
+    label: str,
+    dims: SketchDims,
+    width_name: str,
+    depth_name: str,
+    width_drive: str,
+    depth_drive: str,
+    half_x_drive: str,
+    rear_z_drive: str,
+) -> None:
+    """Fully define an X-centred rectangle with fixed front/rear Z edges.
+
+    A Top-plane sketch's second coordinate is machine ``-Z``.  Anchoring the
+    rear-west corner and driving the full depth keeps the photographed front
+    edge stationary while the v2 delta grows only the rear edge.
+    """
+    points = [
+        (-half_x, -rear_z),
+        (half_x, -rear_z),
+        (half_x, -front_z),
+        (-half_x, -front_z),
+    ]
+    lines = await add_line_chain(adapter, points)
+    await define_rectilinear_chain(
+        adapter,
+        lines,
+        points,
+        label=label,
+        dims=dims,
+        names=[width_name, depth_name, f"{width_name}West", f"{depth_name}Rear"],
+        drives=[width_drive, depth_drive, half_x_drive, rear_z_drive],
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -199,9 +252,11 @@ async def build(adapter) -> dict[str, str]:
     # even though nothing in drive_jobs drives them.
     await set_global(adapter, "BottomLength", f"{BOTTOM_LENGTH}mm")
     await set_global(adapter, "BottomWidth", f"{BOTTOM_WIDTH}mm")
+    await set_global(adapter, "BottomRearLimit", f"{BOTTOM_REAR_Z}mm")
     await set_global(adapter, "BottomThickness", f"{BOTTOM_THICKNESS}mm")
     await set_global(adapter, "TopLength", f"{TOP_LENGTH}mm")
     await set_global(adapter, "TopWidth", f"{TOP_WIDTH}mm")
+    await set_global(adapter, "TopRearLimit", f"{TOP_REAR_Z}mm")
     await set_global(adapter, "TopThickness", f"{TOP_THICKNESS}mm")
     for i, (x, z) in enumerate(HOLE_XZ):
         await set_global(adapter, f"Hole{i}X", f"{x}mm")
@@ -213,13 +268,22 @@ async def build(adapter) -> dict[str, str]:
     # target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Bottom plate, centered on the origin.
+    # Bottom plate: X-centred; front edge unchanged, rear edge extended.
     bottom = SketchDims()
     check("create_sketch bottom", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
-        adapter, BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0, "bottom plate", dims=bottom,
-        name_width="BottomLen", drive_width='"BottomLength"',
-        name_depth="BottomWid", drive_depth='"BottomWidth"',
+    await _define_rear_extended_rectangle(
+        adapter,
+        half_x=BOTTOM_LENGTH / 2.0,
+        front_z=BOTTOM_FRONT_Z,
+        rear_z=BOTTOM_REAR_Z,
+        label="bottom plate",
+        dims=bottom,
+        width_name="BottomLen",
+        depth_name="BottomWid",
+        width_drive='"BottomLength"',
+        depth_drive='"BottomWidth"',
+        half_x_drive='"BottomLength" / 2',
+        rear_z_drive='"BottomRearLimit"',
     )
     await ensure_fully_defined(adapter, "bottom plate sketch")
     check("exit_sketch bottom", await adapter.exit_sketch())
@@ -231,15 +295,24 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "BottomPlate")
     _telemetry.info(f"volume after bottom plate: {await _volume(adapter):.1f} mm^3")
-    # expected: 18 * 11 * 0.5 in^3 = 99 in^3 = 1,622,319 mm^3
+    # The rear-only extension is included in BOTTOM_WIDTH.
 
-    # Top plate, centered, starting at the bottom plate's upper face.
+    # Top plate shares the same rear-only extension and starts on the flange.
     top = SketchDims()
     check("create_sketch top", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
-        adapter, TOP_LENGTH / 2.0, TOP_WIDTH / 2.0, "top plate", dims=top,
-        name_width="TopLen", drive_width='"TopLength"',
-        name_depth="TopWid", drive_depth='"TopWidth"',
+    await _define_rear_extended_rectangle(
+        adapter,
+        half_x=TOP_LENGTH / 2.0,
+        front_z=TOP_FRONT_Z,
+        rear_z=TOP_REAR_Z,
+        label="top plate",
+        dims=top,
+        width_name="TopLen",
+        depth_name="TopWid",
+        width_drive='"TopLength"',
+        depth_drive='"TopWidth"',
+        half_x_drive='"TopLength" / 2',
+        rear_z_drive='"TopRearLimit"',
     )
     await ensure_fully_defined(adapter, "top plate sketch")
     check("exit_sketch top", await adapter.exit_sketch())
@@ -248,7 +321,7 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     name_last_feature(adapter, "TopPlate")
     _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
-    # expected: 99 + 17.5 * 10.5 * 1.5 = 374.625 in^3 = 6,139,003 mm^3
+    # The rear-only extension is included in TOP_WIDTH.
 
     # M6.10 fastener holes + lag-head recesses: ONE native Hole Wizard
     # counterbored 9/16 FILLISTER feature (4 placement points) drilled from
@@ -346,7 +419,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "base length (annotated 46 cm / 18 in)", "x", BOTTOM_LENGTH
     )
     await bbox_extent_check(
-        adapter, "base depth (annotated 28 cm / 11 in)", "z", BOTTOM_WIDTH
+        adapter, "base depth (rear-extended from the 28 cm plate)", "z", BOTTOM_WIDTH
     )
 
     await report_mass_properties(adapter)

@@ -106,6 +106,7 @@ from rocker_arm_support_spec import (
     P2_BACK_LOCAL_TOP_Y,
     P2_FOOT_SCREW_DIA,
     P2_FOOT_SCREW_LIGAMENT,
+    P2_FOOT_SCREW_MIN_LIGAMENT,
     P2_FOOT_SCREW_LOCAL_X,
     P2_FOOT_SCREW_LOCAL_Y_MAX,
     P2_FOOT_SCREW_LOCAL_Y_MIN,
@@ -116,8 +117,10 @@ from rocker_arm_support_spec import (
     P2_SPRING_LOCAL_Y_MAX,
     P2_SPRING_LOCAL_Y_MIN,
     P2_SPRING_SLOT_LIGAMENT,
+    P2_SPRING_SLOT_MIN_LIGAMENT,
     SUPPORT_HALF_MACHINE_Z,
 )
+from cone_pivot_post_installation import MACHINE_X_SHIFT
 
 PART_NAME = "rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -633,8 +636,14 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "P2BackPocket")
     cut_dim = name_dimensions(adapter, "P2BackPocket", ["Depth"])
     drive_jobs.append((cut_dim[0], '"P2BackDepth"'))
+    # The rig's +1.484 X re-anchor widens this open rectangular cut by the same
+    # amount; height and depth are unchanged because the support and rig share
+    # the full Z translation.
+    back_x_cut_delta = MACHINE_X_SHIFT * (
+        P2_BACK_LOCAL_TOP_Y + HALF_Y + _RELIEF_FACE_OVERSHOOT
+    ) * P2_BACK_DEPTH
     volume = await volume_check(
-        adapter, "p2 back pocket", source_volume - 789.77, 200
+        adapter, "p2 back pocket", source_volume - (789.77 + back_x_cut_delta), 200
     )
 
     # Feature 2 is only 1.3 mm high: it clears the brass spring strip while
@@ -689,10 +698,16 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "P2SpringSlot")
     cut_dim = name_dimensions(adapter, "P2SpringSlot", ["Depth"])
     drive_jobs.append((cut_dim[0], '"P2SpringDepth"'))
-    volume = await volume_check(adapter, "p2 spring slot", volume - 48.15, 200)
+    spring_x_cut_delta = MACHINE_X_SHIFT * (
+        P2_SPRING_LOCAL_Y_MAX - P2_SPRING_LOCAL_Y_MIN
+    ) * P2_SPRING_DEPTH
+    volume = await volume_check(
+        adapter, "p2 spring slot", volume - (48.15 + spring_x_cut_delta), 200
+    )
 
     # Feature 3 follows the foot-screw head rather than widening the spring
-    # slot.  The round pocket retains 3.416 mm radial ligament to the support tap.
+    # slot.  After the X re-anchor the round pocket retains 2.691 mm radial
+    # ligament to the unchanged support tap.
     check(
         "create p2 foot-screw plane",
         await adapter.create_plane(
@@ -736,7 +751,10 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "p2 support clearance", volume - (91.85 - 25.40), 200
     )
-    if P2_SPRING_SLOT_LIGAMENT < 2.5 or P2_FOOT_SCREW_LIGAMENT < 3.0:
+    if (
+        P2_SPRING_SLOT_LIGAMENT < P2_SPRING_SLOT_MIN_LIGAMENT
+        or P2_FOOT_SCREW_LIGAMENT < P2_FOOT_SCREW_MIN_LIGAMENT
+    ):
         raise AssertionError("p2 support relief violates the tap-ligament contract")
 
     # Apply the deferred drive equations now that the whole model + a rebuild

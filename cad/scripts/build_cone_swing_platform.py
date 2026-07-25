@@ -259,9 +259,10 @@ def _corner_fillet_area(label: str, r: float) -> float:
 # to machine z (cf. cone-pivot-post) -- at height CRANK_AXIS_Y above the
 # plate BOTTOM, passing the plan point (-CRANK_AXIS_OFF * cos I,
 # -CRANK_AXIS_OFF * sin I) -- CRANK_AXIS_OFF is the distance the crank axis
-# sits EAST of the pivot, pivot.x - X_CRANK = 51.405 (asserted against the
-# live cone geometry in the assembly).
-CRANK_AXIS_OFF = 51.1316439009  # pivot.x -79.6886620349 - X_CRANK -130.8203059357
+# sits EAST of the pivot. This part-local separation is invariant under the
+# v2 installation translation and is asserted against the live cone geometry
+# in the assembly.
+CRANK_AXIS_OFF = 51.1316439009
 CRANK_AXIS_Y = 79.05  # Y_CRANK 129.85 - Y_BASE_TOP 50.8 (above plate BOTTOM)
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan
 # point (the foot of the pivot's perpendicular onto the axis line), built

@@ -24,9 +24,11 @@ HEAD_DIA = 42.7506
 HEAD_HEIGHT = 26.6
 HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 
-# Straight crank/sprocket journal.  It begins at the south tangent of the head
-# and projects north to z=+50.6591.  Keep Pedro's corrected source dimension in
-# inches: 2.8360 in replaces the 2.85086614 in initial derivation.
+# Straight crank/sprocket journal in the harvested PART frame.  It starts at
+# local -Z and projects along local +Z to +50.6591.  The assembly's exact
+# Ry(180) installation maps that long boss toward machine -Z.  Keep Pedro's
+# corrected source dimension in inches: 2.8360 in replaces the 2.85086614 in
+# initial derivation.
 CRANK_BOSS_DIA = 21.93
 CRANK_BORE_DIA = 11.438
 CRANK_BORE_HEIGHT = 72.7
@@ -37,7 +39,8 @@ CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
 
 # Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
-# into this bore and the whole post therefore wants identity placement.
+# into the part; downstream placement composes it with the exact Ry(180)
+# installation instead of re-authoring the harvested feature frame.
 INCLINE_DEG = 12.5182
 BORE_HEIGHT = 33.368
 CONE_BOSS_DIA = 17.2
@@ -45,8 +48,8 @@ BORE_DIA = 12.2808
 CONE_BOSS_LENGTH = BLOCK_DIA
 
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
-# Under identity placement model +X is machine west: +ATTACHMENT_X is the west
-# hole and -ATTACHMENT_X is the east hole.
+# Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
+# local east/west axes to the opposite platform names.
 ATTACHMENT_SPACING = 26.88704
 ATTACHMENT_X = ATTACHMENT_SPACING / 2.0
 ATTACHMENT_THRU_DIA = 7.14248

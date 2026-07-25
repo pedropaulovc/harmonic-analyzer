@@ -7,6 +7,11 @@ from pathlib import Path
 import build_top_frame as part
 import draw_top_frame as drawing
 import top_frame_spec
+from cone_pivot_post_installation import (
+    FRAME_FRONT_COLUMN_Z,
+    FRAME_REAR_COLUMN_Z,
+    MACHINE_Z_SHIFT,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -33,14 +38,14 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "GREEN ENAMEL" not in notes
     assert "UOS" not in notes
     assert "MACHINE FROM SOLID STOCK" in notes
-    assert "442.00 +/-0.25 X 272.00 +/-0.25" in notes
-    assert "416.00 X 246.00" in notes
-    assert "372.00 X 202.00 CLEAR OPENING" in notes
+    assert "442.00 +/-0.25 X 307.42 +/-0.25" in notes
+    assert "416.00 X 281.42" in notes
+    assert "372.00 X 237.42 CLEAR OPENING" in notes
     assert "STRAIGHT INNER-RAIL-FACE SPACING ONLY" in notes
     assert "CORNER BOSSES INTRUDE" in notes
     assert "NO BLENDS OR" in notes
     assert "CHAMFERS AT BOSS/RAIL INTERSECTIONS" in notes
-    assert "394.00 X 224.00" in notes
+    assert "394.00 X 259.42" in notes
     assert "25.50 +0.05/0" in notes
     assert "POSITION <MOD-DIAM>0.20 A|B|C" in notes
     assert "MAX-MIN RADIAL WALL THICKNESS" in inspection_flat
@@ -57,8 +62,8 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "DIMENSIONS/GD&T APPLY BEFORE COATING" in notes
     assert "TIR" not in notes
     assert "GOOSENECK BORE" in notes
-    assert "LEFT COLUMN-BORE CENTRELINE" in notes
-    assert "MIDWAY BETWEEN LEFT BORE AXES" in notes
+    assert "LEFT RAIL" in notes
+    assert "123.00 BASIC FROM DATUM C" in notes
     assert "ALL BORES Ra 1.6" in notes
     assert "MASK DATUM A/B/C FACES, ALL BORES" in notes
     assert "4X BOSS ANNULI" in notes
@@ -79,9 +84,21 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert 'quantity="4X COLUMN BORES"' in source
     assert 'quantity="4X BOSS ODS"' in source
     assert 'allow_coincident=True' in source
-    assert "-COLUMN_Z" in source
+    assert "FRONT_COLUMN_Z" in source
     assert 'quantity="GOOSENECK BORE"' in source
     assert '{"Width": "+/-0.25", "Depth": "+/-0.25"}' in source
+
+
+def test_asymmetric_rear_column_and_ring_envelope_are_single_sourced() -> None:
+    assert part.FRONT_COLUMN_Z == FRAME_FRONT_COLUMN_Z == -112.0
+    assert part.REAR_COLUMN_Z == FRAME_REAR_COLUMN_Z == 147.415
+    assert part.GOOSENECK_Z == MACHINE_Z_SHIFT == 35.415
+    assert part.OUTER_FRONT_Z == -123.0
+    assert part.OUTER_REAR_Z == 158.415
+    assert part.INNER_FRONT_Z == -101.0
+    assert part.INNER_REAR_Z == 136.415
+    assert abs(2.0 * part.OUTER_Z - 281.415) < 1e-12
+    assert abs(2.0 * part.INNER_Z - 237.415) < 1e-12
 
 
 def test_view_scales_are_explicit() -> None:

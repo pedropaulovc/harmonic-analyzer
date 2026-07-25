@@ -11,14 +11,14 @@ axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
 depth):
 
 * harmonic-base fixed at the origin, top face at Y = 50.8.
-* tube-frame x4 standing on the base top face near the top-plate corners,
-  centres at (+/-197, +/-112) — 25.25/21.35 mm inset from the top-plate
-  edges (eight views: columns sit at the extreme corners).
+* tube-frame x4 standing on the base top face near the top-plate corners.
+  The front pair stays at z -112 while the rear pair moves to z +147.415
+  with the v2 support/channel envelope; x remains +/-197.
 * rocker-arm-support x1 (the windowed trapezoidal NORTH support,
-  build_rocker_arm_support.py) at (X, Z) = (+72.9, +44.45), foot seated on the
+  build_rocker_arm_support.py) at (X, Z) = (+72.9, +35.415), foot seated on the
   base top. A 177.8 x 177.8 cast plate, 63.5 thick (tapering to 16.94 at the
   apex), with the central rounded window; its apex carries the north pivot ball
-  mount (channel.SLDASM, at machine z +81.5) and the rocker-pivot SHAFT runs
+  mount (channel.SLDASM, at machine z +116.915) and the rocker-pivot SHAFT runs
   along Z. This REPLACES the rocker-arm-portal casting (north + south unified
   portal frame) with the faithful reproduction of the original hand-built
   support -- the NORTH upright ONLY; the south upright and the top/foot rails
@@ -32,14 +32,12 @@ depth):
   -> machine Z, local Y (height) -> machine Y. The part origin is at the casting
   centre (bbox +/-88.9 in X and Y), so the turned wall spans machine
   Y 50.8..228.6 (foot on the base top, apex at the pivot height) and machine
-  Z -88.9..88.9 -- centred on the base z-axis (origin z 0): the window reads
-  centred in the +/-X side views. The north pivot ball mount (channel.SLDASM)
-  now seats FULLY on the support: it was moved south to z +81.5 and its ball/base
-  narrowed to O13 so its z-footprint [75.0, 88.0] clears the channel-19 amplitude
-  bar (z +74.1) and stays inside the wall's north edge (88.9) -- no cantilever.
+  Z -53.485..124.315 after the +35.415 rear translation. The north pivot ball
+  mount (channel.SLDASM) follows that same shift to z +116.915, so its narrowed
+  O13 footprint remains fully seated inside the wall's rear edge -- no cantilever.
   Seat Y = base-top 50.8 + 88.9 (half-height) = 139.7. The pivot x = 72.9, the
   rocker seesaw's mid-span (ch30 GT arm-end triangulation midpoint +72.5; the
-  rod-pin hole 127.37 out reaches the cam drum at -54.7, rods plumb; the old
+  reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
 * top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
@@ -52,7 +50,8 @@ depth):
 
 Hold-down: four 9/16-12 lag screws come up through the base into the support
 foot's tapped holes. The base was re-drilled to the foot's pattern (4 holes at
-local X +/-60.32, Z +/-17.46 -> machine x 55.44/90.36, z +/-60.32; see
+local X +/-60.32, Z +/-17.46 -> machine x 55.44/90.36,
+z -24.905/+95.735; see
 build_harmonic_base.py HOLE_XZ) with O23 head counterbores on its underside, and
 the lag screws (build_lag_screw.py, resized to the 9/16-12 foot tap) are
 inserted at their exact authored transforms and locked to the fixed base. The
@@ -98,24 +97,26 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _transforms import ROT_Y_POS90
+from cone_pivot_post_installation import (
+    FRAME_FRONT_COLUMN_Z,
+    FRAME_REAR_COLUMN_Z,
+)
 from rocker_arm_support_spec import (
+    SUPPORT_HOLD_DOWN_XZ,
     SUPPORT_WORLD_SEAT_Y,
     SUPPORT_WORLD_X,
+    SUPPORT_WORLD_Z,
 )
 
 ASM_NAME = "frame"
 
 BASE_TOP_Y = 50.8  # harmonic-base: 0.5 in bottom + 1.5 in top plate
 COLUMN_X = 197.0  # column centres, from the ch. 6 / ch. 30 corner placement
-COLUMN_Z = 112.0
+FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z
+REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z
 SUPPORT_X = SUPPORT_WORLD_X  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
 # triangulation midpoint +72.5; M6.8 mirror). Rod-side tip reaches the drum.
-# The support's z position is NOT a constant: it is CENTRED on the base z-axis by
-# a coincident mate of symmetry planes (see build()), so the window reads centred
-# in the +/-X side views with no tuned offset. The north pivot ball mount
-# (channel.SLDASM pivot-ball-mount) now seats fully on the wall: it was moved to
-# z +81.5 and narrowed to O13 so its z-footprint [75.0, 88.0] clears the channel-
-# 19 amplitude-bar (z +74.1) and stays inside the wall's north edge (88.9).
+SUPPORT_Z = SUPPORT_WORLD_Z
 SUPPORT_SEAT_Y = SUPPORT_WORLD_SEAT_Y  # rocker-arm-support's origin is
 # at the casting centre (bbox Y +/-88.9), so seating its foot on the base top
 # lifts the origin by the 88.9 foot half-height.
@@ -130,13 +131,13 @@ SUPPORT_ROWS = ROT_Y_POS90
 # holes above them) by concentric + seat mates -- see build(). The
 # stations are the foot's tapped pattern in the machine frame: local X +/-60.32,
 # Z +/-17.46 turned +90deg about Y -> machine x 72.9 -/+ 17.46 = 55.44/90.36,
-# z +/-60.32 (these ARE the base HOLE_XZ machine positions). The screw is authored
+# z SUPPORT_Z +/-60.32 (these ARE the base HOLE_XZ machine positions). The screw is authored
 # head-down at IDENTITY, so the placement point is the station and y is the under-
 # head plane: machine y 6.5 (the base underside counterbore depth) sets the O22
 # head recessed in the base underside, the O12 shank rising through the base into
 # the O12.30 tapped foot hole. Placed on its exact machine transform (like the
 # support); constrained by concentric + seat + spin-pin mates (see build()).
-LAG_SCREW_XZ = ((55.44, 60.32), (55.44, -60.32), (90.36, 60.32), (90.36, -60.32))
+LAG_SCREW_XZ = SUPPORT_HOLD_DOWN_XZ
 LAG_SCREW_UNDER_HEAD_Y = 6.5
 
 TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
@@ -156,10 +157,11 @@ TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
 # (local -Z) drops onto the base top. The placed point is the part origin CORNER
 # (decorated face, x=0/y=0): Y 52.3 lays the decorated face on top with the 1.5
 # body resting on the base top (50.8); Z 50 centres the 100 mm line at z 0 between
-# the east columns (z +/-112); X 214.25 sets the plate's east edge ~8 mm in from
+# the east columns (z -112/+147.415); X 214.25 sets the plate's east edge ~8 mm in from
 # the top-plate east edge (x 222.25), span x 159.25..214.25 -- east of the
 # rocker-arm-support (x 28..117) and clear of the east columns (which sit at
-# z +/-112, away from the plate's z -50..50), so it grounds 0-DOF, no interference.
+# both column stations, away from the plate's z -50..50), so it grounds 0-DOF,
+# no interference.
 NAMEPLATE_POS = [214.25, 52.3, 50.0]
 NAMEPLATE_EULER = [-90.0, 90.0, 0.0]
 NAMEPLATE_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
@@ -197,10 +199,9 @@ async def build(adapter) -> dict[str, str]:
     # Columns at the four top-plate corners: one lock-mated seed and one native
     # two-direction grid replace four inserts and four independent mates.
     # The pattern instances are positioned rigidly by the feature -- they read
-    # fully defined (the channel bushing-bank precedent) and spacing 2*COLUMN_Z
-    # lands them exactly on the old mate-solved corners, so the top-frame ring
-    # bores and every render are unchanged.
-    column_target = [COLUMN_X, BASE_TOP_Y, COLUMN_Z]
+    # fully defined (the channel bushing-bank precedent). The asymmetric span
+    # preserves the front pair and lands the rear pair on its translated bores.
+    column_target = [COLUMN_X, BASE_TOP_Y, REAR_COLUMN_Z]
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=column_path, position=column_target)
     )
@@ -217,7 +218,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         [column_name],
         axis1="x", spacing1_mm=2.0 * COLUMN_X, instances1=2,
-        axis2="z", spacing2_mm=2.0 * COLUMN_Z, instances2=2,
+        axis2="z", spacing2_mm=REAR_COLUMN_Z - FRONT_COLUMN_Z, instances2=2,
         direction1=PatternDirection.FORWARD,
         direction2=PatternDirection.REVERSE,
         label="tube-frame column grid",
@@ -226,9 +227,9 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         column_instances,
         [
-            [-COLUMN_X, BASE_TOP_Y, COLUMN_Z],
-            [COLUMN_X, BASE_TOP_Y, -COLUMN_Z],
-            [-COLUMN_X, BASE_TOP_Y, -COLUMN_Z],
+            [-COLUMN_X, BASE_TOP_Y, REAR_COLUMN_Z],
+            [COLUMN_X, BASE_TOP_Y, FRONT_COLUMN_Z],
+            [-COLUMN_X, BASE_TOP_Y, FRONT_COLUMN_Z],
         ],
         IDENTITY,
         "tube-frame column grid",
@@ -244,7 +245,7 @@ async def build(adapter) -> dict[str, str]:
     #
     # Inserted on-solution (a single machine-handed casting) and locked to the
     # fixed base. Its authored transform places the physical foot on the base top.
-    support_target = [SUPPORT_X, SUPPORT_SEAT_Y, 0.0]
+    support_target = [SUPPORT_X, SUPPORT_SEAT_Y, SUPPORT_Z]
     support_name = await place_component(
         adapter,
         "rocker-arm-support",
@@ -298,7 +299,7 @@ async def build(adapter) -> dict[str, str]:
         spacing1_mm=LAG_SCREW_XZ[2][0] - LAG_SCREW_XZ[0][0],
         instances1=2,
         axis2="z",
-        spacing2_mm=2.0 * abs(LAG_SCREW_XZ[0][1]),
+        spacing2_mm=LAG_SCREW_XZ[0][1] - LAG_SCREW_XZ[1][1],
         instances2=2,
         direction1=PatternDirection.REVERSE,
         direction2=PatternDirection.REVERSE,
