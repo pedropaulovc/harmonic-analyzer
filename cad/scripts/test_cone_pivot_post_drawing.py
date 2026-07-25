@@ -149,6 +149,7 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert "create_revolve" not in source
     assert source.count("both_directions=True") == 2
     assert source.count('create_sketch("ConeShaftNormal")') == 2
+    assert "angle=-INCLINE_DEG" in source
     assert 'HoleSpec(\n    "counterbore_fillister",\n    "1/4"' in source
     assert source.count("wizard_holes(") == 1
     assert "attachment_cut.placement_drive_jobs" in source
