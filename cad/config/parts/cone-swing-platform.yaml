@@ -1,4 +1,6 @@
 cone-swing-platform:
+  # The 266 x 61 mm plan envelope and 1/4-20 post-mount pattern cascade from
+  # cone-pivot-post-v2.SLDPRT; the wedge itself remains the ch.12 p.18 platform.
   number: MHA-091
   material: ASTM A830/A830M Gr 1018 HR steel plate; 5/16 in minimum stock
   material_specification: ASTM A830/A830M Gr 1018 HR steel plate; 5/16 in minimum stock
