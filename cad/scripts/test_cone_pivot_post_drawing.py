@@ -128,7 +128,8 @@ def test_part_exposes_semantic_mating_references() -> None:
         "mount west",
     ):
         assert f'"{name}"' in source
-    assert 'mode="cylindrical_face"' in source
+    assert '_create_feature_cylinder_axis(' in source
+    assert '"ConeShaftBoss",\n        CONE_BOSS_DIA / 2.0' in source
     assert '(("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X))' in source
     assert not hasattr(part, "CRANK_BORE_DX")
     assert not hasattr(part, "CRANK_BORE_Y")
