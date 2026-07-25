@@ -23,9 +23,12 @@ These are tracked against the book photos and are fidelity-only, not mechanism-b
 
 - lever-fan rest pose (photos show it drooped; CAD holds neutral);
 - pen-marker plumb vs the book's ~12° tilt;
-- round domed cone-pivot-post (modeled as a block);
 - white render background vs the plates' black studio background (pipeline-inherent; the gallery
   blend layer compensates).
+
+The cone-pivot-post is no longer a cosmetic deferral: its 86 mm height was manually
+rederived from ch30 Eight Views station 2 (`ch30_images/page003_img01.png`), and its
+bossed-casting proportions from ch11 `page002_img05.jpeg` and `page002_img06.jpeg`.
 
 ## Omitted hardware (documented)
 
