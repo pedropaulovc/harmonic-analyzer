@@ -59,3 +59,11 @@ def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
     assert _seed_flip(
         "fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z
     )
+
+
+def test_copied_rod_orientation_uses_the_relearned_spin_side() -> None:
+    assert not _seed_flip(
+        "J2 rod ch02 swing -> ring -53.0,99.2",
+        channel.RING_CENTER[0],
+        " @npn",
+    )
