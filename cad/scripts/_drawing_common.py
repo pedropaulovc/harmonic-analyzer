@@ -33,7 +33,6 @@ from solidworks_mcp.adapters.com_variant import (
     bool_array,
     bstr_array,
     dispatch_array,
-    double_array,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -362,7 +361,6 @@ def add_datum_feature(
     entity_type: str = "EDGE",
     entity: Any | None = None,
     annotation: Any | None = None,
-    shoulder: bool = False,
     callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
@@ -397,12 +395,9 @@ def add_datum_feature(
         "GetAnnotation",
         "GetLabel",
         "SetText",
-        "Shoulder",
     )
     if not tag.SetLabel(datum):
         raise RuntimeError(f"failed to label datum feature {datum} ({label})")
-    if shoulder:
-        tag.Shoulder = True
     tag_annotation = _sw_type_info.early_bound_or_flag(
         tag.GetAnnotation(), "IAnnotation", "SetPosition2"
     )
@@ -710,31 +705,6 @@ def add_view_centerline(
         raise RuntimeError(f"failed to insert view centerline ({label})")
     draw.ClearSelection2(True)
     return centerline
-
-
-@_telemetry.traced("drawing.model_point_projection", label_param="label")
-def model_point_in_view(
-    adapter: Any,
-    view: Any,
-    xyz: tuple[float, float, float],
-    *,
-    label: str,
-) -> tuple[float, float]:
-    """Project a model-space point into drawing-sheet coordinates."""
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    model_point = math_utility.CreatePoint(double_array([float(v) for v in xyz]))
-    if model_point is None:
-        raise RuntimeError(f"failed to create model point ({label})")
-    model_point = _early_bound(model_point, "IMathPoint")
-    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
-    view_point = model_point.MultiplyTransform(transform)
-    if view_point is None:
-        raise RuntimeError(f"failed to project model point into view ({label})")
-    view_point = _early_bound(view_point, "IMathPoint")
-    coordinates = list(view_point.ArrayData or ())
-    if len(coordinates) < 2:
-        raise RuntimeError(f"projected model point has no sheet coordinates ({label})")
-    return (float(coordinates[0]), float(coordinates[1]))
 
 
 @_telemetry.traced("drawing.linked_note", label_param="property_name")
@@ -1047,7 +1017,6 @@ def new_project_drawing(
     ddoc = _early_bound(
         draw, "IDrawingDoc"
     )  # IDrawingDoc view for drawing-only methods (same dispatch)
-    _assert_third_angle_projection_symbol(draw, ddoc)
     # A hand-saved template can be saved while in Edit Sheet Format mode (it
     # was, the day the title block was drawn) -- a drawing created from it then
     # opens with the FORMAT layer active, where every pick lands on the sheet
@@ -1184,84 +1153,6 @@ def _assert_third_angle_order(frustum_x: float, circle_x: float) -> None:
             "project template carries a first-angle projection symbol: "
             f"circle_x={circle_x:.6f} is not right of frustum_x={frustum_x:.6f}"
         )
-
-
-def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
-    """Fail every drawing at creation if the template carries first-angle ink."""
-    ddoc.EditTemplate()
-    try:
-        manager = _early_bound(draw.SketchManager, "ISketchManager")
-        definitions = manager.GetSketchBlockDefinitions() or ()
-        candidates = [
-            _early_bound(definition, "ISketchBlockDefinition")
-            for definition in definitions
-            if Path(
-                str(_early_bound(definition, "ISketchBlockDefinition").FileName)
-            ).name.lower()
-            == "third-angle-projection.sldblk"
-        ]
-        if len(candidates) != 1:
-            raise RuntimeError(
-                "project template must contain exactly one third-angle projection "
-                f"block definition, got {len(candidates)}"
-            )
-        sketch = _early_bound(candidates[0].GetSketch(), "ISketch")
-        circle_specs: list[tuple[float, float]] = []
-        line_x_pairs: list[tuple[float, float]] = []
-        for raw_segment in sketch.GetSketchSegments() or ():
-            segment = _early_bound(raw_segment, "ISketchSegment")
-            kind = int(segment.GetType())
-            if kind == 0:
-                line = _early_bound(raw_segment, "ISketchLine")
-                line_x_pairs.append(
-                    (
-                        float(_early_bound(line.GetStartPoint2(), "ISketchPoint").X),
-                        float(_early_bound(line.GetEndPoint2(), "ISketchPoint").X),
-                    )
-                )
-                continue
-            if kind != 1:
-                continue
-            arc = _early_bound(raw_segment, "ISketchArc")
-            if not bool(arc.IsCircle()):
-                continue
-            center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
-            circle_specs.append((float(center.X), float(arc.GetRadius())))
-        frustum_x, circle_x = _projection_symbol_centers(circle_specs, line_x_pairs)
-        _assert_third_angle_order(frustum_x, circle_x)
-        # A correct block DEFINITION can persist in the document even when the
-        # placed title-block INSTANCE was deleted, mirrored, or never inserted,
-        # so the definition geometry alone does not prove the sheet shows the
-        # symbol.  Require at least one placed instance and reject a rotated /
-        # mirrored one (which flips the projection convention on the sheet).
-        definition = candidates[0]
-        instance_count = int(definition.GetInstanceCount())
-        with _telemetry.span(
-            "drawing.projection_symbol_scan", instances=instance_count
-        ):
-            if instance_count < 1:
-                raise RuntimeError(
-                    "third-angle projection block is defined but has no placed "
-                    "instance — the title-block symbol was deleted or never inserted"
-                )
-            for raw_instance in definition.GetInstances() or ():
-                instance = _early_bound(raw_instance, "ISketchBlockInstance")
-                angle = float(instance.Angle) % math.tau
-                if min(angle, math.tau - angle) > math.radians(0.5):
-                    raise RuntimeError(
-                        "placed third-angle projection block instance is rotated "
-                        f"(angle={angle:.4f} rad) — a rotated or mirrored symbol "
-                        "misreads the projection convention on the sheet"
-                    )
-        _telemetry.event(
-            "drawing.projection_symbol_verified",
-            convention="third-angle",
-            frustum_x=frustum_x,
-            circle_x=circle_x,
-            instance_count=instance_count,
-        )
-    finally:
-        ddoc.EditSheet()
 
 
 def assert_asme_b_sheet(

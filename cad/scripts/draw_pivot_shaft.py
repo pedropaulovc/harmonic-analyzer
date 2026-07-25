@@ -149,8 +149,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
-    # Live readback normalizes this restricted axis tag by 16.826 um.  Bound
-    # only annotation placement; part dimensions and GD&T remain unchanged.
     add_datum_feature(
         adapter,
         front,

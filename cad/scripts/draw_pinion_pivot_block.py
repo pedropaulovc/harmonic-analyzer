@@ -237,8 +237,6 @@ async def build(adapter: Any) -> dict[str, str]:
         _front_x(BORE_HALF_SPACING),
         _front_y(0.0) - BORE_R_SHEET,
     )
-    # SolidWorks restricts this axis-attached tag and live readback normalizes
-    # the intended sheet point by 2.927 mm.  Bound only annotation placement.
     add_datum_feature(
         adapter,
         front,

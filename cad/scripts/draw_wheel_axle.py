@@ -188,8 +188,6 @@ async def build(adapter: Any) -> dict[str, str]:
         END_CENTER[0] + STUD_DIA / 2.0 * _END_K * math.cos(_DATUM_B_ANGLE),
         END_CENTER[1] + STUD_DIA / 2.0 * _END_K * math.sin(_DATUM_B_ANGLE),
     )
-    # Live readback normalizes this restricted tag by 13.776 um; this bound
-    # applies only to annotation placement, not part geometry or GD&T.
     add_datum_feature(
         adapter,
         end,

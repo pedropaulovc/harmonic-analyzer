@@ -117,8 +117,8 @@ DIMENSION_CALLOUTS = {
 
 _TOP_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 _Z_MIN_MM = -GRIP_LEN / 2.0 - CAP_SAG
-_Z_MAX_MM = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
-_Z_CENTER_MM = (_Z_MIN_MM + _Z_MAX_MM) / 2.0
+z_max = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
+_Z_CENTER_MM = (_Z_MIN_MM + z_max) / 2.0
 CROSS_HOLE_RIM_XY = (
     TOP_CENTER[0],
     TOP_CENTER[1]
@@ -126,7 +126,8 @@ CROSS_HOLE_RIM_XY = (
 )
 DATUM_B_END_EDGE_XY = (
     TOP_CENTER[0],
-    TOP_CENTER[1] - (_Z_MAX_MM - _Z_CENTER_MM) * _TOP_VIEW_SCALE / 1000.0,
+    TOP_CENTER[1]
+    - (z_max / 1000.0 - _Z_CENTER_MM / 1000.0) * _TOP_VIEW_SCALE,
 )
 
 
@@ -230,15 +231,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     flat_end_x = (
         RIGHT_CENTER[0]
-        - (_Z_MAX_MM - _Z_CENTER_MM) * _TOP_VIEW_SCALE / 1000.0
+        - (z_max - _Z_CENTER_MM) * _TOP_VIEW_SCALE / 1000.0
     )
     flat_end = (flat_end_x, bore_center[1])
     flat_end_face = (
         flat_end_x,
         bore_center[1] + TUBE_OD * SHEET_SCALE[0] / 4000.0,
     )
-    # Live readback normalizes this axis-attached tag by 0.0127 mm; the
-    # allowance verifies annotation persistence only, not part geometry.
     add_datum_feature(
         adapter,
         front,

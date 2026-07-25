@@ -96,6 +96,7 @@ def test_finalize_exports_once_without_layout_or_reopen_cycles():
 def test_new_drawing_uses_template_content_and_normalizes_viewport_once():
     source = getsource(drawing_common.new_project_drawing)
     assert "normalize_edge_break" not in source
+    assert "_assert_third_angle_projection_symbol" not in source
     assert "SetText(" not in source
     assert source.count("ViewZoomtofit2()") == 1
     assert "ForceRebuild3" not in source
@@ -145,8 +146,12 @@ def test_live_collector_never_flags_transient_dispatches(monkeypatch):
         GetNextView=None,
     )
     sheet_view = SimpleNamespace(GetNextView=lambda: view, GetTableAnnotations=[])
-    zone = {0: ZONE_MARGINS["top"], 1: ZONE_MARGINS["bottom"],
-            2: ZONE_MARGINS["right"], 3: ZONE_MARGINS["left"]}
+    zone = {
+        0: ZONE_MARGINS["top"],
+        1: ZONE_MARGINS["bottom"],
+        2: ZONE_MARGINS["right"],
+        3: ZONE_MARGINS["left"],
+    }
     sheet = SimpleNamespace(
         GetProperties=lambda: [0.0, 0.0, 1.0, 1.0, 0.0, SHEET_W, SHEET_H],
         GetZoneMargin=lambda code: zone[code],
@@ -181,12 +186,8 @@ def test_live_collector_includes_sheet_notes_but_excludes_template_notes():
             OwnerType=owner_type,
         )
 
-    drawing_note = annotation(
-        "setup-notes", 1, [0.02, 0.08, 0.0, 0.12, 0.20, 0.0]
-    )
-    template_note = annotation(
-        "zone-label", 2, [0.00, 0.00, 0.0, 0.01, 0.01, 0.0]
-    )
+    drawing_note = annotation("setup-notes", 1, [0.02, 0.08, 0.0, 0.12, 0.20, 0.0])
+    template_note = annotation("zone-label", 2, [0.00, 0.00, 0.0, 0.01, 0.01, 0.0])
     sheet_gdt = SimpleNamespace(
         GetLeaderCount=0,
         GetSpecificAnnotation=SimpleNamespace(GetPosition=[-0.02, 0.0, 0.0]),
@@ -376,7 +377,16 @@ def test_leadered_callout_collides_with_notes_not_owner_view():
     # Codex #269 thread 6: a NON_VIEW leadered callout's overlap with the view
     # geometry it OWNS is intended and suppressed, but a collision with a free
     # note / table must still be reported.
-    callout = _el("C", 0.10, 0.18, 0.13, 0.20, kind="note", scope=CollisionScope.NON_VIEW, owner="V")
+    callout = _el(
+        "C",
+        0.10,
+        0.18,
+        0.13,
+        0.20,
+        kind="note",
+        scope=CollisionScope.NON_VIEW,
+        owner="V",
+    )
     view = _el("V", 0.05, 0.15, 0.20, 0.23)
     assert find_overlaps([view, callout]) == []  # over its OWNER view: allowed
     notes_block = _el("N", 0.09, 0.17, 0.14, 0.21, kind="note")  # ALL scope
@@ -387,7 +397,16 @@ def test_nonview_tag_collides_with_a_different_view():
     # Codex #269 thread 3: the view exemption is owner-scoped -- a tag owned by
     # V1 that strays onto a DIFFERENT view V2 is real drawing content overlapping
     # and must be flagged; only the overlap with its own V1 is suppressed.
-    tag = _el("tag", 0.16, 0.18, 0.175, 0.19, kind="note", scope=CollisionScope.NON_VIEW, owner="V1")
+    tag = _el(
+        "tag",
+        0.16,
+        0.18,
+        0.175,
+        0.19,
+        kind="note",
+        scope=CollisionScope.NON_VIEW,
+        owner="V1",
+    )
     v1 = _el("V1", 0.05, 0.15, 0.18, 0.23)  # owner -- exempt
     v2 = _el("V2", 0.15, 0.15, 0.30, 0.23)  # different view -- audited
     assert find_overlaps([v1, tag]) == []
@@ -419,9 +438,19 @@ def test_dimension_is_overflow_only():
     # they measure, so they are NONE-scope -- not overlap-checked against a view,
     # but an off-sheet callout is caught by the overflow audit.
     view = _el("V", 0.05, 0.15, 0.20, 0.23)
-    dim_on_view = _el("D", 0.10, 0.18, 0.108, 0.188, kind="dim", scope=CollisionScope.NONE)
+    dim_on_view = _el(
+        "D", 0.10, 0.18, 0.108, 0.188, kind="dim", scope=CollisionScope.NONE
+    )
     assert find_overlaps([view, dim_on_view]) == []
-    dim_off = _el("D2", SHEET_W - 0.002, 0.15, SHEET_W + 0.006, 0.16, kind="dim", scope=CollisionScope.NONE)
+    dim_off = _el(
+        "D2",
+        SHEET_W - 0.002,
+        0.15,
+        SHEET_W + 0.006,
+        0.16,
+        kind="dim",
+        scope=CollisionScope.NONE,
+    )
     overflows = find_overflows([dim_off], WHOLE_SHEET)
     assert len(overflows) == 1 and "right" in {s for s, _ in overflows[0].sides}
 
@@ -607,7 +636,7 @@ def _datum_tag(x, y, lines, label="A"):
         GetPosition=[x, y, 0.0],
         GetType=lambda: drawing_common._ANNOT_DATUM,
         GetName=lambda: label,
-        GetLeaderCount=lambda: 0,          # the whole point: it registers none
+        GetLeaderCount=lambda: 0,  # the whole point: it registers none
         GetSpecificAnnotation=lambda: spec,
     )
 
@@ -621,13 +650,18 @@ def test_datum_tag_leader_is_collected_even_though_it_registers_none():
     readable only as IDatumTag geometry.
     """
     ax, ay = 0.2100, 0.1436
-    box = [((0.2065, 0.1366), (0.2065, ay)), ((0.2065, ay), (0.2135, ay)),
-           ((0.2135, ay), (0.2135, 0.1366)), ((0.2135, 0.1366), (0.2065, 0.1366))]
+    box = [
+        ((0.2065, 0.1366), (0.2065, ay)),
+        ((0.2065, ay), (0.2135, ay)),
+        ((0.2135, ay), (0.2135, 0.1366)),
+        ((0.2135, 0.1366), (0.2065, 0.1366)),
+    ]
     leader = [((ax, 0.1562), (ax, ay))]
     ann = _datum_tag(ax, ay, box + leader)
 
     segs = drawing_common._datum_leader_segments(
-        _FakeAdapter(None), ann, label="A", owner="Front")
+        _FakeAdapter(None), ann, label="A", owner="Front"
+    )
 
     # The BOX must be excluded -- it is not a leader, and a tag's box legitimately
     # abuts its own view. Only the leader run survives.
@@ -642,6 +676,7 @@ def _hole_callout(lines, *, is_callout=True):
     ``[color, lineType, _, _, startPt[3], endPt[3]]``. GetLeaderCount()==0 (no
     SetLeader3 leader) -- the geometry is read from GetDisplayData instead.
     """
+
     def _line(index):
         (sx, sy), (ex, ey) = lines[index]
         return [0.0, 0.0, 0.0, 0.0, sx, sy, 0.0, ex, ey, 0.0]
@@ -657,7 +692,7 @@ def _hole_callout(lines, *, is_callout=True):
     return SimpleNamespace(
         GetType=lambda: drawing_common._ANNOT_DIM,
         GetName=lambda: "RD3",
-        GetLeaderCount=lambda: 0,             # the whole point: registers none
+        GetLeaderCount=lambda: 0,  # the whole point: registers none
         GetSpecificAnnotation=lambda: display,
     )
 
@@ -671,19 +706,21 @@ def test_hole_callout_leader_reads_the_true_bent_geometry():
     real per-primitive ink in sheet space: stub, sloped run, horizontal shoulder.
     """
     lines = [
-        ((0.0707, 0.20571), (0.08389, 0.2192)),   # sloped run up to the elbow
-        ((0.0693, 0.20429), (0.0707, 0.20571)),   # stub at the hole
-        ((0.08389, 0.2192), (0.12252, 0.2192)),   # horizontal shoulder past text
+        ((0.0707, 0.20571), (0.08389, 0.2192)),  # sloped run up to the elbow
+        ((0.0693, 0.20429), (0.0707, 0.20571)),  # stub at the hole
+        ((0.08389, 0.2192), (0.12252, 0.2192)),  # horizontal shoulder past text
     ]
     ann = _hole_callout(lines)
 
     segs = drawing_common._display_dimension_leader_segments(
-        _FakeAdapter(None), ann, label="RD3", owner="Front")
+        _FakeAdapter(None), ann, label="RD3", owner="Front"
+    )
 
     assert len(segs) == 3
     assert all(s.kind == "dim" for s in segs)
     assert (segs[2].x0, segs[2].y0, segs[2].x1, segs[2].y1) == pytest.approx(
-        (0.08389, 0.2192, 0.12252, 0.2192))
+        (0.08389, 0.2192, 0.12252, 0.2192)
+    )
     # The shoulder reaches x=0.12252, PAST the text at 0.104 -- ground a straight
     # attachment->text chord never covered, so the chord could miss a crossing.
     assert max(s.x1 for s in segs) == pytest.approx(0.12252)
@@ -695,7 +732,8 @@ def test_plain_dimension_contributes_no_leader():
     linear/radius dimension would spray phantom leaders across the audit)."""
     ann = _hole_callout([((0.0, 0.0), (0.1, 0.1))], is_callout=False)
     segs = drawing_common._display_dimension_leader_segments(
-        _FakeAdapter(None), ann, label="Length", owner="Front")
+        _FakeAdapter(None), ann, label="Length", owner="Front"
+    )
     assert segs == []
 
 
@@ -707,12 +745,17 @@ def test_datum_leader_across_a_foreign_view_now_flags():
     contributes no leader segments so it was never crossing-checked either.
     """
     # Tag below the view, leader driven straight UP through it to a pick above.
-    box = [((0.14, 0.05), (0.14, 0.057)), ((0.14, 0.057), (0.147, 0.057)),
-           ((0.147, 0.057), (0.147, 0.05)), ((0.147, 0.05), (0.14, 0.05))]
+    box = [
+        ((0.14, 0.05), (0.14, 0.057)),
+        ((0.14, 0.057), (0.147, 0.057)),
+        ((0.147, 0.057), (0.147, 0.05)),
+        ((0.147, 0.05), (0.14, 0.05)),
+    ]
     leader = [((0.1435, 0.25), (0.1435, 0.057))]
     ann = _datum_tag(0.1435, 0.057, box + leader)
     segs = drawing_common._datum_leader_segments(
-        _FakeAdapter(None), ann, label="A", owner="Front")
+        _FakeAdapter(None), ann, label="A", owner="Front"
+    )
 
     (crossing,) = find_leader_crossings(segs, _views())
     assert crossing.view.label == "Top"
@@ -728,7 +771,8 @@ def test_closed_rectangle_ignores_a_tag_with_no_box():
     assert drawing_common._closed_rectangle(lines) == set()
     ann = _datum_tag(0.10, 0.10, lines)
     segs = drawing_common._datum_leader_segments(
-        _FakeAdapter(None), ann, label="A", owner="Front")
+        _FakeAdapter(None), ann, label="A", owner="Front"
+    )
     assert len(segs) == 1
 
 
@@ -740,8 +784,9 @@ def test_leader_clipping_a_pictorial_view_is_not_a_crossing():
     empty corner fails a drawing that is correct (codex #334). Keying on
     kind == "view" alone was what let this in.
     """
-    iso = _el("Isometric", 0.10, 0.10, 0.30, 0.30, kind="view",
-              scope=CollisionScope.NONE)
+    iso = _el(
+        "Isometric", 0.10, 0.10, 0.30, 0.30, kind="view", scope=CollisionScope.NONE
+    )
     leader = LeaderSegment("Ra 1.6", "gdt", 0.05, 0.12, 0.35, 0.12, owner="Front")
     assert find_leader_crossings([leader], [iso]) == []
 
@@ -804,9 +849,7 @@ def _gdt(x, y, kind, label):
     annotation = SimpleNamespace(
         GetPosition=[x, y, 0.0], GetType=lambda k=kind: k, GetName=lambda n=label: n
     )
-    return drawing_common._gdt_element(
-        _FakeAdapter(None), annotation, label, kind
-    )
+    return drawing_common._gdt_element(_FakeAdapter(None), annotation, label, kind)
 
 
 def test_surface_finish_box_matches_the_measured_symbol_anatomy():
@@ -820,7 +863,7 @@ def test_surface_finish_box_matches_the_measured_symbol_anatomy():
 
     assert element.xmin == ax - drawing_common._SF_BOX_LEFT_M
     assert element.xmax == ax + drawing_common._SF_BOX_RIGHT_M
-    assert element.ymin == ay              # the vertex IS the bottom edge
+    assert element.ymin == ay  # the vertex IS the bottom edge
     assert element.ymax == ay + drawing_common._SF_BOX_UP_M
     # The body is far wider than tall and sits entirely above its anchor.
     assert element.xmax - element.xmin > 2 * (element.ymax - element.ymin)
@@ -839,9 +882,9 @@ def _gdt_with_geometry(x, y, kind, label, lines=(), triangles=()):
         GetArcCount=lambda: 0,
         GetArcAtIndex=lambda i: None,
         GetTriangleCount=lambda: len(triangles),
-        GetTriangleAtIndex=lambda i: [
-            c for v in triangles[i] for c in (*v, 0.0)
-        ] + [1.0, 1.0],
+        GetTriangleAtIndex=lambda i: (
+            [c for v in triangles[i] for c in (*v, 0.0)] + [1.0, 1.0]
+        ),
     )
     annotation = SimpleNamespace(
         GetPosition=[x, y, 0.0],
@@ -862,14 +905,19 @@ def test_control_frame_is_measured_from_its_rendered_lines():
     the same frame at +41.6mm right / -7.1mm down of the anchor.
     """
     ax, ay = 0.1200, 0.0900
-    frame = [((ax, ay - 0.0070), (ax, ay)),          # first compartment
-             ((ax, ay), (0.1616, ay)),               # frame top run
-             ((0.1616, ay), (0.1616, ay - 0.0070)),
-             ((0.1616, ay - 0.0070), (ax, ay - 0.0070))]
-    leader = [((0.1137, 0.0865), (ax, 0.0865)),      # shoulder
-              ((0.1137, 0.0865), (0.1049, 0.1268))]  # diagonal
-    el = _gdt_with_geometry(ax, ay, drawing_common._ANNOT_GTOL, "pos",
-                            lines=frame + leader)
+    frame = [
+        ((ax, ay - 0.0070), (ax, ay)),  # first compartment
+        ((ax, ay), (0.1616, ay)),  # frame top run
+        ((0.1616, ay), (0.1616, ay - 0.0070)),
+        ((0.1616, ay - 0.0070), (ax, ay - 0.0070)),
+    ]
+    leader = [
+        ((0.1137, 0.0865), (ax, 0.0865)),  # shoulder
+        ((0.1137, 0.0865), (0.1049, 0.1268)),
+    ]  # diagonal
+    el = _gdt_with_geometry(
+        ax, ay, drawing_common._ANNOT_GTOL, "pos", lines=frame + leader
+    )
 
     # The FRAME hangs down-right of the anchor (its top-left corner), so the
     # box's bottom is the frame's bottom...
@@ -889,15 +937,20 @@ def test_control_frame_is_measured_from_its_rendered_lines():
 def test_datum_tag_box_spans_its_leader_and_triangle():
     """rocker-arm-support datum A as probed: 7x7mm box + a 12.6mm leader up."""
     ax, ay = 0.2100, 0.1436
-    box = [((0.2065, 0.1366), (0.2065, ay)), ((0.2065, ay), (0.2135, ay)),
-           ((0.2135, ay), (0.2135, 0.1366)), ((0.2135, 0.1366), (0.2065, 0.1366))]
+    box = [
+        ((0.2065, 0.1366), (0.2065, ay)),
+        ((0.2065, ay), (0.2135, ay)),
+        ((0.2135, ay), (0.2135, 0.1366)),
+        ((0.2135, 0.1366), (0.2065, 0.1366)),
+    ]
     leader = [((ax, 0.1562), (ax, ay))]
     tri = [((0.2086, 0.1537), (0.2114, 0.1537), (0.2100, 0.1562))]
-    el = _gdt_with_geometry(ax, ay, drawing_common._ANNOT_DATUM, "A",
-                            lines=box + leader, triangles=tri)
+    el = _gdt_with_geometry(
+        ax, ay, drawing_common._ANNOT_DATUM, "A", lines=box + leader, triangles=tri
+    )
 
-    assert el.ymin == pytest.approx(0.1366)   # box bottom
-    assert el.ymax == pytest.approx(0.1562)   # triangle tip at the attachment
+    assert el.ymin == pytest.approx(0.1366)  # box bottom
+    assert el.ymax == pytest.approx(0.1562)  # triangle tip at the attachment
     assert (el.xmin, el.xmax) == pytest.approx((0.2065, 0.2135))
 
 
@@ -928,8 +981,15 @@ def test_surface_finish_over_the_top_border_is_now_caught():
 
     # The old symmetric box is the negative control: it does NOT reach the bound.
     half = drawing_common._NOMINAL_GDT_HALF_M
-    old = _el("Ra", 0.030 - half, 0.255 - half, 0.030 + half, 0.255 + half,
-              kind="gdt", scope=CollisionScope.NONE)
+    old = _el(
+        "Ra",
+        0.030 - half,
+        0.255 - half,
+        0.030 + half,
+        0.255 + half,
+        kind="gdt",
+        scope=CollisionScope.NONE,
+    )
     assert not find_overflows([old], ZONE_REGION), (
         "negative control: the old box was blind here -- that is the bug"
     )
@@ -1049,11 +1109,13 @@ def _stub_layout(monkeypatch, leader_crossings):
     seg = LeaderSegment("a", "gdt", 0.0, 0.0, 0.1, 0.1, owner="Front")
     found = [LeaderCrossing(seg, seg, 0.05, 0.05) for _ in range(leader_crossings)]
     monkeypatch.setattr(
-        drawing_common, "collect_layout_elements",
+        drawing_common,
+        "collect_layout_elements",
         lambda _adapter: ([], [], WHOLE_SHEET),
     )
     monkeypatch.setattr(
-        drawing_common, "audit_layout",
+        drawing_common,
+        "audit_layout",
         lambda *_a, **_k: ([], [], found),
     )
 

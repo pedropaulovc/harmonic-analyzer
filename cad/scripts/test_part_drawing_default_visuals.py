@@ -227,6 +227,7 @@ def test_dimension_curation_never_mutates_view_display() -> None:
 def test_datum_uses_precomputed_position_without_readback() -> None:
     parameters = inspect.signature(drawing_common.add_datum_feature).parameters
     assert "position_tolerance_m" not in parameters
+    assert "shoulder" not in parameters
     source = inspect.getsource(drawing_common.add_datum_feature)
     assert "GetPosition" not in source
     assert "drawing.annotation_auto_layout" not in source

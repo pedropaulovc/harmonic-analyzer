@@ -182,9 +182,6 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_left = (hub_center[0] - BORE_R_SHEET, hub_center[1])
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
-    # SolidWorks restricts this axis-attached tag and live readback normalizes
-    # the intended sheet point by 4.664 mm.  Bound only annotation placement;
-    # part dimensions and GD&T remain unchanged.
     add_datum_feature(
         adapter,
         front,

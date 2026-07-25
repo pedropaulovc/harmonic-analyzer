@@ -269,8 +269,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # off-border even though SetPosition2 succeeds. Attach B to the cylindrical
     # feature itself instead, with a short radial leader that unmistakably ends
     # on the projected circumference rather than the centre mark/axis.
-    # SolidWorks normalizes this restricted cylindrical tag by 3.574 mm; the
-    # bound checks annotation placement only, not part geometry or GD&T.
     add_datum_feature(
         adapter,
         top,

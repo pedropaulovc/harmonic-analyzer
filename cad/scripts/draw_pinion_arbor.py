@@ -145,8 +145,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Screen-right in *Right is model -Z: the flat front tip (z 0) lands on the
     # RIGHT end of the side view, the crowned back end on the LEFT.
     flat_end = (RIGHT_CENTER[0] + OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
-    # Live readback normalizes this restricted axis tag by up to 10.699 um. Bound
-    # only annotation placement; part dimensions and GD&T remain unchanged.
     add_datum_feature(
         adapter,
         front,

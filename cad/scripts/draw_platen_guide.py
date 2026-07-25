@@ -214,9 +214,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=datum_b_entity,
         symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098),
         datum="B",
-        # SolidWorks normalizes this legal bottom-edge attachment 0.0507 mm
-        # upward when the symbol is committed.  Accept that measured native
-        # readback shift; this is an automation check, not a part tolerance.
         label="guide bottom edge",
     )
     # Dropped to y=0.098 from FRONT_HOLE_Y_M (0.1111): level with the edge, the
