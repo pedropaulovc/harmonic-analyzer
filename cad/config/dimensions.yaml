@@ -193,11 +193,17 @@ sections:
         - scaled
         - low
       - - Crankshaft diameter
-        - 9.5 mm (3/8")
+        - 9.525 mm (3/8") on the T12, pinion, and crank-arm seats
         - '0.375'
-        - legacy `parameters.kcl` ShaftDiameter; uncontradicted
+        - legacy `parameters.kcl` ShaftDiameter; retained outside the v2-post bearing journal so all fitted parts keep their existing bores and world stations
         - legacy
         - med
+      - - Crankshaft bearing journal
+        - 'Ø11.388 × 72.412 mm; local stations 26.623905572..99.035905572 (world z −148.376094428..−75.964094428)'
+        - —
+        - 'derived from the manually rederived `cone-pivot-post-v2` Ø11.438 crank bore with 0.05 mm diametral running clearance; integral with the Ø9.525 shaft, whose world origin remains z −175'
+        - derived
+        - high
       - - Arm thickness
         - ~8 mm
         - ~0.31
@@ -305,17 +311,17 @@ sections:
         - derived
         - low
       - - Cone shaft length
-        - 190 mm
-        - '7.5'
-        - 'M6.7: pivot journal 25 + stack 19 × 6.889 + 6.5 ≈ 137.4 + thin T006/tip section reaching the external spacer and adjuster cup (length kept 190; the stack lengthened slightly with the shallower incline)'
+        - 251.9068609979 mm overall
+        - '~9.92'
+        - 'The legacy stack still ends 190 mm past its pivot-origin datum, but the final coupled layout moves the shaft front end to cone station −61.9068609979: post centre −39.90136099793, 42.011 axial body, plus 1.0 proud. Adding the 49.6068609979 stub delta to every downstream local station preserves every gear world station.'
         - derived
-        - low
+        - high
       - - Cone shaft diameter
-        - 'stepped: 9.5 (3/8") z 0–141.9, 6.35 (1/4") to 148.8, 3.18 (1/8") to 155.7, 0.79 (1/32") to 190 (large/pivot end at z 0)'
-        - 0.375/0.25/0.125/0.03125
-        - 'big-end dia kept 3/8" (pivot-post bearing). At DP 49.82 the tip gears are tiny (T006 OD 4.08, root r 0.89), so the shaft steps down MUCH further than the old DP 30 shaft: each step lands in the ~0.39 mm air gap between faces (seats at 28.25 + 6.889j ± 3.25). The 1/32" (0.79 mm) tip journal carrying T006 is mechanically marginal — flagged, follows from the 62.2 OD anchor (low) — `build_cone_gear_shaft.py`'
+        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø9.525 (3/8") to 203.8068609979; Ø6.35 (1/4") to 210.7068609979; Ø3.175 (1/8") to 217.6068609979; Ø0.79375 (1/32") to 251.9068609979'
+        - 12.2308/9.525/6.35/3.175/0.79375
+        - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. All downstream gear-seat diameters and world stations are unchanged; the 1/32" (0.79 mm) tip remains mechanically marginal — `build_cone_gear_shaft.py`.'
         - legacy + derived
-        - low
+        - high
       - - Gear bores (configured `BoreDia`)
         - 'snug on the stepped shaft (M6.7 perpendicular seats) AND inside each gear''s root circle: 9.5 (3/8") T024–T120; 6.35 (1/4") T018; 3.18 (1/8") T012; 0.79 (1/32") T006; no keyway'
         - —

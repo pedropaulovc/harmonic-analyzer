@@ -5,10 +5,20 @@ from __future__ import annotations
 
 MM_PER_IN = 25.4
 
-# The 3/8" big end runs FRONT_STUB past the legacy pivot-end origin, through
-# the pivot post's journal (see build_cone_gear_shaft.py). The part origin is
-# that FRONT END face; every station below is measured from it.
-FRONT_STUB = 12.3
+# The manually rederived v2 pivot post has a Ø12.2808 bearing bore spanning
+# 42.011 mm along the cone axis.  The shaft begins 1.0 mm proud of the post's
+# front face, so the integral journal is one millimetre longer than the post
+# body and runs with 0.05 mm diametral clearance.
+JOURNAL_BORE_DIA = 12.2808
+JOURNAL_CLEARANCE = 0.05
+JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
+JOURNAL_END = 43.011
+
+# The final coupled-layout post centre is cone station -39.90136099793.  Its
+# 42.011 mm axial body therefore has its front face at -60.9068609979; another
+# 1.0 mm makes the shaft end proud at -61.9068609979.  The part origin is that front end and all
+# stations below are measured from it.
+FRONT_STUB = 61.9068609979
 
 # (diameter in inches, section end station in mm from the front stub end).
 # Diameters mirror build_cone_gear.bore_dia_in (snug perpendicular gear seats).
@@ -16,7 +26,8 @@ FRONT_STUB = 12.3
 # follows from the 62.2 OD anchor (ch13, low confidence) and is flagged for
 # Phase 3 rebuild validation. It is drawn faithfully, not "fixed" here.
 SECTIONS: tuple[tuple[float, float], ...] = (
-    (0.375, FRONT_STUB + 141.9),  # front stub + pivot journal + 64T + T120..T024
+    (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
+    (0.375, FRONT_STUB + 141.9),  # unchanged 64T + T120..T024 world stations
     (0.25, FRONT_STUB + 148.8),  # T018 seat
     (0.125, FRONT_STUB + 155.7),  # T012 seat
     (0.03125, FRONT_STUB + 190.0),  # T006 seat + thin-tip journal
@@ -31,10 +42,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec1Profile": {"Sec1Dia"},
     "Sec2Profile": {"Sec2Dia"},
     "Sec3Profile": {"Sec3Dia"},
+    "Sec4Profile": {"Sec4Dia"},
     "Sec0": {"Sec0End"},
     "Sec1": {"Sec1End"},
     "Sec2": {"Sec2End"},
     "Sec3": {"Sec3End"},
+    "Sec4": {"Sec4End"},
 }
 
 # Kept to short lines so the block sits clear of the bottom-right title block
@@ -45,16 +58,18 @@ DRAWING_NOTES = "\n".join(
     (
         "ALL AXIAL STATION DIMENSIONS +/-0.25.",
         "STEP STATIONS ARE MEASURED FROM THE LARGE-END FACE.",
-        f"DIA {SECTION_DIAS[0]:.3f} IS DATUM A. "
+        f"DIA {JOURNAL_DIA:.4f} BEARING JOURNAL IS DATUM A.",
+        f"RUNNING FIT IN DIA {JOURNAL_BORE_DIA:.4f} POST BORE: "
+        f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
         f"DIA {SECTION_DIAS[1]:.3f}, {SECTION_DIAS[2]:.3f}, "
-        f"AND {SECTION_DIAS[3]:.3f}",
+        f"{SECTION_DIAS[3]:.3f}, AND {SECTION_DIAS[4]:.3f}",
         "GEAR-SEAT CYLINDERS HAVE CIRCULAR RUNOUT 0.05 MAX TO A",
         "AT EVERY CROSS SECTION.",
         "SHOULDER ROOTS R0.10 MAX OR RELIEF 0.20 WIDE X 0.20 DEEP MAX.",
-        "START FROM DIA 10.0 MIN ROUND BAR; TURN BETWEEN TEMPORARY",
+        "START FROM DIA 12.5 MIN ROUND BAR; TURN BETWEEN TEMPORARY",
         "CENTRE EXTENSIONS, THEN REMOVE THEM TO FINISHED LENGTH.",
         "NO CENTRE HOLE MAY REMAIN ON EITHER FINISHED END.",
-        f"FINISH-TURN THE DIA {SECTION_DIAS[3]:.3f} TIP LAST "
+        f"FINISH-TURN THE DIA {SECTION_DIAS[-1]:.3f} TIP LAST "
         "WITH FOLLOWER-REST SUPPORT --",
         "SECTION IS FRAGILE BY DESIGN.",
     )
