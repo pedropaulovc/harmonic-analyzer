@@ -29,6 +29,7 @@ import _telemetry
 from _common import (
     CASTING_GREEN,
     SketchDims,
+    _early_bound,
     apply_color,
     apply_material,
     check,
@@ -94,14 +95,8 @@ BLOCK_RADIUS = BLOCK_DIA / 2.0
 HEAD_RADIUS = HEAD_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
-_SIN_I = math.sin(math.radians(INCLINE_DEG))
-_COS_I = math.cos(math.radians(INCLINE_DEG))
-_JOURNAL_AXIS_PICK_INSET = 0.2
-
-
 async def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
-        CreateAxisParameters,
         CreatePlaneParameters,
         ExtrusionParameters,
     )
@@ -385,24 +380,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # Semantic, name-selected assembly references.  The journal axis is taken
     # from its actual cylindrical wall; the three vertical axes are plane
     # intersections and therefore independent of screen projection.
-    check(
-        "create journal axis",
-        await adapter.create_axis(
-            CreateAxisParameters(
-                mode="cylindrical_face",
-                # Pick the exposed outer journal-pad wall, not the internal
-                # bore wall hidden behind the casting in the default view.
-                # Both cylinders are coaxial; the small axial inset avoids
-                # landing on the pad's circular end edge.
-                face_point=[
-                    (BLOCK_RADIUS - _JOURNAL_AXIS_PICK_INSET) * _SIN_I,
-                    BORE_HEIGHT + CONE_BOSS_DIA / 2.0,
-                    (BLOCK_RADIUS - _JOURNAL_AXIS_PICK_INSET) * _COS_I,
-                ],
-            )
-        ),
+    _create_feature_cylinder_axis(
+        adapter,
+        "ConeShaftBoss",
+        CONE_BOSS_DIA / 2.0,
+        "journal axis",
     )
-    name_last_feature(adapter, "journal axis")
     for label, x in (("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X)):
         await name_bore_axis(
             adapter, "Front Plane", 0.0, "Right Plane", x, label
@@ -435,6 +418,60 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     return await save_part_and_images(adapter, PART_NAME)
+
+
+@_telemetry.traced("reference.axis_from_feature_cylinder", label_param="label")
+def _create_feature_cylinder_axis(
+    adapter: Any,
+    feature_name: str,
+    radius_mm: float,
+    label: str,
+) -> None:
+    """Create an axis from an exact feature-owned cylindrical face.
+
+    Coordinate picks are view-dependent and selected ``MainBody`` in the
+    generated post even when the point lay on the small inclined pad. Walking
+    only ``ConeShaftBoss``'s created faces makes the ownership explicit and
+    costs four surface reads instead of scanning the part's complete B-rep.
+    """
+    from solidworks_mcp.adapters import sw_type_info
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2", "InsertAxis2")
+    part = sw_type_info.early_bound_doc(adapter.currentModel)
+    feature = part.FeatureByName(feature_name)
+    if feature is None:
+        raise RuntimeError(f"axis {label}: feature {feature_name!r} not found")
+    feature = _early_bound(feature, "IFeature", "GetFaces")
+    candidates: list[tuple[float, Any]] = []
+    for face in feature.GetFaces() or []:
+        face = _early_bound(face, "IFace2", "GetSurface", "GetArea")
+        surface = _early_bound(
+            face.GetSurface(), "ISurface", "IsCylinder", "CylinderParams"
+        )
+        if not surface.IsCylinder():
+            continue
+        parameters = tuple(float(value) for value in surface.CylinderParams)
+        if abs(parameters[6] * 1000.0 - radius_mm) > 0.001:
+            continue
+        candidates.append((float(face.GetArea()), face))
+    if not candidates:
+        raise RuntimeError(
+            f"axis {label}: {feature_name!r} has no cylinder at r={radius_mm:g} mm"
+        )
+
+    face = max(candidates, key=lambda row: row[0])[1]
+    model.ClearSelection2(True)
+    selectable = _early_bound(face, "IEntity", "Select2")
+    if not selectable.Select2(False, 0):
+        raise RuntimeError(f"axis {label}: exact cylindrical face selection failed")
+    if not model.InsertAxis2(True):
+        raise RuntimeError(f"axis {label}: InsertAxis2 failed")
+    model.ClearSelection2(True)
+    name_last_feature(adapter, label)
+    _telemetry.success(
+        f"axis {label} from {feature_name} r={radius_mm:g} mm "
+        f"({len(candidates)} candidate face(s))"
+    )
 
 
 @_telemetry.traced("appearance.hide_reference_geometry")
