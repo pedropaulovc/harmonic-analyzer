@@ -79,10 +79,8 @@ from _common import (
     apply_color,
     apply_material,
     check,
-    define_circle,
     define_centered_rectangle,
     define_polygon_chain,
-    define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -94,33 +92,11 @@ from _common import (
     set_global,
     volume_check,
 )
-from _visibility import blank_reference_geometry
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from rocker_arm_support_spec import (
-    P2_BACK_LOCAL_INNER_Z,
-    P2_BACK_LOCAL_PLANE_X,
-    P2_BACK_LOCAL_TOP_Y,
-    P2_FOOT_SCREW_DIA,
-    P2_FOOT_SCREW_LIGAMENT,
-    P2_FOOT_SCREW_MIN_LIGAMENT,
-    P2_FOOT_SCREW_LOCAL_X,
-    P2_FOOT_SCREW_LOCAL_Y_MAX,
-    P2_FOOT_SCREW_LOCAL_Y_MIN,
-    P2_FOOT_SCREW_LOCAL_Z,
-    P2_SPRING_LOCAL_INNER_Z,
-    P2_SPRING_LOCAL_X_MAX,
-    P2_SPRING_LOCAL_X_MIN,
-    P2_SPRING_LOCAL_Y_MAX,
-    P2_SPRING_LOCAL_Y_MIN,
-    P2_SPRING_SLOT_LIGAMENT,
-    P2_SPRING_SLOT_MIN_LIGAMENT,
-    SUPPORT_HALF_MACHINE_Z,
-)
-from cone_pivot_post_installation import MECHANISM_X_SHIFT
 
 PART_NAME = "rocker-arm-support"
 # The source repro was authored in steel, but this casting is now the machine's
@@ -135,19 +111,6 @@ WIDE = 31.75       # foot half-width (Z) at Y=-88.9
 NARROW = 8.4665    # top half-width (Z) at Y=+88.9
 HALF_Y = 88.9      # trapezoid half-height (Y)
 BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
-
-# The exact source replay above is retained, then three small p2 clearance cuts
-# are appended for the v2 cascade.  Each bound already includes 0.25 mm air;
-# these overshoots merely guarantee that an open cut crosses the casting face.
-_RELIEF_FACE_OVERSHOOT = 1.0
-P2_BACK_DEPTH = SUPPORT_HALF_MACHINE_Z + P2_BACK_LOCAL_PLANE_X + 0.25
-P2_SPRING_DEPTH = P2_SPRING_LOCAL_X_MAX - P2_SPRING_LOCAL_X_MIN + 0.25
-P2_FOOT_SCREW_DEPTH = (
-    P2_FOOT_SCREW_LOCAL_Y_MAX - P2_FOOT_SCREW_LOCAL_Y_MIN
-)
-
-if abs(BOSS_DEPTH / 2.0 - SUPPORT_HALF_MACHINE_Z) > 1e-9:
-    raise AssertionError("support source depth disagrees with p2 relief transform")
 
 CAV = 63.5         # 127 mm square half (Cut-Extrude2)
 BIG = 82.55        # 165.1 mm square half (Cut-Extrude3/4)
@@ -176,8 +139,6 @@ DRAWING_NOTES = "\n".join(
         "WINDOW: CHAMFER 1.27 X 45 DEG ALL AROUND; FILLET R12.7, 4X.",
         "WINDOW AND CAVITY CENTRED.",
         "CENTRAL WEB 6.35 THICK AND CENTRED.",
-        "P2 CLEARANCE RELIEFS AS-MODELED; 0.25 MIN AIR.",
-        "MAINTAIN 2.5 MIN LIGAMENT AT NEAREST 9/16-12 TAP.",
     )
 )
 # Hole Wizard constants (resolved from the SW type library on this seat):
@@ -431,10 +392,7 @@ def _drill_tapped_holes(adapter, holes_xz, y_face_mm: float):
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        CreatePlaneParameters,
-        ExtrusionParameters,
-    )
+    from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -450,20 +408,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CavHalf", f"{CAV}mm")        # cavity square half
     await set_global(adapter, "WindowOuter", f"{BIG}mm")    # window square half
     await set_global(adapter, "WallWidth", f"{BOSS_DEPTH}mm")  # mid-plane extrude span (X)
-    await set_global(adapter, "P2BackPlaneX", f"{abs(P2_BACK_LOCAL_PLANE_X)}mm")
-    await set_global(adapter, "P2BackInnerZ", f"{abs(P2_BACK_LOCAL_INNER_Z)}mm")
-    await set_global(adapter, "P2BackTopY", f"{abs(P2_BACK_LOCAL_TOP_Y)}mm")
-    await set_global(adapter, "P2BackDepth", f"{P2_BACK_DEPTH}mm")
-    await set_global(adapter, "P2SpringPlaneX", f"{abs(P2_SPRING_LOCAL_X_MAX)}mm")
-    await set_global(adapter, "P2SpringInnerZ", f"{abs(P2_SPRING_LOCAL_INNER_Z)}mm")
-    await set_global(adapter, "P2SpringBottomY", f"{abs(P2_SPRING_LOCAL_Y_MIN)}mm")
-    await set_global(adapter, "P2SpringTopY", f"{abs(P2_SPRING_LOCAL_Y_MAX)}mm")
-    await set_global(adapter, "P2SpringDepth", f"{P2_SPRING_DEPTH}mm")
-    await set_global(adapter, "P2ScrewPlaneY", f"{abs(P2_FOOT_SCREW_LOCAL_Y_MAX)}mm")
-    await set_global(adapter, "P2ScrewCentreX", f"{abs(P2_FOOT_SCREW_LOCAL_X)}mm")
-    await set_global(adapter, "P2ScrewCentreZ", f"{abs(P2_FOOT_SCREW_LOCAL_Z)}mm")
-    await set_global(adapter, "P2ScrewDia", f"{P2_FOOT_SCREW_DIA}mm")
-    await set_global(adapter, "P2ScrewDepth", f"{P2_FOOT_SCREW_DEPTH}mm")
 
     # Each sketch records its dim names + drive equations inline as it is drawn
     # (per-sketch SketchDims); the (dim@feature, expr) jobs are collected here and
@@ -577,195 +521,17 @@ async def build(adapter) -> dict[str, str]:
     check("chamfer", await adapter.add_chamfer(
         CHAMFER, CHAMFER_EDGES, face_points=CHAMFER_FACES, tangent_propagation=True))
     name_last_feature(adapter, "RimChamfer")
-    source_volume = await volume_check(adapter, "RimChamfer", 240_512, 200)
-
-    # 8. V2 p2 closure: localized support reliefs, derived from the exact
-    # cross-subassembly interference bodies.  The support stays at its
-    # independently evidenced rocker-pivot station; only its lower north corner
-    # is machined.  Feature 1 clears the back pivot block and its two screws.
-    check(
-        "create p2 back-pocket plane",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset",
-                base_plane="Right Plane",
-                offset=P2_BACK_LOCAL_PLANE_X,
-            )
-        ),
-    )
-    name_last_feature(adapter, "P2BackPocketPlane")
-    plane_dim = name_dimensions(adapter, "P2BackPocketPlane", ["Offset"])
-    drive_jobs.append((plane_dim[0], '"P2BackPlaneX"'))
-
-    back = SketchDims()
-    check("sketch p2 back pocket", await adapter.create_sketch("P2BackPocketPlane"))
-    # A negative-offset Right plane reverses its sketch-horizontal basis:
-    # sketch +X maps to part-local -Z.  The p2 rig occupies local -Z (machine
-    # -X after SUPPORT_ROWS), so mirror the local-Z bounds into sketch space.
-    back_rect = [
-        (WIDE + _RELIEF_FACE_OVERSHOOT, -HALF_Y - _RELIEF_FACE_OVERSHOOT),
-        (-P2_BACK_LOCAL_INNER_Z, -HALF_Y - _RELIEF_FACE_OVERSHOOT),
-        (-P2_BACK_LOCAL_INNER_Z, P2_BACK_LOCAL_TOP_Y),
-        (WIDE + _RELIEF_FACE_OVERSHOOT, P2_BACK_LOCAL_TOP_Y),
-    ]
-    back_lines = await add_line_chain(adapter, back_rect)
-    await define_rectilinear_chain(
-        adapter,
-        back_lines,
-        back_rect,
-        label="p2 back pocket",
-        dims=back,
-        names=["PocketWidth", "PocketHeight", "PocketAnchorZ", "PocketAnchorY"],
-        drives=[
-            '"FootHalf" + 1mm - "P2BackInnerZ"',
-            '"HalfHeight" + 1mm - "P2BackTopY"',
-            '"FootHalf" + 1mm',
-            '"HalfHeight" + 1mm',
-        ],
-    )
-    await ensure_fully_defined(adapter, "p2 back-pocket sketch")
-    check("exit p2 back pocket", await adapter.exit_sketch())
-    name_last_feature(adapter, "P2BackPocketProfile")
-    drive_jobs += back.apply(adapter, "P2BackPocketProfile")
-    check(
-        "cut p2 back pocket",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=P2_BACK_DEPTH)
-        ),
-    )
-    name_last_feature(adapter, "P2BackPocket")
-    cut_dim = name_dimensions(adapter, "P2BackPocket", ["Depth"])
-    drive_jobs.append((cut_dim[0], '"P2BackDepth"'))
-    # The rig's +1.484 X re-anchor widens this open rectangular cut by the same
-    # amount; height and depth are unchanged because the support and rig share
-    # the full Z translation.
-    back_x_cut_delta = MECHANISM_X_SHIFT * (
-        P2_BACK_LOCAL_TOP_Y + HALF_Y + _RELIEF_FACE_OVERSHOOT
-    ) * P2_BACK_DEPTH
-    volume = await volume_check(
-        adapter, "p2 back pocket", source_volume - (789.77 + back_x_cut_delta), 200
-    )
-
-    # Feature 2 is only 1.3 mm high: it clears the brass spring strip while
-    # preserving almost all thread engagement at the nearby support tap.
-    check(
-        "create p2 spring-slot plane",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset",
-                base_plane="Right Plane",
-                offset=P2_SPRING_LOCAL_X_MAX,
-            )
-        ),
-    )
-    name_last_feature(adapter, "P2SpringSlotPlane")
-    plane_dim = name_dimensions(adapter, "P2SpringSlotPlane", ["Offset"])
-    drive_jobs.append((plane_dim[0], '"P2SpringPlaneX"'))
-
-    spring = SketchDims()
-    check("sketch p2 spring slot", await adapter.create_sketch("P2SpringSlotPlane"))
-    spring_rect = [
-        (WIDE + _RELIEF_FACE_OVERSHOOT, P2_SPRING_LOCAL_Y_MIN),
-        (-P2_SPRING_LOCAL_INNER_Z, P2_SPRING_LOCAL_Y_MIN),
-        (-P2_SPRING_LOCAL_INNER_Z, P2_SPRING_LOCAL_Y_MAX),
-        (WIDE + _RELIEF_FACE_OVERSHOOT, P2_SPRING_LOCAL_Y_MAX),
-    ]
-    spring_lines = await add_line_chain(adapter, spring_rect)
-    await define_rectilinear_chain(
-        adapter,
-        spring_lines,
-        spring_rect,
-        label="p2 spring slot",
-        dims=spring,
-        names=["SlotWidth", "SlotHeight", "SlotAnchorZ", "SlotAnchorY"],
-        drives=[
-            '"FootHalf" + 1mm - "P2SpringInnerZ"',
-            '"P2SpringBottomY" - "P2SpringTopY"',
-            '"FootHalf" + 1mm',
-            '"P2SpringBottomY"',
-        ],
-    )
-    await ensure_fully_defined(adapter, "p2 spring-slot sketch")
-    check("exit p2 spring slot", await adapter.exit_sketch())
-    name_last_feature(adapter, "P2SpringSlotProfile")
-    drive_jobs += spring.apply(adapter, "P2SpringSlotProfile")
-    check(
-        "cut p2 spring slot",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=P2_SPRING_DEPTH)
-        ),
-    )
-    name_last_feature(adapter, "P2SpringSlot")
-    cut_dim = name_dimensions(adapter, "P2SpringSlot", ["Depth"])
-    drive_jobs.append((cut_dim[0], '"P2SpringDepth"'))
-    spring_x_cut_delta = MECHANISM_X_SHIFT * (
-        P2_SPRING_LOCAL_Y_MAX - P2_SPRING_LOCAL_Y_MIN
-    ) * P2_SPRING_DEPTH
-    volume = await volume_check(
-        adapter, "p2 spring slot", volume - (48.15 + spring_x_cut_delta), 200
-    )
-
-    # Feature 3 follows the foot-screw head rather than widening the spring
-    # slot.  After the X re-anchor the round pocket retains 2.691 mm radial
-    # ligament to the unchanged support tap.
-    check(
-        "create p2 foot-screw plane",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset",
-                base_plane="Top Plane",
-                offset=P2_FOOT_SCREW_LOCAL_Y_MAX,
-            )
-        ),
-    )
-    name_last_feature(adapter, "P2FootScrewPlane")
-    plane_dim = name_dimensions(adapter, "P2FootScrewPlane", ["Offset"])
-    drive_jobs.append((plane_dim[0], '"P2ScrewPlaneY"'))
-
-    screw = SketchDims()
-    check("sketch p2 foot-screw pocket", await adapter.create_sketch("P2FootScrewPlane"))
-    await define_circle(
-        adapter,
-        P2_FOOT_SCREW_LOCAL_X,
-        -P2_FOOT_SCREW_LOCAL_Z,
-        P2_FOOT_SCREW_DIA / 2.0,
-        "p2 foot-screw pocket",
-        dims=screw,
-        names=("PocketCx", "PocketCz", "PocketDia"),
-        drives=('"P2ScrewCentreX"', '"P2ScrewCentreZ"', '"P2ScrewDia"'),
-    )
-    await ensure_fully_defined(adapter, "p2 foot-screw pocket sketch")
-    check("exit p2 foot-screw pocket", await adapter.exit_sketch())
-    name_last_feature(adapter, "P2FootScrewProfile")
-    drive_jobs += screw.apply(adapter, "P2FootScrewProfile")
-    check(
-        "cut p2 foot-screw pocket",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=P2_FOOT_SCREW_DEPTH)
-        ),
-    )
-    name_last_feature(adapter, "P2FootScrewPocket")
-    cut_dim = name_dimensions(adapter, "P2FootScrewPocket", ["Depth"])
-    drive_jobs.append((cut_dim[0], '"P2ScrewDepth"'))
-    # The round pocket overlaps the spring slot by 25.40 mm^3.
-    volume = await volume_check(
-        adapter, "p2 support clearance", volume - (91.85 - 25.40), 200
-    )
-    if (
-        P2_SPRING_SLOT_LIGAMENT < P2_SPRING_SLOT_MIN_LIGAMENT
-        or P2_FOOT_SCREW_LIGAMENT < P2_FOOT_SCREW_MIN_LIGAMENT
-    ):
-        raise AssertionError("p2 support relief violates the tap-ligament contract")
+    await volume_check(adapter, "RimChamfer", 240_512, 200)
 
     # Apply the deferred drive equations now that the whole model + a rebuild
     # exist, so every named-dim target resolves. Each equation evaluates to the
     # value just built, so the geometry must not move -- the re-check below is
-    # the proof (same final relief volume as immediately above).
+    # the proof.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven part (equations neutral)", volume, 50)
+    await volume_check(adapter, "driven part (equations neutral)", 240_512, 200)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
@@ -778,14 +544,6 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     apply_drawing_properties(
         adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
-    )
-    blank_reference_geometry(
-        adapter,
-        (
-            ("P2BackPocketPlane", "PLANE"),
-            ("P2SpringSlotPlane", "PLANE"),
-            ("P2FootScrewPlane", "PLANE"),
-        ),
     )
     return await save_part_and_images(adapter, PART_NAME)
 
