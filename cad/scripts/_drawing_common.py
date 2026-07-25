@@ -1639,25 +1639,37 @@ def _prepare_view_for_annotation_authoring(adapter: Any, view: Any) -> None:
         raise RuntimeError(f"failed to expose hidden edges while authoring {name!r}")
 
 
+def _restore_authoring_view_state(state: _AuthoringViewDisplay) -> None:
+    if not state.view.SetDisplayMode4(
+        state.use_parent,
+        state.mode,
+        state.faceted,
+        state.edges,
+        state.cosmetic_threads_high_quality,
+    ):
+        raise RuntimeError(
+            f"failed to restore SolidWorks display defaults for {state.name!r}"
+        )
+    if int(state.view.GetDisplayMode2()) != state.mode:
+        raise RuntimeError(
+            f"SolidWorks display mode drifted for {state.name!r}: "
+            f"{state.view.GetDisplayMode2()} != {state.mode}"
+        )
+
+
+def restore_default_view_display(adapter: Any, view: Any) -> None:
+    """End temporary hidden-edge authoring and restore this view's SW default."""
+    name = view_name(adapter, view)
+    state = _AUTHORING_VIEW_DISPLAYS.pop(name, None)
+    if state is not None:
+        _restore_authoring_view_state(state)
+
+
 def _restore_default_view_displays() -> None:
     """Restore every temporary authoring view to its original SW-selected mode."""
     try:
-        for state in _AUTHORING_VIEW_DISPLAYS.values():
-            if not state.view.SetDisplayMode4(
-                state.use_parent,
-                state.mode,
-                state.faceted,
-                state.edges,
-                state.cosmetic_threads_high_quality,
-            ):
-                raise RuntimeError(
-                    f"failed to restore SolidWorks display defaults for {state.name!r}"
-                )
-            if int(state.view.GetDisplayMode2()) != state.mode:
-                raise RuntimeError(
-                    f"SolidWorks display mode drifted for {state.name!r}: "
-                    f"{state.view.GetDisplayMode2()} != {state.mode}"
-                )
+        for state in tuple(_AUTHORING_VIEW_DISPLAYS.values()):
+            _restore_authoring_view_state(state)
     finally:
         _AUTHORING_VIEW_DISPLAYS.clear()
 

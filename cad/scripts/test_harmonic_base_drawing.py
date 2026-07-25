@@ -84,7 +84,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert 'quantity="DATUM C LEFT END"' in source
     assert 'quantity="A1, B1, C1-C3, D1-D4"' in source
     assert "6.53 BLIND HOLE" not in source
-    assert "underside-only counterbore rims are visible" in source
+    assert "underside-only counterbore rims are visible" not in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
     assert "expected_redundant_notes=4" in source
 

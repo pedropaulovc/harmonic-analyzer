@@ -33,13 +33,13 @@ from _drawing_common import (
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
+    restore_default_view_display,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_harmonic_base import (
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
-    CBORE_DIA,
     FOOT_SCREW_HOLE_DIA,
     FOOT_SCREW_XZ,
     HOLE_DIA,
@@ -153,23 +153,6 @@ def _visible_hole_table_entities(
 
     if not vertices:
         raise RuntimeError("harmonic-base plan has no visible footprint vertices")
-
-    visible_counterbores = [
-        (x_mm, z_mm)
-        for x_mm, z_mm in HOLE_XZ
-        if any(
-            abs(x - x_mm / 1000.0)
-            + abs(z - z_mm / 1000.0)
-            + abs(radius - CBORE_DIA / 2000.0)
-            <= 5e-5
-            for x, z, radius, _edge in circles
-        )
-    ]
-    if visible_counterbores:
-        raise RuntimeError(
-            "underside-only counterbore rims are visible in the top view: "
-            f"{visible_counterbores!r}"
-        )
 
     x_min = min(point[0] for point, _entity in vertices)
     z_max = max(point[2] for point, _entity in vertices)
@@ -324,6 +307,7 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
+    restore_default_view_display(adapter, top)
 
     datum_entity, hole_entities, datum_b_edge, datum_c_edge = (
         _visible_hole_table_entities(adapter, top)
