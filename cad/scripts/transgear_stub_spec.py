@@ -1,21 +1,22 @@
 r"""Pure-data dimensional contract shared by the transgear stud and drawing.
 
-PURE DATA: keep the turned-part nominals and marked-dimension map here so a
-change rebuilds both the SLDPRT and SLDDRW recipes without making the drawing
-import the part build implementation.
+PURE DATA: the marked-dimension map + sheet notes. The turned-part NOMINALS
+live one level down in ``transgear_stub_geom`` (drawing-free) and are re-exported
+here, so ``build_paper_drive_assembly`` can seat the disc on the stud's own stack
+without pulling this module's prose into the assembly recipe.
 """
 
 from __future__ import annotations
 
-
-MM_PER_IN = 25.4
-
-BASE_DIA = 0.375 * MM_PER_IN  # 9.525 machine-standard stock (low)
-BASE_LEN = 9.1  # bracket plate (4) + gap + latch big hub (z -125.9..-135)
-SEAT_DIA = 5.0  # turned-down gear seat (feed pinion + disc bores)
-SEAT_LEN = 13.8  # feed pinion 9.5 + disc 3 + slack (z -135..-148.8)
-COLLAR_DIA = 14.0
-COLLAR_LEN = 4.0
+from transgear_stub_geom import (  # noqa: F401  (re-exported for the drawing)
+    BASE_DIA,
+    BASE_LEN,
+    COLLAR_DIA,
+    COLLAR_LEN,
+    MM_PER_IN,
+    SEAT_DIA,
+    SEAT_LEN,
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StubProfile": {

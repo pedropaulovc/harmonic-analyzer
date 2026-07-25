@@ -481,6 +481,11 @@ _FLIP_INVERT: frozenset[str] = frozenset({
     "arbor pedestal datum Y @npn",
     "arbor pedestal datum Z",
     "axial seat",
+    # 2026-07-24 upper-frame re-anchor: the lever bar-pin arm grew 127.0 ->
+    # 133.8 (the fulcrum moved out with the column line while the bar stayed
+    # plumb over the base-anchored rocker), which put this radial reference on
+    # the far side of its datum -- so the plain sign rule now needs the XOR.
+    "bar radial (top pin hinge)",
     "cam follower back seat depth",
     "cam follower front seat depth",
     "cone gear axial seat",

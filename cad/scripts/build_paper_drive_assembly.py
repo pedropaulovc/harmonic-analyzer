@@ -241,11 +241,11 @@ KNOB_SHAFT_XY = (
 
 # z stack on the stud (front -> back): collar | disc | feed pinion | latch arm
 # | bracket. The disc window clears the platen furniture: the guide-screw
-# heads are counterbored sub-flush (crowns -142.7), so the deepest reach near
-# the cluster is the paper plane at -143.4 -- 2.0 in front of the disc back.
-DISC_Z0 = -148.4  # disc -148.4..-145.4
-THIRD_Z0 = DISC_Z0  # third gear -148.4..-144.4 (full mesh overlap 3.0)
-FEED_Z0 = DISC_Z0 + DISC_FACE  # -145.4; face 9.5 reaches the rack band 3.0 deep
+# heads are counterbored sub-flush (crowns -148.2), so the deepest reach near
+# the cluster is the paper plane at -148.9 -- 2.0 in front of the disc back.
+# (Every station in this stack rides the support bar, so the 2026-07-24
+# re-anchor carried the lot 5.5 forward with the columns; the clearances above
+# are unchanged because they are all bar-relative.)
 RACK_BACK_Z = BAR_FRONT_Z + 6.0  # -132.9 (rack thickness 6 on the platen back)
 ARM_Z = (RACK_BACK_Z + BAR_BACK_Z) / 2.0  # -131.4: the arm's 2.6 band fits the
 # 3.0 slot between the rack's back face and the bar-front/bracket plane
@@ -254,9 +254,28 @@ STUB_Z0 = BRACKET_Z0 + BRACKET_THICK  # -125.9 (Rx-90: local +Y -> -Z)
 KNOB_SHAFT_Z0 = -157.5  # Rx+90: local +Y -> +Z (stack runs to the knob at the back)
 
 REMOVABLE_Z0 = -156.2  # mounted removables: face 2.4 about the -155 chain plane
-T24_MID_Z = REMOVABLE_Z0 + 1.2  # -155.0
+REMOVABLE_FACE = 2.4
+T24_MID_Z = REMOVABLE_Z0 + REMOVABLE_FACE / 2.0  # -155.0
 CHAIN_MID_Z = -155.0  # both wheels coplanar; the crank T12 matches (drive-train)
 REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
+
+# The disc rides the STUD's turned seat, hard against its retaining collar --
+# so its z is the stud's own stack, NOT a station of its own. (It was a bare
+# -148.4 literal until 2026-07-24: the upper-frame re-anchor moved the stud 5.5
+# forward with the bar it brackets to and left the disc behind, burying 5.6 cm^3
+# of it in the platen.)
+from transgear_stub_geom import SEAT_END as STUB_SEAT_END  # noqa: E402  (22.9)
+
+DISC_RETAIN_GAP = 0.4  # disc back face to the collar (running clearance)
+DISC_Z0 = STUB_Z0 - STUB_SEAT_END + DISC_RETAIN_GAP  # -153.9: disc -153.9..-150.9
+# The third gear rides the KNOB shaft, which spans two anchors that no longer
+# move together: the removable sits on the base-anchored chain plane while the
+# latch hub that carries the shaft rides the column-anchored bar. So the third
+# gear seats as close to the removable as the sliver margin allows and takes its
+# mesh overlap with the disc from there (2.65 of the disc's 3.0 face).
+THIRD_CLEAR = 0.25  # third gear front face to the removable's back face
+THIRD_Z0 = REMOVABLE_Z0 + REMOVABLE_FACE + THIRD_CLEAR  # -153.55
+FEED_Z0 = DISC_Z0 + DISC_FACE  # -150.9; face 9.5 reaches the rack band 3.0 deep
 
 # Mesh phasing. build_fixed_gear seeds every gear with a TOOTH centred on
 # local +X (the seed gap spans +pi/(2N)..gamma-pi/(2N)), and teeth repeat

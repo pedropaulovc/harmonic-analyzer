@@ -11,9 +11,9 @@ the reeding recipe needs an X-axis layout and this part's stack is sized
 along its axis).
 
 Layout: axis +Y from the chain-side (machine-front) end at the origin;
-the assembly rotates +Y to +Z (machine back). Front section y 0..9.1
-(removable seat, machine z -157.5..-148.4), O5 pinion seat y 9.1..14.6,
-rear section y 14.6..27.5 (latch small hub near the knob), knob y 27.5..34.
+the assembly rotates +Y to +Z (machine back). Front section y 0..3.95
+(removable seat, machine z -157.5..-153.55), O5 pinion seat y 3.95..9.45,
+rear section y 9.45..22.35 (latch small hub near the knob), knob y 22.35..28.85.
 Dimensions: memory/paper-drive-rework.md E7/E8.
 
 Run (SolidWorks already open)::
@@ -49,10 +49,17 @@ PART_NAME = "transgear-knob-shaft"
 MATERIAL = "Brass"
 
 SHAFT_DIA = 0.375 * IN  # 9.525 (low)
-FRONT_LEN = 9.1  # removable seat (machine z -157.5..-148.4)
+FRONT_LEN = 3.95  # removable seat (machine z -157.5..-153.55). The shaft spans
+# two anchors that stopped moving together at the 2026-07-24 upper-frame
+# re-anchor: the removable rides the BASE-anchored chain plane (-155, shared
+# with the crank T12) while the latch hub that carries the shaft rides the
+# COLUMN-anchored support bar, which came 5.5 forward. This section is the span
+# that absorbed it (was 9.1); the 2.4-wide removable still seats with 1.3 of
+# stub in front of it and 0.25 behind
 SEAT_DIA = 5.0  # turned-down third-gear seat (12T DP38 root < 3/8" surface)
-SEAT_LEN = 5.5  # third gear face 4 + 1.5 clearance (z -148.4..-142.9)
-REAR_LEN = 12.9  # to the knob face; latch small hub rides z -132.75..-130.15
+SEAT_LEN = 5.5  # third gear face 4 + 1.5 clearance (z -153.55..-148.05)
+REAR_LEN = 12.9  # to the knob face (z -148.05..-135.15); the latch's small hub
+# rides z -138.25..-135.65, inside it with 0.5 to spare after the re-anchor
 KNOB_DIA = 20.0  # large brass thumb knob (low)
 KNOB_LEN = 6.5
 
