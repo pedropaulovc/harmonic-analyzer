@@ -500,7 +500,9 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Vertical swing axis through the pivot hole -- Axis1 ("swing pivot").
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot")
+    swing_axis = await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot"
+    )
 
     # Crank-axis construction (see the constants block): a vertical anchor
     # AXIS through CRANK_SEAT_ANCHOR (name-selected pivot, view-independent),
@@ -622,8 +624,8 @@ async def build(adapter) -> dict[str, str]:
             ("Plane9", "PLANE"),
             ("Plane10", "PLANE"),
             ("PlateTop", "PLANE"),
-            ("swing pivot", "AXIS"),
-            ("crank anchor (vertical)", "AXIS"),
+            (swing_axis, "AXIS"),
+            (anchor_axis, "AXIS"),
             ("crank axis", "AXIS"),
             ("post mount west", "AXIS"),
             ("post mount east", "AXIS"),

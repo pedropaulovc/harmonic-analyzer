@@ -256,7 +256,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "M2.5 tap drill", volume, 0.05 * V_TAP_DRILL)
 
     # Named bore axis for the rod mate (Axis1).
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "cam bore axis")
+    cam_bore_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", 0.0, "cam bore axis"
+    )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -285,7 +287,7 @@ async def build(adapter) -> dict[str, str]:
     )
     blank_reference_geometry(
         adapter,
-        (("TapDrillPlane", "PLANE"), ("cam bore axis", "AXIS")),
+        (("TapDrillPlane", "PLANE"), (cam_bore_axis, "AXIS")),
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
