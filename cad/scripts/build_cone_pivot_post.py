@@ -9,10 +9,11 @@ photos (``ch11_images/page002_img05.jpeg`` and ``page002_img06.jpeg``).
 
 The v2 coordinate frame is also authoritative: the body stands on Top at y=0,
 the crank bore runs straight along +Z, and the cone journal itself is yawed
-12.5182 degrees about the vertical body axis.  The part therefore wants identity
-assembly placement.  Stable semantic references are emitted for downstream
-mates: ``ConeShaftNormal``, ``journal axis``, ``swing pivot``, ``mount east``
-and ``mount west``.
+12.5182 degrees about the vertical body axis.  That is the PART feature frame;
+installation turns the casting exactly Ry(180), mapping its long +Z crank boss
+to machine -Z as shown by ch30 p004.  Stable semantic references are emitted
+for downstream mates: ``ConeShaftNormal``, ``journal axis``, ``swing pivot``,
+``mount east`` and ``mount west``.
 
 Run only with SolidWorks already open::
 

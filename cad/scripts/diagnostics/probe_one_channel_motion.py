@@ -32,6 +32,8 @@ from build_channel_assembly import (
     RING_CENTER, SHAFT_R, rot_z_rows, solve_default_state,
     z_station,
 )
+from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X
+from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 from _common import (
     _flag,
     _read_member,
@@ -48,7 +50,7 @@ from _assembly import (
 )
 
 # drive-train cam (build_drive_train_assembly / build_cylinder_gear)
-X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = -54.7, 90.518, -67.1, 7.0568
+X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = DRUM_X, 90.518, CHANNEL_Z0, 7.0568
 DRUM_FACE = 3.0
 GEAR_PHASE_DEG = 1.5
 CAM_R = 25.4  # cam lobe OD radius (Ø50.8)
@@ -150,10 +152,12 @@ async def build(adapter):
     await place_component(
         adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], 0.0], [0, 0, 0],
         [[1, 0, 0], [0, 1, 0], [0, 0, 1]], label="pivot-shaft")
+    cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-GEAR_PHASE_DEG))
     cam = await place_component(
         adapter, "cylinder-gear",
-        [X_DRUM, Y_DRIVE, zj - DRUM_FACE / 2.0], [0, 0, GEAR_PHASE_DEG],
-        rot_z_rows(GEAR_PHASE_DEG), ground=False, label="cam (cylinder-gear)")
+        [X_DRUM, Y_DRIVE, zj + DRUM_FACE / 2.0],
+        euler_from_rows(cylinder_rows), cylinder_rows,
+        ground=False, label="cam (end-for-end cylinder-gear)")
     rod = await place_component(
         adapter, "connecting-rod", [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
         [0, 0, state["rod_tilt"]], rot_z_rows(state["rod_tilt"]),

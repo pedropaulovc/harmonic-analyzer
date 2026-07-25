@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import math
 
+from cone_pivot_post_installation import MACHINE_X_SHIFT
+
 # --- Nominal geometry (DIMENSIONS.md "Chapter 14"). These MUST match the
 # constants in build_rocker_arm.py (the test cross-checks the load-bearing
 # ones), so the drawing's view math reads the same solid the part builds. ---
@@ -24,8 +26,8 @@ TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, perpendicular to the top edge
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft
-ROD_HOLE_X = 127.3738  # rod pin near the +X (rod-side) tip
-ROD_HOLE_ABOVE_BOTTOM = 5.3  # rod-pin hole centre above the arm's bottom edge
+ROD_HOLE_X = 127.3738 - MACHINE_X_SHIFT
+ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the level-pose pin Y after X shift
 
 # --- Derived spans (equations of the primitives; mirror build_rocker_arm). ---
 R_TOP = CURVE_RADIUS

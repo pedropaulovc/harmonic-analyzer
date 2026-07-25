@@ -37,14 +37,14 @@ def test_v2_post_journal_recloses_the_hardware_seats() -> None:
     assert crankshaft_spec.JOURNAL_BORE_DIA == 11.438
     assert crankshaft_spec.JOURNAL_CLEARANCE == 0.05
     assert crankshaft_spec.JOURNAL_DIA == 11.388
-    assert crankshaft_spec.JOURNAL_START == 26.623905572
-    assert crankshaft_spec.JOURNAL_END == 99.035905572
-    assert crankshaft_spec.JOURNAL_LENGTH == 72.412
-    assert -175.0 + crankshaft_spec.JOURNAL_START == -148.376094428
-    assert -175.0 + crankshaft_spec.JOURNAL_END == -75.964094428
+    assert crankshaft_spec.JOURNAL_START == 32.755105572
+    assert crankshaft_spec.JOURNAL_END == 104.789505572
+    assert crankshaft_spec.JOURNAL_LENGTH == 72.0344
+    assert -175.0 + crankshaft_spec.JOURNAL_START == -142.244894428
+    assert -175.0 + crankshaft_spec.JOURNAL_END == -70.210494428
     assert (part.SEAT_T12, part.SEAT_PINION, part.SEAT_ARM) == (
         17.5,
-        103.1597966757,
+        138.5747966757,
         8.0,
     )
     source = Path(part.__file__).read_text(encoding="utf-8")

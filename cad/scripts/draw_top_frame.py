@@ -4,7 +4,7 @@ The SLDPRT remains authoritative.  This recipe supplies only the ring's views,
 profile dimensions, datum-controlled bores, and manufacturing notes; every shared sheet/template,
 import, curation, and export behavior lives in ``_drawing_common``.
 
-The finished envelope is 442 x 272 x 41 with a 416 x 246 rectangular rail
+The finished envelope is 442 x 307.415 x 41 with a 416 x 281.415 rectangular rail
 outside profile, four Ø48 corner bosses bored Ø25.5 to clamp the columns, and
 a Ø17 gooseneck bore through one rail. The sheet runs 1:2; the front elevation
 drops to 1:4.
@@ -40,12 +40,14 @@ from build_top_frame import (
     BORE_DIA,
     BOSS_DIA,
     COLUMN_X,
-    COLUMN_Z,
+    FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
     GOOSENECK_Z,
+    OUTER_FRONT_Z,
+    OUTER_REAR_Z,
     OUTER_X,
-    OUTER_Z,
+    REAR_COLUMN_Z,
     RING_HEIGHT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -79,7 +81,12 @@ DATUM_C_SYMBOL_XY = (0.210, 0.105)
 # Per-view survivors of the marked-dimension import. Width/Depth are the straight
 # rail outside profile, not the boss envelope; note 2 states both explicitly.
 TOP_KEEP = {
-    "Width": (TOP_CENTER[0], TOP_CENTER[1] + OUTER_Z * VIEW_SCALE / 1000.0 + 0.012),
+    "Width": (
+        TOP_CENTER[0],
+        TOP_CENTER[1]
+        + max(abs(OUTER_FRONT_Z), abs(OUTER_REAR_Z)) * VIEW_SCALE / 1000.0
+        + 0.012,
+    ),
     "Depth": (TOP_CENTER[0] + OUTER_X * VIEW_SCALE / 1000.0 + 0.016, TOP_CENTER[1]),
 }
 
@@ -134,17 +141,18 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
     datum_c = [
         edge
         for values, edge in lines
-        if abs(values[2] - OUTER_Z / 1000.0) <= 2e-6 and abs(values[3]) >= 0.99
+        if abs(values[2] - OUTER_REAR_Z / 1000.0) <= 2e-6
+        and abs(values[3]) >= 0.99
     ]
     if not datum_b or not datum_c:
         raise RuntimeError("top-frame plan is missing the B/C outer rail datum edges")
     return (
-        _circle(-COLUMN_X, COLUMN_Z, BORE_DIA, "column bore"),
+        _circle(-COLUMN_X, REAR_COLUMN_Z, BORE_DIA, "column bore"),
         # Use the upper-left representative for the 4X boss control so its
         # leader stays separate from the lower-left bore and gooseneck controls.
         _circle(
             -COLUMN_X,
-            -COLUMN_Z,
+            FRONT_COLUMN_Z,
             BOSS_DIA,
             "column boss OD",
             allow_coincident=True,

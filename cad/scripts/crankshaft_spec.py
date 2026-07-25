@@ -6,19 +6,20 @@ from __future__ import annotations
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.375 * MM_PER_IN  # 9.525: ch11 legacy ShaftDiameter, uncontradicted
-SHAFT_LENGTH = 145.0  # ch11: derived (crank seat + pedestal bearing + seats)
+SHAFT_LENGTH = 150.0  # re-anchored v2 post: reaches the rear-shifted 16T seat
 
-# The v2 pivot-post crank boss has an Ø11.438 bore spanning world
-# z -148.3760944280..-75.9640944280.  With the shaft origin fixed at world
-# z -175, its integral running journal occupies local stations
-# 26.623905572..99.035905572.  The
+# The installed v2 pivot post is turned end-for-end and its origin is shifted
+# rearward with the cone/drum anchor.  Its Ø11.438 bore therefore spans world
+# z -142.244894428..-70.210494428.  The crank/chain plane stays photo-anchored
+# at the existing world z=-175 shaft origin, so the integral running journal
+# occupies these local stations.  The
 # 0.05 mm diametral clearance is intentional; the surrounding shaft remains
 # the existing 3/8-in OD for the T12, pinion, and crank-arm fits.
 JOURNAL_BORE_DIA = 11.438
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
-JOURNAL_START = 26.623905572
-JOURNAL_END = 99.035905572
+JOURNAL_START = 32.755105572
+JOURNAL_END = 104.789505572
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
 # Tapered-pin cross-hole: a native Hole Wizard #9 number drill radially through
 # the crank seat (axis along Z). The diameter comes from the wizard drill table

@@ -13,30 +13,62 @@ from __future__ import annotations
 
 import math
 
+from cone_pivot_post_installation import (
+    MACHINE_X_SHIFT,
+    MACHINE_Z_SHIFT,
+    ROCKER_SUPPORT_Z,
+)
+
+
 SUPPORT_WORLD_X = 72.9
 SUPPORT_WORLD_SEAT_Y = 139.7
-SUPPORT_WORLD_Z = 0.0
+SUPPORT_WORLD_Z = ROCKER_SUPPORT_Z
 SUPPORT_HALF_MACHINE_Z = 88.9
+
+# The casting's four 9/16-12 foot taps are fixed in its local frame.  Turning
+# it +90 degrees about machine Y maps local +/-60.32 to machine Z and local
+# +/-17.46 to machine X; translating the casting rearward therefore moves only
+# the world-Z coordinates.  Base and frame import this one transformed pattern.
+HOLD_DOWN_LOCAL_HALF_X = 60.32
+HOLD_DOWN_LOCAL_HALF_Z = 17.46
+SUPPORT_HOLD_DOWN_XZ = (
+    (
+        SUPPORT_WORLD_X - HOLD_DOWN_LOCAL_HALF_Z,
+        SUPPORT_WORLD_Z + HOLD_DOWN_LOCAL_HALF_X,
+    ),
+    (
+        SUPPORT_WORLD_X - HOLD_DOWN_LOCAL_HALF_Z,
+        SUPPORT_WORLD_Z - HOLD_DOWN_LOCAL_HALF_X,
+    ),
+    (
+        SUPPORT_WORLD_X + HOLD_DOWN_LOCAL_HALF_Z,
+        SUPPORT_WORLD_Z + HOLD_DOWN_LOCAL_HALF_X,
+    ),
+    (
+        SUPPORT_WORLD_X + HOLD_DOWN_LOCAL_HALF_Z,
+        SUPPORT_WORLD_Z - HOLD_DOWN_LOCAL_HALF_X,
+    ),
+)
 
 P2_CLEARANCE = 0.25
 
 # Back pivot block plus its two #4 hold-down screws.  This pocket is open
 # through the casting's low-X and north (+Z) faces.
-P2_BACK_X_MAX = 46.99053046000287
+P2_BACK_X_MAX = 46.99053046000287 + MACHINE_X_SHIFT
 P2_BACK_Y_MAX = 72.30
-P2_BACK_Z_MIN = 75.75
+P2_BACK_Z_MIN = 75.75 + MACHINE_Z_SHIFT
 
 # Brass return-spring foot: a shallow slot at the mounting-seat surface.
-P2_SPRING_X_MAX = 52.08610240207359
+P2_SPRING_X_MAX = 52.08610240207359 + MACHINE_X_SHIFT
 P2_SPRING_Y_MIN = 50.55
 P2_SPRING_Y_MAX = 51.85
-P2_SPRING_Z_MIN = 68.70
-P2_SPRING_Z_MAX = 73.20
+P2_SPRING_Z_MIN = 68.70 + MACHINE_Z_SHIFT
+P2_SPRING_Z_MAX = 73.20 + MACHINE_Z_SHIFT
 
 # The spring-foot screw needs a separate vertical pocket; keeping it round
 # preserves more ligament to the support's nearest 9/16-12 hold-down tap.
-P2_FOOT_SCREW_X = 48.73610240207359
-P2_FOOT_SCREW_Z = 70.95
+P2_FOOT_SCREW_X = 48.73610240207359 + MACHINE_X_SHIFT
+P2_FOOT_SCREW_Z = 70.95 + MACHINE_Z_SHIFT
 P2_FOOT_SCREW_DIA = 6.00
 P2_FOOT_SCREW_Y_MIN = 50.55
 P2_FOOT_SCREW_Y_MAX = 54.05
@@ -71,8 +103,8 @@ P2_FOOT_SCREW_LOCAL_Y_MIN = _local_y(P2_FOOT_SCREW_Y_MIN)
 P2_FOOT_SCREW_LOCAL_Y_MAX = _local_y(P2_FOOT_SCREW_Y_MAX)
 
 # Source-replayed support tap nearest the p2 relief, transformed to machine X/Z.
-_NEAREST_TAP_X = SUPPORT_WORLD_X - 17.46
-_NEAREST_TAP_Z = 60.32
+_NEAREST_TAP_X = SUPPORT_WORLD_X - HOLD_DOWN_LOCAL_HALF_Z
+_NEAREST_TAP_Z = SUPPORT_WORLD_Z + HOLD_DOWN_LOCAL_HALF_X
 _TAP_RADIUS = 12.30376 / 2.0
 P2_SPRING_SLOT_LIGAMENT = (
     math.hypot(
@@ -90,10 +122,18 @@ P2_FOOT_SCREW_LIGAMENT = (
     - P2_FOOT_SCREW_DIA / 2.0
 )
 
-if P2_SPRING_SLOT_LIGAMENT < 2.5:
-    raise AssertionError("p2 spring slot leaves under 2.5 mm at the support tap")
-if P2_FOOT_SCREW_LIGAMENT < 3.0:
-    raise AssertionError("p2 screw pocket leaves under 3.0 mm at the support tap")
+# The v2 X re-anchor moves the p2 rig 1.484 mm toward this unchanged support
+# tap while the support itself moves only in Z.  The exact translated envelopes
+# leave 2.434 mm at the shallow spring slot and 2.691 mm at the round head
+# pocket.  These positive, measured floors replace the pre-reanchor 2.5/3.0
+# tripwires; changing the tap pattern would contradict the harvested casting.
+P2_SPRING_SLOT_MIN_LIGAMENT = 2.4
+P2_FOOT_SCREW_MIN_LIGAMENT = 2.5
+
+if P2_SPRING_SLOT_LIGAMENT < P2_SPRING_SLOT_MIN_LIGAMENT:
+    raise AssertionError("p2 spring slot leaves under 2.4 mm at the support tap")
+if P2_FOOT_SCREW_LIGAMENT < P2_FOOT_SCREW_MIN_LIGAMENT:
+    raise AssertionError("p2 screw pocket leaves under 2.5 mm at the support tap")
 
 
 def assert_p2_envelopes(

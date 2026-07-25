@@ -7,8 +7,11 @@ edge carried by two bearing supports, hung from the top frame by the
 crossbar, and counter-balanced from above by the boss-hook / counter-
 spring / gooseneck chain.
 
-* knife-mount x2 -- the bearing supports, one per hex trunnion (|z| ~ 87).
-* top-crossbar -- hangs the lever from the top-frame ring.
+* knife-mount x2 -- the bearing supports, one per hex trunnion, centred on
+  ``SUMMING_Z`` and separated by ``+/-HEX_Z_MID``.
+* top-crossbar -- hangs the lever from the top-frame ring.  Its body follows
+  the asymmetric frame-span centre; its off-centre stud remains on
+  ``SUMMING_Z`` with the lever and counter-balance chain.
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study. The rock is the sub's single FREED operational DOF: its
@@ -62,6 +65,8 @@ from _assembly import (
     write_dof_manifest,
 )
 from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90
+from cone_pivot_post_installation import SUMMING_Z
+from top_crossbar_spec import BAR_CENTER_Z
 
 ASM_NAME = "summing"
 
@@ -86,8 +91,8 @@ from counter_spring_spec import (  # noqa: E402
     WIRE_DIA as CS_WIRE_DIA,
 )
 
-BOSS_HOOK_POS = (-90.5, 1000.0, 0.0)
-SPRING_POS = (-95.0, 1052.1, 0.0)  # coil-bottom origin; ring at y 1012.1
+BOSS_HOOK_POS = (-90.5, 1000.0, SUMMING_Z)
+SPRING_POS = (-95.0, 1052.1, SUMMING_Z)  # coil-bottom origin; ring at y 1012.1
 # (y 1052.0 left the hook rod poking 0.05 past the ring inner top)
 
 
@@ -117,28 +122,32 @@ async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
 
     # Two knife bearing supports, one per hex trunnion (overhanging the lever
-    # body at |z| ~ 87). The front support is FIRST so the auto-fixed assembly
+    # body at SUMMING_Z +/- HEX_Z_MID). The front support is FIRST so the auto-fixed assembly
     # seed is structure, not the mated summing lever. Each support's circular
     # bore is much larger than the hex, so only the trunnion's top vertex line
     # (the knife edge) nears the upper inner wall. The named "knife axis" is that
     # contact ridge line; the lever's Axis3 (hex ridge) mates coincident to it.
     km = await place_component(adapter, "knife-mount",
-                               [KNIFE[0], KNIFE_CONTACT_Y, HEX_Z_MID],
+                               [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z + HEX_Z_MID],
                                [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (front)")
     await place_component(adapter, "knife-mount",
-                          [KNIFE[0], KNIFE_CONTACT_Y, -HEX_Z_MID],
+                          [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z - HEX_Z_MID],
                           [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (back)")
-    # Crossbar band y 1010..1051: 0.5 above the summing-lever tube top
+    # Crossbar band y 1010..1051: 0.5 above the summing-lever tube top.
+    # The body is centred at BAR_CENTER_Z for the asymmetric frame span; its
+    # local off-centre stud lands at world SUMMING_Z for the lever/knife chain.
     # (1009.5), ends face-flush on the ring rail inner faces (y to 1040.7),
     # stud pokes 14 above for the nut seat.
-    await place_component(adapter, "top-crossbar", [KNIFE[0], 1010.0, 0.0],
+    await place_component(adapter, "top-crossbar",
+                          [KNIFE[0], 1010.0, BAR_CENTER_Z],
                           [0.0, 0.0, 0.0], IDENTITY)
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,
     # leaving the rock DOF -- the sub's freed operational DOF (its drive spec
     # recorded into the DOF manifest, never authored). This is the part the
     # counter spring + channel springs drive in the M6 Motion study.
-    sl = await place_component(adapter, "summing-lever", [KNIFE[0], KNIFE[1], 0.0],
+    sl = await place_component(adapter, "summing-lever",
+                               [KNIFE[0], KNIFE[1], SUMMING_Z],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     sl_o = component_origin(adapter, sl)
     # summing-lever axes (creation order): Axis1 = pivot (cylinder centre),
@@ -186,9 +195,9 @@ async def build(adapter) -> dict[str, str]:
                           [0.0, 90.0, 0.0], ROT_Y_POS90)
     # Ry(180), like the boss-hook: the gooseneck's overhang arm reaches from
     # the east column toward the machine centre.
-    await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, 0.0],
+    await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, SUMMING_Z],
                           [0.0, 180.0, 0.0], ROT_Y_180)
-    await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, 0.0],
+    await place_component(adapter, "gooseneck-clamp", [COLUMN_X, 1040.7, SUMMING_Z],
                           [0.0, 0.0, 0.0], IDENTITY)
 
     # Certify the AS-BUILT model. Necessity only: the freed lever rock is

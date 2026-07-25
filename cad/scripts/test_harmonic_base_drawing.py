@@ -10,6 +10,7 @@ import build_harmonic_base as part
 import build_cone_swing_platform as platform
 import draw_harmonic_base as drawing
 import harmonic_base_spec
+from cone_pivot_post_installation import MACHINE_X_SHIFT, MACHINE_Z_SHIFT
 from cone_lock_knob_spec import WASHER_DIA as KNOB_WASHER_DIA
 from _drawing_registry import DRAWINGS_BY_NAME
 from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
@@ -40,6 +41,16 @@ def test_plate_geometry_is_single_sourced() -> None:
     assert part.TOP_THICKNESS is harmonic_base_spec.TOP_THICKNESS
     assert harmonic_base_spec.BOTTOM_LENGTH == 18.0 * 25.4
     assert harmonic_base_spec.TOP_LENGTH == 17.5 * 25.4
+    assert harmonic_base_spec.BOTTOM_FRONT_Z == -(11.0 * 25.4) / 2.0
+    assert harmonic_base_spec.BOTTOM_REAR_Z == (11.0 * 25.4) / 2.0 + MACHINE_Z_SHIFT
+    assert math.isclose(
+        harmonic_base_spec.BOTTOM_WIDTH,
+        11.0 * 25.4 + MACHINE_Z_SHIFT,
+    )
+    assert math.isclose(
+        harmonic_base_spec.TOP_WIDTH,
+        10.5 * 25.4 + MACHINE_Z_SHIFT,
+    )
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("bbox_extent_check(") == 2
     assert "measure_check(" not in source
@@ -56,6 +67,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "MACHINE FROM SOLID STOCK" in notes
     assert "NO DRAFT" in notes
     assert "PAD-TO-FLANGE ROOT R0.50 MAX" in notes
+    assert "UPPER PAD 444.50 X 302.12" in notes
+    assert "REAR EXTENSION 35.42" in notes
     assert "NEAR LONG SIDE 6.35 +/-0.10 FROM B" in notes
     assert "NEAR LEFT END 6.35 +/-0.10 FROM C" in notes
     assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
@@ -116,6 +129,14 @@ def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:
 def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     """Mirror the drive-train formula without importing its COM-heavy graph."""
     pivot_x, pivot_z = part.PIVOT_SCREW_XZ
+    assert part.PIVOT_SCREW_XZ == (
+        -79.6886620349 + MACHINE_X_SHIFT,
+        103.292512276 + MACHINE_Z_SHIFT,
+    )
+    assert part.STOP_SCREW_XZ == (
+        -128.84976346326022 + MACHINE_X_SHIFT,
+        8.739805835063942 + MACHINE_Z_SHIFT,
+    )
     east_slope = (
         platform.EAST_HALF_S - platform.HALF_WIDTH_N
     ) / platform.PLATE_LEN
@@ -166,6 +187,28 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     )
     assert engaged_gap >= 2.0
     assert math.isclose(engaged_gap, 8.951797639575082)
+
+
+def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
+    former_blocks = (
+        (15.240530460002873, -98.0),
+        (42.24053046000287, -98.0),
+        (15.240530460002873, 82.0),
+        (42.24053046000287, 82.0),
+    )
+    former_feet = (
+        (48.73610240207359, 70.95),
+        (-54.7, -95.5),
+        (-54.7, 102.5),
+    )
+    assert part.BLOCK_SCREW_XZ == tuple(
+        (x + MACHINE_X_SHIFT, z + MACHINE_Z_SHIFT)
+        for x, z in former_blocks
+    )
+    assert part.FOOT_SCREW_XZ == tuple(
+        (x + MACHINE_X_SHIFT, z + MACHINE_Z_SHIFT)
+        for x, z in former_feet
+    )
 
 
 def test_part_stamps_make_critical_properties() -> None:
