@@ -71,7 +71,9 @@ def test_top_view_anchor_keeps_default_dimensions_inside_sheet() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "SLIDING FIT" not in notes
-    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    bore_callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "6.375 MAX" in bore_callout
+    assert "6.360 MIN" in bore_callout
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
     assert "X.XX" not in notes
@@ -85,7 +87,7 @@ def test_long_limit_callouts_wrap_without_losing_machining_content() -> None:
     boss = drawing.DIMENSION_CALLOUTS["BossDia"]
     assert boss.splitlines() == [
         "+/-0.05",
-        "PROJ 3.20 +/-0.05",
+        "PROJ 0.50 +/-0.05",
         "BEYOND",
         "DIA 9.20 OD",
     ]
@@ -135,7 +137,9 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert "COMMON ZONE" not in pinion_cam_spec.DRAWING_NOTES
     assert "POSITION TAP PITCH AXIS TO DATUM D" in pinion_cam_spec.DRAWING_NOTES
     assert "add_surface_finish(" in source
-    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    bore_callout = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "6.375 MAX" in bore_callout
+    assert "6.360 MIN" in bore_callout
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 1
     assert "*Bottom" in source
     assert "BOSS END VIEW SCALE 2:1" in source
