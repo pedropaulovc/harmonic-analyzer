@@ -1559,8 +1559,7 @@ def verify_spring_base(report: Report) -> None:
 
 
 def verify_base_footprint(report: Report) -> None:
-    """Every base-mounted drive-train component's plan footprint must sit fully
-    on the base TOP plate (SolidWorks-free; pure module constants).
+    """Keep fixed hardware and swing-platform support on the base top plate.
 
     This is the gate class the 2026-07-02 slab regression slipped through: the
     crank pedestal was re-placed with over half its foot past the base edge and
@@ -1616,9 +1615,26 @@ def verify_base_footprint(report: Report) -> None:
         # sweep, so it stays conservative. The lock notch is open-ended, so
         # the disengaged pose is the plate swung until its edge clears the
         # knob washer (train.DISENGAGE_DEG, derived from the notch geometry)
-        # -- sweep every corner at BOTH poses. (The pivot post and tip block
-        # ride the PLATE, not the base -- their plate containment is
-        # asserted at drive-train import.)
+        # -- sweep every corner at BOTH poses. The authoritative v2 post moved
+        # the south load centre to z=-127.001, only 6.349 mm inside the legacy
+        # top pad. Its required 266 mm carrier therefore cantilevers: the
+        # engaged sharp SW corner reaches 24.220 mm past that pad. Keep the
+        # actual post/tip load centres on the pad and bound the deliberate
+        # cantilever at 25 mm instead of silently enlarging the photo-confirmed
+        # 18 x 11 in base. (The post and tip block ride the PLATE; their plate
+        # containment is asserted at drive-train import.)
+        for label, station in (
+            ("pivot-post load centre", train.POST_STATION),
+            ("tip-block load centre", train.TIP_BLOCK_STATION),
+        ):
+            centre = train.cone_station(station)
+            _expect(
+                abs(centre[0]) <= half_len + 1e-9
+                and abs(centre[2]) <= half_wid + 1e-9,
+                f"{label} ({centre[0]:.2f}, {centre[2]:.2f}) lies outside "
+                f"the base top plate (+-{half_len:.2f}, +-{half_wid:.2f})",
+            )
+        cantilever_allowance = 25.0
         corners_local = (
             # The NW corner carries the PR8 trim (WEST_HALF_N 9.5), the NE
             # keeps HALF_WIDTH_N 12.
@@ -1642,9 +1658,11 @@ def verify_base_footprint(report: Report) -> None:
                 cx = pv[0] + lx * cos_a + lz * sin_a
                 cz = pv[2] - lx * sin_a + lz * cos_a
                 _expect(
-                    abs(cx) <= half_len + 1e-9 and abs(cz) <= half_wid + 1e-9,
+                    abs(cx) <= half_len + 1e-9
+                    and abs(cz) <= half_wid + cantilever_allowance + 1e-9,
                     f"cone-swing-platform {part} corner ({cx:.2f}, {cz:.2f}) "
-                    f"hangs off the base top plate (+-{half_len:.2f}, "
+                    f"exceeds the base top plate's {cantilever_allowance:.2f} mm "
+                    f"swing-platform allowance (+-{half_len:.2f}, "
                     f"+-{half_wid:.2f}) at the {pose} pose",
                 )
 
