@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import build_cone_swing_platform as part
@@ -39,6 +40,10 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "PIVOT HOLE SIZE PER PLAN-VIEW CALLOUT" in notes
     assert "AXIS PERPENDICULARITY TO A: SEE FCF" in notes
     assert "24.50 +/-0.10 WEST AND 190.10 +/-0.10 SOUTH" in notes
+    assert "2X 1/4-20 UNC-2B THRU" in notes
+    assert "235.901 +/-0.10 SOUTH OF PIVOT" in notes
+    assert "26.887" in notes
+    assert "12.5182 +/-0.10 DEG NORTH OF WEST" in notes
     assert "7.35 +/-0.10 DEG NORTH" in notes
     assert "FULL-R CLOSED END (R4.000 REF)" in notes
     assert "VIRTUAL-SHARP INTERSECTIONS" in notes
@@ -67,8 +72,10 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "drawing.EditSheet()" in source
     assert "drawing.EditSketch()" not in source
     assert "_visible_broad_face_edges(adapter, end)" in source
-    assert "_visible_plan_controls(adapter, top)" in source
+    assert "_visible_plan_controls(" in source
     assert 'label="pivot-hole size"' in source and "edge=pivot_edge" in source
+    assert 'label="v2 post-mount tapped holes"' in source
+    assert "edge=mount_edge" in source
     assert 'datum="B"' in source
     assert 'label="pivot-hole cylindrical datum feature"' in source
     assert "symbol_xy=(pivot_center[0] - 0.010, pivot_center[1])" in source
@@ -95,6 +102,34 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert 'characteristic="flatness"' in source
     assert 'characteristic="parallelism"' in source
     assert '{"PlateLenDim": "+/-0.25"}' in source
+
+
+def test_v2_post_foot_and_mount_pattern_cascade() -> None:
+    assert part.PLATE_LEN == 266.0
+    assert part.EAST_HALF_S == 24.0
+    assert part.POST_STATION == -39.90136099793
+    assert part.PIVOT_STATION == 196.0
+    assert math.isclose(part.POST_LOCAL_Z, -235.90136099793, abs_tol=1e-12)
+    assert part.POST_MAIN_DIA == 42.011
+    assert part.POST_FOOT_CONTAINMENT >= 0.25
+
+    half = part.POST_MOUNT_HALF_PITCH
+    west_x, west_z = part.POST_MOUNT_WEST_XZ
+    east_x, east_z = part.POST_MOUNT_EAST_XZ
+    assert math.isclose(west_x, half * math.cos(math.radians(part.INCLINE_DEG)))
+    assert math.isclose(east_x, -west_x)
+    assert math.isclose(west_z - part.POST_LOCAL_Z, part.POST_MOUNT_DZ)
+    assert math.isclose(east_z - part.POST_LOCAL_Z, -part.POST_MOUNT_DZ)
+    assert math.isclose(math.hypot(west_x - east_x, west_z - east_z), 2.0 * half)
+    assert part.POST_MOUNT_SPEC.kind == "tapped"
+    assert part.POST_MOUNT_SPEC.size == cone_swing_platform_spec.POST_MOUNT_THREAD
+    assert part.POST_MOUNT_SPEC.end == "through_all"
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name="PostMountHoles"' in source
+    assert 'name_last_feature(adapter, axis_name)' in source
+    assert '("post mount west", POST_MOUNT_WEST_XZ)' in source
+    assert '("post mount east", POST_MOUNT_EAST_XZ)' in source
 
 
 def test_straightness_uses_native_gdt_symbol() -> None:

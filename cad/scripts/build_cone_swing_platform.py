@@ -11,7 +11,7 @@ grows with distance from the pivot, so pivoting at the TIP gives the
 big-end gears the largest throw.
 
 Plan shape is the p.18 wedge, ASYMMETRIC about the shaft line: the east
-side tapers 12 -> 20 half-width, the west side flares 12 -> 37 so the
+side tapers 12 -> 24 half-width, the west side flares 9.5 -> 37 so the
 run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
 protrusion); the open LOCK NOTCH cuts straight into the west edge. The
 four plan corners are rounded, echoing the hardware each sits beside
@@ -19,6 +19,12 @@ four plan corners are rounded, echoing the hardware each sits beside
 the lock knob washer at the south-west). A O6.5 pivot hole takes the
 slotted pivot screw (clearance over its O6.35 shoulder -- the plate
 rotates ON the screw).
+
+The 266 mm envelope and paired 1/4-20 post mounts are the direct platform
+cascade from ``cone-pivot-post-v2.SLDPRT``.  Its 42.011 mm casting foot is
+centred at cone station -39.9014; the post's world-X hole pair is transformed
+into this plate's engaged local frame so the two native tapped holes remain
+coaxial after Ry(+12.5182 deg) placement.
 
 The asymmetric flare keeps the part CHIRAL; the assembly places it at
 Ry(+INCLINE), under which part-local +x tips machine WEST at the engaged
@@ -73,6 +79,7 @@ from cone_swing_platform_spec import (
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PLAN_VIEW_NOTE,
+    POST_MOUNT_THREAD,
 )
 
 PART_NAME = "cone-swing-platform"
@@ -85,13 +92,11 @@ WEST_HALF_N = 9.5  # north half-width, WEST side (PR8: trimmed 12 -> 9.5 so
 # the flared west edge clears the NORTH arbor pedestal at z 89.5..105.5 --
 # 12 put the plate corner-touching the clamp's east flank; ch12 img09 shows
 # the real plate narrow at the tip with the clamp hugging its edge)
-EAST_HALF_S = 20.0  # east half-width at the south (big) end -- unchanged taper
+EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
 WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
 # the pivot -> lock-knob line solid plate (covers the notch seat + washer)
-PLATE_LEN = 214.0  # north edge -> south edge along the cone axis: covers the
-# pivot post's south flank by 0.5 while keeping clear air to nothing -- the
-# crank column now RIDES this plate (one casting with the big-end journal),
-# so the old crank-pedestal edge-gap constraint is gone with the pedestal
+PLATE_LEN = 266.0  # extended south for the v2 post at station -39.9014;
+# its Ø42.011 foot retains at least 1.93 mm of plate (guarded below)
 NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
 # Clearance over the O6.35 pivot-screw shoulder: the plate swings ON the screw
 # (build_cone_pivot_screw). 1/4 clearance CLOSE fit (Ø6.756, the wizard twin of
@@ -105,6 +110,46 @@ THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 INCLINE_DEG = 12.5182  # cone-axis plan incline (the assembly's ROT_Y_INCLINE)
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
+
+# --- cone-pivot-post-v2 attachment footprint -------------------------------
+# The rederived casting is centred at cone station -39.90136099793 while the
+# plate origin/pivot remains station 196.  Its two vertical attachment holes
+# are a world-X pair at +/-13.44352 mm.  Undoing the engaged Ry(+INCLINE)
+# placement gives this skewed pair in the platform's local (x, z) frame.
+POST_STATION = -39.90136099793
+PIVOT_STATION = 196.0
+POST_MAIN_DIA = 42.011
+POST_LOCAL_Z = POST_STATION - PIVOT_STATION
+POST_MOUNT_HALF_PITCH = 13.44352
+POST_MOUNT_X = POST_MOUNT_HALF_PITCH * _COS_I
+POST_MOUNT_DZ = POST_MOUNT_HALF_PITCH * _SIN_I
+POST_MOUNT_WEST_XZ = (POST_MOUNT_X, POST_LOCAL_Z + POST_MOUNT_DZ)
+POST_MOUNT_EAST_XZ = (-POST_MOUNT_X, POST_LOCAL_Z - POST_MOUNT_DZ)
+POST_MOUNT_SPEC = HoleSpec("tapped", POST_MOUNT_THREAD)
+POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
+
+# Fail before COM if the v2 foot ever drifts off the tapered plate.  Distance
+# is normal to each straight boundary, not merely an axis-aligned half-width.
+_POST_R = POST_MAIN_DIA / 2.0
+_POST_SOUTH_CLEAR = POST_LOCAL_Z - (NORTH_OVERHANG - PLATE_LEN)
+_POST_FRAC = (NORTH_OVERHANG - POST_LOCAL_Z) / PLATE_LEN
+_POST_EAST_HALF = HALF_WIDTH_N + (EAST_HALF_S - HALF_WIDTH_N) * _POST_FRAC
+_POST_WEST_HALF = WEST_HALF_N + (WEST_HALF_S - WEST_HALF_N) * _POST_FRAC
+_POST_EAST_NORMAL_CLEAR = _POST_EAST_HALF / math.hypot(
+    1.0, (EAST_HALF_S - HALF_WIDTH_N) / PLATE_LEN
+)
+_POST_WEST_NORMAL_CLEAR = _POST_WEST_HALF / math.hypot(
+    1.0, (WEST_HALF_S - WEST_HALF_N) / PLATE_LEN
+)
+POST_FOOT_CONTAINMENT = min(
+    _POST_SOUTH_CLEAR, _POST_EAST_NORMAL_CLEAR, _POST_WEST_NORMAL_CLEAR
+) - _POST_R
+if POST_FOOT_CONTAINMENT < 0.25:
+    raise AssertionError(
+        f"v2 post foot has only {POST_FOOT_CONTAINMENT:.3f} mm platform containment"
+    )
+if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
+    raise AssertionError("v2 post mount taps fall outside the casting foot")
 
 # --- lock notch (the v4_t00411 clamp knob rides this) ------------------------
 # The open-ended lock notch cuts from the engaged stud seat straight out
@@ -184,12 +229,10 @@ def _corner_fillet_area(label: str, r: float) -> float:
 # to machine z (cf. cone-pivot-post) -- at height CRANK_AXIS_Y above the
 # plate BOTTOM, passing the plan point (-CRANK_AXIS_OFF * cos I,
 # -CRANK_AXIS_OFF * sin I) -- CRANK_AXIS_OFF is the distance the crank axis
-# sits EAST of the pivot, pivot.x - X_CRANK = 43.11 (asserted against the
+# sits EAST of the pivot, pivot.x - X_CRANK = 51.405 (asserted against the
 # live cone geometry in the assembly).
-CRANK_AXIS_OFF = 43.11  # east offset: ppivot.x -79.69 - X_CRANK -122.8
-CRANK_AXIS_Y = 92.185  # Y_CRANK 142.985 - Y_BASE_TOP 50.8 (above plate BOTTOM;
-# 2026-07-14 crank-mesh rederive: the crank dropped onto the ENGAGED 16T:64T
-# centre distance R64 + R16 + 0.25 -- see build_drive_train_assembly)
+CRANK_AXIS_OFF = 51.1316439009  # pivot.x -79.6886620349 - X_CRANK -130.8203059357
+CRANK_AXIS_Y = 79.05  # Y_CRANK 129.85 - Y_BASE_TOP 50.8 (above plate BOTTOM)
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan
 # point (the foot of the pivot's perpendicular onto the axis line), built
 # as the intersection of two principal-plane offsets -- name-selected and
@@ -207,7 +250,7 @@ CRANK_AXIS_Y = 92.185  # Y_CRANK 142.985 - Y_BASE_TOP 50.8 (above plate BOTTOM;
 # verify failure.
 CRANK_PLANE_ANGLE = INCLINE_DEG  # sign candidate (flip side)
 CRANK_SEAT_ANCHOR = (-CRANK_AXIS_OFF * _COS_I, -CRANK_AXIS_OFF * _SIN_I)
-# (part-local plan x, z) = (-42.09, -9.34); machine (-122.80, 103.29)
+# (part-local plan x, z) = (-49.92, -11.08); machine (-130.82, 103.29)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -232,6 +275,9 @@ async def build(adapter) -> dict[str, str]:
     # (The old PivotHoleDia knob is gone: the pivot hole is now a native Hole
     # Wizard 1/4 clearance feature whose diameter comes from the table.)
     await set_global(adapter, "SlotW", f"{SLOT_W}mm")
+    await set_global(adapter, "PostLocalZ", f"{POST_LOCAL_Z}mm")
+    await set_global(adapter, "PostMountX", f"{POST_MOUNT_X}mm")
+    await set_global(adapter, "PostMountDZ", f"{POST_MOUNT_DZ}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -286,6 +332,37 @@ async def build(adapter) -> dict[str, str]:
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = await volume_check(adapter, "pivot hole", volume - v_hole, 0.01 * v_hole)
+
+    # The v2 casting's two Fillister-head attachment bores land on matching
+    # native 1/4-20 UNC-2B through taps in the platform.  One Hole Wizard
+    # feature keeps the pair's thread metadata and 2X drawing callout together.
+    post_mount_cut = wizard_holes(
+        adapter,
+        POST_MOUNT_SPEC,
+        [
+            [POST_MOUNT_WEST_XZ[0], 0.0, POST_MOUNT_WEST_XZ[1]],
+            [POST_MOUNT_EAST_XZ[0], 0.0, POST_MOUNT_EAST_XZ[1]],
+        ],
+        (0.0, -1.0, 0.0),
+        "cone-pivot-post-v2 mounts (1/4-20 tapped through)",
+        name="PostMountHoles",
+        expect_dia_mm=POST_MOUNT_TAP_DIA,
+        placement_dims=[
+            (
+                ("PostMountWestX", '"PostMountX"'),
+                ("PostMountWestZ", '-"PostLocalZ" - "PostMountDZ"'),
+            ),
+            (
+                ("PostMountEastX", '-"PostMountX"'),
+                ("PostMountEastZ", '-"PostLocalZ" + "PostMountDZ"'),
+            ),
+        ],
+    )
+    drive_jobs += post_mount_cut.placement_drive_jobs
+    v_post_mounts = 2.0 * math.pi * (POST_MOUNT_TAP_DIA / 2.0) ** 2 * PLATE_T
+    volume = await volume_check(
+        adapter, "v2 post mount taps", volume - v_post_mounts, 0.01 * v_post_mounts
+    )
 
     # Lock notch: open-ended channel = rotated rectangle cut (engaged seat ->
     # past the west edge, opening the mouth) + ONE end-cap circle cut at the
@@ -394,6 +471,17 @@ async def build(adapter) -> dict[str, str]:
         )),
     )
     name_last_feature(adapter, "crank axis")
+
+    # Semantic axes let the assembly mate the v2 fasteners without depending
+    # on feature-tree Axis<N> numbering (which changes as construction grows).
+    for axis_name, (mount_x, mount_z) in (
+        ("post mount west", POST_MOUNT_WEST_XZ),
+        ("post mount east", POST_MOUNT_EAST_XZ),
+    ):
+        await name_bore_axis(
+            adapter, "Front Plane", mount_z, "Right Plane", mount_x, axis_name
+        )
+        name_last_feature(adapter, axis_name)
 
     # Rounded plan corners LAST (they consume the sharp corner edges; the
     # notch-mouth edges and the axis construction are already in place).
