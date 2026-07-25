@@ -114,7 +114,6 @@ def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
         or abs(float(tolerance.GetMaxValue()) - limit_m) > 1e-9
     ):
         raise RuntimeError("stem diameter bilateral tolerance did not persist")
-    adapter.currentModel.EditRebuild3()
 
 
 def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -321,11 +320,6 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="datum-B axis perpendicularity",
         entity_type="DIMENSION",
-        # Land the arrow at the text block's lower-left corner, not its centre
-        # (mid-text pierces the О8.00 digits) and not docked (a docked gtol
-        # reports a stale off-sheet leader segment that trips the layout
-        # audit's crossing check).
-        leader_attach_xy=(STEM_DIM_TEXT[0] - 0.004, STEM_DIM_TEXT[1] - 0.0045),
     )
     # The BASIC height and position zone locate the cross-bore axis from the
     # seat plane and through the stem axis without a prose-only acceptance rule.

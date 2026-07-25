@@ -417,7 +417,6 @@ async def build(adapter: Any) -> dict[str, str]:
         roughness_ra="1.6",
         label="arbor bore finish",
         entity=bore_entity,
-        leader_attach_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),
     )
     screw_entity = _circle_entity(
         adapter,

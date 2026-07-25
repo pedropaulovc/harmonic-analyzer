@@ -140,7 +140,6 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     if centerline is None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)
-    adapter.currentModel.EditRebuild3()
     return pivot
 
 

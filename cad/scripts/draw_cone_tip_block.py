@@ -383,9 +383,7 @@ async def build(adapter: Any) -> dict[str, str]:
     entry_face_label = add_note(adapter, "PINCH ENTRY FACE E (+X)", 0.180, 0.225)
     if entry_face_label is None:
         raise RuntimeError("failed to add datum-E pinch-entry face label")
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025
-    )
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.088)
 
     return await finalize_drawing(
         adapter,

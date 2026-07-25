@@ -88,6 +88,8 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     assert source.count("add_feature_control_frame(") == 1
     assert 'characteristic="perpendicularity"' in source
     assert source.count("add_surface_finish(") == 1
+    assert "visible_circle_edge" not in source
+    assert source.count("edge_xy=bore_top") == 2
 
 
 def test_part_stamps_make_critical_properties() -> None:

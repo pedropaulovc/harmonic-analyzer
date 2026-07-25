@@ -123,7 +123,7 @@ _NOMINAL_GDT_HALF_M = 0.008
 # Measured independently on 3+ sheets by three agents; every sample draws
 # up-right regardless of which side the target sits on (a leader running
 # up-LEFT out of the vertex does not mirror the body), so the offsets are
-# orientation-stable for ``add_surface_finish``'s SetLeader3(BENT, SMART) call.
+# orientation-stable for ``add_surface_finish``'s native bent-leader insertion.
 # LEFT keeps the old 8 mm rather than the measured 7: strictly no less
 # conservative than what it replaces, on every side.
 _SF_BOX_LEFT_M = 0.008
@@ -148,7 +148,6 @@ _NOMINAL_DIM_HALF_M = 0.004
 # happens to take, which is what drove the old Ra symbol's leader diagonally
 # across two views. A bent leader lands its elbow horizontally at the text.
 _LEADER_BENT = 2
-_LEADER_SIDE_SMART = 0
 
 # A circular 2-character BOM balloon renders ~10-12 mm across at the template
 # font; its GetExtent is leader-polluted (see _note_element), so it gets this
@@ -436,7 +435,6 @@ def add_datum_feature(
     if callout_below and not tag.SetText(4, callout_below):
         raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     return tag
 
 
@@ -457,7 +455,6 @@ def add_feature_control_frame(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
-    leader_attach_xy: tuple[float, float] | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
@@ -559,8 +556,11 @@ def add_feature_control_frame(
         "SetAttachedEntities",
         "SetPosition2",
         "SetLeader3",
-        "SetLeaderAttachmentPointAtIndex",
-        "GetLeaderPointsAtIndex",
+        "GetLeaderStyle",
+        "GetLeaderSide",
+        "GetSmartArrowHeadStyle",
+        "GetLeaderPerpendicular",
+        "GetDashedLeader",
     )
     # A GTol inserted from a selected display dimension reports its association
     # through IGtol.IsAttached/GetLeaderCount; whether the dimension ALSO lands
@@ -571,28 +571,33 @@ def add_feature_control_frame(
     if entity_type != "DIMENSION" and int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
-    # Bent leaders keep ordinary feature attachments out of neighbouring views.
-    leader_status = int(
-        annotation.SetLeader3(
-            _LEADER_BENT,
-            _LEADER_SIDE_SMART,
-            True,  # smart arrowhead
-            False,  # perpendicular (GTol-only; not wanted here)
-            all_around,
-            False,  # dashed
+    # A dimension-attached GTol reports IsAttached=False until SolidWorks is
+    # told to materialize its supported bent leader. Preserve every other
+    # SolidWorks-selected leader characteristic; edge-attached FCFs need no
+    # post-insertion styling. The all-around bit is drawing content, not style.
+    if entity_type == "DIMENSION" or all_around:
+        leader_style = (
+            _LEADER_BENT
+            if entity_type == "DIMENSION"
+            else int(annotation.GetLeaderStyle())
         )
-    )
-    if leader_status != 0:
-        raise RuntimeError(
-            f"failed to set a bent leader on the feature-control frame ({label}): "
-            f"SetLeader3 status {leader_status}"
+        leader_status = int(
+            annotation.SetLeader3(
+                leader_style,
+                int(annotation.GetLeaderSide()),
+                bool(annotation.GetSmartArrowHeadStyle()),
+                bool(annotation.GetLeaderPerpendicular()),
+                True,
+                bool(annotation.GetDashedLeader()),
+            )
         )
+        if leader_status != 0:
+            raise RuntimeError(
+                f"failed to add all-around semantics to feature-control frame "
+                f"({label}): SetLeader3 status {leader_status}"
+            )
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
-    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
-        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
-    ):
-        raise RuntimeError(f"failed to position feature-control-frame leader ({label})")
     draw.EditRebuild3()
     if (
         int(annotation.GetAttachedEntityCount3()) not in expected_entities
@@ -606,21 +611,6 @@ def add_feature_control_frame(
             f"attached={bool(gtol.IsAttached())}; "
             f"leaders={gtol.GetLeaderCount()}, expected=1"
         )
-    if leader_attach_xy is not None:
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if len(points) < 6:
-            raise RuntimeError(f"feature-control-frame leader is unreadable ({label})")
-        actual_attach = (float(points[-3]), float(points[-2]))
-        attach_error = math.hypot(
-            actual_attach[0] - leader_attach_xy[0],
-            actual_attach[1] - leader_attach_xy[1],
-        )
-        if attach_error > 0.005:
-            raise RuntimeError(
-                f"feature-control-frame leader attachment moved ({label}): "
-                f"actual={actual_attach}, requested={leader_attach_xy}, "
-                f"error={attach_error:.6g} m"
-            )
     draw.ClearSelection2(True)
     return gtol
 
@@ -637,7 +627,6 @@ def add_surface_finish(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
-    leader_attach_xy: tuple[float, float] | None = None,
     production_method: str = "",
 ) -> Any:
     """Attach a native machining-required surface-finish symbol to an edge.
@@ -690,36 +679,7 @@ def add_surface_finish(
         raise RuntimeError(f"surface-finish roughness did not persist ({label})")
     if production_method and str(symbol.GetText(2) or "").strip() != production_method:
         raise RuntimeError(f"surface target did not persist ({label})")
-    annotation = _sw_type_info.early_bound_or_flag(
-        symbol.GetAnnotation(),
-        "IAnnotation",
-        "SetPosition2",
-        "SetLeader3",
-        "SetLeaderAttachmentPointAtIndex",
-    )
-    leader_status = int(
-        annotation.SetLeader3(
-            _LEADER_BENT,
-            _LEADER_SIDE_SMART,
-            True,  # smart arrowhead
-            False,  # perpendicular (GTol-only)
-            False,  # all-around
-            False,  # dashed
-        )
-    )
-    if leader_status != 0:
-        raise RuntimeError(
-            f"failed to set a bent leader on the Ra {roughness_ra} symbol "
-            f"({label}): SetLeader3 status {leader_status}"
-        )
-    if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
-        raise RuntimeError(f"failed to position surface-finish symbol ({label})")
-    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
-        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
-    ):
-        raise RuntimeError(f"failed to position surface-finish leader ({label})")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     return symbol
 
 
@@ -755,7 +715,6 @@ def add_view_centerline(
     if centerline is None:
         raise RuntimeError(f"failed to insert view centerline ({label})")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     return centerline
 
 
@@ -860,33 +819,11 @@ def add_property_linked_note(
     property_name: str,
     x: float,
     y: float,
-    *,
-    char_height: float | None = None,
 ) -> Any:
     """Place one note whose displayed text resolves from the source SLDPRT."""
     note = add_note(adapter, property_link(property_name), x, y)
     if note is None:
         raise RuntimeError(f"failed to add linked drawing note {property_name!r}")
-    if char_height is None:
-        return note
-
-    note = _early_bound(note, "INote", "GetAnnotation")
-    annotation = note.GetAnnotation()
-    if annotation is None:
-        raise RuntimeError(f"linked drawing note {property_name!r} has no annotation")
-    annotation = _early_bound(
-        annotation, "IAnnotation", "GetTextFormat", "SetTextFormat"
-    )
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(
-            f"linked drawing note {property_name!r} has no text format"
-        )
-    text_format.CharHeight = float(char_height)
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(
-            f"failed to set linked drawing note {property_name!r} text height"
-        )
     return note
 
 
@@ -1032,17 +969,11 @@ def add_native_hole_callout(
     if not adapter.swApp.RunCommand(-2, ""):  # swCommands_e.swCommands_PmOK
         raise RuntimeError(f"failed to accept native hole callout ({label})")
     display = _sw_type_info.early_bound_or_flag(
-        display, "IDisplayDimension", "IsHoleCallout", "GetAnnotation"
+        display, "IDisplayDimension", "IsHoleCallout"
     )
     if not display.IsHoleCallout():
         raise RuntimeError(f"inserted annotation is not a hole callout ({label})")
-    annotation = _sw_type_info.early_bound_or_flag(
-        display.GetAnnotation(), "IAnnotation", "SetPosition2"
-    )
-    if not annotation.SetPosition2(callout_xy[0], callout_xy[1], 0.0):
-        raise RuntimeError(f"failed to position native hole callout ({label})")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     return display
 
 
@@ -1645,7 +1576,6 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
             raise RuntimeError("failed to select an automatic model annotation")
         draw.EditDelete()
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     return survivors
 
 
@@ -1775,7 +1705,6 @@ def set_dimension_callouts(
         raise RuntimeError(
             f"dimension callouts not applied: {sorted(remaining)}"
         )
-    adapter.currentModel.EditRebuild3()
 
 
 def set_dimension_text(
@@ -1811,7 +1740,6 @@ def set_dimension_text(
             raise RuntimeError(f"dimension text did not persist for {name!r}")
     if remaining:
         raise RuntimeError(f"dimension text not applied: {sorted(remaining)}")
-    adapter.currentModel.EditRebuild3()
 
 
 @_telemetry.traced("drawing.reference_dimension", label_param="label")
@@ -1841,7 +1769,6 @@ def set_reference_dimension(
         raise RuntimeError(
             f"failed to parenthesize {label}: prefix={prefix!r}, suffix={suffix!r}"
         )
-    adapter.currentModel.EditRebuild3()
     return display
 
 
@@ -1897,7 +1824,6 @@ def set_dimension_precision(
         raise RuntimeError(
             f"dimension precision not applied: {sorted(remaining)}"
         )
-    adapter.currentModel.EditRebuild3()
 
 
 @_telemetry.traced("drawing.reference_dimensions")
@@ -1955,36 +1881,6 @@ def set_reference_dimensions(
     missing = wanted - marked
     if missing:
         raise RuntimeError(f"reference dimensions not applied: {sorted(missing)}")
-    adapter.currentModel.EditRebuild3()
-
-
-def offset_dimension_text(
-    adapter: Any,
-    annotations: Iterable[Any],
-    positions: dict[str, tuple[float, float]],
-) -> None:
-    """Move named linear-dimension text off its dimension line with a leader."""
-    remaining = dict(positions)
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetSpecificAnnotation", "SetPosition2"
-        )
-        name = dimension_name(adapter, annotation)
-        position = remaining.pop(name, None)
-        if position is None:
-            continue
-        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
-        if display is None:
-            raise RuntimeError(f"dimension {name!r} has no display annotation")
-        display = _sw_type_info.early_bound_or_flag(
-            display, "IDisplayDimension", "OffsetText"
-        )
-        display.OffsetText = True
-        if not annotation.SetPosition2(position[0], position[1], 0.0):
-            raise RuntimeError(f"failed to offset dimension text {name!r}")
-    if remaining:
-        raise RuntimeError(f"dimension text not offset: {sorted(remaining)}")
-    adapter.currentModel.EditRebuild3()
 
 
 def add_edge_dimension(
@@ -2120,7 +2016,6 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
         raise RuntimeError(f"failed to make {label} dimension BASIC")
     if int(model_dimension.GetToleranceType()) != TOL_BASIC:
         raise RuntimeError(f"{label} dimension did not retain BASIC tolerance")
-    adapter.currentModel.EditRebuild3()
     return dimension
 
 
@@ -2924,49 +2819,6 @@ def _drawing_component_stems(
             for identity in identities
         )
     }
-
-
-@_telemetry.traced("drawing.isolate_components", label_param="label")
-def isolate_drawing_view_components(
-    adapter: Any,
-    view: Any,
-    *,
-    visible_stems: frozenset[str],
-    label: str,
-) -> None:
-    """Show only requested top-level component families in one drawing view."""
-    if not visible_stems:
-        raise ValueError(f"{label}: visible component set must not be empty")
-    root = adapter._attempt(
-        lambda: view.RootDrawingComponent2(False), default=None
-    )
-    if root is None:
-        raise RuntimeError(f"{label}: drawing view has no root component")
-
-    pending = list(_drawing_component_children(root))
-    found: set[str] = set()
-    enumerated: list[str] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        enumerated.append(str(drawing_component.Name or ""))
-        if children:
-            continue
-        matched = _drawing_component_stems(
-            adapter, drawing_component, visible_stems
-        )
-        drawing_component.Visible = bool(matched)
-        found.update(matched)
-
-    missing = sorted(visible_stems - found)
-    if missing:
-        raise RuntimeError(
-            f"{label}: component families not found: {missing}; "
-            f"enumerated={sorted(enumerated)}"
-        )
-    adapter.currentModel.EditRebuild3()
-    _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
 def _create_component_bom_balloon(

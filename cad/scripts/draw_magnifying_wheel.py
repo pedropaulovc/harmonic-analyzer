@@ -67,6 +67,7 @@ ISO_CENTER = (0.350, 0.150)
 
 _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
 _HUB_R = HUB_DIA * SHEET_SCALE[0] / 2000.0
+_BORE_R = BORE_DIA * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = (
     "RimOuterDiaDim",
@@ -166,10 +167,16 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0),
+        # Pick the bore rim diagonally: the former 12-o'clock pick overlapped
+        # SolidWorks' automatic diameter/centre-mark layout.
+        edge_xy=(
+            FRONT_CENTER[0] + _BORE_R * 0.707,
+            FRONT_CENTER[1] + _BORE_R * 0.707,
+        ),
         symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),
         datum="A",
         label="axle bore axis",
+        entity_type="EDGE",
         position_tolerance_m=0.0035,
     )
     add_feature_control_frame(
@@ -190,7 +197,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + HUB_DIA * SHEET_SCALE[0] / 2000.0, FRONT_CENTER[1]),
+        edge_xy=(FRONT_CENTER[0] + _HUB_R, FRONT_CENTER[1]),
         # up-right of the hub, clear of the Ø20 leader (round 1: crossed it)
         symbol_xy=(FRONT_CENTER[0] + _HUB_R + 0.024, FRONT_CENTER[1] + 0.024),
         roughness_ra="1.6",

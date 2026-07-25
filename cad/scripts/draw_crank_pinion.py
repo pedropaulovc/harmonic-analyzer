@@ -27,7 +27,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge, visible_tooth_tip_silhouette
 from crank_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -53,6 +52,7 @@ FRONT_CENTER = (0.215, 0.175)
 RIGHT_CENTER = (0.300, 0.175)
 ISO_CENTER = (0.385, 0.210)
 
+BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 
@@ -120,13 +120,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-    tooth_tip_silhouette = visible_tooth_tip_silhouette(adapter, right, OUTSIDE_DIA)
 
+    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
     add_datum_feature(
         adapter,
         front,
-        entity=bore_edge,
+        edge_xy=bore_top,
         symbol_xy=(FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + 0.033),
         datum="A",
         label="crank pinion bore axis",
@@ -147,7 +146,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         right,
-        entity=tooth_tip_silhouette,
+        edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_OD),
         frame_xy=(0.330, 0.220),
         characteristic="circular_runout",
         tolerance="0.05",
@@ -162,19 +161,11 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.017, FRONT_CENTER[1] - 0.060),
         roughness_ra="1.6",
         label="crank pinion bore finish",
-        entity=bore_edge,
-        leader_attach_xy=(
-            FRONT_CENTER[0],
-            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
-        ),
+        edge_xy=bore_top,
     )
 
-    add_property_linked_note(
-        adapter, "Gear Data", 0.018, 0.262, char_height=0.0025
-    )
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.018, 0.102, char_height=0.0025
-    )
+    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.102)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

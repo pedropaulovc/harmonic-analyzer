@@ -105,7 +105,6 @@ def _add_end_diameter(
     # doubled/diameter display (no-op on dimension types it does not apply to).
     adapter._attempt(lambda: setattr(display, "Diametric", True))
     display.SetText(4, below)  # swDimensionTextCalloutBelow
-    draw.EditRebuild3()
     return display
 
 

@@ -77,14 +77,7 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert "STEM_DIM_TEXT = (0.180, _front_y(12.0))" in source
     assert "frame_xy=(0.180, _front_y(12.0) - 0.014)" in source
     assert 'characteristic="profile_surface"' in source
-    # The stem FCF's leader lands at the text block's corner: mid-text pierces
-    # the digits, and docking (no leader) trips the layout audit on the stale
-    # off-sheet leader segment a docked gtol reports.
-    assert "leader_attach_xy=STEM_DIM_TEXT" not in source
-    assert (
-        "leader_attach_xy=(STEM_DIM_TEXT[0] - 0.004, STEM_DIM_TEXT[1] - 0.0045)"
-        in source
-    )
+    assert "leader_attach_xy=" not in source
     assert 'label="stem diameter"' in source
     assert 'entity_type="SILHOUETTE"' in source
     assert source.count('entity_type="DIMENSION"') == 1

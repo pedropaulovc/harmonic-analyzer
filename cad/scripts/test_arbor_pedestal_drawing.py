@@ -90,7 +90,7 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'quantity="CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE"' in source
     assert 'quantity="DATUM D FACE"' in source
     assert 'datums=("A", "B", "D")' in source
-    assert "leader_attach_xy=" in source
+    assert "leader_attach_xy=" not in source
     assert 'characteristic="flatness"' in source
     assert 'characteristic="perpendicularity"' in source
     assert source.count("_add_circle_basic(") == 4  # helper plus three calls

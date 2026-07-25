@@ -31,7 +31,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
 from cylinder_gear_spec import BORE_DIA, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -144,7 +143,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
     gear_face = _largest_visible_planar_face(adapter, front)
 
     # Datum A: the bore axis (front view, 12 o'clock pick with the symbol above,
@@ -184,21 +182,13 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="FACE",
         entity=gear_face,
     )
-    # Bore finish: attaches by model identity (the batch contract) at the
-    # circle edge's canonical vertex, which lands at (FRONT_CENTER-0.0038,
-    # FRONT_CENTER+... ) -- the bore's lower-left, invariant across runs. Two
-    # other invariant leader corridors converge there (the datum's 45-degree
-    # run y = x - 0.05 just below the attach, and the face-FCF's vertical run
-    # at x 0.201..0.208), so route the SF leader STRAIGHT DOWN from a symbol
-    # directly above the attach: x = 0.2212 clears the FCF corridor on the
-    # right, and the vertical span stops 0.9 mm above the 45-degree segment.
     add_surface_finish(
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] - 0.0038, FRONT_CENTER[1] + 0.035),
         roughness_ra="1.6",
         label="cylinder gear bore finish",
-        entity=bore_edge,
+        edge_xy=bore_top,
     )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS)

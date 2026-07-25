@@ -13,6 +13,7 @@ from _drawing_registry import DRAWINGS, DrawingSpec
 
 
 PART_DRAWINGS = tuple(spec for spec in DRAWINGS if spec.source_kind == "part")
+FORBIDDEN_PLACEMENT_KEYWORDS = {"char_height", "leader_attach_xy"}
 VISUAL_OVERRIDE_CALLS = {
     "SetDisplayMode4",
     "SetDisplayTangentEdges2",
@@ -119,6 +120,23 @@ def test_dimension_curation_keeps_names_without_coordinate_maps(
         keep = next(keyword.value for keyword in call.keywords if keyword.arg == "keep")
         names = _dimension_names(keep, assignments)
         assert len(names) == len(set(names)), f"{spec.name} repeats a dimension name"
+
+
+@pytest.mark.parametrize("spec", DRAWINGS, ids=lambda spec: spec.name)
+def test_drawing_recipes_do_not_restore_removed_visual_override_arguments(
+    spec: DrawingSpec,
+) -> None:
+    tree = ast.parse(spec.script.read_text(encoding="utf-8"), filename=str(spec.script))
+    forbidden = {
+        keyword.arg
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        for keyword in node.keywords
+        if keyword.arg in FORBIDDEN_PLACEMENT_KEYWORDS
+    }
+    assert not forbidden, (
+        f"{spec.name} restores drawing visual overrides: {sorted(forbidden)}"
+    )
 
 
 def test_curate_view_dimensions_deletes_only_and_never_repositions(
@@ -248,3 +266,43 @@ def test_datum_auto_layout_is_observed_without_rejecting_solidworks_choice() -> 
     source = inspect.getsource(drawing_common.add_datum_feature)
     assert '"drawing.annotation_auto_layout"' in source
     assert "position did not persist" not in source
+
+
+@pytest.mark.parametrize(
+    ("helper", "forbidden"),
+    (
+        (
+            drawing_common.add_feature_control_frame,
+            {"leader_attach_xy", "SetLeaderAttachmentPointAtIndex", "GetLeaderPointsAtIndex"},
+        ),
+        (
+            drawing_common.add_surface_finish,
+            {
+                "leader_attach_xy",
+                "SetLeaderAttachmentPointAtIndex",
+                "GetLeaderPointsAtIndex",
+                "SetPosition2",
+            },
+        ),
+        (drawing_common.add_native_hole_callout, {"SetPosition2"}),
+        (
+            drawing_common.add_property_linked_note,
+            {"char_height", "SetTextFormat"},
+        ),
+    ),
+)
+def test_shared_annotation_helpers_keep_solidworks_default_visuals(
+    helper: object,
+    forbidden: set[str],
+) -> None:
+    source = inspect.getsource(helper)
+    restored = {token for token in forbidden if token in source}
+    assert not restored, (
+        f"{getattr(helper, '__name__', helper)!s} restores visual overrides: "
+        f"{sorted(restored)}"
+    )
+
+
+def test_dormant_layout_override_helpers_stay_deleted() -> None:
+    assert not hasattr(drawing_common, "offset_dimension_text")
+    assert not hasattr(drawing_common, "isolate_drawing_view_components")

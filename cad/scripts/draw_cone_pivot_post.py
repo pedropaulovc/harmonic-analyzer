@@ -169,27 +169,12 @@ def _crank_bore_edge(
     return candidates[0], (FRONT_CENTER[0], _front_y(CRANK_BORE_HEIGHT))
 
 
-def _format_table_note(note: Any, *, label: str) -> Any:
-    """Apply the compact coordinate-table text size to a native note."""
-    note = _early_bound(note, "INote", "GetAnnotation")
-    annotation = _early_bound(
-        note.GetAnnotation(), "IAnnotation", "GetTextFormat", "SetTextFormat"
-    )
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label} has no text format")
-    text_format.CharHeight = 0.0025
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size {label}")
-    return note
-
-
 @_telemetry.traced("drawing.table_note", label_param="label")
 def _add_table_note(adapter: Any, text: str, x: float, y: float, *, label: str) -> Any:
     note = add_note(adapter, text, x, y)
     if note is None:
         raise RuntimeError(f"failed to add {label}")
-    return _format_table_note(note, label=label)
+    return note
 
 
 def _add_basic_value(adapter: Any, value: float, x: float, y: float) -> Any:
@@ -269,7 +254,6 @@ def _add_crank_axis_table(adapter: Any) -> None:
         0.209,
         label="crank-axis table definition",
     )
-    adapter.currentModel.EditRebuild3()
 
 
 async def build(adapter: Any) -> dict[str, str]:

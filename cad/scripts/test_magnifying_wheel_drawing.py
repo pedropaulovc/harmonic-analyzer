@@ -57,15 +57,20 @@ def test_linked_notes_specify_the_ratio_and_spokes() -> None:
 
 def test_native_gdt_and_axial_dims() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "visible_circle_edge" not in source
+    assert "_gear_drawing_entities" not in source
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert (
         "        symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),\n"
         '        datum="A",\n'
         '        label="axle bore axis",\n'
+        '        entity_type="EDGE",\n'
         "        position_tolerance_m=0.0035,"
         in source
     )
+    assert "FRONT_CENTER[0] + _BORE_R * 0.707" in source
+    assert "FRONT_CENTER[1] + _BORE_R * 0.707" in source
     assert source.count("position_tolerance_m=0.0035") == 1
     assert 'characteristic="circular_runout"' in source
     assert source.count("add_surface_finish(") == 1

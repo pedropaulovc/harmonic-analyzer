@@ -202,11 +202,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    # Sheet geometry the GD&T picks attach to (meters). The side view's tip
+    # Sheet geometry the GD&T pick attaches to (meters). The side view's tip
     # journal silhouette hugs the axis line (half-height 0.79 mm x scale / 2).
     pivot_edge = _outer_end_edge(adapter, end)
-    big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
-    pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
     tip_top = (
         SIDE_CENTER[0] - SHAFT_LENGTH / 2000.0 + 0.016,
         SIDE_CENTER[1] + SECTION_DIAS[3] / 2000.0,
@@ -251,7 +249,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot journal finish",
         entity_type="FACE",
         entity=pivot_face,
-        leader_attach_xy=pivot_top,
     )
     add_surface_finish(
         adapter,
@@ -261,7 +258,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="tip journal finish",
         entity_type="FACE",
         entity=tip_face,
-        leader_attach_xy=(tip_top[0] + 0.010, tip_top[1]),
     )
 
     # Notes block sits lower-left, below the enlarged end view (its bottom

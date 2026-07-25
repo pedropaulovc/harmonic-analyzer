@@ -70,9 +70,9 @@ def test_native_gdt_and_finish_present() -> None:
         in source
     )
     assert source.count("position_tolerance_m=0.0001") == 1
-    assert source.count("_force_dimension_black(") == 3
-    assert source.count("annotation.Color = 0") == 1
-    assert "annotation.LayerOverride" in source
+    assert "_force_dimension_black" not in source
+    assert "annotation.Color" not in source
+    assert "annotation.LayerOverride" not in source
     assert "InsertCenterMark3(2, False, False)" in source
     assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
     assert source.count("add_feature_control_frame(") == 5

@@ -130,7 +130,6 @@ def _display_as_diameter(adapter: Any, dimension: Any, *, label: str) -> None:
     applied = str(adapter._attempt(lambda: display.GetText(1)) or "")
     if "<MOD-DIAM>" not in applied:
         raise RuntimeError(f"{label} dimension did not take the diameter prefix")
-    adapter.currentModel.EditRebuild3()
 
 
 def _add_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
@@ -152,7 +151,6 @@ def _add_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
             )
     centerline = ddoc.InsertCenterLine2()
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     if centerline is None:
         raise RuntimeError(f"failed to insert the {label} axis centerline")
     return centerline
