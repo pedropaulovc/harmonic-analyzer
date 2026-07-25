@@ -346,14 +346,18 @@ async def build(adapter) -> dict[str, str]:
         (0.0, -1.0, 0.0),
         "cone-pivot-post-v2 mounts (1/4-20 tapped through)",
         name="PostMountHoles",
-        expect_dia_mm=POST_MOUNT_TAP_DIA,
+        # Table-derived tap diameters read back as 0.0 on this seat even when
+        # the native feature is exact.  The immediately following measured
+        # volume gate is the hard proof of the 1/4-20 tap-drill geometry.
         placement_dims=[
             (
                 ("PostMountWestX", '"PostMountX"'),
                 ("PostMountWestZ", '-"PostLocalZ" - "PostMountDZ"'),
             ),
             (
-                ("PostMountEastX", '-"PostMountX"'),
+                # Horizontal-distance dimensions are unsigned; the point's
+                # authored side retains the east/west sign.
+                ("PostMountEastX", '"PostMountX"'),
                 ("PostMountEastZ", '-"PostLocalZ" + "PostMountDZ"'),
             ),
         ],
