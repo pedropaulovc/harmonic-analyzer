@@ -25,13 +25,15 @@ HEAD_HEIGHT = 26.6
 HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 
 # Straight crank/sprocket journal.  It begins at the south tangent of the head
-# and projects north to z=+51.0367, exactly as harvested from v2.
+# and projects north to z=+50.6591.  Keep Pedro's corrected source dimension in
+# inches: 2.8360 in replaces the 2.85086614 in initial derivation.
 CRANK_BOSS_DIA = 21.93
 CRANK_BORE_DIA = 11.438
 CRANK_BORE_HEIGHT = 72.7
 CRANK_BORE_OFFSET = 0.0
 CRANK_BOSS_START_Z = -HEAD_DIA / 2.0
-CRANK_BOSS_LENGTH = 72.412
+CRANK_BOSS_LENGTH_IN = 2.8360
+CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
 
 # Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
@@ -51,9 +53,10 @@ ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
 ATTACHMENT_CBORE_DEPTH = 6.0198
 
-# Independent ground truth harvested from the v2 B-rep.
-HARVESTED_VOLUME_MM3 = 112_406.7676
-HARVESTED_MASS_KG = 0.809328727
+# V2 B-rep ground truth cascaded through Pedro's boss-length correction.  The
+# correction removes a uniform annular segment beyond the main casting.
+HARVESTED_VOLUME_MM3 = 112_302.9406
+HARVESTED_MASS_KG = 0.808581173
 
 # Datum-coordinate definition of the inclined journal axis.  The bore passes
 # through the body axis at y=BORE_HEIGHT and points toward +X/+Z.
