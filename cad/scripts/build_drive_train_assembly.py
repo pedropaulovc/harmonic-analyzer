@@ -647,14 +647,17 @@ from pinion_spring_geometry import (  # noqa: E402
 )
 from build_slotted_screw import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
+    HEAD_H as BSCREW_HEAD_H,
     SHANK_DIA as BSCREW_SHANK_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
 )
 from build_foot_screw import (  # noqa: E402
     HEAD_DIA as FSCREW_HEAD_DIA,
+    HEAD_H as FSCREW_HEAD_H,
     SHANK_DIA as FSCREW_SHANK_DIA,
     SHANK_LEN as FSCREW_SHANK_LEN,
 )
+from rocker_arm_support_spec import assert_p2_envelopes  # noqa: E402
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
     BORE_HEIGHT as POST_BORE_HEIGHT,
@@ -1061,8 +1064,9 @@ LIFT_X = PIVOT_X + 2.0 * BLOCK_BORE_HALF_SPACING  # lift rod in the blocks' WEST
 # lifting the strap tails' follower pins from the WEST -- an east lift would
 # swing the drum OUT of mesh. The column (x ~-47) is far east of the new spot,
 # and the M6.9 portal south upright that once blocked the west band was
-# replaced by the lone NORTH rocker-arm-support (x -105..-41) -- nothing lives
-# at x +22..+35 in the rod's z run (cam asserts below re-prove the neighbours).
+# replaced by the lone NORTH rocker-arm-support.  The support actually occupies
+# x +41..+105 at its foot (the former negative-X comment was a mirrored-era
+# sign error); its v2-derived p2 clearance features are contract-checked below.
 LIFT_Y = PIVOT_Y + LIFT_BORE_RISE  # v2 closure: the steep strap carries its
 # follower contact above the pivot at the WEST cam station.  The eccentric cam
 # collars still meet the pins from below; the pins rest on the collar ODs.
@@ -1525,6 +1529,25 @@ _FOOT_SCREW_XZ = (
     (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),
     # North pedestal (ry180 flips its flange to +z): z_c - SCREW_Z = 102.5.
     (X_DRUM, ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_SCREW_Z),
+)
+
+# Cross-subassembly p2/support closure.  The drive-only interference gate cannot
+# see frame.SLDASM, so bind every moving formula to the three authored support
+# reliefs here and fail offline if a future cascade outgrows their 0.25 mm air.
+assert_p2_envelopes(
+    back_x_max=BLOCK_X + BLOCK_WIDTH / 2.0,
+    back_y_max=BLOCK_TOP_Y + BSCREW_HEAD_H,
+    back_z_min=BLOCK_BACK_Z0,
+    spring_x_max=SPRING_X - SPR_FOOT_END_L[0],
+    spring_y_min=Y_BASE_TOP,
+    spring_y_max=SPRING_FOOT_TOP,
+    spring_z_min=SPRING_Z - SPRING_W / 2.0,
+    spring_z_max=SPRING_Z + SPRING_W / 2.0,
+    foot_screw_x=SPRING_HOLE_X,
+    foot_screw_z=SPRING_Z,
+    foot_screw_dia=FSCREW_HEAD_DIA,
+    foot_screw_y_min=Y_BASE_TOP,
+    foot_screw_y_max=SPRING_FOOT_TOP + FSCREW_HEAD_H,
 )
 # Both machine-handed: the base holes agree directly.
 for _want, _have in zip(_FOOT_SCREW_XZ, BASE_FOOT_XZ, strict=True):

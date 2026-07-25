@@ -98,13 +98,17 @@ from _assembly import (
     save_assembly_and_images,
 )
 from _transforms import ROT_Y_POS90
+from rocker_arm_support_spec import (
+    SUPPORT_WORLD_SEAT_Y,
+    SUPPORT_WORLD_X,
+)
 
 ASM_NAME = "frame"
 
 BASE_TOP_Y = 50.8  # harmonic-base: 0.5 in bottom + 1.5 in top plate
 COLUMN_X = 197.0  # column centres, from the ch. 6 / ch. 30 corner placement
 COLUMN_Z = 112.0
-SUPPORT_X = 72.9  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
+SUPPORT_X = SUPPORT_WORLD_X  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
 # triangulation midpoint +72.5; M6.8 mirror). Rod-side tip reaches the drum.
 # The support's z position is NOT a constant: it is CENTRED on the base z-axis by
 # a coincident mate of symmetry planes (see build()), so the window reads centred
@@ -112,7 +116,7 @@ SUPPORT_X = 72.9  # rocker pivot x: the seesaw mid-span (ch30 GT arm-end
 # (channel.SLDASM pivot-ball-mount) now seats fully on the wall: it was moved to
 # z +81.5 and narrowed to O13 so its z-footprint [75.0, 88.0] clears the channel-
 # 19 amplitude-bar (z +74.1) and stays inside the wall's north edge (88.9).
-SUPPORT_SEAT_Y = BASE_TOP_Y + 88.9  # 139.7: rocker-arm-support's origin is
+SUPPORT_SEAT_Y = SUPPORT_WORLD_SEAT_Y  # rocker-arm-support's origin is
 # at the casting centre (bbox Y +/-88.9), so seating its foot on the base top
 # lifts the origin by the 88.9 foot half-height.
 # Turn the support +90deg about Y so its big windowed faces (local Z normal)
