@@ -28,12 +28,10 @@ from typing import Any
 from _common import (
     CASTING_GREEN,
     SketchDims,
-    add_line_chain,
     apply_color,
     apply_material,
     check,
     define_circle,
-    define_polygon_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -51,6 +49,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _holes import HoleSpec, wizard_holes
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DEPTH,
     ATTACHMENT_CBORE_DIA,
@@ -65,7 +64,6 @@ from cone_pivot_post_spec import (
     CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
-    CRANK_BORE_OFFSET,
     CRANK_BOSS_DIA,
     CRANK_BOSS_LENGTH,
     CRANK_BOSS_START_Z,
@@ -81,10 +79,15 @@ from cone_pivot_post_spec import (
 PART_NAME = "cone-pivot-post"
 MATERIAL = "Gray Cast Iron"
 
-# Assembly compatibility names.  v2 puts the straight crank axis on the body
-# centreline and bakes the cone incline into the journal.
-CRANK_BORE_Y = CRANK_BORE_HEIGHT
-CRANK_BORE_DX = CRANK_BORE_OFFSET
+ATTACHMENT_HOLE_SPEC = HoleSpec(
+    "counterbore_fillister",
+    "1/4",
+    overrides_mm={
+        "HoleDiameter": ATTACHMENT_THRU_DIA,
+        "CounterBoreDiameter": ATTACHMENT_CBORE_DIA,
+        "CounterBoreDepth": ATTACHMENT_CBORE_DEPTH,
+    },
+)
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
 HEAD_RADIUS = HEAD_DIA / 2.0
@@ -92,67 +95,6 @@ BORE_RADIUS = BORE_DIA / 2.0
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
-
-
-async def _revolved_cylinder(
-    adapter: Any,
-    *,
-    plane_name: str,
-    profile_name: str,
-    feature_name: str,
-    center_y: float,
-    radius: float,
-    half_length: float,
-    is_cut: bool,
-) -> None:
-    """Create an exact finite cylinder around v2's inclined journal axis.
-
-    A 360-degree revolved rectangle avoids the adapter's missing tangent-plane
-    and up-to-surface extrusion modes while producing the same B-rep.  On a Top
-    sketch, (u, v) maps to model (X, -Z), hence the sketch-axis direction below.
-    """
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
-
-    check(
-        f"create plane {plane_name}",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Top Plane", offset=center_y
-            )
-        ),
-    )
-    name_last_feature(adapter, plane_name)
-    check(
-        f"create sketch {profile_name}",
-        await adapter.create_sketch(plane_name),
-    )
-
-    axis_u, axis_v = _SIN_I, -_COS_I
-    normal_u, normal_v = _COS_I, _SIN_I
-    start = (-half_length * axis_u, -half_length * axis_v)
-    end = (half_length * axis_u, half_length * axis_v)
-    points = [
-        start,
-        end,
-        (end[0] + radius * normal_u, end[1] + radius * normal_v),
-        (start[0] + radius * normal_u, start[1] + radius * normal_v),
-    ]
-    lines = await add_line_chain(adapter, points)
-    await define_polygon_chain(adapter, lines, points, label=profile_name)
-    check(
-        f"centreline {profile_name}",
-        await adapter.add_centerline(start[0], start[1], end[0], end[1]),
-    )
-    await ensure_fully_defined(adapter, profile_name)
-    check(f"exit sketch {profile_name}", await adapter.exit_sketch())
-    name_last_feature(adapter, profile_name)
-    check(
-        f"revolve {feature_name}",
-        await adapter.create_revolve(
-            RevolveParameters(angle=360.0, is_cut=is_cut)
-        ),
-    )
-    name_last_feature(adapter, feature_name)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -340,97 +282,83 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     name_last_feature(adapter, "CrankBore")
 
-    # 4. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.
-    await _revolved_cylinder(
+    # 4. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
+    # are mid-plane extrusions from the harvested ConeShaftNormal reference.
+    # Do not substitute an on-axis revolve here: that SolidWorks topology is
+    # known to make later Boolean features fail on this class of casting.
+    cone_boss = SketchDims()
+    check(
+        "create sketch ConeBossProfile",
+        await adapter.create_sketch("ConeShaftNormal"),
+    )
+    await define_circle(
         adapter,
-        plane_name="ConeBossPlane",
-        profile_name="ConeBossProfile",
-        feature_name="ConeShaftBoss",
-        center_y=BORE_HEIGHT,
-        radius=CONE_BOSS_DIA / 2.0,
-        half_length=CONE_BOSS_LENGTH / 2.0,
-        is_cut=False,
+        0.0,
+        BORE_HEIGHT,
+        CONE_BOSS_DIA / 2.0,
+        "inclined cone boss",
+        dims=cone_boss,
+        names=("ConeBossX", "JournalAxisY", "ConeBossDia"),
+        drives=(None, '"JournalAxisY"', '"ConeBossDia"'),
     )
-    await _revolved_cylinder(
+    await ensure_fully_defined(adapter, "ConeBossProfile")
+    check("exit sketch ConeBossProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "ConeBossProfile")
+    drive_jobs += cone_boss.apply(adapter, "ConeBossProfile")
+    check(
+        "extrude ConeShaftBoss",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=CONE_BOSS_LENGTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ConeShaftBoss")
+
+    journal_bore = SketchDims()
+    check(
+        "create sketch JournalBoreProfile",
+        await adapter.create_sketch("ConeShaftNormal"),
+    )
+    await define_circle(
         adapter,
-        plane_name="JournalBorePlane",
-        profile_name="JournalBoreProfile",
-        feature_name="ConeShaftBore",
-        center_y=BORE_HEIGHT,
-        radius=BORE_RADIUS,
-        half_length=BLOCK_DIA,
-        is_cut=True,
+        0.0,
+        BORE_HEIGHT,
+        BORE_RADIUS,
+        "inclined journal bore",
+        dims=journal_bore,
+        names=("JournalBoreX", "JournalBoreY", "JournalBoreDia"),
+        drives=(None, '"JournalAxisY"', '"JournalBoreDia"'),
     )
-
-    # 5. Two exact Hole-Wizard-equivalent counterbores on the y=86 top face.
+    await ensure_fully_defined(adapter, "JournalBoreProfile")
+    check("exit sketch JournalBoreProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "JournalBoreProfile")
+    drive_jobs += journal_bore.apply(adapter, "JournalBoreProfile")
     check(
-        "create AttachmentPlane",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane="Top Plane", offset=BLOCK_HEIGHT
-            )
-        ),
-    )
-    name_last_feature(adapter, "AttachmentPlane")
-    mount_thru = SketchDims()
-    check(
-        "create sketch MountThruProfile",
-        await adapter.create_sketch("AttachmentPlane"),
-    )
-    for side, x in (("West", ATTACHMENT_X), ("East", -ATTACHMENT_X)):
-        await define_circle(
-            adapter,
-            x,
-            0.0,
-            ATTACHMENT_THRU_DIA / 2.0,
-            f"mount {side.lower()} thru",
-            dims=mount_thru,
-            names=(f"Mount{side}X", f"Mount{side}Z", f"Mount{side}ThruDia"),
-            drives=('"MountSpacing" / 2', None, '"MountThruDia"'),
-        )
-    await ensure_fully_defined(adapter, "MountThruProfile")
-    check("exit sketch MountThruProfile", await adapter.exit_sketch())
-    name_last_feature(adapter, "MountThruProfile")
-    drive_jobs += mount_thru.apply(adapter, "MountThruProfile")
-    check(
-        "cut MountThruHoles",
+        "cut ConeShaftBore",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(
-                depth=BLOCK_HEIGHT + 1.0, reverse_direction=True
-            )
+            ExtrusionParameters(depth=CONE_BOSS_LENGTH, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "MountThruHoles")
+    name_last_feature(adapter, "ConeShaftBore")
 
-    mount_cbore = SketchDims()
-    check(
-        "create sketch MountCounterboreProfile",
-        await adapter.create_sketch("AttachmentPlane"),
+    # 5. Preserve the harvested attachment feature as ONE native ANSI-inch
+    # Hole Wizard counterbore with two driven placement points.
+    attachment_cut = wizard_holes(
+        adapter,
+        ATTACHMENT_HOLE_SPEC,
+        [
+            [ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
+            [-ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
+        ],
+        (0.0, 1.0, 0.0),
+        "mounting counterbores (1/4 fillister)",
+        name="AttachmentScrewHoles",
+        expect_dia_mm=ATTACHMENT_THRU_DIA,
+        placement_dims=[
+            (("MountWestX", '"MountSpacing" / 2'), (None, None)),
+            (("MountEastX", '-"MountSpacing" / 2'), (None, None)),
+        ],
     )
-    for side, x in (("West", ATTACHMENT_X), ("East", -ATTACHMENT_X)):
-        await define_circle(
-            adapter,
-            x,
-            0.0,
-            ATTACHMENT_CBORE_DIA / 2.0,
-            f"mount {side.lower()} counterbore",
-            dims=mount_cbore,
-            names=(f"Cbore{side}X", f"Cbore{side}Z", f"Cbore{side}Dia"),
-            drives=('"MountSpacing" / 2', None, '"MountCboreDia"'),
-        )
-    await ensure_fully_defined(adapter, "MountCounterboreProfile")
-    check("exit sketch MountCounterboreProfile", await adapter.exit_sketch())
-    name_last_feature(adapter, "MountCounterboreProfile")
-    drive_jobs += mount_cbore.apply(adapter, "MountCounterboreProfile")
-    check(
-        "cut AttachmentScrewHoles",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(
-                depth=ATTACHMENT_CBORE_DEPTH, reverse_direction=True
-            )
-        ),
-    )
-    name_last_feature(adapter, "AttachmentScrewHoles")
+    drive_jobs += attachment_cut.placement_drive_jobs
 
     # Apply all neutral equations only after every referenced dimension exists.
     await force_rebuild(adapter)
