@@ -398,7 +398,11 @@ PINION_TOOTH_Z = -66.44020332430648  # centred on the widened 64T contact row
 # study if the slack, band or backlash ever changes.
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
-MESH_WINDOW_CENTRE_DEG = -1.50  # study window [-1.90, -1.10] centre
+# The v2 post changed the crank-pair DP and therefore the tooth count's phase at
+# the new line of centres.  Re-arbitrated against the exact solid study and the
+# live minimal-pair interference body: -3.60 centres the clean [-4.00, -3.20]
+# window (the retired DP26.57 geometry used -1.50).
+MESH_WINDOW_CENTRE_DEG = -3.60
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (R64 / R16) - 22.5 / 2.0
 ) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
@@ -500,6 +504,12 @@ from build_cone_swing_platform import (  # noqa: E402
     CRANK_AXIS_OFF as PLAT_CRANK_OFF,
     CRANK_AXIS_Y as PLAT_CRANK_Y,
     EAST_HALF_S as PLAT_EAST_S,
+    GEAR_RELIEF_AXIS_Y as PLAT_GEAR_RELIEF_AXIS_Y,
+    GEAR_RELIEF_CLEARANCE as PLAT_GEAR_RELIEF_CLEARANCE,
+    GEAR_RELIEF_CENTER_Z as PLAT_GEAR_RELIEF_CENTER_Z,
+    GEAR_RELIEF_RADIUS as PLAT_GEAR_RELIEF_RADIUS,
+    GEAR_RELIEF_RESIDUAL_THICKNESS as PLAT_GEAR_RELIEF_RESIDUAL,
+    GEAR_RELIEF_WIDTH as PLAT_GEAR_RELIEF_WIDTH,
     HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
     # the lock-slot side keeps its full seat; feeds the stop-screw/containment
     # east-edge math)
@@ -568,6 +578,10 @@ from build_pinion_arbor import (  # noqa: E402
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
+    CAM_RELIEF_ENGAGED_CENTER as STRAP_CAM_RELIEF_ENGAGED,
+    CAM_RELIEF_ENVELOPE_RADIUS as STRAP_CAM_RELIEF_ENVELOPE_R,
+    CAM_RELIEF_PARK_CENTER as STRAP_CAM_RELIEF_PARK,
+    CAM_RELIEF_RADIUS as STRAP_CAM_RELIEF_R,
     C2C as STRAP_C2C,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,
@@ -594,6 +608,7 @@ from pinion_cam_geometry import (  # noqa: E402
     CAM_LEN,
     CAM_OD,
     ECC as CAM_ECC,
+    THIN_SIDE_WALL as CAM_THIN_SIDE_WALL,
 )
 from pinion_cam_pin_geometry import (  # noqa: E402
     PIN_DIA as FPIN_DIA,
@@ -781,6 +796,16 @@ if abs(_PPOST[0] - X_CRANK) > 1e-9:
     raise AssertionError("v2 crank boss no longer shares the post body centre x")
 if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
+if abs(PLAT_GEAR_RELIEF_AXIS_Y - (Y_DRIVE - Y_BASE_TOP)) > 1e-9:
+    raise AssertionError("platform gear-relief axis drifted from the v2 cone axis")
+if abs(PLAT_GEAR_RELIEF_CENTER_Z - (GEAR64_STATION - PIVOT_STATION)) > 1e-9:
+    raise AssertionError("platform gear-relief station drifted from the 64T gear")
+if PLAT_GEAR_RELIEF_RADIUS < R64 + ADD16 + PLAT_GEAR_RELIEF_CLEARANCE - 1e-9:
+    raise AssertionError("platform gear relief no longer covers the 64T swept OD")
+if PLAT_GEAR_RELIEF_WIDTH < GEAR64_FACE + 2.0 * PLAT_GEAR_RELIEF_CLEARANCE - 1e-9:
+    raise AssertionError("platform gear relief no longer covers the 64T face")
+if PLAT_GEAR_RELIEF_RESIDUAL < 5.0:
+    raise AssertionError("platform gear relief leaves less than 5 mm of plate")
 # Axial closure around the v2 boss. The 16T is centred on the widened 64T
 # contact row; the post station centres its harvested finite boss between the
 # unchanged T12 north face and the pinion south face. This makes both 4.124-mm
@@ -1210,6 +1235,8 @@ if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
 if not 6.36 <= CAM_BORE_DIA <= 6.375:
     raise AssertionError("cam bore nominal is outside its O6.360-O6.375 fit limits")
+if CAM_THIN_SIDE_WALL < 0.5:
+    raise AssertionError("cam thin-side wall is below 0.5 mm")
 # Blind-seat integrity: nearest approach of the seat cylinder to the pivot
 # bore (perpendicular skew axes; the worst point is the seat bottom).
 _FPIN_S0 = STRAP_R_END - FPIN_SEAT  # 5.0: seat bottom, from the centreline
@@ -1310,6 +1337,56 @@ if (FPIN_DIA + CAM_OD) / 2.0 - _D_ENG < 0.25:
     raise AssertionError("cam lift cannot reach the engaged follower")
 if _FPIN_TIP_S - _S_CAM_ENG < 1.0:
     raise AssertionError("engaged pin slides off the cam axis")
+
+# Bracket scallop closure. The lift rod is base-fixed while the bracket swings,
+# so its centre traces an arc in the bracket's local frame. The part carries
+# two R6.90 open scallops at the parked/engaged endpoint centres; their overlap
+# must cover the full collar sweep plus 0.25 air over the intervening arc.
+def _lift_axis_in_strap(lean_rad: float) -> tuple[float, float]:
+    dx, dy = LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y
+    c, s = math.cos(lean_rad), math.sin(lean_rad)
+    return (-dx * c - dy * s, -dx * s + dy * c)
+
+
+_RELIEF_PARK_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG))
+_RELIEF_ENG_ACTUAL = _lift_axis_in_strap(
+    math.radians(STRAP_LEAN_DEG) + _PHI_ENG
+)
+for _label, _actual, _authored in (
+    ("parked", _RELIEF_PARK_ACTUAL, STRAP_CAM_RELIEF_PARK),
+    ("engaged", _RELIEF_ENG_ACTUAL, STRAP_CAM_RELIEF_ENGAGED),
+):
+    if math.dist(_actual, _authored) > 0.001:
+        raise AssertionError(
+            f"bracket cam relief {_label} centre {_authored} != linkage {_actual}"
+        )
+_RELIEF_CENTRE_CHORD = math.dist(_RELIEF_PARK_ACTUAL, _RELIEF_ENG_ACTUAL)
+_RELIEF_ARC_SAGITTA = math.hypot(LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y) * (
+    1.0 - math.cos(_PHI_ENG / 2.0)
+)
+_RELIEF_REQUIRED_R = math.hypot(
+    STRAP_CAM_RELIEF_ENVELOPE_R, _RELIEF_CENTRE_CHORD / 2.0
+) + _RELIEF_ARC_SAGITTA
+if STRAP_CAM_RELIEF_R < _RELIEF_REQUIRED_R:
+    raise AssertionError(
+        f"bracket cam relief R{STRAP_CAM_RELIEF_R:.3f} does not cover "
+        f"R{_RELIEF_REQUIRED_R:.3f} moving envelope"
+    )
+_PIN_SEAT_SURFACE_X = -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
+_PIN_SEAT_BOTTOM_X = -(STRAP_R_END - FPIN_SEAT)
+_PIN_SEAT_OPEN_X = _PIN_SEAT_SURFACE_X
+for _cx, _cy in (STRAP_CAM_RELIEF_PARK, STRAP_CAM_RELIEF_ENGAGED):
+    _dy = -FPIN_DROP - _cy
+    if abs(_dy) < STRAP_CAM_RELIEF_R:
+        _PIN_SEAT_OPEN_X = max(
+            _PIN_SEAT_OPEN_X,
+            _cx + math.sqrt(STRAP_CAM_RELIEF_R**2 - _dy**2),
+        )
+_PIN_SEAT_REMAINING = _PIN_SEAT_BOTTOM_X - _PIN_SEAT_OPEN_X
+if _PIN_SEAT_REMAINING < 1.5:
+    raise AssertionError(
+        f"cam scallop leaves only {_PIN_SEAT_REMAINING:.3f} mm follower-stud seat"
+    )
 
 # Full-rotation sweep of collar + set-pin boss about the rod axis. The boss
 # sweep books its OUTER CORNER -- hypot(axis reach, boss radius), not just

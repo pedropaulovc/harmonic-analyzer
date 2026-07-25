@@ -61,6 +61,9 @@ from _drawing_marks import (
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_bracket_geometry import (
     ARBOR_BORE,
+    CAM_RELIEF_ENGAGED_CENTER,
+    CAM_RELIEF_PARK_CENTER,
+    CAM_RELIEF_RADIUS,
     C2C,
     PIN_BORE,
     PIN_DROP,
@@ -103,13 +106,70 @@ def _pin_bore_removed() -> float:
     def f(dy: float) -> float:
         y = -PIN_DROP + dy
         chord = 2.0 * math.sqrt(max(r * r - dy * dy, 0.0))
-        surface = -math.sqrt(max(R_END**2 - y * y, 0.0))
+        surface = max(
+            -math.sqrt(max(R_END**2 - y * y, 0.0)),
+            _cam_relief_right_x(y),
+        )
         return chord * max(bottom - surface, 0.0)
 
     total = f(-r) + f(r)
     for i in range(1, n):
         total += (4.0 if i % 2 else 2.0) * f(-r + i * h)
     return total * h / 3.0
+
+
+def _cam_relief_intervals(y: float, centers) -> list[tuple[float, float]]:
+    """Scallop intervals clipped to the bottom-cap chord at local *y*."""
+    if not -R_END <= y <= 0.0:
+        return []
+    cap_half = math.sqrt(max(R_END * R_END - y * y, 0.0))
+    intervals: list[tuple[float, float]] = []
+    for cx, cy in centers:
+        dy = y - cy
+        if abs(dy) >= CAM_RELIEF_RADIUS:
+            continue
+        half = math.sqrt(CAM_RELIEF_RADIUS**2 - dy * dy)
+        lo = max(-cap_half, cx - half)
+        hi = min(cap_half, cx + half)
+        if hi > lo:
+            intervals.append((lo, hi))
+    return sorted(intervals)
+
+
+def _cam_relief_width(y: float, centers) -> float:
+    intervals = _cam_relief_intervals(y, centers)
+    if not intervals:
+        return 0.0
+    total = 0.0
+    lo, hi = intervals[0]
+    for next_lo, next_hi in intervals[1:]:
+        if next_lo > hi:
+            total += hi - lo
+            lo, hi = next_lo, next_hi
+            continue
+        hi = max(hi, next_hi)
+    return total + hi - lo
+
+
+def _cam_relief_area(centers) -> float:
+    """Plan area removed from the R9 pivot cap, Simpson-integrated."""
+    n = 4000
+    h = R_END / n
+    values = [_cam_relief_width(-R_END + i * h, centers) for i in range(n + 1)]
+    return h / 3.0 * (
+        values[0] + values[-1]
+        + 4.0 * sum(values[1:-1:2])
+        + 2.0 * sum(values[2:-1:2])
+    )
+
+
+def _cam_relief_right_x(y: float) -> float:
+    """Rightmost opened edge at *y*, or the original cap edge if untouched."""
+    cap_left = -math.sqrt(max(R_END**2 - y * y, 0.0))
+    intervals = _cam_relief_intervals(
+        y, (CAM_RELIEF_PARK_CENTER, CAM_RELIEF_ENGAGED_CENTER)
+    )
+    return max((hi for _, hi in intervals), default=cap_left)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -131,6 +191,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinBore", f"{PIN_BORE}mm")
     await set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
     await set_global(adapter, "PinSeatDepth", f"{PIN_SEAT}mm")
+    await set_global(adapter, "CamReliefDia", f"{2.0 * CAM_RELIEF_RADIUS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -228,6 +289,44 @@ async def build(adapter) -> dict[str, str]:
     expected = area * THICKNESS
     await volume_check(adapter, "strap", expected, 0.005 * expected)
 
+    # Full-spin cam-envelope relief at the parked and engaged strap poses.
+    # Each open circle is cut through the 5-mm strap; their union covers the
+    # intervening centre arc with >=0.25 air while retaining >2.5 mm around the
+    # pivot bore. The follower stud is silver-brazed after pressing because the
+    # open scallop deliberately exposes part of its old blind-seat mouth.
+    relief_centers = (CAM_RELIEF_PARK_CENTER, CAM_RELIEF_ENGAGED_CENTER)
+    previous_area = 0.0
+    for label, centre, centers in (
+        ("Park", CAM_RELIEF_PARK_CENTER, relief_centers[:1]),
+        ("Engaged", CAM_RELIEF_ENGAGED_CENTER, relief_centers),
+    ):
+        relief = SketchDims()
+        check(f"create_sketch cam relief {label}", await adapter.create_sketch("Front"))
+        await define_circle(
+            adapter, centre[0], centre[1], CAM_RELIEF_RADIUS,
+            f"cam relief {label}", dims=relief,
+            names=(f"CamRelief{label}X", f"CamRelief{label}Y", f"CamRelief{label}Dia"),
+            drives=(None, None, '"CamReliefDia"'),
+        )
+        await ensure_fully_defined(adapter, f"cam relief {label} sketch")
+        check(f"exit_sketch cam relief {label}", await adapter.exit_sketch())
+        name_last_feature(adapter, f"CamRelief{label}Profile")
+        drive_jobs += relief.apply(adapter, f"CamRelief{label}Profile")
+        check(
+            f"cut cam relief {label}",
+            await adapter.create_cut_extrude(ExtrusionParameters(
+                depth=2.0 * (THICKNESS + 1.0), both_directions=True,
+            )),
+        )
+        name_last_feature(adapter, f"CamRelief{label}")
+        union_area = _cam_relief_area(centers)
+        removed = (union_area - previous_area) * THICKNESS
+        expected -= removed
+        await volume_check(
+            adapter, f"cam relief {label}", expected, max(0.5, 0.02 * removed)
+        )
+        previous_area = union_area
+
     # Blind cam-pin seat (PR8): O4 along X into the -X edge at (y -PIN_DROP,
     # z mid), PIN_SEAT deep from a tangent plane at x -R_END. Both signs are
     # computed UP FRONT, not probed by exception-retry (#194): the seat is on
@@ -248,6 +347,8 @@ async def build(adapter) -> dict[str, str]:
     v_bore = _pin_bore_removed()
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
+    com_before = res.data.center_of_mass
+    com_before_x = com_before[0] * 1000.0 if com_before is not None else None
     check(
         f"create_plane PinSeatPlane (Right, {-R_END:+g})",
         await adapter.create_plane(CreatePlaneParameters(
@@ -279,10 +380,10 @@ async def build(adapter) -> dict[str, str]:
         )
     com = res.data.center_of_mass
     com_x = com[0] * 1000.0 if com is not None else None
-    if com_x is None or com_x <= 0.02:
+    if com_x is None or com_before_x is None or com_x <= com_before_x + 0.005:
         raise RuntimeError(
-            f"pin seat landed on the wrong edge (COM x {com_x}) -- "
-            "the -x seat must push the COM to +x"
+            f"pin seat landed on the wrong edge (COM x {com_before_x} -> {com_x}) -- "
+            "the -x seat must move the COM farther +x"
         )
     _telemetry.success(
         f"pin seat (plane {-R_END:+g}, u {u_mid:+g}) removed "

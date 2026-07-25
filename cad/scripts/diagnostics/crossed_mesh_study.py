@@ -22,11 +22,13 @@ Findings it reproduces (run it after changing any crank-mesh input):
 * helix hand: +INCLINE on the 64T zeroes the collision; the mirrored hand and
   straight teeth both collide hard at the engaged depth;
 * the shipped pose (backlash 0.15, smooth helix, c2c slack 0.25 -> tips 1.66
-  into the gaps, 87% of working depth; re-arbitrated 2026-07-14 from the
-  K=12-slice era's 0.40/0.60 after the user flagged visible slop) is
-  ZERO-collision over a full crank-pitch phase sweep, with a >=0.05 backlash
-  margin and a [-1.90, -1.10] deg zero seed window (+-0.40 around the
-  shipped centre -- 4x the 0.10-deg authoring-time correction bound).
+  into the gaps, 87% of working depth) is ZERO-collision over a full
+  crank-pitch phase sweep, with a >=0.05 backlash margin and a
+  [-4.00, -3.20] deg zero seed window (+-0.40 around the shipped centre --
+  4x the 0.10-deg authoring-time correction bound).  The window was
+  re-arbitrated 2026-07-25 when cone-pivot-post-v2 changed the pair from
+  DP26.57 to DP24.74; retaining the old -1.50 centre reproduced 1.37 mm^3 of
+  live flank interference.
 
 Run (no SolidWorks)::
 
