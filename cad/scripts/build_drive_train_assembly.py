@@ -146,6 +146,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+import os
 import sys
 
 import _config
@@ -191,6 +192,7 @@ from _assembly import (
     reset_dof_manifest,
     save_assembly_and_images,
     suspend_automatic_assembly_rebuilds,
+    whats_wrong,
     write_dof_manifest,
 )
 from _interference_contracts import allowed_interference_pairs
@@ -202,6 +204,8 @@ from _cwm import (  # noqa: E402
     component_mate_count,
     component_mate_dump,
     copy_with_mates,
+    external_mate_rows,
+    mates_with_owners,
     put_component_pose,
     resolve_entity,
 )
@@ -2679,24 +2683,57 @@ async def build(adapter) -> dict[str, str]:
             f"cylinder seed slice drifted: {dump} -- expected"
             " [dimension-less radial, axial dim]; re-derive the ladder's"
             " slot map before replicating")
+    cylinder_dim_slot = 1
+    if os.environ.get("HARMONIC_CYLINDER_SLOT_DEBUG"):
+        rows = mates_with_owners(
+            adapter, {"cylinder-gear", "cylinder-gear-shaft"})
+        seed_rows = [row for row in rows if seed_cyl in row["instances"]]
+        external = external_mate_rows(seed_rows, {seed_cyl})
+        dim_slots = [
+            i for i, row in enumerate(external)
+            if row["type"] == "MateDistanceDim"
+        ]
+        log(
+            "  DEBUG cylinder external slots: "
+            f"{[(row['name'], row['type'], sorted(row['owners'])) for row in external]}"
+        )
+        if len(external) != 2 or len(dim_slots) != 1:
+            raise RuntimeError(
+                "cylinder debug slot survey expected two external mates and one dim;"
+                f" got {[(row['name'], row['type']) for row in external]}"
+            )
+        cylinder_dim_slot = dim_slots[0]
     seed_cyl_arr = list(component_transform(adapter, seed_cyl))
     # Every copy's axial slot re-points at the SEED's Front Plane, laddered
     # j * Z_PITCH -- ONE resolve_entity for the whole drum (re-resolving the
     # previous station per copy measured ~1.5 s x 19, half the ladder's win)
-    # The face-centred Ry180 reverses the seed Front-plane normal, so the old
-    # FlipDimension=True side is reversed too: False now ladders the copies in
-    # machine +Z.  A wrong side lands 2 * the dim off and fails the pose assert
-    # below.
+    # The face-centred Ry180 changes the distance side: with alignment repaired,
+    # FlipDimension=True lands copy 1 at seed-Z - pitch instead of + pitch, so
+    # this ladder's measured side is False. The authored seed mate references
+    # the assembly Front Plane (+Z), while each copy re-points that slot to the
+    # Ry180 seed's Front Plane (-Z). The reference normal changed, so
+    # CopyWithMates2 also needs FlipAlignment=True.
+    # Without it SolidWorks creates red Distance32, code 47, reporting reversed
+    # plane alignment; changing FlipDimension alone leaves the same 5.597 mm miss.
     seed_front = resolve_entity(
         adapter, named_ref(f"Front Plane@{seed_cyl}", "PLANE"))
     pending_cylinder_puts: list[tuple[str, list[float]]] = []
     with _telemetry.span("cylinder.replicate",
                          copies=_config.active_count() - 1):
         for j in range(1, _config.active_count()):
+            values = [0.0, 0.0]
+            values[cylinder_dim_slot] = j * Z_PITCH / 1000.0
+            repeat = [True, True]
+            repeat[cylinder_dim_slot] = False
+            new_entities: list = [None, None]
+            new_entities[cylinder_dim_slot] = seed_front
+            flips = [False, False]
+            flip_alignments = [False, False]
+            flip_alignments[cylinder_dim_slot] = True
             copy_with_mates(
-                adapter, [seed_cyl], 2, [0.0, j * Z_PITCH / 1000.0],
-                flips=[False, False], repeat=[True, False],
-                new_entities=[None, seed_front])
+                adapter, [seed_cyl], 2, values,
+                flips=flips, flip_alignments=flip_alignments,
+                repeat=repeat, new_entities=new_entities)
             new_name = f"cylinder-gear-{j + 1}"
             if _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(new_name) is None:
                 raise RuntimeError(
@@ -2708,14 +2745,34 @@ async def build(adapter) -> dict[str, str]:
             # axial dim alone. A wrong slot/side lands it on station 0 or
             # 2 * the dim off -- fail on copy 1, naming the cause.
             got = list(component_transform(adapter, new_name))
+            want = [
+                seed_cyl_arr[9] * 1000.0,
+                seed_cyl_arr[10] * 1000.0,
+                seed_cyl_arr[11] * 1000.0 + j * Z_PITCH,
+            ]
             err = math.dist(
-                [v * 1000.0 for v in got[9:12]],
-                [seed_cyl_arr[9] * 1000.0, seed_cyl_arr[10] * 1000.0,
-                 seed_cyl_arr[11] * 1000.0 + j * Z_PITCH])
+                [v * 1000.0 for v in got[9:12]], want)
             if err > 0.05:
+                # CopyWithMates2 returns no usable status. Ask the same API
+                # behind What's Wrong only on the failure path, so the build
+                # names a red mate and its swFeatureError_e immediately without
+                # adding a document scan to every successful copy. IMate2's
+                # state dump distinguishes alignment from dimension-side errors.
+                hard_errors = [
+                    (name, code)
+                    for name, code, is_warning in whats_wrong(
+                        adapter, adapter.currentModel
+                    )
+                    if not is_warning
+                ]
+                mate_state = component_mate_dump(adapter, new_name)
                 raise RuntimeError(
                     f"cylinder-gear copy {j} landed {err:.3f} mm off its"
-                    " station pre-put -- the CopyWithMates2 slot order on"
+                    f" station pre-put: got {[round(v * 1000.0, 3) for v in got[9:12]]},"
+                    f" want {[round(v, 3) for v in want]}, dim slot"
+                    f" {cylinder_dim_slot}; SolidWorks hard errors"
+                    f" {hard_errors or 'none'}, copied mate state {mate_state} --"
+                    " the CopyWithMates2 slot order on"
                     " this seat/model does not match the audited"
                     " [radial, axial dim] map (or the flip side moved);"
                     " re-derive the slot map (external_mate_rows)")

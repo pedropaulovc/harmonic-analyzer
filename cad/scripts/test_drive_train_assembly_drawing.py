@@ -86,6 +86,19 @@ def test_bom_covers_every_top_level_component_family() -> None:
     assert len(drawing.BOM_COMPONENTS) == 32
 
 
+def test_end_for_end_cylinder_copy_preserves_the_seed_relative_axial_side() -> None:
+    source = (Path(__file__).parent / "build_drive_train_assembly.py").read_text(
+        encoding="utf-8"
+    )
+    assert "flips[cylinder_dim_slot] = True" not in source
+    assert "flips = [False, False]" in source
+    assert "flip_alignments[cylinder_dim_slot] = True" in source
+    assert "flip_alignments=flip_alignments" in source
+    assert "SolidWorks hard errors" in source
+    assert "whats_wrong(" in source
+    assert "component_mate_dump(adapter, new_name)" in source
+
+
 def test_grouped_cone_gear_row_has_a_source_description_property() -> None:
     description = _config.parts("cone-gear")["description"]
     assert description == drawing.BOM_COMPONENTS["cone-gear"]

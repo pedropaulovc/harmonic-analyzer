@@ -7,6 +7,7 @@ from pathlib import Path
 import build_cone_pivot_post as part
 import cone_pivot_post_spec as spec
 import draw_cone_pivot_post as drawing
+from _assembly import _seed_flip
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -136,6 +137,10 @@ def test_part_exposes_semantic_mating_references() -> None:
     assert not hasattr(part, "CRANK_BORE_DX")
     assert not hasattr(part, "CRANK_BORE_Y")
     assert "HARVESTED_VOLUME_MM3" in source
+
+
+def test_rotated_post_reverses_the_cone_shaft_axial_mate_side() -> None:
+    assert not _seed_flip("cone-shaft axial d=22.01", 22.01)
 
 
 def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
