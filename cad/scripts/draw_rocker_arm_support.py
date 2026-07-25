@@ -24,6 +24,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -38,7 +39,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_rocker_arm_support import BOSS_DEPTH, HALF_Y, HOLES, WIDE
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
     remove_notes_matching,
 )
@@ -149,7 +149,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, bottom, holes=True):
         raise RuntimeError("failed to add ASME center marks to bottom view")
 
     # Foot corner datum + the four tapped holes: the native hole table carries

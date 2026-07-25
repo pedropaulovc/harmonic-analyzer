@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
@@ -27,7 +28,6 @@ from crank_pin_spec import (
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
     view_name,
 )
@@ -173,7 +173,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, right, holes=True):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
     # The cone's side-view outline is a SILHOUETTE, not a selectable model

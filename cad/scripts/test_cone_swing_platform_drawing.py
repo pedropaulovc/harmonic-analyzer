@@ -56,14 +56,14 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "pivot_center = _add_cone_axis_centerline(adapter, top)" in source
-    assert "view.ModelToViewTransform" in source
+    assert "_add_cone_axis_centerline(adapter, top)" in source
+    assert "model_point_in_view(" in source
     assert "view.GetVisibleEntities2" in source
     assert "blind_cut_dia_mm(PIVOT_HOLE_SPEC)" in source
     assert "curve.CircleParams" in source
-    assert "pivot_centers" in source
-    assert "view.GetOutline()" in source
-    assert "projected pivot center" in source
+    assert "pivot_centers" not in source
+    assert "GetOutline" not in source
+    assert "pivot_center" not in source
     assert "drawing.EditSheet()" in source
     assert "drawing.EditSketch()" not in source
     assert "_visible_broad_face_edges(adapter, end)" in source
@@ -71,15 +71,15 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert 'label="pivot-hole size"' in source and "edge=pivot_edge" in source
     assert 'datum="B"' in source
     assert 'label="pivot-hole cylindrical datum feature"' in source
-    assert "symbol_xy=(pivot_center[0] - 0.010, pivot_center[1])" in source
+    assert drawing.DATUM_B_SYMBOL_XY == (0.101, 0.160)
+    assert "symbol_xy=DATUM_B_SYMBOL_XY" in source
     assert "entity=pivot_edge" in source
     assert "shoulder=True" in source
     assert (
         '        label="pivot-hole cylindrical datum feature",\n'
         "        entity=pivot_edge,\n"
         "        shoulder=True,\n"
-        "        position_tolerance_m=0.004,"
-        in source
+        "        position_tolerance_m=0.004," in source
     )
     assert source.count("position_tolerance_m=0.004") == 1
     assert "annotation=pivot_callout.GetAnnotation()" not in source
@@ -109,10 +109,7 @@ def test_view_scales_are_explicit() -> None:
     assert source.count("scale=(1, 2)") == 2
     assert source.count("scale=(1, 3)") == 1
     assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
-    assert (
-        cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE
-        == "ISOMETRIC VIEW SCALE 1:3"
-    )
+    assert cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
     assert cone_swing_platform_spec.END_VIEW_NOTE == "END VIEW SCALE 1:2"
 
 
@@ -124,9 +121,10 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-swing-platform")
     assert config["material"] == config["material_specification"]
-    assert "astm a830/a830m gr 1018 hr steel plate" in str(
-        config["material_specification"]
-    ).lower()
+    assert (
+        "astm a830/a830m gr 1018 hr steel plate"
+        in str(config["material_specification"]).lower()
+    )
     assert "5/16 in minimum stock" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "mil-dtl-13924 class 1" in finish

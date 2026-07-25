@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -33,7 +34,6 @@ from cone_lock_knob_spec import (
     WASHER_T,  # noqa: F401 - drawing contract re-export
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -91,22 +91,6 @@ DIMENSION_CALLOUTS = {
 }
 
 
-def _outline_center(adapter: Any, view: Any) -> tuple[float, float]:
-    """A view's actual on-sheet geometry center, read from its outline.
-
-    ``CreateDrawViewFromModelView3`` documents its LocX/LocY as the view
-    center, but the achieved center can differ from the requested one (the
-    proven failure: every model-mapped edge pick missing by one constant
-    offset).  The outline pads the geometry with a uniform whitespace margin,
-    so its midpoint IS the geometry center; measuring it and shifting every
-    pick keeps the recipe correct whatever the placement anchored.
-    """
-    x0, y0, x1, y1 = (
-        float(v) for v in adapter._get_attr_or_call(view, "GetOutline")
-    )
-    return ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -150,19 +134,6 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(3, 1))
 
-    # Measured before any annotation lands (dims would grow the outline).
-    front_center = _outline_center(adapter, front)
-    top_center = _outline_center(adapter, top)
-    front_delta = (
-        front_center[0] - FRONT_CENTER[0],
-        front_center[1] - FRONT_CENTER[1],
-    )
-    top_delta = (top_center[0] - TOP_CENTER[0], top_center[1] - TOP_CENTER[1])
-    _telemetry.info(
-        f"view-center deltas: front=({front_delta[0]:.4f}, {front_delta[1]:.4f}) "
-        f"top=({top_delta[0]:.4f}, {top_delta[1]:.4f})"
-    )
-
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
@@ -171,7 +142,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*front_annotations, *top_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center marks to top view")
 
     # Every GD&T anchor is a REAL model edge seen edge-on or as a circle (a
@@ -182,20 +153,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # the fulcrum-shaft/lever-bushing convention); the clamp seat is held
     # perpendicular to it and the washer OD holds runout to it, so the
     # thread line, body and flange are tied to one inspectable axis.
-    fdx, fdy = front_delta
-    tdx, tdy = top_delta
-    seat_y = _front_y(0.0) + fdy
+    seat_y = _front_y(0.0)
     seat_half_x = (STUD_DIA / 2.0 + WASHER_DIA / 2.0) / 2.0 * _S
-    seat_right = (FRONT_CENTER[0] + fdx + seat_half_x, seat_y)
-    crown_flat = (FRONT_CENTER[0] + fdx, _front_y(BODY_TOP) + fdy)
-    _diag = 2.0 ** -0.5
+    seat_right = (FRONT_CENTER[0] + seat_half_x, seat_y)
+    crown_flat = (FRONT_CENTER[0], _front_y(BODY_TOP))
+    _diag = 2.0**-0.5
     body_circle = (
-        TOP_CENTER[0] + tdx + BODY_DIA * _S / 2.0 * _diag,
-        TOP_CENTER[1] + tdy + BODY_DIA * _S / 2.0 * _diag,
+        TOP_CENTER[0] + BODY_DIA * _S / 2.0 * _diag,
+        TOP_CENTER[1] + BODY_DIA * _S / 2.0 * _diag,
     )
     washer_circle = (
-        TOP_CENTER[0] + tdx + WASHER_DIA * _S / 2.0,
-        TOP_CENTER[1] + tdy,
+        TOP_CENTER[0] + WASHER_DIA * _S / 2.0,
+        TOP_CENTER[1],
     )
     # Both top-view symbols sit RIGHT of the view, not above it: the washer OD
     # is 18 at 3:1, so the top view already reaches y=0.262 against the zone

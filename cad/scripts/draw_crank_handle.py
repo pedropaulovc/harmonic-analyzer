@@ -24,6 +24,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -48,7 +49,6 @@ from crank_handle_spec import (
     PIVOT_BORE_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -167,7 +167,7 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(_front_x(35.0), _front_y(0.0)),
         label="crank handle turning axis",
     )
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, right, holes=True):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
 
     collar_od_top = (RIGHT_CENTER[0], RIGHT_CENTER[1] + COLLAR_R_SHEET)

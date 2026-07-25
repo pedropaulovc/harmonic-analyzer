@@ -21,6 +21,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_edge_dimension,
@@ -43,7 +44,6 @@ from magnifying_wheel_spec import (
     RIM_OUTER_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -137,7 +137,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to wheel bore")
 
     # Axial widths across the right-view section: hub drum length (10) at the

@@ -21,6 +21,7 @@ VISUAL_OVERRIDE_CALLS = {
     "set_hidden_lines_removed",
     "set_hidden_lines_visible",
 }
+DYNAMIC_LAYOUT_READ_CALLS = {"GetPosition"}
 
 
 def _call_name(node: ast.Call) -> str:
@@ -65,7 +66,9 @@ def _dimension_names(
     expression: ast.expr, assignments: dict[str, ast.expr]
 ) -> tuple[str, ...]:
     if isinstance(expression, ast.Name):
-        assert expression.id in assignments, f"unresolved keep collection {expression.id}"
+        assert expression.id in assignments, (
+            f"unresolved keep collection {expression.id}"
+        )
         return _dimension_names(assignments[expression.id], assignments)
     if isinstance(expression, (ast.Set, ast.List, ast.Tuple)):
         assert all(
@@ -103,6 +106,10 @@ def test_part_drawing_keeps_explicit_placements_and_default_visuals(
     assert calls.isdisjoint(VISUAL_OVERRIDE_CALLS), (
         f"{spec.name} overrides SolidWorks drawing visuals: "
         f"{sorted(calls & VISUAL_OVERRIDE_CALLS)}"
+    )
+    assert calls.isdisjoint(DYNAMIC_LAYOUT_READ_CALLS), (
+        f"{spec.name} reads SolidWorks-chosen annotation placement: "
+        f"{sorted(calls & DYNAMIC_LAYOUT_READ_CALLS)}"
     )
 
 
@@ -143,8 +150,13 @@ def test_curate_view_dimensions_deletes_only_and_never_repositions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     keep = SimpleNamespace(name="Keep")
-    drop = SimpleNamespace(name="Drop")
-    curate_calls: list[tuple[str, ...]] = []
+    drop = SimpleNamespace(name="Drop", Select2=lambda *_args: True)
+    deleted: list[str] = []
+    draw = SimpleNamespace(
+        ClearSelection2=lambda *_args: None,
+        EditDelete=lambda: deleted.append("Drop"),
+    )
+    adapter = SimpleNamespace(currentModel=draw)
 
     monkeypatch.setattr(
         drawing_common, "_prepare_view_for_annotation_authoring", lambda *_args: None
@@ -165,19 +177,21 @@ def test_curate_view_dimensions_deletes_only_and_never_repositions(
         lambda _adapter, annotation: annotation.name,
     )
 
-    def curate(_adapter, annotations, *, delete):
-        curate_calls.append(delete)
-        return [annotation for annotation in annotations if annotation.name not in delete]
-
-    monkeypatch.setattr(drawing_common, "curate_dimensions", curate)
+    monkeypatch.setattr(
+        drawing_common._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_args: value,
+    )
 
     curated = drawing_common.curate_view_dimensions(
-        object(), object(), keep={"Keep"}, view_label="front"
+        adapter, object(), keep={"Keep"}, view_label="front"
     )
 
     assert curated == [keep]
-    assert curate_calls == [("Drop",)]
-    assert "reposition" not in inspect.getsource(drawing_common.curate_view_dimensions)
+    assert deleted == ["Drop"]
+    source = inspect.getsource(drawing_common.curate_view_dimensions)
+    assert "reposition" not in source
+    assert "EditRebuild3" not in source
 
 
 def test_curate_view_dimensions_still_rejects_missing_names(
@@ -192,11 +206,14 @@ def test_curate_view_dimensions_still_rejects_missing_names(
         "delete_unnamed_imports",
         lambda _adapter, annotations: annotations,
     )
-    monkeypatch.setattr(drawing_common, "curate_dimensions", lambda *_args, **_kwargs: [])
-
     with pytest.raises(RuntimeError, match=r"missing model dimensions: \['Required'\]"):
         drawing_common.curate_view_dimensions(
-            object(), object(), keep={"Required"}, view_label="front"
+            SimpleNamespace(
+                currentModel=SimpleNamespace(ClearSelection2=lambda *_: None)
+            ),
+            object(),
+            keep={"Required"},
+            view_label="front",
         )
 
 
@@ -248,12 +265,8 @@ def test_hidden_edges_are_temporary_authoring_input_not_saved_visuals(
     monkeypatch.setattr(drawing_common, "view_name", lambda _adapter, _view: "Front")
     drawing_common._AUTHORING_VIEW_DISPLAYS.clear()
 
-    drawing_common._prepare_view_for_annotation_authoring(
-        SimpleNamespace(), view
-    )
-    drawing_common._prepare_view_for_annotation_authoring(
-        SimpleNamespace(), view
-    )
+    drawing_common._prepare_view_for_annotation_authoring(SimpleNamespace(), view)
+    drawing_common._prepare_view_for_annotation_authoring(SimpleNamespace(), view)
     assert view.calls == [(False, 1, False, True, True)]
 
     drawing_common._restore_default_view_displays()
@@ -273,7 +286,11 @@ def test_datum_auto_layout_is_observed_without_rejecting_solidworks_choice() -> 
     (
         (
             drawing_common.add_feature_control_frame,
-            {"leader_attach_xy", "SetLeaderAttachmentPointAtIndex", "GetLeaderPointsAtIndex"},
+            {
+                "leader_attach_xy",
+                "SetLeaderAttachmentPointAtIndex",
+                "GetLeaderPointsAtIndex",
+            },
         ),
         (
             drawing_common.add_surface_finish,
@@ -303,6 +320,41 @@ def test_shared_annotation_helpers_keep_solidworks_default_visuals(
     )
 
 
+def test_auto_center_marks_uses_document_defaults_and_neutral_style_args() -> None:
+    calls: list[tuple[object, ...]] = []
+
+    class FakeView:
+        def AutoInsertCenterMarks2(self, *args: object) -> bool:
+            calls.append(args)
+            return True
+
+    adapter = SimpleNamespace(
+        _attempt=lambda operation, *, default: operation(),
+    )
+
+    assert drawing_common.auto_center_marks(adapter, FakeView(), holes=True)
+    assert calls == [
+        (
+            0x1,
+            0,
+            False,
+            False,
+            True,
+            0.0,
+            0.0,
+            False,
+            False,
+            0.0,
+        )
+    ]
+
+
+def test_auto_center_marks_exposes_no_visual_style_knobs() -> None:
+    parameters = inspect.signature(drawing_common.auto_center_marks).parameters
+    assert set(parameters) == {"adapter", "view", "holes", "slots"}
+    assert {"size", "gap", "extended_lines", "center_line_font"}.isdisjoint(parameters)
+
+
 def test_dimension_attached_fcf_materializes_only_requested_all_around() -> None:
     tree = ast.parse(inspect.getsource(drawing_common.add_feature_control_frame))
     leader_calls = [
@@ -314,6 +366,13 @@ def test_dimension_attached_fcf_materializes_only_requested_all_around() -> None
     assert len(leader_calls) == 1
     assert isinstance(leader_calls[0].args[4], ast.Name)
     assert leader_calls[0].args[4].id == "all_around"
+
+
+def test_dimension_attached_fcf_accepts_annotation_objects() -> None:
+    parameters = inspect.signature(drawing_common.add_feature_control_frame).parameters
+    assert "annotation" in parameters
+    source = inspect.getsource(drawing_common.add_feature_control_frame)
+    assert "_select_drawing_annotation" in source
 
 
 def test_dormant_layout_override_helpers_stay_deleted() -> None:

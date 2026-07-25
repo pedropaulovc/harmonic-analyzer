@@ -11,6 +11,7 @@ import _telemetry
 from _common import check
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_property_linked_note,
     add_view_centerline,
     curate_view_dimensions,
@@ -20,7 +21,7 @@ from _drawing_common import (
     set_dimension_callouts,
     stamp_drawing_summary,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 @dataclass(frozen=True)
@@ -127,7 +128,7 @@ async def build_fastener_sheet(
             label=f"{property_view} side-view axis centerline",
         )
     if recipe.end_center_mark == "required" and not auto_center_marks(
-        adapter, end, holes=True, size=0.0025
+        adapter, end, holes=True
     ):
         raise RuntimeError(f"failed to add ASME center mark to {property_view} end view")
 

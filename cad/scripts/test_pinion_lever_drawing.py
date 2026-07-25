@@ -104,9 +104,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "ModelToViewTransform" in common_source
     assert "(0.0, HUB_OD / 2000.0, HUB_LEN / 2000.0)" in source
     assert "section_hub_y" not in source
-    assert 'sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")' in common_source
-    assert "segment = sketch_manager.CreateLine(" in common_source
-    assert "segment = ddoc.CreateLine2(" not in common_source
+    assert "def create_section_view(" not in common_source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

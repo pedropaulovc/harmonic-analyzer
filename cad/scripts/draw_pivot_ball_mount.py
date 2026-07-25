@@ -10,6 +10,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_attached_note,
     add_datum_feature,
@@ -37,7 +38,6 @@ from pivot_ball_mount_spec import (
     STEM_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
 )
@@ -240,7 +240,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if rise_display is None:
         raise RuntimeError("BallRise has no display dimension to box")
     set_basic_dimension(adapter, rise_display, label="ball and cross-bore height")
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to the front view")
 
     stem_face = _cylindrical_face(adapter, front, STEM_DIA)

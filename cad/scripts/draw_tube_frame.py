@@ -25,6 +25,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -39,7 +40,6 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 from tube_frame_spec import COLUMN_LENGTH, OUTER_DIA
@@ -125,7 +125,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, end_annotations, {"OuterDia": 2})
     set_dimension_callouts(adapter, end_annotations, {"OuterDia": "+0/-0.05"})
     set_dimension_callouts(adapter, length_annotations, {"Depth": "+/-0.25"})
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, end, holes=True):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
     end_top = (

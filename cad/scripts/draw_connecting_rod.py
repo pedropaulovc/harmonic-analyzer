@@ -23,6 +23,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
@@ -46,7 +47,6 @@ from connecting_rod_spec import (
     RING_BOTTOM_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -154,7 +154,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, front_annotations, {"StrapBoreDia": "BORE +0.10/0"}
     )
 
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # Centre distance: ring bore edge to the rocker-pin bore edge (SolidWorks

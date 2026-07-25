@@ -20,6 +20,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_edge_dimension,
@@ -36,7 +37,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from knife_mount_spec import BLK_BOT, BLK_TOP, BORE_CY, R_BORE, SUPPORT_Z_THICK
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -130,7 +130,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to knife bore")
 
     # Block depth (14): dimension the right view's flat front/back faces.

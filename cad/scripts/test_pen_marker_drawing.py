@@ -73,6 +73,7 @@ def test_view_scales_are_explicit_and_profile_is_rotated() -> None:
     assert pen_marker_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
     assert "_rotate_view(adapter, front, -math.pi / 2.0" in source
+    assert "EditRebuild3" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -39,7 +39,6 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     TOL_BASIC,
     add_note,
-    curate_dimensions,
     dimension_name,
     iter_views,
     new_drawing,
@@ -56,16 +55,12 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 _ANNOT_NOTE = 6
 _DIMENSION_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
-# The checked-in DRWDOT currently carries the inch-origin ``.01`` edge-break
-# value even though generated sheets declare millimetres.  Normalize only that
-# semantic content on the instantiated drawing; do not alter the template
-# note's format, size, position, or leader behavior.
-_INCH_EDGE_BREAK_NOTE = (
-    "REMOVE BURRS AND BREAK SHARP EDGES R.01 OR CHAMFER .01 MAX"
-)
-_METRIC_EDGE_BREAK_NOTE = (
-    "REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX"
-)
+# swAutoInsertCenterMarkTypes_e / swCenterMarkConnectionLine_e values. Center
+# mark styling comes from the project drawing document; these flags select only
+# which model geometry receives a mark.
+_AUTO_CENTER_MARK_HOLES = 0x1
+_AUTO_CENTER_MARK_SLOTS = 0x4
+_CENTER_MARK_CONNECTION_NONE = 0
 
 # swInsertAnnotation_e flags used by the curated model-item import. Hole Wizard
 # placement dimensions live on an absorbed sketch and require their dedicated
@@ -257,7 +252,9 @@ def _select_view_entity(
     entity: Any | None = None,
 ) -> Any:
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
@@ -282,9 +279,7 @@ def _select_view_entity(
         )
     if not selected:
         where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
-        raise RuntimeError(
-            f"failed to select {label} {entity_type.lower()} {where}"
-        )
+        raise RuntimeError(f"failed to select {label} {entity_type.lower()} {where}")
     count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
     entity = draw.SelectionManager.GetSelectedObject6(count, -1)
     if entity is None:
@@ -330,6 +325,50 @@ def _select_annotation_entity(
     return edge_entity
 
 
+def _select_drawing_annotation(
+    adapter: Any,
+    view: Any,
+    annotation: Any,
+    *,
+    label: str,
+) -> Any:
+    """Select an existing drawing annotation without reading its sheet position."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+    draw.ClearSelection2(True)
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "Select3", "GetSpecificAnnotation"
+    )
+    selected = bool(annotation.Select3(False, null_callout()))
+    if not selected:
+        display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+        if display is not None:
+            display = _sw_type_info.early_bound_or_flag(
+                display, "IDisplayDimension", "GetNameForSelection"
+            )
+            selection_name = str(display.GetNameForSelection() or "")
+            selected = bool(
+                selection_name
+                and draw.Extension.SelectByID2(
+                    selection_name,
+                    "DIMENSION",
+                    0.0,
+                    0.0,
+                    0.0,
+                    False,
+                    0,
+                    null_callout(),
+                    0,
+                )
+            )
+    if not selected:
+        raise RuntimeError(f"failed to select {label} annotation")
+    return annotation
+
+
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
@@ -364,38 +403,11 @@ def add_datum_feature(
             label=label,
         )
     else:
-        ddoc = _early_bound(draw, "IDrawingDoc")
-        name = view_name(adapter, view)
-        if not ddoc.ActivateView(name):
-            raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
-        draw.ClearSelection2(True)
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "Select3", "GetSpecificAnnotation"
-        )
-        selected = bool(annotation.Select3(False, null_callout()))
-        if not selected:
-            display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
-            if display is not None:
-                display = _sw_type_info.early_bound_or_flag(
-                    display, "IDisplayDimension", "GetNameForSelection"
-                )
-                selection_name = str(display.GetNameForSelection() or "")
-                selected = bool(
-                    selection_name
-                    and draw.Extension.SelectByID2(
-                        selection_name,
-                        "DIMENSION",
-                        0.0,
-                        0.0,
-                        0.0,
-                        False,
-                        0,
-                        null_callout(),
-                        0,
-                    )
-                )
-        if not selected:
-            raise RuntimeError(f"failed to select {label} annotation")
+        if any(value is not None for value in (edge_xy, edge_entity, entity)):
+            raise ValueError(
+                f"{label} cannot combine annotation with edge_xy, edge_entity, or entity"
+            )
+        _select_drawing_annotation(adapter, view, annotation, label=label)
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
@@ -433,12 +445,8 @@ def add_datum_feature(
             label=label,
             requested_x_m=symbol_xy[0],
             requested_y_m=symbol_xy[1],
-            actual_x_m=(
-                float(actual_position[0]) if actual_position else math.nan
-            ),
-            actual_y_m=(
-                float(actual_position[1]) if actual_position else math.nan
-            ),
+            actual_x_m=(float(actual_position[0]) if actual_position else math.nan),
+            actual_y_m=(float(actual_position[1]) if actual_position else math.nan),
             position_error_m=position_error,
             former_limit_m=position_tolerance_m,
         )
@@ -467,6 +475,7 @@ def add_feature_control_frame(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    annotation: Any | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
@@ -474,15 +483,22 @@ def add_feature_control_frame(
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
     """
     draw = adapter.currentModel
-    edge = _select_annotation_entity(
-        adapter,
-        view,
-        edge_xy=edge_xy,
-        edge_entity=edge_entity,
-        entity=entity,
-        entity_type=entity_type,
-        label=label,
-    )
+    if annotation is None:
+        edge = _select_annotation_entity(
+            adapter,
+            view,
+            edge_xy=edge_xy,
+            edge_entity=edge_entity,
+            entity=entity,
+            entity_type=entity_type,
+            label=label,
+        )
+    else:
+        if any(value is not None for value in (edge_xy, edge_entity, entity)):
+            raise ValueError(
+                f"{label} cannot combine annotation with edge_xy, edge_entity, or entity"
+            )
+        edge = _select_drawing_annotation(adapter, view, annotation, label=label)
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
@@ -546,9 +562,7 @@ def add_feature_control_frame(
     frame = _sw_type_info.early_bound_or_flag(
         frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
     )
-    xml = _gtol_frame_xml(
-        characteristic, tolerance, datums=datums, diameter=diameter
-    )
+    xml = _gtol_frame_xml(characteristic, tolerance, datums=datums, diameter=diameter)
     if not migrated and not frame.SetSymbolXml(xml):
         raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
     applied = str(frame.GetSymbolXml() or "")
@@ -695,6 +709,40 @@ def add_surface_finish(
     return symbol
 
 
+def auto_center_marks(
+    adapter: Any,
+    view: Any,
+    *,
+    holes: bool = True,
+    slots: bool = False,
+) -> bool:
+    """Auto-insert center marks using the drawing document's visual defaults."""
+    insert_type = 0
+    if holes:
+        insert_type |= _AUTO_CENTER_MARK_HOLES
+    if slots:
+        insert_type |= _AUTO_CENTER_MARK_SLOTS
+    if insert_type == 0:
+        return False
+
+    inserted = adapter._attempt(
+        lambda: view.AutoInsertCenterMarks2(
+            insert_type,
+            _CENTER_MARK_CONNECTION_NONE,
+            False,  # LinearSlotCenter
+            False,  # ArcSlotCenter
+            True,  # UseDocumentDefaults
+            0.0,  # Size: ignored when document defaults are enabled
+            0.0,  # Gap: ignored when document defaults are enabled
+            False,  # ExtendedLines: ignored when document defaults are enabled
+            False,  # CenterLineFont: ignored when document defaults are enabled
+            0.0,  # Angle
+        ),
+        default=False,
+    )
+    return bool(inserted)
+
+
 @_telemetry.traced("drawing.centerline", label_param="label")
 def add_view_centerline(
     adapter: Any,
@@ -714,7 +762,9 @@ def add_view_centerline(
     the cylindrical FACE and let ``InsertCenterLine2`` derive its axis.
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     _select_view_entity(
         adapter,
         view,
@@ -728,76 +778,6 @@ def add_view_centerline(
         raise RuntimeError(f"failed to insert view centerline ({label})")
     draw.ClearSelection2(True)
     return centerline
-
-
-@_telemetry.traced("drawing.section_view", label_param="label")
-def create_section_view(
-    adapter: Any,
-    parent_view: Any,
-    *,
-    line_start: tuple[float, float],
-    line_end: tuple[float, float],
-    view_xy: tuple[float, float],
-    section_label: str,
-    scale: tuple[int, int] = (1, 1),
-    label: str,
-) -> Any:
-    """Create a full, unaligned section from one straight cutting-plane line.
-
-    The coordinates are drawing-sheet meters.  ``ISketchManager.CreateLine``
-    leaves the new sketch segment selected, which is the documented precondition for
-    ``CreateSectionViewAt5``.  The section is deliberately unaligned so a part
-    recipe can place and scale it independently of the parent view.
-    """
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    name = view_name(adapter, parent_view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"failed to activate section parent view {name!r} ({label})")
-    draw.ClearSelection2(True)
-    segment = sketch_manager.CreateLine(
-        float(line_start[0]),
-        float(line_start[1]),
-        0.0,
-        float(line_end[0]),
-        float(line_end[1]),
-        0.0,
-    )
-    if segment is None:
-        raise RuntimeError(f"failed to create section line ({label})")
-    # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
-    section = ddoc.CreateSectionViewAt5(
-        float(view_xy[0]),
-        float(view_xy[1]),
-        0.0,
-        section_label,
-        0x1 | 0x8,
-        None,
-        0.0,
-    )
-    if section is None:
-        raise RuntimeError(f"failed to create section view ({label})")
-    section = _sw_type_info.early_bound_or_flag(
-        section, "IView", "GetSection", "SetViewPosition"
-    )
-    section.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
-    if not section.SetViewPosition(
-        double_array([float(view_xy[0]), float(view_xy[1])]), False
-    ):
-        raise RuntimeError(f"failed to position section view ({label})")
-    dr_section = section.GetSection()
-    if dr_section is None:
-        raise RuntimeError(f"section view has no section definition ({label})")
-    dr_section = _sw_type_info.early_bound_or_flag(
-        dr_section, "IDrSection", "SetAutoHatch", "SetLabel2"
-    )
-    dr_section.SetAutoHatch(True)
-    if int(dr_section.SetLabel2(section_label)) < 0:
-        raise RuntimeError(f"failed to persist section label ({label})")
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    return section
 
 
 @_telemetry.traced("drawing.model_point_projection", label_param="label")
@@ -850,7 +830,9 @@ def add_property_linked_callout(
 ) -> Any:
     """Attach one arrowed callout whose text resolves from the source SLDPRT."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate linked-callout view {name!r}")
@@ -871,18 +853,31 @@ def add_property_linked_callout(
         "SetLeader3",
         "SetPosition2",
         "GetLeaderCount",
+        "GetLeaderStyle",
+        "GetLeaderSide",
+        "GetSmartArrowHeadStyle",
+        "GetLeaderPerpendicular",
+        "GetDashedLeader",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach linked callout {property_name!r}")
-    status = annotation.SetLeader3(1, 0, True, False, False, False)
-    if status != 0:
-        raise RuntimeError(
-            f"failed to create linked-callout leader {property_name!r}: {status}"
+    if int(annotation.GetLeaderCount()) == 0:
+        status = annotation.SetLeader3(
+            int(annotation.GetLeaderStyle()),
+            int(annotation.GetLeaderSide()),
+            bool(annotation.GetSmartArrowHeadStyle()),
+            bool(annotation.GetLeaderPerpendicular()),
+            False,
+            bool(annotation.GetDashedLeader()),
         )
+        if status != 0:
+            raise RuntimeError(
+                f"failed to materialize linked-callout leader "
+                f"{property_name!r}: {status}"
+            )
     if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
         raise RuntimeError(f"failed to position linked callout {property_name!r}")
-    draw.EditRebuild3()
     if (
         int(annotation.GetAttachedEntityCount3()) != 1
         or int(annotation.GetLeaderCount()) != 1
@@ -929,16 +924,30 @@ def add_attached_note(
         "SetLeader3",
         "SetPosition2",
         "GetLeaderCount",
+        "GetLeaderStyle",
+        "GetLeaderSide",
+        "GetSmartArrowHeadStyle",
+        "GetLeaderPerpendicular",
+        "GetDashedLeader",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([target])):
             raise RuntimeError(f"failed to attach note ({label})")
-    status = annotation.SetLeader3(1, 0, True, False, False, False)
-    if status != 0:
-        raise RuntimeError(f"failed to create attached-note leader ({label}): {status}")
+    if int(annotation.GetLeaderCount()) == 0:
+        status = annotation.SetLeader3(
+            int(annotation.GetLeaderStyle()),
+            int(annotation.GetLeaderSide()),
+            bool(annotation.GetSmartArrowHeadStyle()),
+            bool(annotation.GetLeaderPerpendicular()),
+            False,
+            bool(annotation.GetDashedLeader()),
+        )
+        if status != 0:
+            raise RuntimeError(
+                f"failed to materialize attached-note leader ({label}): {status}"
+            )
     if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
         raise RuntimeError(f"failed to position attached note ({label})")
-    draw.EditRebuild3()
     if (
         int(annotation.GetAttachedEntityCount3()) != 1
         or int(annotation.GetLeaderCount()) != 1
@@ -968,11 +977,11 @@ def add_native_hole_callout(
     True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
     callout still prints the bare nominal.
     """
-    _select_view_entity(
-        adapter, view, "EDGE", edge_xy, label=label, entity=edge
-    )
+    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label, entity=edge)
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     display = ddoc.AddHoleCallout2(callout_xy[0], callout_xy[1], 0.0)
     if display is None:
         raise RuntimeError(f"failed to insert native hole callout ({label})")
@@ -994,21 +1003,23 @@ def add_native_hole_callout(
 # template's title block reads via $PRPSHEET. finalize_drawing requires them on
 # the linked model so a stale part can't ship blank tolerance cells.
 TITLE_BLOCK_TOLERANCE_PROPERTIES = (
-    "TOL_LIN_XX", "TOL_LIN_XXX", "TOL_ANG", "TOL_SURFACE",
+    "TOL_LIN_XX",
+    "TOL_LIN_XXX",
+    "TOL_ANG",
+    "TOL_SURFACE",
     # The DRILLED HOLES row's two cells. Required like the rest: with holes now
     # relying on this general tolerance UOS (no per-feature callout), a blank row
     # would silently drop every clearance hole's fit -- so a stale source part
     # that predates the TOL_HOLE_* stamp must fail loud here, not ship blank.
-    "TOL_HOLE_MINUS", "TOL_HOLE_PLUS",
+    "TOL_HOLE_MINUS",
+    "TOL_HOLE_PLUS",
 )
 
 
 def read_required_properties(
     model: Any, names: Sequence[str], *, required: Iterable[str]
 ) -> dict[str, str]:
-    properties = {
-        name: str(model.GetCustomInfoValue("", name) or "") for name in names
-    }
+    properties = {name: str(model.GetCustomInfoValue("", name) or "") for name in names}
     missing = [name for name in required if not properties.get(name)]
     if missing:
         raise RuntimeError(f"source part properties are missing: {missing}")
@@ -1027,7 +1038,9 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
         view, "IView", "GetCThreadCount", "GetFirstCThread"
     )
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     ddoc.ActivateView(name)
     draw.ClearSelection2(True)
@@ -1038,8 +1051,8 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
         raise RuntimeError(f"failed to select drawing view {name!r}")
     adapter._attempt(
         lambda: ddoc.InsertModelAnnotations3(
-            0,      # swImportModelItemsFromEntireModel
-            0x1,    # swInsertCThreads
+            0,  # swImportModelItemsFromEntireModel
+            0x1,  # swInsertCThreads
             False,
             True,
             True,
@@ -1090,7 +1103,8 @@ def new_project_drawing(
     _ = property_view
     if not PROJECT_DRWDOT.is_file() or PROJECT_DRWDOT.stat().st_size == 0:
         raise FileNotFoundError(
-            f"project drawing standard is missing: {PROJECT_DRWDOT}")
+            f"project drawing standard is missing: {PROJECT_DRWDOT}"
+        )
 
     draw = new_drawing(
         adapter,
@@ -1098,7 +1112,9 @@ def new_project_drawing(
         width=ASME_B_WIDTH_M,
         height=ASME_B_HEIGHT_M,
     )
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     _assert_third_angle_projection_symbol(draw, ddoc)
     # A hand-saved template can be saved while in Edit Sheet Format mode (it
     # was, the day the title block was drawn) -- a drawing created from it then
@@ -1106,7 +1122,6 @@ def new_project_drawing(
     # format and view geometry is inert (all typed SelectByID2 picks fail).
     # EditSheet() drops back to the sheet layer; idempotent when already there.
     ddoc.EditSheet()
-    _normalize_metric_edge_break_note(adapter, ddoc)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("project drawing template has no current sheet")
@@ -1154,9 +1169,7 @@ def create_blank_drawing_sheets(
         for attempt in range(1, 4):
             if not ddoc.ActivateSheet(previous_name):
                 raise RuntimeError(f"{label}: failed to activate {previous_name!r}")
-            before_names = tuple(
-                adapter._get_attr_or_call(ddoc, "GetSheetNames") or ()
-            )
+            before_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
             draw.ClearSelection2(True)
             if not draw.Extension.SelectByID2(
                 previous_name,
@@ -1172,9 +1185,7 @@ def create_blank_drawing_sheets(
                 raise RuntimeError(f"{label}: failed to select {previous_name!r}")
             draw.EditCopy()
             returned = bool(ddoc.PasteSheet(2, 2))
-            after_names = tuple(
-                adapter._get_attr_or_call(ddoc, "GetSheetNames") or ()
-            )
+            after_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
             added = tuple(name for name in after_names if name not in before_names)
             if len(after_names) == len(before_names) + 1 and len(added) == 1:
                 pasted_name = added[0]
@@ -1223,8 +1234,7 @@ def _projection_symbol_centers(
     frustum_lines = [
         pair
         for pair in line_x_pairs
-        if max(abs(pair[0] - circle_x), abs(pair[1] - circle_x))
-        > outer_radius * 1.5
+        if max(abs(pair[0] - circle_x), abs(pair[1] - circle_x)) > outer_radius * 1.5
     ]
     if len(frustum_lines) != 6:
         raise RuntimeError(
@@ -1254,8 +1264,9 @@ def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
         candidates = [
             _early_bound(definition, "ISketchBlockDefinition")
             for definition in definitions
-            if Path(str(_early_bound(definition, "ISketchBlockDefinition").FileName))
-            .name.lower()
+            if Path(
+                str(_early_bound(definition, "ISketchBlockDefinition").FileName)
+            ).name.lower()
             == "third-angle-projection.sldblk"
         ]
         if len(candidates) != 1:
@@ -1322,64 +1333,14 @@ def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
         ddoc.EditSheet()
 
 
-@_telemetry.traced("drawing.normalize_edge_break")
-def _normalize_metric_edge_break_note(adapter: Any, ddoc: Any) -> None:
-    """Replace the instantiated template's inch edge-break value with mm."""
-    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
-    if sheet_view is None:
-        raise RuntimeError("drawing template has no sheet view for note normalization")
-    annotations = adapter._attempt(
-        lambda: adapter._get_attr_or_call(sheet_view, "GetAnnotations")
-    ) or []
-    matched = 0
-    for annotation in annotations:
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
-        )
-        if int(adapter._get_attr_or_call(annotation, "GetType") or 0) != _ANNOT_NOTE:
-            continue
-        note = adapter._attempt(
-            lambda a=annotation: adapter._get_attr_or_call(
-                a, "GetSpecificAnnotation"
-            )
-        )
-        if note is None:
-            continue
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetText", "SetText")
-        normalized = " ".join(
-            str(adapter._get_attr_or_call(note, "GetText") or "").upper().split()
-        )
-        if normalized not in {_INCH_EDGE_BREAK_NOTE, _METRIC_EDGE_BREAK_NOTE}:
-            continue
-        matched += 1
-        if normalized == _METRIC_EDGE_BREAK_NOTE:
-            continue
-        if not adapter._attempt(
-            lambda n=note: n.SetText(_METRIC_EDGE_BREAK_NOTE), default=False
-        ):
-            raise RuntimeError("failed to replace drawing edge-break note")
-        applied = " ".join(
-            str(adapter._get_attr_or_call(note, "GetText") or "").upper().split()
-        )
-        if applied != _METRIC_EDGE_BREAK_NOTE:
-            raise RuntimeError(
-                "drawing edge-break note replacement did not persist: "
-                f"{applied!r}"
-            )
-    if matched != 1:
-        raise RuntimeError(
-            "drawing template must contain exactly one recognized edge-break "
-            f"note, found {matched}"
-        )
-    _telemetry.event("drawing.edge_break_normalized", value_mm=0.25)
-
-
 def assert_asme_b_sheet(
     adapter: Any, sheet: Any, *, phase: str, scale: tuple[float, float] = (1.0, 1.0)
 ) -> None:
     properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
     if len(properties) < 7:
-        raise RuntimeError(f"{phase}: incomplete drawing sheet properties {properties!r}")
+        raise RuntimeError(
+            f"{phase}: incomplete drawing sheet properties {properties!r}"
+        )
     if properties[2:4] != [float(scale[0]), float(scale[1])]:
         raise RuntimeError(
             f"{phase}: drawing sheet scale is not "
@@ -1465,9 +1426,7 @@ def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
     contact.save(png, dpi=(ASME_B_DPI, ASME_B_DPI))
 
 
-def sanitize_pdf_metadata(
-    pdf: Path, *, title: str, expected_pages: int = 1
-) -> None:
+def sanitize_pdf_metadata(pdf: Path, *, title: str, expected_pages: int = 1) -> None:
     """Replace seat/user PDF metadata while preserving the vector page."""
     from pypdf import PdfReader, PdfWriter
 
@@ -1513,71 +1472,6 @@ def _select_edge(adapter: Any, x: float, y: float, *, append: bool) -> Any:
     return edge
 
 
-def add_hole_group_tags(
-    adapter: Any,
-    view: Any,
-    tag: str,
-    *,
-    edge_points: Sequence[tuple[float, float]],
-    note_positions: Sequence[tuple[float, float]],
-) -> list[Any]:
-    """Put the same short arrowed group tag on every hole in a group.
-
-    ``IAnnotation.SetAttachedEntities`` throws for multiple edges on a note in
-    SolidWorks 2026.  One leadered note per hole is both supported and clearer:
-    the nearby schedule owns the full specification while every individual hole
-    visibly carries its group letter.
-    """
-    if not edge_points:
-        raise ValueError("hole group tags require at least one edge")
-    if len(edge_points) != len(note_positions):
-        raise ValueError("hole edge and tag-position counts differ")
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"failed to activate drawing view {name!r}")
-    notes: list[Any] = []
-    for edge_point, note_position in zip(edge_points, note_positions, strict=True):
-        draw.ClearSelection2(True)
-        edge = _select_edge(adapter, *edge_point, append=False)
-        note = draw.InsertNote(tag)
-        if note is None:
-            raise RuntimeError(f"failed to insert hole group tag {tag!r}")
-        note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
-        annotation = note.GetAnnotation()
-        if annotation is None:
-            raise RuntimeError(f"hole group tag has no annotation: {tag!r}")
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation,
-            "IAnnotation",
-            "GetAttachedEntityCount3",
-            "SetAttachedEntities",
-            "SetLeader3",
-            "SetPosition2",
-            "GetLeaderCount",
-        )
-        if int(annotation.GetAttachedEntityCount3()) != 1:
-            if not annotation.SetAttachedEntities(dispatch_array([edge])):
-                raise RuntimeError(f"failed to attach hole group tag {tag!r}")
-        leader_status = annotation.SetLeader3(1, 0, True, False, False, False)
-        if leader_status != 0:
-            raise RuntimeError(
-                f"failed to create hole-group tag leader: status={leader_status}"
-            )
-        if not annotation.SetPosition2(*note_position, 0.0):
-            raise RuntimeError(f"failed to position hole group tag {tag!r}")
-        draw.EditRebuild3()
-        if (
-            int(annotation.GetAttachedEntityCount3()) != 1
-            or int(annotation.GetLeaderCount()) != 1
-        ):
-            raise RuntimeError(f"hole group tag {tag!r} lacks one attached arrow")
-        notes.append(note)
-    draw.ClearSelection2(True)
-    return notes
-
-
 def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     """Import the source part's marked-for-drawing dimensions into ``view``.
 
@@ -1586,7 +1480,9 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     ``swInsertDimensionsMarkedForDrawing`` only.
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     ddoc.ActivateView(name)
     draw.ClearSelection2(True)
@@ -1597,7 +1493,7 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
         raise RuntimeError(f"failed to select drawing view {name!r}")
     result = adapter._attempt(
         lambda: ddoc.InsertModelAnnotations3(
-            0,       # swImportModelItemsFromEntireModel
+            0,  # swImportModelItemsFromEntireModel
             _INSERT_DIMS_MARKED | _INSERT_HOLE_WIZARD_LOCATION_DIMS,
             False,
             True,
@@ -1619,8 +1515,7 @@ def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
         if name
     )
     _telemetry.info(
-        f"model-item import {name}: annotations={len(annotations)}, "
-        f"dimensions={names}"
+        f"model-item import {name}: annotations={len(annotations)}, dimensions={names}"
     )
     return annotations
 
@@ -1665,7 +1560,23 @@ def curate_view_dimensions(
     )
     names = {dimension_name(adapter, annotation) for annotation in annotations}
     delete = tuple(sorted(name for name in names if name and name not in expected))
-    curated = curate_dimensions(adapter, annotations, delete=delete)
+    draw = adapter.currentModel
+    curated: list[Any] = []
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in delete:
+            curated.append(annotation)
+            continue
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "Select2"
+        )
+        draw.ClearSelection2(True)
+        if not annotation.Select2(False, 0):
+            raise RuntimeError(
+                f"failed to select model dimension {name!r} for deletion"
+            )
+        draw.EditDelete()
+    draw.ClearSelection2(True)
     present = {dimension_name(adapter, annotation) for annotation in curated}
     missing = sorted(expected - present)
     if missing:
@@ -1775,13 +1686,9 @@ def set_dimension_callouts(
         display = _sw_type_info.early_bound_or_flag(
             display, "IDisplayDimension", "SetText"
         )
-        adapter._attempt(
-            lambda d=display, s=text: d.SetText(text_part, s)
-        )
+        adapter._attempt(lambda d=display, s=text: d.SetText(text_part, s))
     if remaining:
-        raise RuntimeError(
-            f"dimension callouts not applied: {sorted(remaining)}"
-        )
+        raise RuntimeError(f"dimension callouts not applied: {sorted(remaining)}")
 
 
 def set_dimension_text(
@@ -1898,9 +1805,7 @@ def set_dimension_precision(
                 f"requested {digits} decimals, dimension reports {applied}"
             )
     if remaining:
-        raise RuntimeError(
-            f"dimension precision not applied: {sorted(remaining)}"
-        )
+        raise RuntimeError(f"dimension precision not applied: {sorted(remaining)}")
 
 
 @_telemetry.traced("drawing.reference_dimensions")
@@ -1988,7 +1893,9 @@ def add_edge_dimension(
     slant reads ambiguous for holes not collinear with their datum).
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
@@ -2011,7 +1918,6 @@ def add_edge_dimension(
     else:
         raise ValueError(f"unknown dimension orientation {orientation!r}")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     if dimension is None:
         raise RuntimeError(f"failed to add the {label} {orientation} dimension")
     return dimension
@@ -2030,9 +1936,7 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     drawing_view = _early_bound(view, "IView")
     entities: list[Any] = []
     for component in drawing_view.GetVisibleComponents() or []:
-        entities.extend(
-            drawing_view.GetVisibleEntities2(component, entity_kind) or []
-        )
+        entities.extend(drawing_view.GetVisibleEntities2(component, entity_kind) or [])
     return entities
 
 
@@ -2076,9 +1980,7 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
     display = _sw_type_info.early_bound_or_flag(
         dimension, "IDisplayDimension", "GetDimension", "SetText", "GetText"
     )
-    adapter._attempt(
-        lambda: display.SetText(_DIMENSION_TEXT_CALLOUT_BELOW, "")
-    )
+    adapter._attempt(lambda: display.SetText(_DIMENSION_TEXT_CALLOUT_BELOW, ""))
     below_text = adapter._attempt(
         lambda: display.GetText(_DIMENSION_TEXT_CALLOUT_BELOW), default=""
     )
@@ -2158,7 +2060,9 @@ def insert_hole_table(
     returning.
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate hole-table view {name!r}")
@@ -2235,7 +2139,9 @@ def insert_hole_table(
     if basic_locations:
         for column, heading in ((1, "X LOC (BASIC)"), (2, "Y LOC (BASIC)")):
             if not table.IsCellTextEditable(0, column):
-                raise RuntimeError(f"native hole-table header column {column} is not editable")
+                raise RuntimeError(
+                    f"native hole-table header column {column} is not editable"
+                )
             table.SetText2(0, column, False, heading)
             applied_heading = str(table.DisplayedText2(0, column, False) or "")
             if applied_heading.upper() != heading:
@@ -2272,9 +2178,7 @@ def insert_hole_table(
     )
     if tuple(value.upper() for value in header) != expected:
         raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
-    _telemetry.success(
-        f"native hole table inserted: {rows - 1} holes, header={header}"
-    )
+    _telemetry.success(f"native hole table inserted: {rows - 1} holes, header={header}")
     return table
 
 
@@ -2300,7 +2204,9 @@ def bom_table_template(adapter: Any) -> Path:
 def _activate_and_select_view(adapter: Any, view: Any, *, label: str) -> str:
     """Activate ``view`` and select it as a DRAWINGVIEW; return its name."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
@@ -2412,9 +2318,7 @@ def insert_bom_table(
     actual_grouping = int(
         adapter._get_attr_or_call(feature, "PartConfigurationGrouping") or 0
     )
-    actual_one_item = bool(
-        adapter._get_attr_or_call(feature, "DisplayAsOneItem")
-    )
+    actual_one_item = bool(adapter._get_attr_or_call(feature, "DisplayAsOneItem"))
     if actual_grouping != grouping_value or actual_one_item != (
         configuration_grouping == "same-part"
     ):
@@ -2454,7 +2358,9 @@ def insert_bom_table(
         observed = {cell.strip().lower() for row in contents[1:] for cell in row}
     else:
         observed = {
-            identities.get(row[part_column].strip().lower(), row[part_column].strip().lower())
+            identities.get(
+                row[part_column].strip().lower(), row[part_column].strip().lower()
+            )
             for row in contents[1:]
         }
     missing = sorted(
@@ -2475,10 +2381,14 @@ def insert_bom_table(
         part_column = header.index("PART NUMBER")
         remaining = {key.strip().lower(): text for key, text in descriptions.items()}
         for row in range(1, rows):
-            part = str(
-                adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
-                or ""
-            ).strip().lower()
+            part = (
+                str(
+                    adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
+                    or ""
+                )
+                .strip()
+                .lower()
+            )
             text = remaining.pop(identities.get(part, part), None)
             if text is None:
                 continue
@@ -2520,7 +2430,9 @@ def _set_bom_cell_text(
         raise RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")
 
 
-def _min_angular_gap(ring_radius: float, balloon_radius: float, *, clearance: float) -> float:
+def _min_angular_gap(
+    ring_radius: float, balloon_radius: float, *, clearance: float
+) -> float:
     """Smallest angle between two balloon centres that keeps their circles apart.
 
     Separation is set against the SQUARE the audit boxes a balloon with, not the
@@ -2630,9 +2542,7 @@ def _push_apart_on_ring(
             value_b, weight_b = blocks.pop()
             value_a, weight_a = blocks.pop()
             weight = weight_a + weight_b
-            blocks.append(
-                [(value_a * weight_a + value_b * weight_b) / weight, weight]
-            )
+            blocks.append([(value_a * weight_a + value_b * weight_b) / weight, weight])
     fitted: list[float] = []
     for value, weight in blocks:
         fitted.extend([value] * int(weight))
@@ -2773,9 +2683,7 @@ def _spread_balloons(
     # API: INote::GetBalloonInfo returns the circle's centre and radius outright,
     # and had been in the generated binding all along. The claim was never tested
     # and the sheet carried the defect for it.)
-    gap = _min_angular_gap(
-        min(radius_x, radius_y), max(radii), clearance=clearance
-    )
+    gap = _min_angular_gap(min(radius_x, radius_y), max(radii), clearance=clearance)
     angles = _push_apart_on_ring([theta for theta, _ in items], min_gap=gap)
     for angle, (_theta, annotation) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle)
@@ -2840,7 +2748,9 @@ def _balloon_item_number(adapter: Any, note: Any, *, label: str) -> str:
     return item
 
 
-def add_auto_balloons(adapter: Any, view: Any, *, expected: int, label: str) -> list[Any]:
+def add_auto_balloons(
+    adapter: Any, view: Any, *, expected: int, label: str
+) -> list[Any]:
     """Auto-insert circular item-number balloons around one assembly view.
 
     ``IDrawingDoc.CreateAutoBalloonOptions`` + ``AutoBalloon5`` on the selected
@@ -2907,9 +2817,7 @@ def _create_component_bom_balloon(
     label: str,
 ) -> Any:
     """Attach one BOM balloon to a visible edge of a requested component."""
-    root = adapter._attempt(
-        lambda: view.RootDrawingComponent2(False), default=None
-    )
+    root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
     selected_edge: Any | None = None
@@ -2929,9 +2837,10 @@ def _create_component_bom_balloon(
         component = adapter._attempt(
             lambda dc=drawing_component: dc.Component, default=None
         )
-        edges = adapter._attempt(
-            lambda: view.GetVisibleEntities2(component, 1), default=()
-        ) or ()
+        edges = (
+            adapter._attempt(lambda: view.GetVisibleEntities2(component, 1), default=())
+            or ()
+        )
         if not edges:
             continue
         selected_edge = edges[0]
@@ -3099,9 +3008,7 @@ def position_bom_balloon(
     )
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = ddoc.GetCurrentSheet()
-    magnetic_lines = int(
-        adapter._get_attr_or_call(sheet, "GetMagneticLinesCount") or 0
-    )
+    magnetic_lines = int(adapter._get_attr_or_call(sheet, "GetMagneticLinesCount") or 0)
     _telemetry.info(
         f"{label}: item {item_number} placement diagnostics "
         f"stacked={bool(note.IsStackedBalloon())}, "
@@ -3161,7 +3068,9 @@ def position_bom_balloon(
         )
 
 
-def stamp_drawing_summary(adapter: Any, drawing_model: Any, fields: dict[int, str]) -> None:
+def stamp_drawing_summary(
+    adapter: Any, drawing_model: Any, fields: dict[int, str]
+) -> None:
     """Write and read-verify the drawing document summary metadata."""
     model_doc = _sw_type_info.early_bound_or_flag(drawing_model, "IModelDoc2")
     for field, value in fields.items():
@@ -3204,7 +3113,9 @@ def _is_small_tag(element: LayoutElement) -> bool:
     )
 
 
-def _center_inside(element: LayoutElement, outline: tuple[float, float, float, float]) -> bool:
+def _center_inside(
+    element: LayoutElement, outline: tuple[float, float, float, float]
+) -> bool:
     """True if ``element``'s center lies within the ``(xmin,ymin,xmax,ymax)`` box."""
     cx = (element.xmin + element.xmax) / 2.0
     cy = (element.ymin + element.ymax) / 2.0
@@ -3250,7 +3161,12 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
         # (probed on pen-assembly), so it boxed the balloon off-centre.
         cx, cy, half = float(info[0]), float(info[1]), float(info[6])
         return LayoutElement(
-            diagnostic_name, "note", cx - half, cy - half, cx + half, cy + half,
+            diagnostic_name,
+            "note",
+            cx - half,
+            cy - half,
+            cx + half,
+            cy + half,
             scope=CollisionScope.NON_VIEW,
         )
     extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
@@ -3281,17 +3197,11 @@ def _table_element(adapter: Any, table: Any, name: str) -> LayoutElement | None:
     table = _sw_type_info.early_bound_or_flag(
         table, "ITableAnnotation", "GetAnnotation", "GetSplitInformation"
     )
-    inner = adapter._attempt(
-        lambda: adapter._get_attr_or_call(table, "GetAnnotation")
-    )
+    inner = adapter._attempt(lambda: adapter._get_attr_or_call(table, "GetAnnotation"))
     if inner is None:
         return None
-    inner = _sw_type_info.early_bound_or_flag(
-        inner, "IAnnotation", "GetPosition"
-    )
-    position = adapter._attempt(
-        lambda: adapter._get_attr_or_call(inner, "GetPosition")
-    )
+    inner = _sw_type_info.early_bound_or_flag(inner, "IAnnotation", "GetPosition")
+    position = adapter._attempt(lambda: adapter._get_attr_or_call(inner, "GetPosition"))
     if not position:
         return None
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
@@ -3326,9 +3236,12 @@ def _datum_is_dimension_attached(adapter: Any, annotation: Any) -> bool:
     type in the dimension's local frame.  They must not be mixed with the
     sheet-space annotation position used by the layout audit.
     """
-    attachment_types = adapter._attempt(
-        lambda: adapter._get_attr_or_call(annotation, "GetAttachedEntityTypes")
-    ) or ()
+    attachment_types = (
+        adapter._attempt(
+            lambda: adapter._get_attr_or_call(annotation, "GetAttachedEntityTypes")
+        )
+        or ()
+    )
     return _SEL_DIMENSION in (int(value) for value in attachment_types)
 
 
@@ -3371,9 +3284,12 @@ def _measured_gdt_box(
         ("GetArcCount", "GetArcAtIndex", ((1, 2), (4, 5))),
         ("GetTriangleCount", "GetTriangleAtIndex", ((0, 1), (3, 4), (6, 7))),
     ):
-        n = adapter._attempt(
-            lambda c=count_name: int(adapter._get_attr_or_call(spec, c) or 0)
-        ) or 0
+        n = (
+            adapter._attempt(
+                lambda c=count_name: int(adapter._get_attr_or_call(spec, c) or 0)
+            )
+            or 0
+        )
         for i in range(n):
             raw = adapter._attempt(lambda a=at_name, j=i: getattr(spec, a)(j))
             if not raw:
@@ -3474,9 +3390,10 @@ def _iter_view_annotations(adapter: Any, view: Any):
     The live annotation rides along so the caller can pull its leader geometry
     (see :func:`_leader_segments_of`) without a second COM walk.
     """
-    annotations = adapter._attempt(
-        lambda: adapter._get_attr_or_call(view, "GetAnnotations")
-    ) or []
+    annotations = (
+        adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetAnnotations"))
+        or []
+    )
     for annotation in annotations:
         annotation = _sw_type_info.early_bound_or_flag(
             annotation,
@@ -3503,9 +3420,10 @@ def _iter_view_annotations(adapter: Any, view: Any):
 
 def _iter_tables(adapter: Any, view: Any):
     """Yield each table ``LayoutElement`` owned by ``view`` (or the sheet view)."""
-    tables = adapter._attempt(
-        lambda: adapter._get_attr_or_call(view, "GetTableAnnotations")
-    ) or []
+    tables = (
+        adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetTableAnnotations"))
+        or []
+    )
     for table in tables:
         table = _sw_type_info.early_bound_or_flag(
             table, "ITableAnnotation", "GetAnnotation"
@@ -3514,9 +3432,7 @@ def _iter_tables(adapter: Any, view: Any):
             lambda: adapter._get_attr_or_call(table, "GetAnnotation")
         )
         if inner is not None:
-            inner = _sw_type_info.early_bound_or_flag(
-                inner, "IAnnotation", "GetName"
-            )
+            inner = _sw_type_info.early_bound_or_flag(inner, "IAnnotation", "GetName")
         name = (
             str(adapter._get_attr_or_call(inner, "GetName") or "")
             if inner is not None
@@ -3580,7 +3496,8 @@ def _closed_rectangle(
     by position in the list or by its 7 mm size -- both of those are incidental.
     """
     axis = [
-        i for i, (a, b) in enumerate(lines)
+        i
+        for i, (a, b) in enumerate(lines)
         if abs(a[0] - b[0]) < tol or abs(a[1] - b[1]) < tol
     ]
     for quad in combinations(axis, 4):
@@ -3588,7 +3505,7 @@ def _closed_rectangle(
         counts = Counter((round(x, 6), round(y, 6)) for x, y in pts)
         if len(counts) != 4 or any(v != 2 for v in counts.values()):
             continue
-        if len({p[0] for p in counts} ) == 2 and len({p[1] for p in counts}) == 2:
+        if len({p[0] for p in counts}) == 2 and len({p[1] for p in counts}) == 2:
             return set(quad)
     return set()
 
@@ -3623,8 +3540,7 @@ def _datum_leader_segments(
         return []
     spec = _sw_type_info.early_bound_or_flag(spec, "IDatumTag")
     count = int(
-        adapter._attempt(lambda: adapter._get_attr_or_call(spec, "GetLineCount"))
-        or 0
+        adapter._attempt(lambda: adapter._get_attr_or_call(spec, "GetLineCount")) or 0
     )
     lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
     for index in range(count):
@@ -3698,8 +3614,12 @@ def _display_dimension_leader_segments(
         values = [float(v) for v in raw]
         segments.append(
             LeaderSegment(
-                label, "dim",
-                values[4], values[5], values[7], values[8],
+                label,
+                "dim",
+                values[4],
+                values[5],
+                values[7],
+                values[8],
                 owner,
             )
         )
@@ -3725,9 +3645,7 @@ def _leader_segments_of(
         if not raw:
             continue
         values = [float(v) for v in raw]
-        points = [
-            (values[i], values[i + 1]) for i in range(0, len(values) - 2, 3)
-        ]
+        points = [(values[i], values[i + 1]) for i in range(0, len(values) - 2, 3)]
         for start, end in zip(points, points[1:]):
             segments.append(
                 LeaderSegment(label, kind, start[0], start[1], end[0], end[1], owner)
@@ -3764,7 +3682,9 @@ def collect_layout_elements(
     excluded while the title block remains covered by its explicit keep-out.
     """
     drawing_model = adapter.currentModel
-    ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        drawing_model, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
     if sheet is None:
         raise RuntimeError("drawing has no current sheet to audit layout on")
@@ -3814,12 +3734,15 @@ def collect_layout_elements(
             # real, drawn, and readable only as IDatumTag geometry -- collect it
             # separately or a datum leader driven through a neighbouring view is
             # invisible to every gate (codex #334).
-            if int(
-                adapter._attempt(
-                    lambda a=annotation: adapter._get_attr_or_call(a, "GetType")
+            if (
+                int(
+                    adapter._attempt(
+                        lambda a=annotation: adapter._get_attr_or_call(a, "GetType")
+                    )
+                    or 0
                 )
-                or 0
-            ) == _ANNOT_DATUM:
+                == _ANNOT_DATUM
+            ):
                 leaders.extend(
                     _datum_leader_segments(
                         adapter, annotation, label=element.label, owner=name
@@ -3833,7 +3756,10 @@ def collect_layout_elements(
             if element.kind == "dim":
                 leaders.extend(
                     _display_dimension_leader_segments(
-                        adapter, annotation, label=element.label, owner=name,
+                        adapter,
+                        annotation,
+                        label=element.label,
+                        owner=name,
                     )
                 )
             # A SMALL note centered inside its owning view is a hole tag / balloon
@@ -3904,8 +3830,6 @@ def collect_layout_elements(
     return elements, leaders, region
 
 
-
-
 def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     """Diagnose a colliding, border-crossing, or leader-crossed layout.
 
@@ -3920,9 +3844,7 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
     """
     with _telemetry.span("drawing.layout_audit"):
         elements, leaders, region = collect_layout_elements(adapter)
-        overlaps, overflows, crossings = audit_layout(
-            elements, region, leaders=leaders
-        )
+        overlaps, overflows, crossings = audit_layout(elements, region, leaders=leaders)
         if not overlaps and not overflows and not crossings:
             _telemetry.success(
                 f"drawing layout clean: {len(elements)} elements, "
@@ -3951,7 +3873,9 @@ async def finalize_drawing(
     """Validate the sheet contract and export SLDDRW, PDF, and rendered PNG."""
     _restore_default_view_displays()
     drawing_model = adapter.currentModel
-    ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        drawing_model, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
     sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
     if not sheet_names:
@@ -3971,16 +3895,10 @@ async def finalize_drawing(
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
         if sheet is None:
             raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
-        if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
-            raise RuntimeError(
-                f"failed to pin final drawing sheet {sheet_name!r} scale"
-            )
         assert_asme_b_sheet(
             adapter, sheet, phase=f"before save {sheet_name}", scale=scale
         )
-        properties = list(
-            adapter._get_attr_or_call(sheet, "GetProperties2") or []
-        )
+        properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
         if len(properties) < 8:
             raise RuntimeError(
                 f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
@@ -4002,9 +3920,7 @@ async def finalize_drawing(
                 False,
             )
             sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-            properties = list(
-                adapter._get_attr_or_call(sheet, "GetProperties2") or []
-            )
+            properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
             if len(properties) < 8 or bool(properties[7]):
                 raise RuntimeError(
                     f"failed to enable explicit property source on {sheet_name!r}"
@@ -4049,6 +3965,7 @@ async def finalize_drawing(
     # the inch migration (#290) -- a hardcoded IN cell over mm dimensions would
     # read as inch values and get machined at the wrong scale (Codex P1).
     from _common import apply_custom_properties
+
     apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
     # Explicit recipe-requested cleanup remains sheet-scoped. Layout and view
@@ -4078,14 +3995,10 @@ async def finalize_drawing(
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot
     # path; the template and precomputed recipe placements own the layout.
-    artifacts = save_drawing(
-        adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
-    )
+    artifacts = save_drawing(adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf))
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
-    sanitize_pdf_metadata(
-        outputs.pdf, title=pdf_title, expected_pages=len(sheet_names)
-    )
+    sanitize_pdf_metadata(outputs.pdf, title=pdf_title, expected_pages=len(sheet_names))
     render_pdf_png(outputs.pdf, outputs.png, expected_pages=len(sheet_names))
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:

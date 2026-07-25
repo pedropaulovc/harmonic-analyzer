@@ -26,6 +26,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
@@ -49,7 +50,6 @@ from column_clamp_front_spec import (
     EAR_HOLE_Z,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -181,7 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="collar-height overall",
     )
 
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, right, holes=True):
         raise RuntimeError("failed to add ASME center marks to the right view")
 
     # Ear-hole span (35 c-c), BASIC: the position FCF below carries the

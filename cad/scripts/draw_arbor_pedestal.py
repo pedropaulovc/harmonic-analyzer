@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_native_hole_callout,
@@ -38,7 +39,6 @@ from arbor_pedestal_spec import (
     TOP_RADIUS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
     view_name,
@@ -320,7 +320,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if dome_display is None:
         raise RuntimeError("DomeDia has no display dimension to box")
     set_basic_dimension(adapter, dome_display, label="crown true-profile diameter")
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center mark to the plan view")
 
     # Datum A = the foot seat face (the base-seat datum the bore/dome heights

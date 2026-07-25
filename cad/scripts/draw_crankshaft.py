@@ -25,6 +25,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
@@ -50,7 +51,6 @@ from crankshaft_spec import (
     SHAFT_LENGTH,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
 )
@@ -278,7 +278,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
     # ASME centre mark, the side view marks the #9 cross-hole circle.
     for view, label in ((front, "end"), (right, "side")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+        if not auto_center_marks(adapter, view, holes=True):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     shaft_face = _visible_shaft_face(adapter, right)

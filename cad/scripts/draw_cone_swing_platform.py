@@ -25,25 +25,30 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 from _holes import blind_cut_dia_mm
-from build_cone_swing_platform import NORTH_OVERHANG, PIVOT_HOLE_SPEC, PLATE_T
+from build_cone_swing_platform import (
+    NORTH_OVERHANG,
+    PIVOT_HOLE_SPEC,
+    PLATE_LEN,
+    PLATE_T,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -58,7 +63,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)   # 1:3 keeps the 214 mm plan plus dimensions in-zone
+SHEET_SCALE = (1.0, 3.0)  # 1:3 keeps the 214 mm plan plus dimensions in-zone
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view; the
 # isometric and an end view occupy the open right-hand field.
@@ -70,63 +75,31 @@ END_CENTER = (0.330, 0.095)
 # notes define both asymmetric end widths without redundant chained dimensions.
 TOP_KEEP = ("PlateLenDim",)
 
+# Fixed sheet placement from the last live positive control. SolidWorks moves
+# the circular datum tag 3.574 mm toward its attached rim, so retain the same
+# requested anchor while leaving the resulting leader geometry to SolidWorks.
+DATUM_B_SYMBOL_XY = (0.101, 0.160)
+_CENTERLINE_OVERRUN_MM = 5.0
 
-def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
-    """Draw the plan-view cone axis through the modeled pivot-hole center."""
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
 
-    def _view_xy(point_xyz: tuple[float, float, float]) -> tuple[float, float]:
-        point = _early_bound(
-            math_utility.CreatePoint(double_array(point_xyz)),
-            "IMathPoint",
-        )
-        mapped = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        values = tuple(float(value) for value in mapped.ArrayData)
-        return values[0], values[1]
-
-    expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
-    pivot_centers: list[tuple[float, float]] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
-        for raw_edge in edges:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            parameters = tuple(float(value) for value in curve.CircleParams)
-            if abs(parameters[6] - expected_radius_m) > 1e-6:
-                continue
-            pivot_centers.append(_view_xy(parameters[:3]))
-    if not pivot_centers:
-        raise RuntimeError(
-            "cone-platform plan view has no visible pivot-hole rim at "
-            f"radius {expected_radius_m:g} m"
-        )
-
-    pivot = pivot_centers[0]
-    if any(
-        abs(center[0] - pivot[0]) > 1e-6 or abs(center[1] - pivot[1]) > 1e-6
-        for center in pivot_centers[1:]
-    ):
-        raise RuntimeError(
-            f"cone-platform plan view has conflicting pivot centers: {pivot_centers!r}"
-        )
-    outline = tuple(float(value) for value in view.GetOutline())
-    margin = 0.001
-    if not (
-        outline[0] - margin <= pivot[0] <= outline[2] + margin
-        and outline[1] - margin <= pivot[1] <= outline[3] + margin
-    ):
-        raise RuntimeError(
-            f"projected pivot center {pivot!r} falls outside plan-view outline "
-            f"{outline!r}"
-        )
-    north = (pivot[0], outline[3])
-    south = (pivot[0], outline[1])
+def _add_cone_axis_centerline(adapter: Any, view: Any) -> Any:
+    """Draw the cone axis from fixed model-space endpoints."""
+    north = model_point_in_view(
+        adapter,
+        view,
+        (0.0, 0.0, (NORTH_OVERHANG + _CENTERLINE_OVERRUN_MM) / 1000.0),
+        label="cone-platform axis north endpoint",
+    )
+    south = model_point_in_view(
+        adapter,
+        view,
+        (
+            0.0,
+            0.0,
+            (NORTH_OVERHANG - PLATE_LEN - _CENTERLINE_OVERRUN_MM) / 1000.0,
+        ),
+        label="cone-platform axis south endpoint",
+    )
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     model = adapter.currentModel
     # IDrawingDoc.EditSheet explicitly makes subsequently created geometry
@@ -140,7 +113,7 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     if centerline is None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)
-    return pivot
+    return centerline
 
 
 def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -149,9 +122,12 @@ def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
     top: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+            )
+            or ()
+        )
         for raw_edge in edges:
             edge = _early_bound(raw_edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -170,7 +146,9 @@ def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
         )
     # Prefer the south-end width edges; they are the longest unbroken
     # representatives of each broad planar face.
-    return min(bottom, key=lambda item: item[0])[1], min(top, key=lambda item: item[0])[1]
+    return min(bottom, key=lambda item: item[0])[1], min(top, key=lambda item: item[0])[
+        1
+    ]
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
@@ -181,9 +159,12 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
     straight_side_edges: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+            )
+            or ()
+        )
         for raw_edge in edges:
             edge = _early_bound(raw_edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -195,14 +176,21 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
             if not curve.IsLine():
                 continue
             values = tuple(float(value) for value in curve.LineParams)
-            if abs(values[2] - NORTH_OVERHANG / 1000.0) <= 2e-6 and abs(values[3]) >= 0.99:
+            if (
+                abs(values[2] - NORTH_OVERHANG / 1000.0) <= 2e-6
+                and abs(values[3]) >= 0.99
+            ):
                 north_edges.append(edge)
             start = adapter._attempt(lambda e=edge: e.GetStartVertex(), default=None)
             end = adapter._attempt(lambda e=edge: e.GetEndVertex(), default=None)
             if start is None or end is None:
                 continue
-            p0 = tuple(float(value) for value in _early_bound(start, "IVertex").GetPoint())
-            p1 = tuple(float(value) for value in _early_bound(end, "IVertex").GetPoint())
+            p0 = tuple(
+                float(value) for value in _early_bound(start, "IVertex").GetPoint()
+            )
+            p1 = tuple(
+                float(value) for value in _early_bound(end, "IVertex").GetPoint()
+            )
             length = sum((a - b) ** 2 for a, b in zip(p0, p1, strict=True)) ** 0.5
             if abs(values[3]) < 0.99:
                 straight_side_edges.append((length, edge))
@@ -262,11 +250,13 @@ async def build(adapter: Any) -> dict[str, str]:
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(1, 2))
 
-    top_annotations = curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
+    )
     set_dimension_callouts(adapter, top_annotations, {"PlateLenDim": "+/-0.25"})
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center mark to the pivot hole")
-    pivot_center = _add_cone_axis_centerline(adapter, top)
+    _add_cone_axis_centerline(adapter, top)
 
     pivot_edge, north_edge, straight_side_edge = _visible_plan_controls(adapter, top)
     add_native_hole_callout(
@@ -289,7 +279,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Place the native tag one short radial leader from the projected hole
         # rim.  The former distant tag visually merged with the overall-length
         # extension line and could be read as a planar datum.
-        symbol_xy=(pivot_center[0] - 0.010, pivot_center[1]),
+        symbol_xy=DATUM_B_SYMBOL_XY,
         datum="B",
         label="pivot-hole cylindrical datum feature",
         entity=pivot_edge,

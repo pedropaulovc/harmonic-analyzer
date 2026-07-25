@@ -82,7 +82,6 @@ def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
         raise RuntimeError(
             f"failed to rotate {label} view to {angle:g} rad (reads {applied:g})"
         )
-    adapter.currentModel.EditRebuild3()
 
 
 def _add_picked_dimension(
@@ -115,7 +114,6 @@ def _add_picked_dimension(
             )
     dimension = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
     if dimension is None:
         raise RuntimeError(f"failed to add the {label} dimension")
     return dimension

@@ -20,6 +20,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -49,7 +50,6 @@ from pinion_cam_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     place_view,
 )
 
@@ -175,9 +175,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(
         adapter, boss_station_display, label="boss/tap axial station"
     )
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center marks to front view")
-    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, bottom, holes=True):
         raise RuntimeError("failed to add ASME center marks to boss end view")
 
     bore_center = (FRONT_CENTER[0], _front_y(0.0))

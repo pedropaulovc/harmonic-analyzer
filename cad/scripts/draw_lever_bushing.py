@@ -10,6 +10,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -25,7 +26,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from lever_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -112,7 +112,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center marks to front view")
 
     outer_radius = OUTER_DIA * SHEET_SCALE[0] / 2000.0

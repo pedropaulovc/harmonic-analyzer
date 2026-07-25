@@ -8,8 +8,9 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -30,13 +31,7 @@ from wheel_axle_spec import (
     STUD_DIA,
     STUD_LEN,
 )
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-    view_name,
-    view_outline,
-)
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["wheel_axle"]
@@ -87,75 +82,6 @@ _DATUM_B_OFFSET = (0.038, -0.052)
 _DATUM_B_ANGLE = math.atan2(_DATUM_B_OFFSET[1], _DATUM_B_OFFSET[0])
 
 
-def _view_center_delta(
-    adapter: Any, view: Any, intended: tuple[float, float], label: str
-) -> tuple[float, float]:
-    """Measured-vs-intended geometry-center delta for coordinate picks.
-
-    ``place_view`` anchors on the model origin's projection, not the geometry
-    box center, so a part that is not origin-symmetric (this axle spans
-    y 0..17) lands its geometry offset from the requested center. Every
-    layout constant in this recipe is authored about the intended geometry
-    center; shifting by this delta makes the edge picks and text positions
-    track wherever SolidWorks actually put the geometry.
-    """
-    outline = view_outline(adapter, view)
-    if outline is None:
-        raise RuntimeError(f"{label} drawing view has no outline")
-    cx = (outline[0] + outline[2]) / 2.0
-    cy = (outline[1] + outline[3]) / 2.0
-    _telemetry.debug(
-        f"{label} view geometry center ({cx:.4f}, {cy:.4f}) vs intended "
-        f"({intended[0]:.4f}, {intended[1]:.4f})"
-    )
-    return cx - intended[0], cy - intended[1]
-
-
-def _find_edge(
-    adapter: Any,
-    view: Any,
-    xy: tuple[float, float],
-    *,
-    axis: str,
-    label: str,
-    span: float = 0.0015,
-    step: float = 0.00025,
-) -> tuple[float, float]:
-    """Refine an approximate sheet point to one a typed EDGE pick actually hits.
-
-    The projected geometry sits up to ~0.75 mm off the outline-derived
-    position (measured live) while the pick tolerance is sub-millimeter, so a
-    formula-exact coordinate can miss its edge. Scan outward along ``axis``
-    (the direction perpendicular to the target edge) and return the first
-    point SolidWorks answers; the nearest OTHER edge on every use here is
-    >= 6 mm away, so the +-1.5 mm band can never latch onto the wrong one.
-    """
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    if not ddoc.ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"failed to activate view for {label}")
-    steps = int(round(span / step))
-    offsets = sorted((k * step for k in range(-steps, steps + 1)), key=abs)
-    for offset in offsets:
-        x = xy[0] + (offset if axis == "x" else 0.0)
-        y = xy[1] + (offset if axis == "y" else 0.0)
-        draw.ClearSelection2(True)
-        if draw.Extension.SelectByID2(
-            "", "EDGE", x, y, 0.0, False, 0, null_callout(), 0
-        ):
-            draw.ClearSelection2(True)
-            if offset:
-                _telemetry.debug(
-                    f"{label}: edge found {offset * 1000:+.2f} mm off the "
-                    f"nominal pick along {axis}"
-                )
-            return (x, y)
-    raise RuntimeError(
-        f"{label}: no edge within {span * 1000:.1f} mm of sheet "
-        f"({xy[0]:g}, {xy[1]:g}) along {axis}"
-    )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -201,15 +127,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # The O5 stud hides under the O9 collar from the tip side; show it greyed
     # so its diameter and GD&T attach to a real circle.
 
-    fdx, fdy = _view_center_delta(adapter, front, FRONT_CENTER, "front")
-    edx, edy = _view_center_delta(adapter, end, END_CENTER, "end")
-
-    def fpt(x: float, y: float) -> tuple[float, float]:
-        return (x + fdx, y + fdy)
-
-    def ept(x: float, y: float) -> tuple[float, float]:
-        return (x + edx, y + edy)
-
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
@@ -219,30 +136,29 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *end_annotations], DIMENSION_CALLOUTS
     )
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, end, holes=True):
         raise RuntimeError("failed to add ASME center marks to axle end view")
 
-    flange_face_edge = _find_edge(
-        adapter, front,
-        fpt(FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K, _front_y(0.0)),
-        axis="y", label="flange seating face pick",
+    flange_face_edge = (
+        FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K,
+        _front_y(0.0) - 0.00025,
     )
-    stud_circle_top = _find_edge(
-        adapter, end,
-        ept(END_CENTER[0], END_CENTER[1] + STUD_DIA / 2.0 * _END_K),
-        axis="y", label="stud circle top pick",
+    stud_circle_top = (
+        END_CENTER[0],
+        END_CENTER[1] + STUD_DIA / 2.0 * _END_K,
     )
-    collar_circle_left = _find_edge(
-        adapter, end,
-        ept(END_CENTER[0] - COLLAR_DIA / 2.0 * _END_K, END_CENTER[1]),
-        axis="x", label="collar circle left pick",
+    collar_circle_left = (
+        END_CENTER[0] - COLLAR_DIA / 2.0 * _END_K,
+        END_CENTER[1],
     )
     add_datum_feature(
         adapter,
         front,
         edge_xy=flange_face_edge,
-        symbol_xy=fpt(FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K + 0.006,
-                      _front_y(0.0) - 0.016),
+        symbol_xy=(
+            FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K + 0.006,
+            _front_y(0.0) - 0.016,
+        ),
         datum="A",
         label="flange seating face",
     )
@@ -268,14 +184,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # at r=0.0645 the box clears the O35 ray by >=9.8 mm and the O5.00 text by
     # 14 mm. Its leader crosses the flange arc once, which is inherent to reaching
     # a concentric inner circle and is what the O9/O5/runout leaders already do.
-    # _find_edge scans perpendicular to the circle, so axis="y" here: at -53.8 deg
-    # the nearest other edge (the O9 collar circle) is 6.7 mm off, well outside
-    # the +-1.5 mm band.
-    stud_circle_at_datum_b = _find_edge(
-        adapter, end,
-        ept(END_CENTER[0] + STUD_DIA / 2.0 * _END_K * math.cos(_DATUM_B_ANGLE),
-            END_CENTER[1] + STUD_DIA / 2.0 * _END_K * math.sin(_DATUM_B_ANGLE)),
-        axis="y", label="stud circle datum-B pick",
+    stud_circle_at_datum_b = (
+        END_CENTER[0] + STUD_DIA / 2.0 * _END_K * math.cos(_DATUM_B_ANGLE),
+        END_CENTER[1] + STUD_DIA / 2.0 * _END_K * math.sin(_DATUM_B_ANGLE),
     )
     # Live readback normalizes this restricted tag by 13.776 um; this bound
     # applies only to annotation placement, not part geometry or GD&T.
@@ -283,8 +194,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         end,
         edge_xy=stud_circle_at_datum_b,
-        symbol_xy=ept(END_CENTER[0] + _DATUM_B_OFFSET[0],
-                      END_CENTER[1] + _DATUM_B_OFFSET[1]),
+        symbol_xy=(
+            END_CENTER[0] + _DATUM_B_OFFSET[0],
+            END_CENTER[1] + _DATUM_B_OFFSET[1],
+        ),
         datum="B",
         label="stud bearing axis",
         position_tolerance_m=0.00002,
@@ -306,7 +219,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # direction that DOES bite is the RIGHT: the frame grows right by its
         # full width (20-30 mm, not 8), which is what put platen_guide's frame
         # over the right margin. That is why the x note above still matters.
-        frame_xy=ept(END_CENTER[0] + 0.058, END_CENTER[1] + 0.045),
+        frame_xy=(END_CENTER[0] + 0.058, END_CENTER[1] + 0.045),
         characteristic="perpendicularity",
         tolerance="0.05",
         datums=("A",),
@@ -317,7 +230,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         end,
         edge_xy=collar_circle_left,
-        frame_xy=ept(END_CENTER[0] - 0.075, END_CENTER[1] - 0.045),
+        frame_xy=(END_CENTER[0] - 0.075, END_CENTER[1] - 0.045),
         characteristic="circular_runout",
         tolerance="0.05",
         datums=("B",),
@@ -337,10 +250,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         # A cylinder's side outline is a SILHOUETTE, not a model edge.
-        edge_xy=fpt(FRONT_CENTER[0] - STUD_DIA / 2.0 * _K, stud_flank_y),
+        edge_xy=(FRONT_CENTER[0] - STUD_DIA / 2.0 * _K, stud_flank_y),
         # Text lands at x~0.058..0.084: clear of the stud flank (x=0.0975) and
         # of the O9 collar (x>=0.0915), which starts a further 9 mm up.
-        symbol_xy=fpt(0.045, stud_flank_y),
+        symbol_xy=(0.045, stud_flank_y),
         roughness_ra="1.6",
         label="stud bearing finish",
         entity_type="SILHOUETTE",

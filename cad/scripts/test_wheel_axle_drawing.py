@@ -86,6 +86,20 @@ def test_end_view_anchor_keeps_default_dimensions_inside_sheet() -> None:
     assert drawing.END_CENTER[1] > drawing.FRONT_CENTER[1]
 
 
+def test_annotation_picks_and_placements_are_precomputed() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    forbidden_dynamic_layout = (
+        "_view_center_delta",
+        "view_outline",
+        "def fpt",
+        "def ept",
+        "_find_edge",
+        "SelectByID2",
+    )
+    assert not any(token in source for token in forbidden_dynamic_layout)
+    assert "_front_y(0.0) - 0.00025" in source
+
+
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source

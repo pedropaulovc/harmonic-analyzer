@@ -20,6 +20,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_attached_note,
     add_datum_feature,
@@ -47,7 +48,6 @@ from pinion_cam_pin_spec import (
     PIN_LEN,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -145,7 +145,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cam-pin nominal diameter",
         diameter=True,
     )
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
     add_view_centerline(

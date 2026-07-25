@@ -16,6 +16,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -31,7 +32,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from alignment_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -119,7 +119,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to drum bore")
 
     # No coordinate-picked face-length dimension on the drum profile: every

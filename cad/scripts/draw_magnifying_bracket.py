@@ -24,6 +24,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
@@ -35,7 +36,6 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -134,7 +134,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, top_annotations, DIMENSION_CALLOUTS)
 
     # ASME centre mark on the collar bore (a real circular edge in the end view).
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, right, holes=True):
         raise RuntimeError("failed to add ASME center mark to the collar bore")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)

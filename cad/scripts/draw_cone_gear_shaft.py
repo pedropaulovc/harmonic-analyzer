@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -27,7 +28,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_gear_shaft_spec import SECTION_DIAS, SHAFT_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -175,12 +175,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(1, 1))
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(4, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for label, view in (("side", side), ("end", end), ("iso", iso)):
-        outline = adapter._attempt(
-            lambda v=view: adapter._get_attr_or_call(v, "GetOutline")
-        )
-        _telemetry.info(f"PROBE {label} outline={outline}")
+    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     pivot_face = _cylindrical_face(adapter, side, SECTION_DIAS[0])
     tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[3])
     add_view_centerline(
@@ -199,7 +194,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, end, holes=True):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
     # Sheet geometry the GD&T pick attaches to (meters). The side view's tip

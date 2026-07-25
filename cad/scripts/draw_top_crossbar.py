@@ -9,6 +9,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -24,7 +25,6 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 from top_crossbar_spec import (
@@ -107,7 +107,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center mark to top-view stud hole")
 
     hole_radius_sheet = STUD_HOLE_DIA / 4000.0

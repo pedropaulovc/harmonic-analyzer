@@ -24,6 +24,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
@@ -48,7 +49,6 @@ from channel_lever_spec import (
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
     view_name,
@@ -178,7 +178,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_basic_dimension(adapter, display, label=f"profile {name}")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
 
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center marks to front view")
     _add_tip_arc_center_mark(adapter, front)
 

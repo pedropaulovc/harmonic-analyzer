@@ -18,6 +18,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -36,7 +37,6 @@ from build_platen_guide import GUIDE_LENGTH
 from build_platen_guide import HOLE_X as THROUGH_X
 from build_platen_guide import SCREW_STATION_X as BLIND_X
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
     remove_notes_matching,
 )
@@ -173,7 +173,7 @@ async def build(adapter: Any) -> dict[str, str]:
         keep=frozenset({"Depth", "Height"}),
         view_label="right",
     )
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center marks to front view")
 
     stations = tuple(sorted((*THROUGH_X, *BLIND_X)))

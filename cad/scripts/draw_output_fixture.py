@@ -24,6 +24,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
@@ -34,7 +35,6 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -116,9 +116,9 @@ async def build(adapter: Any) -> dict[str, str]:
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center marks to the end view")
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to the cross hole")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.078)

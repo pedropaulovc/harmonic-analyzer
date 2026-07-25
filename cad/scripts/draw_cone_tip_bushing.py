@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -26,7 +27,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -118,7 +118,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*end_annotations, *side_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, end, holes=True):
         raise RuntimeError("failed to add ASME center marks to end view")
     # Axis centerline of the OD cylinder in the side view: with the axis
     # vertical, it marks which edge pair is the end faces (datum B and the

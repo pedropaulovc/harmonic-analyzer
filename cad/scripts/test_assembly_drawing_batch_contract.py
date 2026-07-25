@@ -16,6 +16,7 @@ import draw_magnifier_assembly
 import draw_paper_drive_assembly
 import draw_pen_assembly
 import draw_summing_assembly
+import pytest
 from _drawing_common import DrawingOutputs
 from _drawing_registry import DRAWINGS
 
@@ -108,6 +109,8 @@ def test_shared_builder_uses_default_visuals_and_three_named_views() -> None:
     assert '("*Right", right_center)' in source
     assert '("*Isometric", iso_center)' in source
     assert "scale=sheet_scale" in source
+    assert '"GetSheetNames"' in source
+    assert "next(iter_views(adapter), None)" in source
     for token in (
         "set_hidden_lines_",
         "ViewDisplay",
@@ -130,7 +133,11 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         pdf=tmp_path / "assembly.pdf",
         png=tmp_path / "assembly.png",
     )
-    adapter = SimpleNamespace(open_model=lambda _path: None)
+    drawing = SimpleNamespace(GetSheetNames=lambda: ("Sheet1",))
+    adapter = SimpleNamespace(
+        open_model=lambda _path: None,
+        _get_attr_or_call=lambda obj, name: getattr(obj, name)(),
+    )
 
     async def open_model(path: str) -> bool:
         calls.append(("open", path))
@@ -143,11 +150,15 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         "check",
         lambda _label, result: result,
     )
+    monkeypatch.setattr(_assembly_drawing, "_early_bound", lambda value, *_args: value)
     monkeypatch.setattr(
         _assembly_drawing,
         "new_project_drawing",
-        lambda _adapter, *, scale: calls.append(("new", scale)),
+        lambda _adapter, *, scale: (
+            calls.append(("new", scale)) or (drawing, object())
+        ),
     )
+    monkeypatch.setattr(_assembly_drawing, "iter_views", lambda _adapter: iter(()))
     monkeypatch.setattr(
         _assembly_drawing,
         "place_view",
@@ -184,3 +195,66 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
     ]
     assert all(call[5] == (1.0, 4.0) for call in view_calls)
     assert result == {"pdf": str(outputs.pdf)}
+
+
+@pytest.mark.parametrize(
+    ("sheet_names", "seed_views", "message"),
+    (
+        (("Sheet1", "Sheet2"), (), "2 sheets, expected 1"),
+        (("Sheet1",), (object(),), "pre-existing model view"),
+    ),
+)
+def test_shared_builder_rejects_nonblank_template_before_placing_views(
+    monkeypatch,
+    tmp_path: Path,
+    sheet_names: tuple[str, ...],
+    seed_views: tuple[object, ...],
+    message: str,
+) -> None:
+    source = tmp_path / "assembly.SLDASM"
+    source.touch()
+    outputs = DrawingOutputs(
+        slddrw=tmp_path / "assembly.SLDDRW",
+        pdf=tmp_path / "assembly.pdf",
+        png=tmp_path / "assembly.png",
+    )
+    drawing = SimpleNamespace(GetSheetNames=lambda: sheet_names)
+
+    async def open_model(_path: str) -> bool:
+        return True
+
+    adapter = SimpleNamespace(
+        open_model=open_model,
+        _get_attr_or_call=lambda obj, name: getattr(obj, name)(),
+    )
+    monkeypatch.setattr(_assembly_drawing, "check", lambda _label, result: result)
+    monkeypatch.setattr(_assembly_drawing, "_early_bound", lambda value, *_args: value)
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "new_project_drawing",
+        lambda _adapter, *, scale: (drawing, object()),
+    )
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "iter_views",
+        lambda _adapter: iter(seed_views),
+    )
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "place_view",
+        lambda *_args, **_kwargs: pytest.fail("view placement must not run"),
+    )
+
+    with pytest.raises(RuntimeError, match=message):
+        asyncio.run(
+            _assembly_drawing.build_simple_three_view_drawing(
+                adapter,
+                source=source,
+                outputs=outputs,
+                sheet_scale=(1.0, 4.0),
+                front_center=(0.1, 0.2),
+                right_center=(0.2, 0.2),
+                iso_center=(0.3, 0.2),
+                pdf_title="Assembly Drawing",
+            )
+        )

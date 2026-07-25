@@ -26,11 +26,14 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
     assert part.BORE_DIA == cone_pivot_post_spec.BORE_DIA == 9.550
     assert part.CRANK_BORE_DIA == cone_pivot_post_spec.CRANK_BORE_DIA == 10.025
-    assert round(
-        cone_pivot_post_spec.CRANK_BORE_DIA
-        - cone_pivot_post_spec.CRANK_SHAFT_MAX_DIA,
-        3,
-    ) == 0.500
+    assert (
+        round(
+            cone_pivot_post_spec.CRANK_BORE_DIA
+            - cone_pivot_post_spec.CRANK_SHAFT_MAX_DIA,
+            3,
+        )
+        == 0.500
+    )
 
 
 def test_marked_dimensions_cover_the_column_and_journal() -> None:
@@ -88,12 +91,15 @@ def test_datum_and_notes_control_the_journal_bore() -> None:
     assert source.count("position_tolerance_m=0.016") == 2
     assert 'datums=("A", "B")' in source
     assert 'datums=("A", "B", "C")' in source
-    assert 'diameter=True' in source
+    assert "diameter=True" in source
     assert 'characteristic="flatness"' in source
     assert 'characteristic="cylindricity"' in source
     assert 'characteristic="perpendicularity"' in source
-    assert '_dimension_position(adapter, top_annotations, "BlockDia")' in source
-    assert "edge_xy=block_dia_position" in source
+    assert "_dimension_position" not in source
+    assert "GetPosition" not in source
+    assert 'block_dia_annotation = top_by_name["BlockDia"]' in source
+    assert "annotation=block_dia_annotation" in source
+    assert "frame_xy=(0.160, 0.220)" in source
     assert 'entity_type="DIMENSION"' in source
     assert "leader=False" not in source
     assert drawing.DIMENSION_CALLOUTS["BlockDia"] == "+/-0.05"

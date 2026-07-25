@@ -25,6 +25,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -35,7 +36,6 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -129,7 +129,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Ø16.50 +0.05/0.00 (machinist round 2: a 16.5-vs-16.50 pair reads as two
     # different callouts for the same bore).
     set_dimension_precision(adapter, top_annotations, {"BoreDia": 2})
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center mark to the clamp bore")
 
     # 0.082 (was 0.071): machinist round 1 grew the notes block by two lines

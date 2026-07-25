@@ -15,9 +15,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/cone-lock-knob.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/cone-lock-knob.pdf")
     assert drawing.PNG.as_posix().endswith("/png/cone-lock-knob_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["cone_lock_knob"].script == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["cone_lock_knob"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -77,10 +75,19 @@ def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
     assert (
         'symbol_xy=(0.128, 0.255),\n        datum="A",\n'
         '        label="knob body axis",\n'
-        "        position_tolerance_m=0.0035,"
-        in source
+        "        position_tolerance_m=0.0035," in source
     )
     assert source.count("position_tolerance_m=0.0035") == 1
+
+
+def test_annotation_targets_use_precomputed_coordinates() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "GetOutline" not in source
+    assert "_outline_center" not in source
+    assert "front_delta" not in source
+    assert "top_delta" not in source
+    assert "seat_y = _front_y(0.0)" in source
+    assert "crown_flat = (FRONT_CENTER[0], _front_y(BODY_TOP))" in source
 
 
 def test_view_scales_are_explicit() -> None:

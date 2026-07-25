@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -35,7 +36,6 @@ from cone_tip_adjuster_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     place_view,
 )
 
@@ -181,9 +181,9 @@ async def build(adapter: Any) -> dict[str, str]:
         location="above",
     )
     set_reference_dimensions(adapter, front_annotations, ("BodyDiaDim",))
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, end, holes=True):
         raise RuntimeError("failed to add ASME center mark to the head end view")
-    if not auto_center_marks(adapter, cup, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, cup, holes=True):
         raise RuntimeError("failed to add ASME center mark to the cup-end view")
 
     # Identify the complete threaded cylindrical datum feature on its visible

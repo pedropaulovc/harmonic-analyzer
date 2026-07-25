@@ -14,10 +14,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/cone-tip-block.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/cone-tip-block.pdf")
     assert drawing.PNG.as_posix().endswith("/png/cone-tip-block_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["cone_tip_block"].script
-        == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["cone_tip_block"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -46,9 +43,7 @@ def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
     assert "BoreDiaDim" not in source
     assert 'name_last_feature(adapter, "ShaftPassage")' in source
     assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA == 2.0
-    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == (
-        "THRU - CLEARANCE PASSAGE"
-    )
+    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == ("THRU - CLEARANCE PASSAGE")
     assert drawing.DIMENSION_CALLOUTS["BlockHt"] == "+0.05/-0.00"
     assert "A SHAFT-BEARING SURFACE" in cone_tip_block_spec.DRAWING_NOTES
 
@@ -82,12 +77,16 @@ def test_datum_and_position_controls_are_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'datum="A"' in source
     assert 'datum="B"' in source
-    assert 'symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024)' in source
+    assert "symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024)" in source
     assert source.count("position_tolerance_m=0.001") == 2
-    assert '_dimension_position(adapter, front_annotations, "Width")' in source
-    assert '_dimension_position(adapter, top_annotations, "Depth")' in source
-    assert "edge_xy=width_position" in source
-    assert "symbol_xy=depth_position" in source
+    assert "_dimension_position" not in source
+    assert "GetPosition" not in source
+    assert 'width_annotation = front_by_name["Width"]' in source
+    assert 'depth_annotation = top_by_name["Depth"]' in source
+    assert "annotation=width_annotation" in source
+    assert "annotation=depth_annotation" in source
+    assert "symbol_xy=DATUM_D_SYMBOL_XY" in source
+    assert drawing.DATUM_D_SYMBOL_XY == (0.152, 0.245)
     assert 'datum="C"' in source
     assert 'datum="D"' in source
     assert 'datum="E"' in source

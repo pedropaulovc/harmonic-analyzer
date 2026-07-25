@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -38,7 +39,6 @@ from cone_tip_block_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     dimension_name,
     place_view,
 )
@@ -88,20 +88,7 @@ DIMENSION_CALLOUTS = {
     "PassageDiaDim": "THRU - CLEARANCE PASSAGE",
 }
 DIMENSION_PRECISION = {"PassageZ": 2}
-
-
-def _dimension_position(
-    adapter: Any, annotations: list[Any], name: str
-) -> tuple[float, float]:
-    for raw_annotation in annotations:
-        annotation = _early_bound(raw_annotation, "IAnnotation")
-        if dimension_name(adapter, annotation) != name:
-            continue
-        position = annotation.GetPosition()
-        if not position or len(position) < 2:
-            raise RuntimeError(f"dimension {name!r} has no sheet position")
-        return float(position[0]), float(position[1])
-    raise RuntimeError(f"dimension {name!r} is not present in the curated view")
+DATUM_D_SYMBOL_XY = (0.152, 0.245)
 
 
 def _circle_entity(
@@ -128,8 +115,7 @@ def _circle_entity(
         raise RuntimeError(f"{label} view has no visible circular model edges")
     radius, center_y, edge = min(
         candidates,
-        key=lambda item: abs(item[0] - radius_mm)
-        + abs(item[1] - center_y_mm),
+        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - center_y_mm),
     )
     if abs(radius - radius_mm) > 0.01 or abs(center_y - center_y_mm) > 0.01:
         raise RuntimeError(
@@ -225,8 +211,6 @@ async def build(adapter: Any) -> dict[str, str]:
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
-    width_position = _dimension_position(adapter, front_annotations, "Width")
-    depth_position = _dimension_position(adapter, top_annotations, "Depth")
     set_dimension_callouts(
         adapter,
         [*front_annotations, *top_annotations, *right_annotations],
@@ -235,17 +219,25 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter, [*front_annotations, *right_annotations], DIMENSION_PRECISION
     )
-    by_name = {
+    front_by_name = {
         dimension_name(adapter, annotation): annotation
         for annotation in front_annotations
     }
+    top_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in top_annotations
+    }
+    width_annotation = front_by_name["Width"]
+    depth_annotation = top_by_name["Depth"]
     for name, label in (("PassageZ", "adjuster common-axis height"),):
-        display = adapter._attempt(lambda n=name: by_name[n].GetSpecificAnnotation())
+        display = adapter._attempt(
+            lambda n=name: front_by_name[n].GetSpecificAnnotation()
+        )
         if display is None:
             raise RuntimeError(f"{name} has no display dimension to box")
         set_basic_dimension(adapter, display, label=label)
     for label, view in (("front", front), ("plan", top), ("right", right)):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+        if not auto_center_marks(adapter, view, holes=True):
             raise RuntimeError(f"failed to add ASME center mark to the {label} view")
 
     # Datum A = the foot seat face (the platform-seat datum the adjuster and
@@ -262,11 +254,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        edge_xy=width_position,
         symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024),
         datum="B",
         label="block-width median plane",
         entity_type="DIMENSION",
+        annotation=width_annotation,
         position_tolerance_m=0.001,
     )
     add_datum_feature(
@@ -293,11 +285,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        edge_xy=depth_position,
-        symbol_xy=depth_position,
+        symbol_xy=DATUM_D_SYMBOL_XY,
         datum="D",
         label="block-depth median plane",
         entity_type="DIMENSION",
+        annotation=depth_annotation,
         shoulder=True,
         position_tolerance_m=0.001,
     )

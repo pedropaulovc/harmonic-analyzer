@@ -24,6 +24,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
@@ -52,7 +53,6 @@ from crank_arm_spec import (
     SHAFT_BORE_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -203,7 +203,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     for view, label in ((front, "front"), (top, "top")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+        if not auto_center_marks(adapter, view, holes=True):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     handle_edge = (

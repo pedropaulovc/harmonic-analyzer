@@ -85,7 +85,7 @@ class _FakeAdapter:
 def test_finalize_exports_once_without_layout_or_reopen_cycles():
     source = getsource(drawing_common.finalize_drawing)
     assert source.count("save_drawing(") == 1
-    assert source.count("sheet.SetScale(") == 1
+    assert "sheet.SetScale(" not in source
     assert "reopen_drawing" not in source
     assert "check_drawing_layout" not in source
     assert "GetSaveFlag" not in source
@@ -93,94 +93,13 @@ def test_finalize_exports_once_without_layout_or_reopen_cycles():
     assert "render_pdf_png" in source
 
 
-def test_new_drawing_normalizes_metric_content_and_viewport_once():
+def test_new_drawing_uses_template_content_and_normalizes_viewport_once():
     source = getsource(drawing_common.new_project_drawing)
-    assert source.count("_normalize_metric_edge_break_note(adapter, ddoc)") == 1
+    assert "normalize_edge_break" not in source
+    assert "SetText(" not in source
     assert source.count("ViewZoomtofit2()") == 1
     assert "ForceRebuild3" not in source
     assert "EditRebuild3" not in source
-
-
-class _EdgeBreakNote:
-    def __init__(self, text: str) -> None:
-        self.text = text
-        self.set_text_calls: list[str] = []
-
-    def GetText(self) -> str:
-        return self.text
-
-    def SetText(self, text: str) -> bool:
-        self.set_text_calls.append(text)
-        self.text = text
-        return True
-
-
-class _EdgeBreakAdapter:
-    @staticmethod
-    def _attempt(call, default=None):
-        try:
-            return call()
-        except Exception:
-            return default
-
-    @staticmethod
-    def _get_attr_or_call(obj, name):
-        member = getattr(obj, name, None)
-        return member() if callable(member) else member
-
-
-def _edge_break_document(note: _EdgeBreakNote):
-    annotation = SimpleNamespace(
-        GetType=lambda: 6,
-        GetSpecificAnnotation=lambda: note,
-    )
-    sheet_view = SimpleNamespace(GetAnnotations=lambda: [annotation])
-    return SimpleNamespace(GetFirstView=lambda: sheet_view)
-
-
-@pytest.mark.parametrize(
-    ("initial", "expected_set_calls"),
-    (
-        (drawing_common._INCH_EDGE_BREAK_NOTE, 1),
-        (drawing_common._METRIC_EDGE_BREAK_NOTE, 0),
-    ),
-)
-def test_metric_edge_break_normalization_changes_content_only(
-    monkeypatch, initial, expected_set_calls
-):
-    note = _EdgeBreakNote(initial)
-    monkeypatch.setattr(
-        drawing_common._sw_type_info,
-        "early_bound_or_flag",
-        lambda value, *_args: value,
-    )
-
-    drawing_common._normalize_metric_edge_break_note(
-        _EdgeBreakAdapter(), _edge_break_document(note)
-    )
-
-    assert note.text == drawing_common._METRIC_EDGE_BREAK_NOTE
-    assert len(note.set_text_calls) == expected_set_calls
-    source = getsource(drawing_common._normalize_metric_edge_break_note)
-    assert "SetText(" in source
-    assert all(
-        token not in source
-        for token in ("SetTextFormat", "SetPosition", "SetLeader", "ViewZoom")
-    )
-
-
-def test_metric_edge_break_normalization_rejects_missing_policy_note(monkeypatch):
-    note = _EdgeBreakNote("UNRELATED TEMPLATE NOTE")
-    monkeypatch.setattr(
-        drawing_common._sw_type_info,
-        "early_bound_or_flag",
-        lambda value, *_args: value,
-    )
-
-    with pytest.raises(RuntimeError, match="recognized edge-break note, found 0"):
-        drawing_common._normalize_metric_edge_break_note(
-            _EdgeBreakAdapter(), _edge_break_document(note)
-        )
 
 
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):

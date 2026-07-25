@@ -9,6 +9,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -24,7 +25,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_arbor_spec import CAP_R, CAP_SAG, SHAFT_DIA, SHAFT_LEN
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -125,7 +125,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to arbor end view")
 
     # Pick the end circle at 12 o'clock, because the symbol goes straight ABOVE

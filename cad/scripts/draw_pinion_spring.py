@@ -21,6 +21,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_attached_note,
     add_feature_control_frame,
@@ -48,7 +49,6 @@ from build_pinion_spring import (
 from pinion_spring_spec import TERMINAL_CALLOUT
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     place_view,
 )
 
@@ -162,7 +162,7 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=(0.215, 0.215),
         label="spring short terminal inside edge",
     )
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center marks to top view")
 
     hole_center_x = _front_x(FOOT_END[0] + HOLE_FROM_END) + (

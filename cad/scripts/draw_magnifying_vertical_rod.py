@@ -23,6 +23,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
@@ -35,7 +36,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from magnifying_vertical_rod_spec import ROD_DIA, ROD_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -129,7 +129,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     # The end silhouette is circular; SolidWorks files it under the same
     # "hole" bit as a bored circle, so a disabled bit makes the API a no-op.
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, right, holes=True):
         raise RuntimeError("failed to add ASME center mark to rod end view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.100)

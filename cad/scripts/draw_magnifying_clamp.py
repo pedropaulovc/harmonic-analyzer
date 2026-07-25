@@ -20,6 +20,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_edge_dimension,
@@ -41,7 +42,6 @@ from magnifying_clamp_spec import (
     LEVER_BORE_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -156,7 +156,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
     for view, label in ((front, "front"), (top, "top")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+        if not auto_center_marks(adapter, view, holes=True):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     # Block depth (12): dimension the right view's flat front/back silhouette

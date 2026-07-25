@@ -25,6 +25,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -51,7 +52,6 @@ from build_harmonic_base import (
 )
 from harmonic_base_spec import BOTTOM_LENGTH, BOTTOM_WIDTH, STACK_HEIGHT
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -308,7 +308,7 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
     restore_default_view_display(adapter, top)
 

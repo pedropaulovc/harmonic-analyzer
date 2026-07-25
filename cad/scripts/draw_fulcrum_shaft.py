@@ -11,6 +11,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
@@ -25,7 +26,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from fulcrum_shaft_spec import SHAFT_DIA, SHAFT_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -125,7 +125,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
     # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
     end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0

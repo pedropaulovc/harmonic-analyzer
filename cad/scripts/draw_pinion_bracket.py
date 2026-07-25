@@ -22,6 +22,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -46,7 +47,6 @@ from pinion_bracket_spec import (
     THICKNESS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -177,7 +177,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     for view, label in ((front, "front"), (right, "right")):
-        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+        if not auto_center_marks(adapter, view, holes=True):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     pivot_bore_edge = (_front_x(0.0), _front_y(0.0) - PIVOT_R_SHEET)

@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    auto_center_marks,
     add_attached_note,
     add_datum_feature,
     add_feature_control_frame,
@@ -37,7 +38,6 @@ from cone_pivot_post_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     dimension_name,
     place_view,
 )
@@ -87,20 +87,6 @@ DIMENSION_CALLOUTS = {
 DIMENSION_PRECISION = {"BoreDia": 3}
 
 
-def _dimension_position(
-    adapter: Any, annotations: list[Any], name: str
-) -> tuple[float, float]:
-    for raw_annotation in annotations:
-        annotation = _early_bound(raw_annotation, "IAnnotation")
-        if dimension_name(adapter, annotation) != name:
-            continue
-        position = annotation.GetPosition()
-        if not position or len(position) < 2:
-            raise RuntimeError(f"dimension {name!r} has no sheet position")
-        return float(position[0]), float(position[1])
-    raise RuntimeError(f"dimension {name!r} is not present in the curated view")
-
-
 def _circular_edge(
     adapter: Any,
     view: Any,
@@ -125,8 +111,7 @@ def _circular_edge(
     _telemetry.info(
         "front-view circular edges (radius,height mm): "
         + ", ".join(
-            f"({radius:.3f},{center_y:.3f})"
-            for radius, center_y, _edge in candidates
+            f"({radius:.3f},{center_y:.3f})" for radius, center_y, _edge in candidates
         )
     )
     radius, center_y, edge = min(
@@ -141,9 +126,7 @@ def _circular_edge(
     return edge
 
 
-def _crank_bore_edge(
-    adapter: Any, view: Any
-) -> tuple[Any, tuple[float, float]]:
+def _crank_bore_edge(adapter: Any, view: Any) -> tuple[Any, tuple[float, float]]:
     """Return a visible rim edge adjacent to the modeled crank-bore cylinder."""
     expected_radius_m = CRANK_BORE_DIA / 2000.0
     candidates: list[Any] = []
@@ -238,9 +221,7 @@ def _add_crank_axis_table(adapter: Any) -> None:
     for row_y, (point, x_value, y_value, z_value) in zip(
         (0.232, 0.221), CRANK_AXIS_POINTS, strict=True
     ):
-        _add_table_note(
-            adapter, point, 0.220, row_y, label=f"crank-axis point {point}"
-        )
+        _add_table_note(adapter, point, 0.220, row_y, label=f"crank-axis point {point}")
         for column_x, value in zip(
             (0.248, 0.290, 0.332),
             (x_value, y_value, z_value),
@@ -307,7 +288,6 @@ async def build(adapter: Any) -> dict[str, str]:
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    block_dia_position = _dimension_position(adapter, top_annotations, "BlockDia")
     set_dimension_callouts(
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
@@ -316,16 +296,19 @@ async def build(adapter: Any) -> dict[str, str]:
         dimension_name(adapter, annotation): annotation
         for annotation in front_annotations
     }
+    top_by_name = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in top_annotations
+    }
     bore_height_annotation = front_by_name["BoreZ"]
+    block_dia_annotation = top_by_name["BlockDia"]
     bore_height_display = adapter._attempt(
         lambda: bore_height_annotation.GetSpecificAnnotation()
     )
     if bore_height_display is None:
         raise RuntimeError("BoreZ has no display dimension to box")
-    set_basic_dimension(
-        adapter, bore_height_display, label="journal-bore basic height"
-    )
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    set_basic_dimension(adapter, bore_height_display, label="journal-bore basic height")
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center mark to the plan view")
 
     # Datum A establishes height, datum B is the turned column axis, and the
@@ -388,7 +371,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=block_dia_position,
         frame_xy=(0.160, 0.220),
         characteristic="perpendicularity",
         tolerance="0.05",
@@ -396,6 +378,7 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="datum-B axis perpendicularity",
         entity_type="DIMENSION",
+        annotation=block_dia_annotation,
     )
     add_feature_control_frame(
         adapter,

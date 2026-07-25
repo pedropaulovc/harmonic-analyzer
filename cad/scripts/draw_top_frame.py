@@ -23,6 +23,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_datum_feature,
     add_feature_control_frame,
@@ -48,7 +49,6 @@ from build_top_frame import (
     RING_HEIGHT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -227,7 +227,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top_annotations,
         {"Width": "+/-0.25", "Depth": "+/-0.25"},
     )
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, top, holes=True):
         raise RuntimeError("failed to add ASME center marks to the ring bores")
 
     (

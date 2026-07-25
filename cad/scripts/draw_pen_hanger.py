@@ -25,6 +25,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    auto_center_marks,
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
@@ -41,7 +42,6 @@ from build_pen_hanger import (
     STRAP_TOP_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     place_view,
 )
 
@@ -141,7 +141,7 @@ async def build(adapter: Any) -> dict[str, str]:
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, front, holes=True):
         raise RuntimeError("failed to add ASME center mark to the hanger-screw hole")
 
     # Do not add a native callout here: R2026x renders a through tapped Hole
