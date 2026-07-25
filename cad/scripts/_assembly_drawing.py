@@ -51,7 +51,6 @@ async def build_simple_three_view_drawing(
             str(source),
             view_name,
             *center,
-            scale=sheet_scale,
         )
 
     return await finalize_drawing(

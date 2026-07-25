@@ -162,8 +162,8 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
     monkeypatch.setattr(
         _assembly_drawing,
         "place_view",
-        lambda _adapter, path, name, x, y, *, scale: calls.append(
-            ("view", path, name, x, y, scale)
+        lambda _adapter, path, name, x, y: calls.append(
+            ("view", path, name, x, y)
         ),
     )
 
@@ -193,7 +193,6 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         (0.2, 0.2),
         (0.3, 0.2),
     ]
-    assert all(call[5] == (1.0, 4.0) for call in view_calls)
     assert result == {"pdf": str(outputs.pdf)}
 
 
