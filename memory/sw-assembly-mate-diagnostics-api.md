@@ -19,16 +19,15 @@ this call. Key codes: `46 = mate over-defining the assembly` (usually a warning)
 `47 = mate cannot be solved` (hard error), `48 = mate entities suppressed/broken`,
 `2 = rebuild error`, `5/6 = sketch over/no-solution`.
 
-**GetWhatsWrong is BLIND mid-build — do not gate a build on it (measured
-2026-07-25).** Inside a live drive-train build, with a copied mate sitting at
-code 47, `GetWhatsWrong` returned ZERO entries — and still zero after an
-explicit 22 s `ForceRebuild3`. It only populates once the UI settles: attaching
-to the same seat AFTER the build process detached showed all five entries. So
-it is fine for post-hoc autopsy on a saved/settled document (and for
-`verify:soundness`, which reopens), but a build that must fail at the operation
-which CAUSED the fault has to use `IFeature::GetErrorCode2` on the mate feature
-— that IS live immediately, which is why `_mate_hard_error` works for authored
-mates. Cost is all TRAVERSAL: walking MateGroup's 104 subfeatures measured
+**GetWhatsWrong works FINE mid-build — an earlier "it is BLIND mid-build"
+entry here was WRONG and has been deleted (2026-07-25).** That verdict came
+from calling it with byref VARIANTs on an early-bound extension, where the outs
+ride the return tuple and the byrefs stay empty — it reported zero entries
+because the data went somewhere else, not because SolidWorks had none. An A/B
+against the walk proved equivalence in-build. Call it as the makepy wrapper
+declares it (no args, consume the tuple) and it is live immediately, like
+`IFeature::GetErrorCode2`. Cost is all TRAVERSAL: walking MateGroup's 104
+subfeatures measured
 5.62 s (~54 ms per `GetNextSubFeature`) vs 0.45 s for all 104 `GetErrorCode2`
 reads (4.4 ms each), so scan incrementally from a remembered cursor
 (`_cwm.new_mate_errors`), never per-copy from the top. Cheap per-component
@@ -50,7 +49,7 @@ model.ForceRebuild3(False)    # regenerates the messages (~21 s on drive-train)
 msgs = error_messages(sw)     # -> ['<Doc> - Rebuild Errors', 'Mates: …']
 ```
 
-Same byref trap as `GetWhatsWrong` (three `VT_BYREF|VT_VARIANT` VARIANTs). Traps
+Same `[out]`-param trap as `GetWhatsWrong` (see the rule below). Traps
 specific to it: the stack keeps only the last **20** messages and is cleared by
 the read (drain before the rebuild or you parse stale text); **every** mate
 problem arrives concatenated into ONE string with no separator
@@ -62,30 +61,51 @@ the text**. Pair it with `IMate2.Alignment` (`swMateAlign_e`: 0 ALIGNED /
 message is pointing at. Working script:
 `cad/scripts/diagnostics/probe_mate_error_text.py`.
 
-**Early-vs-late binding trap (bit this THREE times in one session):** every one
-of these calls has `out` params, so binding decides where the data lands. Under
-an `_early_bound(...)` wrapper InvokeTypes returns the outs in the RETURN TUPLE
-and leaves the byref VARIANTs empty — which silently reads as "no errors found"
-/ "no messages". Either call on the RAW late-bound dispatch, or read the tuple:
+**The `[out]`-param trap — ONE rule: go through makepy, read the tuple.** This
+bit five times in one session, so state the rule positively rather than
+cataloguing victims. 542 SolidWorks methods have at least one `[out]` param
+(derivable from the generated wrapper: an `_ApplyTypes_` argspec entry whose
+flags have bit 2, `PARAMFLAG_FOUT`). **makepy already handles all of them
+uniformly** — the generated method defaults every out to `pythoncom.Missing`
+and returns them in the RETURN TUPLE:
 
-- `GetWhatsWrong` → raw dispatch (`adapter.currentModel`, NOT `_early_bound`).
-- `GetErrorCode2` → early-bound is fine, but consume the `(code, is_warning)`
-  tuple; `int(result)` crashes on it.
-- `GetErrorMessages` → **`adapter.swApp` IS early-bound** (`_do_connect` wraps it
-  as `ISldWorks`), so the byrefs stay empty and the data is in the return tuple
-  `(count, Msgs, MsgIDs, MsgTypes)` — read `ret[1]`. Confirmed by printing the
-  shape live. Standalone `GetObject(...)` probes are late-bound and DO fill the
-  byrefs, so a probe that works standalone can still come back empty in-build.
+```python
+def GetWhatsWrong(self, Features=pythoncom.Missing, ErrorCodes=..., Warnings=...):
+    return self._ApplyTypes_(186, 1, (11,0), ((16396,2),(16396,2),(16396,2)), ...)
+```
+
+Call with no out args, unpack the tuple — `GetWhatsWrong` → `(ok, feats, codes,
+warns)`, `GetErrorMessages` → `(count, msgs, ids, types)`, `OpenDoc6` →
+`(doc, errors, warnings)`, `GetErrorCode2` → `(code, is_warning)`
+(`int(result)` crashes on it). Never pass byref VARIANTs to a generated
+wrapper: they defeat the `Missing` defaults, stay unwritten, and `.value is
+None` then reads as "no errors" — a SILENT wrong answer, which is what makes
+this trap expensive.
+
+The trap only exists where code LEAVES the makepy path, and every such place is
+ours, not SolidWorks': `_common._early_bound` swallows failure and returns the
+raw dispatch (`except Exception: return obj`); `sw_type_info.early_bound_or_flag`
+returns the object unwrapped-but-flagged when no typed class resolves; and the
+standalone probes in `cad/scripts/diagnostics/` use `GetObject`/`Dispatch`
+directly, so they are dynamic and genuinely DO need byrefs — which is exactly why
+a probe that works standalone can come back empty in-build. Root-cause fix
+(analysed 2026-07-25, NOT yet implemented): make `_early_bound` raise instead of
+falling back, give diagnostics the same early-bound `connect()`, then ban
+`VT_BYREF` repo-wide with a one-grep gate. Do NOT write a dual-mode
+`call_outs()` helper — that makes the broken mode permanent. See
+[[no-untested-failure-assumptions]].
 
 Also `FeatureByName` is declared on `IAssemblyDoc`, not `IModelDoc2` (same
 dispatch), and `IMate2` has no feature/error accessor at all — you cannot get an
 error code from `IComponent2::GetMates`, only from the mate FEATURE.
 
-**pywin32 byref trap (critical):** the three `out` params raise on a bare
-`ext.GetWhatsWrong()` call. Pass `VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT,
-None)` for each and read `.value` back (parallel tuples). Same byref pattern as
-`SaveAs` Errors/Warnings. A quietly-swallowed bare call that reports "no errors"
-is the trap that hides corruption — verify the call actually returned data.
+**"A bare `ext.GetWhatsWrong()` raises — you must pass byrefs" was FOLKLORE,
+now deleted (2026-07-25).** It holds ONLY on a late-bound dispatch (a
+`GetObject`/`Dispatch` probe). Through the makepy wrapper the bare call is the
+CORRECT form and the byrefs are the bug — see the `[out]`-param rule above. This
+entry survived untested for months and is what sent a whole session chasing a
+non-existent "GetWhatsWrong is blind mid-build" defect: a specific, confident,
+un-repro'd claim is a hypothesis wearing a fact's clothes.
 
 **Per-feature/per-mate →** `IFeature::GetErrorCode2(out IsWarning)` returns the
 `swFeatureError_e` code + warning flag for ONE feature. Walk the `MateGroup`
