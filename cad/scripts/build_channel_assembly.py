@@ -123,6 +123,7 @@ import _config
 import _telemetry
 from _common import (
     UNDER_CONSTRAINED,
+    _early_bound,
     apply_custom_properties,
     apply_summary_info,
     check,
@@ -445,6 +446,49 @@ CHAIN_PARTS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
 # else -- root planes -- maps to "ROOT" in mates_with_owners).
 _CWM_PREFIXES = set(CHAIN_PARTS) | {
     "pivot-bushing", "pivot-shaft", "fulcrum-shaft", "lever-bushing"}
+
+
+def _copied_chain_instances(adapter: Any, j: int) -> dict[str, str]:
+    """The chain instances channel ``j``'s CopyWithMates2 created.
+
+    Named DETERMINISTICALLY rather than discovered by diffing the component
+    list. Every channel -- authored seed or copy -- contributes exactly one
+    instance of each chain part, in channel order, so channel ``j`` owns
+    ``f"{part}-{j + 1}"``. Verified against the built assembly (all four parts,
+    20 instances, contiguous 1..20) and the same idiom the drive-train cylinder
+    ladder already relies on (``f"cylinder-gear-{j + 1}"``).
+
+    This replaced a before/after ``component_names`` diff that cost ~3.0 s PER
+    COPY -- ~100 s over the 18 copies, 12% of the channel build. The diff could
+    not be made cheaper: of its ~1.5 s per scan, ``GetComponents(True)`` alone
+    measured ~1.0 s, so the scan had to go rather than shrink. Targeted lookups
+    measured ~10 ms each.
+
+    Fails loud in BOTH directions, which is what the diff's
+    "unexpected new component" check bought: the expected instance must EXIST
+    (else the copy dropped a part), and the NEXT one must NOT (else the copy
+    created extra instances, or the numbering rule this rests on has broken --
+    either way the caller must not silently mate the wrong components).
+    """
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    comps: dict[str, str] = {}
+    for part in CHAIN_PARTS:
+        name = f"{part}-{j + 1}"
+        if asm.GetComponentByName(name) is None:
+            raise RuntimeError(
+                f"ch{j:02d} copy: expected instance {name!r} is absent -- the"
+                f" copy did not create its {part}, or channel instances are no"
+                " longer numbered one-per-channel in channel order")
+        extra = f"{part}-{j + 2}"
+        if asm.GetComponentByName(extra) is not None:
+            raise RuntimeError(
+                f"ch{j:02d} copy: unexpected instance {extra!r} already exists"
+                f" -- the copy created more than one {part}, or the"
+                " one-instance-per-channel numbering rule has broken")
+        comps[part] = name
+    return comps
+
+
 # The free-build slice: J1 radial+axial, J2 coaxial+axial, J4 radial+axial,
 # J3 radial+axial, J5 = 9 mates, of which 3 are EXTERNAL (J1 radial on the
 # pivot-shaft, J1a axial dim to the gap bushing -- the ONLY external dim --
@@ -1433,25 +1477,10 @@ async def build(adapter) -> dict[str, str]:
             adapter, named_ref(f"Front Plane@{own_bushing}", "PLANE"))
         flips = [False] * n_slice
         flips[dim_slot] = slice_info["dim_flip"]
-        with _telemetry.span("cwm.comp_names", channel=j, phase="before"):
-            before_comps = set(component_names(adapter))
         copy_with_mates(
             adapter, [seed_comps[p] for p in CHAIN_PARTS], n_slice, values,
             flips=flips, repeat=repeat, new_entities=new_ents)
-        with _telemetry.span("cwm.comp_names", channel=j, phase="after"):
-            new_comps = sorted(set(component_names(adapter)) - before_comps)
-        comps = {}
-        for name in new_comps:
-            part = name.rsplit("-", 1)[0]
-            if part not in CHAIN_PARTS or part in comps:
-                raise RuntimeError(
-                    f"ch{j:02d} copy: unexpected new component {name!r}"
-                    f" (full new set {new_comps})")
-            comps[part] = name
-        if len(comps) != len(CHAIN_PARTS):
-            raise RuntimeError(
-                f"ch{j:02d} copy created {len(comps)}/{len(CHAIN_PARTS)} chain"
-                f" parts: {new_comps}")
+        comps = _copied_chain_instances(adapter, j)
         # Land the copy on its DESIGN pose by pinning its 3 operational DOF
         # with TRANSIENT drivers, then deleting them. The chain's DOF are
         # genuinely free, so the copied mates pin the copy only up to the
