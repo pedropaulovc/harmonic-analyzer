@@ -108,6 +108,308 @@ def _component(adapter: Any, name: str) -> Any:
     return comp
 
 
+# --- Copied-mate error diagnostics -----------------------------------------
+# `_assembly._mate` fails loud on a hard `swFeatureError_e` for every AUTHORED
+# mate (`_mate_hard_error` + the flip-seed MISS raise). A CopyWithMates2 copy
+# bypasses that path entirely, so a copied mate that lands UNSOLVED surfaces
+# only indirectly -- as a pose assert in the caller ("landed N mm off its
+# station"), which names the wrong cause (slot order) for what is really a mate
+# SolidWorks refused to solve. These helpers close that gap.
+
+_ERR_NAMES: dict[int, str] = {
+    1: "(folder/component rollup)",
+    2: "swFeatureErrorRebuild",
+    38: "swFeatureErrorMateInvalidEdge",
+    39: "swFeatureErrorMateInvalidFace",
+    40: "swFeatureErrorMateFailedCreatingSurface",
+    41: "swFeatureErrorMateInvalidEntity",
+    42: "swFeatureErrorMateUnknownTangent",
+    43: "swFeatureErrorMateDanglingGeometry",
+    44: "swFeatureErrorMateEntityNotLinear",
+    45: "swFeatureErrorMateEntityFailed",
+    46: "swFeatureErrorMateOverdefined",
+    47: "swFeatureErrorMateIlldefined",
+    48: "swFeatureErrorMateBroken",
+}
+_ALIGN: dict[int, str] = {0: "ALIGNED", 1: "ANTI_ALIGNED", 2: "CLOSEST"}
+
+
+def _byref() -> Any:
+    import pythoncom
+    from win32com.client import VARIANT
+
+    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
+
+
+def whats_wrong_hard_errors(adapter: Any) -> dict[str, int] | None:
+    """Hard feature errors via ``GetWhatsWrong`` -- ~20 ms, no MateGroup walk.
+
+    Returns ``None`` when the call yields nothing usable, so the caller can tell
+    "cheap read unavailable" from "cheap read says clean" and fall back to the
+    traversal scan rather than trusting a silent empty.
+
+    Uses the TUPLE form (``ext.GetWhatsWrong()`` with no args, consuming
+    ``(retval, feats, codes, warns)``) that `_assembly.whats_wrong` documents:
+    under early binding InvokeTypes collects the three ``out`` arrays into the
+    return value and leaves byref VARIANTs UNWRITTEN, which reads as "every
+    model clean". Getting that wrong is what made an earlier version of this
+    guard believe What's Wrong was unpopulated mid-build.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    ext = _read_member(adapter.currentModel, "Extension")
+    if ext is None:
+        return None
+    ext = _early_bound(ext, "IModelDocExtension")
+    res = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
+    if not res or len(res) < 4:
+        return None
+    _retval, feats, codes, warns = res
+    feats, codes, warns = list(feats or []), list(codes or []), list(warns or [])
+    out: dict[str, int] = {}
+    for i, feat in enumerate(feats):
+        code = int(codes[i]) if i < len(codes) else -1
+        warn = bool(warns[i]) if i < len(warns) else False
+        if code <= 0 or warn or feat is None:
+            continue
+        out[str(_read_member(_early_bound(feat, "IFeature"), "Name"))] = code
+    return out
+
+
+def _feature_hard_error(feat: Any) -> int:
+    """This mate feature's HARD ``swFeatureError_e`` (0 when clean or a warning)."""
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    code = _read_member(_early_bound(feat, "IFeature"), "GetErrorCode2")
+    if code is None:
+        return 0  # member genuinely absent (test double / non-feature object)
+    # `_read_member` returns the BOUND MEMBER ITSELF when calling it raised, so a
+    # failed COM read arrives as a callable -- not as a tuple. Treating that as
+    # "no tuple, therefore clean" is a safeguard that fails OPEN: the scan would
+    # report a healthy copy while the mate is red. Distinguish it and raise.
+    if callable(code):
+        raise RuntimeError(
+            "GetErrorCode2 could not be read for a mate feature -- the copied-"
+            "mate check cannot prove the copy solved, so the build stops rather"
+            " than passing an unverified copy")
+    # Early-bound GetErrorCode2 returns (code, is_warning) -- the [out] param
+    # rides the tuple, so int(result) would crash on it.
+    if not isinstance(code, (list, tuple)):
+        raise RuntimeError(
+            f"GetErrorCode2 returned {type(code).__name__} {code!r}, expected the"
+            " (code, is_warning) tuple -- the copied-mate check cannot be trusted")
+    if not code[0] or code[1]:
+        return 0
+    return int(code[0])
+
+
+def walk_hard_errors(adapter: Any) -> dict[str, int]:
+    """Hard mate errors by WALKING MateGroup -- the fallback, not the fast path.
+
+    Correct but expensive, and the cost is getting TO each feature rather than
+    reading it: 104 subfeatures measured 5.62 s (~54 ms each) against 0.45 s for
+    all 104 `GetErrorCode2` reads. Only used when
+    :func:`whats_wrong_hard_errors` cannot answer.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import (
+        _mate_group_subfeatures, _read_member,
+    )
+
+    found: dict[str, int] = {}
+    for feat in _mate_group_subfeatures(adapter):
+        code = _feature_hard_error(feat)
+        if code:
+            found[str(_read_member(feat, "Name"))] = code
+    return found
+
+
+def new_mate_errors(adapter: Any) -> dict[str, int]:
+    """Hard feature errors that appeared SINCE the last call.
+
+    Prefers `GetWhatsWrong` (~20 ms, no traversal), falling back to the
+    MateGroup walk only when that call cannot answer. A/B logged inside a live
+    build across 37 copies -- 36 clean plus a failing one -- showed the two
+    agree exactly, including ``walk={'Distance32': 47}`` vs
+    ``whatswrong={'Distance32': 47}``.
+
+    Fails CLOSED throughout: an unreadable `GetErrorCode2` raises rather than
+    counting as clean (:func:`_feature_hard_error`), and a `GetWhatsWrong` that
+    returns nothing USABLE re-scans by walking instead of reporting "clean".
+    """
+    found = whats_wrong_hard_errors(adapter)
+    if found is None:
+        _telemetry.warn(
+            "GetWhatsWrong returned nothing usable -- falling back to the"
+            " MateGroup walk so the copied-mate check cannot silently pass")
+        found = walk_hard_errors(adapter)
+
+    # Report only errors not already known, so a pre-existing fault is never
+    # blamed on this copy (both paths read the WHOLE document).
+    known: set[str] = getattr(adapter, "_cwm_known_errors", set())
+    adapter._cwm_known_errors = known | set(found)
+    return {n: c for n, c in found.items() if n not in known}
+
+
+def prime_mate_baseline(adapter: Any) -> None:
+    """Record the current hard errors so the next call reports only NEW ones."""
+    new_mate_errors(adapter)
+
+
+def mate_error_prose(adapter: Any, names: list[str]) -> dict[str, str]:
+    """SolidWorks' OWN wording for each named feature's error.
+
+    No API returns a per-feature description -- `GetWhatsWrong` and
+    `GetErrorCode2` both yield only a numeric code, and that code is COARSER
+    than the UI text (47's enum blurb is the generic "This mate cannot be
+    solved. Consider: deleting / dragging / adding more mates", while the live
+    message distinguishes "Planes are parallel but their **alignment is
+    reversed**" from the dimension-flipped wording). But SolidWorks writes the
+    prose into the SESSION MESSAGE STACK on a rebuild, so:
+    drain -> ForceRebuild3 -> read -> split.
+
+    EXPENSIVE (the rebuild dominates, ~22 s measured mid-build) -- failure path
+    only. Traps: `GetErrorMessages` is read-and-CLEAR and keeps only the last 20
+    messages (drain BEFORE the rebuild or you parse stale text), and every
+    problem arrives concatenated into ONE string with no separator
+    (``...red error icons.Coincident37: This mate is over...Distance32: The
+    components...``), so the split anchors on the feature NAMES, never on
+    punctuation. The text is UI-LOCALIZED while the code is not -- decide on the
+    code, explain with the text.
+    """
+    app = getattr(adapter, "swApp", None)
+    if app is None:
+        return {}
+
+    def _drain() -> list[str]:
+        m, i, t = _byref(), _byref(), _byref()
+        ret = app.GetErrorMessages(m, i, t)
+        if m.value:
+            return list(m.value)
+        # `adapter.swApp` is the EARLY-BOUND ISldWorks wrapper, and InvokeTypes
+        # returns the three [out] params in the RETURN tuple
+        # (count, Msgs, MsgIDs, MsgTypes) while leaving the byref VARIANTs
+        # empty. Reading only `m.value` here is why the first version of this
+        # guard reported the code with no prose.
+        if isinstance(ret, (list, tuple)) and len(ret) >= 2:
+            return list(ret[1] or [])
+        return []
+
+    _drain()  # so we read only what the rebuild below emits
+    _early_bound(adapter.currentModel, "IModelDoc2").ForceRebuild3(False)
+    blob = "\n".join(_drain())
+    hits = sorted((blob.index(f"{n}: "), n) for n in names if f"{n}: " in blob)
+    out: dict[str, str] = {}
+    for k, (pos, name) in enumerate(hits):
+        end = hits[k + 1][0] if k + 1 < len(hits) else len(blob)
+        out[name] = " ".join(blob[pos + len(name) + 2:end].split())
+    return out
+
+
+def _mate_state(adapter: Any, name: str) -> str:
+    """``IMate2`` alignment/flip state of a named mate feature, for the report."""
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    # FeatureByName is declared on IAssemblyDoc, not IModelDoc2 (same dispatch).
+    doc = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    feat = adapter._attempt(lambda: doc.FeatureByName(name), default=None)
+    if feat is None:
+        return ""
+    mate = _read_member(_early_bound(feat, "IFeature"), "GetSpecificFeature2")
+    if mate is None:
+        return ""
+    align = _read_member(mate, "Alignment")
+    align_txt = _ALIGN.get(int(align), str(align)) if align is not None else "?"
+    return (f"IMate2: type={_read_member(mate, 'Type')}"
+            f" alignment={align_txt}"
+            f" flipped={_read_member(mate, 'Flipped')}"
+            f" canBeFlipped={_read_member(mate, 'CanBeFlipped')}")
+
+
+def _slot_report(
+    n_mates: int,
+    values_m: list[float],
+    rep: list[bool],
+    flip_dim: list[bool],
+    ents_src: list[Any],
+) -> str:
+    """Every CopyWithMates2 slot argument this call actually passed."""
+    def _at(seq: list, i: int) -> Any:
+        return seq[i] if i < len(seq) else "?"
+
+    lines = []
+    for i in range(n_mates):
+        val = _at(values_m, i)
+        val_txt = f"{val * 1000.0:.4f} mm" if isinstance(val, (int, float)) else "-"
+        lines.append(
+            f"    slot {i}: repeat={str(_at(rep, i)):5}"
+            f" value={val_txt:>14}"
+            f" flip_dimension={str(_at(flip_dim, i)):5}"
+            f" new_entity={'set' if _at(ents_src, i) is not None else '-'}"
+        )
+    return "\n".join(lines)
+
+
+def _assert_copy_solved(
+    adapter: Any,
+    comp_names: list[str],
+    n_mates: int,
+    values_m: list[float],
+    rep: list[bool],
+    flip_dim: list[bool],
+    ents_src: list[Any],
+) -> None:
+    """Raise if the copy just made left any of ITS OWN mates unsolvable."""
+    new = new_mate_errors(adapter)
+    if not new:
+        return
+
+    _telemetry.event(
+        "cwm.copied_mate_error",
+        components=",".join(comp_names),
+        mates=n_mates,
+        errors=",".join(f"{n}={c}" for n, c in sorted(new.items())),
+    )
+
+    # The prose costs a full ForceRebuild3 -- affordable only because we are
+    # aborting anyway. Best-effort: a failure to read it must not swallow the
+    # error that matters, so the report degrades to codes rather than raising
+    # from inside the reporter.
+    try:
+        prose = mate_error_prose(adapter, sorted(new))
+    except Exception as exc:  # noqa: BLE001
+        prose = {}
+        _telemetry.warn(f"could not read SolidWorks mate-error prose: {exc!r}")
+
+    detail = []
+    for name, code in sorted(new.items()):
+        detail.append(f"  {name} -- {_ERR_NAMES.get(code, '?')}"
+                      f" (swFeatureError_e {code})")
+        text = prose.get(name)
+        if text:
+            detail.append(f"      SolidWorks: {text}")
+        state = _mate_state(adapter, name)
+        if state:
+            detail.append(f"      {state}")
+
+    raise RuntimeError(
+        f"CopyWithMates2 left {len(new)} copied mate(s) UNSOLVED -- copying"
+        f" {comp_names} across {n_mates} external-mate slot(s).\n"
+        + "\n".join(detail)
+        + "\n  slot arguments this call passed:\n"
+        + _slot_report(n_mates, values_m, rep, flip_dim, ents_src)
+        + f"\n    FlipAlignment: {[False] * n_mates} -- copy_with_mates does NOT"
+        " expose this argument; it is pinned False for every slot.\n"
+        "  Read the message above before assuming a slot-order bug: an"
+        " alignment complaint means the copy's mate is geometrically"
+        " unsatisfiable as authored, NOT mis-slotted. FlipDimension (which this"
+        " call DOES set) only picks which side of the dimension is measured --"
+        " it can never change the ALIGNMENT. When a repeat=False slot re-points"
+        " at a NewEntityToMateTo whose normal opposes the seed reference's, the"
+        " copied mate needs the FlipAlignment slot toggled, which means adding"
+        " that array to copy_with_mates."
+    )
+
+
 def component_mate_count(adapter: Any, name: str) -> int:
     """How many mates reference this component -- ONE ``IComponent2::GetMates``
     call (the API docs' own remedy for the slow mate-list iteration; the
@@ -229,6 +531,7 @@ def copy_with_mates(
     flips: list[bool] | None = None,
     repeat: list[bool] | None = None,
     new_entities: list[Any] | None = None,
+    assert_solved: bool = True,
 ) -> None:
     """One native-typed ``CopyWithMates2`` of the given component slice.
 
@@ -256,6 +559,16 @@ def copy_with_mates(
 
     The call's return value is IGNORED (it lies); the caller validates from
     the model (component-name diff, mate recount, poses, health).
+
+    ``assert_solved`` (default True) closes the copied-mate blind spot: this
+    path bypasses `_assembly._mate`, whose `_mate_hard_error` check fails loud on
+    every AUTHORED mate, so a copied mate SolidWorks refuses to solve would
+    otherwise surface only as the caller's downstream pose assert -- which blames
+    the slot map for what is really an unsolvable mate. Any NEW hard
+    `swFeatureError_e` this call introduces raises here instead, quoting
+    SolidWorks' own wording and dumping every slot argument passed. Cost is two
+    `GetWhatsWrong` reads per copy, ~20 ms each; the expensive prose fetch runs
+    on the FAILURE path only.
     """
     import pythoncom
     from win32com.client import VARIANT
@@ -270,14 +583,14 @@ def copy_with_mates(
     rep = list(repeat) if repeat is not None else [True] * n_mates
     ents_src = new_entities if new_entities is not None else [None] * n_mates
     ents = [e._oleobj_ if e is not None else None for e in ents_src]
+    flip_dim = list(flips) if flips is not None else [False] * n_mates
     args = (
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, raw),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, rep),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, ents),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, list(values_m)),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n_mates),
-        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL,
-                list(flips) if flips is not None else [False] * n_mates),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, flip_dim),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n_mates),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, [0] * n_mates),
     )
@@ -285,4 +598,10 @@ def copy_with_mates(
     # copy+solve must not read as an unsegmented gap in the trace.
     with _telemetry.span("assembly.copy_with_mates",
                          components=len(raw), mates=n_mates):
+        if assert_solved:
+            prime_mate_baseline(adapter)  # pre-existing faults are not ours
         adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
+        if not assert_solved:
+            return
+        _assert_copy_solved(adapter, comp_names, n_mates, list(values_m), rep,
+                            flip_dim, ents_src)
