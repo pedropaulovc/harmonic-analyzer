@@ -38,14 +38,14 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert "GREEN ENAMEL" not in notes
     assert "UOS" not in notes
     assert "MACHINE FROM SOLID STOCK" in notes
-    assert "442.00 +/-0.25 X 307.42 +/-0.25" in notes
-    assert "416.00 X 281.42" in notes
-    assert "372.00 X 237.42 CLEAR OPENING" in notes
+    assert "442.00 +/-0.25 X 272.00 +/-0.25" in notes
+    assert "416.00 X 246.00" in notes
+    assert "372.00 X 202.00 CLEAR OPENING" in notes
     assert "STRAIGHT INNER-RAIL-FACE SPACING ONLY" in notes
     assert "CORNER BOSSES INTRUDE" in notes
     assert "NO BLENDS OR" in notes
     assert "CHAMFERS AT BOSS/RAIL INTERSECTIONS" in notes
-    assert "394.00 X 259.42" in notes
+    assert "394.00 X 224.00" in notes
     assert "25.50 +0.05/0" in notes
     assert "POSITION <MOD-DIAM>0.20 A|B|C" in notes
     assert "MAX-MIN RADIAL WALL THICKNESS" in inspection_flat

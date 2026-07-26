@@ -62,7 +62,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "SEE PLAN" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'adapter, "Manufacturing Notes", 0.016, 0.100, char_height=0.0025' in source
     assert "pivot_center = _add_cone_axis_centerline(adapter, top)" in source
     assert "view.ModelToViewTransform" in source
     assert "view.GetVisibleEntities2" in source
@@ -152,6 +152,16 @@ def test_view_scales_are_explicit() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(1, 2)") == 2
     assert source.count("scale=(1, 3)") == 1
+
+
+def test_rederived_plate_layout_stays_inside_the_sheet_zones() -> None:
+    assert drawing.TOP_CENTER == (0.115, 0.195)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "callout_xy=(0.170, 0.135)" in source
+    assert "callout_xy=(0.175, 0.245)" in source
+    assert "frame_xy=(0.195, 0.190)" in source
+    assert "frame_xy=(0.285, 0.080)" in source
+    assert '"Manufacturing Notes", 0.016, 0.100, char_height=0.0025' in source
     assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
     assert (
         cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE

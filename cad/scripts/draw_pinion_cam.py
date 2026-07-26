@@ -18,7 +18,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -35,6 +35,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_limits import fit_limits
@@ -112,6 +113,34 @@ DIMENSION_CALLOUTS = {
     ),
     "BossCz": "A TO BOSS / TAP AXIS",
 }
+
+
+@_telemetry.traced("drawing.pinion_cam_front_end_scan")
+def _front_end_edge(view: Any) -> Any:
+    """Return the collar's real front circular edge at model Z=0."""
+    candidates: list[tuple[float, float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label="pinion-cam top edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        candidates.append((params[2], params[6], edge))
+    matches = [
+        edge
+        for center_z, radius, edge in candidates
+        if abs(center_z) <= 0.01 and abs(radius - CAM_OD / 2.0) <= 0.01
+    ]
+    if len(matches) != 1:
+        seen = [(round(z, 4), round(r, 4)) for z, r, _edge in candidates]
+        raise RuntimeError(
+            "pinion-cam top view expected one front OD edge at "
+            f"z=0 r={CAM_OD / 2.0:.3f} mm; found {len(matches)} from {seen}"
+        )
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -214,11 +243,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        edge_xy=front_face,
+        edge_entity=_front_end_edge(top),
         symbol_xy=(front_face_x - 0.018, TOP_CENTER[1] + 0.018),
         datum="A",
         label="cam front end face",
-        entity_type="SILHOUETTE",
     )
     # SolidWorks restricts this axis-attached tag and live readback normalizes
     # the requested sheet point by 2.846 mm.  Bound that annotation placement
@@ -247,7 +275,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum D attaches on the boss's LEFT flank, opposite the two position
     # frames on the right, so its leader unambiguously lands on the boss OD
     # rather than the tap/axis region (machinist round 1).
-    # Live readback normalizes the restricted tag by 2.409 mm; bound only that
+    # Live readback normalizes the restricted tag by 4.072 mm; bound only that
     # annotation-placement behavior while retaining the reviewed sheet point.
     add_datum_feature(
         adapter,
@@ -256,7 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.192, 0.170),
         datum="D",
         label="cam boss OD axis",
-        position_tolerance_m=0.0025,
+        position_tolerance_m=0.0041,
     )
     add_feature_control_frame(
         adapter,

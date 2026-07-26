@@ -68,7 +68,7 @@ SHEET_SCALE = (1.0, 3.0)   # 1:2 plan keeps the 266 mm envelope in-zone
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view; the
 # isometric and an end view occupy the open right-hand field.
-TOP_CENTER = (0.115, 0.210)
+TOP_CENTER = (0.115, 0.195)
 ISO_CENTER = (0.330, 0.175)
 END_CENTER = (0.330, 0.095)
 
@@ -294,14 +294,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         top,
-        callout_xy=(0.170, 0.200),
+        callout_xy=(0.170, 0.135),
         label="pivot-hole size",
         edge=pivot_edge,
     )
     add_native_hole_callout(
         adapter,
         top,
-        callout_xy=(0.175, 0.150),
+        callout_xy=(0.175, 0.245),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
@@ -336,7 +336,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.195, 0.245),
+        frame_xy=(0.195, 0.190),
         characteristic="straightness",
         tolerance="0.25",
         quantity="2X LONG STRAIGHT PLAN EDGES",
@@ -369,7 +369,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         end,
-        frame_xy=(0.360, 0.080),
+        frame_xy=(0.285, 0.080),
         characteristic="flatness",
         tolerance="0.10",
         quantity="DATUM A BROAD FACE",
@@ -388,7 +388,9 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=opposite_face_edge,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
+    add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.016, 0.100, char_height=0.0025
+    )
     add_property_linked_note(adapter, "Plan View Note", 0.190, 0.205)
     add_property_linked_note(adapter, "Isometric View Note", 0.290, 0.135)
     add_property_linked_note(adapter, "End View Note", 0.300, 0.125)

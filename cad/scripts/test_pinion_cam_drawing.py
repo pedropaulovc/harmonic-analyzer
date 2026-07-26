@@ -89,6 +89,8 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
 def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 4
+    assert "def _front_end_edge(" in source
+    assert "edge_entity=_front_end_edge(top)" in source
     assert source.count("add_feature_control_frame(") == 2
     assert (
         'symbol_xy=(0.085, 0.105),\n        datum="B",\n'
@@ -107,10 +109,10 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert (
         'symbol_xy=(0.192, 0.170),\n        datum="D",\n'
         '        label="cam boss OD axis",\n'
-        "        position_tolerance_m=0.0025,"
+        "        position_tolerance_m=0.0041,"
         in source
     )
-    assert source.count("position_tolerance_m=0.0025") == 1
+    assert source.count("position_tolerance_m=0.0041") == 1
     assert "set_basic_dimension(" in source
     assert 'datums=("A", "B", "C")' in source
     assert 'datums=("D",)' in source

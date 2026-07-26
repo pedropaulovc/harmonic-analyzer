@@ -82,6 +82,12 @@ def test_native_gdt_controls_crossbar_end_seats_and_hole() -> None:
     assert "characteristic=\"position\"" in source
     assert "characteristic=\"perpendicularity\"" in source
     assert "characteristic=\"parallelism\"" in source
+    assert "def _stud_hole_edge(" in source
+    assert "edge_entity=hole_edge" in source
+    assert "edge=hole_edge" in source
+    assert "frame_xy=(0.020, 0.235)" in source
+    assert 'label="stud-hole length location"' in source
+    assert "set_arc_endpoints_to_center(" in source
 
 
 def test_view_scales_are_explicit() -> None:

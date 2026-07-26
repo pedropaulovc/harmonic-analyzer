@@ -68,6 +68,12 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "CrankBossDia",
         "CrankBoreDia",
     }
+    assert drawing.FRONT_KEEP["CrankBossDia"][1] == (
+        drawing._front_y(drawing.CRANK_BORE_HEIGHT) + 0.018
+    )
+    assert drawing.FRONT_KEEP["CrankBoreDia"][1] == (
+        drawing._front_y(drawing.CRANK_BORE_HEIGHT) - 0.012
+    )
 
 
 def test_journal_axis_table_matches_the_inclined_v2_bore() -> None:
@@ -177,9 +183,10 @@ def test_native_datums_and_controls_are_present() -> None:
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
+    assert drawing.TOP_CENTER == (0.105, 0.235)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(1, 1)") == 2
-    assert source.count("scale=(1, 2)") == 1
+    assert source.count("scale=(1, 1)") == 1
+    assert source.count("scale=(1, 2)") == 2
 
 
 def test_bore_rim_com_scan_is_traced() -> None:
@@ -187,6 +194,18 @@ def test_bore_rim_com_scan_is_traced() -> None:
     assert (
         '@_telemetry.traced("drawing.bore_rim_scan")\n'
         "def _bore_rim_edge"
+    ) in source
+
+
+def test_inclined_journal_datum_uses_projected_axis_center() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "journal_center = model_point_in_view(" in source
+    assert "symbol_xy=(journal_center[0], journal_center[1] - 0.018)" in source
+    assert "position_tolerance_m=0.0009" in source
+    assert "frame_xy=(0.185, journal_center[1] - 0.023)" in source
+    assert (
+        '"UPPER PLAN SCALE 1:2 (+X RIGHT, +Z DOWN)",\n'
+        "        0.070,\n        0.263,"
     ) in source
 
 

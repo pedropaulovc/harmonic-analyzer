@@ -45,7 +45,7 @@ from _assembly import (
 from build_motion_study import (
     ANGLE, CH_SPRING, CT_SPRING, DISTANCE, SPRING_KCH, SPRING_KCT, _by_z_rank,
     _components, _entity_ref, _family, _find_one, _iter_mates, _k_helical,
-    _lone_real, _mate_value, _read_member, _sub_model, _suppress_named,
+    _lone_real, _read_member, _sub_model, _suppress_named,
 )
 
 # Part-local points ON each eye hole's circular edge (mm) -> arc_center -> centre.
@@ -164,25 +164,27 @@ RIM_EDGE_CANDIDATES = [[50.0, 0.0, 4.0], [50.0, 0.0, 8.0], [50.0, 0.0, -4.0],
 
 
 async def _suppress_pen_travel(adapter):
-    """Suppress the pen-rod Y-travel snapshot (the largest-value pen-rod DISTANCE
-    = the Top<->Top plane Y position; confirmed Distance12 via probe_pen_mates) so
-    the WIRE2 yoke can drag the pen freely in Y."""
+    """Suppress an explicitly authored transient pen-travel drive, if present.
+
+    Default-free ``pen.SLDASM`` has no Y-travel mate.  Its two remaining
+    pen-rod distance mates locate depth/across and must never be suppressed.
+    """
     from solidworks_mcp.adapters.base import SuppressMateParameters
     _, model = _sub_model(adapter, "pen-1")
-    best = (None, -1.0)
+    travel_name = None
     for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
         lone = _lone_real(parts, "pen")
         if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
             continue
-        val = _mate_value(adapter, mate, mtype) or 0.0
-        if val > best[1]:
-            best = (name, val)
-    if best[0] is None:
+        if name == "DRIVE_pen_travel":
+            travel_name = name
+            break
+    if travel_name is None:
         log("  pen-rod travel is already free (default-free artefact)")
         return
-    log(f"  suppress pen-rod Y-travel {best[0]}")
+    log(f"  suppress pen-rod Y-travel {travel_name}")
     check("suppress pen travel", await adapter.suppress_mate(
-        SuppressMateParameters(name=best[0], suppress=True, component="pen-1")))
+        SuppressMateParameters(name=travel_name, suppress=True, component="pen-1")))
 
 
 async def _rim_point(adapter, comps=None):

@@ -85,7 +85,7 @@ if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
 # pattern; the front elevation (1:4) shows the stepped stack; the hole
 # table sits upper-right and the notes fill the lower-left.  The plan runs at the
 # sheet's 1:2; only the 1:4 isometric carries a scale note.
-TOP_CENTER = (0.130, 0.170)
+TOP_CENTER = (0.130, 0.163)
 SIDE_CENTER = (0.345, 0.075)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -448,8 +448,10 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=top_pad_edge,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.078)
-    add_property_linked_note(adapter, "Side View Note", 0.235, 0.088)
+    add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025
+    )
+    add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)
 
     return await finalize_drawing(
         adapter,

@@ -59,8 +59,8 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # The side view sits high so the ~108 mm profile clears the wide manufacturing
 # note that anchors just above the title block.
 END_CENTER = (0.075, 0.190)
-SIDE_CENTER = (0.190, 0.200)
-ISO_CENTER = (0.315, 0.185)
+SIDE_CENTER = (0.190, 0.190)
+ISO_CENTER = (0.315, 0.175)
 
 _Y_MID = (HEAD_H - SHANK_LEN) / 2.0
 
@@ -144,7 +144,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # inserted and positioned to the right of the vertical profile.
     curate_view_dimensions(adapter, side, keep=SIDE_KEEP, view_label="side")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.115)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.105)
     add_property_linked_note(adapter, "End View Note", END_CENTER[0] - 0.020, 0.250)
 
     return await finalize_drawing(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -102,6 +103,18 @@ def test_view_scales_are_explicit() -> None:
     assert source.count("scale=(4, 1)") == 1  # enlarged end view
     assert source.count("scale=(1, 2)") == 1  # reduced pictorial
     assert drawing.END_VIEW_SCALE == 4.0
+
+
+def test_datum_symbol_requests_the_persisted_journal_boundary() -> None:
+    expected = (
+        drawing.SIDE_CENTER[0]
+        + drawing.SHAFT_LENGTH / 2000.0
+        - drawing.JOURNAL_END / 1000.0
+    )
+    assert math.isclose(expected, 0.237942430381, abs_tol=1e-12)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "symbol_xy=(big_end_x - JOURNAL_END / 1000.0, 0.252)" in source
+    assert "symbol_xy=(0.255, 0.242)" in source
     assert cone_gear_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
 
