@@ -28,6 +28,26 @@ Traps that cost 8 probe rounds — do not re-learn:
   TABLE-derived dims read 0.0 — pin expected cut diameters from the database
   dump instead (`TAP_DRILL_MM`/`CLEARANCE_MM`/`NUMBER_DRILL_MM` in _holes.py,
   regenerate with `diagnostics/diag_hole_wizard_tables.py`).
+- **A build log CANNOT settle a wizard diameter — only the DATABASE can
+  (2026-07-26).** `arbor_pedestal_spec.SCREW_CLEARANCE_DIA` flip-flopped
+  3.2512 ↔ 3.264 three times, each side citing a from-scratch build log
+  (`1x #4 clearance (Ø3.251)` vs `(Ø3.264)`) as a "live positive control", and
+  each flip broke `part:arbor_pedestal` for the other seat state — the guard
+  only surfaced it when a real rebuild replaced a remote-cache restore.
+  A log line echoes **whatever was cut**, so it cannot distinguish "the table
+  says so" from "we asked for the wrong row". `diag_hole_wizard_tables.py`
+  ended it in one run: the seat's Screw Clearances `#4` row is
+  `['#4', '0.116', '0.1285', '0.136', ...]` (close/normal/loose, INCHES), so
+  normal = 0.1285 in = **3.2639 mm**, matching `CLEARANCE_MM` and
+  `HoleSpec.fit`'s `"normal"` default. **3.2512 is not a `#4` entry at all —
+  it is exactly `("#3", "loose")` = 3.251**, i.e. a wrong-size/fit resolution,
+  never "the seat's table moved". When a cut diameter surprises you, dump the
+  table before touching a pin, and check the surprising value against the
+  WHOLE `CLEARANCE_MM` map — landing on another row's exact value is the tell.
+  Duplicated pins of table values now need a test tying them back to the
+  resolver (`_holes` can't be imported into pure-data spec modules without
+  dragging `_common`/`_telemetry` into the part's dependency closure and
+  re-keying it, so the gate lives in the test). See [[load-bearing-claims-need-a-repro]].
 - **Property knobs that actually work** (post-create `GetDefinition` →
   `AccessSelections(model, None)` → set → `ModifyDefinition(defn._oleobj_,
   model, null_callout())`): `CounterBoreDiameter/Depth`, `ThruHoleDiameter`,
