@@ -64,7 +64,7 @@ CONE_FACE down to 6.5 (annotated 7 mm faces would overlap 0.42): the
 book's annotated cone figures (face 7, pitch 7.5, stack 150) are
 mutually inconsistent with the photo-measured drum grid -- the drum
 grid wins (it anchors the gates and all channel machinery), and the
-150 mm annotation reconciles as gear stack 131.6 + 64T face 10 + air.
+150 mm annotation reconciles as gear stack 131.6 + 64T face 8 + air.
 Self-consistency: tan(cone half-angle) = 2.54/6.5839 = tan(i), so the
 cone's drum-side generator runs PARALLEL to the drum axis -- the p.18
 seam.
@@ -266,7 +266,10 @@ INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
 SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
 CONE_FACE = 6.5  # M6.7 mesh packing (annotated 7 -- build_cone_gear.py)
-GEAR64_FACE = 10.0
+GEAR64_FACE = 8.0
+# Preserve the rederived gear centre while narrowing both axial faces equally.
+# The 10 mm reference face is placement history, not current part geometry.
+GEAR64_CENTRE_REFERENCE_FACE = 10.0
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 PINION_FACE = 10.8  # re-derived 2026-07-14: fills the casting-face -> T120
 # span (0.32 wall / 0.30 T120 clearance, span-fit assert below); ch12
@@ -348,9 +351,12 @@ for _j in range(20):
     if abs(_p[0] - _x) > 1e-9 or abs(_p[2] - _z) > 1e-9:
         raise AssertionError(f"cone seat {_j} off the shaft line: {(_x, _z)} vs {_p}")
 
-# 64T crank-drive gear: perpendicular on the pivot journal, 0.1 air to
-# the T120 south face (p.20: directly beside).
-GEAR64_STATION = SHAFT_T120_STATION - (CONE_FACE + GEAR64_FACE) / 2.0 - 0.1  # 19.9
+# 64T crank-drive gear: perpendicular on the pivot journal, directly beside
+# T120 (p.20).  Its station remains the rederived 19.9 mm centre; narrowing
+# the face symmetrically increases the axial air to T120 and the post to 1.1 mm.
+GEAR64_STATION = (
+    SHAFT_T120_STATION - (CONE_FACE + GEAR64_CENTRE_REFERENCE_FACE) / 2.0 - 0.1
+)  # 19.9
 GEAR64_SEAT = cone_station(GEAR64_STATION + GEAR_AXIS_SHIFT)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
 R16 = (16.0 / DP_CRANK) * 25.4 / 2.0
@@ -471,10 +477,8 @@ ARBOR_PEDESTAL_Z = 90.5 - MECHANISM_Z_SHIFT
 # Its complete footing follows the translated cylinder/arbor family.
 ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
 # real machine's base-standing north clamp) -- the SAME casting rotated 180
-# about Y so its strap looks SOUTH at the drum: strap band z 89.5..99.5
-# (face 89.5), exposed flange band 99.5..105.5 carrying the foot screw at
-# z_c + 5 = 102.5. The foot (z_c +- 8 = 89.5..105.5) starts 0.6 north of the
-# rocker-arm-support's solid footprint (machine z to +88.9 at x 41..105).
+# about Y so its strap looks SOUTH at the drum.  After the fixed-post recenter
+# its foot spans z 92.588..108.588, still north of the unchanged rocker support.
 from build_arbor_pedestal import FOOT_DEPTH as ARBOR_PED_DEPTH  # noqa: E402
 # (also imported with the main block below; repeated here because these
 # asserts run before it)
@@ -482,8 +486,8 @@ from build_arbor_pedestal import FOOT_DEPTH as ARBOR_PED_DEPTH  # noqa: E402
 _ARBOR_NORTH = ARBOR_SOUTH_Z + ARBOR_LENGTH  # +132.415
 if (ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0) - 88.9 < 0.5:
     raise AssertionError("north pedestal foot reaches the rocker-support foot")
-_N_PED_FACE = ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0  # 124.915: the
-# south-looking strap face after the ry180
+_N_PED_FACE = ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0
+# south-looking strap face after the Ry180 installation
 if not 6.0 <= _ARBOR_NORTH - _N_PED_FACE <= ARBOR_PED_DEPTH - 4.0:
     raise AssertionError("arbor north engagement in the north pedestal out of band")
 
@@ -539,7 +543,7 @@ from build_cone_swing_platform import (  # noqa: E402
     HALF_WIDTH_N as PLAT_EAST_N,  # EAST taper line's north endpoint (12 --
     # the lock-slot side keeps its full seat; feeds the stop-screw/containment
     # east-edge math)
-    WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (9.5, the PR8
+    WEST_HALF_N as PLAT_WEST_N,  # WEST line's north endpoint (8.0, the
     # trim; feeds ONLY the west-edge pedestal scan. Aliasing it into the east
     # math shifted the derived stop point -- Codex catch, 2026-07-05)
     NORTH_OVERHANG as PLAT_OVERHANG,
@@ -730,8 +734,8 @@ if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
 
 def _plat_half_width(s: float) -> float:
     """Platform MIN half-width at cone station s: the narrower of the east
-    taper and the west flare (the PR8 west-tip trim makes the WEST side the
-    narrow one near the north end -- 9.5 vs 12); negative if s is off the
+    taper and the west flare (the west-tip trim makes the WEST side the
+    narrow one near the north end -- 8 vs 12); negative if s is off the
     plate. Riders are centred on the shaft plan line (local x 0), so the
     narrower side at each station bounds their containment."""
     z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
@@ -927,8 +931,8 @@ def _plate_local_to_machine(x_l: float, z_l: float) -> tuple[float, float]:
 # The platform is authored machine-handed (it was the "x0" pre-mirrored part
 # of the retired M6.8 scheme), so its exported local-x constants feed straight
 # through; z is untouched.
-KNOB_X, KNOB_Z = _plate_local_to_machine(PLAT_SLOT_E_X, PLAT_SLOT_E_Z)  # -96.98,
-# -87.60: the video's gap between the pivot post and the arbor pedestal
+KNOB_X, KNOB_Z = _plate_local_to_machine(PLAT_SLOT_E_X, PLAT_SLOT_E_Z)
+# (-92.563, -52.834): the video's gap between the pivot post and pedestal
 if PLAT_SLOT_W - KNOB_STUD_DIA < 0.5:
     raise AssertionError("lock stud has <0.5 clearance in the platform notch")
 # The plate's crank-anchor point (CrankAxisSeat's anchor, on the plate's
@@ -1015,36 +1019,50 @@ if _WASHER_POST_GAP < 2.0:
     raise AssertionError(
         f"lock knob washer within {_WASHER_POST_GAP:.2f} of the pivot post "
         f"foot (needs >= 2.0)")
-# Plate WEST edge (the flare) vs BOTH arbor-pedestal blocks: sample the edge
-# along its run and check each machine point against each block's east flank
-# band (the old lobe-corner check generalised to the flared edge; the north
-# pedestal joined in PR8).
+# Plate WEST edge (the flare) vs BOTH arbor-pedestal blocks.  The edge and its
+# engaged placement are linear, so solve the exact local interval crossing
+# each pedestal z band; a coarse sample previously stepped over the 0.93 mm
+# north-pedestal overlap that the SolidWorks interference gate found.
 _K_W = (PLAT_WEST_S - PLAT_WEST_N) / PLAT_LEN
-_ARB_E_X = X_DRUM - ARBOR_PED_WIDTH / 2.0  # -66.7: pedestal EAST flank
+_ARB_E_X = X_DRUM - ARBOR_PED_WIDTH / 2.0  # plate-facing pedestal flank
 _ARB_Z_BANDS = (
-    # (band, min gap): the SOUTH pedestal keeps the 2.0 design margin; the
-    # NORTH one runs at 0.5 -- ch12 img09 shows the real clamp hugging the
-    # plate's flared edge (actual minimum 0.68 here), and the p1 DISENGAGE swing
-    # sweeps the plate EAST, away from the pedestal, so the authored pose is
-    # already the closest approach. The interference gate owns the contact
-    # proof either way.
+    # (band, min gap): the SOUTH pedestal keeps the 2.0 design margin.  The
+    # NORTH one runs at the repository's 0.25 mm interference-design floor;
+    # ch12 img09 shows the real clamp hugging the plate edge, and the p1 swing
+    # moves the plate away from it.
     ((-ARBOR_PEDESTAL_Z - ARBOR_PED_DEPTH / 2.0,
       -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0), 2.0),  # -63.085..-47.085
     ((ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0,
-      ARBOR_PEDESTAL_NORTH_Z + ARBOR_PED_DEPTH / 2.0), 0.5),  # 124.915..140.915
+      ARBOR_PEDESTAL_NORTH_Z + ARBOR_PED_DEPTH / 2.0), 0.25),
 )
-for _step in range(0, 43):
-    _zl = PLAT_OVERHANG - PLAT_LEN + 5.0 * _step  # south edge -> north
-    _xw = PLAT_WEST_N + _K_W * (PLAT_OVERHANG - _zl)  # west half-width (local +x)
-    _cx, _cz = _plate_local_to_machine(_xw, _zl)
-    for _ARB_Z, _min_gap in _ARB_Z_BANDS:
-        _gap = _ARB_E_X - _cx if _ARB_Z[0] - 2.0 <= _cz <= _ARB_Z[1] + 2.0 \
-            else math.hypot(max(0.0, _cx - _ARB_E_X),
-                            min(abs(_cz - _ARB_Z[0]), abs(_cz - _ARB_Z[1])))
-        if _gap < _min_gap:
-            raise AssertionError(
-                f"swing-plate west edge (z_l {_zl:.0f}) within {_gap:.2f} of "
-                f"an arbor-pedestal block (needs >= {_min_gap})")
+_EDGE_X_INTERCEPT = PLAT_WEST_N + _K_W * PLAT_OVERHANG
+_EDGE_WORLD_Z_BASE = _PPIVOT[2] - _EDGE_X_INTERCEPT * SIN_I
+_EDGE_WORLD_Z_SLOPE = COS_I + _K_W * SIN_I
+_EDGE_WORLD_X_BASE = _PPIVOT[0] + _EDGE_X_INTERCEPT * COS_I
+_EDGE_WORLD_X_SLOPE = SIN_I - _K_W * COS_I
+_EDGE_LOCAL_Z_MIN = PLAT_OVERHANG - PLAT_LEN
+_EDGE_LOCAL_Z_MAX = PLAT_OVERHANG
+for _ARB_Z, _min_gap in _ARB_Z_BANDS:
+    _zl0 = max(
+        _EDGE_LOCAL_Z_MIN,
+        (_ARB_Z[0] - _EDGE_WORLD_Z_BASE) / _EDGE_WORLD_Z_SLOPE,
+    )
+    _zl1 = min(
+        _EDGE_LOCAL_Z_MAX,
+        (_ARB_Z[1] - _EDGE_WORLD_Z_BASE) / _EDGE_WORLD_Z_SLOPE,
+    )
+    if _zl1 < _zl0:
+        continue
+    _closest_x = max(
+        _EDGE_WORLD_X_BASE + _EDGE_WORLD_X_SLOPE * _zl0,
+        _EDGE_WORLD_X_BASE + _EDGE_WORLD_X_SLOPE * _zl1,
+    )
+    _gap = _ARB_E_X - _closest_x
+    if _gap < _min_gap:
+        raise AssertionError(
+            f"swing-plate west edge within {_gap:.3f} mm of an arbor-pedestal "
+            f"block over world z {_ARB_Z} (needs >= {_min_gap})"
+        )
 
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The ch30 GT proves the zeroing rig is on the machine (tee handle triangulates

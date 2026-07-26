@@ -50,7 +50,7 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
         assert field in data, field
     assert "64" in data
     assert spec.HELIX_ANGLE_DEG == pytest.approx(part.HELIX_DEG, abs=0.01)
-    assert spec.TOTAL_TWIST_DEG == pytest.approx(3.86, abs=0.01)
+    assert spec.TOTAL_TWIST_DEG == pytest.approx(3.09, abs=0.01)
     assert spec.ROOT_DIA == pytest.approx(
         (part.TEETH / part.DP - 2.0 * 1.157 / part.DP) * spec.MM_PER_IN
     )

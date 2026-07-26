@@ -25,7 +25,7 @@ HELIX_ANGLE_DEG = 12.0            # recentered crossed-axis accommodation
 BACKLASH_MM = 0.15
 
 BORE_DIA = 0.375 * MM_PER_IN       # 9.525 (3/8" cone-shaft journal)
-FACE_WIDTH = 10.0
+FACE_WIDTH = 8.0
 TOTAL_TWIST_DEG = math.degrees(
     FACE_WIDTH * math.tan(math.radians(HELIX_ANGLE_DEG)) / (PITCH_DIA / 2.0)
 )

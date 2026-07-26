@@ -11,7 +11,7 @@ grows with distance from the pivot, so pivoting at the TIP gives the
 big-end gears the largest throw.
 
 Plan shape is the p.18 wedge, ASYMMETRIC about the shaft line: the east
-side tapers 12 -> 24 half-width, the west side flares 9.5 -> 37 so the
+side tapers 12 -> 24 half-width, the west side flares 8 -> 37 so the
 run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
 protrusion); the open LOCK NOTCH cuts straight into the west edge. The
 four plan corners are rounded, echoing the hardware each sits beside
@@ -90,10 +90,9 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
 PLATE_T = PLATE_THICKNESS  # 1/4" plate
 HALF_WIDTH_N = 12.0  # north (pivot/tip) half-width, EAST side (the lock-slot
 # region keeps its full seat)
-WEST_HALF_N = 9.5  # north half-width, WEST side (PR8: trimmed 12 -> 9.5 so
-# the flared west edge clears the NORTH arbor pedestal at z 89.5..105.5 --
-# 12 put the plate corner-touching the clamp's east flank; ch12 img09 shows
-# the real plate narrow at the tip with the clamp hugging its edge)
+WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
+# pedestal otherwise clips the flared edge; 8.0 leaves 0.37 mm exact plan
+# clearance while retaining the close photo relationship in ch12 img09.
 EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
 WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
 # the pivot -> lock-knob line solid plate (covers the notch seat + washer)
@@ -169,8 +168,11 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 # at the engaged pose -- every west-side feature below (the flare, the lock
 # notch) is authored at local +x, east-side features at local -x.
 SLOT_W = 8.0  # notch width: O6.35 stud + chord-vs-arc slack (see above)
-SLOT_E_X, SLOT_E_Z = 24.5, -190.1  # engaged stud centre (part-local frame)
-SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)  # 191.67 about the swing pivot
+SLOT_E_X, SLOT_E_Z = 27.5, -190.1  # engaged stud centre (part-local frame).
+# An exact rotating-solid sweep against T114 proves this 3 mm outward move
+# clears the cone gear through a full tooth pitch while retaining the notch
+# seat on the west flare.
+SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)  # 192.079 about the swing pivot
 # The plate swings toward disengage (big end away from the drum), so in PLATE
 # coords the fixed stud sweeps the INVERSE rotation: unit direction (-z, x)/R
 # at E -- outward toward the west edge (+x), slightly north (+z).
@@ -178,7 +180,7 @@ _SLOT_TX, _SLOT_TZ = -SLOT_E_Z / SLOT_R, SLOT_E_X / SLOT_R
 
 
 def _west_edge_x(z_local: float) -> float:
-    """Authored x of the west taper edge at local z (linear 9.5 -> 37)."""
+    """Authored x of the west taper edge at local z (linear 8 -> 37)."""
     return WEST_HALF_N + (WEST_HALF_S - WEST_HALF_N) * (
         NORTH_OVERHANG - z_local) / PLATE_LEN
 
@@ -193,7 +195,7 @@ def _chord_exit_travel(x0: float, z0: float) -> float:
 # Stud travel (in plate coords) from the engaged seat to the mouth. Past this
 # the stud is OUT of the plate; the assembly derives the disengaged pose
 # (edge clear of the knob washer, DISENGAGE_DEG) from it.
-NOTCH_EXIT_TRAVEL = _chord_exit_travel(SLOT_E_X, SLOT_E_Z)  # 10.46
+NOTCH_EXIT_TRAVEL = _chord_exit_travel(SLOT_E_X, SLOT_E_Z)
 _MOUTH_OVERSHOOT = 4.0  # cut ends past the edge so the mouth opens clean
 _SLOT_OUT_X = SLOT_E_X + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TX
 _SLOT_OUT_Z = SLOT_E_Z + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TZ

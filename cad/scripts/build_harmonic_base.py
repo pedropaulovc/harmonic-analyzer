@@ -115,7 +115,7 @@ PIVOT_SCREW_XZ = (
 )
 # pivot seat: blind #10-24 UNC-2B tap.  The screw's ground shoulder stops on
 # the base top; only its distinct threaded tail enters this seat.
-_FORMER_STOP_SCREW_XZ = (-128.84976346326022, 8.739805835063942)
+_FORMER_STOP_SCREW_XZ = (-127.16504133403544, 7.882755974036954)
 STOP_SCREW_XZ = (
     _FORMER_STOP_SCREW_XZ[0] + POST_X_SHIFT,
     _FORMER_STOP_SCREW_XZ[1] + POST_Z_SHIFT,
@@ -123,10 +123,10 @@ STOP_SCREW_XZ = (
 # Past the DISENGAGED east taper edge, one O3.15 stop-shank radius outward.
 # The v2-post cascade lengthened/widened the platform to 266 / east-half 24,
 # which changes BOTH contributors in the drive-train derivation: the shallower
-# west taper shortens notch exit travel to 5.350066, hence disengage to
-# 4.887456 deg, while the contact line at local z -105 now has east half-width
-# 17.052632.  The exact formula is reproduced by the offline base drawing test;
-# it also proves 8.9518 mm signed clearance in the engaged pose.
+# west taper and outward lock seat shorten notch exit travel to 1.977850,
+# hence disengage to 3.871203 deg, while the contact line at local z -105 has
+# east half-width 17.052632.  The exact formula is reproduced by the offline
+# base drawing test and guards the engaged-pose clearance.
 # Disengage swing sweeps the plate EAST (machine -x); the first
 # derivation sat 19 inside the engaged plate -- interference-gate proven.
 # stop seat: #20 drill (O4.089, wizard) -- stop-screw O3.15 shank clearance

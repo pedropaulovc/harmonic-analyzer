@@ -271,7 +271,7 @@ sections:
       - - Cone set axial length
         - 150 mm
         - '5.91'
-        - photo callout p.18; with the finer DP 49.82 module the gear stack shrank to 19 × 6.889 + 6.5 ≈ 137.4 mm (+ 64T face 10 + air) — the 150 arrow no longer matches cleanly and is flagged (the annotated 7/7.5/150 trio was already inconsistent with the drum grid)
+        - photo callout p.18; with the finer DP 49.82 module the gear stack shrank to 19 × 6.889 + 6.5 ≈ 137.4 mm (+ 64T face 8 + air) — the 150 arrow no longer matches cleanly and is flagged (the annotated 7/7.5/150 trio was already inconsistent with the drum grid)
         - annotated
         - high
       - - Gear count
@@ -525,8 +525,8 @@ sections:
         - 'M6.7: a perpendicular gear''s contact tooth sits r·sin i along-shaft south of its centre, so each centre rides r_j·sin i NORTH of its drum plane. The +55 ± 5 photo blob NO LONGER agrees in x (the smaller cone pulled the big-end inboard to +13.9) — flagged consequence of the 62.2 anchor'
         - low
       - - 64T drive gear
-        - perpendicular on the 3/8" pivot journal at effective shaft station −13.215, centre (x, z) = (−123.552, −65.533), 0.1 air to the T120 south face
-        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the recentered v2 crank-axis c2c; contact-row centre z = −64.560 and the gear face retains 0.681 mm axial air to the post boss
+        - perpendicular on the 3/8" pivot journal at effective shaft station −13.215, centre (x, z) = (−123.552, −65.533), 8 mm face with 1.1 mm axial air to the T120 south face
+        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the recentered v2 crank-axis c2c and the rederived centre is unchanged. The low-confidence face-width proportion narrows symmetrically 10 → 8 mm; an exact SolidWorks full-pitch phase sweep proves both the 16T mesh and fixed-post clearance.
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −84.702 − (30.59 − 1.5295j)·cos i, z_j = −31.685 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 90.518; ALL 20 perpendicular to the shaft (true cone, p.18)
@@ -569,8 +569,8 @@ sections:
         - ch30 GT (cyl_front); shape from still t00393 / v4_pinion_008 (base:top taper ~1.2, scaled off the 120T OD 62.2)
         - med (GT height; shape photo-scaled)
       - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
-        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 east / 9.5 west (north, pivot) → east 24 / west 37 (south, big end) over 266 along the cone axis; two native 1/4-20 UNC-2B through taps match the post''s 26.887 attachment pitch; the west flare makes the pivot → lock-knob line SOLID plate; plan corners remain NE R10 / NW R8 / SW R10 / SE R12; Ø6.756 close-clearance pivot hole rides the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch remains at the R191.7 swing chord; carries the part-local crank-axis reference 51.132 east of the pivot and 79.05 above the plate bottom (installed X_CRANK −129.336, Y_CRANK 129.85); plate top remains y 57.15'
-        - 'FLOATED, pivot at cone station 196 = (−78.205, +138.708) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft, tip block and crank rig all ride it. The p1 disengage DOF remains FREE by default and sweeps 4.887°. The complete carrier translates (+1.484 X, +35.415 Z); the base preserves its front edge and extends only at the rear, so the swept carrier and load centres are now contained by the asymmetric top pad without the retired 25-mm cantilever allowance.'
+        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 east / 8 west (north, pivot) → east 24 / west 37 (south, big end) over 266 along the cone axis; two native 1/4-20 UNC-2B through taps match the post''s 26.887 attachment pitch; the north-west trim leaves 0.370 mm exact plan clearance to the recentered north arbor pedestal; plan corners remain NE R10 / NW R8 / SW R10 / SE R12; Ø6.756 close-clearance pivot hole rides the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch remains at the R192.1 swing chord; carries the part-local crank-axis reference 51.132 east of the pivot and 79.05 above the plate bottom (installed X_CRANK −129.336, Y_CRANK 129.85); plate top remains y 57.15'
+        - 'FLOATED, pivot at cone station 196 = (−78.205, +138.708) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft, tip block and crank rig all ride it. The p1 disengage DOF remains FREE by default and sweeps 3.871°. The post and carrier retain their rederived world placement; only the working cone/cylinder/channel family is recentered along the unchanged cone-bore line. The base preserves its front edge and extends only at the rear.'
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; v2 envelope/mount cascade from cone-pivot-post-v2.SLDPRT, whose height was manually rederived from ch30 Eight Views image 2 (page003_img01.png) and whose proportions follow ch11 page002_img05.jpeg / page002_img06.jpeg
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
@@ -585,7 +585,7 @@ sections:
         - med (GT-anchored)
       - - '`cone-lock-knob` (clamps the swing plate engaged/disengaged)'
         - chromed steel thumb knob — washer flange Ø18 × 1.5 seating on the plate top, one straight body Ø13 to 13.5 crowned by an R5 dome fillet (Ø3 apex flat), Ø6.35 clamp stud dropping through the plate's lock notch, ending FLUSH with the base top (thread engagement into the base unmodeled — the pedestal-bolt precedent)
-        - 'base-bolted STATIC at (+96.98, −87.60), washer seat y 57.15 — the video''s gap between the pivot post and the arbor pedestal; the PLATE is the mover: loosen and its open notch sweeps the stationary stud 5.350 to the mouth, then swings clear (4.887° total after the 266-long v2 platform cascade — the bolt stands past the plate edge, v4_t00417); screwed down with no plate under it the washer fences the mouth = locked DISENGAGED ("Unscrewing this knob allows the cone gear set to swing away", v4 6:48)'
+        - 'base-bolted STATIC at (−92.563, −52.834), washer seat y 57.15 — the video''s gap between the pivot post and the arbor pedestal; the PLATE is the mover: loosen and its open notch sweeps the stationary stud 1.978 to the mouth, then swings clear (3.871° total after the outward 27.5-mm notch-seat cascade — the bolt stands past the plate edge, v4_t00417); screwed down with no plate under it the washer fences the mouth = locked DISENGAGED ("Unscrewing this knob allows the cone gear set to swing away", v4 6:48)'
         - v4_t00411 ("knob" label) + v4_t00417 top view; ch12 p.16 text; dims photo-scaled vs the Ø24 post foot
         - med (role high, dims low)
       - - '`cone-pivot-screw` (the physical p1 pivot pin)'
@@ -595,7 +595,7 @@ sections:
         - med (role high, dims low)
       - - '`swing-stop-screw` (p1 travel limit)'
         - slotted screw — Ø4 shank, 6 embedded into the base + 8 proud (covering the 6.35 plate band), head Ø8 × 2.5 on top
-        - 'base-threaded STATIC at (−128.850, +8.740), derived so the 266-long plate''s EAST taper edge just touches the shank flank at the 4.887° disengaged swing — the disengage swing sweeps the plate EAST (the sense that walks the knob stud out the notch mouth), so the east edge is the one that advances onto the stop; 8.952 signed clearance to the ENGAGED edge (offline-derived and asserted against the base''s hardcoded hole; the first WEST-side derivation sat 19 inside the engaged plate — interference-gate caught)'
+        - 'base-threaded STATIC at (−125.681, +43.298), derived so the 266-long plate''s EAST taper edge just touches the shank flank at the 3.871° disengaged swing — the disengage swing sweeps the plate EAST (the sense that walks the knob stud out the notch mouth), so the east edge is the one that advances onto the stop; 7.102 mm signed clearance to the ENGAGED edge (offline-derived and asserted against the base''s hardcoded hole; the first WEST-side derivation sat 19 mm inside the engaged plate — interference-gate caught)'
         - user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry
         - med (role high, dims low)
       - - '`cone-tip-bushing` (T006 spacer on the tip stub)'

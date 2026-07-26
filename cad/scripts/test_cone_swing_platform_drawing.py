@@ -39,12 +39,12 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "LOCK NOTCH" in notes
     assert "PIVOT HOLE SIZE PER PLAN-VIEW CALLOUT" in notes
     assert "AXIS PERPENDICULARITY TO A: SEE FCF" in notes
-    assert "24.50 +/-0.10 WEST AND 190.10 +/-0.10 SOUTH" in notes
+    assert "27.50 +/-0.10 WEST AND 190.10 +/-0.10 SOUTH" in notes
     assert "2X 1/4-20 UNC-2B THRU" in notes
     assert "235.901 +/-0.10 SOUTH OF PIVOT" in notes
     assert "26.887" in notes
     assert "12.5182 +/-0.10 DEG NORTH OF WEST" in notes
-    assert "7.35 +/-0.10 DEG NORTH" in notes
+    assert "8.23 +/-0.10 DEG NORTH" in notes
     assert "FULL-R CLOSED END (R4.000 REF)" in notes
     assert "VIRTUAL-SHARP INTERSECTIONS" in notes
     assert "DATUM B IS THE" in notes
@@ -108,7 +108,9 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
 
 def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     assert part.PLATE_LEN == 266.0
+    assert part.WEST_HALF_N == 8.0
     assert part.EAST_HALF_S == 24.0
+    assert part.SLOT_E_X == 27.5
     assert part.POST_STATION == -39.90136099793
     assert part.PIVOT_STATION == 196.0
     assert math.isclose(part.POST_LOCAL_Z, -235.90136099793, abs_tol=1e-12)

@@ -139,8 +139,8 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         103.292512276 + POST_Z_SHIFT,
     )
     assert part.STOP_SCREW_XZ == (
-        -128.84976346326022 + POST_X_SHIFT,
-        8.739805835063942 + POST_Z_SHIFT,
+        -127.16504133403544 + POST_X_SHIFT,
+        7.882755974036954 + POST_Z_SHIFT,
     )
     east_slope = (
         platform.EAST_HALF_S - platform.HALF_WIDTH_N
@@ -168,8 +168,8 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         contact_z + normal_z * STOP_SHANK_DIA / 2.0,
     )
 
-    assert math.isclose(platform.NOTCH_EXIT_TRAVEL, 5.350066257823344)
-    assert math.isclose(math.degrees(disengage_rad), 4.887455966852316)
+    assert math.isclose(platform.NOTCH_EXIT_TRAVEL, 1.9778497018812349)
+    assert math.isclose(math.degrees(disengage_rad), 3.8712032227632633)
     assert math.isclose(derived[0], part.STOP_SCREW_XZ[0], abs_tol=1e-12)
     assert math.isclose(derived[1], part.STOP_SCREW_XZ[1], abs_tol=1e-12)
 
@@ -191,7 +191,7 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         - STOP_SHANK_DIA / 2.0
     )
     assert engaged_gap >= 2.0
-    assert math.isclose(engaged_gap, 8.951797639575082)
+    assert math.isclose(engaged_gap, 7.101970902077434)
 
 
 def test_v2_structural_holes_follow_the_same_installation_delta() -> None:

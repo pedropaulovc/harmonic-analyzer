@@ -75,7 +75,8 @@ MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass trai
 TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
 PA_DEG = 14.5
-FACE_WIDTH = 10.0  # mm, p.20 -- wider than the 7 mm cone faces (low)
+FACE_WIDTH = 8.0  # mm, p.20 photo-proportioned (low).  Symmetric narrowing
+# retains the rederived centre/mesh axes and clears the fixed v2 post boss.
 # M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal
 # like the cone gears (true cone, p.20).
 BORE_DIAMETER = 0.375 * IN  # snug on the 3/8" journal
