@@ -159,6 +159,10 @@ SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 # download) and STORE (upload) run OUTSIDE the lock, so cache hits stay fully
 # parallel and a publish never holds the seat. The SolidWorks-free ``check:*`` tasks
 # never call ``_com_seat``, so they fan out under ``-n``.
+#
+# Waiting for the seat is QUEUEING, not work, so it is DISCOUNTED from the enclosing
+# ``task <label>`` span (see ``_com_seat``): a task's span duration times its build,
+# not how contended the machine was when it ran.
 def _com_lock_path() -> Path:
     override = os.environ.get("HARMONIC_COM_LOCK")
     if override:
@@ -212,23 +216,45 @@ def _com_seat(label: str):
     process's environment (inherited by the COM subprocess) so a COM build launched
     WITHOUT the seat trips ``_common``'s guard loud -- the runtime successor to the
     removed ``_assert_spine_complete`` tripwire. Reentrancy-safe (``filelock`` counts
-    same-process acquisitions), though no COM action nests it."""
+    same-process acquisitions), though no COM action nests it.
+
+    **The wait gets its OWN top-level span, and the ``task <label>`` span starts once
+    the seat is HELD** -- the two are siblings, never nested. Blocking on the seat is
+    queueing, not work: inside the task span it made a duration report how contended
+    the machine was (the same part reads 40 s on an idle seat and 20 min behind a cold
+    assembly build), skewing every cross-run comparison and the watchdog calibration
+    read off ``traces.jsonl``. Splitting keeps BOTH numbers exact and each in the
+    signal it belongs to -- ``com.seat.wait <label>`` times the queue, ``task
+    <label>`` times the work -- with no timestamp surgery on a live span (an earlier
+    cut moved the task span's start forward instead; that is not a spec'd operation,
+    and it left the pre-wait cache events dangling before their own span's start).
+    Callers get the wait handed back so the task span can still carry it as a
+    ``seat_wait_s`` attribute, and release logs the seat's TOTAL elapsed time.
+
+    Yields the seconds spent blocked (0.0 when the seat was free)."""
     _COM_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     holder = f"{label} pid={os.getpid()}"
-    while True:
-        try:
-            _COM_LOCK.acquire(timeout=_COM_SEAT_POLL_S)
-            break
-        except Timeout:
-            other = _read_seat_holder()
-            _telemetry.warn(f"[com.seat] {label} waiting for the SolidWorks seat"
-                            + (f" (held by {other})" if other else ""))
+    entered = time.monotonic()
+    with _telemetry.span(f"com.seat.wait {label}", label=label,
+                        service=_telemetry.BUILD_INFRA_SERVICE) as wait_span:
+        polls = 0
+        while True:
+            try:
+                _COM_LOCK.acquire(timeout=_COM_SEAT_POLL_S)
+                break
+            except Timeout:
+                polls += 1
+                other = _read_seat_holder()
+                _telemetry.warn(f"[com.seat] {label} waiting for the SolidWorks seat"
+                                + (f" (held by {other})" if other else ""))
+        acquired = time.monotonic()
+        waited = acquired - entered
+        wait_span.set_attribute("polls", polls)
     _write_seat_holder(holder)
     prev = os.environ.get(_COM_SEAT_HELD_ENV)
     os.environ[_COM_SEAT_HELD_ENV] = holder
-    _telemetry.event("com.seat.acquired", label=label)
     try:
-        yield
+        yield waited
     finally:
         if prev is None:
             os.environ.pop(_COM_SEAT_HELD_ENV, None)
@@ -236,6 +262,24 @@ def _com_seat(label: str):
             os.environ[_COM_SEAT_HELD_ENV] = prev
         _clear_seat_holder(holder)
         _COM_LOCK.release()
+        released = time.monotonic()
+        # The task span has already closed here (the seat outlives it), so there is no
+        # span to hang an event on: the seat's TOTAL elapsed time is a log record,
+        # queryable in logs.jsonl by its structured fields.
+        _telemetry.info(
+            f"[com.seat] {label} released after {released - entered:.1f}s total "
+            f"(waited {waited:.1f}s, held {released - acquired:.1f}s)",
+            wait_s=round(waited, 2), held_s=round(released - acquired, 2),
+            elapsed_s=round(released - entered, 2))
+
+
+def _tag_seat_wait(span, waited: float | None) -> None:
+    """Carry the seat wait onto the task span, so "how long did this task queue?"
+    is answerable from the task span alone (its sibling ``com.seat.wait`` span holds
+    the same number as its duration). ``None`` = no seat was taken (a ``check:*``
+    gate, or a test stubbing ``_com_seat``)."""
+    if waited is not None:
+        span.set_attribute("seat_wait_s", round(waited, 2))
 
 # Drawing tasks declare only their source model as CAD input, while their code
 # recipe follows the exporter's complete repo-local import closure and the full
@@ -497,7 +541,15 @@ def _stage_name(label: str) -> str:
     -- part-build / assembly-build / verify-<suite> / check-<gate> / export / release
     -- instead of every process reading the same umbrella name. Injected into the
     child env as ``OTEL_SERVICE_NAME`` (the standard OTel var) by :func:`_exec`, so
-    the child is labelled the moment it imports ``_telemetry``."""
+    the child is labelled the moment it imports ``_telemetry``.
+
+    The PARENT-side ``task <label>`` span uses it too (via ``service=`` on
+    ``_telemetry.span``), so a task and the subprocess it spawns share one resource
+    instead of the task span reading the umbrella name while its own children read
+    the stage. What is left on the umbrella is only what genuinely has no stage --
+    and the seat/cache phases have their own ``build-infra`` resource -- so
+    ``harmonic-analyzer`` is now a namespace and a fallback, not a span label.
+    A label this does not map (the fallback below) simply keeps the umbrella."""
     if label.startswith("part:"):
         return "part-build"
     if label.startswith(("assembly:", "FULL build", "REFRESH", "hook ")):
@@ -565,10 +617,14 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None,
 
     ``com=True`` marks a SolidWorks-touching task: the subprocess runs holding the
     single COM seat (``_com_seat``), so it is serialized against every other COM task
-    on the machine. SolidWorks-free tasks (the ``check:*`` gates) pass ``com=False``
-    and never take the lock, so they fan out under ``-n``."""
-    with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd)):
-        with (_com_seat(label) if com else contextlib.nullcontext()):
+    on the machine. The seat is acquired OUTSIDE this span -- its wait is a sibling
+    ``com.seat.wait <label>`` span -- so ``task <label>`` starts once the seat is held
+    and its duration is the task's own work. SolidWorks-free tasks (the ``check:*``
+    gates) pass ``com=False`` and never take the lock, so they fan out under ``-n``."""
+    with (_com_seat(label) if com else contextlib.nullcontext()) as waited:
+        with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd),
+                             service=_stage_name(label)) as sp:
+            _tag_seat_wait(sp, waited)
             _exec(cmd, label, log_stem)
 
 
@@ -1089,26 +1145,37 @@ def _cached_drawing_action(stem: str) -> None:
 
     Mirrors the part/assembly cache contract exactly: HIT always skips COM work;
     MISS takes the seat, re-probes after any wait, builds once, then stores outside
-    the seat. The task span and console therefore state one unambiguous disposition.
+    the seat. The spans and console therefore state one unambiguous disposition.
     """
     spec = DRAWINGS_BY_NAME[stem]
     label = f"drawing:{stem}"
     cmd = [sys.executable, str(spec.script.resolve()), spec.artifact_stem]
-    with _telemetry.span(f"task {label}", label=label) as sp:
+    outputs = _drawing_cache_outputs(stem)
+    with _telemetry.span(f"cache.probe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
         key = _cache_key(_drawing_file_deps(stem), label)
-        outputs = _drawing_cache_outputs(stem)
         if _cache.restore(key, outputs, label):
-            sp.set_attribute("cache", "hit")
+            probe.set_attribute("cache", "hit")
             return
+        probe.set_attribute("cache", "miss")
 
-        with _com_seat(label):
+    with _com_seat(label) as waited:
+        with _telemetry.span(f"cache.reprobe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
             if _cache.restore(key, outputs, label):
-                sp.set_attribute("cache", "hit-after-wait")
+                reprobe.set_attribute("cache", "hit-after-wait")
                 return
+            reprobe.set_attribute("cache", "miss")
+
+        with _telemetry.span(f"task {label}", label=label,
+                             service=_stage_name(label)) as sp:
+            _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _exec(cmd, label, log_stem=f"drawing-{stem}")
 
-        _cache.store(key, _drawing_cache_outputs(stem), label)
+    with _telemetry.span(f"cache.store {label}", label=label,
+                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
+        store.set_attribute("cache", _cache.store(key, _drawing_cache_outputs(stem), label))
 
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
@@ -1152,34 +1219,51 @@ def _cached_part_action(stem: str, script: Path) -> None:
     are downloaded and the SolidWorks build is skipped; otherwise build, then push.
     Falls through to a normal build whenever the cache is off or errors.
 
-    Opens the ``task part:<stem>`` span HERE (rather than in _run) so the cache
-    decision and the build it gates share ONE trace: the restore/store record
-    ``cache.hit``/``cache.miss``/``cache.store`` events on this span and a ``cache``
-    attribute, so a miss (and why the build ran) is backtraceable from the trace,
-    not just the console -- and a HIT still shows a (fast) task span instead of the
-    task vanishing from the trace entirely."""
+    Opens its OWN spans HERE (rather than in _run) so every phase of the task is
+    timed for what it is, and each carries the ``cache`` disposition + ``label``:
+    ``cache.probe part:<stem>`` (the restore attempt -- on a HIT this IS the task,
+    an Azure download, so the task never vanishes from the trace), the sibling
+    ``com.seat.wait``/``task`` pair, and ``cache.store`` for the publish. The
+    restore/store also record ``cache.hit``/``cache.miss``/``cache.store`` events, so
+    a miss (and why the build ran) is backtraceable from the signals, not just the
+    console."""
     label = f"part:{stem}"
-    with _telemetry.span(f"task {label}", label=label) as sp:
+    outputs = _part_cache_outputs(stem)
+    with _telemetry.span(f"cache.probe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
         key = _cache_key(_part_file_deps(script, stem), label)
-        outputs = _part_cache_outputs(stem)
         if _cache.restore(key, outputs, label):
-            sp.set_attribute("cache", "hit")
+            probe.set_attribute("cache", "hit")
             _stamp_part_execution(stem)
             return
-        with _com_seat(label):
-            # Re-probe under the seat: we may have blocked for the seat for minutes
-            # while a peer builder published this exact part -- restore it rather than
-            # rebuild (the fleet cache-split win; fable/codex review).
+        probe.set_attribute("cache", "miss")
+
+    with _com_seat(label) as waited:
+        # Re-probe under the seat: we may have blocked for the seat for minutes while
+        # a peer builder published this exact part -- restore it rather than rebuild
+        # (the fleet cache-split win; fable/codex review). Its OWN phase span, never
+        # inside the task span: it is another network round-trip, and on a hit it is a
+        # full download -- which would otherwise make the "work" span pure transfer.
+        with _telemetry.span(f"cache.reprobe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
             if _cache.restore(key, outputs, label):
-                sp.set_attribute("cache", "hit-after-wait")
+                reprobe.set_attribute("cache", "hit-after-wait")
                 _stamp_part_execution(stem)
                 return
+            reprobe.set_attribute("cache", "miss")
+
+        with _telemetry.span(f"task {label}", label=label,
+                             service=_stage_name(label)) as sp:
+            _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _exec([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
-        # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
-        # not hold the seat the next task is waiting for.
-        _cache.store(key, outputs, label)
+
+    # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
+    # not hold the seat the next task is waiting for.
+    with _telemetry.span(f"cache.store {label}", label=label,
+                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
+        store.set_attribute("cache", _cache.store(key, outputs, label))
 
 
 def _recipe_files(stem: str) -> list[str]:
@@ -1390,37 +1474,47 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # build + any hooks share ONE trace rooted at this task: the cache events, the
     # FULL-vs-REFRESH ``mode`` attribute, and every subprocess span nest under it, so
     # a cache miss and the work it triggered are backtraceable from one trace.
-    with _telemetry.span(f"task {label}", label=label) as sp:
-        sidecar = _recipe_sidecar(stem)
-        digest = _digest_files(_recipe_files(stem))
+    sidecar = _recipe_sidecar(stem)
+    digest = _digest_files(_recipe_files(stem))
 
-        # Remote-cache shortcut: a HIT downloads the .SLDASM (+ renders), skipping the
-        # COM build/refresh entirely. The recipe sidecar is NOT cached -- its digest
-        # tags by absolute path (machine-local) -- so recompute it here, exactly as the
-        # success tail does, to keep the next run's FULL/REFRESH decision correct.
+    def _record_recipe_digest() -> None:
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(digest + "\n", encoding="utf-8")
+
+    # Remote-cache shortcut: a HIT downloads the .SLDASM (+ renders), skipping the
+    # COM build/refresh entirely. The recipe sidecar is NOT cached -- its digest
+    # tags by absolute path (machine-local) -- so recompute it here, exactly as the
+    # success tail does, to keep the next run's FULL/REFRESH decision correct.
+    cache_outputs = _assembly_cache_outputs(stem)
+    with _telemetry.span(f"cache.probe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
         cache_key = _cache_key(_assembly_file_deps(stem), label)
-        cache_outputs = _assembly_cache_outputs(stem)
-
-        def _record_recipe_digest() -> None:
-            sidecar.parent.mkdir(parents=True, exist_ok=True)
-            sidecar.write_text(digest + "\n", encoding="utf-8")
-
         if _cache.restore(cache_key, cache_outputs, label):
-            sp.set_attribute("cache", "hit")
+            probe.set_attribute("cache", "hit")
             _stamp_assembly_execution(stem)
             _record_recipe_digest()
             return
+        probe.set_attribute("cache", "miss")
 
-        with _com_seat(label):
-            # Re-probe under the seat: a peer builder may have published this assembly
-            # while we blocked for the seat (fable/codex review) -> restore, don't
-            # rebuild. The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks
-            # operate on the just-built model without another COM task interleaving.
+    with _com_seat(label) as waited:
+        # Re-probe under the seat: a peer builder may have published this assembly
+        # while we blocked for the seat (fable/codex review) -> restore, don't
+        # rebuild. Its own phase span (see the part action), so a hit-after-wait is
+        # reported as the download it is rather than as build work.
+        with _telemetry.span(f"cache.reprobe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
             if _cache.restore(cache_key, cache_outputs, label):
-                sp.set_attribute("cache", "hit-after-wait")
+                reprobe.set_attribute("cache", "hit-after-wait")
                 _stamp_assembly_execution(stem)
                 _record_recipe_digest()
                 return
+            reprobe.set_attribute("cache", "miss")
+
+        # The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks operate on
+        # the just-built model without another COM task interleaving.
+        with _telemetry.span(f"task {label}", label=label,
+                             service=_stage_name(label)) as sp:
+            _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
 
             target_missing = not Path(targets[0]).exists()
@@ -1448,13 +1542,16 @@ def build_or_refresh(stem, dependencies, changed, targets):
             # this build's recipe digest for the next run's FULL/REFRESH decision.
             _stamp_assembly_execution(stem)
             _record_recipe_digest()
-        # Publish the fresh artefacts for other machines OUTSIDE the seat (an Azure
-        # upload is network, not COM). RECOMPUTE the output set here, not reuse the one
-        # from the top: the channel stretch parts and the top-level gallery PNGs are
-        # glob-discovered and DID NOT EXIST yet on a clean builder when cache_outputs
-        # was first computed, so the early list would publish an incomplete archive
-        # (codex review). They exist now.
-        _cache.store(cache_key, _assembly_cache_outputs(stem), label)
+
+    # Publish the fresh artefacts for other machines OUTSIDE the seat (an Azure
+    # upload is network, not COM). RECOMPUTE the output set here, not reuse the one
+    # from the top: the channel stretch parts and the top-level gallery PNGs are
+    # glob-discovered and DID NOT EXIST yet on a clean builder when cache_outputs
+    # was first computed, so the early list would publish an incomplete archive
+    # (codex review). They exist now.
+    with _telemetry.span(f"cache.store {label}", label=label,
+                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
+        store.set_attribute("cache", _cache.store(cache_key, _assembly_cache_outputs(stem), label))
 
 
 def _close_sw_documents() -> None:

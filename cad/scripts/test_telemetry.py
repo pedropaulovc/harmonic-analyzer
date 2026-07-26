@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import cast
 
@@ -44,11 +45,20 @@ def capture():
     _telemetry.configure()
 
     spans = InMemorySpanExporter()
-    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(SimpleSpanProcessor(spans))
+    processor = SimpleSpanProcessor(spans)
+    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(processor)
+    # Auxiliary per-resource providers (build-infra) are built lazily from
+    # ``_span_processors``, so register there too -- and drop any already built -- or
+    # a test would see nothing from spans emitted under another resource.
+    _telemetry._span_processors.append(processor)
+    _telemetry._aux_providers.clear()
 
     logs = InMemoryLogRecordExporter()
     cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(SimpleLogRecordProcessor(logs))
-    return spans, logs
+    yield spans, logs
+
+    _telemetry._span_processors.remove(processor)
+    _telemetry._aux_providers.clear()
 
 
 def test_logs_split_into_severity_levels(capture):
@@ -223,6 +233,113 @@ def test_cross_process_trace_propagation(tmp_path):
     assert out.stdout.strip() == parent_trace
 
 
+def test_build_infra_spans_carry_their_own_resource(capture):
+    """The COM seat queue and the artefact cache are not a pipeline STAGE, so their
+    spans are attributed to a ``build-infra`` resource instead of this process's --
+    two resources from one process, which takes a second provider (a resource is
+    fixed at provider creation). Only the resource differs: the span still nests
+    normally and rides the same exporters."""
+    spans, _ = capture
+    with _telemetry.span("task part:cone_gear"):
+        with _telemetry.span("com.seat.wait part:cone_gear",
+                             service=_telemetry.BUILD_INFRA_SERVICE) as seat:
+            seat_trace = seat.get_span_context().trace_id
+
+    finished = {s.name: s for s in spans.get_finished_spans()}
+    task, wait = finished["task part:cone_gear"], finished["com.seat.wait part:cone_gear"]
+    assert wait.resource.attributes["service.name"] == "build-infra"
+    assert task.resource.attributes["service.name"] == _telemetry._service_name
+    assert wait.resource.attributes["service.namespace"] == "harmonic-analyzer"
+    # Provider ≠ context: the infra span still parents under the task span.
+    assert seat_trace == task.context.trace_id
+    assert wait.parent.span_id == task.context.span_id
+
+
+def test_process_startup_is_billed_to_the_parent_trace(capture, monkeypatch):
+    """The spawn + interpreter + import region between a parent launching a process
+    and that process's first span is DARK -- ~2-5 s per COM task. ``inject_env``
+    stamps the launch instant and the child draws it as ``proc.startup``
+    (``proc.launch`` + ``proc.import``), back-dated via OTel's creation-time
+    ``start_time`` -- the sanctioned way to record an interval already past."""
+    spans, _ = capture
+    now = time.time_ns()
+    monkeypatch.setattr(_telemetry, "_startup_recorded", False)
+    monkeypatch.setattr(_telemetry, "_IMPORT_NS", now - int(1.5e9))  # imported 1.5 s ago
+    monkeypatch.setenv(_telemetry.SPAWN_ENV, str(now - int(4.0e9)))  # spawned 4 s ago
+
+    with _telemetry.span("task part:cone_gear"):
+        _telemetry.record_process_startup()
+        _telemetry.record_process_startup()  # once per process, not once per call
+
+    finished = [s for s in spans.get_finished_spans() if s.name.startswith("proc.")]
+    assert [s.name for s in finished] == ["proc.launch", "proc.import", "proc.startup"]
+    by_name = {s.name: s for s in finished}
+    dur = lambda s: (s.end_time - s.start_time) / 1e9  # noqa: E731
+    assert 3.9 < dur(by_name["proc.startup"]) < 4.2, "must span back to the spawn"
+    assert 2.4 < dur(by_name["proc.launch"]) < 2.6, "spawn -> _telemetry import"
+    assert 1.4 < dur(by_name["proc.import"]) < 1.6, "_telemetry import -> first span"
+    assert by_name["proc.launch"].end_time == by_name["proc.import"].start_time
+    task = [s for s in spans.get_finished_spans() if s.name == "task part:cone_gear"][0]
+    assert by_name["proc.startup"].parent.span_id == task.context.span_id
+
+
+def test_process_startup_ignores_a_missing_or_stale_stamp(capture, monkeypatch):
+    """No stamp = a standalone run, nothing to bill. A stamp from another era is a
+    stale value inherited through an intermediate process, not our parent's."""
+    spans, _ = capture
+    monkeypatch.delenv(_telemetry.SPAWN_ENV, raising=False)
+    monkeypatch.setattr(_telemetry, "_startup_recorded", False)
+    _telemetry.record_process_startup()
+
+    monkeypatch.setattr(_telemetry, "_startup_recorded", False)
+    monkeypatch.setenv(_telemetry.SPAWN_ENV, str(time.time_ns() - int(2e9 * 3600)))
+    _telemetry.record_process_startup()
+
+    assert not [s for s in spans.get_finished_spans() if s.name.startswith("proc.")]
+
+
+def test_otlp_export_is_batched_off_the_critical_path():
+    """OTLP export runs on a background thread, so a build subprocess never pays an
+    export on the COM seat; console + file capture stay SIMPLE (live console, and a
+    .jsonl that cannot lose a record to a queue). Flushing is what makes the batch
+    trade safe -- ``shutdown()`` covers both signals and runs on both exit paths."""
+    span_proc, log_proc = _telemetry._otlp_span_processor(), _telemetry._otlp_log_processor()
+    try:
+        assert type(span_proc).__name__ == "BatchSpanProcessor"
+        assert type(log_proc).__name__ == "BatchLogRecordProcessor"
+    finally:
+        for processor in (span_proc, log_proc):
+            if processor is not None:
+                processor.shutdown()
+
+    simple = [p for p in _telemetry._span_processors
+              if type(p).__name__ == "SimpleSpanProcessor"]
+    assert simple, "console/file capture must stay on Simple processors"
+
+
+def test_default_otlp_endpoint_is_a_literal_address_never_localhost(monkeypatch):
+    """Measured: the first OTLP POST to ``localhost`` cost 2.05 s vs 0.003 s to
+    ``127.0.0.1`` -- Windows tries ``::1`` first and the dashboard is IPv4, so every
+    process ate a failed connect (per process, holding the seat). Defaults are literal
+    addresses, IPv4 first, with the v6 loopback as a fallback so a v6-only dashboard
+    still exports."""
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    assert not any("localhost" in e for e in _telemetry._DEFAULT_OTLP_ENDPOINTS)
+
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: True)
+    assert _telemetry._resolve_otlp_endpoint() == "http://127.0.0.1:18890"
+
+    v6_only = lambda e, timeout=0.15: e.startswith("http://[::1]")  # noqa: E731
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", v6_only)
+    assert _telemetry._resolve_otlp_endpoint() == "http://[::1]:18890"
+
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: False)
+    assert _telemetry._resolve_otlp_endpoint() is None, "nothing listening: export nowhere"
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
+    assert _telemetry._resolve_otlp_endpoint() == "http://collector:4318", "env wins"
+
+
 def test_event_records_span_event_on_current_span(capture):
     """``event()`` attaches a point-in-time event (with attrs) to the active span --
     the idiomatic home for a cache hit/miss or a mate flip, vs a standalone log."""
@@ -239,6 +356,29 @@ def test_event_without_active_span_is_noop():
     """A bare ``event()`` with no span in scope must be a silent no-op, so callers
     never have to guard (telemetry must never break the caller)."""
     _telemetry.event("orphan", foo="bar")  # must not raise
+
+
+def test_sequential_root_spans_do_not_nest(capture):
+    """Two spans opened one after the other are SIBLINGS, each timing only its own
+    stretch -- the shape dodo relies on to split a COM task's queueing
+    (``com.seat.wait <label>``) from its work (``task <label>``): neither duration
+    contains the other, and no timestamp surgery is involved."""
+    spans, _ = capture
+    with _telemetry.span("com.seat.wait part:cone_gear", label="part:cone_gear"):
+        time.sleep(0.2)
+    with _telemetry.span("task part:cone_gear", label="part:cone_gear"):
+        pass
+
+    finished = {s.name: s for s in spans.get_finished_spans()}
+    wait, task = finished["com.seat.wait part:cone_gear"], finished["task part:cone_gear"]
+    assert task.parent is None and wait.parent is None, "the wait must not parent the task"
+    assert (wait.end_time - wait.start_time) / 1e9 >= 0.2
+    # The ordering is the real invariant, and it is deterministic. An upper bound on
+    # the task span's own duration would only measure how busy the host is -- a
+    # descheduled process would fail it while the topology was perfectly correct
+    # (codex #424).
+    assert task.start_time >= wait.end_time, "the task must start once the seat is held"
+    assert wait.end_time <= task.start_time, "no overlap: the wait cannot leak into work"
 
 
 def test_export_save_as_is_visible_during_long_com_call(capture, tmp_path):

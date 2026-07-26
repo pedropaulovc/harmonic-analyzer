@@ -567,12 +567,61 @@ scripts that `from _common import log, check` are instrumented unchanged.
   it never clobbers an inherited label; `force=True` overrides; it rebuilds the
   providers, resetting OTel's one-shot provider guard, since the resource is fixed
   at provider creation). Add a new stage to `_stage_name` when a new task family
-  appears.
-- **Cache decisions live on the task trace.** The remote-cache restore/store run
-  INSIDE the `task part:`/`assembly:` span `dodo` opens (the cached actions open it
-  themselves, not `_run`), so a HIT/MISS/STORE is a `cache.*` **span event** + a
-  `cache` span attribute — a miss (and the build it triggered) is backtraceable from
-  ONE trace, and a HIT still shows a fast task span instead of the task vanishing. A
+  appears. The doit PARENT's `task <label>` span uses `_stage_name` too (via
+  `service=` on `_telemetry.span`), so a task and the subprocess it spawns share one
+  resource — `task part:cone_gear` reads `part-build`, `task assembly:pen` reads
+  `assembly-build`, a drawing reads `drawing-export` — instead of the task reading
+  the umbrella name while its own children read the stage. `harmonic-analyzer` is
+  now a namespace and a fallback for an unmapped label, not a span label.
+    - **`build-infra` owns the seat + cache spans.** Queueing for the COM seat and
+      pulling/publishing artefacts belong to no pipeline stage, so `com.seat.wait`,
+      `cache.probe` and `cache.store` are attributed to a `build-infra` resource
+      (`_telemetry.BUILD_INFRA_SERVICE`) — NOT to the stage their task belongs to —
+      so the resource column answers "how much of this build was queue and transfer,
+      not work?" in one filter. Together with the stage-labelled `task` span above,
+      every span now names either the stage doing the work or the infrastructure
+      serving it. A resource is fixed per
+      provider, so this is a SECOND `TracerProvider` in the same process
+      (`_provider_for_service`), sharing the primary's span processors — one console
+      stream, one `traces.jsonl`, one OTLP exporter. Pass `service=` to
+      `_telemetry.span` to put a span there; it changes only the resource, never the
+      parent/child shape. (Aux providers are built with `shutdown_on_exit=False` and
+      skipped by `shutdown()`: they don't own their processors, and double-shutting
+      them just re-closes every exporter.)
+- **A COM task is a CHAIN of top-level spans, one per phase — never one span that
+  swallows the lot.** A cached part/assembly/drawing task emits, all as siblings:
+  `cache.probe <label>` (the remote-cache restore attempt — on a HIT this IS the
+  task, an Azure download, so the task never vanishes from the trace),
+  `com.seat.wait <label>` (blocking on the COM seat), `cache.reprobe <label>` (the
+  under-seat re-probe — a peer may have published while we queued, and on a hit that
+  is another full download, so it is never inside the work span), `task <label>` (the
+  work, starting once the seat is HELD) and `cache.store <label>` (the publish, whose
+  `cache` attribute carries the outcome `_cache.store` returns —
+  `stored`/`skip`/`empty`/`error`/`off` — since a swallowed upload failure must not
+  look like a successful publish). Each
+  phase is then timed for what it is: the `task` span can no longer absorb queueing
+  or network transfer, so "how long does this part take to build?" is finally
+  answerable from `traces.jsonl` — which is what the watchdog calibration and every
+  perf audit read. Without the split, the same part read 40 s on an idle seat and
+  20 min behind a cold assembly build.
+    - `_com_seat` opens the wait span and hands the caller the seconds blocked; the
+      `task` span carries them as `seat_wait_s` (`_tag_seat_wait`), so the queue is
+      answerable from the task span alone. On release — the `task` span having
+      already closed — the seat's TOTAL elapsed time goes to a **log** record with
+      `wait_s`/`held_s`/`elapsed_s` fields, not a span event.
+    - **Do not nest these.** Putting the wait inside the task span is what this
+      replaced, and so is the interim fix that moved the task span's start forward
+      to elide the wait: mutating a live span's start is not a spec'd operation
+      (start time is recorded at CREATION; only a creation-time `start_time` may
+      back-date it), and it left the pre-wait cache events dangling before their own
+      span's start. Sibling spans need no timestamp surgery.
+    - Cost, accepted: sibling ROOT spans are separate traces (a root has no parent,
+      so "sibling" and "one trace" cannot both hold). Correlate by the `label`
+      attribute every phase span carries.
+- **Cache decisions stay on the phase spans.** A HIT/MISS/STORE is a `cache.*` **span
+  event** + a `cache` attribute on the phase span that made the decision (`hit`/`miss`
+  on `cache.probe`, `hit-after-wait`/`miss` on `task`), so a miss and the build it
+  triggered are backtraceable from the signals, not just the console. A
   miss/drift/soft-error is a `warn` (`!!`), not routine `info` — it is the signal for
   "why did this rebuild?". (`_artifact_cache.py`; still also appended to
   `cache.jsonl`.)
@@ -582,6 +631,30 @@ scripts that `from _common import log, check` are instrumented unchanged.
   script's `build_session` extracts it, so the doit task and the process it
   spawns are **one** end-to-end trace. Preserve `env=_telemetry.inject_env()` on any
   new subprocess launch.
+- **The process boundary itself is billed, not dark.** Between a task span starting
+  and the child's first span (`sw.connect`) sat ~2–5 s of nothing: process creation,
+  interpreter boot, and the import graph (`solidworks_mcp` + `_common` ≈ 0.75 s idle,
+  more under `-n` contention). `inject_env` now also stamps `HARMONIC_SPAWN_NS` with
+  the launch instant, and the child's `build_session`/`run_pipeline_span` calls
+  `_telemetry.record_process_startup()` once, drawing `proc.startup` with children
+  `proc.launch` (spawn → `_telemetry` import) and `proc.import` (→ first span). The
+  spans are back-dated with OTel's creation-time `start_time`, which is exactly its
+  documented use ("SHOULD only be set when span creation time has already passed") —
+  no live span is mutated. A process nobody stamped (standalone run) or a stale
+  inherited stamp (>1 h) records nothing.
+- **Telemetry must not cost seat time.** Two measured traps, both fixed, both worth
+  remembering before adding an exporter: (1) the OTLP default endpoint is a **literal
+  loopback address, never the name `localhost`** — on Windows `localhost` resolves to
+  `::1` first and the Aspire dashboard is IPv4, so the first POST ate a ~2 s failed
+  connect *per process* (twice: spans and logs), measured 2.05 s vs 0.003 s for
+  `127.0.0.1`; `_resolve_otlp_endpoint` tries IPv4 then the v6 loopback, both literal.
+  (2) OTLP export is **batched** (`BatchSpanProcessor` / `BatchLogRecordProcessor`) so
+  it never runs on the calling thread — a build subprocess holds the COM seat for its
+  whole life, so any synchronous export is seat time. Console + `.jsonl` stay on
+  Simple processors (live console; capture that cannot lose a record to a queue). The
+  batch trade is safe only because `shutdown()` flushes BOTH providers and runs on both
+  exit paths (`run_build`'s tail, and the watchdog before `os._exit`) — keep it that
+  way. Net: ~4 s per process of pure telemetry overhead removed, on ~110 COM tasks.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
   (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to

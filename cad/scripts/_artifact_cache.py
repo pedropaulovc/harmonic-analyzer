@@ -553,31 +553,39 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
         return False
 
 
-def store(key: str, outputs: list[Path], label: str) -> None:
+def store(key: str, outputs: list[Path], label: str) -> str:
     """Pack+upload the just-built outputs under ``key``. No-op unless mode=rw.
     Swallows every error -- a failed push must not fail the build. Records the event
     in cache.jsonl and stamps the per-label "last published key" sidecar so a later
-    HIT under a shifted key can be flagged as drift."""
+    HIT under a shifted key can be flagged as drift.
+
+    RETURNS the outcome (``stored``/``skip``/``empty``/``error``/``off``) so the
+    caller's ``cache.store`` phase span can carry it as an attribute: swallowing the
+    failure keeps the build alive, but a publish, a deliberate read-only skip and a
+    failed upload must not all look like the same OK span (codex #424)."""
     if not writable():
         if enabled():  # ro: pulled but deliberately won't publish -- note the skip
             _record("store_skip", label, key)
-        return
+            return "skip"
+        return "off"
     try:
         backend = _backend()
         if backend is None:
-            return
+            return "off"
         present = [o for o in outputs if o.exists()]
         if not present:
             _warn(f"nothing to store for {label} (no outputs on disk)")
             _event("cache.store_empty", label, key)
             _record("store_empty", label, key)
-            return
+            return "empty"
         backend.put(key, _pack(present))
         _log(f"store {label} ({key[:12]})")
         _event("cache.store", label, key)
         _save_stored_key(label, key)
         _record("store", label, key)
+        return "stored"
     except Exception as exc:  # noqa: BLE001
         _warn(f"store error for {label}: {exc!r} -- continuing")
         _event("cache.store_error", label, key)
         _record("store_error", label, key)
+        return "error"

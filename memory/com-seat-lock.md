@@ -38,6 +38,19 @@ peer that published while we waited is picked up (this + the lock is what makes
 the seat across an assembly build + its POST_ASSEMBLY hooks (one acquire) so nothing
 interleaves into the post-build state. Tradeoff: cold `-n N` builds can starve `check:*`
 toward the end (workers block on the seat) — tens of seconds on a ~25 min cold build.
+**The seat wait is its own top-level span** (2026-07-26): blocking is queueing, not
+work, so `_com_seat` opens `com.seat.wait <label>` for the wait and the `task <label>`
+span starts once the seat is HELD — SIBLINGS, never nested (a cached task is a chain:
+`cache.probe` → `com.seat.wait` → `task` → `cache.store`, each top-level). Otherwise
+the same part reads 40 s idle vs 20 min behind a cold assembly, and anything timed off
+`traces.jsonl` (watchdog calibration, perf audits) measures contention. `_com_seat`
+yields the seconds blocked so the task span carries `seat_wait_s`; release LOGS the
+seat's total elapsed (`wait_s`/`held_s`/`elapsed_s`) — no span is in scope by then, so
+the old `com.seat.acquired`/`com.seat` events are gone. Rejected on the way here:
+discounting the wait by moving the live task span's `_start_time` forward — not a
+spec'd operation (start time is recorded at creation) and it dangled the pre-wait cache
+events before their own span's start. Accepted cost: sibling roots are separate traces;
+correlate on the `label` attribute.
 **Serializes but does NOT isolate** — SolidWorks keys open docs by filename + carries
 session state, so it is a safety belt, not a green light for independent parallel builds
 (see [[parallel-sw-instances-investigation]]). Tests: `test_dodo_recipe.py`
