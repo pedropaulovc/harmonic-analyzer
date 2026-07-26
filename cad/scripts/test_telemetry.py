@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import cast
 
@@ -239,6 +240,40 @@ def test_event_without_active_span_is_noop():
     """A bare ``event()`` with no span in scope must be a silent no-op, so callers
     never have to guard (telemetry must never break the caller)."""
     _telemetry.event("orphan", foo="bar")  # must not raise
+
+
+def test_set_attribute_labels_the_current_span(capture):
+    """``set_attribute`` labels the ambient span for a caller holding no handle on
+    it (dodo's ``_com_seat`` tagging the task span with its seat wait)."""
+    spans, _ = capture
+    with _telemetry.span("op"):
+        _telemetry.set_attribute("seat_wait_s", 12.5)
+    (sp,) = [s for s in spans.get_finished_spans() if s.name == "op"]
+    assert sp.attributes["seat_wait_s"] == 12.5
+
+    _telemetry.set_attribute("orphan", 1)  # no span in scope: must not raise
+
+
+def test_discount_duration_excludes_the_interval_from_span_duration(capture):
+    """A discounted stretch (blocking on the COM seat) leaves the span's DURATION,
+    so a task's span times its work, not the queue it sat in -- while the elided
+    amount stays recoverable as ``harmonic.discounted_s``."""
+    spans, _ = capture
+    with _telemetry.span("task part:cone_gear"):
+        time.sleep(0.2)
+        assert _telemetry.discount_duration(0.15) == 0.15
+        assert _telemetry.discount_duration(0.05) == 0.2  # accumulates
+
+    (sp,) = [s for s in spans.get_finished_spans() if s.name == "task part:cone_gear"]
+    duration = (sp.end_time - sp.start_time) / 1e9
+    assert 0.0 <= duration < 0.15, f"discounted wait still in the duration: {duration}"
+    assert sp.attributes["harmonic.discounted_s"] == 0.2
+
+
+def test_discount_duration_is_a_noop_without_a_span():
+    """Best-effort like every helper here: no span in scope, nothing to discount."""
+    assert _telemetry.discount_duration(5.0) == 0.0  # must not raise
+    assert _telemetry.discount_duration(-1.0) == 0.0
 
 
 def test_export_save_as_is_visible_during_long_com_call(capture, tmp_path):

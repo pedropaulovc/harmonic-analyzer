@@ -576,6 +576,20 @@ scripts that `from _common import log, check` are instrumented unchanged.
   miss/drift/soft-error is a `warn` (`!!`), not routine `info` — it is the signal for
   "why did this rebuild?". (`_artifact_cache.py`; still also appended to
   `cache.jsonl`.)
+- **A task span times WORK, not queueing.** Blocking on the COM seat is not work, so
+  `_com_seat` **discounts its wait from the enclosing `task <label>` span** — without
+  it the same part reads 40 s on an idle seat and 20 min behind a cold assembly build,
+  and every cross-run duration comparison (including the watchdog calibration read off
+  `traces.jsonl`) measures contention instead of the task. A span can't be paused, so
+  `_telemetry.discount_duration(seconds)` moves its START forward by the elided
+  interval and accumulates the amount as `harmonic.discounted_s` (true wall-clock =
+  duration + discounted). Nothing is lost: the wait is a `!!` log per poll, a
+  `seat_wait_s` span attribute, and a **`com.seat` span event carrying the seat's
+  TOTAL elapsed time** (`wait_s`/`held_s`/`elapsed_s`) — which replaced the old
+  point-in-time `com.seat.acquired` event. Accepted cosmetic cost: events recorded
+  before the wait (a cache hit/miss at the head of the task span) now timestamp
+  earlier than the span's own start. Use `discount_duration` for any future
+  wait-on-a-shared-resource; do NOT use it to hide slow work.
 - **Cross-process trace continuity.** `dodo._exec` (the span-less core `_run` and
   the cached part/assembly actions both call) injects W3C trace context
   (`TRACEPARENT`) into each subprocess env via `_telemetry.inject_env`; the build

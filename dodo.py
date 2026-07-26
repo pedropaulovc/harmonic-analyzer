@@ -159,6 +159,10 @@ SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
 # download) and STORE (upload) run OUTSIDE the lock, so cache hits stay fully
 # parallel and a publish never holds the seat. The SolidWorks-free ``check:*`` tasks
 # never call ``_com_seat``, so they fan out under ``-n``.
+#
+# Waiting for the seat is QUEUEING, not work, so it is DISCOUNTED from the enclosing
+# ``task <label>`` span (see ``_com_seat``): a task's span duration times its build,
+# not how contended the machine was when it ran.
 def _com_lock_path() -> Path:
     override = os.environ.get("HARMONIC_COM_LOCK")
     if override:
@@ -212,9 +216,22 @@ def _com_seat(label: str):
     process's environment (inherited by the COM subprocess) so a COM build launched
     WITHOUT the seat trips ``_common``'s guard loud -- the runtime successor to the
     removed ``_assert_spine_complete`` tripwire. Reentrancy-safe (``filelock`` counts
-    same-process acquisitions), though no COM action nests it."""
+    same-process acquisitions), though no COM action nests it.
+
+    **The seat wait is DISCOUNTED from the enclosing ``task <label>`` span.** Blocking
+    on the seat is queueing, not work: left in, it makes a task's span duration report
+    how contended the machine was (the same part reads 40 s on an idle seat and 20 min
+    behind a cold assembly build), so every cross-run timing comparison -- and the
+    watchdog calibration read off ``traces.jsonl`` -- is skewed by scheduling noise.
+    :func:`_telemetry.discount_duration` moves the task span's start forward by the
+    wait, so its duration is the ACTIVE work alone, and records the elided amount as
+    ``harmonic.discounted_s``. Nothing is lost: the wait stays a ``!!`` log per poll,
+    a ``seat_wait_s`` attribute on the task span, and a ``com.seat`` span event
+    carrying the seat's TOTAL elapsed time (wait + held) -- which is what the retired
+    point-in-time ``com.seat.acquired`` event became."""
     _COM_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     holder = f"{label} pid={os.getpid()}"
+    entered = time.monotonic()
     while True:
         try:
             _COM_LOCK.acquire(timeout=_COM_SEAT_POLL_S)
@@ -223,10 +240,13 @@ def _com_seat(label: str):
             other = _read_seat_holder()
             _telemetry.warn(f"[com.seat] {label} waiting for the SolidWorks seat"
                             + (f" (held by {other})" if other else ""))
+    acquired = time.monotonic()
+    waited = acquired - entered
     _write_seat_holder(holder)
     prev = os.environ.get(_COM_SEAT_HELD_ENV)
     os.environ[_COM_SEAT_HELD_ENV] = holder
-    _telemetry.event("com.seat.acquired", label=label)
+    _telemetry.discount_duration(waited)
+    _telemetry.set_attribute("seat_wait_s", round(waited, 2))
     try:
         yield
     finally:
@@ -236,6 +256,10 @@ def _com_seat(label: str):
             os.environ[_COM_SEAT_HELD_ENV] = prev
         _clear_seat_holder(holder)
         _COM_LOCK.release()
+        released = time.monotonic()
+        _telemetry.event("com.seat", label=label, wait_s=round(waited, 2),
+                         held_s=round(released - acquired, 2),
+                         elapsed_s=round(released - entered, 2))
 
 # Drawing tasks declare only their source model as CAD input, while their code
 # recipe follows the exporter's complete repo-local import closure and the full
@@ -565,8 +589,10 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None,
 
     ``com=True`` marks a SolidWorks-touching task: the subprocess runs holding the
     single COM seat (``_com_seat``), so it is serialized against every other COM task
-    on the machine. SolidWorks-free tasks (the ``check:*`` gates) pass ``com=False``
-    and never take the lock, so they fan out under ``-n``."""
+    on the machine -- and the time spent BLOCKED on that seat is discounted from this
+    span, so its duration is the task's own work. SolidWorks-free tasks (the
+    ``check:*`` gates) pass ``com=False`` and never take the lock, so they fan out
+    under ``-n``."""
     with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd)):
         with (_com_seat(label) if com else contextlib.nullcontext()):
             _exec(cmd, label, log_stem)

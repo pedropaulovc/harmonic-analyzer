@@ -38,6 +38,14 @@ peer that published while we waited is picked up (this + the lock is what makes
 the seat across an assembly build + its POST_ASSEMBLY hooks (one acquire) so nothing
 interleaves into the post-build state. Tradeoff: cold `-n N` builds can starve `check:*`
 toward the end (workers block on the seat) — tens of seconds on a ~25 min cold build.
+**The seat wait is discounted from the task span** (2026-07-26): blocking is queueing,
+not work, so `_com_seat` calls `_telemetry.discount_duration(waited)` — the span's start
+is moved forward so its duration times the build, not the machine's contention (the same
+part otherwise reads 40 s idle vs 20 min behind a cold assembly). The elided time stays
+visible as `harmonic.discounted_s` + a `seat_wait_s` attribute, and the old
+`com.seat.acquired` event became a `com.seat` event on RELEASE carrying the seat's total
+elapsed (`wait_s`/`held_s`/`elapsed_s`). Anything timed off `traces.jsonl` (watchdog
+calibration, perf audits) now reads work, not queue.
 **Serializes but does NOT isolate** — SolidWorks keys open docs by filename + carries
 session state, so it is a safety belt, not a green light for independent parallel builds
 (see [[parallel-sw-instances-investigation]]). Tests: `test_dodo_recipe.py`

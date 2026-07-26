@@ -8,6 +8,7 @@ import contextlib
 import importlib.util
 import inspect
 import os
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -508,6 +509,48 @@ def test_com_seat_wait_logs_without_opening_a_span(tmp_path, monkeypatch):
 
     assert attempts == 2
     assert warnings == ["[com.seat] part:x waiting for the SolidWorks seat"]
+
+
+class _FakeClock:
+    """``time`` stand-in yielding scripted monotonic readings (rest passes through)."""
+
+    def __init__(self, *ticks: float) -> None:
+        self._ticks = list(ticks)
+
+    def monotonic(self) -> float:
+        return self._ticks.pop(0)
+
+    def __getattr__(self, name):
+        return getattr(time, name)
+
+
+def test_com_seat_discounts_its_wait_and_records_total_elapsed(tmp_path, monkeypatch):
+    """Blocking on the seat is QUEUEING, not work: the wait is discounted from the
+    enclosing ``task <label>`` span so its duration measures the build, not the
+    machine's contention. The wait is not lost -- it lands as a ``seat_wait_s``
+    attribute plus a ``com.seat`` event carrying the seat's TOTAL elapsed time
+    (wait + held), which replaced the old point-in-time ``com.seat.acquired``."""
+    monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))
+    dodo = _load_dodo()
+    # entered=100.0, acquired=145.0 (45 s blocked), released=150.5 (5.5 s held).
+    monkeypatch.setattr(dodo, "time", _FakeClock(100.0, 145.0, 150.5))
+
+    discounted: list[float] = []
+    attributes: dict[str, object] = {}
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(dodo._telemetry, "discount_duration", discounted.append)
+    monkeypatch.setattr(dodo._telemetry, "set_attribute",
+                        lambda key, value: attributes.__setitem__(key, value))
+    monkeypatch.setattr(dodo._telemetry, "event",
+                        lambda name, **attrs: events.append((name, attrs)))
+
+    with dodo._com_seat("part:x"):
+        assert discounted == [45.0], "the seat wait must leave the task span duration"
+        assert attributes == {"seat_wait_s": 45.0}
+        assert not events, "the seat event reports the TOTAL, so it lands on release"
+
+    assert events == [("com.seat", {"label": "part:x", "wait_s": 45.0,
+                                    "held_s": 5.5, "elapsed_s": 50.5})]
 
 
 def test_com_seat_is_reentrant_within_a_process(tmp_path, monkeypatch):

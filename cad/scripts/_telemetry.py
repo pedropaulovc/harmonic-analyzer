@@ -484,6 +484,63 @@ def event(name: str, **attributes: Any) -> None:
             span.add_event(name, attributes=_extra(attributes) or {})
 
 
+def set_attribute(key: str, value: Any) -> None:
+    """Set an attribute on the CURRENT span (best-effort, no-op without one).
+
+    The sibling of :func:`event` for a FACT about the span rather than a moment in
+    it -- so a caller that only has the ambient span (no handle on it) can still
+    label it without reaching into the OTel API itself.
+    """
+    with contextlib.suppress(Exception):
+        span = trace.get_current_span()
+        if span is not None and span.get_span_context().is_valid:
+            span.set_attribute(key, value)
+
+
+_DISCOUNTED_ATTR = "harmonic.discounted_s"
+
+
+def discount_duration(seconds: float, span: Span | None = None) -> float:
+    """Take ``seconds`` of wall-clock OUT of a span's measured duration.
+
+    For a span whose wall-clock includes a stretch of pure QUEUEING -- blocking on
+    the machine-global COM seat is the one case today -- the raw duration measures
+    "how contended the machine was", not "how long this task took". That skew is
+    invisible in a waterfall and poisons any per-task timing comparison (the same
+    part reads 40 s on an idle seat and 20 min behind a cold assembly build).
+
+    A span cannot be paused, so the exclusion is done by moving its START forward
+    by the queued interval: ``end - start`` then measures only the ACTIVE work.
+    The elided amount is accumulated onto the span as ``harmonic.discounted_s`` so
+    the true wall-clock stays recoverable (duration + discounted). Returns the
+    running total for that span.
+
+    Consequence, accepted: anything recorded BEFORE the discounted interval (a
+    cache hit/miss event at the head of a task span) now carries a timestamp
+    earlier than the span's own start. Duration fidelity is worth more than that
+    cosmetic ordering -- and callers keep the wait itself in the record (a log
+    line while blocked, plus the seat's own elapsed-time event).
+
+    Best-effort and never fatal, like every other helper here.
+    """
+    if seconds <= 0:
+        return 0.0
+    total = 0.0
+    with contextlib.suppress(Exception):
+        sp = span if span is not None else trace.get_current_span()
+        start = getattr(sp, "_start_time", None)
+        if start is None or not sp.get_span_context().is_valid:
+            return 0.0
+        # ReadableSpan exposes start_time read-only; the live SDK span keeps it in
+        # ``_start_time`` right up to export, so shifting it before the span ends
+        # is what the exporters (and _compact_span) read.
+        sp._start_time = start + int(seconds * 1e9)
+        prior = (sp.attributes or {}).get(_DISCOUNTED_ATTR, 0.0)
+        total = round(float(cast(float, prior)) + seconds, 3)
+        sp.set_attribute(_DISCOUNTED_ATTR, total)
+    return total
+
+
 def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, Any, int]:
     _touch_activity(f"span-start {name}")
     tracer = get_tracer()
