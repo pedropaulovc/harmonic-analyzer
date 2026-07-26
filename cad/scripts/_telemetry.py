@@ -515,11 +515,31 @@ def discount_duration(seconds: float, span: Span | None = None) -> float:
     the true wall-clock stays recoverable (duration + discounted). Returns the
     running total for that span.
 
-    Consequence, accepted: anything recorded BEFORE the discounted interval (a
-    cache hit/miss event at the head of a task span) now carries a timestamp
-    earlier than the span's own start. Duration fidelity is worth more than that
-    cosmetic ordering -- and callers keep the wait itself in the record (a log
-    line while blocked, plus the seat's own elapsed-time event).
+    Two DELIBERATE deviations from the OTel spec, both weighed:
+
+    * **Semantic.** "The Span's start and end timestamps reflect the elapsed real
+      time of the operation" (trace/api.md). A discounted span reports ACTIVE time
+      instead, so a consumer summing durations for wall-clock occupancy must add
+      ``harmonic.discounted_s`` back. That is the whole point -- use this only for
+      genuine queueing on a shared resource, NEVER to make slow work look fast.
+    * **Mechanical.** The start timestamp is spec'd as recorded at creation, and the
+      only sanctioned way to back-date it is the creation-time ``Start timestamp``
+      argument -- there is no ``UpdateStartTime``, so writing ``_start_time`` on a
+      live span is outside the API contract. It is safe against the SDK we pin
+      (``Span.end()`` snapshots the ``ReadableSpan`` from ``_start_time`` at end and
+      validates only ``is not None``), and if that private field ever moves this
+      degrades to a no-op -- accuracy lost, never a broken build -- with
+      ``test_telemetry.py`` failing loud. The spec-clean alternative (defer span
+      creation until after the wait, passing the back-dated ``start_time``, and
+      re-add the pre-wait events with explicit timestamps) costs an event buffer at
+      every call site for the same recorded result.
+
+    Consequence, NOT a violation: anything recorded before the discounted interval
+    (a cache hit/miss event at the head of a task span) now timestamps earlier than
+    the span's own start. The spec explicitly anticipates this -- "an event's
+    timestamp might be before the start ... The specification does not require any
+    normalization if provided timestamps are out of range" -- so consumers must
+    already tolerate it.
 
     Best-effort and never fatal, like every other helper here.
     """

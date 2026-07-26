@@ -586,10 +586,18 @@ scripts that `from _common import log, check` are instrumented unchanged.
   duration + discounted). Nothing is lost: the wait is a `!!` log per poll, a
   `seat_wait_s` span attribute, and a **`com.seat` span event carrying the seat's
   TOTAL elapsed time** (`wait_s`/`held_s`/`elapsed_s`) — which replaced the old
-  point-in-time `com.seat.acquired` event. Accepted cosmetic cost: events recorded
-  before the wait (a cache hit/miss at the head of the task span) now timestamp
-  earlier than the span's own start. Use `discount_duration` for any future
-  wait-on-a-shared-resource; do NOT use it to hide slow work.
+  point-in-time `com.seat.acquired` event. **Where this sits vs the OTel spec:** an
+  event timestamped before its span's start is explicitly anticipated and needs no
+  normalization (`trace/api.md`), so the pre-wait cache events are fine; but the
+  start timestamp is spec'd as recorded at CREATION (only a creation-time
+  `start_time` argument may back-date it — there is no `UpdateStartTime`), so
+  writing `_start_time` on a live span is a deliberate contract deviation, safe
+  against the pinned SDK (`Span.end()` snapshots it at end, no ordering check) and
+  self-degrading to a no-op if that private field moves. The semantic divergence is
+  the one to remember: a discounted span no longer reports "elapsed real time", so
+  anything summing durations for wall-clock occupancy must add `harmonic.discounted_s`
+  back. Use `discount_duration` for a genuine wait on a shared resource; do NOT use
+  it to hide slow work.
 - **Cross-process trace continuity.** `dodo._exec` (the span-less core `_run` and
   the cached part/assembly actions both call) injects W3C trace context
   (`TRACEPARENT`) into each subprocess env via `_telemetry.inject_env`; the build
