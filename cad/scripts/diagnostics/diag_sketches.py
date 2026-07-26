@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import _telemetry  # noqa: E402
 from _common import check, run_build  # noqa: E402
-from render_compare import _flag  # noqa: E402
+from _common import _flag  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 ASM = ROOT / "out" / "sldasm" / "channel.SLDASM"

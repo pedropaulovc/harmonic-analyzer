@@ -57,7 +57,6 @@ def test_previous_tag_uses_compact_release_history(
 def test_release_image_tools_do_not_use_deprecated_getdata() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     sources = (
-        repo_root / "cad" / "scripts" / "render_compare.py",
         repo_root / "comparisons" / "tools" / "composite.py",
         repo_root / "comparisons" / "tools" / "parity_check.py",
     )

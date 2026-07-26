@@ -1813,7 +1813,6 @@ def task_check():
         SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
-        SCRIPTS_DIR / "test_render_compare.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
@@ -2058,7 +2057,11 @@ def task_check():
 
 
 def task_export():
-    """Complete release-neutral export (STEP / STL / assembly glTF / PNG manifest + scene). COM seat.
+    """Export neutral CAD plus the offline comparison gallery.
+
+    ``export_models.py`` writes STEP / STL / assembly glTF / PNG manifest + scene,
+    then invokes ``comparisons/tools/render_offline.py`` so the export task leaves
+    the comparison renders, composites, scores, and gallery current. COM seat.
 
     Always runs ``export_models.py`` (``uptodate: False``) -- it self-checks every
     output's per-file staleness cheaply and prints "all exports fresh" when there
@@ -2076,8 +2079,15 @@ def task_export():
     ]
     deps = ([_sldprt(s) for s in part_stems()]
             + [_sldasm(s) for s in ASSEMBLY_ORDER])
+    comparison_tools = [
+        str((REPO_ROOT / "comparisons" / "manifest.json").resolve()),
+        str((REPO_ROOT / "comparisons" / "tools" / "render_offline.py").resolve()),
+        str((REPO_ROOT / "comparisons" / "tools" / "blender_worker.py").resolve()),
+        str((REPO_ROOT / "comparisons" / "tools" / "composite.py").resolve()),
+        str((REPO_ROOT / "comparisons" / "tools" / "gallery.py").resolve()),
+    ]
     return {
-        "file_dep": [str(EXPORT_PY), *deps],
+        "file_dep": [str(EXPORT_PY), *deps, *comparison_tools],
         "targets": targets,
         # REAL gate edge (was implicit via the spine): export writes neutral formats +
         # refreshes the comparison gallery into cad/out, side effects that must NOT be

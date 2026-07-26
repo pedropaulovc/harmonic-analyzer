@@ -38,11 +38,7 @@ uv run comparisons/tools/merge_catalog.py
 uv run comparisons/tools/extract_frames.py          # full-res video keepers
 uv run comparisons/tools/seed_manifest.py
 
-# 2a. render via SolidWorks (SolidWorks open; sibling venv)
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\render_compare.py --stale-only
-#    --selftest validates the euler camera against named views pixel-wise
-
-# 2b. or render offline (no SolidWorks): refresh the STL cache once after
+# 2. render offline (no SolidWorks): refresh the STL cache once after
 #     any rebuild, then Blender replays the same manifest cameras
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\export_models.py
 uv run comparisons/tools/render_offline.py [--only id,..] [--stale-only]

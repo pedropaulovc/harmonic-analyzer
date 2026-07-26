@@ -390,7 +390,7 @@ def save_colors(colors: dict) -> None:
 
 def _exporter_digest() -> str:
     """Digest of the exporter's own source CLOSURE -- this module plus every repo-local
-    helper it transitively imports (render_compare's scene extraction, _common's STL
+    helper it transitively imports (_common's STL
     preference constants, ...) -- stamped into the cache so a change to ANY export /
     format / scene / colour logic invalidates every recorded output even when no CAD
     recipe changed (codex review). Best-effort: if the closure can't be resolved, fall

@@ -22,7 +22,7 @@ space, and component boxes need no normalisation. (Framing is unit-agnostic
 anyway — it derives from bbox ratios — but mesh and transform units must
 agree, and now both are mm.)
 
-Camera convention matches cad/scripts/render_compare.py: model space has +Y
+Camera convention matches the comparison manifest: model space has +Y
 up, az 0 / el 0 looks from +Z (SolidWorks Front), +az moves the camera
 toward +X. Orthographic by default; a pair whose camera.perspective is set
 (focal_length_mm = the book's 100 mm lens, or a raw object_sizes_away) renders
@@ -50,7 +50,7 @@ DEFAULT_RGB = (0.55, 0.55, 0.55)
 # focal-length camera, so a perspective pair renders the real lens: lens =
 # focal_length_mm with the DX long edge (23.6 mm) oriented to the canvas long
 # edge -- a portrait canvas (the tall machine, ch30 ~675x1600) rotates the
-# camera just as the photographer did. render_compare.py references the same
+# camera just as the photographer did. The manifest is the canonical
 # long edge (ObjectSizesAway = f / long_edge), so both engines reproduce the
 # lens's long-axis angle of view (~13.5 deg at 100 mm).
 DX_SENSOR_MM = (23.6, 15.8)

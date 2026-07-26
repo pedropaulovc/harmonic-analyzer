@@ -719,8 +719,7 @@ finds no gallery and ships the bundle without it (`release.comparisons`,
 `staged=false`) — or, if an *old* gallery lingers, ships it with a loud
 `STALE vs geometry` warning rather than silently publishing stale renders. Refresh
 it standalone anytime — unchanged — with
-`uv run comparisons/tools/render_offline.py` (Blender) or
-`cad/scripts/render_compare.py` (SolidWorks), then `gallery.py`.
+`uv run comparisons/tools/render_offline.py` (Blender), then `gallery.py`.
 
 ## Considered but NOT done (with reasons)
 
