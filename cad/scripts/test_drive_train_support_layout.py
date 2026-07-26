@@ -22,6 +22,12 @@ def test_complete_support_rig_is_on_the_cylinder_side() -> None:
     assert drive.BLOCK_X < drive.APINION_X
     assert drive.LEVER_TILT_DEG < 0.0
     assert drive.HANDLE_TILT_DEG < 0.0
+    assert all(
+        drive.LEVER_TILT_DEG
+        + math.copysign(step * 0.25, drive.LEVER_TILT_DEG)
+        <= drive.LEVER_TILT_DEG
+        for step in range(81)
+    )
 
 
 def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:

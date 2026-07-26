@@ -1510,7 +1510,9 @@ if _TEE_HUB_Z[0] < CRANK_ARM_Z0 + ARM_THICKNESS + 0.25:
 # arbor distance grows monotonically past 37.6 deg, but prove it numerically,
 # and prove the swept tip annulus shares no z band with anything it could hit.
 for _step in range(0, 81):
-    _t = math.radians(LEVER_TILT_DEG + _step * 0.25)
+    _t = math.radians(
+        LEVER_TILT_DEG + math.copysign(_step * 0.25, LEVER_TILT_DEG)
+    )
     _d = abs(_LEV_REL[0] * math.cos(_t) - _LEV_REL[1] * math.sin(_t))
     if _d < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
         raise AssertionError("lever shaft crowds the arbor mid-throw")
@@ -3081,8 +3083,8 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Right Plane@{lever}", "PLANE"),
         named_ref(f"Right Plane@{lift_rod}", "PLANE"),
-        LEVER_TILT_DEG,
-        label=f"lever clamp phase (a={LEVER_TILT_DEG:.2f})",
+        abs(LEVER_TILT_DEG),
+        label=f"lever clamp phase (a={abs(LEVER_TILT_DEG):.2f})",
         verify=(lever, lev_o),
     )
     # Pinion drum: journaled in the straps' top bores -- coaxial on the front
