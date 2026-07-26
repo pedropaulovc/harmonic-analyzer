@@ -373,8 +373,12 @@ def test_sequential_root_spans_do_not_nest(capture):
     wait, task = finished["com.seat.wait part:cone_gear"], finished["task part:cone_gear"]
     assert task.parent is None and wait.parent is None, "the wait must not parent the task"
     assert (wait.end_time - wait.start_time) / 1e9 >= 0.2
-    assert (task.end_time - task.start_time) / 1e9 < 0.15, "the wait leaked into the work"
+    # The ordering is the real invariant, and it is deterministic. An upper bound on
+    # the task span's own duration would only measure how busy the host is -- a
+    # descheduled process would fail it while the topology was perfectly correct
+    # (codex #424).
     assert task.start_time >= wait.end_time, "the task must start once the seat is held"
+    assert wait.end_time <= task.start_time, "no overlap: the wait cannot leak into work"
 
 
 def test_export_save_as_is_visible_during_long_com_call(capture, tmp_path):

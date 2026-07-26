@@ -592,8 +592,13 @@ scripts that `from _common import log, check` are instrumented unchanged.
   swallows the lot.** A cached part/assembly/drawing task emits, all as siblings:
   `cache.probe <label>` (the remote-cache restore attempt — on a HIT this IS the
   task, an Azure download, so the task never vanishes from the trace),
-  `com.seat.wait <label>` (blocking on the COM seat), `task <label>` (the work,
-  starting once the seat is HELD) and `cache.store <label>` (the publish). Each
+  `com.seat.wait <label>` (blocking on the COM seat), `cache.reprobe <label>` (the
+  under-seat re-probe — a peer may have published while we queued, and on a hit that
+  is another full download, so it is never inside the work span), `task <label>` (the
+  work, starting once the seat is HELD) and `cache.store <label>` (the publish, whose
+  `cache` attribute carries the outcome `_cache.store` returns —
+  `stored`/`skip`/`empty`/`error`/`off` — since a swallowed upload failure must not
+  look like a successful publish). Each
   phase is then timed for what it is: the `task` span can no longer absorb queueing
   or network transfer, so "how long does this part take to build?" is finally
   answerable from `traces.jsonl` — which is what the watchdog calibration and every

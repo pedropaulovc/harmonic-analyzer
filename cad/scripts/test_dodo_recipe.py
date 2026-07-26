@@ -209,7 +209,7 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(
         dodo._cache, "store",
-        lambda key, outputs, label: stores.append((key, outputs, label)),
+        lambda key, outputs, label: stores.append((key, outputs, label)) or "stored",
     )
     monkeypatch.setattr(
         dodo, "_exec",
@@ -246,7 +246,7 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "_exec", build)
     monkeypatch.setattr(
         dodo._cache, "store",
-        lambda key, outputs, label: stores.append((key, outputs, label)),
+        lambda key, outputs, label: stores.append((key, outputs, label)) or "stored",
     )
 
     dodo._cached_drawing_action("platen_guide")
@@ -576,7 +576,7 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
-    monkeypatch.setattr(dodo._cache, "store", lambda *_a: None)
+    monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
     monkeypatch.setattr(dodo, "_stamp_part_execution", lambda _stem: None)
     monkeypatch.setattr(dodo, "_exec", lambda *_a, **_kw: None)
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(45.0))
@@ -604,8 +604,9 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
 
     dodo._cached_part_action("pen_rod", script)
 
-    assert opened == ["cache.probe part:pen_rod", "task part:pen_rod",
-                      "cache.store part:pen_rod"]  # the seat wait span is _com_seat's
+    # The seat wait span is _com_seat's, so it is not in this list.
+    assert opened == ["cache.probe part:pen_rod", "cache.reprobe part:pen_rod",
+                      "task part:pen_rod", "cache.store part:pen_rod"]
 
 
 def test_task_span_carries_its_pipeline_stage_resource():

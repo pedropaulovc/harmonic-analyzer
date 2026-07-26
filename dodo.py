@@ -1160,18 +1160,22 @@ def _cached_drawing_action(stem: str) -> None:
         probe.set_attribute("cache", "miss")
 
     with _com_seat(label) as waited:
+        with _telemetry.span(f"cache.reprobe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
+            if _cache.restore(key, outputs, label):
+                reprobe.set_attribute("cache", "hit-after-wait")
+                return
+            reprobe.set_attribute("cache", "miss")
+
         with _telemetry.span(f"task {label}", label=label,
                              service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
-            if _cache.restore(key, outputs, label):
-                sp.set_attribute("cache", "hit-after-wait")
-                return
             sp.set_attribute("cache", "miss")
             _exec(cmd, label, log_stem=f"drawing-{stem}")
 
     with _telemetry.span(f"cache.store {label}", label=label,
-                         service=_telemetry.BUILD_INFRA_SERVICE):
-        _cache.store(key, _drawing_cache_outputs(stem), label)
+                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
+        store.set_attribute("cache", _cache.store(key, _drawing_cache_outputs(stem), label))
 
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
@@ -1235,16 +1239,22 @@ def _cached_part_action(stem: str, script: Path) -> None:
         probe.set_attribute("cache", "miss")
 
     with _com_seat(label) as waited:
+        # Re-probe under the seat: we may have blocked for the seat for minutes while
+        # a peer builder published this exact part -- restore it rather than rebuild
+        # (the fleet cache-split win; fable/codex review). Its OWN phase span, never
+        # inside the task span: it is another network round-trip, and on a hit it is a
+        # full download -- which would otherwise make the "work" span pure transfer.
+        with _telemetry.span(f"cache.reprobe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
+            if _cache.restore(key, outputs, label):
+                reprobe.set_attribute("cache", "hit-after-wait")
+                _stamp_part_execution(stem)
+                return
+            reprobe.set_attribute("cache", "miss")
+
         with _telemetry.span(f"task {label}", label=label,
                              service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
-            # Re-probe under the seat: we may have blocked for the seat for minutes
-            # while a peer builder published this exact part -- restore it rather than
-            # rebuild (the fleet cache-split win; fable/codex review).
-            if _cache.restore(key, outputs, label):
-                sp.set_attribute("cache", "hit-after-wait")
-                _stamp_part_execution(stem)
-                return
             sp.set_attribute("cache", "miss")
             _exec([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
@@ -1252,8 +1262,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
     # not hold the seat the next task is waiting for.
     with _telemetry.span(f"cache.store {label}", label=label,
-                         service=_telemetry.BUILD_INFRA_SERVICE):
-        _cache.store(key, outputs, label)
+                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
+        store.set_attribute("cache", _cache.store(key, outputs, label))
 
 
 def _recipe_files(stem: str) -> list[str]:
@@ -1487,18 +1497,24 @@ def build_or_refresh(stem, dependencies, changed, targets):
         probe.set_attribute("cache", "miss")
 
     with _com_seat(label) as waited:
-        with _telemetry.span(f"task {label}", label=label,
-                             service=_stage_name(label)) as sp:
-            _tag_seat_wait(sp, waited)
-            # Re-probe under the seat: a peer builder may have published this assembly
-            # while we blocked for the seat (fable/codex review) -> restore, don't
-            # rebuild. The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks
-            # operate on the just-built model without another COM task interleaving.
+        # Re-probe under the seat: a peer builder may have published this assembly
+        # while we blocked for the seat (fable/codex review) -> restore, don't
+        # rebuild. Its own phase span (see the part action), so a hit-after-wait is
+        # reported as the download it is rather than as build work.
+        with _telemetry.span(f"cache.reprobe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
             if _cache.restore(cache_key, cache_outputs, label):
-                sp.set_attribute("cache", "hit-after-wait")
+                reprobe.set_attribute("cache", "hit-after-wait")
                 _stamp_assembly_execution(stem)
                 _record_recipe_digest()
                 return
+            reprobe.set_attribute("cache", "miss")
+
+        # The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks operate on
+        # the just-built model without another COM task interleaving.
+        with _telemetry.span(f"task {label}", label=label,
+                             service=_stage_name(label)) as sp:
+            _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
 
             target_missing = not Path(targets[0]).exists()
@@ -1534,8 +1550,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # was first computed, so the early list would publish an incomplete archive
     # (codex review). They exist now.
     with _telemetry.span(f"cache.store {label}", label=label,
-                         service=_telemetry.BUILD_INFRA_SERVICE):
-        _cache.store(cache_key, _assembly_cache_outputs(stem), label)
+                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
+        store.set_attribute("cache", _cache.store(cache_key, _assembly_cache_outputs(stem), label))
 
 
 def _close_sw_documents() -> None:

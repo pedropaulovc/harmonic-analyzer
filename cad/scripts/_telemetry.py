@@ -731,14 +731,16 @@ def build_session(label: str, /, **attributes: Any) -> Generator[Span | None, No
         token = otel_context.attach(parent)
         try:
             # Inside the attached parent context, so this process's spawn + import
-            # cost is billed to the task span that paid for it.
+            # cost is billed to the REMOTE task span that paid for it -- and before
+            # any local span is opened, since a back-dated startup span parented
+            # under a span that started later reads as a malformed waterfall.
             record_process_startup()
             yield None
         finally:
             otel_context.detach(token)
     else:
+        record_process_startup()
         with span(f"build.{label}", label=label, **attributes) as root:
-            record_process_startup()
             yield root
 
 
@@ -846,8 +848,11 @@ def run_pipeline_span(stage: str, /, **attributes: Any) -> Generator[Span, None,
     parent = _parent_context_from_env()
     token = otel_context.attach(parent) if parent is not None else None
     try:
+        # Before the pipeline span: ``proc.startup`` is back-dated to the spawn
+        # instant, which precedes this span's start, so nesting it here would make a
+        # child that begins before its parent (codex #424).
+        record_process_startup()
         with span(f"pipeline.{stage}", **attributes) as sp:
-            record_process_startup()
             yield sp
     finally:
         if token is not None:
