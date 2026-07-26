@@ -1719,6 +1719,10 @@ def task_check():
         SCRIPTS_DIR / "test_render_compare.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
+        # The copied-mate safeguard must keep failing CLOSED: an unreadable
+        # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
+        # read as "this copy is clean".
+        SCRIPTS_DIR / "test_cwm_mate_guard.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
