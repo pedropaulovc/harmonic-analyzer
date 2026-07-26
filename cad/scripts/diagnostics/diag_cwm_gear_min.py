@@ -113,6 +113,14 @@ Use --visible geometry so the phase can be seen. Menu paths are SW 2024-2026.
    mate, rotate the copy so its marker matches the seed (Move Component --
    now free, it stays), then add a FRESH gear mate to C's axis. Ctrl-Q:
    the phase holds -- a fresh mate records the CURRENT pose as its phase.
+
+LATE-BOUND PROBE: this script drives SolidWorks through its own
+``GetObject``/``Dispatch`` (or a raw ``adapter.currentModel``), NOT the makepy
+wrapper, so its ``[out]`` params land in the ``VT_BYREF`` VARIANTs passed in
+rather than in the return tuple. That is the OPPOSITE of the build path, where
+``_common._early_bound`` guarantees an early-bound object and the outs ride the
+return tuple. Both are correct for their binding -- mixing them is the trap that
+reads as "no data" instead of failing. See memory/sw-assembly-mate-diagnostics-api.md.
 """
 
 from __future__ import annotations

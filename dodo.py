@@ -1723,6 +1723,12 @@ def task_check():
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".
         SCRIPTS_DIR / "test_cwm_mate_guard.py",
+        # The [out]-param binding rule is ENFORCED, not just documented: no
+        # VT_BYREF on the (uniformly early-bound) build path, late-bound probes
+        # declare themselves, and _early_bound never falls back to a raw
+        # dispatch. Mixing the two conventions returns a wrong answer that looks
+        # like a clean result, so a comment alone decays into folklore.
+        SCRIPTS_DIR / "test_out_param_binding.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",

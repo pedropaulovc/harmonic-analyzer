@@ -40,6 +40,14 @@ Read-only apart from the rebuild; never saves. Run against whatever assembly is
 open (SolidWorks already running)::
 
     uv run python cad\scripts\diagnostics\probe_mate_error_text.py
+
+LATE-BOUND PROBE: this script drives SolidWorks through its own
+``GetObject``/``Dispatch`` (or a raw ``adapter.currentModel``), NOT the makepy
+wrapper, so its ``[out]`` params land in the ``VT_BYREF`` VARIANTs passed in
+rather than in the return tuple. That is the OPPOSITE of the build path, where
+``_common._early_bound`` guarantees an early-bound object and the outs ride the
+return tuple. Both are correct for their binding -- mixing them is the trap that
+reads as "no data" instead of failing. See memory/sw-assembly-mate-diagnostics-api.md.
 """
 
 from __future__ import annotations

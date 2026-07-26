@@ -1535,19 +1535,51 @@ def _flag(obj: Any, interface: str) -> None:
 
 
 def _early_bound(obj: Any, interface: str, *method_names: str) -> Any:
-    """Return a generated interface wrapper, selectively flagging as fallback.
+    """Return the generated interface wrapper, or RAISE -- never a raw dispatch.
 
     Early-bound wrappers invoke known DISPIDs directly and avoid the repeated
-    ``GetIDsOfNames`` calls paid by whole-interface method flagging.  The exact
-    names are used only when makepy metadata is unavailable, preserving support
-    for deliberately minimal test doubles and unusual SolidWorks installs.
+    ``GetIDsOfNames`` calls paid by whole-interface method flagging.
+
+    **This never silently returns the unwrapped object.** It used to
+    (``except Exception: return obj``), and that one line is the root of the
+    ``[out]``-param trap: 542 SolidWorks methods have ``[out]`` params, and
+    which marshalling convention applies depends ENTIRELY on whether the object
+    is early-bound. makepy handles all 542 uniformly -- call bare, read the
+    return tuple -- but on a raw late-bound dispatch that same call needs
+    ``VT_BYREF`` VARIANTs. A silent fallback therefore flipped the convention
+    invisibly, and the failure mode is a WRONG ANSWER, not an error: an
+    unwritten byref reads as "no data" == "no errors found". That cost a full
+    session chasing a non-existent "GetWhatsWrong is blind mid-build" defect.
+
+    So a call site can now TRUST that what it gets back is early-bound, and the
+    single calling convention (consume the tuple) is always correct.
+
+    Two quiet passthroughs remain, both provably not COM: ``None``, and an
+    object with no ``_oleobj_`` (a test double, which never reaches a COM
+    boundary). ``method_names`` is accepted for call-site compatibility and
+    ignored -- it only ever fed the ``flag_method_names`` fallback, which was
+    the silent late-binding path this removes.
     """
     from solidworks_mcp.adapters import sw_type_info
 
-    try:
-        return sw_type_info.early_bound_or_flag(obj, interface, *method_names)
-    except Exception:
-        return obj
+    if obj is None or getattr(obj, "_oleobj_", None) is None:
+        return obj  # not a COM dispatch -- nothing to bind, nothing to marshal
+
+    # Raises ValueError on an interface absent from the wrapper -- a typo or a
+    # wrapper that needs regenerating. Let it out; that is a bug, not a mode.
+    typed = sw_type_info.early_bound(obj, interface)
+    if sw_type_info.is_early_bound(typed, interface):
+        return typed
+
+    raise RuntimeError(
+        f"_early_bound({interface}) could not bind a generated wrapper to a live"
+        f" COM dispatch ({type(obj).__name__}). Refusing to hand back the raw"
+        " late-bound object: [out] params would then need VT_BYREF VARIANTs"
+        " instead of the return tuple, and getting that wrong reads as 'no"
+        " data' rather than failing. Regenerate the checked-in makepy wrapper"
+        " for this SolidWorks version, or bind the interface that declares the"
+        " member being called."
+    )
 
 
 def _flag_only(obj: Any, *method_names: str) -> None:

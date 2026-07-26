@@ -305,11 +305,13 @@ def _fake_gear_links(owner: str):
 
 
 def _patch_com_seam(monkeypatch, gear_owner: str = "drive-train") -> None:
-    """Replace the win32-only COM seam (pythoncom byref / MateGroup walk) with the
+    """Replace the win32-only COM seam (GetWhatsWrong / MateGroup walk) with the
     sleepy fakes; everything else stays production code."""
-    # whats_wrong() reads GetWhatsWrong via a pythoncom VT_BYREF VARIANT (win32
-    # only). Patch the reader, NOT assert_model_healthy -- the health.whats_wrong
-    # span we are testing lives in the (real) assert_model_healthy loop.
+    # whats_wrong() calls the early-bound GetWhatsWrong and consumes its return
+    # tuple (win32 only; it does NOT pass byref VARIANTs -- that idiom belongs to
+    # late-bound probes, see test_out_param_binding). Patch the reader, NOT
+    # assert_model_healthy -- the health.whats_wrong span we are testing lives in
+    # the (real) assert_model_healthy loop.
     def clean_whats_wrong(_adapter: Any, _model: Any) -> list:
         _sleep(T_WHATS_WRONG)
         return []
