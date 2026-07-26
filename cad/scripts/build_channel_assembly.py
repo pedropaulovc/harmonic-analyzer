@@ -469,23 +469,31 @@ def _copied_chain_instances(adapter: Any, j: int) -> dict[str, str]:
     (else the copy dropped a part), and the NEXT one must NOT (else the copy
     created extra instances, or the numbering rule this rests on has broken --
     either way the caller must not silently mate the wrong components).
+
+    ONE span around the whole loop, not one per lookup: eight near-instant
+    ``GetComponentByName`` leaves per copy would be 144 over the 18 copies,
+    the per-item trace flood AGENTS.md rules out. The aggregate lands as
+    attributes, and a failure names its own component in the raised error.
     """
-    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
-    comps: dict[str, str] = {}
-    for part in CHAIN_PARTS:
-        name = f"{part}-{j + 1}"
-        if asm.GetComponentByName(name) is None:
-            raise RuntimeError(
-                f"ch{j:02d} copy: expected instance {name!r} is absent -- the"
-                f" copy did not create its {part}, or channel instances are no"
-                " longer numbered one-per-channel in channel order")
-        extra = f"{part}-{j + 2}"
-        if asm.GetComponentByName(extra) is not None:
-            raise RuntimeError(
-                f"ch{j:02d} copy: unexpected instance {extra!r} already exists"
-                f" -- the copy created more than one {part}, or the"
-                " one-instance-per-channel numbering rule has broken")
-        comps[part] = name
+    with _telemetry.span("cwm.copied_instances", channel=j) as csp:
+        asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
+        comps: dict[str, str] = {}
+        for part in CHAIN_PARTS:
+            name = f"{part}-{j + 1}"
+            if asm.GetComponentByName(name) is None:
+                raise RuntimeError(
+                    f"ch{j:02d} copy: expected instance {name!r} is absent -- the"
+                    f" copy did not create its {part}, or channel instances are no"
+                    " longer numbered one-per-channel in channel order")
+            extra = f"{part}-{j + 2}"
+            if asm.GetComponentByName(extra) is not None:
+                raise RuntimeError(
+                    f"ch{j:02d} copy: unexpected instance {extra!r} already exists"
+                    f" -- the copy created more than one {part}, or the"
+                    " one-instance-per-channel numbering rule has broken")
+            comps[part] = name
+        csp.set_attribute("components", len(comps))
+        csp.set_attribute("lookups", 2 * len(CHAIN_PARTS))
     return comps
 
 

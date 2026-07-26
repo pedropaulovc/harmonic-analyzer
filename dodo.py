@@ -1739,6 +1739,11 @@ def task_check():
         SCRIPTS_DIR / "test_fastener_drawing_metadata.py",
         SCRIPTS_DIR / "test_remaining_fastener_drawings.py",
         SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
+        # Was omitted while its two siblings above were enrolled, so NO gate ran
+        # it: converting channel to a three-view diagram left it reading
+        # attributes the sheet no longer defines, and every check:* gate stayed
+        # green (codex #416). Enrolled so the cross-sheet contracts are covered.
+        SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
     ]
     recipe_test_deps = sorted({
         *(str(path.resolve()) for path in recipe_tests),

@@ -29,8 +29,17 @@ SHEETS = (
     draw_summing_assembly,
 )
 
+# Sheets that carry a BOM, balloons and assembly notes. The two exclusions are
+# ARRANGEMENT DIAGRAMS -- three views and nothing else -- so they define none of
+# the ``ASSEMBLY_NOTES`` / ``BOM_COMPONENTS`` / ``BOM_PART_NUMBERS`` attributes
+# the contracts below read. paper-drive is a mechanism still changing; channel
+# was reduced 2026-07-25 because AutoBalloon5 cannot place its item 4/7 cluster
+# without crossing leaders (see draw_channel_assembly's module docstring) and
+# will be restored when it regains deterministic balloon placement.
+DIAGRAM_SHEETS = (draw_channel_assembly, draw_paper_drive_assembly)
+
 DOCUMENTATION_SHEETS = tuple(
-    drawing for drawing in SHEETS if drawing is not draw_paper_drive_assembly
+    drawing for drawing in SHEETS if drawing not in DIAGRAM_SHEETS
 )
 
 ORDINARY_SHEETS = tuple(
@@ -99,6 +108,26 @@ def test_bom_identity_map_accepts_stems_and_released_number_aliases() -> None:
     assert identities["mha-013"] == "cone-gear"
     assert identities["pinion-cam-pin"] == "pinion-cam-pin"
     assert identities["mha-116"] == "pinion-cam-pin"
+
+
+def test_diagram_sheets_really_are_bare_three_view_diagrams() -> None:
+    """The exclusion above must stay honest in both directions.
+
+    Without this, a sheet could be parked in DIAGRAM_SHEETS to duck the
+    documentation contracts while still carrying a half-built BOM.
+    """
+    for drawing in DIAGRAM_SHEETS:
+        for attribute in ("ASSEMBLY_NOTES", "BOM_COMPONENTS", "BOM_PART_NUMBERS"):
+            assert not hasattr(drawing, attribute), (
+                f"{drawing.ARTIFACT_STEM} defines {attribute} -- it is classified "
+                "as an arrangement diagram, so move it back to the documentation "
+                "sheets rather than half-restoring its parts list"
+            )
+        source = Path(drawing.__file__).read_text(encoding="utf-8")
+        assert source.count("place_view(") == 3, drawing.ARTIFACT_STEM
+        assert "insert_identified_bom_table(" not in source, drawing.ARTIFACT_STEM
+        assert "add_auto_balloons" not in source, drawing.ARTIFACT_STEM
+        assert "add_note(" not in source, drawing.ARTIFACT_STEM
 
 
 def test_assembly_notes_do_not_repeat_title_block_metadata() -> None:
