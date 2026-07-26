@@ -69,6 +69,23 @@ def test_dodo_yields_the_assembly_drawing_task() -> None:
     }
 
 
+def test_copied_channel_axes_use_component_correspondence() -> None:
+    source = (Path(__file__).parent / "build_channel_assembly.py").read_text(
+        encoding="utf-8"
+    )
+    for component, axis in (
+        ("rocker_c", "Axis2"),
+        ("bar_c", "Axis2"),
+        ("rod_c", "Axis1"),
+        ("rocker", "Axis2"),
+        ("bar", "Axis2"),
+        ("rod", "Axis1"),
+    ):
+        assert f'component_named_ref({component}, "{axis}")' in source
+        if component.endswith("_c"):
+            assert f'named_ref(f"{axis}@{{{component}}}"' not in source
+
+
 def test_assembly_stamps_title_block_properties() -> None:
     source = (Path(__file__).parent / "build_channel_assembly.py").read_text(
         encoding="utf-8"

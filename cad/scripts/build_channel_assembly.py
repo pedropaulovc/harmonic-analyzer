@@ -137,6 +137,7 @@ from _assembly import (
     check_no_interference,
     coincident_mate,
     collected_dof_specs,
+    component_named_ref,
     component_names,
     component_transform,
     concentric_mate,
@@ -1575,7 +1576,7 @@ async def build(adapter) -> dict[str, str]:
                 drives: list[str] = []
                 _put_all_copies()
                 mate = await spin_driver(
-                    adapter, named_ref(f"Axis2@{rocker_c}", "AXIS"),
+                    adapter, component_named_ref(rocker_c, "Axis2"),
                     pivot_w, (off[0], off[1]),
                     label=(f"J1 rocker ch{j:02d} spin ->"
                            f" {off[0]:.1f},{off[1]:.1f}"),
@@ -1583,7 +1584,7 @@ async def build(adapter) -> dict[str, str]:
                 drives.append(mate["name"])
                 _put_all_copies()
                 mate = await distance_driver(
-                    adapter, named_ref(f"Axis2@{bar_c}", "AXIS"),
+                    adapter, component_named_ref(bar_c, "Axis2"),
                     named_ref("Right Plane", "PLANE"), foot[0],
                     label=(f"J3 bar ch{j:02d} AMPLITUDE drive"
                            f" foot-X={foot[0]:.2f} (amp"
@@ -1603,7 +1604,7 @@ async def build(adapter) -> dict[str, str]:
                             f"{component_mate_dump(adapter, comps[part])}"
                         )
                 mate = await spin_driver(
-                    adapter, named_ref(f"Axis1@{rod_c}", "AXIS"),
+                    adapter, component_named_ref(rod_c, "Axis1"),
                     (pin[0], pin[1]), (ring[0], ring[1]),
                     label=(f"J2 rod ch{j:02d} swing -> ring"
                            f" {ring[0]:.1f},{ring[1]:.1f}"),
@@ -1689,7 +1690,7 @@ async def build(adapter) -> dict[str, str]:
             tgt = _org(adapter, rocker)
             off = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
             await spin_driver(
-                adapter, named_ref(f"Axis2@{rocker}", "AXIS"), pivot_w,
+                adapter, component_named_ref(rocker, "Axis2"), pivot_w,
                 (off[0], off[1]),
                 label=f"J1 rocker ch{j:02d} spin -> {off[0]:.1f},{off[1]:.1f}",
                 verify=(rocker, tgt), free_dof_key=f"rocker_angle_{j:02d}")
@@ -1698,7 +1699,7 @@ async def build(adapter) -> dict[str, str]:
             ring = world_point(adapter, rod, ROD_STRAP_BORE_LOCAL)
             pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
             await spin_driver(
-                adapter, named_ref(f"Axis1@{rod}", "AXIS"),
+                adapter, component_named_ref(rod, "Axis1"),
                 (pin[0], pin[1]), (ring[0], ring[1]),
                 label=f"J2 rod ch{j:02d} swing -> ring {ring[0]:.1f},{ring[1]:.1f}",
                 verify=(rod, tgt), free_dof_key=f"rod_swing_{j:02d}")
@@ -1708,7 +1709,7 @@ async def build(adapter) -> dict[str, str]:
             amplitude = foot[0] - pivot_w[0]
             await distance_driver(
                 adapter,
-                named_ref(f"Axis2@{bar}", "AXIS"),
+                component_named_ref(bar, "Axis2"),
                 named_ref("Right Plane", "PLANE"),
                 foot[0],
                 label=(f"J3 bar ch{j:02d} AMPLITUDE drive foot-X={foot[0]:.2f}"
