@@ -120,18 +120,25 @@ def _pin_bore_removed() -> float:
 
 
 def _cam_relief_intervals(y: float, centers) -> list[tuple[float, float]]:
-    """Scallop intervals clipped to the bottom-cap chord at local *y*."""
-    if not -R_END <= y <= 0.0:
+    """Scallop intervals clipped to the rounded strap outline at local *y*."""
+    if not -R_END <= y <= C2C + R_END:
         return []
-    cap_half = math.sqrt(max(R_END * R_END - y * y, 0.0))
+    if y < 0.0:
+        strap_half = math.sqrt(max(R_END * R_END - y * y, 0.0))
+    elif y <= C2C:
+        strap_half = R_END
+    else:
+        strap_half = math.sqrt(
+            max(R_END * R_END - (y - C2C) * (y - C2C), 0.0)
+        )
     intervals: list[tuple[float, float]] = []
     for cx, cy in centers:
         dy = y - cy
         if abs(dy) >= CAM_RELIEF_RADIUS:
             continue
         half = math.sqrt(CAM_RELIEF_RADIUS**2 - dy * dy)
-        lo = max(-cap_half, cx - half)
-        hi = min(cap_half, cx + half)
+        lo = max(-strap_half, cx - half)
+        hi = min(strap_half, cx + half)
         if hi > lo:
             intervals.append((lo, hi))
     return sorted(intervals)
@@ -153,9 +160,10 @@ def _cam_relief_width(y: float, centers) -> float:
 
 
 def _cam_relief_area(centers) -> float:
-    """Plan area removed from the R9 pivot cap, Simpson-integrated."""
+    """Plan area removed from the rounded strap, Simpson-integrated."""
     n = 4000
-    h = R_END / n
+    span = C2C + 2.0 * R_END
+    h = span / n
     values = [_cam_relief_width(-R_END + i * h, centers) for i in range(n + 1)]
     return h / 3.0 * (
         values[0] + values[-1]
