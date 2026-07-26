@@ -35,12 +35,26 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+from pathlib import Path
 from typing import Any
 
-import pythoncom
-from win32com.client import VARIANT
+# This probe used to live in cad/scripts/, where _common was a sibling. Moved
+# into diagnostics/, sys.path[0] is this directory, so the import below fails
+# with ModuleNotFoundError before reaching SolidWorks -- same insert every other
+# relocated diagnostic carries.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import OUT_SLDASM, _flag, _read_member, check, log, run_build
+import pythoncom  # noqa: E402
+from win32com.client import VARIANT  # noqa: E402
+
+from _common import (  # noqa: E402
+    OUT_SLDASM,
+    _flag,
+    _read_member,
+    check,
+    log,
+    run_build,
+)
 
 SILENT = 1           # swSaveAsOptions_Silent
 # swSaveAsOptions_SaveReferenced is 4; 8 is AvoidRebuildOnSave (checked against
