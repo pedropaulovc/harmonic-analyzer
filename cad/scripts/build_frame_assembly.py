@@ -50,7 +50,7 @@ depth):
 Hold-down: four 9/16-12 lag screws come up through the base into the support
 foot's tapped holes. The base was re-drilled to the foot's pattern (4 holes at
 local X +/-60.32, Z +/-17.46 -> machine x 55.44/90.36,
-z -24.905/+95.735; see
+z -60.32/+60.32; see
 build_harmonic_base.py HOLE_XZ) with O23 head counterbores on its underside, and
 the lag screws (build_lag_screw.py, resized to the 9/16-12 foot tap) are
 inserted at their exact authored transforms and locked to the fixed base. The

@@ -138,6 +138,7 @@ def _circular_edge(
     return edge
 
 
+@_telemetry.traced("drawing.bore_rim_scan")
 def _bore_rim_edge(adapter: Any, view: Any, *, diameter_mm: float) -> Any:
     """Return a rim adjacent to the unique cylindrical bore of this diameter."""
     expected_radius_m = diameter_mm / 2000.0

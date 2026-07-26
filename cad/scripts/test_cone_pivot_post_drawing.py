@@ -182,6 +182,14 @@ def test_view_scales_are_explicit() -> None:
     assert source.count("scale=(1, 2)") == 1
 
 
+def test_bore_rim_com_scan_is_traced() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        '@_telemetry.traced("drawing.bore_rim_scan")\n'
+        "def _bore_rim_edge"
+    ) in source
+
+
 def test_part_config_is_a_machined_casting() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source

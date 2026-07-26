@@ -751,7 +751,7 @@ sections:
         - original support placement retained; apex top at y = 228.6
         - med
       - - Hold-down lag screws ×4 (M6.10)
-        - '9/16-12 screws rise through the base into the support''s source-replayed four-tap pattern at machine (x, z) = (55.44 or 90.36, −24.905 or +95.735); base holes and counterbores consume this shared transformed contract.'
+        - '9/16-12 screws rise through the base into the support''s source-replayed four-tap pattern at machine (x, z) = (55.44 or 90.36, −60.32 or +60.32); base holes and counterbores consume this shared transformed contract.'
         - the support's 63.5 mounting-hole pitch (`build_rocker_arm_support.py`); placed in frame.SLDASM (`build_lag_screw.py`)
         - low
       - - Ball mounts ×2
