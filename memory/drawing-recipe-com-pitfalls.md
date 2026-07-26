@@ -62,4 +62,43 @@ BOM + auto-balloons):
     fits ~7 characters (`MHA-###` / `MHA-A##`); a longer id overlaps the REV
     cell.
 
-Related: [[codex-drawing-image-review]].
+19. **A named part entity beats a coordinate pick — UNPROVEN here, but the API
+    path is documented (2026-07-26, Pedro's suggestion).** Every attached
+    annotation ultimately needs a SELECTION: `IModelDoc2::InsertDatumTag2()`
+    takes **no arguments** and acts on whatever is selected, and SolidWorks' own
+    example does exactly what this repo does — coordinate `SelectByID2("",
+    "EDGE", x, y, ...)` then `InsertDatumTag2()` (it does not even check the
+    selection's return). So the coordinate idiom is CANONICAL, not a shortcut,
+    and it is safe here only because item 1 pins every view scale.
+
+    The failure mode is what argues against it: a pick that lands slightly off
+    does not necessarily FAIL — it can silently select a NEIGHBOURING edge and
+    attach datum A to the wrong face, which passes every gate and looks
+    plausible on the render. A name cannot do that.
+
+    The documented alternative, per the *Select Entity in Drawing View* example:
+    `IView::SelectEntity` accepts a **MODEL** entity (the example passes one
+    straight from the part's `GetSelectedObject6`) and selects its projection in
+    that view. Pair it with `IPartDoc::SetEntityName` / `GetEntityByName` in the
+    part build and the sheet coordinate disappears entirely.
+
+    Verify before adopting: `SetEntityName` REFUSES when the entity is already
+    named or the name is not unique (SolidWorks auto-names faces used by
+    assembly mates), so read the existing name first; the example warns a
+    dimension "is not guaranteed to be created if a face is selected" and that
+    `SelectEntity` can select an entity NOT VISIBLE in the view, so face-vs-edge
+    datum attachment needs a live probe. ~218 `edge_xy=` call sites exist —
+    migrate the datum/GD&T attachments first, where a silent wrong-edge pick
+    does the most damage.
+
+    Independent of that: `place_view` never reads back `IView.Position` after
+    `CreateDrawViewFromModelView3`, so if SolidWorks ever snaps or nudges a
+    view, EVERY computed pick on it shifts and nothing notices. Asserting
+    requested-vs-actual position is a few lines and would confirm or kill that
+    class outright. Open symptom that motivated this: `drawing:top_crossbar`
+    failed its datum pick once inside a `doit -n 4` run and passed standalone
+    against the SAME .SLDPRT, with view scales pinned — so neither geometry nor
+    auto-scale explains it, and it remains UNDIAGNOSED (do not repeat the
+    earlier mistake of asserting seat contention from one failure and one pass).
+
+Related: [[codex-drawing-image-review]], [[no-untested-failure-assumptions]].
