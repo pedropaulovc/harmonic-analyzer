@@ -129,13 +129,13 @@ def _dimensions(feat):
     """
     rows = []
     feat = _early_bound(
-        feat, "IFeature", "GetFirstDisplayDimension", "GetNextDisplayDimension"
+        feat, "IFeature"
     )
     disp = _read_member(feat, "GetFirstDisplayDimension")
     for _ in range(1000):
         if not disp:
             break
-        disp = _early_bound(disp, "IDisplayDimension", "GetDimension2", "Type2")
+        disp = _early_bound(disp, "IDisplayDimension")
         try:
             idim = _early_bound(disp.GetDimension2(0), "IDimension", "GetType")
         except Exception:  # noqa: BLE001
@@ -168,8 +168,7 @@ def _sketch(feat):
     sk = _g(feat, "GetSpecificFeature2")
     if sk is None:
         return None
-    sk = _early_bound(sk, "ISketch", "GetSketchSegments", "GetSketchPoints2",
-                      "GetConstrainedStatus", "ModelToSketchTransform")
+    sk = _early_bound(sk, "ISketch")
     info = {
         "constrained_status": _g(sk, "GetConstrainedStatus"),
         "is_3d": bool(_g(sk, "Is3D")),
@@ -184,8 +183,7 @@ def _sketch(feat):
             info["model_to_sketch"] = [round(float(v), 9) for v in arr]
 
     for s in _g(sk, "GetSketchSegments") or []:
-        s = _early_bound(s, "ISketchSegment", "GetType", "GetName", "GetLength",
-                         "GetRelationsCount")
+        s = _early_bound(s, "ISketchSegment")
         st = _g(s, "GetType")
         row = {
             "kind": SEG_TYPES.get(int(st) if st is not None else -1, f"type{st}"),
@@ -195,20 +193,18 @@ def _sketch(feat):
             "relations": _g(s, "GetRelationsCount"),
         }
         if row["kind"] == "line":
-            ln = _early_bound(s, "ISketchLine", "GetStartPoint2", "GetEndPoint2")
+            ln = _early_bound(s, "ISketchLine")
             row["start"] = _pt(_g(ln, "GetStartPoint2"))
             row["end"] = _pt(_g(ln, "GetEndPoint2"))
         elif row["kind"] == "arc":
-            ar = _early_bound(s, "ISketchArc", "GetCenterPoint2", "GetStartPoint2",
-                              "GetEndPoint2", "GetRadius", "IsCircle")
+            ar = _early_bound(s, "ISketchArc")
             row["center"] = _pt(_g(ar, "GetCenterPoint2"))
             row["start"] = _pt(_g(ar, "GetStartPoint2"))
             row["end"] = _pt(_g(ar, "GetEndPoint2"))
             row["radius_mm"] = _mm(_g(ar, "GetRadius"))
             row["is_circle"] = bool(_g(ar, "IsCircle"))
         elif row["kind"] == "ellipse":
-            el = _early_bound(s, "ISketchEllipse", "GetCenterPoint2", "GetStartPoint2",
-                              "GetEndPoint2", "GetMajorPoint2", "GetMinorPoint2")
+            el = _early_bound(s, "ISketchEllipse")
             for key, meth in (("center", "GetCenterPoint2"), ("start", "GetStartPoint2"),
                               ("end", "GetEndPoint2"), ("major", "GetMajorPoint2"),
                               ("minor", "GetMinorPoint2")):
@@ -230,8 +226,7 @@ def _feature_data(feat, type_name):
         return None
     out: dict = {}
     if type_name in ("Extrusion", "ICE"):  # boss AND cut extrudes
-        d = _early_bound(raw, "IExtrudeFeatureData2", "GetDepth", "GetEndCondition",
-                         "GetDraftAngle")
+        d = _early_bound(raw, "IExtrudeFeatureData2")
         for key, meth, args in (
             ("depth1_mm", "GetDepth", (True,)),
             ("depth2_mm", "GetDepth", (False,)),
@@ -254,8 +249,7 @@ def _feature_data(feat, type_name):
                 continue
             out[prop] = _mm(v) if prop == "FromOffsetDistance" else v
     elif type_name in ("RevolveBoss", "RevolveCut", "Revolve"):
-        d = _early_bound(raw, "IRevolveFeatureData2", "GetRevolutionAngle",
-                         "GetAxisType")
+        d = _early_bound(raw, "IRevolveFeatureData2")
         for key, prop in (("angle_deg", "GetRevolutionAngle"),
                           ("reverse", "ReverseDirection"), ("type", "Type"),
                           ("is_boss", "IsBossFeature"), ("is_thin", "IsThinFeature"),
@@ -318,8 +312,7 @@ def _tree(model):
     for _ in range(5000):
         if not feat:
             break
-        feat = _early_bound(feat, "IFeature", "GetNextFeature", "GetTypeName2",
-                            "GetSpecificFeature2", "GetFirstSubFeature")
+        feat = _early_bound(feat, "IFeature")
         name = str(_g(feat, "Name"))
         tn = str(_g(feat, "GetTypeName2"))
         if tn in SKIP_TYPES:
@@ -341,8 +334,7 @@ def _tree(model):
         for _ in range(100):
             if not sub:
                 break
-            sub = _early_bound(sub, "IFeature", "GetNextSubFeature", "GetTypeName2",
-                               "GetSpecificFeature2")
+            sub = _early_bound(sub, "IFeature")
             stn = str(_g(sub, "GetTypeName2"))
             srow = {"name": str(_g(sub, "Name")), "type": stn,
                     "dimensions": _dimensions(sub)}
@@ -380,7 +372,7 @@ def _entity(ent):
     if ent is None:
         return None
     out: dict = {}
-    sel = _g(_early_bound(ent, "IEntity", "GetType"), "GetType")
+    sel = _g(_early_bound(ent, "IEntity"), "GetType")
     if sel is not None:
         out["select_type"] = SELECT_TYPES.get(int(sel), sel)
     if out.get("select_type") != "face":
@@ -391,7 +383,7 @@ def _entity(ent):
         if isinstance(name, str) and name:
             out["name"] = name
         return out or None
-    face = _early_bound(ent, "IFace2", "GetFeature", "GetSurface", "GetArea", "GetBox")
+    face = _early_bound(ent, "IFace2")
     feat = _g(face, "GetFeature")
     if feat is not None:
         out["owner_feature"] = str(_g(_early_bound(feat, "IFeature"), "Name"))
@@ -411,8 +403,7 @@ def _entity(ent):
 def _surface(surf):
     if surf is None:
         return None
-    s = _early_bound(surf, "ISurface", "IsPlane", "IsCylinder", "IsCone", "IsSphere",
-                     "IsTorus")
+    s = _early_bound(surf, "ISurface")
     for flag, kind, params in (("IsPlane", "plane", "PlaneParams"),
                                ("IsCylinder", "cylinder", "CylinderParams"),
                                ("IsCone", "cone", "ConeParams"),
@@ -444,8 +435,7 @@ def _refs(model):
     for _ in range(5000):
         if not feat:
             break
-        feat = _early_bound(feat, "IFeature", "GetNextFeature", "GetTypeName2",
-                            "GetSpecificFeature2", "GetParents")
+        feat = _early_bound(feat, "IFeature")
         name = str(_g(feat, "Name"))
         tn = str(_g(feat, "GetTypeName2"))
         if tn in SKIP_TYPES:
@@ -540,11 +530,11 @@ def _plane_refs(feat, model, name):
 # pass 3 -- the as-built B-rep
 # --------------------------------------------------------------------------
 def _faces(adapter):
-    part = _early_bound(adapter.currentModel, "IPartDoc", "GetBodies2")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = part.GetBodies2(0, True) or []
     out = []
     for b in bodies:
-        b = _early_bound(b, "IBody2", "GetBodyBox", "GetFaceCount", "GetFaces")
+        b = _early_bound(b, "IBody2")
         brow = {
             "name": str(_g(b, "Name")),
             "box_mm": [_mm(v) for v in (_g(b, "GetBodyBox") or [])],
@@ -552,8 +542,7 @@ def _faces(adapter):
             "faces": [],
         }
         for i, f in enumerate(_g(b, "GetFaces") or []):
-            f = _early_bound(f, "IFace2", "GetSurface", "GetArea", "GetFeature",
-                             "GetBox")
+            f = _early_bound(f, "IFace2")
             row = {"i": i, "area_mm2": round(float(_g(f, "GetArea") or 0.0) * 1e6, 4)}
             feat = _g(f, "GetFeature")
             if feat is not None:
@@ -593,7 +582,7 @@ def _doc_level(adapter, model):
     mgr = _g(model, "GetEquationMgr")
     eqns = []
     if mgr is not None:
-        mgr = _early_bound(mgr, "IEquationMgr", "GetCount")
+        mgr = _early_bound(mgr, "IEquationMgr")
         for i in range(int(_g(mgr, "GetCount") or 0)):
             try:
                 equation = str(mgr.Equation(i))
@@ -613,7 +602,7 @@ def _doc_level(adapter, model):
     ext = _g(model, "Extension")
     try:
         cpm = ext.CustomPropertyManager("")
-        for nm in (_g(_early_bound(cpm, "ICustomPropertyManager", "GetNames"),
+        for nm in (_g(_early_bound(cpm, "ICustomPropertyManager"),
                       "GetNames") or []):
             try:
                 res = cpm.Get5(str(nm), False)
@@ -646,8 +635,7 @@ async def build(adapter) -> dict[str, str]:
             "usage: diag_dump_part.py <part.SLDPRT> [out.json] [--no-refs] "
             "[--no-faces]")
     check("open", await adapter.open_model(str(PART)))
-    model = _early_bound(adapter.currentModel, "IModelDoc2", "FirstFeature",
-                         "GetTitle", "GetEquationMgr")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     doc: dict = {"path": str(PART), "title": str(_g(model, "GetTitle"))}
     doc.update(_doc_level(adapter, model))
 

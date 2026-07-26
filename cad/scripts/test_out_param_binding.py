@@ -131,6 +131,39 @@ def test_late_bound_probes_declare_themselves(path: Path) -> None:
     )
 
 
+def test_every_scanned_source_is_a_check_recipe_dependency() -> None:
+    """This gate must re-run when a file it SCANS changes, not just this file.
+
+    The two tests above open sources rather than importing them, so
+    ``module_deps_of`` cannot discover them -- an import graph does not cover a
+    file a test merely reads. If they are not ``file_dep``s, the first green
+    stamp freezes the gate: adding a ``VT_BYREF`` to a build script leaves
+    ``check:recipe`` up to date and the enforcement silently stops enforcing.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "dodo", Path(__file__).resolve().parents[2] / "dodo.py"
+    )
+    assert spec is not None and spec.loader is not None
+    dodo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dodo)
+
+    deps = {
+        Path(dep).resolve()
+        for task in dodo.task_check()
+        if task["name"] == "recipe"
+        for dep in task["file_dep"]
+    }
+    scanned = {p.resolve() for p in _build_path_sources()}
+    scanned |= {p.resolve() for p in DIAGNOSTICS.glob("*.py")}
+    missing = sorted(p.name for p in scanned - deps)
+    assert not missing, (
+        "check:recipe does not depend on sources this gate scans, so edits to "
+        "them will not re-run it:\n  " + "\n  ".join(missing)
+    )
+
+
 def test_early_bound_refuses_to_return_a_raw_dispatch() -> None:
     """The root-cause fix itself: no silent fallback to late binding.
 

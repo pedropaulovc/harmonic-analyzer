@@ -97,7 +97,7 @@ def test_early_bound_RAISES_rather_than_returning_a_raw_dispatch(monkeypatch)\
     original = _Dispatch()
     _patch_binding(monkeypatch, typed=original, early=False)
     with pytest.raises(RuntimeError, match="could not bind"):
-        _early_bound(original, "IComponent2", "GetModelDoc2")
+        _early_bound(original, "IComponent2")
 
 
 def test_non_com_objects_still_pass_through_quietly(monkeypatch) -> None:

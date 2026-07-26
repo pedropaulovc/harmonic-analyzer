@@ -1192,11 +1192,11 @@ class PatternDirection(StrEnum):
 
 
 def _top_features(model: Any) -> list[Any]:
-    model = _early_bound(model, "IModelDoc2", "FirstFeature")
+    model = _early_bound(model, "IModelDoc2")
     features = []
     feature = _read_member(model, "FirstFeature")
     while feature is not None:
-        feature = _early_bound(feature, "IFeature", "GetNextFeature")
+        feature = _early_bound(feature, "IFeature")
         features.append(feature)
         feature = feature.GetNextFeature()
     return features
@@ -1242,14 +1242,14 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     # feature tree, so searching backward from the tail took 39-78 seconds on
     # large mechanisms and any fixed scan bound eventually failed.
     selection = _early_bound(
-        model.SelectionManager, "ISelectionMgr", "GetSelectedObject6"
+        model.SelectionManager, "ISelectionMgr"
     )
     created = adapter._attempt(
         lambda: selection.GetSelectedObject6(1, -1), default=None
     )
     if created is None:
         raise RuntimeError(f"cannot read newly-created global {key}-axis")
-    created = _early_bound(created, "IFeature", "GetTypeName2")
+    created = _early_bound(created, "IFeature")
     if str(created.GetTypeName2()) != "RefAxis":
         raise RuntimeError(
             f"new global {key}-axis selected {created.GetTypeName2()!r}, expected RefAxis"
@@ -1386,7 +1386,7 @@ async def linear_component_pattern(
     ):
         _select_pattern_inputs(adapter, seeds, direction_name, "AXIS")
         manager = _early_bound(
-            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+            model.FeatureManager, "IFeatureManager"
         )
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
         if definition is None:
@@ -1415,7 +1415,7 @@ async def linear_component_pattern(
             )
         names = []
         for component in created:
-            component = _early_bound(component, "IComponent2", "IsPatternInstance")
+            component = _early_bound(component, "IComponent2")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
@@ -1468,7 +1468,7 @@ async def grid_component_pattern(
             adapter, seeds, direction1_name, "AXIS", direction2_name, "AXIS"
         )
         manager = _early_bound(
-            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+            model.FeatureManager, "IFeatureManager"
         )
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
         if definition is None:
@@ -1497,7 +1497,7 @@ async def grid_component_pattern(
             )
         names = []
         for component in created:
-            component = _early_bound(component, "IComponent2", "IsPatternInstance")
+            component = _early_bound(component, "IComponent2")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
@@ -1536,7 +1536,7 @@ async def circular_component_pattern(
     ):
         _select_pattern_inputs(adapter, seeds, axis_name, "AXIS")
         manager = _early_bound(
-            model.FeatureManager, "IFeatureManager", "CreateDefinition", "CreateFeature"
+            model.FeatureManager, "IFeatureManager"
         )
         definition = manager.CreateDefinition(_LOCAL_CIRCULAR_PATTERN)
         if definition is None:
@@ -1561,7 +1561,7 @@ async def circular_component_pattern(
             )
         names = []
         for component in created:
-            component = _early_bound(component, "IComponent2", "IsPatternInstance")
+            component = _early_bound(component, "IComponent2")
             name = str(_read_member(component, "Name2"))
             if not component.IsPatternInstance():
                 raise RuntimeError(f"{name} is not owned by the component pattern")
@@ -1663,8 +1663,8 @@ async def place_components_batch(
         grounds.append(bool(spec.get("ground", True)))
 
     raw_model = adapter.currentModel
-    asm = _early_bound(raw_model, "IAssemblyDoc", "AddComponents3")
-    model_doc = _early_bound(raw_model, "IModelDoc2", "ClearSelection2")
+    asm = _early_bound(raw_model, "IAssemblyDoc")
+    model_doc = _early_bound(raw_model, "IModelDoc2")
     names_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, names)
     xforms_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, transforms)
     coordsys_arg = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, [""] * len(names))
@@ -1832,7 +1832,7 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
             # Wrap once as IComponent2 so both zero-arg methods invoke known
             # DISPIDs; Name2/IsFixed remain property reads.
             component = _early_bound(
-                component, "IComponent2", "IsPatternInstance", "GetConstrainedStatus"
+                component, "IComponent2"
             )
             comp_name = str(_read_member(component, "Name2"))
             if bool(_read_member(component, "IsFixed")):
@@ -2072,7 +2072,7 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     under = []
     for component in components:
         component = _early_bound(
-            component, "IComponent2", "IsPatternInstance", "GetConstrainedStatus"
+            component, "IComponent2"
         )
         comp_name = str(_read_member(component, "Name2"))
         if bool(_read_member(component, "IsFixed")):
@@ -2186,7 +2186,7 @@ def assert_free_dof_necessity(
 
 def component_names(adapter: Any) -> list[str]:
     """Top-level component names (``Name2``) of the active assembly."""
-    asm = _early_bound(adapter.currentModel, "IAssemblyDoc", "GetComponents")
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
     components = adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
     names = []
     for component in components:
@@ -2252,7 +2252,7 @@ def check_no_interference(
         mgr = _read_member(asm, "InterferenceDetectionManager")
         if mgr is None:
             raise RuntimeError("InterferenceDetectionManager unavailable")
-        mgr = _early_bound(mgr, "IInterferenceDetectionMgr", "GetInterferences")
+        mgr = _early_bound(mgr, "IInterferenceDetectionMgr")
         mgr.TreatCoincidenceAsInterference = False
         mgr.TreatSubAssembliesAsComponents = True
         mgr.IncludeMultibodyPartInterferences = True
@@ -2380,8 +2380,8 @@ def assert_model_healthy(
     in the parent's What's Wrong, only in the sub document's.
     """
     raw_model = model or adapter.currentModel
-    model_doc = _early_bound(raw_model, "IModelDoc2", "ForceRebuild3")
-    asm_doc = _early_bound(raw_model, "IAssemblyDoc", "GetComponents")
+    model_doc = _early_bound(raw_model, "IModelDoc2")
+    asm_doc = _early_bound(raw_model, "IAssemblyDoc")
     with _telemetry.span("gate.health", label=label or "top", deep=deep) as hsp:
         # ``rebuilt`` may be supplied by a caller that already re-solved this
         # model (the soundness suite's single shared rebuild). Emit a rebuild span
@@ -2404,7 +2404,7 @@ def assert_model_healthy(
                 for comp in comps:
                     # Wrap once as IComponent2 so GetModelDoc2 invokes its known
                     # DISPID; Name2 remains a property read.
-                    comp = _early_bound(comp, "IComponent2", "GetModelDoc2")
+                    comp = _early_bound(comp, "IComponent2")
                     name = str(_read_member(comp, "Name2"))
                     if "/" in name:  # top-level instances only; their docs cover nested parts
                         continue
@@ -2488,7 +2488,7 @@ def remap_front_to_machine_front(adapter: Any) -> None:
     change. Leaves Front active so the saved document opens on the machine front.
     """
     SW_FRONT, SW_BACK = 1, 2  # swStandardViews_e
-    model = _early_bound(adapter.currentModel, "IModelDoc2", "ShowNamedView2")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     model.ShowNamedView2("", SW_BACK)  # orient to the machine front
     ok = model.Extension.UpdateStandardViews("", SW_FRONT)
     if not ok:
@@ -2920,13 +2920,13 @@ def select_mates_folder(adapter: Any, model: Any = None) -> bool:
         feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
         if feat is None:
             continue
-        feat = _early_bound(feat, "IFeature", "GetTypeName2", "Select2")
+        feat = _early_bound(feat, "IFeature")
         if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
             return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
     feat = adapter._attempt(lambda: model.FirstFeature(), default=None)
     while feat is not None:
         feat = _early_bound(
-            feat, "IFeature", "GetTypeName2", "Select2", "GetNextFeature"
+            feat, "IFeature"
         )
         if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
             return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))

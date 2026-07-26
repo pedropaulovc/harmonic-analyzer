@@ -143,13 +143,13 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
     """
     candidates: list[tuple[float, float, Any]] = []
     for edge in visible_view_entities(view, 1, label="tip-block foot edges"):
-        edge = _early_bound(edge, "IEdge", "GetStartVertex", "GetEndVertex")
+        edge = _early_bound(edge, "IEdge")
         start = edge.GetStartVertex()
         end = edge.GetEndVertex()
         if start is None or end is None:
             continue
-        start = _early_bound(start, "IVertex", "GetPoint")
-        end = _early_bound(end, "IVertex", "GetPoint")
+        start = _early_bound(start, "IVertex")
+        end = _early_bound(end, "IVertex")
         p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
         p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
         if abs(p0[1]) > 0.01 or abs(p1[1]) > 0.01:

@@ -1751,9 +1751,22 @@ def task_check():
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
     ]
+    # test_out_param_binding SCANS sources instead of importing them (it reads
+    # every top-level build script and every diagnostics/*.py looking for
+    # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
+    # cover a file the test merely opens. Without these, the first green stamp
+    # would freeze the gate: adding a VT_BYREF to a build script, or an unmarked
+    # late-bound probe, leaves check:recipe "up to date" and the enforcement
+    # silently stops enforcing (codex #418). Same failure shape as the
+    # never-enrolled contract test above -- a green gate that checks nothing.
+    scanned_by_binding_gate = {
+        *(str(path.resolve()) for path in SCRIPTS_DIR.glob("*.py")),
+        *(str(path.resolve()) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
+    }
     recipe_test_deps = sorted({
         *(str(path.resolve()) for path in recipe_tests),
         *(dep for path in recipe_tests for dep in module_deps_of(path)),
+        *scanned_by_binding_gate,
         str((REPO_ROOT / "comparisons" / "tools" / "composite.py").resolve()),
         str((REPO_ROOT / "comparisons" / "tools" / "pose_manifest.py").resolve()),
         str((REPO_ROOT / "comparisons" / "tools" / "render_offline.py").resolve()),

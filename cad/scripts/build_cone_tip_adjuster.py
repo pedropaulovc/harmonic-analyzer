@@ -89,17 +89,17 @@ def _slotted_rim_chamfer_volume(r: float, chamfer: float, slot_w: float) -> floa
 @_telemetry.traced("feature.cosmetic_thread")
 def _insert_cosmetic_thread(adapter) -> bool:
     """Attach the catalog cosmetic thread to the exact north-end outer edge."""
-    part = _early_bound(adapter.currentModel, "IPartDoc", "GetBodies2")
+    part = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = part.GetBodies2(0, False) or []  # swSolidBody
     candidates = []
     for body in bodies:
-        body = _early_bound(body, "IBody2", "GetEdges")
+        body = _early_bound(body, "IBody2")
         for edge in body.GetEdges() or []:
-            edge = _early_bound(edge, "IEdge", "GetCurve")
+            edge = _early_bound(edge, "IEdge")
             curve = edge.GetCurve()
             if curve is None:
                 continue
-            curve = _early_bound(curve, "ICurve", "IsCircle", "CircleParams")
+            curve = _early_bound(curve, "ICurve")
             if not curve.IsCircle():
                 continue
             params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
@@ -115,14 +115,14 @@ def _insert_cosmetic_thread(adapter) -> bool:
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     model.ClearSelection2(True)
     selection_manager = _early_bound(
-        model.SelectionManager, "ISelectionMgr", "CreateSelectData"
+        model.SelectionManager, "ISelectionMgr"
     )
     selection_data = selection_manager.CreateSelectData()
-    selectable = _early_bound(edge, "IEntity", "Select4")
+    selectable = _early_bound(edge, "IEntity")
     if not selectable.Select4(False, selection_data):
         return False
     manager = _early_bound(
-        model.FeatureManager, "IFeatureManager", "InsertCosmeticThread3"
+        model.FeatureManager, "IFeatureManager"
     )
     feature = manager.InsertCosmeticThread3(
         0, "", SPEC.thread, 0.0, 0, BODY_LEN / 1000.0, ""

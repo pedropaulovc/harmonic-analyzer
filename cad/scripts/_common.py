@@ -1262,7 +1262,7 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
     mgr = adapter._attempt(lambda: ext.CustomPropertyManager(""), default=None)
     if mgr is None:
         raise RuntimeError("CustomPropertyManager unavailable")
-    mgr = _early_bound(mgr, "ICustomPropertyManager", "Add3")
+    mgr = _early_bound(mgr, "ICustomPropertyManager")
     written = []
     for name, value in props.items():
         if value in (None, ""):
@@ -1534,7 +1534,7 @@ def _flag(obj: Any, interface: str) -> None:
         pass
 
 
-def _early_bound(obj: Any, interface: str, *method_names: str) -> Any:
+def _early_bound(obj: Any, interface: str) -> Any:
     """Return the generated interface wrapper, or RAISE -- never a raw dispatch.
 
     Early-bound wrappers invoke known DISPIDs directly and avoid the repeated
@@ -1556,9 +1556,14 @@ def _early_bound(obj: Any, interface: str, *method_names: str) -> Any:
 
     Two quiet passthroughs remain, both provably not COM: ``None``, and an
     object with no ``_oleobj_`` (a test double, which never reaches a COM
-    boundary). ``method_names`` is accepted for call-site compatibility and
-    ignored -- it only ever fed the ``flag_method_names`` fallback, which was
-    the silent late-binding path this removes.
+    boundary).
+
+    The former ``*method_names`` varargs are GONE, not merely ignored. They only
+    ever fed ``flag_method_names``, the exact-name fallback used when no
+    generated class resolved -- i.e. the silent late-binding path removed above.
+    All 74 call sites that passed them were stripped in the same change, so a
+    lingering name is now a ``TypeError`` at the call site rather than an
+    argument that silently means nothing.
     """
     from solidworks_mcp.adapters import sw_type_info
 
@@ -1639,12 +1644,12 @@ def _iter_features(adapter: Any):
     property to find the profile to cut, and a flagged model silently yields no
     profile (``FeatureCut3 ... Parameter not optional``). ``_read_member`` reads
     these accessors property-style whether or not they are flagged."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2", "FirstFeature")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     feat = _read_member(model, "FirstFeature")
     for _ in range(5000):
         if not feat:
             return
-        feat = _early_bound(feat, "IFeature", "GetNextFeature")
+        feat = _early_bound(feat, "IFeature")
         yield feat
         feat = _read_member(feat, "GetNextFeature")
 
@@ -1709,7 +1714,7 @@ def _display_dimensions(feat: Any, owner: str | None = None):
     for _ in range(1000):
         if not disp:
             return
-        disp = _early_bound(disp, "IDisplayDimension", "GetDimension2")
+        disp = _early_bound(disp, "IDisplayDimension")
         idim = _early_bound(disp.GetDimension2(0), "IDimension")
         if owner is None or _dim_owner_feature(idim) == owner:
             yield idim
@@ -1996,7 +2001,7 @@ def set_isometric_view(adapter: Any) -> None:
     of an empty just-created document -- the orient + zoom-to-fit are best-effort.
     """
     SW_ISOMETRIC = 7  # swStandardViews_e.swIsometricView
-    model = _early_bound(adapter.currentModel, "IModelDoc2", "ShowNamedView2")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     if model is None:
         return
     adapter._attempt(lambda: model.ShowNamedView2("", SW_ISOMETRIC), default=None)

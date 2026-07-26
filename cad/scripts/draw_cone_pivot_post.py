@@ -171,7 +171,7 @@ def _bore_rim_edge(adapter: Any, view: Any, *, diameter_mm: float) -> Any:
 
 
 def _format_table_note(note: Any, *, label: str) -> Any:
-    note = _early_bound(note, "INote", "GetAnnotation")
+    note = _early_bound(note, "INote")
     annotation = _early_bound(
         note.GetAnnotation(), "IAnnotation", "GetTextFormat", "SetTextFormat"
     )

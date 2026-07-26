@@ -310,7 +310,7 @@ def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
             for comp in components:
                 # Wrap once as IComponent2 so GetConstrainedStatus invokes its
                 # known DISPID; Name2 remains a property read.
-                comp = _early_bound(comp, "IComponent2", "GetConstrainedStatus")
+                comp = _early_bound(comp, "IComponent2")
                 status = int(
                     adapter._attempt(lambda c=comp: c.GetConstrainedStatus(), default=-1)
                 )
@@ -689,7 +689,7 @@ def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
     seen: set[str] = set()
     components = adapter._attempt(lambda: top_asm.GetComponents(False), default=None) or []
     for component in components:
-        component = _early_bound(component, "IComponent2", "GetModelDoc2")
+        component = _early_bound(component, "IComponent2")
         instance = str(_read_member(component, "Name2") or "?")
         if "/" in instance:
             continue

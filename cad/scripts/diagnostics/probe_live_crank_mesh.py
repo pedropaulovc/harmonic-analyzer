@@ -87,7 +87,7 @@ async def build(adapter) -> dict[str, str]:
     )
     adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
     mgr = _read_member(asm, "InterferenceDetectionManager")
-    mgr = _early_bound(mgr, "IInterferenceDetectionMgr", "GetInterferences")
+    mgr = _early_bound(mgr, "IInterferenceDetectionMgr")
     mgr.TreatCoincidenceAsInterference = False
     mgr.TreatSubAssembliesAsComponents = True
     mgr.IncludeMultibodyPartInterferences = True
@@ -102,7 +102,7 @@ async def build(adapter) -> dict[str, str]:
     g0 = dta.cone_station(dta.GEAR64_STATION)
     patch_boxes: list[list[float]] = []
     for i, itf in enumerate(hits):
-        itf = _early_bound(itf, "IInterference", "GetInterferenceBody")
+        itf = _early_bound(itf, "IInterference")
         names = [str(_read_member(c, "Name2"))
                  for c in list(_read_member(itf, "Components") or [])]
         vol = float(_read_member(itf, "Volume") or 0.0) * 1e9
