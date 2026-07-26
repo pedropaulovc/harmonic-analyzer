@@ -22,6 +22,10 @@ JOURNAL_END = 43.011
 # stations below are measured from it.
 FRONT_STUB = 61.9068609979
 
+# T006's north face is followed by the 4 mm bushing, a 2 mm half-bushing
+# clearance, and the 12 mm tip block. Keep 5 mm of the tip in the adjuster cup.
+T006_TIP_STATION = 126.02232594770454 + 6.5 / 2.0 + 4.0 + 2.0 + 12.0 / 2.0 + 5.0
+
 # (diameter in inches, section end station in mm from the front stub end).
 # Diameters mirror build_cone_gear.bore_dia_in (snug perpendicular gear seats).
 # WARNING the 1/32" (0.79 mm) tip journal is mechanically marginal -- it
@@ -32,7 +36,7 @@ SECTIONS: tuple[tuple[float, float], ...] = (
     (0.375, FRONT_STUB + 141.9 + GEAR_AXIS_SHIFT),
     (0.25, FRONT_STUB + 148.8 + GEAR_AXIS_SHIFT),
     (0.125, FRONT_STUB + 155.7 + GEAR_AXIS_SHIFT),
-    (0.03125, FRONT_STUB + 190.0),  # T006 seat + thin-tip journal
+    (0.03125, FRONT_STUB + T006_TIP_STATION),  # shortened tip journal
 )
 
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)

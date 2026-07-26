@@ -48,7 +48,9 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
     assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 0.79375))
     assert cone_gear_shaft_spec.FRONT_STUB == pytest.approx(61.9068609979)
-    assert cone_gear_shaft_spec.SHAFT_LENGTH == cone_gear_shaft_spec.FRONT_STUB + 190.0
+    assert cone_gear_shaft_spec.SHAFT_LENGTH == (
+        cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
+    )
     # The fixed journal/tip endpoints stay put while the three gear-seat
     # shoulders follow the recentered stack along the shaft.
     stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
@@ -57,7 +59,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
             old_end + stub_delta + cone_gear_shaft_spec.GEAR_AXIS_SHIFT
             for old_end in (154.2, 161.1, 168.0)
         )
-        + (202.3 + stub_delta,)
+        + (cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION,)
     )
     # Every seat diameter gets a snug-fit callout and exact-conversion display.
     assert drawing.DIMENSION_CALLOUTS == {
@@ -111,7 +113,7 @@ def test_datum_symbol_requests_the_persisted_journal_boundary() -> None:
         + drawing.SHAFT_LENGTH / 2000.0
         - drawing.JOURNAL_END / 1000.0
     )
-    assert math.isclose(expected, 0.237942430381, abs_tol=1e-12)
+    assert math.isclose(expected, 0.21607859347280226, abs_tol=1e-12)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "symbol_xy=(big_end_x - JOURNAL_END / 1000.0, 0.252)" in source
     assert "symbol_xy=(0.255, 0.242)" in source

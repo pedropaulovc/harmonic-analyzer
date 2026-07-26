@@ -10,39 +10,33 @@ silently drift.
 
 from __future__ import annotations
 
-from cone_pivot_post_installation import POST_Z_SHIFT
-
-
 MM_PER_IN = 25.4
 
-# --- Two-plate welded base (book ch. 6). The front edges and side/end reveals
-# stay on the photo-derived v1 footprint; v2 adds its 35.415 mm only at the rear. ---
+# --- Two-plate welded base (book ch. 6), centred on the part origin. ---
 BOTTOM_LENGTH = 18.0 * MM_PER_IN  # 457.2 (46 cm callout)
 FORMER_BOTTOM_WIDTH = 11.0 * MM_PER_IN  # 279.4 (28 cm callout)
 BOTTOM_FRONT_Z = -FORMER_BOTTOM_WIDTH / 2.0
-BOTTOM_REAR_Z = FORMER_BOTTOM_WIDTH / 2.0 + POST_Z_SHIFT
+BOTTOM_REAR_Z = FORMER_BOTTOM_WIDTH / 2.0
 BOTTOM_WIDTH = BOTTOM_REAR_Z - BOTTOM_FRONT_Z
 BOTTOM_CENTER_Z = (BOTTOM_FRONT_Z + BOTTOM_REAR_Z) / 2.0
 BOTTOM_THICKNESS = 0.5 * MM_PER_IN  # 12.7
 TOP_LENGTH = 17.5 * MM_PER_IN   # 444.5 (0.25 in reveal per side)
 FORMER_TOP_WIDTH = 10.5 * MM_PER_IN  # 266.7
 TOP_FRONT_Z = -FORMER_TOP_WIDTH / 2.0
-TOP_REAR_Z = FORMER_TOP_WIDTH / 2.0 + POST_Z_SHIFT
+TOP_REAR_Z = FORMER_TOP_WIDTH / 2.0
 TOP_WIDTH = TOP_REAR_Z - TOP_FRONT_Z
 TOP_CENTER_Z = (TOP_FRONT_Z + TOP_REAR_Z) / 2.0
 TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
 STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8
 
-if abs(BOTTOM_CENTER_Z - POST_Z_SHIFT / 2.0) > 1e-12:
-    raise AssertionError("rear-extended lower base is not correctly recentered")
-if abs(TOP_CENTER_Z - POST_Z_SHIFT / 2.0) > 1e-12:
-    raise AssertionError("rear-extended upper base is not correctly recentered")
+if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
+    raise AssertionError("base plates are not centred")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_harmonic_base`` marks exactly these; ``draw_harmonic_base``
 # keeps exactly their union. Only the BOTTOM plate's plan footprint is a marked
 # sketch dimension -- it is the overall envelope; the top plate is fixed by the
-# front/side reveal and rear-extension note (note 2), and the plate THICKNESSES are
+# side reveal note (note 2), and the plate THICKNESSES are
 # parameters (not sketch dims) carried in note 2 as well. Keeping the marked set
 # to the two overalls avoids stacking four dimensions on a 457 mm plan that
 # barely fits the sheet. ---
@@ -57,7 +51,7 @@ DRAWING_NOTES = "\n".join(
         "1. MACHINE FROM SOLID STOCK TO THE FINISHED PROFILE SHOWN; NO DRAFT.",
         "   PAD-TO-FLANGE ROOT R0.50 MAX; LOWER FLANGE 12.70 THICK;",
         "   TOTAL HEIGHT 50.80.",
-        "2. UPPER PAD 444.50 X 302.12; REAR EXTENSION 35.42;",
+        "2. UPPER PAD 444.50 X 266.70;",
         "   NEAR LONG SIDE 6.35 +/-0.10 FROM B;",
         "   NEAR LEFT END 6.35 +/-0.10 FROM C.",
         "3. DATUM A = UNDERSIDE FACE; B = LONG-SIDE FACE; C = LEFT-END FACE;",

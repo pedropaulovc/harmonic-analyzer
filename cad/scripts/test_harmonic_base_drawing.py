@@ -47,15 +47,9 @@ def test_plate_geometry_is_single_sourced() -> None:
     assert harmonic_base_spec.BOTTOM_LENGTH == 18.0 * 25.4
     assert harmonic_base_spec.TOP_LENGTH == 17.5 * 25.4
     assert harmonic_base_spec.BOTTOM_FRONT_Z == -(11.0 * 25.4) / 2.0
-    assert harmonic_base_spec.BOTTOM_REAR_Z == (11.0 * 25.4) / 2.0 + POST_Z_SHIFT
-    assert math.isclose(
-        harmonic_base_spec.BOTTOM_WIDTH,
-        11.0 * 25.4 + POST_Z_SHIFT,
-    )
-    assert math.isclose(
-        harmonic_base_spec.TOP_WIDTH,
-        10.5 * 25.4 + POST_Z_SHIFT,
-    )
+    assert harmonic_base_spec.BOTTOM_REAR_Z == (11.0 * 25.4) / 2.0
+    assert math.isclose(harmonic_base_spec.BOTTOM_WIDTH, 11.0 * 25.4)
+    assert math.isclose(harmonic_base_spec.TOP_WIDTH, 10.5 * 25.4)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("bbox_extent_check(") == 2
     assert "measure_check(" not in source
@@ -72,8 +66,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "MACHINE FROM SOLID STOCK" in notes
     assert "NO DRAFT" in notes
     assert "PAD-TO-FLANGE ROOT R0.50 MAX" in notes
-    assert "UPPER PAD 444.50 X 302.12" in notes
-    assert "REAR EXTENSION 35.42" in notes
+    assert "UPPER PAD 444.50 X 266.70" in notes
+    assert "REAR EXTENSION" not in notes
     assert "NEAR LONG SIDE 6.35 +/-0.10 FROM B" in notes
     assert "NEAR LEFT END 6.35 +/-0.10 FROM C" in notes
     assert "B = LONG-SIDE FACE; C = LEFT-END FACE" in notes
@@ -138,12 +132,12 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     """Mirror the drive-train formula without importing its COM-heavy graph."""
     pivot_x, pivot_z = part.PIVOT_SCREW_XZ
     assert part.PIVOT_SCREW_XZ == (
-        -79.6886620349 + POST_X_SHIFT,
-        103.292512276 + POST_Z_SHIFT,
+        -89.16663981674521 + POST_X_SHIFT,
+        60.60437088764276 + POST_Z_SHIFT,
     )
     assert part.STOP_SCREW_XZ == (
-        -127.16504133403544 + POST_X_SHIFT,
-        7.882755974036954 + POST_Z_SHIFT,
+        -141.14905420183916 + POST_X_SHIFT,
+        -33.08089452405298 + POST_Z_SHIFT,
     )
     east_slope = (
         platform.EAST_HALF_S - platform.HALF_WIDTH_N
@@ -171,8 +165,8 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         contact_z + normal_z * STOP_SHANK_DIA / 2.0,
     )
 
-    assert math.isclose(platform.NOTCH_EXIT_TRAVEL, 1.9778497018812349)
-    assert math.isclose(math.degrees(disengage_rad), 3.8712032227632633)
+    assert math.isclose(platform.NOTCH_EXIT_TRAVEL, 4.097712434428717)
+    assert math.isclose(math.degrees(disengage_rad), 4.883134225775778)
     assert math.isclose(derived[0], part.STOP_SCREW_XZ[0], abs_tol=1e-12)
     assert math.isclose(derived[1], part.STOP_SCREW_XZ[1], abs_tol=1e-12)
 
@@ -194,7 +188,7 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         - STOP_SHANK_DIA / 2.0
     )
     assert engaged_gap >= 2.0
-    assert math.isclose(engaged_gap, 7.101970902077434)
+    assert math.isclose(engaged_gap, 8.92856567081106)
 
 
 def test_v2_structural_holes_follow_the_same_installation_delta() -> None:

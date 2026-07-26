@@ -527,9 +527,11 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
 # north of the shaft's rear end, so on disengage the BIG end -- where the
 # gears need the most working-depth separation -- swings the farthest
 # (throw ~ distance from pivot).
-TIP_BLOCK_STATION = 185.0  # tip block plan centre; the shaft's tip end
-# (station 190) rests in the adjuster cup -- the GT tip post (-81, 104.6, +102)
-PIVOT_STATION = 196.0  # platform swing pivot (plan), north of the shaft end
+# T006 is the reference gear for the tip-end stack. The bushing sits directly
+# against its north face; the block follows after one bushing-half-width of
+# clearance, and the pivot keeps its established 11 mm offset from the block.
+T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
+T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE / 2.0
 
 # --- platform <-> riders fit (SolidWorks-free, import-time) ------------------
 # The platform/post/block parts hardcode their envelopes in THEIR part frames;
@@ -589,6 +591,10 @@ from build_harmonic_base import (  # noqa: E402
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
     STOP_SCREW_HOLE_DIA as BASE_STOP_HOLE_DIA,
     STOP_SCREW_XZ as BASE_STOP_XZ,
+)
+from harmonic_base_spec import (  # noqa: E402
+    TOP_LENGTH as BASE_TOP_LENGTH,
+    TOP_WIDTH as BASE_TOP_WIDTH,
 )
 from build_arbor_pedestal import (  # noqa: E402
     FOOT_DEPTH as ARBOR_PED_DEPTH,  # PR3 reshaped the pedestal; its foot
@@ -721,6 +727,11 @@ from cone_gear_shaft_spec import (  # noqa: E402
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
 )
+
+TIP_BLOCK_STATION = (
+    T006_NORTH_FACE + BUSH_LEN + BUSH_LEN / 2.0 + TIP_BLOCK_Z / 2.0
+)
+PIVOT_STATION = TIP_BLOCK_STATION + 11.0
 # One journal drive height across the platform and both riders: plate
 # thickness under each foot + bore height = 54 above the base top.
 if (abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
@@ -760,7 +771,7 @@ for _lbl, _s0, _hx, _hz in (
                 f"{_lbl} overhangs the swing platform at station {_end:g}")
 # The shaft's tip reaches through the block to the adjuster cup (>= 5 inside
 # the block envelope, end short of the north face).
-_TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]  # 190.0
+_TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]
 if not (TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + 5.0
         <= _TIP_END_STATION
         <= TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - 0.5):
@@ -777,11 +788,11 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
 # Along the axis, south to north: T006 gear | brass bushing (spacer) | block
 # south face | short unsupported tip span | adjuster screw in the tapped bore, its blind cup
 # holding the shaft's tip end; the block's top slit + pinch screw lock it.
-TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0  # 179: block south face
-BUSH_STATION = TIP_SOUTH_STATION - BUSH_LEN  # 175: bushing south end
+TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
+BUSH_STATION = T006_NORTH_FACE
 ADJ_EMBED = 6.0  # adjuster thread engagement into the counterbore (8 deep)
-ADJ_HEAD_STATION = TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_EMBED)  # 199
-_ADJ_MOUTH = ADJ_HEAD_STATION - ADJ_LEN  # 185: the blind cup's mouth
+ADJ_HEAD_STATION = TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_EMBED)
+_ADJ_MOUTH = ADJ_HEAD_STATION - ADJ_LEN
 _STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4  # 0.794: the 1/32" tip stub
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]  # 155.7
 if BUSH_STATION < _STUB_START + 1.0:
@@ -814,6 +825,27 @@ if PINCH_SHANK_LEN < TIP_BLOCK_X / 2.0 + 0.5:
 # for the merged column's crank bore and the platform's "crank axis":
 _PPIVOT = cone_station(PIVOT_STATION)
 _PPOST = cone_station(POST_STATION)
+# The centered legacy harmonic base is the installation envelope. The engaged
+# platform's four sharp plan vertices must all remain on its top plate; the
+# filleted outline is contained by that convex polygon. This catches a plate
+# length regression before SolidWorks inserts an off-base rider.
+_BASE_X_LIMIT = BASE_TOP_LENGTH / 2.0
+_BASE_Z_LIMIT = BASE_TOP_WIDTH / 2.0
+_PLATFORM_VERTICES = (
+    (-PLAT_EAST_N, PLAT_OVERHANG),
+    (PLAT_WEST_N, PLAT_OVERHANG),
+    (PLAT_WEST_S, PLAT_OVERHANG - PLAT_LEN),
+    (-PLAT_EAST_S, PLAT_OVERHANG - PLAT_LEN),
+)
+for _x_local, _z_local in _PLATFORM_VERTICES:
+    _x_machine = _PPIVOT[0] + _x_local * COS_I + _z_local * SIN_I
+    _z_machine = _PPIVOT[2] - _x_local * SIN_I + _z_local * COS_I
+    if (abs(_x_machine) > _BASE_X_LIMIT + 1e-9
+            or abs(_z_machine) > _BASE_Z_LIMIT + 1e-9):
+        raise AssertionError(
+            f"cone swing platform vertex ({_x_machine:.3f}, {_z_machine:.3f}) "
+            f"is outside harmonic-base top ({_BASE_X_LIMIT:.3f}, {_BASE_Z_LIMIT:.3f})")
+
 # CRANK_AXIS_OFF is the distance the crank axis sits EAST of the pivot
 # (east = machine -x), so it equals pivot.x - X_CRANK.
 if abs(PLAT_CRANK_OFF - (_PPIVOT[0] - X_CRANK)) > 0.05:
