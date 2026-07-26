@@ -59,6 +59,27 @@ _KINDS = {
 _ENDS = {"blind": 0, "through_all": 1, "through_next": 2}
 _FITS = {"close": 0, "normal": 1, "loose": 2}  # swWzdHoleScrewClearanceTypes_e
 
+# How far an initialized wizard diameter may sit from its pinned target before
+# `wizard_holes` FORCES it -- and, by the same token, the tolerance a caller may
+# assume the delivered cut honours. Deliberately ONE constant: two different
+# numbers here open a DEAD BAND where the wizard declines to correct a drift
+# that the caller then refuses to accept, and nothing can satisfy both.
+#
+# That band was real. The correction threshold was 0.05 while
+# `build_arbor_pedestal` asserted 0.005, so a #4 clearance initialized at
+# 3.2512 instead of 3.264 (drift 0.0128) was left alone by the wizard and then
+# rejected by the builder -- an unfixable failure whichever value the spec
+# pinned. It presented as the seat's table "moving" and cost three flip-flops of
+# the pin (codex, PR #422).
+#
+# The value must stay ABOVE the benign rounding gap -- CLEARANCE_MM rounds the
+# live 3.2639 to 3.264, a 0.0001 difference that must NOT trigger a write, since
+# redundantly writing the same diameter corrupts swHoleThru (25) into
+# swHoleThruCounterSinkBottom (26) and adds a bogus far-side line to hole
+# tables. 0.005 clears that by 50x while still catching every real fit error
+# (the #8-normal probe drifted ~0.5).
+DIAMETER_TOLERANCE_MM = 0.005
+
 # Cut diameters (mm) from this seat's wizard database and live feature probes.
 # HoleDiameter commonly reads 0.0; a plain through hole's usable value is in
 # ThruHoleDiameter (live #4 normal = 0.0032639 m). Scripts take analytic volume
@@ -548,7 +569,7 @@ def wizard_holes(
         # countersink line to native hole tables. Modify only on real drift.
         pinned_dia_mm = blind_cut_dia_mm(spec)
         initialized_dia_mm = float(defn.ThruHoleDiameter) * 1000.0
-        diameter_drift = abs(initialized_dia_mm - pinned_dia_mm) > 0.05
+        diameter_drift = abs(initialized_dia_mm - pinned_dia_mm) > DIAMETER_TOLERANCE_MM
         if diameter_drift and "HoleDiameter" not in spec.overrides_mm:
             # On a plain hole the DRIVING knob is ThruHoleDiameter -- a
             # HoleDiameter-only write is silently dropped (probe 2026-07-11:

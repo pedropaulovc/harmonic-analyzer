@@ -73,7 +73,7 @@ from arbor_pedestal_spec import (
     STRAP_T,
     TOP_RADIUS,
 )
-from _holes import HoleSpec, wizard_holes
+from _holes import DIAMETER_TOLERANCE_MM, HoleSpec, wizard_holes
 
 PART_NAME = "arbor-pedestal"
 MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
@@ -86,9 +86,9 @@ MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 # Keeps the arbor's 7.5 engagement from the north face; the -Z flange carries
 # the screw. Foot-screw shank O2.9 pass-through (build_foot_screw, the flange
 # hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange):
-# #4 clearance NORMAL fit (Ø3.2512, measured from the seat's created feature).
+# #4 clearance NORMAL fit (Ø3.264 = 0.1285 in, the seat wizard-table value).
 SCREW_HOLE_SPEC = HoleSpec("clearance", SCREW_THREAD)
-SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.2512, the seat-proven cut (see the
+SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.264, the seat-proven cut (see the
 # spec's pin rationale); the post-create assert below keeps model, note and
 # drive-train assembly's foot-screw clearance assert (build_drive_train_assembly)
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
@@ -272,11 +272,16 @@ async def build(adapter) -> dict[str, str]:
         (0.0, -1.0, 0.0), "flange hold-down hole (#4 clearance)", name="ScrewHole",
         placement_dims=[((None, None), ("ScrewZ", '"ScrewZ"'))],
     )
-    if abs(screw_cut.hole_dia_mm - SCREW_CLEARANCE_DIA) > 0.005:
+    # Same constant wizard_holes corrects against, so this can never demand a
+    # precision the wizard declines to deliver (the dead band -- see _holes).
+    if abs(screw_cut.hole_dia_mm - SCREW_CLEARANCE_DIA) > DIAMETER_TOLERANCE_MM:
         raise RuntimeError(
             f"flange hold-down hole cut Ø{screw_cut.hole_dia_mm:.4f} != spec "
-            f"SCREW_CLEARANCE_DIA Ø{SCREW_CLEARANCE_DIA} -- the seat's wizard "
-            "table moved; realign the spec pin (and the sheet masking note)"
+            f"SCREW_CLEARANCE_DIA Ø{SCREW_CLEARANCE_DIA} -- wizard_holes should "
+            f"have forced it to within {DIAMETER_TOLERANCE_MM} mm, so either the "
+            "spec pin no longer matches _holes.CLEARANCE_MM or the override "
+            "write was rejected; dump the table with "
+            "diagnostics/diag_hole_wizard_tables.py before touching the pin"
         )
     drive_jobs += screw_cut.placement_drive_jobs
     v_hole = math.pi * (SCREW_CLEARANCE_DIA / 2.0) ** 2 * FOOT_HEIGHT

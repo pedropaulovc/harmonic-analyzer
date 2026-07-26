@@ -24,11 +24,23 @@ BORE_HEIGHT = 39.718  # v2 post journal axis: 6.35 platform + 33.368 boss height
 SCREW_THREAD = "#4"  # flange hold-down clearance hole
 # The #4 NORMAL clearance the wizard ACTUALLY cuts on this seat.
 #
-# 2026-07-26 live positive control: a from-scratch part rebuild created
-# ThruHoleDiameter 3.2512 (build log "1x #4 clearance (Ø3.251)").  This disproves
-# the short-lived 3.264 pin: _holes.CLEARANCE_MM still resolves ("#4", "normal")
-# to 3.264, but the seat's actual wizard feature and its native sheet callout are
-# 3.2512 / 3.25.  Keep the model and masking note pinned to that created feature.
+# 2026-07-26, settled against the wizard DATABASE rather than a build log.
+# `diagnostics/diag_hole_wizard_tables.py` dumps the seat's own Screw Clearances
+# table via ISldWorks::GetHoleStandardsData; the "#4" row reads
+#
+#     ['#4', '0.116', '0.1285', '0.136', ...]   # close / normal / loose, INCHES
+#
+# so normal fit is 0.1285 in = 3.2639 mm, matching _holes.CLEARANCE_MM's 3.264.
+# A from-scratch rebuild the same day cut exactly that ("1x #4 clearance
+# (Ø3.264)"), and HoleSpec.fit defaults to "normal", so the whole chain agrees.
+#
+# This pin was briefly 3.2512, read from an earlier build log. That value is NOT
+# a "#4" entry in the seat's table OR in _holes.CLEARANCE_MM -- it is exactly
+# ("#3", "loose") = 3.251. So the earlier reading was a wrong-size/fit
+# resolution, not the seat's table moving, and pinning it baked a #3-loose-sized
+# hole into a #4 clearance. Read the DATABASE, not the log line: the log echoes
+# whatever was cut, so it cannot distinguish "the table says so" from "we asked
+# for the wrong row".
 #
 # The guard that caught this worked exactly as written -- build_arbor_pedestal
 # asserts the created hole matches this pin to 0.005 mm. It stayed silent for
@@ -37,8 +49,10 @@ SCREW_THREAD = "#4"  # flange hold-down clearance hole
 # Kept as a literal rather than sourced from _holes.CLEARANCE_MM on purpose:
 # this module is pure data with no imports, and pulling in _holes would drag
 # _common/_telemetry into its dependency closure and re-key both the part and
-# the drawing.
-SCREW_CLEARANCE_DIA = 3.2512
+# the drawing. The literal is instead pinned TO the resolver by
+# `test_arbor_pedestal_drawing.test_screw_clearance_tracks_the_hole_resolver`,
+# so the duplicate cannot drift again without a gate going red.
+SCREW_CLEARANCE_DIA = 3.264
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},

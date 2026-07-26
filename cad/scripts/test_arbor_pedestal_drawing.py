@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import arbor_pedestal_spec
@@ -49,6 +50,69 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     assert tuple(round(value, 3) for value in clearances) == expected
 
 
+def test_screw_clearance_tracks_the_hole_resolver() -> None:
+    """The hand-pinned diameter must equal what the hole resolver would give.
+
+    ``arbor_pedestal_spec`` keeps ``SCREW_CLEARANCE_DIA`` as a LITERAL on
+    purpose -- it is a pure-data module, and importing ``_holes`` would pull
+    ``_common``/``_telemetry`` into its dependency closure and re-key both the
+    part and the drawing. The cost of that choice is a duplicated constant, and
+    this duplicate has now drifted twice (3.2512 <-> 3.264), each time only
+    surfacing when a real rebuild replaced a remote-cache restore.
+
+    A test can import both without touching the part's closure, so the drift is
+    pinned here instead: the literal, ``_holes.CLEARANCE_MM``, and the seat's
+    own wizard table (``#4`` normal = 0.1285 in) must all agree.
+    """
+    import _holes
+
+    assert arbor_pedestal_spec.SCREW_CLEARANCE_DIA == _holes.CLEARANCE_MM[("#4", "normal")]
+    # 0.1285 in is the seat's Screw Clearances row, read via
+    # diagnostics/diag_hole_wizard_tables.py -- the authority the build asserts
+    # against. Rounded to the resolver's 3 dp.
+    assert round(0.1285 * 25.4, 3) == arbor_pedestal_spec.SCREW_CLEARANCE_DIA
+
+
+def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None:
+    """What the wizard will FORCE must cover what the builder will ACCEPT.
+
+    These were two different literals -- `_holes` only corrected a drift over
+    0.05 mm, while `build_arbor_pedestal` rejected anything over 0.005. A #4
+    clearance initialized at 3.2512 instead of 3.264 drifts 0.0128 and lands in
+    the gap: the wizard leaves it, the builder refuses it, and NO value of the
+    spec pin can satisfy both. It read as the seat's table "moving" and cost
+    three flip-flops of the pin before Codex spotted the real mechanism on #422.
+
+    Both now read one constant. This test fails if they are ever separated
+    again, including by someone tightening only the builder's side.
+    """
+    import _holes
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "DIAMETER_TOLERANCE_MM" in source, "builder must use the shared tolerance"
+    # Any numeric literal compared against the cut diameter re-opens the band.
+    # Regex rather than a fixed string so `>0.005`, `> 0.0050` and friends are
+    # caught too -- a whitespace variant slipping through would defeat the gate.
+    assert not re.search(r"[<>]=?\s*0\.0*5\b|[<>]=?\s*0\.005\d*", source), (
+        "builder compares the cut diameter against a numeric literal; use "
+        "_holes.DIAMETER_TOLERANCE_MM so the wizard's correction threshold and "
+        "this acceptance threshold cannot separate into a dead band again"
+    )
+
+    holes_source = Path(_holes.__file__).read_text(encoding="utf-8")
+    assert "abs(initialized_dia_mm - pinned_dia_mm) > DIAMETER_TOLERANCE_MM" in holes_source
+
+    # The tolerance must sit strictly between the benign rounding gap (the
+    # 0.0001 between CLEARANCE_MM's 3.264 and the live 3.2639 -- writing there
+    # would corrupt swHoleThru 25 into 26) and the wrong-row drift it must
+    # catch (3.264 vs ("#3","loose") 3.251 = 0.0128).
+    rounding_gap = abs(3.2639 - _holes.CLEARANCE_MM[("#4", "normal")])
+    wrong_row_drift = abs(
+        _holes.CLEARANCE_MM[("#4", "normal")] - _holes.CLEARANCE_MM[("#3", "loose")]
+    )
+    assert rounding_gap < _holes.DIAMETER_TOLERANCE_MM < wrong_row_drift
+
+
 def test_notes_specify_part_requirements_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "MATING ARBOR LIMITS DIA 9.505-9.525 (REF)" in notes
@@ -67,10 +131,11 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "BOXED 6.00/16.00 LOCATE STRAP NEAR/FAR FACES FROM D" in notes
     assert "DIMENSIONS AND GD&T APPLY BEFORE COATING" in notes
     assert "MASK ARBOR BORE" in notes
-    # 3.25: the live seat's wizard cut (ThruHoleDiameter 3.2512), which the
-    # sheet's native hole callout also prints.  This deliberately follows the
-    # created feature rather than _holes.CLEARANCE_MM's 3.264 resolver value.
-    assert "DIA 3.25\nHOLE" in notes
+    # 3.26: the seat's wizard-table value for #4 NORMAL (0.1285 in = 3.2639),
+    # which the sheet's native hole callout also prints -- so masking note and
+    # callout agree. See the spec's pin rationale for why the 3.25 reading was
+    # a wrong-row artefact rather than a different seat.
+    assert "DIA 3.26\nHOLE" in notes
     assert "FOOT SEAT A, LEFT SIDE B" in notes
     assert "PROFILE-CONTROLLED SURFACES" in notes
     assert "25-50 um" not in notes
