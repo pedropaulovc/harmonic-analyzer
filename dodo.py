@@ -541,7 +541,15 @@ def _stage_name(label: str) -> str:
     -- part-build / assembly-build / verify-<suite> / check-<gate> / export / release
     -- instead of every process reading the same umbrella name. Injected into the
     child env as ``OTEL_SERVICE_NAME`` (the standard OTel var) by :func:`_exec`, so
-    the child is labelled the moment it imports ``_telemetry``."""
+    the child is labelled the moment it imports ``_telemetry``.
+
+    The PARENT-side ``task <label>`` span uses it too (via ``service=`` on
+    ``_telemetry.span``), so a task and the subprocess it spawns share one resource
+    instead of the task span reading the umbrella name while its own children read
+    the stage. What is left on the umbrella is only what genuinely has no stage --
+    and the seat/cache phases have their own ``build-infra`` resource -- so
+    ``harmonic-analyzer`` is now a namespace and a fallback, not a span label.
+    A label this does not map (the fallback below) simply keeps the umbrella."""
     if label.startswith("part:"):
         return "part-build"
     if label.startswith(("assembly:", "FULL build", "REFRESH", "hook ")):
@@ -614,7 +622,8 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None,
     and its duration is the task's own work. SolidWorks-free tasks (the ``check:*``
     gates) pass ``com=False`` and never take the lock, so they fan out under ``-n``."""
     with (_com_seat(label) if com else contextlib.nullcontext()) as waited:
-        with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd)) as sp:
+        with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd),
+                             service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
             _exec(cmd, label, log_stem)
 
@@ -1151,7 +1160,8 @@ def _cached_drawing_action(stem: str) -> None:
         probe.set_attribute("cache", "miss")
 
     with _com_seat(label) as waited:
-        with _telemetry.span(f"task {label}", label=label) as sp:
+        with _telemetry.span(f"task {label}", label=label,
+                             service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
             if _cache.restore(key, outputs, label):
                 sp.set_attribute("cache", "hit-after-wait")
@@ -1225,7 +1235,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
         probe.set_attribute("cache", "miss")
 
     with _com_seat(label) as waited:
-        with _telemetry.span(f"task {label}", label=label) as sp:
+        with _telemetry.span(f"task {label}", label=label,
+                             service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
             # Re-probe under the seat: we may have blocked for the seat for minutes
             # while a peer builder published this exact part -- restore it rather than
@@ -1476,7 +1487,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
         probe.set_attribute("cache", "miss")
 
     with _com_seat(label) as waited:
-        with _telemetry.span(f"task {label}", label=label) as sp:
+        with _telemetry.span(f"task {label}", label=label,
+                             service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
             # Re-probe under the seat: a peer builder may have published this assembly
             # while we blocked for the seat (fable/codex review) -> restore, don't

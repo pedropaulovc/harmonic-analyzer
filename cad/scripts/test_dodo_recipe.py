@@ -608,6 +608,26 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
                       "cache.store part:pen_rod"]  # the seat wait span is _com_seat's
 
 
+def test_task_span_carries_its_pipeline_stage_resource():
+    """The parent-side ``task <label>`` span is attributed to the SAME stage as the
+    subprocess it spawns (``_stage_name`` -> OTEL_SERVICE_NAME), so a task and its
+    own children share a resource instead of the task reading the umbrella name.
+    Queueing/transfer keep the separate build-infra resource."""
+    dodo = _load_dodo()
+    assert dodo._stage_name("part:pen_rod") == "part-build"
+    assert dodo._stage_name("assembly:pen") == "assembly-build"
+    assert dodo._stage_name("drawing:pen_rod") == "drawing-export"
+    assert dodo._stage_name("verify soundness") == "verify-soundness"
+    assert dodo._stage_name("nothing recognisable") == "harmonic-analyzer"
+
+    source = inspect.getsource(dodo)
+    task_spans = [line for line in source.splitlines() if 'span(f"task {label}"' in line]
+    assert len(task_spans) == 4, "every task span must be accounted for"
+    for line in task_spans:
+        start = source.index(line)
+        assert "service=_stage_name(label)" in source[start:start + 400], line
+
+
 def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():
     """``check:*`` gates take no seat (``_run`` yields None from nullcontext), so the
     task span must not grow a meaningless ``seat_wait_s=0``."""

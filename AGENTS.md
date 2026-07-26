@@ -567,13 +567,20 @@ scripts that `from _common import log, check` are instrumented unchanged.
   it never clobbers an inherited label; `force=True` overrides; it rebuilds the
   providers, resetting OTel's one-shot provider guard, since the resource is fixed
   at provider creation). Add a new stage to `_stage_name` when a new task family
-  appears.
+  appears. The doit PARENT's `task <label>` span uses `_stage_name` too (via
+  `service=` on `_telemetry.span`), so a task and the subprocess it spawns share one
+  resource — `task part:cone_gear` reads `part-build`, `task assembly:pen` reads
+  `assembly-build`, a drawing reads `drawing-export` — instead of the task reading
+  the umbrella name while its own children read the stage. `harmonic-analyzer` is
+  now a namespace and a fallback for an unmapped label, not a span label.
     - **`build-infra` owns the seat + cache spans.** Queueing for the COM seat and
       pulling/publishing artefacts belong to no pipeline stage, so `com.seat.wait`,
       `cache.probe` and `cache.store` are attributed to a `build-infra` resource
-      (`_telemetry.BUILD_INFRA_SERVICE`) instead of the doit parent's umbrella
-      `harmonic-analyzer` — the resource column then answers "how much of this build
-      was queue and transfer, not work?" in one filter. A resource is fixed per
+      (`_telemetry.BUILD_INFRA_SERVICE`) — NOT to the stage their task belongs to —
+      so the resource column answers "how much of this build was queue and transfer,
+      not work?" in one filter. Together with the stage-labelled `task` span above,
+      every span now names either the stage doing the work or the infrastructure
+      serving it. A resource is fixed per
       provider, so this is a SECOND `TracerProvider` in the same process
       (`_provider_for_service`), sharing the primary's span processors — one console
       stream, one `traces.jsonl`, one OTLP exporter. Pass `service=` to
