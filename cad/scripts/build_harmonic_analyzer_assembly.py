@@ -21,7 +21,7 @@ Cross-subassembly fits proven by the top-level interference check:
 * the pen-hanger (pen.SLDASM) clamps the wheel-bar (magnifier.SLDASM), and the
   wheel rim -> pen-rod wire couples the two;
 * chain sprockets (drive-train crankshaft + paper-drive knob shaft) share the
-  z -81 chain plane;
+  z -155 chain plane;
 * rocker-arm connecting-rod rings (channel) ride the cam lobes integral
   to the drive-train's cylinder gears;
 * the loose measuring-stick sits on the base top (y 50.8). The spare T18

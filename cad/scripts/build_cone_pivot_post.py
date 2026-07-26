@@ -1,37 +1,21 @@
-r"""Reproduction script: cone pivot post + crank pedestal, ONE column.
+r"""Reproduce the v2 cone pivot post and integrated crank pedestal.
 
-The single green casting at the cone big end serving BOTH purposes
-(user-confirmed vs v4_t00411/t00417 and ch12 p.18): the cone shaft's
-big-end journal at BORE_HEIGHT, and the crank pedestal -- the crank
-bore CRANK_BORE_Y higher, running along MACHINE z. It STANDS ON the
-cone swing platform, so the whole crank rig (crankshaft, 16T pinion,
-chain wheel, arm, handle) swings with the cone set as one unit and the
-16T<->64T mesh survives the p1 disengage.
+``cone-pivot-post-v2.SLDPRT`` is a new casting, not a refinement of the old
+O24 x 100.5 cylinder.  The exact feature dimensions were harvested from that
+model.  Its 86 mm height was manually rederived from the second ch30 eight-view
+(``references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png``);
+the body/head/boss proportions were manually rederived from the two ch11 detail
+photos (``ch11_images/page002_img05.jpeg`` and ``page002_img06.jpeg``).
 
-Cylindrical on purpose -- the assembly rotates it about Y (the shaft
-incline, 12.52 deg) and a circular plan section reads the same at every
-angle. Because the column rides the INCLINED plate, the crank bore is
-OBLIQUE in the part: plan direction rotated +INCLINE from local z (=
-machine z once placed), cut as a 360-degree REVOLVED cut about an
-in-sketch centreline on a Top-offset plane (the is_cut revolve; the
-straight extruded cut cannot make an angled bore without an angled
-reference plane). The kinematic crank AXIS the crankshaft mates to
-lives on the PLATFORM part ("crank axis"), not here -- this part
-carries the casting geometry; the interference gate proves the shaft
-fits the bore.
+The v2 coordinate frame is also authoritative: the body stands on Top at y=0,
+the crank bore runs straight along +Z, and the cone journal itself is yawed
+12.5182 degrees about the vertical body axis.  That is the PART feature frame;
+installation turns the casting exactly Ry(180), mapping its long +Z crank boss
+to machine -Z as shown by ch30 p004.  Stable semantic references are emitted
+for downstream mates: ``ConeShaftNormal``, ``journal axis``, ``swing pivot``,
+``mount east`` and ``mount west``.
 
-Dimensions: cad/DIMENSIONS.md ch. 13 "Drive supports" (estimated;
-heights re-read from the ch30 GT). BORE_HEIGHT + the platform's PLATE_T
-must equal the drive height above the base top (54), and CRANK_BORE_Y
-must equal Y_CRANK - Y_BASE_TOP - PLATE_T -- both asserted module-level
-in build_drive_train_assembly.
-
-Layout: cylinder standing on the Top plane, axis through the origin,
-cone journal bore along Z at y = BORE_HEIGHT (the assembly rotates the
-column about Y to align it with the cone axis), oblique crank bore at
-y = CRANK_BORE_Y.
-
-Run (SolidWorks already open)::
+Run only with SolidWorks already open::
 
     uv run python cad\scripts\build_cone_pivot_post.py
 """
@@ -40,27 +24,27 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
+import _telemetry
 from _common import (
     CASTING_GREEN,
     SketchDims,
-    add_line_chain,
+    _early_bound,
     apply_color,
     apply_material,
-    name_bore_axis,
     check,
     define_circle,
-    define_polygon_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -68,210 +52,349 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _holes import HoleSpec, wizard_holes
 from cone_pivot_post_spec import (
+    ATTACHMENT_CBORE_DEPTH,
+    ATTACHMENT_CBORE_DIA,
+    ATTACHMENT_SPACING,
+    ATTACHMENT_THRU_DIA,
+    ATTACHMENT_X,
     BLOCK_DIA,
     BLOCK_HEIGHT,
     BORE_DIA,
     BORE_HEIGHT,
+    CONE_BOSS_DIA,
+    CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
-    CRANK_BORE_OFFSET,
+    CRANK_BOSS_DIA,
+    CRANK_BOSS_LENGTH,
+    CRANK_BOSS_START_Z,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    HARVESTED_VOLUME_MM3,
+    HEAD_BASE_Y,
+    HEAD_DIA,
+    HEAD_HEIGHT,
     INCLINE_DEG,
 )
 
 PART_NAME = "cone-pivot-post"
-MATERIAL = "Gray Cast Iron"  # ONE green casting: big-end journal + crank pedestal
+MATERIAL = "Gray Cast Iron"
 
-# Geometry comes from cone_pivot_post_spec — the drawing's single source of the
-# marked dimensions — so a spec correction rebuilds the SLDPRT from the same
-# values the print annotates. Derivation notes live with the spec constants.
-#
-# Crank bore: same 3/8" as the crankshaft (ch. 11), running along MACHINE z
-# once placed. The column rides the plate at Ry(+INCLINE), so the AUTHORED
-# plan direction is (-sin I, +cos I) -- the direction that rotation maps to
-# machine z (see the bore feature's comment); it passes CRANK_BORE_DX east
-# of the column axis (ppost.x - X_CRANK, asserted in the assembly).
-CRANK_BORE_Y = CRANK_BORE_HEIGHT  # Y_CRANK 142.985 - Y_BASE_TOP 50.8 - PLATE_T 6.35
-CRANK_BORE_DX = CRANK_BORE_OFFSET  # east offset: ppost.x -121.85 - X_CRANK -122.8
+ATTACHMENT_HOLE_SPEC = HoleSpec(
+    "counterbore_fillister",
+    "1/4",
+    overrides_mm={
+        "HoleDiameter": ATTACHMENT_THRU_DIA,
+        "CounterBoreDiameter": ATTACHMENT_CBORE_DIA,
+        "CounterBoreDepth": ATTACHMENT_CBORE_DEPTH,
+    },
+)
 
 BLOCK_RADIUS = BLOCK_DIA / 2.0
+HEAD_RADIUS = HEAD_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0
-# The crank bore gets a REAL running clearance over the O9.525 crankshaft
-# (0.25 per side): the crank spins in this cast journal, and the crankshaft
-# is mated to the PLATFORM's crank axis (not this bore), so a line-to-line
-# bore turns micron-level chain mismatch into an interference sliver (0.29
-# mm^3 measured; the M6.8 sliver class -- design 0.25 margins, see memory).
-# The cone journal bore carries 0.02..0.05 diametral running clearance over
-# the shaft's 9.505..9.525 limits; its named axis still defines the mate.
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
-_SIN_I = math.sin(math.radians(INCLINE_DEG))
-_COS_I = math.cos(math.radians(INCLINE_DEG))
-
-
-def _bore_removed(r: float = BORE_RADIUS) -> float:
-    """Material removed by a horizontal r-cylinder crossing the O24 column --
-    z-chord 2*sqrt(R^2-x^2) integrated over the bore disc (through-axis; the
-    crank bore's 0.95 offset shortens its crossing ~0.3%, inside the 1% gate)."""
-    R = BLOCK_RADIUS
-    n = 4000
-    h = 2.0 * r / n
-
-    def f(x: float) -> float:
-        return 2.0 * math.sqrt(max(R * R - x * x, 0.0)) * 2.0 * math.sqrt(
-            max(r * r - x * x, 0.0)
-        )
-
-    s = f(-r) + f(r)
-    s += 4.0 * sum(f(-r + (2 * k - 1) * h) for k in range(1, n // 2 + 1))
-    s += 2.0 * sum(f(-r + 2 * k * h) for k in range(1, n // 2))
-    return s * h / 3.0
-
-
-async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+async def build(adapter: Any) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the block envelope and the journal
-    # bore. The mm suffix is load-bearing -- this is an INCH document and the
-    # equation manager reads BARE numbers in document units (an unsuffixed 24 =
-    # 24 in, blowing the part up 25.4x). BoreDia carries the legacy 0.375" value
-    # already reduced to mm.
-    await set_global(adapter, "BlockDia", f"{BLOCK_DIA}mm")
-    await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    await set_global(adapter, "BoreHeight", f"{BORE_HEIGHT}mm")
+    # Retain the harvested reference topology, but give the vertical axis the
+    # semantic name the assembly consumes instead of relying on Axis<N> order.
+    await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot"
+    )
+    name_last_feature(adapter, "swing pivot")
+    check(
+        "create ConeShaftNormal",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="angle",
+                base_plane="Front Plane",
+                # The harvested v2 plane reports ReverseDirection=true.  The
+                # signed helper maps the negative angle to that alternate
+                # solution while retaining the positive 12.5182° magnitude.
+                angle=-INCLINE_DEG,
+                pivot_axis="swing pivot",
+            )
+        ),
+    )
+    name_last_feature(adapter, "ConeShaftNormal")
+
+    # GUI-editable dimensional contract.  Explicit mm is load-bearing because
+    # the project part template uses inch document units.
+    globals_mm = {
+        "MainBodyDia": BLOCK_DIA,
+        "MainBodyHeight": BLOCK_HEIGHT,
+        "HeadDia": HEAD_DIA,
+        "HeadHeight": HEAD_HEIGHT,
+        "CrankBossDia": CRANK_BOSS_DIA,
+        "CrankBoreDia": CRANK_BORE_DIA,
+        "CrankAxisY": CRANK_BORE_HEIGHT,
+        "ConeBossDia": CONE_BOSS_DIA,
+        "JournalBoreDia": BORE_DIA,
+        "JournalAxisY": BORE_HEIGHT,
+        "MountSpacing": ATTACHMENT_SPACING,
+        "MountThruDia": ATTACHMENT_THRU_DIA,
+        "MountCboreDia": ATTACHMENT_CBORE_DIA,
+        "MountCboreDepth": ATTACHMENT_CBORE_DEPTH,
+    }
+    for name, value in globals_mm.items():
+        await set_global(adapter, name, f"{value}mm")
+    await set_global(adapter, "ConeIncline", f"{INCLINE_DEG}deg")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Origin-centred circular footprint. Origin circle: only the diameter dim.
-    block = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Top"))
+    # 1. Main O42.011 body, y=0..86.
+    main = SketchDims()
+    check("create sketch MainBodyProfile", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, BLOCK_RADIUS, "block circle", dims=block,
-        names=("BlockCx", "BlockCz", "BlockDia"),
-        drives=(None, None, '"BlockDia"'),
+        adapter,
+        0.0,
+        0.0,
+        BLOCK_RADIUS,
+        "main body",
+        dims=main,
+        names=("MainBodyCx", "MainBodyCz", "MainBodyDia"),
+        drives=(None, None, '"MainBodyDia"'),
     )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
-    name_last_feature(adapter, "BlockProfile")
-    drive_jobs += block.apply(adapter, "BlockProfile")
+    await ensure_fully_defined(adapter, "MainBodyProfile")
+    check("exit sketch MainBodyProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "MainBodyProfile")
+    drive_jobs += main.apply(adapter, "MainBodyProfile")
     check(
-        "extrude block",
+        "extrude MainBody",
         await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)),
     )
-    name_last_feature(adapter, "Block")
-    # Name the extrude DEPTH (a feature parameter) so the column height is a
-    # markable manufacturing dimension for the drawing, driven by its global.
-    block_depth_dim = name_dimensions(adapter, "Block", ["BlockHt"])
-    drive_jobs += [(block_depth_dim[0], '"BlockHeight"')]
-    v_block = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
-    volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
+    name_last_feature(adapter, "MainBody")
+    main_depth = name_dimensions(adapter, "MainBody", ["MainBodyHt"])
+    drive_jobs.append((main_depth[0], '"MainBodyHeight"'))
+    body_volume = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
+    await volume_check(adapter, "v2 main body", body_volume, 0.001 * body_volume)
 
-    # Big-end journal bore along Z at the drive height. On-axis in X (centre x 0,
-    # a relation), so define_circle records only the centre-Z + diameter dims.
-    bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, 0.0, BORE_HEIGHT, BORE_RADIUS, "bore", dims=bore,
-        names=("BoreX", "BoreZ", "BoreDia"),
-        drives=(None, '"BoreHeight"', '"BoreDia"'),
-    )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreProfile")
-    drive_jobs += bore.apply(adapter, "BoreProfile")
+    # 2. Slightly larger O42.7506 head/collar over y=59.4..86.
     check(
-        "cut bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=BLOCK_DIA + 4.0, both_directions=True)
+        "create HeadBasePlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=HEAD_BASE_Y
+            )
         ),
     )
-    name_last_feature(adapter, "JournalBore")
-    v_bore = _bore_removed()
-    volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+    name_last_feature(adapter, "HeadBasePlane")
+    head = SketchDims()
+    check(
+        "create sketch HeadProfile", await adapter.create_sketch("HeadBasePlane")
+    )
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        HEAD_RADIUS,
+        "head collar",
+        dims=head,
+        names=("HeadCx", "HeadCz", "HeadDia"),
+        drives=(None, None, '"HeadDia"'),
+    )
+    await ensure_fully_defined(adapter, "HeadProfile")
+    check("exit sketch HeadProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "HeadProfile")
+    drive_jobs += head.apply(adapter, "HeadProfile")
+    check(
+        "extrude Head",
+        await adapter.create_extrusion(ExtrusionParameters(depth=HEAD_HEIGHT)),
+    )
+    name_last_feature(adapter, "Head")
+    head_depth = name_dimensions(adapter, "Head", ["HeadHt"])
+    drive_jobs.append((head_depth[0], '"HeadHeight"'))
+    head_volume = body_volume + math.pi * (
+        HEAD_RADIUS**2 - BLOCK_RADIUS**2
+    ) * HEAD_HEIGHT
+    await volume_check(adapter, "v2 head collar", head_volume, 0.001 * head_volume)
 
-    # Oblique crank bore: 360-degree revolved CUT about an in-sketch
-    # centreline on a Top-offset plane at the crank height (proven live:
-    # sketch (x, y) -> part (X, -Z)). The column is placed at Ry(+INCLINE)
-    # riding the plate, so the authored plan direction must be the one that
-    # rotation carries to machine z: plan (-sin I, +cos I) (sketch
-    # (-sin I, -cos I)), with the anchor at (-DX*cos I, +DX*sin I) sketch
-    # coords (both signs interference-gate pinned: the naive (sin I, cos I)
-    # landed 2*INCLINE off machine z -- a two-lobe crankshaft interference).
-    # The placement maps the anchor to DX east of the column
-    # axis. The removed volume equals
-    # the straight-bore integral: the column is rotationally symmetric, and
-    # the two bores are 40 apart (no boolean interaction).
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
+    # 3. Preserve the harvested attachment feature as ONE native ANSI-inch Hole
+    # Wizard counterbore with two driven placement points.  Drill while the
+    # casting is still prismatic: the later transverse boss booleans change the
+    # first body's face topology and make this top face undiscoverable through
+    # COM even though the final geometry still has a top surface.
+    attachment_cut = wizard_holes(
+        adapter,
+        ATTACHMENT_HOLE_SPEC,
+        [
+            [ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
+            [-ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
+        ],
+        (0.0, 1.0, 0.0),
+        "mounting counterbores (1/4 fillister)",
+        name="AttachmentScrewHoles",
+        expect_dia_mm=ATTACHMENT_THRU_DIA,
+        placement_dims=[
+            (("MountWestX", '"MountSpacing" / 2'), (None, None)),
+            # Horizontal-distance dimensions are unsigned; the authored point
+            # retains the east/west side.
+            (("MountEastX", '"MountSpacing" / 2'), (None, None)),
+        ],
+    )
+    drive_jobs += attachment_cut.placement_drive_jobs
+
+    # 4. Straight crank boss and bore along +Z from the head tangent plane.
     check(
-        "create_plane CrankBorePlane",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Top Plane", offset=CRANK_BORE_Y,
-        )),
+        "create CrankInterfacePlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Front Plane",
+                offset=CRANK_BOSS_START_Z,
+            )
+        ),
     )
-    name_last_feature(adapter, "CrankBorePlane")
-    check("create_sketch crank bore", await adapter.create_sketch("CrankBorePlane"))
-    _dx, _dy = -_SIN_I, -_COS_I  # sketch direction (maps to machine z, above)
-    _nx, _ny = _COS_I, -_SIN_I  # in-sketch normal
-    # Anchor sign pinned EMPIRICALLY: with (+DX*C, -DX*S) the built bore ran
-    # PARALLEL to the crankshaft but displaced 2*DX -- a single 408 mm^3
-    # crescent (two O9.525 cylinders offset 1.9 over the ~24 crossing), the
-    # exact wrong-side signature: the bore belongs EAST of the column axis.
-    _cx, _cy = -CRANK_BORE_DX * _COS_I, CRANK_BORE_DX * _SIN_I  # axis plan point
-    cbore = SketchDims()
-    set_sketch_direct_db(adapter, True)
-    _rect = [
-        (_cx - 20.0 * _dx, _cy - 20.0 * _dy),
-        (_cx + 20.0 * _dx, _cy + 20.0 * _dy),
-        (_cx + 20.0 * _dx + CRANK_BORE_RADIUS * _nx,
-         _cy + 20.0 * _dy + CRANK_BORE_RADIUS * _ny),
-        (_cx - 20.0 * _dx + CRANK_BORE_RADIUS * _nx,
-         _cy - 20.0 * _dy + CRANK_BORE_RADIUS * _ny),
-    ]
-    _rect_lines = await add_line_chain(adapter, _rect)
-    set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(
-        adapter, _rect_lines, _rect, label="crank bore rect", dims=cbore,
-        names=["CBAnchorX", "CBAnchorZ", "CBRunDx", "CBRunDy",
-               "CBEndDx", "CBEndDy", "CBBackDx", "CBBackDy"],
-        drives=[None] * 8,
+    name_last_feature(adapter, "CrankInterfacePlane")
+    crank_boss = SketchDims()
+    check(
+        "create sketch CrankBossProfile",
+        await adapter.create_sketch("CrankInterfacePlane"),
     )
-    # Revolve centreline: same endpoints as the rectangle's axis-side edge --
-    # inference merges the endpoints, so the dimensioned rectangle fully
-    # defines it (the crank-handle merged-in-centreline pattern).
-    check("centreline crank bore", await adapter.add_centerline(
-        _rect[0][0], _rect[0][1], _rect[1][0], _rect[1][1]))
-    await ensure_fully_defined(adapter, "crank bore sketch")
-    check("exit_sketch crank bore", await adapter.exit_sketch())
+    await define_circle(
+        adapter,
+        0.0,
+        CRANK_BORE_HEIGHT,
+        CRANK_BOSS_DIA / 2.0,
+        "crank boss",
+        dims=crank_boss,
+        names=("CrankBossX", "CrankAxisY", "CrankBossDia"),
+        drives=(None, '"CrankAxisY"', '"CrankBossDia"'),
+    )
+    await ensure_fully_defined(adapter, "CrankBossProfile")
+    check("exit sketch CrankBossProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrankBossProfile")
+    drive_jobs += crank_boss.apply(adapter, "CrankBossProfile")
+    check(
+        "extrude CrankSprocketBoss",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=CRANK_BOSS_LENGTH)
+        ),
+    )
+    name_last_feature(adapter, "CrankSprocketBoss")
+
+    crank_bore = SketchDims()
+    check(
+        "create sketch CrankBoreProfile",
+        await adapter.create_sketch("CrankInterfacePlane"),
+    )
+    await define_circle(
+        adapter,
+        0.0,
+        CRANK_BORE_HEIGHT,
+        CRANK_BORE_RADIUS,
+        "crank bore",
+        dims=crank_bore,
+        names=("CrankBoreX", "CrankBoreY", "CrankBoreDia"),
+        drives=(None, '"CrankAxisY"', '"CrankBoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "CrankBoreProfile")
+    check("exit sketch CrankBoreProfile", await adapter.exit_sketch())
     name_last_feature(adapter, "CrankBoreProfile")
+    drive_jobs += crank_bore.apply(adapter, "CrankBoreProfile")
     check(
-        "cut-revolve crank bore",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+        "cut CrankBore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=CRANK_BOSS_LENGTH)
+        ),
     )
     name_last_feature(adapter, "CrankBore")
-    v_crank = _bore_removed(CRANK_BORE_RADIUS)
-    volume = await volume_check(adapter, "crank bore", volume - v_crank, 0.01 * v_crank)
 
-    # Apply the deferred drive equations after the model + a rebuild exist, then
-    # re-check: every equation evaluates to the value just built, so geometry
-    # must not move.
-    await force_rebuild(adapter)
-    for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven post (equations neutral)", volume, 0.01 * v_bore)
+    # 5. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
+    # are mid-plane extrusions from the harvested ConeShaftNormal reference.
+    # Do not substitute an on-axis revolve here: that SolidWorks topology is
+    # known to make later Boolean features fail on this class of casting.
+    cone_boss = SketchDims()
+    check(
+        "create sketch ConeBossProfile",
+        await adapter.create_sketch("ConeShaftNormal"),
+    )
+    await define_circle(
+        adapter,
+        -BORE_HEIGHT,
+        0.0,
+        CONE_BOSS_DIA / 2.0,
+        "inclined cone boss",
+        dims=cone_boss,
+        names=("JournalAxisY", "ConeBossY", "ConeBossDia"),
+        # ConeShaftNormal's local X axis points down the model's -Y axis.
+        # The horizontal distance is unsigned; the authored point retains the
+        # negative side that places the bore at world Y=+JournalAxisY.
+        drives=('"JournalAxisY"', None, '"ConeBossDia"'),
+    )
+    await ensure_fully_defined(adapter, "ConeBossProfile")
+    check("exit sketch ConeBossProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "ConeBossProfile")
+    drive_jobs += cone_boss.apply(adapter, "ConeBossProfile")
+    check(
+        "extrude ConeShaftBoss",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=CONE_BOSS_LENGTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ConeShaftBoss")
 
-    # Named bore/central axis for view-independent assembly mate
-    # selection (M6 mated-DOF drive train).
-    await name_bore_axis(adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "journal axis")
-    # Vertical centreline (Axis2), historically named "swing pivot". The p1
-    # swing DOF now lives on the PLATFORM's own pivot axis (the post just rides
-    # the plate); this axis remains the post's plan centreline, used by the
-    # platform seat mates to locate the post on the plate.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot")
+    journal_bore = SketchDims()
+    check(
+        "create sketch JournalBoreProfile",
+        await adapter.create_sketch("ConeShaftNormal"),
+    )
+    await define_circle(
+        adapter,
+        -BORE_HEIGHT,
+        0.0,
+        BORE_RADIUS,
+        "inclined journal bore",
+        dims=journal_bore,
+        names=("JournalAxisY", "JournalBoreY", "JournalBoreDia"),
+        drives=('"JournalAxisY"', None, '"JournalBoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "JournalBoreProfile")
+    check("exit sketch JournalBoreProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "JournalBoreProfile")
+    drive_jobs += journal_bore.apply(adapter, "JournalBoreProfile")
+    check(
+        "cut ConeShaftBore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=CONE_BOSS_LENGTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "ConeShaftBore")
+
+    # Apply all neutral equations only after every referenced dimension exists.
+    await force_rebuild(adapter)
+    for dimension, expression in drive_jobs:
+        await drive_dimension(adapter, dimension, expression)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter,
+        "v2 harvested final",
+        HARVESTED_VOLUME_MM3,
+        0.001 * HARVESTED_VOLUME_MM3,
+    )
+
+    # Semantic, name-selected assembly references.  The journal axis is taken
+    # from its actual cylindrical wall; the three vertical axes are plane
+    # intersections and therefore independent of screen projection.
+    _create_feature_cylinder_axis(
+        adapter,
+        "ConeShaftBoss",
+        CONE_BOSS_DIA / 2.0,
+        "journal axis",
+    )
+    for label, x in (("mount west", ATTACHMENT_X), ("mount east", -ATTACHMENT_X)):
+        await name_bore_axis(
+            adapter, "Front Plane", 0.0, "Right Plane", x, label
+        )
+        name_last_feature(adapter, label)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
@@ -284,7 +407,103 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Manufacturing Notes": DRAWING_NOTES},
     )
+    _blank_reference_geometry(
+        adapter,
+        (
+            ("ConeShaftNormal", "PLANE"),
+            ("HeadBasePlane", "PLANE"),
+            ("CrankInterfacePlane", "PLANE"),
+            ("Plane4", "PLANE"),
+            ("Plane5", "PLANE"),
+            ("swing pivot", "AXIS"),
+            ("journal axis", "AXIS"),
+            ("mount west", "AXIS"),
+            ("mount east", "AXIS"),
+        ),
+    )
     return await save_part_and_images(adapter, PART_NAME)
+
+
+@_telemetry.traced("reference.axis_from_feature_cylinder", label_param="label")
+def _create_feature_cylinder_axis(
+    adapter: Any,
+    feature_name: str,
+    radius_mm: float,
+    label: str,
+) -> None:
+    """Create an axis from an exact feature-owned cylindrical face.
+
+    Coordinate picks are view-dependent and selected ``MainBody`` in the
+    generated post even when the point lay on the small inclined pad. Walking
+    only ``ConeShaftBoss``'s created faces makes the ownership explicit and
+    costs four surface reads instead of scanning the part's complete B-rep.
+    """
+    from solidworks_mcp.adapters import sw_type_info
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2", "InsertAxis2")
+    part = sw_type_info.early_bound_doc(adapter.currentModel)
+    feature = part.FeatureByName(feature_name)
+    if feature is None:
+        raise RuntimeError(f"axis {label}: feature {feature_name!r} not found")
+    feature = _early_bound(feature, "IFeature", "GetFaces")
+    candidates: list[tuple[float, Any]] = []
+    for face in feature.GetFaces() or []:
+        face = _early_bound(face, "IFace2", "GetSurface", "GetArea")
+        surface = _early_bound(
+            face.GetSurface(), "ISurface", "IsCylinder", "CylinderParams"
+        )
+        if not surface.IsCylinder():
+            continue
+        parameters = tuple(float(value) for value in surface.CylinderParams)
+        if abs(parameters[6] * 1000.0 - radius_mm) > 0.001:
+            continue
+        candidates.append((float(face.GetArea()), face))
+    if not candidates:
+        raise RuntimeError(
+            f"axis {label}: {feature_name!r} has no cylinder at r={radius_mm:g} mm"
+        )
+
+    face = max(candidates, key=lambda row: row[0])[1]
+    model.ClearSelection2(True)
+    selectable = _early_bound(face, "IEntity", "Select2")
+    if not selectable.Select2(False, 0):
+        raise RuntimeError(f"axis {label}: exact cylindrical face selection failed")
+    if not model.InsertAxis2(True):
+        raise RuntimeError(f"axis {label}: InsertAxis2 failed")
+    model.ClearSelection2(True)
+    name_last_feature(adapter, label)
+    _telemetry.success(
+        f"axis {label} from {feature_name} r={radius_mm:g} mm "
+        f"({len(candidates)} candidate face(s))"
+    )
+
+
+@_telemetry.traced("appearance.hide_reference_geometry")
+def _blank_reference_geometry(
+    adapter: Any, references: tuple[tuple[str, str], ...]
+) -> None:
+    """Keep mating references selectable but out of the saved part render."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    for index, (name, kind) in enumerate(references):
+        selected = model.Extension.SelectByID2(
+            name,
+            kind,
+            0,
+            0,
+            0,
+            index > 0,
+            0,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
+    _telemetry.success(f"blanked {len(references)} reference entities")
 
 
 if __name__ == "__main__":

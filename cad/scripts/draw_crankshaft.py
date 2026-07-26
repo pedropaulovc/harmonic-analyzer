@@ -45,6 +45,9 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from crankshaft_spec import (
+    JOURNAL_DIA,
+    JOURNAL_LENGTH,
+    JOURNAL_START,
     PIN_HOLE_DIA,
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
@@ -78,7 +81,7 @@ FRONT_CENTER = (0.060, 0.150)
 RIGHT_CENTER = (0.150, 0.150)
 ISO_CENTER = (0.345, 0.200)
 DATUM_A_RIGHT = (
-    FRONT_CENTER[0] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+    FRONT_CENTER[0] + JOURNAL_DIA * END_VIEW_SCALE / 2000.0,
     FRONT_CENTER[1],
 )
 
@@ -99,23 +102,37 @@ FRONT_KEEP = {
         ),
         FRONT_CENTER[1] + 0.008,
     ),
+    "JournalDiaDim": (0.102, FRONT_CENTER[1] + 0.020),
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1]),
+    "JournalStart": (RIGHT_CENTER[0] + 0.035, _SIDE_BOTTOM + 0.020),
+    "JournalLength": (
+        RIGHT_CENTER[0] + 0.052,
+        _SIDE_BOTTOM + (JOURNAL_START + JOURNAL_LENGTH / 2.0) / 1000.0,
+    ),
 }
-DIMENSION_CALLOUTS = {"ShaftDiaDim": "+0.00/-0.02"}
+DIMENSION_CALLOUTS = {
+    "ShaftDiaDim": "+0.00/-0.02",
+    "JournalDiaDim": "+0.00/-0.02",
+}
 
 
-def _visible_shaft_face(adapter: Any, view: Any) -> Any:
-    """Return the modeled OD face visible in the crankshaft side view."""
-    expected_radius_m = SHAFT_DIA / 2000.0
+def _visible_cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
+    """Return the requested modeled OD face in the crankshaft side view."""
+    expected_radius_m = diameter_mm / 2000.0
     candidates: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        faces = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 3),  # swViewEntityType_Face
-            default=(),
-        ) or ()
+        faces = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(
+                    c, 3
+                ),  # swViewEntityType_Face
+                default=(),
+            )
+            or ()
+        )
         for face in faces:
             face = _early_bound(face, "IFace2")
             surface = _early_bound(face.GetSurface(), "ISurface")
@@ -133,15 +150,18 @@ def _visible_shaft_face(adapter: Any, view: Any) -> Any:
     return max(candidates, key=lambda candidate: candidate[0])[1]
 
 
-def _visible_shaft_silhouette(adapter: Any, view: Any) -> Any:
-    """Return the longest drawing-native silhouette of the turned shaft OD."""
+def _visible_journal_silhouette(adapter: Any, view: Any) -> Any:
+    """Return the longest silhouette: the v2-post bearing journal OD."""
     candidates: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        silhouettes = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 4),
-            default=(),
-        ) or ()
+        silhouettes = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 4),
+                default=(),
+            )
+            or ()
+        )
         for raw_silhouette in silhouettes:
             silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
             start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
@@ -152,16 +172,17 @@ def _visible_shaft_silhouette(adapter: Any, view: Any) -> Any:
             end_xyz = adapter._get_attr_or_call(end, "ArrayData")
             if not start_xyz or not end_xyz:
                 continue
-            length = sum(
-                (float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz)
-            ) ** 0.5
+            length = (
+                sum((float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz))
+                ** 0.5
+            )
             candidates.append((length, silhouette))
     if not candidates:
         raise RuntimeError("crankshaft side view has no usable silhouette edges")
     length, silhouette = max(candidates, key=lambda candidate: candidate[0])
-    if length < SHAFT_LENGTH * 0.8 / 1000.0:
+    if length < JOURNAL_LENGTH * 0.8 / 1000.0:
         raise RuntimeError(
-            "could not identify the crankshaft OD silhouette: "
+            "could not identify the crankshaft journal silhouette: "
             f"longest visible silhouette is only {length * 1000:g} mm"
         )
     return silhouette
@@ -173,10 +194,15 @@ def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
     candidates: list[Any] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1),  # swViewEntityType_Edge
-            default=(),
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(
+                    c, 1
+                ),  # swViewEntityType_Edge
+                default=(),
+            )
+            or ()
+        )
         for edge in edges:
             edge = _early_bound(edge, "IEdge")
             adjacent_faces = edge.GetTwoAdjacentFaces2() or ()
@@ -206,10 +232,13 @@ def _visible_shaft_end_edges(adapter: Any, view: Any) -> list[tuple[float, Any]]
     candidates: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1),
-            default=(),
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1),
+                default=(),
+            )
+            or ()
+        )
         for edge in edges:
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -282,10 +311,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    # Ø9.525 is the exact 3/8 in conversion; two sheet decimals (9.53) would
-    # contradict the crank-arm bore note, so keep three.
+    # Ø9.525 is the exact 3/8 in conversion and Ø11.388 is the post-bearing
+    # journal; three decimals preserve both fit-defining values.
     set_dimension_precision(
-        adapter, [*front_annotations, *right_annotations], {"ShaftDiaDim": 3}
+        adapter,
+        [*front_annotations, *right_annotations],
+        {
+            "ShaftDiaDim": 3,
+            "JournalDiaDim": 3,
+            "JournalStart": 3,
+            "JournalLength": 3,
+        },
     )
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
@@ -294,13 +330,13 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    shaft_face = _visible_shaft_face(adapter, right)
-    shaft_silhouette = _visible_shaft_silhouette(adapter, right)
+    journal_face = _visible_cylindrical_face(adapter, right, JOURNAL_DIA)
+    journal_silhouette = _visible_journal_silhouette(adapter, right)
     add_view_centerline(
         adapter,
         right,
         label="crankshaft bearing axis",
-        face=shaft_face,
+        face=journal_face,
     )
 
     if not any(
@@ -323,7 +359,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=DATUM_A_RIGHT,
         symbol_xy=(FRONT_CENTER[0] + 0.027, FRONT_CENTER[1]),
         datum="A",
-        label="shaft OD datum axis",
+        label="bearing-journal datum axis",
         position_tolerance_m=0.0001,
     )
     add_datum_feature(
@@ -386,9 +422,9 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         symbol_xy=(0.205, 0.145),
         roughness_ra="1.6",
-        label="crankshaft bearing finish",
-        edge_entity=shaft_silhouette,
-        production_method="SHAFT OD",
+        label="crankshaft bearing-journal finish",
+        edge_entity=journal_silhouette,
+        production_method="BEARING JOURNAL",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)
     # Identify the enlarged circular projection without relying on its position.

@@ -1,10 +1,11 @@
 r"""Reproduction script: crankshaft (book ch. 11, pp. 12-15).
 
-Short Ø3/8 in steel shaft in the green pedestal bearing at the base
-corner: crank arm on the outboard end (affixed by a removable tapered
+Stepped steel shaft in the green v2 post bearing at the base corner:
+an integral Ø11.388 journal runs over local stations 26.623905572..99.035905572,
+while the crank arm on the outboard end (affixed by a removable tapered
 pin so the crankshaft gear can be changed), chain sprocket and the 4:1
-drive pinion inboard. Modeled as the plain shaft with the tapered-pin
-cross-hole; the crank arm/pin/handle and the gears are separate parts
+drive pinion retain their existing 3/8-in seats. Modeled with the
+tapered-pin cross-hole; the crank arm/pin/handle and the gears are separate parts
 (`build_crank_arm.py` etc., gears in M4).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 11" - dia legacy (med), length
@@ -56,6 +57,9 @@ from crankshaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
+    JOURNAL_DIA,
+    JOURNAL_LENGTH,
+    JOURNAL_START,
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
     SHAFT_LENGTH,
@@ -84,11 +88,8 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # arm seats at SEAT_ARM. build_drive_train asserts these match its
 # REMOVABLE_Z0 / PINION_TOOTH_Z / arm-placement derivations.
 SEAT_T12 = 17.5
-SEAT_PINION = 100.7  # |PINION_TOOTH_Z - FACE/2 - CRANKSHAFT_Z0|
-# (2026-07-14 crank-mesh rederive: the pinion stands proud of the pivot
-# post's casting face, centred in the TRUE casting-to-T120 span -- ch12
-# page002_img06, no relief pocket -- at the engaged-c2c Y_CRANK 142.985;
-# = |-68.90 - 10.8/2 - (-175)|)
+SEAT_PINION = 105.039505572
+# = -31.0252033243 - 10.8/2 - (-175): rear-shifted 16T centred on the 64T row.
 SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's placed pose composes a
 # Ry(180), which keeps its 8-thick plate at station 0..8 but puts the
 # AS-BUILT origin at the plate's NORTH face (station 8, machine -167): the
@@ -99,7 +100,7 @@ SEAT_ARM = 8.0  # the arm's ORIGIN plane. The arm's placed pose composes a
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -110,6 +111,9 @@ async def build(adapter) -> dict[str, str]:
     # already mm (0.375 * IN), so it serialises as its mm value.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+    await set_global(adapter, "JournalDia", f"{JOURNAL_DIA}mm")
+    await set_global(adapter, "JournalStart", f"{JOURNAL_START}mm")
+    await set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
     # PinHoleHeight is deliberately the COM-free spec constant used below.
     # On the local-X radial point, assigning the same 4 mm value through a
     # 3D-sketch equation built the hole but made ForceRebuild3 fail on both
@@ -123,7 +127,12 @@ async def build(adapter) -> dict[str, str]:
     shaft = SketchDims()
     check("create_sketch shaft", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, SHAFT_DIA / 2.0, "shaft circle", dims=shaft,
+        adapter,
+        0.0,
+        0.0,
+        SHAFT_DIA / 2.0,
+        "shaft circle",
+        dims=shaft,
         names=("ShaftCx", "ShaftCz", "ShaftDiaDim"),
         drives=(None, None, '"ShaftDia"'),
     )
@@ -140,6 +149,58 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * (SHAFT_DIA / 2.0) ** 2 * SHAFT_LENGTH
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
+
+    # Integral v2-post bearing journal.  An offset reference plane exposes the
+    # start station as a markable manufacturing dimension; the journal then
+    # extrudes exactly across the boss span and merges into the 3/8-in core.
+    check(
+        "create_plane JournalStartPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=JOURNAL_START
+            )
+        ),
+    )
+    name_last_feature(adapter, "JournalStartPlane")
+    start_dim = name_dimensions(adapter, "JournalStartPlane", ["JournalStart"])
+    drive_jobs += [(start_dim[0], '"JournalStart"')]
+
+    journal = SketchDims()
+    check(
+        "create_sketch bearing journal",
+        await adapter.create_sketch("JournalStartPlane"),
+    )
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        JOURNAL_DIA / 2.0,
+        "bearing journal circle",
+        dims=journal,
+        names=("JournalCx", "JournalCz", "JournalDiaDim"),
+        drives=(None, None, '"JournalDia"'),
+    )
+    await ensure_fully_defined(adapter, "bearing journal sketch")
+    check("exit_sketch bearing journal", await adapter.exit_sketch())
+    name_last_feature(adapter, "JournalProfile")
+    drive_jobs += journal.apply(adapter, "JournalProfile")
+    check(
+        "extrude bearing journal",
+        await adapter.create_extrusion(ExtrusionParameters(depth=JOURNAL_LENGTH)),
+    )
+    name_last_feature(adapter, "Journal")
+    journal_depth_dim = name_dimensions(adapter, "Journal", ["JournalLength"])
+    drive_jobs += [(journal_depth_dim[0], '"JournalLength"')]
+    v_with_journal = (
+        v_shaft
+        + math.pi * ((JOURNAL_DIA / 2.0) ** 2 - (SHAFT_DIA / 2.0) ** 2) * JOURNAL_LENGTH
+    )
+    await volume_check(
+        adapter,
+        "shaft + bearing journal",
+        v_with_journal,
+        0.005 * v_with_journal,
+    )
 
     # Tapered-pin cross-hole through the crank seat: a native Hole Wizard #9
     # drill placed RADIALLY on the shaft's cylindrical face (3D-sketch
@@ -160,7 +221,7 @@ async def build(adapter) -> dict[str, str]:
     # integrated numerically (probe-exact; replaces the old ~178 as-built
     # constant for the retired Ø5.0).
     v_pin = cross_hole_volume_mm3(NUMBER_DRILL_MM["#9"], SHAFT_DIA)
-    v_final = v_shaft - v_pin
+    v_final = v_with_journal - v_pin
     await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
 
     # Apply the deferred drive equations after the whole model + a rebuild
@@ -190,9 +251,13 @@ async def build(adapter) -> dict[str, str]:
     ):
         check(
             f"create_plane {seat_name} (Top Plane, +{station:.3f})",
-            await adapter.create_plane(CreatePlaneParameters(
-                mode="offset", base_plane="Top Plane", offset=station,
-            )),
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset",
+                    base_plane="Top Plane",
+                    offset=station,
+                )
+            ),
         )
         name_last_feature(adapter, seat_name)
 

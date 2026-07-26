@@ -65,6 +65,8 @@ def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
     assert "3.00 MIN" not in notes
     assert "GO PIN" not in notes
     assert "CLAMPED FACE-TO-FACE" in notes
+    assert "2X OPEN R6.90 SCALLOPS" in notes
+    assert "SILVER-BRAZE" in notes
     assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
     assert "4.012 MAX / 4.000 MIN" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
@@ -99,6 +101,14 @@ def test_hole_states_are_annotated() -> None:
 def test_blind_seat_depth_uses_the_marked_drawing_name() -> None:
     source = Path(bracket.__file__).read_text(encoding="utf-8")
     assert 'name_dimensions(adapter, "PinSeat", ["PinSeatDepth"])' in source
+
+
+def test_cam_scallops_cover_both_linkage_extremes() -> None:
+    assert pinion_bracket_geometry.CAM_RELIEF_RADIUS == 6.90
+    assert pinion_bracket_geometry.CAM_RELIEF_MIN_PIVOT_LIGAMENT >= 2.5
+    source = Path(bracket.__file__).read_text(encoding="utf-8")
+    assert 'name_last_feature(adapter, f"CamRelief{label}")' in source
+    assert "_cam_relief_area(centers)" in source
 
 
 def test_datum_scheme_fully_defines_functional_relationships() -> None:

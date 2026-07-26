@@ -8,9 +8,10 @@ Photo reads at 9.45 px/mm against the Ø6.35 rods: collar OD ~9.5, a
 ~Ø3.2 set-pin dome proud of the OD (locks the collar to the rod and
 stops axial drift -- review item 8b), pin-on-collar tangency at park.
 
-Eccentricity 1.0 (photo-consistent): full lift 2.0 vs the 1.08 the
-4.1-deg engage swing needs (15 * tan 4.1 -- the pin rides 15 west of
-the pivot), and the thin side keeps a 0.575 wall over the bore.
+Eccentricity 1.4 after the v2 drive-line closure provides 2.8 full lift.  The
+low-confidence photo OD is reclosed to 10.32 so that the thin side retains the
+stated 0.575-mm wall over the Ø6.37 bore; the former Ø9.2 literal left only
+0.015 mm and was not manufacturable.
 
 Layout: bore axis Z through the ORIGIN (rides the rod), authored in the
 PARK pose -- collar centre at (0, -ECC), heavy side and the set-pin
@@ -55,6 +56,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
+from _visibility import blank_reference_geometry
 from pinion_cam_geometry import (
     BORE,
     BOSS_DIA,
@@ -254,7 +256,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "M2.5 tap drill", volume, 0.05 * V_TAP_DRILL)
 
     # Named bore axis for the rod mate (Axis1).
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "cam bore axis")
+    cam_bore_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", 0.0, "cam bore axis"
+    )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -280,6 +284,10 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
+    )
+    blank_reference_geometry(
+        adapter,
+        (("TapDrillPlane", "PLANE"), (cam_bore_axis, "AXIS")),
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

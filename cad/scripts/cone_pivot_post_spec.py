@@ -1,4 +1,13 @@
-r"""Pure-data dimensional contract shared by the cone pivot post and drawing."""
+r"""Pure-data dimensional contract shared by the cone pivot post and drawing.
+
+The hand-modelled ``cone-pivot-post-v2.SLDPRT`` is the dimensional authority.
+Its 86 mm height was manually rederived from the second ch30 eight-view
+(``references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png``).
+The casting proportions were manually rederived from the two sharp ch11 details
+(``ch11_images/page002_img05.jpeg`` and ``page002_img06.jpeg``).  Those photos
+support proportions, not manufacturing tolerances; the decimal values below are
+the exact dimensions harvested from v2's feature tree.
+"""
 
 from __future__ import annotations
 
@@ -7,73 +16,95 @@ import math
 
 MM_PER_IN = 25.4
 
-# Round green casting standing on the swing platform: the cone shaft's big-end
-# journal bore (along Z at BORE_HEIGHT) and the crank pedestal's oblique crank
-# bore (at CRANK_BORE_HEIGHT, tipped INCLINE_DEG off vertical, offset east). See
-# build_cone_pivot_post.py for the derivation; this module is only the drawing's
-# single source of the marked dimensions.
-BLOCK_DIA = 24.0  # round column outside diameter
-BLOCK_HEIGHT = 100.5  # column height, foot (platform seat) to top
-BORE_DIA = 9.550  # 9.545..9.555 finished bore over shaft max 9.525
-BORE_HEIGHT = 47.65  # journal-bore axis above the foot
-# Mating cone-shaft OD limits in the journal fit (the cone_gear_shaft datum-A
-# seat that rides this bore) -- a distinct feature from CRANK_SHAFT_MAX_DIA
-# despite the shared 3/8" nominal.
-JOURNAL_SHAFT_MAX_DIA = 9.525  # upper limit
-JOURNAL_SHAFT_MIN_DIA = JOURNAL_SHAFT_MAX_DIA - 0.02  # 9.505: lower limit (0.02 band)
-CRANK_SHAFT_MAX_DIA = 9.525
-CRANK_BORE_DIA = CRANK_SHAFT_MAX_DIA + 0.5  # 10.025: 0.25 radial clearance
-CRANK_BORE_HEIGHT = 85.835  # crank-bore axis above the foot
-CRANK_BORE_OFFSET = 0.95  # crank-bore axis east of the column axis
-INCLINE_DEG = 12.5182  # crank bore tips this far off the column's vertical axis
+# Main casting: the upper 26.6 mm is a very slightly larger collar around the
+# main body.  Both cylinders share the vertical body/swing axis.
+BLOCK_DIA = 42.011
+BLOCK_HEIGHT = 86.0
+HEAD_DIA = 42.7506
+HEAD_HEIGHT = 26.6
+HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 
-# Datum-coordinate definition of the crank-bore theoretical axis.  The point is
-# the unique point on the axis closest to datum B; the direction is a unit
-# vector.  Signs refer to the coordinate directions stated in the boxed drawing
-# note, so neither the sheet image scale nor an inferred hidden-line quadrant is
-# part of the manufacturing definition.
-_CRANK_SIN = math.sin(math.radians(INCLINE_DEG))
-_CRANK_COS = math.cos(math.radians(INCLINE_DEG))
-CRANK_AXIS_POINT_X = -CRANK_BORE_OFFSET * _CRANK_COS
-CRANK_AXIS_POINT_Z = -CRANK_BORE_OFFSET * _CRANK_SIN
-CRANK_AXIS_DIRECTION_X = -_CRANK_SIN
-CRANK_AXIS_DIRECTION_Z = _CRANK_COS
-CRANK_AXIS_SECOND_POINT_DISTANCE = 100.0
-CRANK_AXIS_POINTS = (
-    ("P", CRANK_AXIS_POINT_X, CRANK_BORE_HEIGHT, CRANK_AXIS_POINT_Z),
+# Straight crank/sprocket journal in the harvested PART frame.  It starts at
+# local -Z and projects along local +Z to +50.6591.  The assembly's exact
+# Ry(180) installation maps that long boss toward machine -Z.  Keep Pedro's
+# corrected source dimension in inches: 2.8360 in replaces the 2.85086614 in
+# initial derivation.
+CRANK_BOSS_DIA = 21.93
+CRANK_BORE_DIA = 11.438
+CRANK_BORE_HEIGHT = 72.7
+CRANK_BORE_OFFSET = 0.0
+CRANK_BOSS_START_Z = -HEAD_DIA / 2.0
+CRANK_BOSS_LENGTH_IN = 2.8360
+CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
+CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
+
+# Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
+# into the part; downstream placement composes it with the exact Ry(180)
+# installation instead of re-authoring the harvested feature frame.
+INCLINE_DEG = 12.5182
+BORE_HEIGHT = 33.368
+CONE_BOSS_DIA = 17.2
+BORE_DIA = 12.2808
+CONE_BOSS_LENGTH = BLOCK_DIA
+
+# Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
+# Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
+# local east/west axes to the opposite platform names.
+ATTACHMENT_SPACING = 26.88704
+ATTACHMENT_X = ATTACHMENT_SPACING / 2.0
+ATTACHMENT_THRU_DIA = 7.14248
+ATTACHMENT_CBORE_DIA = 11.50874
+ATTACHMENT_CBORE_DEPTH = 6.0198
+
+# V2 B-rep ground truth cascaded through Pedro's boss-length correction.  The
+# correction removes a uniform annular segment beyond the main casting.
+HARVESTED_VOLUME_MM3 = 112_302.9406
+HARVESTED_MASS_KG = 0.808581173
+
+# Datum-coordinate definition of the inclined journal axis.  The bore passes
+# through the body axis at y=BORE_HEIGHT and points toward +X/+Z.
+_JOURNAL_SIN = math.sin(math.radians(INCLINE_DEG))
+_JOURNAL_COS = math.cos(math.radians(INCLINE_DEG))
+JOURNAL_AXIS_SECOND_POINT_DISTANCE = 100.0
+JOURNAL_AXIS_POINTS = (
+    ("P", 0.0, BORE_HEIGHT, 0.0),
     (
         "Q",
-        CRANK_AXIS_POINT_X
-        + CRANK_AXIS_SECOND_POINT_DISTANCE * CRANK_AXIS_DIRECTION_X,
-        CRANK_BORE_HEIGHT,
-        CRANK_AXIS_POINT_Z
-        + CRANK_AXIS_SECOND_POINT_DISTANCE * CRANK_AXIS_DIRECTION_Z,
+        JOURNAL_AXIS_SECOND_POINT_DISTANCE * _JOURNAL_SIN,
+        BORE_HEIGHT,
+        JOURNAL_AXIS_SECOND_POINT_DISTANCE * _JOURNAL_COS,
     ),
 )
-CRANK_AXIS_ORIENTATION_NOTE = "\n".join(
+JOURNAL_AXIS_ORIENTATION_NOTE = "\n".join(
     (
         "O = A/B INTERSECTION; +Y ALONG B AWAY FROM A",
-        "+X RIGHT; +Z PARALLEL C, DOWN IN UPPER PLAN",
+        "+X RIGHT; +Z DOWN IN UPPER PLAN",
     )
 )
 
-# The oblique, offset crank bore is a running-clearance feature on a cast column.
-# Its size is an arrowed feature callout and its theoretical axis is the BASIC
-# two-point coordinate table above, controlled by a native position frame.
+# Only dimensions that exist natively on the authored model are marked for the
+# curated print.  Boss, journal and counterbore callouts are sourced from these
+# same constants as attached notes, so the drawing cannot drift from the part.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BlockProfile": {"BlockDia"},
-    "Block": {"BlockHt"},
-    "BoreProfile": {"BoreDia", "BoreZ"},
+    "MainBodyProfile": {"MainBodyDia"},
+    "MainBody": {"MainBodyHt"},
+    "HeadProfile": {"HeadDia"},
+    "Head": {"HeadHt"},
+    "CrankBossProfile": {"CrankAxisY", "CrankBossDia"},
+    "CrankBoreProfile": {"CrankBoreDia"},
 }
 
 DRAWING_NOTES = "\n".join(
     (
-        "MACHINE FROM CONTINUOUS-CAST ROUND STOCK; REMOVE AS-CAST SKIN.",
-        "DATUM A IS FOOT SEAT; B IS COLUMN OD; C IS JOURNAL-BORE AXIS.",
-        f"JOURNAL BORE LIMITS DIA {BORE_DIA - 0.005:.3f}-{BORE_DIA + 0.005:.3f}; "
-        "FINISH RA 1.6;",
-        f"AXIS BASICALLY INTERSECTS DATUM AXIS B AT BOXED {BORE_HEIGHT:.2f} ABOVE A.",
-        f"MATING SHAFT LIMITS DIA {JOURNAL_SHAFT_MIN_DIA:.3f}-{JOURNAL_SHAFT_MAX_DIA:.3f}.",
-        "JOURNAL IS LOWER CIRCLE; CRANK BORE IS UPPER ELLIPSE IN FRONT VIEW.",
+        "CAST ASTM A48 CLASS 30; MACHINE FOOT, BOSSES, BORES AND MOUNTING HOLES.",
+        "DATUM A IS FOOT SEAT; B IS MAIN-BODY OD; C IS INCLINED JOURNAL AXIS.",
+        f"CONE BOSS DIA {CONE_BOSS_DIA:.3f}; JOURNAL BORE DIA {BORE_DIA:.4f} THRU.",
+        f"JOURNAL AXIS INTERSECTS B AT BASIC {BORE_HEIGHT:.3f} ABOVE A; "
+        f"ANGLE {INCLINE_DEG:.4f} DEG ABOUT +Y.",
+        f"CRANK BOSS DIA {CRANK_BOSS_DIA:.3f}; BORE DIA {CRANK_BORE_DIA:.3f} THRU "
+        f"AT BASIC {CRANK_BORE_HEIGHT:.3f} ABOVE A.",
+        f"2X 1/4 FILLISTER C'BORE DIA {ATTACHMENT_CBORE_DIA:.5f} X "
+        f"{ATTACHMENT_CBORE_DEPTH:.4f} DEEP; THRU DIA {ATTACHMENT_THRU_DIA:.5f}; "
+        f"C-C {ATTACHMENT_SPACING:.5f}.",
     )
 )

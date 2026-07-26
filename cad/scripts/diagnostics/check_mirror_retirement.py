@@ -2,8 +2,9 @@
 machine-handed placement, recomputed by importing the assembly modules
 SolidWorks-free, is compared against the pre-sweep golden pose dump
 (``cad/out/reports/pose-golden/``, captured with
-``diagnostics/probe_pose_dump.py dump`` before the sweep). World geometry is
-FROZEN by design, so every check must land within tolerance; the documented
+``diagnostics/probe_pose_dump.py dump`` before the sweep).  The v2 post
+installation intentionally re-anchors the cone/channel/frame families, so the
+expected formulas below now describe the new machine frame; the documented
 exceptions carry their own widened tolerances inline (lever-wire 2c artifact,
 crank-family solver noise, chain-pattern fill drift).
 
@@ -49,14 +50,14 @@ from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90, ROT_X_NEG90, compose_r
 # ---- summing --------------------------------------------------------------
 import build_summing_assembly as s
 
-expect("summing", "knife-mount-1", [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.HEX_Z_MID], IDENTITY, "knife-mount front")
-expect("summing", "knife-mount-2", [s.KNIFE[0], s.KNIFE_CONTACT_Y, -s.HEX_Z_MID], IDENTITY, "knife-mount back")
-expect("summing", "top-crossbar-1", [s.KNIFE[0], 1010.0, 0.0], IDENTITY, "top-crossbar")
-expect("summing", "summing-lever-1", [s.KNIFE[0], s.KNIFE[1], 0.0], IDENTITY, "summing-lever")
+expect("summing", "knife-mount-1", [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.SUMMING_Z + s.HEX_Z_MID], IDENTITY, "knife-mount front")
+expect("summing", "knife-mount-2", [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.SUMMING_Z - s.HEX_Z_MID], IDENTITY, "knife-mount back")
+expect("summing", "top-crossbar-1", [s.KNIFE[0], 1010.0, s.BAR_CENTER_Z], IDENTITY, "top-crossbar")
+expect("summing", "summing-lever-1", [s.KNIFE[0], s.KNIFE[1], s.SUMMING_Z], IDENTITY, "summing-lever")
 expect("summing", "boss-hook-1", list(s.BOSS_HOOK_POS), ROT_Y_180, "boss-hook")
 expect("summing", "counter-spring-1", list(s.SPRING_POS), ROT_Y_POS90, "counter-spring")
-expect("summing", "gooseneck-1", [s.COLUMN_X, 1210.0, 0.0], ROT_Y_180, "gooseneck")
-expect("summing", "gooseneck-clamp-1", [s.COLUMN_X, 1040.7, 0.0], IDENTITY, "gooseneck-clamp")
+expect("summing", "gooseneck-1", [s.COLUMN_X, 1210.0, s.SUMMING_Z], ROT_Y_180, "gooseneck")
+expect("summing", "gooseneck-clamp-1", [s.COLUMN_X, 1040.7, s.SUMMING_Z], IDENTITY, "gooseneck-clamp")
 
 # ---- pen ------------------------------------------------------------------
 import build_pen_assembly as p
@@ -114,6 +115,7 @@ if d >= 1e-9:
 
 # ---- drive-train ------------------------------------------------------------
 import build_drive_train_assembly as d
+import build_harmonic_base as base
 
 def eul(euler, rows, label):
     fr = rows_from_euler(euler)
@@ -136,13 +138,26 @@ DT = "drive-train"
 expect(DT, "cylinder-gear-shaft-1", [d.X_DRUM, d.Y_DRIVE, d.ARBOR_SOUTH_Z], d.ROT_X_POS90, "arbor (seed)")
 expect(DT, "arbor-pedestal-1", [d.X_DRUM, d.Y_BASE_TOP, -d.ARBOR_PEDESTAL_Z], IDENTITY, "arbor-pedestal south")
 expect(DT, "arbor-pedestal-2", [d.X_DRUM, d.Y_BASE_TOP, d.ARBOR_PEDESTAL_NORTH_Z], ROT_Y_180, "arbor-pedestal north")
-_ppv = d.cone_station(d.PIVOT_STATION)
-_pps = d.cone_station(d.POST_STATION)
-_ptp = d.cone_station(d.TIP_BLOCK_STATION)
-_pbu = d.cone_station(d.BUSH_STATION)
-_pad = d.cone_station(d.ADJ_HEAD_STATION)
+_drive_pivot = d.cone_station(d.PIVOT_STATION)
+
+
+def platform_station(station):
+    """Drive-line station re-anchored from the base's authoritative pivot."""
+    point = d.cone_station(station)
+    return [
+        base.PIVOT_SCREW_XZ[0] + point[0] - _drive_pivot[0],
+        point[1],
+        base.PIVOT_SCREW_XZ[1] + point[2] - _drive_pivot[2],
+    ]
+
+
+_ppv = platform_station(d.PIVOT_STATION)
+_pps = platform_station(d.POST_STATION)
+_ptp = platform_station(d.TIP_BLOCK_STATION)
+_pbu = platform_station(d.BUSH_STATION)
+_pad = platform_station(d.ADJ_HEAD_STATION)
 expect(DT, "cone-swing-platform-1", [_ppv[0], d.Y_BASE_TOP, _ppv[2]], d.ROT_Y_INCLINE, "cone-swing-platform")
-expect(DT, "cone-pivot-post-1", [_pps[0], d.Y_BASE_TOP + d.PLAT_T, _pps[2]], d.ROT_Y_INCLINE, "cone-pivot-post")
+expect(DT, "cone-pivot-post-1", [_pps[0], d.Y_BASE_TOP + d.PLAT_T, _pps[2]], ROT_Y_180, "cone-pivot-post")
 expect(DT, "cone-tip-block-1", [_ptp[0], d.Y_BASE_TOP + d.PLAT_T, _ptp[2]], d.ROT_Y_INCLINE, "cone-tip-block")
 expect(DT, "cone-tip-bushing-1", [_pbu[0], d.Y_DRIVE, _pbu[2]], d.ROT_SHAFT_NORTH, "cone-tip-bushing")
 expect(DT, "cone-tip-adjuster-1", [_pad[0], d.Y_DRIVE, _pad[2]], d.ROT_SHAFT_SOUTH, "cone-tip-adjuster")
@@ -152,8 +167,8 @@ expect(DT, "cone-tip-pinch-screw-1",
         _ptp[2] + (d.TIP_BLOCK_X / 2.0) * d.SIN_I],
        d.ROT_PINCH_WEST, "cone-tip-pinch-screw")
 expect(DT, "cone-lock-knob-1", [d.KNOB_X, d.Y_BASE_TOP + d.PLAT_T, d.KNOB_Z], IDENTITY, "cone-lock-knob")
-expect(DT, "cone-pivot-screw-1", [_ppv[0], d.Y_BASE_TOP + d.PSCREW_SHOULDER_LEN, _ppv[2]], IDENTITY, "cone-pivot-screw")
-expect(DT, "swing-stop-screw-1", [d.STOP_X, d.Y_BASE_TOP, d.STOP_Z], IDENTITY, "swing-stop-screw")
+expect(DT, "cone-pivot-screw-1", [base.PIVOT_SCREW_XZ[0], d.Y_BASE_TOP + d.PSCREW_SHOULDER_LEN, base.PIVOT_SCREW_XZ[1]], IDENTITY, "cone-pivot-screw")
+expect(DT, "swing-stop-screw-1", [base.STOP_SCREW_XZ[0], d.Y_BASE_TOP, base.STOP_SCREW_XZ[1]], IDENTITY, "swing-stop-screw")
 expect(DT, "alignment-pinion-1", [d.APINION_X, d.APINION_Y, d.APINION_Z_FRONT], IDENTITY, "alignment-pinion")
 _strap = compose_rows(ROT_Y_180, d.rot_z_rows(d.STRAP_LEAN_DEG))
 expect(DT, "pinion-bracket-1", [d.PIVOT_X, d.PIVOT_Y, d.APINION_Z_FRONT - d.STRAP_AIR], _strap, "pinion-bracket front")
@@ -177,20 +192,21 @@ for k, ((sx, sz), seat_y) in enumerate(zip(
         (d.Y_BASE_TOP + d.SPRING_T, d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T,
          d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T))):
     expect(DT, f"foot-screw-{k + 1}", [sx, seat_y, sz], IDENTITY, f"foot-screw {k}")
-expect(DT, "cone-gear-shaft-1", list(d.cone_station(d.SHAFT_FRONT_STATION)), d.ROT_Y_INCLINE, "cone-gear-shaft")
+expect(DT, "cone-gear-shaft-1", platform_station(d.SHAFT_FRONT_STATION), d.ROT_Y_INCLINE, "cone-gear-shaft")
 
 def on_shaft(station, face):
-    c = d.cone_station(station)
+    c = platform_station(station)
     return [c[0] - (face / 2.0) * d.SIN_I, d.Y_DRIVE, c[2] - (face / 2.0) * d.COS_I]
 
 expect(DT, "crank-drive-gear-1", on_shaft(d.GEAR64_STATION, d.GEAR64_FACE), d.ROT_Y_INCLINE, "crank-drive-gear 64T")
 for j in range(20):
     expect(DT, f"cone-gear-{j + 1}", on_shaft(d.SHAFT_T120_STATION + j * d.SEAT_PITCH, d.CONE_FACE),
            d.ROT_Y_INCLINE, f"cone-gear j={j}")
+cylinder_rows = compose_rows(ROT_Y_180, d.rot_z_rows(-1.5))
 for j in range(20):
     expect(DT, f"cylinder-gear-{j + 1}",
-           [d.X_DRUM, d.Y_DRIVE, d.Z_DRUM0 + d.Z_PITCH * j - d.DRUM_FACE / 2.0],
-           d.rot_z_rows(-1.5), f"cylinder-gear j={j}")
+           [d.X_DRUM, d.Y_DRIVE, d.Z_DRUM0 + d.Z_PITCH * j + d.DRUM_FACE / 2.0],
+           cylinder_rows, f"cylinder-gear j={j}")
 # The crank family is a fully mated keyed chain: the golden dump records its
 # SOLVED pose, which sits ~1.2 um / 3.9e-7 rows off the insert intent (mate
 # solver epsilon). Compare with a solver-noise allowance.

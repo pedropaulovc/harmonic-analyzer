@@ -31,7 +31,7 @@ fits:
 
   crank_mesh:              # 16T:64T crossed mesh (crank machine-z over the inclined 64T)
     c2c_slack_mm: 0.25               # MESH16_C2C = R64 + R16 + this; tips 1.66 into the gaps (87% of working depth)
-    note: "crossed-helical pair (64T true 12.52° helix, swept teeth + 0.15 backlash, gear_train.yaml); 0.25 keeps a 1.0° zero-collision seed window over a full crank-pitch phase sweep at the smooth helix (crossed_mesh_study 2026-07-14, re-arbitrated from the K=12-era 0.60 after the user flagged visible slop) — arbitrated with the live interference gate"
+    note: "crossed-helical pair (64T true 12.52° helix, swept teeth + 0.15 backlash, gear_train.yaml); 0.25 keeps a 0.8° zero-collision seed window over a full crank-pitch phase sweep at the smooth helix (crossed_mesh_study re-arbitrated 2026-07-25 for the v2 post's DP24.74 geometry; the retired DP26.57 phase produced 1.37 mm³ of live overlap) — arbitrated with the live interference gate"
 
   cam_follower_contact:
     min_clearance_to_adjacent_channel_mm: 0.50

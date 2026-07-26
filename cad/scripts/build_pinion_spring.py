@@ -14,16 +14,17 @@ contact edge; when the strap swings east and flexes the leaf, the FLAT
 above the kink lays against the flank -- no metal-on-metal slip on
 engage. The FOOT points WEST, the SAME side the top bends back toward
 (photo review follow-up): the L's interior angle -- foot ray to blade,
-the open west side -- reads ~100 deg (leg at the strap's 12.38 lean =
-102.4, within the photo's tolerance).
+the open west side -- follows the parked strap after the v2 post moved the
+drive axis and forced the whole pinion-return linkage to re-close.
 
 Layout (sketch on the Front plane; the assembly seats the part at machine
-(-9.04, base top 50.8) with a composed Ry(180), so part-local -x reads
-machine WEST -- direction words below are MACHINE directions; the part is
+(the derived assembly anchor, base top 50.8) with a composed Ry(180), so
+part-local -x reads machine WEST -- direction words below are MACHINE
+directions; the part is
 an exact mid-plane z-extrude, so the Ry(180)'s z-flip is immaterial):
-strip centreline path = 31.0 foot at y 0.8 pointing
+strip centreline path = 25.4 foot at y 0.8 pointing
 WEST of the bend, r 2.0 bend (77.62 deg sweep), blade up-east at the
-strap's parked 12.38 deg lean to t 32 along the strap axis, r 1.5 x
+strap's parked 49.86 deg lean to t 32 along the strap axis, r 1.5 x
 20 deg WEST kink, 2.0 flat to the free tip.
 Thin mid-plane extrude, width 4.0 symmetric about z 0. The thin side is
 ONE-sided and orientation-dependent (RevThinDir 0 -- see the SolidworksMCP
@@ -101,7 +102,8 @@ MATERIAL = "Brass"  # p.68: the leaf reads brass against the steel strap
 # Primitive nominals come from the drawing spec (single source of truth shared
 # with the manufacturing print). Design rationale, unchanged:
 #   FOOT_LEN -- the flat screw-down foot points WEST and crosses UNDER the lift
-#               rod and parked cam pin so its screw lands west of the moving rig.
+#               rod; its 1-in reach keeps the free end and screw head clear of
+#               the unchanged rocker-arm-support casting.
 #   FLAT_LEN -- short on purpose: the free flat remains clear of the parked strap.
 
 _SAVED_DRAWING_PROPERTIES = (

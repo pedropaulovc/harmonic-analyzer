@@ -6,6 +6,7 @@ from pathlib import Path
 
 import draw_rocker_arm_support as drawing
 import build_rocker_arm_support as support
+import rocker_arm_support_spec as placement
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -42,6 +43,14 @@ def test_hole_table_covers_every_foot_hole() -> None:
     for x, y in points:
         assert abs(x - drawing.BOTTOM_CENTER[0]) <= half_w
         assert abs(y - drawing.BOTTOM_CENTER[1]) <= half_h
+
+
+def test_support_keeps_original_world_placement_and_hold_down_pattern() -> None:
+    assert placement.SUPPORT_WORLD_Z == 0.0
+    assert {z for _, z in placement.SUPPORT_HOLD_DOWN_XZ} == {
+        -60.32,
+        60.32,
+    }
 
 
 def test_notes_cover_casting_specifics() -> None:

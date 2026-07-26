@@ -2,10 +2,22 @@ r"""Pure-data dimensional contract shared by the top crossbar and drawing."""
 
 from __future__ import annotations
 
+from cone_pivot_post_installation import (
+    FRAME_COLUMN_Z_CENTER,
+    FRAME_FRONT_COLUMN_Z,
+    FRAME_REAR_COLUMN_Z,
+    SUMMING_Z,
+)
+
 
 BAR_HALF_X = 11.0
 BAR_HEIGHT = 41.0
-BAR_HALF_Z = 101.0
+RAIL_WIDTH = 22.0
+BAR_FRONT_Z = FRAME_FRONT_COLUMN_Z + RAIL_WIDTH / 2.0
+BAR_REAR_Z = FRAME_REAR_COLUMN_Z - RAIL_WIDTH / 2.0
+BAR_CENTER_Z = FRAME_COLUMN_Z_CENTER
+BAR_HALF_Z = (BAR_REAR_Z - BAR_FRONT_Z) / 2.0
+STUD_HOLE_Z = SUMMING_Z - BAR_CENTER_Z
 
 BAR_WIDTH = 2.0 * BAR_HALF_X
 BAR_LENGTH = 2.0 * BAR_HALF_Z

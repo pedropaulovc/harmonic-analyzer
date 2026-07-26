@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import build_crankshaft as part
@@ -27,6 +28,29 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         crankshaft_spec.SHAFT_DIA,
         crankshaft_spec.SHAFT_LENGTH,
     )
+    assert drawing.JOURNAL_DIA == crankshaft_spec.JOURNAL_DIA
+    assert drawing.JOURNAL_START == crankshaft_spec.JOURNAL_START
+    assert drawing.JOURNAL_LENGTH == crankshaft_spec.JOURNAL_LENGTH
+
+
+def test_v2_post_journal_recloses_the_hardware_seats() -> None:
+    assert crankshaft_spec.JOURNAL_BORE_DIA == 11.438
+    assert crankshaft_spec.JOURNAL_CLEARANCE == 0.05
+    assert crankshaft_spec.JOURNAL_DIA == 11.388
+    assert crankshaft_spec.JOURNAL_START == 32.755105572
+    assert crankshaft_spec.JOURNAL_END == 104.789505572
+    assert crankshaft_spec.JOURNAL_LENGTH == 72.0344
+    assert -175.0 + crankshaft_spec.JOURNAL_START == -142.244894428
+    assert -175.0 + crankshaft_spec.JOURNAL_END == -70.210494428
+    assert (part.SEAT_T12, part.SEAT_PINION, part.SEAT_ARM) == (
+        17.5,
+        105.039505572,
+        8.0,
+    )
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'await set_global(adapter, "JournalDia"' in source
+    assert 'await adapter.create_sketch("JournalStartPlane")' in source
+    assert "ExtrusionParameters(depth=JOURNAL_LENGTH)" in source
 
 
 def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
@@ -70,6 +94,10 @@ def test_linked_notes_define_remaining_operations() -> None:
     assert "ZINC" not in notes
     assert "UOS" not in notes
     assert "OUTSIDE THIS PART DRAWING" in notes
+    assert "11.388 BEARING JOURNAL" in notes
+    assert "11.438 POST BORE" in notes
+    assert "0.05 DIAMETRAL CLEARANCE" in notes
+    assert "KEEP DIA 9.525" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -82,16 +110,15 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert source.count("add_surface_finish(") == 1
     assert "add_view_centerline(" in source
-    assert "GetVisibleEntities2(c, 3)" in source
-    assert "face=shaft_face" in source
-    assert "GetVisibleEntities2(c, 4)" in source
-    assert "shaft_silhouette = _visible_shaft_silhouette(adapter, right)" in source
-    assert "edge_entity=shaft_silhouette" in source
-    assert 'production_method="SHAFT OD"' in source
+    assert re.search(r"GetVisibleEntities2\(\s*c,\s*3\s*\)", source)
+    assert "face=journal_face" in source
+    assert re.search(r"GetVisibleEntities2\(\s*c,\s*4\s*\)", source)
+    assert "journal_silhouette = _visible_journal_silhouette(adapter, right)" in source
+    assert "edge_entity=journal_silhouette" in source
+    assert 'production_method="BEARING JOURNAL"' in source
     assert 'dimension_name(adapter, annotation) == "ShaftDiaDim"' in source
     assert drawing.DATUM_A_RIGHT == (
-        drawing.FRONT_CENTER[0]
-        + drawing.SHAFT_DIA * drawing.END_VIEW_SCALE / 2000.0,
+        drawing.FRONT_CENTER[0] + drawing.JOURNAL_DIA * drawing.END_VIEW_SCALE / 2000.0,
         drawing.FRONT_CENTER[1],
     )
     assert "edge_xy=DATUM_A_RIGHT" in source

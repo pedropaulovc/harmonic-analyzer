@@ -26,23 +26,22 @@ from __future__ import annotations
 # --- Nominal geometry (cad/DIMENSIONS.md "Chapter 25", photo-scaled low).
 # These drive the part's named equation globals AND the drawing's coordinate
 # math. Layout: block centred on the origin midway between the bores, both
-# bores along Z, block x -18..18, y -12..4, z 0..12. ---
+# bores along Z, block x -18..18, y -12..6.75, z 0..12. ---
 BLOCK_WIDTH = 36.0  # spans both bores + margin; widened 33 -> 36 (PR7) so the
 # Ø8 screw heads at x +-13.5 seat fully on the block (edge 17.5 + 0.5 rim)
-BLOCK_HEIGHT = 16.0  # photo-scaled (low); keeps the strap's r 11 bottom cap
+BLOCK_HEIGHT = 18.75  # v2 linkage closure; keeps the strap's r 11 bottom cap
 # (PIVOT_Y - 11 = 51.8) swinging clear of the base top 50.8
 BLOCK_DEPTH = 12.0  # photo-scaled (low)
 BORE_UP = 12.0  # pivot bore height above the base seat -- sets PIVOT_Y (derived)
 BORE_DIA = 6.35  # 1/4 in: rides the Ø6.35 torque shaft / lift rod (derived)
-BORE_HALF_SPACING = 7.5  # half the pivot-to-lift rod spacing 15.0 -- the
+BORE_HALF_SPACING = 6.25  # half the pivot-to-lift rod spacing 12.5 -- the
 # lift rod must clear BOTH the cone-pivot-post column (machine x -47.1)
 # and the strap's swinging r 11 bottom cap (build_drive_train_assembly)
-LIFT_BORE_DROP = 4.66  # the WEST (lift) bore sits this far BELOW the pivot
-# bore (PR8, page001_img01: the rods ride at different heights so the
-# eccentric cam collar's top meets the follower pin from below). Bore
-# bottom at local -7.84 keeps a 4.2 web to the block bottom (-12). The
-# 4.66 (not the photo-first 4.51) buys the 0.15 park AIR between pin and
-# collar -- exact tangency tips the interference gate on FP noise.
+LIFT_BORE_RISE = 1.769918302299855  # v2 post raises the drive axis, steepening
+# the parked strap to 49.864 deg.  Re-solving the follower-pin/cam contact puts
+# the WEST lift bore above the pivot. This rise and the 12.5 c2c X spacing give
+# exactly 0.15 mm parked air after the cam OD grows 9.2 -> 10.32 to restore its
+# 0.575-mm thin-side wall. The block retains >1.8 mm above the reamed bore.
 SCREW_HALF_SPACING = 13.5  # hold-down hole centres out past the bores: 0.6 web
 # to the bore wall, 0.9 rim to the block end
 SCREW_HOLE_DIA = 4.216  # #19 drill; mirrors _holes.NUMBER_DRILL_MM["#19"]

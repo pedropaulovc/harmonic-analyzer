@@ -526,7 +526,7 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations now that the whole model + a rebuild
     # exist, so every named-dim target resolves. Each equation evaluates to the
     # value just built, so the geometry must not move -- the re-check below is
-    # the proof (same final volume as RimChamfer above).
+    # the proof.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)

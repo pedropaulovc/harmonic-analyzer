@@ -18,8 +18,8 @@ SPRINGS (add_springs):
   length with ZERO force, so the motion is driven purely by the cam-chain length
   changes -- no fragile pretension calibration (tune later for amplitude, F6).
 
-  The summing-lever rock driver (an ANGLE snapshot dim in output.SLDASM) is
-  SUPPRESSED here so the springs can actually move it. The 20 bottom eyes share
+  The summing lever arrives operationally free in summing.SLDASM; a legacy
+  snapshot driver, if present in an older artefact, is suppressed here. The 20 bottom eyes share
   ONE summing-lever datum point: every plate hole sits at the same X off the
   knife axis, so each spring's torque arm about the (Z) knife line is identical
   -- one point reproduces the summing torque exactly (the per-hole Z does not
@@ -98,7 +98,7 @@ async def add_springs(adapter):
 
     # 1) free the summing-lever rock (the ANGLE snapshot dim) so springs move it.
     await _suppress_named(
-        adapter, "output-1", ("summing-lever",), (ANGLE,),
+        adapter, "summing-1", ("summing-lever",), (ANGLE,),
         "summing-lever rock (free for springs)")
 
     # 2) eye datum points on the shared part docs (inherited by all instances).
@@ -168,20 +168,21 @@ async def _suppress_pen_travel(adapter):
     = the Top<->Top plane Y position; confirmed Distance12 via probe_pen_mates) so
     the WIRE2 yoke can drag the pen freely in Y."""
     from solidworks_mcp.adapters.base import SuppressMateParameters
-    _, model = _sub_model(adapter, "output-1")
+    _, model = _sub_model(adapter, "pen-1")
     best = (None, -1.0)
     for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
-        lone = _lone_real(parts, "output")
+        lone = _lone_real(parts, "pen")
         if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
             continue
         val = _mate_value(adapter, mate, mtype) or 0.0
         if val > best[1]:
             best = (name, val)
     if best[0] is None:
-        raise RuntimeError("pen-rod Y-travel snapshot not found")
+        log("  pen-rod travel is already free (default-free artefact)")
+        return
     log(f"  suppress pen-rod Y-travel {best[0]}")
     check("suppress pen travel", await adapter.suppress_mate(
-        SuppressMateParameters(name=best[0], suppress=True, component="output-1")))
+        SuppressMateParameters(name=best[0], suppress=True, component="pen-1")))
 
 
 async def _rim_point(adapter, comps=None):
@@ -219,7 +220,7 @@ async def _rim_point(adapter, comps=None):
     return name
 
 
-async def _add_wire1_gear(adapter):
+async def _add_wire1_gear(adapter, summing_name=None, wheel_name=None):
     """WIRE1 gear summing-lever(Z) <-> magnifying-wheel(Z), parallel axes.
 
     The gear over-defines intermittently with alignment="closest": a fresh open
@@ -229,12 +230,21 @@ async def _add_wire1_gear(adapter):
     "closest" -- try both explicit alignments; one is always accepted. A failed
     AddMate5 creates no mate, so no cleanup is needed between attempts.
     """
+    comps = None
+    if summing_name is None or wheel_name is None:
+        comps = _components(adapter)
+    summing_name = summing_name or _find_one(
+        adapter, "summing-lever-1", comps=comps)[1]
+    wheel_name = wheel_name or _find_one(
+        adapter, "magnifying-wheel-1", comps=comps)[1]
+    if summing_name is None or wheel_name is None:
+        raise RuntimeError("WIRE1 split-sub component path unresolved")
     last = None
     for alignment in ("aligned", "anti_aligned"):
         try:
             w1 = await gear_mate(
-                adapter, _entity_ref("summing-lever-1", "Axis1", "AXIS"),
-                _entity_ref("magnifying-wheel-1", "Axis1", "AXIS"),
+                adapter, _entity_ref(summing_name, "Axis1", "AXIS"),
+                _entity_ref(wheel_name, "Axis1", "AXIS"),
                 RATIO_SUM_WHEEL, alignment=alignment, label="WIRE1 summing->wheel")
             if w1.get("name"):
                 log(f"  WIRE1 gear: {w1['name']} (alignment={alignment})")
@@ -257,9 +267,9 @@ async def add_wires_gravity(adapter, with_gravity=False):
              rack-pinion mate in-sub (proven), but DOES enforce gears and the
              coincident point-on-plane -- so both wires use enforced primitives.
 
-    Both are authored INSIDE output.SLDASM's doc: the four chain parts share the
-    one output-1 flexible sub, so a top-level mate between any two is rejected.
-    Run after add_springs (which suppressed the summing-lever rock). NEVER saves.
+    The output chain is split across summing, magnifier and pen subassemblies,
+    so both couplings are authored at the top level between separate flexible
+    subs. Run after add_springs. NEVER saves.
     """
     from solidworks_mcp.adapters.base import MotionGravityParameters
 
@@ -267,28 +277,25 @@ async def add_wires_gravity(adapter, with_gravity=False):
 
     # 1) free the driven output DOF the wires control: wheel rock (WIRE1 spins it)
     #    + pen-rod Y travel (WIRE2 yoke drags it). The mag-lever rock stays pinned.
-    await _suppress_named(adapter, "output-1", ("magnifying-wheel",), (ANGLE,),
+    await _suppress_named(adapter, "magnifier-1", ("magnifying-wheel",), (ANGLE,),
                           "wheel rock (free for WIRE1)")
     await _suppress_pen_travel(adapter)
 
     # 2) rim datum point on the shared wheel doc (before retargeting currentModel).
     rim_pt = await _rim_point(adapter, comps=comps)
 
-    # 3) both wires authored INSIDE output.SLDASM's own document.
-    _, out_doc = _sub_model(adapter, "output-1")
-    top = adapter.currentModel
-    adapter.currentModel = out_doc
-    w1 = None
-    try:
-        w1 = await _add_wire1_gear(adapter)
-        w2 = await coincident_mate(
-            adapter, _entity_ref("magnifying-wheel-1", rim_pt, "POINT"),
-            _entity_ref("pen-rod-1", "Top Plane", "PLANE"),
-            label="WIRE2 yoke rim->pen")
-        log(f"  WIRE2 yoke: {w2.get('name')}")
-    finally:
-        adapter._attempt(lambda: out_doc.ForceRebuild3(False), default=None)
-        adapter.currentModel = top
+    # 3) both wires authored at top level between the split flexible subs.
+    summing_name = _find_one(adapter, "summing-lever-1", comps=comps)[1]
+    wheel_name = _find_one(adapter, "magnifying-wheel-1", comps=comps)[1]
+    pen_name = _find_one(adapter, "pen-rod-1", comps=comps)[1]
+    if summing_name is None or wheel_name is None or pen_name is None:
+        raise RuntimeError("split output-chain component path unresolved")
+    w1 = await _add_wire1_gear(adapter, summing_name, wheel_name)
+    w2 = await coincident_mate(
+        adapter, _entity_ref(wheel_name, rim_pt, "POINT"),
+        _entity_ref(pen_name, "Top Plane", "PLANE"),
+        label="WIRE2 yoke rim->pen")
+    log(f"  WIRE2 yoke: {w2.get('name')}")
 
     # 4) gravity (-Y), OPT-IN: on a ~1 m steel mechanism gravity forces dwarf the
     #    weak channel/counter springs (k ~ 0.5-2 kN/m) and can destabilise the

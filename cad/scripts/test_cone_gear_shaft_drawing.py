@@ -32,21 +32,39 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 
 def test_sections_are_a_monotonic_stepped_shaft() -> None:
-    """Four turned sections: diameters strictly step DOWN, stations UP."""
+    """The v2 journal and four legacy gear sections step down monotonically."""
     sections = cone_gear_shaft_spec.SECTIONS
-    assert len(sections) == 4
+    assert len(sections) == 5
     dias = cone_gear_shaft_spec.SECTION_DIAS
     ends = cone_gear_shaft_spec.SECTION_ENDS
     assert all(a > b for a, b in zip(dias, dias[1:]))
     assert all(a < b for a, b in zip(ends, ends[1:]))
-    # Exact inch stock/seat conversions, big pivot journal to marginal tip.
-    assert dias == pytest.approx((9.525, 6.35, 3.175, 0.79375))
+    # The integral bearing journal fits the v2 post at 0.05 diametral
+    # clearance; every downstream gear seat keeps its existing diameter.
+    assert cone_gear_shaft_spec.JOURNAL_BORE_DIA == pytest.approx(12.2808)
+    assert cone_gear_shaft_spec.JOURNAL_CLEARANCE == pytest.approx(0.05)
+    assert cone_gear_shaft_spec.JOURNAL_DIA == pytest.approx(12.2308)
+    assert cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
+    assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 0.79375))
+    assert cone_gear_shaft_spec.FRONT_STUB == pytest.approx(61.9068609979)
     assert cone_gear_shaft_spec.SHAFT_LENGTH == cone_gear_shaft_spec.FRONT_STUB + 190.0
+    # The fixed journal/tip endpoints stay put while the three gear-seat
+    # shoulders follow the recentered stack along the shaft.
+    stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
+    assert ends[1:] == pytest.approx(
+        tuple(
+            old_end + stub_delta + cone_gear_shaft_spec.GEAR_AXIS_SHIFT
+            for old_end in (154.2, 161.1, 168.0)
+        )
+        + (202.3 + stub_delta,)
+    )
     # Every seat diameter gets a snug-fit callout and exact-conversion display.
     assert drawing.DIMENSION_CALLOUTS == {
         name: "+0.00/-0.02" for name in drawing.END_KEEP
     }
-    assert drawing.DIMENSION_PRECISION == {name: 3 for name in drawing.END_KEEP}
+    assert drawing.DIMENSION_PRECISION == {
+        name: 4 if name == "Sec0Dia" else 3 for name in drawing.END_KEEP
+    }
 
 
 def test_linked_notes_cover_the_remaining_shaft_operations() -> None:
@@ -57,6 +75,10 @@ def test_linked_notes_cover_the_remaining_shaft_operations() -> None:
     # characteristic -- the print warns the machinist instead of hiding it.
     assert "FRAGILE BY DESIGN" in notes
     assert "FOLLOWER-REST" in notes
+    assert "12.2308 BEARING JOURNAL" in notes
+    assert "12.2808 POST BORE" in notes
+    assert "0.05 DIAMETRAL CLEARANCE" in notes
+    assert "DIA 12.5 MIN ROUND BAR" in notes
     assert "X.XX" not in notes
     assert "BREAK EXTERNAL EDGES" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")

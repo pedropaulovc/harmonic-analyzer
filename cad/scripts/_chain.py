@@ -35,8 +35,9 @@ KNOB_CENTRE = (42.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
 # stud (0, 266.2007) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
 # mesh). The 2026-07-23 platen refit raises the bar-hung reducer 11.134 mm
 # with the resized platen/support geometry.
-# The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_CRANK)
-# (the ch30 GT crank axis, ABOVE the drive line since the 2026-07-02 re-anchor).
+# The crank chain-wheel rides the crankshaft, so its centre IS (X_CRANK, Y_CRANK).
+# The v2 casting's exact Ry180 installation moves this axis 1.484 mm in machine
+# X while the photo-anchored T12 axial plane remains at z -155.
 # Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from
 # build_drive_train_assembly. _chain feeds the leaf chain-link PARTS through
 # _chain_link, and a leaf part must not transitively depend on _assembly
@@ -46,9 +47,9 @@ KNOB_CENTRE = (42.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
 # drive-train (X_CRANK, Y_CRANK) and fails loud on drift, so a stale literal can
 # never silently mis-anchor the chain over the relocated 64T/cone. The cleaner
 # split (leaf-safe geometry vs assembly-time layout, no literal) is issue #86.
-CRANK_CENTRE = (122.8, 142.985)  # drive-train X_CRANK, Y_CRANK (2026-07-14
-# crank-mesh rederive: the crank dropped onto the ENGAGED 16T:64T c2c, then
-# 0.355 deeper when the smooth swept helix re-tightened the slack to 0.25)
+CRANK_CENTRE = (129.33630593573418, 129.85)
+# drive-train -X_CRANK, Y_CRANK: cone-pivot-post-v2's cast-in crank axis.
+# The chain count and droop below are re-solved from this centre automatically.
 
 TIP_R_T24 = 26.0  # mounted removables, module 2: tip r = (T + 2) * 2 / 2
 TIP_R_T12 = 14.0
@@ -69,7 +70,7 @@ SAG_NOMINAL = 14.0  # slack-run droop seed (p006 crop read 18; was trimmed
 # from 18 to clear the cone-pivot-post top, but the ch30 GT re-anchor retired
 # that constraint: the post (now the p1 swing bracket at machine z -113..-87)
 # no longer shares a z corridor with the chain plane (z -155). 14 kept
-# conservatively -- every M6.8/M6.9 clearance was tuned near this droop.
+# conservatively -- exact 66-link closure now resolves to 16.471 mm droop.
 # The BUILT droop is SAG below: solved off this seed so the loop closes on an
 # integer number of standard-pitch links (a real chain's length is quantised;
 # the sag is the underdefined member that absorbs the slack).
@@ -77,7 +78,7 @@ SAG_NOMINAL = 14.0  # slack-run droop seed (p006 crop read 18; was trimmed
 # --- centreline geometry (A = knob = origin, B = crank) ----------------------
 BX = CRANK_CENTRE[0] - KNOB_CENTRE[0]
 BY = CRANK_CENTRE[1] - KNOB_CENTRE[1]
-D = math.hypot(BX, BY)  # 135.65
+D = math.hypot(BX, BY)
 UX, UY = BX / D, BY / D
 NX, NY = -UY, UX  # taut-side normal (local upper-right)
 
@@ -182,8 +183,8 @@ SAG = 0.5 * (_LO_SAG + _HI_SAG)  # the BUILT droop (solved for LINK_COUNT).
 # The count quantisation moves the target length by at most LINK_PITCH / 2
 # (~3.2 mm); the slack run's length-vs-droop sensitivity is ~0.85 mm/mm here,
 # so the solved sag stays inside the +-8 bracket. At the 2026-07-23 platen
-# layout this selects 62 links and about 20.6 mm sag, close to the p006 photo
-# read (~18 mm) while preserving exact standard-pitch closure.
+# layout the selected even count and sag are derived above while preserving
+# exact standard-pitch closure.
 assert abs(_loop_length(SAG) - CENTRELINE_LEN) < 1e-6
 
 SLACK_R = _solve_slack_radius(SAG)

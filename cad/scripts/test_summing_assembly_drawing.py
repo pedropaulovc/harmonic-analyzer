@@ -6,8 +6,14 @@ import importlib.util
 import re
 from pathlib import Path
 
+import pytest
+
+import build_summing_assembly as assembly
 import draw_summing_assembly as drawing
+import top_crossbar_spec
+from _assembly import _seed_flip
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME
+from cone_pivot_post_installation import MECHANISM_Z_SHIFT, SUMMING_Z
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -85,6 +91,36 @@ def test_bom_covers_every_placed_component() -> None:
     placed = re.findall(r'place_component\(\s*adapter,\s*"([a-z0-9-]+)"', source)
     assert set(placed) == set(drawing.BOM_COMPONENTS)
     assert len(placed) == 8  # knife-mount placed twice (front + back support)
+
+
+def test_summing_chain_shares_the_v2_world_anchor() -> None:
+    """The lever/knife/counter family follows the recentered mechanism."""
+    assert SUMMING_Z == MECHANISM_Z_SHIFT
+    assert assembly.BOSS_HOOK_POS[2] == SUMMING_Z
+    assert assembly.SPRING_POS[2] == SUMMING_Z
+
+    source = Path(assembly.__file__).read_text(encoding="utf-8")
+    assert "SUMMING_Z + HEX_Z_MID" in source
+    assert "SUMMING_Z - HEX_Z_MID" in source
+    assert '[KNIFE[0], KNIFE[1], SUMMING_Z]' in source
+    assert 'list(BOSS_HOOK_POS)' in source
+    assert 'list(SPRING_POS)' in source
+    assert '[COLUMN_X, 1210.0, SUMMING_Z]' in source
+    assert '[COLUMN_X, 1040.7, SUMMING_Z]' in source
+
+
+def test_positive_summing_station_uses_the_relearned_axial_mate_side() -> None:
+    assert _seed_flip("summing-lever axial", SUMMING_Z)
+
+
+def test_crossbar_body_and_stud_use_distinct_world_anchors() -> None:
+    """The asymmetric bar centre must not drag the summing stud off-axis."""
+    assert top_crossbar_spec.BAR_CENTER_Z == pytest.approx(0.0)
+    assert top_crossbar_spec.STUD_HOLE_Z == pytest.approx(SUMMING_Z)
+    assert top_crossbar_spec.BAR_CENTER_Z + top_crossbar_spec.STUD_HOLE_Z == pytest.approx(SUMMING_Z)
+
+    source = Path(assembly.__file__).read_text(encoding="utf-8")
+    assert '[KNIFE[0], 1010.0, BAR_CENTER_Z]' in source
 
 
 def test_assembly_stamps_title_block_properties() -> None:

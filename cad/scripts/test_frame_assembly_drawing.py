@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 import importlib.util
+import math
 from pathlib import Path
 
+import build_frame_assembly as frame
 import draw_frame_assembly as drawing
+from cone_pivot_post_installation import (
+    FRAME_FRONT_COLUMN_Z,
+    FRAME_REAR_COLUMN_Z,
+    ROCKER_SUPPORT_Z,
+)
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -117,3 +124,14 @@ def test_drawing_places_bom_and_balloons() -> None:
         token not in drawing.ASSEMBLY_NOTES
         for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
     )
+
+
+def test_frame_uses_the_asymmetric_rear_reanchor_contract() -> None:
+    assert frame.FRONT_COLUMN_Z == FRAME_FRONT_COLUMN_Z
+    assert frame.REAR_COLUMN_Z == FRAME_REAR_COLUMN_Z
+    assert frame.SUPPORT_Z == ROCKER_SUPPORT_Z
+    assert math.isclose(frame.REAR_COLUMN_Z - frame.FRONT_COLUMN_Z, 224.0)
+    assert {z for _, z in frame.LAG_SCREW_XZ} == {
+        ROCKER_SUPPORT_Z - 60.32,
+        ROCKER_SUPPORT_Z + 60.32,
+    }

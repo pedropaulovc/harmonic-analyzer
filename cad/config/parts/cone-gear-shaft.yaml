@@ -6,4 +6,4 @@ cone-gear-shaft:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "machined (steel)"
+  process: "turned stepped shaft with integral bearing journal (steel)"

@@ -10,7 +10,7 @@ slot; thread geometry is not modeled.
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (pointing -Y =
 down into the base): under-head face on the Top plane at y = 0, head
-0..+2.5, shank -18..0. Symmetric about local x = 0.
+0..+2.5, shank -22..0. Symmetric about local x = 0.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 

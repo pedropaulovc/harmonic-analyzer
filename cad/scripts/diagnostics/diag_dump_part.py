@@ -596,9 +596,15 @@ def _doc_level(adapter, model):
         mgr = _early_bound(mgr, "IEquationMgr", "GetCount")
         for i in range(int(_g(mgr, "GetCount") or 0)):
             try:
-                eqns.append({"index": i, "equation": str(mgr.Equation(i)),
-                             "global": bool(mgr.GlobalVariable(i)),
-                             "status": mgr.Status(i)})
+                equation = str(mgr.Equation(i))
+                is_global = bool(mgr.GlobalVariable(i))
+                # Status is the scalar status of the last indexed operation,
+                # not another indexed property.  Calling it as Status(i)
+                # turns the returned int into a callable and loses the entire
+                # otherwise-successful equation row.
+                eqns.append({"index": i, "equation": equation,
+                             "global": is_global,
+                             "status": _g(mgr, "Status")})
             except Exception as exc:  # noqa: BLE001
                 eqns.append({"index": i, "error": repr(exc)})
     out["equations"] = eqns

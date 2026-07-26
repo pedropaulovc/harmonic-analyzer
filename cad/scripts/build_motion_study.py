@@ -1,5 +1,5 @@
 r"""Phase F (artifact B): the OPERATION simulation -- a throwaway SOLIDWORKS
-Motion study that opens the static, fully-defined harmonic-analyzer.SLDASM and
+Motion study that opens the default-free harmonic-analyzer.SLDASM and
 drives the whole device from a single crank motor, with the channel/counter
 springs as real force elements and the two amplifying wires as motion
 couplings. It NEVER re-saves the .SLDASM (artifact A stays fully-defined on
@@ -7,29 +7,19 @@ disk; this study lives only in the dirtied in-memory doc + an exported video).
 
 Pipeline (see plan from-other-conversation-current-tender-meteor.md, Part 3):
 
-  1. open harmonic-analyzer.SLDASM (the 4 subs inserted rigid + fixed).
-  2. for the 3 MOVING subs (channel/drive-train/output; frame stays fixed):
+  1. open harmonic-analyzer.SLDASM (seven machine-authored subassemblies).
+  2. for the six MOVING subs (drive-train/channel/summing/magnifier/pen/
+     paper-drive; frame stays fixed):
      float -> ground the rigid pose at identity with 3 coincident plane mates
      -> set_component_solving FLEXIBLE, so their internal mates solve with the
      parent and a top-level motor/cam/spring reaches the parts inside them.
-  3. suppress the internal DRIVER dims that pin the DOF Motion must control:
-       * drive-train: the single crank-angle driver (frees the whole gear train)
-       * channel:     the per-rocker spin + per-rod swing drivers (frees the
-                      rocker->rod cam followers); the 20 amplitude-bar slides
-                      stay pinned (they are coefficient settings)
-       * output:      the 4 compliant-chain snapshot drivers (summing-lever,
-                      magnifying-lever, magnifying-wheel rocks + pen-rod travel);
-                      the platen + clamp settings stay pinned
-     -- all via suppress_mate(component=<sub>), resolved inside the sub doc,
-     never saving the sub.
-  4a. add 20 rod-pin<->rocker-bore coincident revolutes INSIDE channel.SLDASM
-      (currentModel retargeted to the sub doc, never saved): the rod<->rocker
-      pin joint cannot be a top-level mate because AddMate5 refuses a mate
-      between two parts both nested in the same flexible sub (proven).
-  4b. add 20 cross-assembly CAM couplings: each channel connecting-rod ring axis
+  3. consume the default-free DOF manifests as built. Only the cone-swing setup
+     DOF is transiently replayed to hold it engaged; crank/channel/output/paper
+     operational DOF already have no driver mates in the saved subassemblies.
+  4. add 20 cross-assembly CAM couplings: each channel connecting-rod ring axis
       rides its drive-train cylinder-gear eccentric lobe axis (cross-sub, so it
-      IS allowed at the top level). 4a + 4b are the 1-DOF four-bar that turns
-      crank rotation into the per-channel rocker oscillation.
+      IS allowed at the top level). The rod-rocker revolutes and rocker-foot arc
+      couplings already ship in channel.SLDASM and must not be duplicated.
   5. crank MOTOR: a rotary constant-speed motor on the crankshaft axis -- the
      one physical input that runs the device.
   6. 21 SPRING force elements: 20 channel springs + 1 counter spring, k from
@@ -101,7 +91,14 @@ BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]
 
 # ---- study constants --------------------------------------------------------
 ASM = "harmonic-analyzer"
-MOVING_SUBS = ("drive-train-1", "channel-1", "output-1")  # frame-1 stays fixed
+MOVING_SUBS = (
+    "drive-train-1",
+    "channel-1",
+    "summing-1",
+    "magnifier-1",
+    "pen-1",
+    "paper-drive-1",
+)  # frame-1 stays fixed
 FRAME_SUB = "frame-1"
 
 CRANK_RPM = 20.0          # gentle: 1 rev / 3 s at 20 RPM
@@ -1243,14 +1240,15 @@ async def build(adapter):
     log(f"opened {asm_path}")
 
     await _flex_subs(adapter)
-    await _suppress_drivers(adapter, level, dump=dump)
+    await _replay_setup_drives(adapter)
+    if dump:
+        for sub in MOVING_SUBS:
+            _dump_sub_mates(adapter, sub)
     if level < 1:
         log("stage flex complete (no motor/solve)")
         return {}
 
-    await _add_rod_rocker_revolutes(adapter)
     await _add_cam_couplings(adapter)
-    await _add_foot_axis_joints(adapter)
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
     from solidworks_mcp.adapters.base import MotionStudyParameters, MotionStudyRefParameters
     made = check("create_motion_study", await adapter.create_motion_study(
@@ -1274,7 +1272,8 @@ async def build(adapter):
     await _sample_rockers(adapter)
     if level >= 2:
         await _sample_chain(adapter)
-    samples = await _sample_pen(adapter) if level >= 3 else []
+    if level >= 3:
+        await _sample_pen(adapter)
 
     # Export the operating-device mp4 for every stage that solves (kinematic and
     # up) -- the crank-driven motion is worth capturing even before the springs.

@@ -5,10 +5,10 @@ views, the wedge envelope dimensions, and the machining notes; every shared
 sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
 
 The platform is machined from black-oxide 5/16 in minimum steel stock to a
-6.35 mm finished plate: an asymmetric wedge (214 long, 21.5 -> 57 wide) with a
-Ø6.76 pivot hole at the narrow tip, an open lock notch through the west edge,
-and rounded plan corners. The sheet and both views run 1:3 so the plan
-dimensions remain inside the zone border.
+6.35 mm finished plate: an asymmetric wedge (266 long, 21.5 -> 61 wide) with a
+Ø6.76 pivot hole at the narrow tip, paired 1/4-20 post-mount taps, an open
+lock notch through the west edge, and rounded plan corners. The main plan and
+end views run 1:2; the isometric runs 1:3.
 
 Run with SolidWorks open::
 
@@ -44,7 +44,12 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 from _holes import blind_cut_dia_mm
-from build_cone_swing_platform import NORTH_OVERHANG, PIVOT_HOLE_SPEC, PLATE_T
+from build_cone_swing_platform import (
+    NORTH_OVERHANG,
+    PIVOT_HOLE_SPEC,
+    PLATE_T,
+    POST_MOUNT_SPEC,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -59,7 +64,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)   # 1:3 keeps the 214 mm plan plus dimensions in-zone
+SHEET_SCALE = (1.0, 3.0)   # 1:2 plan keeps the 266 mm envelope in-zone
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view; the
 # isometric and an end view occupy the open right-hand field.
@@ -177,10 +182,12 @@ def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
     return min(bottom, key=lambda item: item[0])[1], min(top, key=lambda item: item[0])[1]
 
 
-def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
-    """Return the pivot rim, north datum edge, and a long straight side."""
+def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
+    """Return pivot/mount rims, north datum edge, and a long straight side."""
     expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
+    expected_mount_radius_m = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000.0
     pivot_edges: list[Any] = []
+    mount_edges: list[Any] = []
     north_edges: list[Any] = []
     straight_side_edges: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
@@ -195,6 +202,8 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
                 values = tuple(float(value) for value in curve.CircleParams)
                 if abs(values[6] - expected_radius_m) <= 1e-6:
                     pivot_edges.append(edge)
+                if abs(values[6] - expected_mount_radius_m) <= 1e-6:
+                    mount_edges.append(edge)
                 continue
             if not curve.IsLine():
                 continue
@@ -210,12 +219,17 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
             length = sum((a - b) ** 2 for a, b in zip(p0, p1, strict=True)) ** 0.5
             if abs(values[3]) < 0.99:
                 straight_side_edges.append((length, edge))
-    if not pivot_edges or not north_edges or len(straight_side_edges) < 2:
+    if (
+        not pivot_edges
+        or len(mount_edges) < 2
+        or not north_edges
+        or len(straight_side_edges) < 2
+    ):
         raise RuntimeError(
-            "cone-platform plan view is missing pivot/north/straight-side controls"
+            "cone-platform plan view is missing pivot/mount/north/side controls"
         )
     straight_side_edges.sort(key=lambda item: item[0], reverse=True)
-    return pivot_edges[0], north_edges[0], straight_side_edges[0][1]
+    return pivot_edges[0], mount_edges[0], north_edges[0], straight_side_edges[0][1]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -274,13 +288,22 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the pivot hole")
     pivot_center = _add_cone_axis_centerline(adapter, top)
 
-    pivot_edge, north_edge, straight_side_edge = _visible_plan_controls(adapter, top)
+    pivot_edge, mount_edge, north_edge, straight_side_edge = _visible_plan_controls(
+        adapter, top
+    )
     add_native_hole_callout(
         adapter,
         top,
         callout_xy=(0.170, 0.200),
         label="pivot-hole size",
         edge=pivot_edge,
+    )
+    add_native_hole_callout(
+        adapter,
+        top,
+        callout_xy=(0.175, 0.150),
+        label="v2 post-mount tapped holes",
+        edge=mount_edge,
     )
     # A datum tag attached to the Hole Wizard callout reports its native
     # annotation position as sheet (0, 0), so the fail-loud layout gate sees it

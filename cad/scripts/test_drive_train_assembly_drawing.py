@@ -86,6 +86,19 @@ def test_bom_covers_every_top_level_component_family() -> None:
     assert len(drawing.BOM_COMPONENTS) == 32
 
 
+def test_end_for_end_cylinder_copy_preserves_the_seed_relative_axial_side() -> None:
+    source = (Path(__file__).parent / "build_drive_train_assembly.py").read_text(
+        encoding="utf-8"
+    )
+    assert "flips[cylinder_dim_slot] = True" not in source
+    assert "flips = [False, False]" in source
+    assert "flip_alignments[cylinder_dim_slot] = True" in source
+    assert "flip_alignments=flip_alignments" in source
+    assert "SolidWorks hard errors" in source
+    assert "whats_wrong(" in source
+    assert "component_mate_dump(adapter, new_name)" in source
+
+
 def test_grouped_cone_gear_row_has_a_source_description_property() -> None:
     description = _config.parts("cone-gear")["description"]
     assert description == drawing.BOM_COMPONENTS["cone-gear"]
@@ -256,7 +269,7 @@ def test_sheet_seven_uses_state_and_acceptance_tables_with_a_parked_view() -> No
     for required in (
         "2.00 MM",
         "41.30 MM",
-        "12.38 DEG",
+        f"{drawing.PINION_PARK_ANGLE_DEG:.2f} DEG",
         "0.25 MM",
         "7.00 MM",
         "0.10-0.25 MM",
@@ -298,7 +311,7 @@ def test_assembly_notes_preserve_the_source_backed_manufacturing_contract() -> N
         "22.90 + j(7.0565) MM",
         "2.00 MM CLEARANCE",
         "41.30 MM C-C",
-        "12.38 DEG",
+        f"{drawing.PINION_PARK_ANGLE_DEG:.2f} DEG",
         "0.25 MM AXIAL CLEARANCE",
         "7.00 MM",
         "0.10-0.25 MM MINIMUM SURFACE",

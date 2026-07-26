@@ -11,7 +11,7 @@ is the drift alarm the offline test enforces.
 from __future__ import annotations
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
-CENTER_DISTANCE = 147.6655  # cam ring centre -> rocker pin (vertical rod)
+CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
 RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
 RING_WALL = 5.0  # radial strap wall
 RING_THICKNESS = 3.0

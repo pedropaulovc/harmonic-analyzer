@@ -7,8 +7,8 @@ shaft (east bore) and the lever lift rod (west bore). The slotted screw
 heads on the plates are simplified away.
 
 Layout: block centred on the origin midway between the bores (at local
-x +-BORE_HALF_SPACING), both bores along Z at y 0 (12 above the base
-seat), block x -16.5..16.5, y -12..4, z 0..12.
+x +-BORE_HALF_SPACING), both bores along Z with the lift bore raised from
+the pivot bore after the v2 drive-line closure, z 0..12.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25". The nominal geometry lives in
 ``pinion_pivot_block_spec`` -- the pure-data contract shared with the
@@ -62,7 +62,7 @@ from pinion_pivot_block_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
-    LIFT_BORE_DROP,
+    LIFT_BORE_RISE,
     SCREW_HALF_SPACING,
 )
 
@@ -101,7 +101,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreUp", f"{BORE_UP}mm")
     await set_global(adapter, "Bore", f"{BORE_DIA}mm")
     await set_global(adapter, "BoreHalfSpacing", f"{BORE_HALF_SPACING}mm")
-    await set_global(adapter, "LiftBoreDrop", f"{LIFT_BORE_DROP}mm")
+    await set_global(adapter, "LiftBoreRise", f"{LIFT_BORE_RISE}mm")
     await set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
     # (The old ScrewHoleDia/ScrewHalfSpacing knobs are gone: the two hold-down
     # holes are now a native Hole Wizard #19 feature at literal stations.)
@@ -122,18 +122,18 @@ async def build(adapter) -> dict[str, str]:
     entities = await add_line_chain(adapter, block_rect)
     # Pivot bore on the sketch x axis (y 0): x != 0 records ONE centre dim (an
     # unsigned distance to the origin, driven by the positive spacing global) +
-    # diameter. The lift bore drops LIFT_BORE_DROP below it (PR8), adding its
-    # own unsigned y dim.
+    # diameter. The v2 linkage closure raises the lift bore, adding its own
+    # unsigned y dim.
     await define_circle(
         adapter, BORE_HALF_SPACING, 0.0, BORE_DIA / 2.0, "pivot bore", dims=block,
         names=("PivotBoreX", "PivotBoreCz", "PivotBoreDia"),
         drives=('"BoreHalfSpacing"', None, '"Bore"'),
     )
     await define_circle(
-        adapter, -BORE_HALF_SPACING, -LIFT_BORE_DROP, BORE_DIA / 2.0, "lift bore",
+        adapter, -BORE_HALF_SPACING, LIFT_BORE_RISE, BORE_DIA / 2.0, "lift bore",
         dims=block,
         names=("LiftBoreX", "LiftBoreCz", "LiftBoreDia"),
-        drives=('"BoreHalfSpacing"', '"LiftBoreDrop"', '"Bore"'),
+        drives=('"BoreHalfSpacing"', '"LiftBoreRise"', '"Bore"'),
     )
     # Rectangle anchored at vertex 0 (-BLOCK_WIDTH/2, -BORE_UP): the width (X
     # span) and height (Y span) segment dims, then the two anchor dims (absolute
@@ -185,7 +185,7 @@ async def build(adapter) -> dict[str, str]:
     # Named lift-bore axis (Axis1): the lift rod's revolute mates coaxial to
     # this in the assembly (PR8 -- the rod spins to drive the cams).
     lift_axis = await name_bore_axis(
-        adapter, "Right Plane", -BORE_HALF_SPACING, "Top Plane", -LIFT_BORE_DROP,
+        adapter, "Right Plane", -BORE_HALF_SPACING, "Top Plane", LIFT_BORE_RISE,
         "lift bore",
     )
     _blank_ref_geometry(adapter, "Plane1", "PLANE")

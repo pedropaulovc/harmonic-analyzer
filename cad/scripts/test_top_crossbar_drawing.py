@@ -4,10 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_top_crossbar as part
 import draw_top_crossbar as drawing
 import top_crossbar_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from cone_pivot_post_installation import (
+    FRAME_COLUMN_Z_CENTER,
+    FRAME_FRONT_COLUMN_Z,
+    FRAME_REAR_COLUMN_Z,
+    SUMMING_Z,
+)
 
 
 def test_required_drawing_paths() -> None:
@@ -26,6 +34,34 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         top_crossbar_spec.BAR_WIDTH,
         top_crossbar_spec.BAR_HEIGHT,
     )
+    assert drawing.STUD_HOLE_Z == top_crossbar_spec.STUD_HOLE_Z
+    assert top_crossbar_spec.BAR_FRONT_Z == -101.0
+    assert top_crossbar_spec.BAR_REAR_Z == 101.0
+
+
+def test_symmetric_frame_span_and_off_centre_stud_contract() -> None:
+    """The bar follows the frame while its stud stays on the summing axis."""
+    assert FRAME_FRONT_COLUMN_Z == -112.0
+    assert FRAME_REAR_COLUMN_Z == 112.0
+    assert top_crossbar_spec.BAR_FRONT_Z == -101.0
+    assert top_crossbar_spec.BAR_REAR_Z == 101.0
+    assert top_crossbar_spec.BAR_CENTER_Z == FRAME_COLUMN_Z_CENTER
+    assert top_crossbar_spec.BAR_CENTER_Z == pytest.approx(0.0)
+    assert top_crossbar_spec.BAR_HALF_Z == pytest.approx(101.0)
+    assert top_crossbar_spec.BAR_LENGTH == pytest.approx(202.0)
+    assert top_crossbar_spec.BAR_CENTER_Z - top_crossbar_spec.BAR_HALF_Z == pytest.approx(-101.0)
+    assert top_crossbar_spec.BAR_CENTER_Z + top_crossbar_spec.BAR_HALF_Z == pytest.approx(101.0)
+
+    assert top_crossbar_spec.STUD_HOLE_Z == pytest.approx(SUMMING_Z)
+    assert top_crossbar_spec.BAR_CENTER_Z + top_crossbar_spec.STUD_HOLE_Z == pytest.approx(SUMMING_Z)
+
+
+def test_part_and_drawing_apply_the_same_local_stud_offset() -> None:
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_global(adapter, "StudHoleZ", f"{STUD_HOLE_Z}mm")' in part_source
+    assert '[[0.0, 0.0, STUD_HOLE_Z]]' in part_source
+    assert 'hole_center_y = TOP_CENTER[1] + STUD_HOLE_Z / 2000.0' in drawing_source
 
 
 def test_linked_notes_define_remaining_casting_requirements() -> None:

@@ -21,12 +21,13 @@ Findings it reproduces (run it after changing any crank-mesh input):
   manifests as lateral flank misregistration, +-1.08 mm across the face);
 * helix hand: +INCLINE on the 64T zeroes the collision; the mirrored hand and
   straight teeth both collide hard at the engaged depth;
-* the shipped pose (backlash 0.15, smooth helix, c2c slack 0.25 -> tips 1.66
-  into the gaps, 87% of working depth; re-arbitrated 2026-07-14 from the
-  K=12-slice era's 0.40/0.60 after the user flagged visible slop) is
-  ZERO-collision over a full crank-pitch phase sweep, with a >=0.05 backlash
-  margin and a [-1.90, -1.10] deg zero seed window (+-0.40 around the
-  shipped centre -- 4x the 0.10-deg authoring-time correction bound).
+* the shipped pose (backlash 0.15, smooth helix, c2c slack 0.25 -> tips engaged
+  into the gaps, 87% of working depth) is ZERO-collision over a full
+  crank-pitch phase sweep, with a >=0.05 backlash margin and a
+  [-4.00, -3.20] deg zero seed window (+-0.40 around the shipped centre --
+  4x the 0.10-deg authoring-time correction bound).  The window was
+  re-arbitrated for the fixed-post recenter at DP25.7311 and a 12.0-degree
+  helix; the current -1.50 phase centre is checked with +/-0.4-degree margin.
 
 Run (no SolidWorks)::
 
@@ -229,7 +230,7 @@ def worst_over_phase(widen: float, extra: float, k: int, lut: dict,
                      seed_off: float = 0.0) -> float:
     w = 0.0
     for ph in np.linspace(0.0, 22.5, phases):
-        w = max(w, study(y_for_extra(extra), skew_deg=INCLINE_DEG, widen64=widen,
+        w = max(w, study(y_for_extra(extra), skew_deg=HELIX_DEG, widen64=widen,
                          root16=ROOT16, root64=ROOT64, crank_deg=float(ph),
                          slices=k, vox=vox, seed_off=seed_off,
                          lut=lut)["vol_mm3"])
@@ -253,8 +254,8 @@ def main() -> int:
     off = dta.MESH_WINDOW_CENTRE_DEG
 
     print("\n== helix hand at the live depth ==", flush=True)
-    for skew, label in ((INCLINE_DEG, "+incline (shipped)"),
-                        (-INCLINE_DEG, "mirrored hand"), (0.0, "straight teeth")):
+    for skew, label in ((HELIX_DEG, "+helix (shipped)"),
+                        (-HELIX_DEG, "mirrored hand"), (0.0, "straight teeth")):
         r = study(y_for_extra(SLACK), skew_deg=skew, widen64=BACKLASH_MM,
                   root16=ROOT16, root64=ROOT64, seed_off=off, lut=lut)
         print(f"{label:20s}: vol {r['vol_mm3']:8.3f} mm^3")
@@ -262,7 +263,7 @@ def main() -> int:
     print("\n== the shipped pose over a crank-pitch phase sweep ==", flush=True)
     # Pin the study's derived pose to the assembly's shipped constants -- a
     # drift here means the study is validating a pose the build doesn't ship.
-    live = study(dta.Y_CRANK, skew_deg=INCLINE_DEG, widen64=BACKLASH_MM,
+    live = study(dta.Y_CRANK, skew_deg=HELIX_DEG, widen64=BACKLASH_MM,
                  root16=ROOT16, root64=ROOT64, seed_off=off, lut=lut)
     assert abs(live["ptz"] - dta.PINION_TOOTH_Z) < 1e-9, (
         f"study placement {live['ptz']} != assembly PINION_TOOTH_Z "

@@ -13,8 +13,11 @@ pinned rules this module encodes:
 * ``Values``/flip slots enumerate the slice's EXTERNAL mates only (mates
   referencing an entity outside the copied set), tree-ordered among
   themselves; INTERNAL mates are re-bound between the copies and inherit
-  their dims. Every external dim slot must carry its REAL value -- a 0.0
-  re-values the copied dim to zero.
+  their dimension values, but SolidWorks can reset an internal distance
+  mate's ``Flipped`` side to false. Match that side to the seed explicitly
+  through the documented writable ``IMate2::Flipped`` property. Every
+  external dim slot must carry its REAL value -- a 0.0 re-values the copied
+  dim to zero.
 * FlipDimension is honoured per slot ONLY where that slot is copied with
   Repeat=False + a NewEntityToMateTo entity. On the Repeat=True path a
   re-valued dim's FlipDimension RESETS to False (the seed's state is not
@@ -25,6 +28,10 @@ pinned rules this module encodes:
   post-copy ``ModifyDefinition`` flip-heal. A MIXED Repeat array is valid
   (measured 2026-07-10): flip only the external DIM slot to Repeat=False and
   leave the shared-reference slots on Repeat=True.
+* ``FlipAlignment`` is independent of ``FlipDimension``. Re-pointing a slot
+  from a root plane to a component plane with the opposite directed normal can
+  leave the copied mate unsolvable even when its distance side is correct; set
+  ``flip_alignments`` for that slot instead of trying the other distance sign.
 * A copy of a slice with FREED operational DOF carries a solver-state
   ATTRACTOR: the solver returns the copied chain to one deterministic wrong
   pose on the free manifold from ANY start, even though every copied mate is
@@ -330,6 +337,7 @@ def _slot_report(
     values_m: list[float],
     rep: list[bool],
     flip_dim: list[bool],
+    flip_align: list[bool],
     ents_src: list[Any],
 ) -> str:
     """Every CopyWithMates2 slot argument this call actually passed."""
@@ -344,6 +352,7 @@ def _slot_report(
             f"    slot {i}: repeat={str(_at(rep, i)):5}"
             f" value={val_txt:>14}"
             f" flip_dimension={str(_at(flip_dim, i)):5}"
+            f" flip_alignment={str(_at(flip_align, i)):5}"
             f" new_entity={'set' if _at(ents_src, i) is not None else '-'}"
         )
     return "\n".join(lines)
@@ -356,6 +365,7 @@ def _assert_copy_solved(
     values_m: list[float],
     rep: list[bool],
     flip_dim: list[bool],
+    flip_align: list[bool],
     ents_src: list[Any],
 ) -> None:
     """Raise if the copy just made left any of ITS OWN mates unsolvable."""
@@ -396,17 +406,14 @@ def _assert_copy_solved(
         f" {comp_names} across {n_mates} external-mate slot(s).\n"
         + "\n".join(detail)
         + "\n  slot arguments this call passed:\n"
-        + _slot_report(n_mates, values_m, rep, flip_dim, ents_src)
-        + f"\n    FlipAlignment: {[False] * n_mates} -- copy_with_mates does NOT"
-        " expose this argument; it is pinned False for every slot.\n"
+        + _slot_report(n_mates, values_m, rep, flip_dim, flip_align, ents_src)
+        + "\n  FlipAlignment is independent of FlipDimension."
         "  Read the message above before assuming a slot-order bug: an"
         " alignment complaint means the copy's mate is geometrically"
-        " unsatisfiable as authored, NOT mis-slotted. FlipDimension (which this"
-        " call DOES set) only picks which side of the dimension is measured --"
-        " it can never change the ALIGNMENT. When a repeat=False slot re-points"
-        " at a NewEntityToMateTo whose normal opposes the seed reference's, the"
-        " copied mate needs the FlipAlignment slot toggled, which means adding"
-        " that array to copy_with_mates."
+        " unsatisfiable with the passed slot state, NOT necessarily mis-slotted."
+        " FlipDimension only picks which side of the dimension is measured;"
+        " compare the reported flip_alignment value with the directed normal"
+        " of each repeat=False NewEntityToMateTo reference."
     )
 
 
@@ -479,6 +486,100 @@ def component_mate_dump(adapter: Any, name: str) -> list[dict]:
     return out
 
 
+def _component_distance_mate(
+    adapter: Any, name: str, distance_mm: float, *, tolerance_mm: float = 0.01,
+) -> Any:
+    """Return one uniquely-sized distance mate on ``name``.
+
+    ``IComponent2::GetMates`` is the cheap component-local lookup. Matching
+    the driving value makes this independent of the mate array's order, which
+    differs between an authored seed and its CopyWithMates2 copy.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    comp = _component(adapter, name)
+    _flag_only(comp, "GetMates")
+    matches: list[Any] = []
+    for mate in adapter._attempt(lambda: comp.GetMates(), default=None) or []:
+        if int(_read_member(mate, "Type") or -1) != 5:  # swMateDISTANCE
+            continue
+        _flag_only(mate, "DisplayDimension2")
+        display = adapter._attempt(
+            lambda m=mate: m.DisplayDimension2(0), default=None)
+        dim = _read_member(display, "GetDimension") if display is not None else None
+        value = _read_member(dim, "SystemValue") if dim is not None else None
+        if value is None:
+            continue
+        if abs(float(value) * 1000.0 - distance_mm) <= tolerance_mm:
+            matches.append(mate)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{name}: found {len(matches)} distance mates at {distance_mm:.3f} mm;"
+            " expected exactly one"
+        )
+    return matches[0]
+
+
+def component_distance_mate_flip(
+    adapter: Any, name: str, distance_mm: float, *, tolerance_mm: float = 0.01,
+) -> bool:
+    """Read the side of one uniquely-sized distance mate on ``name``."""
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    mate = _component_distance_mate(
+        adapter, name, distance_mm, tolerance_mm=tolerance_mm)
+    return bool(_read_member(mate, "Flipped"))
+
+
+def ensure_component_distance_mate_flip(
+    adapter: Any,
+    name: str,
+    distance_mm: float,
+    expected: bool,
+    *,
+    tolerance_mm: float = 0.01,
+) -> bool:
+    """Make one copied distance mate use the seed's side.
+
+    Returns ``True`` only when a write was needed. The official API exposes
+    ``IMate2::Flipped`` as a writable property, so this repairs the copied
+    INTERNAL mate directly without deleting/re-authoring it or walking the
+    assembly's MateGroup tree.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import _read_member
+
+    mate = _component_distance_mate(
+        adapter, name, distance_mm, tolerance_mm=tolerance_mm)
+    current = bool(_read_member(mate, "Flipped"))
+    if current == expected:
+        return False
+    if not bool(_read_member(mate, "CanBeFlipped")):
+        raise RuntimeError(
+            f"{name}: {distance_mm:.3f} mm mate is not flippable"
+        )
+    with _telemetry.span(
+        "assembly.copy_internal_mate_flip",
+        component=name,
+        distance_mm=distance_mm,
+        from_flip=current,
+        to_flip=expected,
+    ):
+        mate.Flipped = bool(expected)
+    readback = bool(_read_member(mate, "Flipped"))
+    if readback != expected:
+        raise RuntimeError(
+            f"{name}: internal distance mate flip readback {readback} != {expected}"
+        )
+    _telemetry.event(
+        "cwm.internal_mate_flip_corrected",
+        component=name,
+        distance_mm=distance_mm,
+        from_flip=current,
+        to_flip=expected,
+    )
+    return True
+
+
 def put_component_pose(adapter: Any, name: str, array16: list[float]) -> None:
     """Reposition a component to ``array16`` WITHOUT a mate solve (an
     ``IComponent2.Transform2`` property put).
@@ -529,6 +630,7 @@ def resolve_entity(adapter: Any, ref: Any) -> Any:
 def copy_with_mates(
     adapter: Any, comp_names: list[str], n_mates: int, values_m: list[float],
     flips: list[bool] | None = None,
+    flip_alignments: list[bool] | None = None,
     repeat: list[bool] | None = None,
     new_entities: list[Any] | None = None,
     assert_solved: bool = True,
@@ -557,6 +659,11 @@ def copy_with_mates(
     re-pointed with ``repeat=False`` + its own entity, not left on the Repeat
     path with an always-positive ladder.
 
+    ``flip_alignments`` is the separate CopyWithMates2 ``FlipAlignment``
+    array. Use it when a re-pointed entity has the opposite directed normal
+    from the seed reference; changing ``FlipDimension`` cannot repair an
+    alignment error.
+
     The call's return value is IGNORED (it lies); the caller validates from
     the model (component-name diff, mate recount, poses, health).
 
@@ -584,12 +691,16 @@ def copy_with_mates(
     ents_src = new_entities if new_entities is not None else [None] * n_mates
     ents = [e._oleobj_ if e is not None else None for e in ents_src]
     flip_dim = list(flips) if flips is not None else [False] * n_mates
+    flip_align = (
+        list(flip_alignments)
+        if flip_alignments is not None else [False] * n_mates
+    )
     args = (
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, raw),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, rep),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, ents),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, list(values_m)),
-        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n_mates),
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, flip_align),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, flip_dim),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BOOL, [False] * n_mates),
         VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, [0] * n_mates),
@@ -603,5 +714,13 @@ def copy_with_mates(
         adapter._attempt(lambda: model.CopyWithMates2(*args), default=None)
         if not assert_solved:
             return
-        _assert_copy_solved(adapter, comp_names, n_mates, list(values_m), rep,
-                            flip_dim, ents_src)
+        _assert_copy_solved(
+            adapter,
+            comp_names,
+            n_mates,
+            list(values_m),
+            rep,
+            flip_dim,
+            flip_align,
+            ents_src,
+        )

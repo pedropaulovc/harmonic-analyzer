@@ -49,6 +49,8 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "NOT" in notes and "CONCENTRIC" in notes
     assert "OFFSET 1.0" not in notes
+    assert pinion_cam_geometry.THIN_SIDE_WALL >= 0.5
+    assert pinion_cam_geometry.CAM_OD == 10.32
 
 
 def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:

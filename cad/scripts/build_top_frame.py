@@ -2,12 +2,12 @@ r"""Reproduction script: top frame ring (ch. 30 eight-views; NEW part, 1 used).
 
 Green cast rectangular ring clamping the four brass columns just below
 their tops: rails 22 wide x 41 tall, corner bosses Ø48 bored Ø25.5 around
-the Ø25.4 columns (OD rederived from the ch30 8-views, M6.11) at (x, z) =
-(+/-197, +/-112). In the machine it sits
+the Ø25.4 columns (OD rederived from the ch30 8-views, M6.11) at x +/-197,
+front z -112 and rear z +112. In the machine it sits
 at y 999.7..1040.7; its west rail carries the two ball mounts of the
 top-lever fulcrum shaft (seat 1040.7 + ball rise 25.2 = axis 1065.9) and
 the summing lever hangs below it (M6.4). One rail carries a Ø17 clearance
-bore at mid-span (z 0) for the counter-spring gooseneck post, which slides
+bore at z +3.088 for the recentered counter-spring gooseneck post, which slides
 through and drops below the plate (ch. 19; the real corner casting is bored
 for the post). Summing places the post at machine x -197 (COLUMN_X, with a
 composed Ry(180)), so the bore is cut at part x -197 to meet it (M6.12).
@@ -18,8 +18,10 @@ continuing above to their caps); no book chapter covers it directly.
 Dimensions: cad/DIMENSIONS.md "Channel & top-frame layout" (med; boss OD
 scaled, low).
 
-Layout: plan profile in XZ centred on the origin, ring mid-plane extruded
-both ways in Y (y -20.5..+20.5) - the assembly lifts it to 1020.2. Build
+Layout: plan profile in XZ is symmetric around the original front/rear column
+stations, with plan centre z=0. The ring mid-plane is extruded both ways in Y
+(y -20.5..+20.5)
+and the assembly lifts it to 1020.2. Build
 order: outer slab, window cut, THEN corner bosses, then column bores -
 bosses after the window so the full Ø48 cylinder survives at the window
 corners (the window rectangle passes within 15.6 of the boss centres,
@@ -41,11 +43,12 @@ import sys
 from _common import (
     CASTING_GREEN,
     SketchDims,
+    add_line_chain,
     apply_color,
     apply_material,
     check,
-    define_centered_rectangle,
     define_circle,
+    define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -68,18 +71,28 @@ from top_frame_spec import (
     INSPECTION_NOTES,
     TOP_VIEW_NOTE,
 )
+from cone_pivot_post_installation import (
+    FRAME_COLUMN_Z_CENTER,
+    FRAME_COLUMN_Z_SPAN,
+    FRAME_FRONT_COLUMN_Z,
+    FRAME_REAR_COLUMN_Z,
+    SUMMING_Z,
+)
 
 PART_NAME = "top-frame"
 MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
 
 COLUMN_X = 197.0  # column stations (frame.SLDASM, M6.1)
-COLUMN_Z = 112.0
+FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z
+REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z
+FRAME_CENTER_Z = FRAME_COLUMN_Z_CENTER
+COLUMN_Z = FRAME_COLUMN_Z_SPAN / 2.0  # half-pitch about FRAME_CENTER_Z
 RAIL_WIDTH = 22.0  # DIMENSIONS.md top-frame row (photo, med)
 RING_HEIGHT = 41.0  # DIMENSIONS.md top-frame row (photo, med)
 BOSS_DIA = 48.0  # corner boss around the column (scaled, low)
 BORE_DIA = 25.5  # clamps the Ø25.4 column (0.1 slip; OD rederived from 8-views)
 GOOSENECK_BORE_DIA = 17.0  # clearance for the Ø16 counter-spring post sliding
-# through the rail mid-span (build_gooseneck); the post drops below the
+# through the left rail (build_gooseneck); the post drops below the
 # plate, gripped by the gooseneck-clamp above -- ch. 19. Fully inside the rail
 # band (|x| 197 in 186..208), so a clean cylindrical cut.
 GOOSENECK_X = -COLUMN_X  # The counter-spring post body sits at machine
@@ -88,13 +101,61 @@ GOOSENECK_X = -COLUMN_X  # The counter-spring post body sits at machine
 # with the post body. At +COLUMN_X it bored the opposite rail and the post
 # drilled solid casting (full Ø16x41 = 8243 mm^3 top-level interference,
 # M6.12).
-GOOSENECK_Z = 0.0  # rail mid-span (sketch y -> machine -Z; 0 is handedness-free)
+GOOSENECK_Z = SUMMING_Z
 
 OUTER_X = COLUMN_X + RAIL_WIDTH / 2.0  # 208
-OUTER_Z = COLUMN_Z + RAIL_WIDTH / 2.0  # 123
+OUTER_FRONT_Z = FRONT_COLUMN_Z - RAIL_WIDTH / 2.0
+OUTER_REAR_Z = REAR_COLUMN_Z + RAIL_WIDTH / 2.0
+OUTER_Z = (OUTER_REAR_Z - OUTER_FRONT_Z) / 2.0
 INNER_X = COLUMN_X - RAIL_WIDTH / 2.0  # 186
-INNER_Z = COLUMN_Z - RAIL_WIDTH / 2.0  # 101
+INNER_FRONT_Z = FRONT_COLUMN_Z + RAIL_WIDTH / 2.0
+INNER_REAR_Z = REAR_COLUMN_Z - RAIL_WIDTH / 2.0
+INNER_Z = (INNER_REAR_Z - INNER_FRONT_Z) / 2.0
 THROUGH_CUT_DEPTH = 60.0  # mid-plane total; > ring height
+
+if abs((OUTER_FRONT_Z + OUTER_REAR_Z) / 2.0 - FRAME_CENTER_Z) > 1e-12:
+    raise AssertionError("top-frame outer profile is not centred on its column span")
+if abs((INNER_FRONT_Z + INNER_REAR_Z) / 2.0 - FRAME_CENTER_Z) > 1e-12:
+    raise AssertionError("top-frame inner profile is not centred on its column span")
+
+
+async def _define_asymmetric_plan_rectangle(
+    adapter,
+    *,
+    half_x: float,
+    front_z: float,
+    rear_z: float,
+    label: str,
+    dims: SketchDims,
+    width_name: str,
+    depth_name: str,
+    width_drive: str,
+    depth_drive: str,
+    half_x_drive: str,
+    rear_z_drive: str,
+) -> None:
+    """Define a world-Z asymmetric Top-plane rectangle.
+
+    Top-plane sketch Y maps to machine ``-Z``; the rear-west corner anchor
+    keeps the expanded ring deterministic while retaining named width/depth
+    dimensions for the manufacturing drawing.
+    """
+    points = [
+        (-half_x, -rear_z),
+        (half_x, -rear_z),
+        (half_x, -front_z),
+        (-half_x, -front_z),
+    ]
+    lines = await add_line_chain(adapter, points)
+    await define_rectilinear_chain(
+        adapter,
+        lines,
+        points,
+        label=label,
+        dims=dims,
+        names=[width_name, depth_name, f"{width_name}West", f"{depth_name}Rear"],
+        drives=[width_drive, depth_drive, half_x_drive, rear_z_drive],
+    )
 
 
 def _boss_extra_area() -> float:
@@ -135,22 +196,29 @@ async def build(adapter) -> dict[str, str]:
     # dimension below. A GUI fine-tune edits THESE (Tools > Equations) -- e.g.
     # RailWidth or BossDia -- never an auto "D7@Sketch3". The derived spans
     # (Outer*/Inner*) are equations of the primitives, so the rail band stays
-    # centred on the column stations when a primitive changes.
+    # centred on the asymmetric column span when a primitive changes.
     # Primitives carry an explicit ``mm`` unit: this is an INCH document (like
     # the rest of the codebase) and the equation manager evaluates BARE numbers
     # in document units, so an unsuffixed "416" would be read as 416 inches and
     # blow the part up 25.4x in-plane. Length-valued globals keep the arithmetic
     # in mm; the derived globals and dimension equations inherit the unit.
     await set_global(adapter, "ColumnX", f"{COLUMN_X}mm")
-    await set_global(adapter, "ColumnZ", f"{COLUMN_Z}mm")
+    await set_global(adapter, "FrontColumnZ", f"{abs(FRONT_COLUMN_Z)}mm")
+    await set_global(adapter, "RearColumnZ", f"{REAR_COLUMN_Z}mm")
+    await set_global(adapter, "FrameCenterZ", f"{FRAME_CENTER_Z}mm")
     await set_global(adapter, "RailWidth", f"{RAIL_WIDTH}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
     await set_global(adapter, "GooseneckBoreDia", f"{GOOSENECK_BORE_DIA}mm")
+    await set_global(adapter, "GooseneckZ", f"{GOOSENECK_Z}mm")
     await set_global(adapter, "OuterX", '"ColumnX" + "RailWidth" / 2')
-    await set_global(adapter, "OuterZ", '"ColumnZ" + "RailWidth" / 2')
+    await set_global(adapter, "OuterFrontZ", '"FrontColumnZ" + "RailWidth" / 2')
+    await set_global(adapter, "OuterRearZ", '"RearColumnZ" + "RailWidth" / 2')
+    await set_global(adapter, "OuterDepth", '"OuterFrontZ" + "OuterRearZ"')
     await set_global(adapter, "InnerX", '"ColumnX" - "RailWidth" / 2')
-    await set_global(adapter, "InnerZ", '"ColumnZ" - "RailWidth" / 2')
+    await set_global(adapter, "InnerFrontZ", '"FrontColumnZ" - "RailWidth" / 2')
+    await set_global(adapter, "InnerRearZ", '"RearColumnZ" - "RailWidth" / 2')
+    await set_global(adapter, "InnerDepth", '"InnerFrontZ" + "InnerRearZ"')
 
     # Each sketch DECLARES its dim names + drive equations inline at the
     # define_* call; a per-sketch SketchDims records each dim in the exact order
@@ -164,10 +232,19 @@ async def build(adapter) -> dict[str, str]:
     # absorbed sketch drops off the top-level tree the namer walks).
     outer = SketchDims()
     check("create_sketch outer", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
-        adapter, OUTER_X, OUTER_Z, "outer rectangle", dims=outer,
-        name_width="Width", drive_width='2 * "OuterX"',
-        name_depth="Depth", drive_depth='2 * "OuterZ"',
+    await _define_asymmetric_plan_rectangle(
+        adapter,
+        half_x=OUTER_X,
+        front_z=OUTER_FRONT_Z,
+        rear_z=OUTER_REAR_Z,
+        label="outer rectangle",
+        dims=outer,
+        width_name="Width",
+        depth_name="Depth",
+        width_drive='2 * "OuterX"',
+        depth_drive='"OuterDepth"',
+        half_x_drive='"OuterX"',
+        rear_z_drive='"OuterRearZ"',
     )
     await ensure_fully_defined(adapter, "outer rectangle")
     check("exit_sketch outer", await adapter.exit_sketch())
@@ -186,10 +263,19 @@ async def build(adapter) -> dict[str, str]:
     # Window, leaving the 22-wide rail band.
     window = SketchDims()
     check("create_sketch window", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
-        adapter, INNER_X, INNER_Z, "window rectangle", dims=window,
-        name_width="Width", drive_width='2 * "InnerX"',
-        name_depth="Depth", drive_depth='2 * "InnerZ"',
+    await _define_asymmetric_plan_rectangle(
+        adapter,
+        half_x=INNER_X,
+        front_z=INNER_FRONT_Z,
+        rear_z=INNER_REAR_Z,
+        label="window rectangle",
+        dims=window,
+        width_name="Width",
+        depth_name="Depth",
+        width_drive='2 * "InnerX"',
+        depth_drive='"InnerDepth"',
+        half_x_drive='"InnerX"',
+        rear_z_drive='"InnerRearZ"',
     )
     await ensure_fully_defined(adapter, "window rectangle")
     check("exit_sketch window", await adapter.exit_sketch())
@@ -211,12 +297,15 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch bosses", await adapter.create_sketch("Top"))
     n = 0
     for sx in (-1.0, 1.0):
-        for sz in (-1.0, 1.0):
+        for z_world, z_drive in (
+            (FRONT_COLUMN_Z, '"FrontColumnZ"'),
+            (REAR_COLUMN_Z, '"RearColumnZ"'),
+        ):
             await define_circle(
-                adapter, sx * COLUMN_X, sz * COLUMN_Z, BOSS_DIA / 2.0,
-                f"boss ({sx:+.0f}, {sz:+.0f})", dims=bosses,
+                adapter, sx * COLUMN_X, -z_world, BOSS_DIA / 2.0,
+                f"boss ({sx:+.0f}, z={z_world:+.3f})", dims=bosses,
                 names=(f"C{n}X", f"C{n}Z", f"C{n}Dia"),
-                drives=('"ColumnX"', '"ColumnZ"', '"BossDia"'),
+                drives=('"ColumnX"', z_drive, '"BossDia"'),
             )
             n += 1
     await ensure_fully_defined(adapter, "bosses sketch")
@@ -239,12 +328,15 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch bores", await adapter.create_sketch("Top"))
     n = 0
     for sx in (-1.0, 1.0):
-        for sz in (-1.0, 1.0):
+        for z_world, z_drive in (
+            (FRONT_COLUMN_Z, '"FrontColumnZ"'),
+            (REAR_COLUMN_Z, '"RearColumnZ"'),
+        ):
             await define_circle(
-                adapter, sx * COLUMN_X, sz * COLUMN_Z, BORE_DIA / 2.0,
-                f"bore ({sx:+.0f}, {sz:+.0f})", dims=bores,
+                adapter, sx * COLUMN_X, -z_world, BORE_DIA / 2.0,
+                f"bore ({sx:+.0f}, z={z_world:+.3f})", dims=bores,
                 names=(f"C{n}X", f"C{n}Z", f"C{n}Dia"),
-                drives=('"ColumnX"', '"ColumnZ"', '"BoreDia"'),
+                drives=('"ColumnX"', z_drive, '"BoreDia"'),
             )
             n += 1
     await ensure_fully_defined(adapter, "bores sketch")
@@ -262,17 +354,16 @@ async def build(adapter) -> dict[str, str]:
     v_bored = v_bossed - v_bores
     await volume_check(adapter, "bored ring", v_bored, 0.005 * v_boss_extra + 50.0)
 
-    # Counter-spring (gooseneck) clearance bore through the east rail mid-span:
-    # the post slides through here and drops below the plate (build_gooseneck).
-    # On-axis centre (z 0): only X + diameter are dims (the Z is a relation), so
-    # define_circle records just those two -- the "Z" slot is ignored.
+    # Counter-spring (gooseneck) clearance bore through the east rail at the
+    # translated summing-chain station. The post slides through here and drops
+    # below the plate (build_gooseneck).
     gooseneck = SketchDims()
     check("create_sketch gooseneck bore", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, GOOSENECK_X, GOOSENECK_Z, GOOSENECK_BORE_DIA / 2.0, "gooseneck bore",
+        adapter, GOOSENECK_X, -GOOSENECK_Z, GOOSENECK_BORE_DIA / 2.0, "gooseneck bore",
         dims=gooseneck,
         names=("X", "Z", "Dia"),
-        drives=('"ColumnX"', None, '"GooseneckBoreDia"'),
+        drives=('"ColumnX"', '"GooseneckZ"', '"GooseneckBoreDia"'),
     )
     await ensure_fully_defined(adapter, "gooseneck bore sketch")
     check("exit_sketch gooseneck bore", await adapter.exit_sketch())

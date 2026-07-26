@@ -34,6 +34,7 @@ from top_crossbar_spec import (
     BAR_LENGTH,
     BAR_WIDTH,
     STUD_HOLE_DIA,
+    STUD_HOLE_Z,
 )
 
 
@@ -125,11 +126,12 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to top-view stud hole")
 
     hole_radius_sheet = STUD_HOLE_DIA / 4000.0
+    hole_center_y = TOP_CENTER[1] + STUD_HOLE_Z / 2000.0
     length_location = add_edge_dimension(
         adapter,
         top,
         p0=(TOP_CENTER[0], TOP_CENTER[1] - BAR_LENGTH / 4000.0),
-        p1=(TOP_CENTER[0], TOP_CENTER[1] - hole_radius_sheet),
+        p1=(TOP_CENTER[0], hole_center_y - hole_radius_sheet),
         text_xy=(TOP_CENTER[0] + 0.030, TOP_CENTER[1] - 0.025),
         label="stud-hole length location",
     )
@@ -147,7 +149,7 @@ async def build(adapter: Any) -> dict[str, str]:
     upper_end = (TOP_CENTER[0], TOP_CENTER[1] + BAR_LENGTH / 4000.0)
     hole_edge = (
         TOP_CENTER[0] + STUD_HOLE_DIA / 4000.0,
-        TOP_CENTER[1],
+        hole_center_y,
     )
     add_datum_feature(
         adapter,
