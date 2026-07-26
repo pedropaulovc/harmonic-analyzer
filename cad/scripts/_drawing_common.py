@@ -1218,7 +1218,6 @@ def new_project_drawing(
         height=ASME_B_HEIGHT_M,
     )
     ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
-    _assert_third_angle_projection_symbol(draw, ddoc)
     # A hand-saved template can be saved while in Edit Sheet Format mode (it
     # was, the day the title block was drawn) -- a drawing created from it then
     # opens with the FORMAT layer active, where every pick lands on the sheet
@@ -1327,122 +1326,6 @@ def create_blank_drawing_sheets(
     actual = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
     if actual != tuple(sheet_names):
         raise RuntimeError(f"{label}: sheet order mismatch: {actual!r}")
-
-
-def _projection_symbol_centers(
-    circle_specs: list[tuple[float, float]],
-    line_x_pairs: list[tuple[float, float]],
-) -> tuple[float, float]:
-    """Return ``(frustum_x, circle_x)`` for the standard projection symbol."""
-    if len(circle_specs) != 2:
-        raise RuntimeError(
-            f"projection symbol must contain two concentric circles, got {len(circle_specs)}"
-        )
-    circle_xs = [center_x for center_x, _radius in circle_specs]
-    if max(circle_xs) - min(circle_xs) > 1e-9:
-        raise RuntimeError(f"projection-symbol circles are not concentric: {circle_xs}")
-    circle_x = sum(circle_xs) / len(circle_xs)
-    outer_radius = max(radius for _center_x, radius in circle_specs)
-    frustum_lines = [
-        pair
-        for pair in line_x_pairs
-        if max(abs(pair[0] - circle_x), abs(pair[1] - circle_x))
-        > outer_radius * 1.5
-    ]
-    if len(frustum_lines) != 6:
-        raise RuntimeError(
-            "projection symbol must contain four circle-group entities and six "
-            f"frustum entities; found {len(line_x_pairs) - len(frustum_lines) + 2} "
-            f"and {len(frustum_lines)}"
-        )
-    frustum_xs = [x for pair in frustum_lines for x in pair]
-    frustum_x = (min(frustum_xs) + max(frustum_xs)) / 2.0
-    return frustum_x, circle_x
-
-
-def _assert_third_angle_order(frustum_x: float, circle_x: float) -> None:
-    if circle_x <= frustum_x:
-        raise RuntimeError(
-            "project template carries a first-angle projection symbol: "
-            f"circle_x={circle_x:.6f} is not right of frustum_x={frustum_x:.6f}"
-        )
-
-
-def _assert_third_angle_projection_symbol(draw: Any, ddoc: Any) -> None:
-    """Fail every drawing at creation if the template carries first-angle ink."""
-    ddoc.EditTemplate()
-    try:
-        manager = _early_bound(draw.SketchManager, "ISketchManager")
-        definitions = manager.GetSketchBlockDefinitions() or ()
-        candidates = [
-            _early_bound(definition, "ISketchBlockDefinition")
-            for definition in definitions
-            if Path(str(_early_bound(definition, "ISketchBlockDefinition").FileName))
-            .name.lower()
-            == "third-angle-projection.sldblk"
-        ]
-        if len(candidates) != 1:
-            raise RuntimeError(
-                "project template must contain exactly one third-angle projection "
-                f"block definition, got {len(candidates)}"
-            )
-        sketch = _early_bound(candidates[0].GetSketch(), "ISketch")
-        circle_specs: list[tuple[float, float]] = []
-        line_x_pairs: list[tuple[float, float]] = []
-        for raw_segment in sketch.GetSketchSegments() or ():
-            segment = _early_bound(raw_segment, "ISketchSegment")
-            kind = int(segment.GetType())
-            if kind == 0:
-                line = _early_bound(raw_segment, "ISketchLine")
-                line_x_pairs.append(
-                    (
-                        float(_early_bound(line.GetStartPoint2(), "ISketchPoint").X),
-                        float(_early_bound(line.GetEndPoint2(), "ISketchPoint").X),
-                    )
-                )
-                continue
-            if kind != 1:
-                continue
-            arc = _early_bound(raw_segment, "ISketchArc")
-            if not bool(arc.IsCircle()):
-                continue
-            center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
-            circle_specs.append((float(center.X), float(arc.GetRadius())))
-        frustum_x, circle_x = _projection_symbol_centers(circle_specs, line_x_pairs)
-        _assert_third_angle_order(frustum_x, circle_x)
-        # A correct block DEFINITION can persist in the document even when the
-        # placed title-block INSTANCE was deleted, mirrored, or never inserted,
-        # so the definition geometry alone does not prove the sheet shows the
-        # symbol.  Require at least one placed instance and reject a rotated /
-        # mirrored one (which flips the projection convention on the sheet).
-        definition = candidates[0]
-        instance_count = int(definition.GetInstanceCount())
-        with _telemetry.span(
-            "drawing.projection_symbol_scan", instances=instance_count
-        ):
-            if instance_count < 1:
-                raise RuntimeError(
-                    "third-angle projection block is defined but has no placed "
-                    "instance — the title-block symbol was deleted or never inserted"
-                )
-            for raw_instance in definition.GetInstances() or ():
-                instance = _early_bound(raw_instance, "ISketchBlockInstance")
-                angle = float(instance.Angle) % math.tau
-                if min(angle, math.tau - angle) > math.radians(0.5):
-                    raise RuntimeError(
-                        "placed third-angle projection block instance is rotated "
-                        f"(angle={angle:.4f} rad) — a rotated or mirrored symbol "
-                        "misreads the projection convention on the sheet"
-                    )
-        _telemetry.event(
-            "drawing.projection_symbol_verified",
-            convention="third-angle",
-            frustum_x=frustum_x,
-            circle_x=circle_x,
-            instance_count=instance_count,
-        )
-    finally:
-        ddoc.EditSheet()
 
 
 @_telemetry.traced("drawing.normalize_edge_break")

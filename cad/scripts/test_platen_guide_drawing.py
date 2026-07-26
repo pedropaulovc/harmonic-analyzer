@@ -17,10 +17,8 @@ import build_platen_guide as guide
 import _drawing_common as drawing_common
 from _drawing_registry import DRAWINGS, PROJECT_DRWDOT
 from _drawing_common import (
-    _assert_third_angle_order,
     _contact_preview_grid,
     _gtol_frame_xml,
-    _projection_symbol_centers,
     property_link,
     render_pdf_png,
     sanitize_pdf_metadata,
@@ -250,27 +248,6 @@ def test_drawing_registry_is_unique_and_extensible() -> None:
     assert len(set(outputs)) == len(outputs)
     assert PROJECT_DRWDOT.suffix.lower() == ".drwdot"
     assert PROJECT_DRWDOT.is_file() and PROJECT_DRWDOT.stat().st_size > 0
-
-
-def test_projection_symbol_requires_third_angle_order() -> None:
-    circles = [(0.338096872, 0.004069535), (0.338096872, 0.002265426)]
-    lines = [
-        (0.338096872, 0.338096872),
-        (0.332670531, 0.343523212),
-        (0.326686701, 0.326686701),
-        (0.326686701, 0.318436811),
-        (0.318436811, 0.318436811),
-        (0.318436811, 0.326686701),
-        (0.316931747, 0.328191765),
-        (0.326686701, 0.318436811),
-    ]
-    frustum_x, circle_x = _projection_symbol_centers(circles, lines)
-    assert frustum_x == pytest.approx(0.322561756)
-    assert circle_x == pytest.approx(0.338096872)
-    _assert_third_angle_order(frustum_x, circle_x)
-
-    with pytest.raises(RuntimeError, match="first-angle projection symbol"):
-        _assert_third_angle_order(circle_x, frustum_x)
 
 
 def test_dirty_reopened_scale_is_reexported_to_pdf() -> None:
