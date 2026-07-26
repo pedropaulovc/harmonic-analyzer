@@ -630,6 +630,19 @@ scripts that `from _common import log, check` are instrumented unchanged.
   documented use ("SHOULD only be set when span creation time has already passed") —
   no live span is mutated. A process nobody stamped (standalone run) or a stale
   inherited stamp (>1 h) records nothing.
+- **Telemetry must not cost seat time.** Two measured traps, both fixed, both worth
+  remembering before adding an exporter: (1) the OTLP default endpoint is a **literal
+  loopback address, never the name `localhost`** — on Windows `localhost` resolves to
+  `::1` first and the Aspire dashboard is IPv4, so the first POST ate a ~2 s failed
+  connect *per process* (twice: spans and logs), measured 2.05 s vs 0.003 s for
+  `127.0.0.1`; `_resolve_otlp_endpoint` tries IPv4 then the v6 loopback, both literal.
+  (2) OTLP export is **batched** (`BatchSpanProcessor` / `BatchLogRecordProcessor`) so
+  it never runs on the calling thread — a build subprocess holds the COM seat for its
+  whole life, so any synchronous export is seat time. Console + `.jsonl` stay on
+  Simple processors (live console; capture that cannot lose a record to a queue). The
+  batch trade is safe only because `shutdown()` flushes BOTH providers and runs on both
+  exit paths (`run_build`'s tail, and the watchdog before `os._exit`) — keep it that
+  way. Net: ~4 s per process of pure telemetry overhead removed, on ~110 COM tasks.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
   (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to

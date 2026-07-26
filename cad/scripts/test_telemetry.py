@@ -298,6 +298,48 @@ def test_process_startup_ignores_a_missing_or_stale_stamp(capture, monkeypatch):
     assert not [s for s in spans.get_finished_spans() if s.name.startswith("proc.")]
 
 
+def test_otlp_export_is_batched_off_the_critical_path():
+    """OTLP export runs on a background thread, so a build subprocess never pays an
+    export on the COM seat; console + file capture stay SIMPLE (live console, and a
+    .jsonl that cannot lose a record to a queue). Flushing is what makes the batch
+    trade safe -- ``shutdown()`` covers both signals and runs on both exit paths."""
+    span_proc, log_proc = _telemetry._otlp_span_processor(), _telemetry._otlp_log_processor()
+    try:
+        assert type(span_proc).__name__ == "BatchSpanProcessor"
+        assert type(log_proc).__name__ == "BatchLogRecordProcessor"
+    finally:
+        for processor in (span_proc, log_proc):
+            if processor is not None:
+                processor.shutdown()
+
+    simple = [p for p in _telemetry._span_processors
+              if type(p).__name__ == "SimpleSpanProcessor"]
+    assert simple, "console/file capture must stay on Simple processors"
+
+
+def test_default_otlp_endpoint_is_a_literal_address_never_localhost(monkeypatch):
+    """Measured: the first OTLP POST to ``localhost`` cost 2.05 s vs 0.003 s to
+    ``127.0.0.1`` -- Windows tries ``::1`` first and the dashboard is IPv4, so every
+    process ate a failed connect (per process, holding the seat). Defaults are literal
+    addresses, IPv4 first, with the v6 loopback as a fallback so a v6-only dashboard
+    still exports."""
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    assert not any("localhost" in e for e in _telemetry._DEFAULT_OTLP_ENDPOINTS)
+
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: True)
+    assert _telemetry._resolve_otlp_endpoint() == "http://127.0.0.1:18890"
+
+    v6_only = lambda e, timeout=0.15: e.startswith("http://[::1]")  # noqa: E731
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", v6_only)
+    assert _telemetry._resolve_otlp_endpoint() == "http://[::1]:18890"
+
+    monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: False)
+    assert _telemetry._resolve_otlp_endpoint() is None, "nothing listening: export nowhere"
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
+    assert _telemetry._resolve_otlp_endpoint() == "http://collector:4318", "env wins"
+
+
 def test_event_records_span_event_on_current_span(capture):
     """``event()`` attaches a point-in-time event (with attrs) to the active span --
     the idiomatic home for a cache hit/miss or a mate flip, vs a standalone log."""

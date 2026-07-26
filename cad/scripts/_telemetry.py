@@ -47,16 +47,18 @@ from typing import IO, Any, cast
 
 from opentelemetry import context as otel_context
 from opentelemetry import trace
-from opentelemetry._logs import set_logger_provider
+from opentelemetry._logs import get_logger_provider, set_logger_provider
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import (
+    BatchLogRecordProcessor,
     ConsoleLogRecordExporter,
     SimpleLogRecordProcessor,
 )
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
     ConsoleSpanExporter,
     SimpleSpanProcessor,
 )
@@ -129,7 +131,17 @@ _service_name = _resolve_service_name()
 # image's OTLP/HTTP port) with zero env. So `doit ...` / a build script lights up
 # the dashboard's traces+logs the moment it's running -- no OTEL_* exports needed.
 # Override or disable with OTEL_EXPORTER_OTLP_ENDPOINT (set it empty to turn off).
-_DEFAULT_OTLP_ENDPOINT = "http://localhost:18890"
+#
+# By LITERAL ADDRESS, never the name "localhost". Measured on this seat: the first
+# OTLP POST to ``http://localhost:18890`` cost 2.05 s, and to
+# ``http://127.0.0.1:18890`` 0.003 s -- Windows resolves ``localhost`` to ``::1``
+# first, the dashboard listens on IPv4, so every process paid a ~2 s failed connect
+# before falling back (twice: once for spans, once for logs). That is per PROCESS,
+# and a build subprocess pays it holding the COM seat. IPv4 is tried first because
+# that is what the Aspire container publishes; the IPv6 loopback is kept as a
+# fallback so a v6-only dashboard still gets export rather than silence.
+_OTLP_PORT = 18890
+_DEFAULT_OTLP_ENDPOINTS = (f"http://127.0.0.1:{_OTLP_PORT}", f"http://[::1]:{_OTLP_PORT}")
 
 
 def _endpoint_listening(endpoint: str, timeout: float = 0.15) -> bool:
@@ -156,12 +168,14 @@ def _resolve_otlp_endpoint() -> str | None:
 
     Precedence: an explicit ``OTEL_EXPORTER_OTLP_ENDPOINT`` always wins (empty
     string disables export); otherwise fall back to the local Aspire dashboard
-    default, but only when it is actually listening.
+    default -- IPv4 loopback first, then IPv6 -- but only when it is actually
+    listening, and by literal address so no name resolution can stall the first
+    export (see :data:`_DEFAULT_OTLP_ENDPOINTS`).
     """
     env = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if env is not None:
         return env or None
-    return _DEFAULT_OTLP_ENDPOINT if _endpoint_listening(_DEFAULT_OTLP_ENDPOINT) else None
+    return next((e for e in _DEFAULT_OTLP_ENDPOINTS if _endpoint_listening(e)), None)
 
 _T0 = time.perf_counter()
 _LAST_TICK = _T0
@@ -294,6 +308,47 @@ class _LiveStderr:
             sys.stderr.flush()
 
 
+# --------------------------------------------------------------------------- #
+# OTLP export is BATCHED (console + .jsonl stay Simple).                       #
+#                                                                              #
+# Measured on this seat with the Aspire dashboard listening: the FIRST span     #
+# export in a process costs ~2.0 s and the first log record another ~2.0 s      #
+# (HTTP client construction, TLS/urllib3 import, connection setup); every       #
+# subsequent one costs ~1 ms. With OTLP disabled both are ~0 ms. Under a        #
+# SimpleSpanProcessor that ~4 s is paid ON the calling thread -- in a build     #
+# subprocess, while it HOLDS the COM seat, once per process. Across ~110 COM    #
+# tasks that is minutes of a full build spent inside a telemetry client.        #
+#                                                                              #
+# A Batch processor hands export to a background thread, so the cost leaves the #
+# critical path entirely. The trade is that queued records are lost if the      #
+# process dies without flushing -- covered on both exit paths we have:          #
+# ``_common.run_build`` calls :func:`shutdown` after the build session closes,  #
+# and the watchdog flushes before its ``os._exit``. Console and file capture    #
+# deliberately stay on Simple processors: the console must stay live and        #
+# ``traces.jsonl``/``logs.jsonl`` must never lose a record to a queue.          #
+# --------------------------------------------------------------------------- #
+
+
+def _otlp_span_processor():
+    """``BatchSpanProcessor`` around the OTLP span exporter, or ``None``."""
+    with contextlib.suppress(Exception):
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
+
+        return BatchSpanProcessor(OTLPSpanExporter())
+    return None
+
+
+def _otlp_log_processor():
+    """``BatchLogRecordProcessor`` around the OTLP log exporter, or ``None``."""
+    with contextlib.suppress(Exception):
+        from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+
+        return BatchLogRecordProcessor(OTLPLogExporter())
+    return None
+
+
 def configure(*, console: bool = True, force: bool = False) -> None:
     """Wire up the trace + log providers. Idempotent; safe to call from import.
 
@@ -370,16 +425,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
                     )
                 )
             )
-    # OTLP export to the resolved endpoint (Aspire dashboard by default, see
-    # _resolve_otlp_endpoint). SimpleSpanProcessor so short-lived build
-    # subprocesses flush each span on end without relying on an explicit shutdown.
     if otlp_endpoint:
-        with contextlib.suppress(Exception):
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-                OTLPSpanExporter,
-            )
-
-            _span_processors.append(SimpleSpanProcessor(OTLPSpanExporter()))
+        processor = _otlp_span_processor()
+        if processor is not None:
+            _span_processors.append(processor)
 
     tracer_provider = TracerProvider(resource=resource)
     for processor in _span_processors:
@@ -402,14 +451,9 @@ def configure(*, console: bool = True, force: bool = False) -> None:
                 )
             )
     if otlp_endpoint:
-        with contextlib.suppress(Exception):
-            from opentelemetry.exporter.otlp.proto.http._log_exporter import (
-                OTLPLogExporter,
-            )
-
-            logger_provider.add_log_record_processor(
-                SimpleLogRecordProcessor(OTLPLogExporter())
-            )
+        processor = _otlp_log_processor()
+        if processor is not None:
+            logger_provider.add_log_record_processor(processor)
     set_logger_provider(logger_provider)
 
     pylog = logging.getLogger(_LOGGER_NAME)
@@ -813,12 +857,20 @@ def run_pipeline_span(stage: str, /, **attributes: Any) -> Generator[Span, None,
 def shutdown() -> None:
     """Flush + close providers (force-flush exporters). Best-effort.
 
+    Covers BOTH signals: OTLP export is batched (see the block above
+    :func:`_otlp_span_processor`), so anything still queued -- spans AND log records
+    -- is only delivered because this runs. It is the reason the batch trade is safe:
+    ``_common.run_build`` calls this after the build session closes, and the watchdog
+    calls it before ``os._exit``.
+
     The auxiliary per-resource providers (build-infra) are deliberately NOT shut down:
     they hold the primary provider's processors, not their own, so this one call
     already closes every exporter -- and shutting them down too would just re-close
     each exporter and log "Exporter already shutdown" for every extra resource."""
     with contextlib.suppress(Exception):
         trace.get_tracer_provider().shutdown()  # type: ignore[attr-defined]
+    with contextlib.suppress(Exception):
+        get_logger_provider().shutdown()  # type: ignore[attr-defined]
 
 
 # Preconfigure on import: a script that merely ``import _telemetry`` (directly
