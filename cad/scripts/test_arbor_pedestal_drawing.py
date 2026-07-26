@@ -104,6 +104,8 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'label="far-face depth coordinate"' in source
     assert 'label="strap near-face profile"' in source
     assert 'label="coplanar far-face profile"' in source
+    assert "flank_rise = BORE_HEIGHT - FOOT_HEIGHT" in source
+    assert "flank_run = FOOT_WIDTH / 2.0 - TOP_RADIUS" in source
     common_source = Path(drawing.__file__).with_name("_drawing_common.py").read_text(
         encoding="utf-8"
     )

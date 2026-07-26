@@ -279,3 +279,10 @@ def test_assert_solved_False_skips_the_scan_entirely(_stub_com):
         [], creates=[FakeFeature("Distance32", (47, False))])
     _copy(adapter, assert_solved=False)
     assert adapter.currentModel._asm.copied == 1
+
+def test_distance_mate_lookup_is_traced() -> None:
+    source = Path(_cwm.__file__).read_text(encoding="utf-8")
+    assert (
+        '@_telemetry.traced("copy_with_mates.distance_mate_lookup", '
+        'label_param="name")\ndef _component_distance_mate(' in source
+    )

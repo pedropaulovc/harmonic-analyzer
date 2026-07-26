@@ -486,6 +486,7 @@ def component_mate_dump(adapter: Any, name: str) -> list[dict]:
     return out
 
 
+@_telemetry.traced("copy_with_mates.distance_mate_lookup", label_param="name")
 def _component_distance_mate(
     adapter: Any, name: str, distance_mm: float, *, tolerance_mm: float = 0.01,
 ) -> Any:

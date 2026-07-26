@@ -124,10 +124,12 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
             and abs(p1[0] + FOOT_WIDTH / 2.0) <= 0.01
         ):
             side_candidates.append((abs(p1[1] - p0[1]), edge))
+        flank_rise = BORE_HEIGHT - FOOT_HEIGHT
+        flank_run = FOOT_WIDTH / 2.0 - TOP_RADIUS
         if (
             min(p0[0], p1[0]) > 0.0
-            and abs(p1[1] - p0[1]) > 40.0
-            and abs(p1[0] - p0[0]) > 0.5
+            and abs(abs(p1[1] - p0[1]) - flank_rise) <= 0.01
+            and abs(abs(p1[0] - p0[0]) - flank_run) <= 0.01
         ):
             flank_candidates.append((abs(p1[1] - p0[1]), edge))
     if not foot_candidates:
@@ -143,7 +145,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
     if not flank_candidates:
         raise RuntimeError("front view has no right taper-flank edge")
     flank_span, flank_edge = max(flank_candidates, key=lambda item: item[0])
-    if flank_span < 40.0:
+    if flank_span < BORE_HEIGHT - FOOT_HEIGHT - 0.01:
         raise RuntimeError(f"right taper-flank span is only {flank_span:.3f} mm")
     if not bore_candidates:
         raise RuntimeError("front view has no circular model edges")

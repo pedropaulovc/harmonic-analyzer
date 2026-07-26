@@ -199,7 +199,7 @@ sections:
         - legacy
         - med
       - - Crankshaft bearing journal
-        - 'Ø11.388 × 72.412 mm; local stations 26.623905572..99.035905572 (world z −148.376094428..−75.964094428)'
+        - 'Ø11.388 × 72.0344 mm; local stations 32.755105572..104.789505572 (world z −142.244894428..−70.210494428)'
         - —
         - 'derived from the manually rederived `cone-pivot-post-v2` Ø11.438 crank bore with 0.05 mm diametral running clearance; integral with the Ø9.525 shaft, whose world origin remains z −175'
         - derived

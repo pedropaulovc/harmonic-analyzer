@@ -1,7 +1,7 @@
 r"""Reproduction script: crankshaft (book ch. 11, pp. 12-15).
 
 Stepped steel shaft in the green v2 post bearing at the base corner:
-an integral Ø11.388 journal runs over local stations 26.623905572..99.035905572,
+an integral Ø11.388 journal runs over local stations 32.755105572..104.789505572,
 while the crank arm on the outboard end (affixed by a removable tapered
 pin so the crankshaft gear can be changed), chain sprocket and the 4:1
 drive pinion retain their existing 3/8-in seats. Modeled with the

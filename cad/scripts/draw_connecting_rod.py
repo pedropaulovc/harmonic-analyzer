@@ -199,6 +199,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(bore_left[0] - 0.020, bore_left[1]),
         datum="A",
         label="strap bore axis",
+        position_tolerance_m=0.000005,
     )
     # Datum B: the shank's left flank.  A alone leaves rotation about the bore
     # axis unconstrained, so the pin-hole position (and the 147.67 direction)
