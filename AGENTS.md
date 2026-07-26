@@ -568,36 +568,38 @@ scripts that `from _common import log, check` are instrumented unchanged.
   providers, resetting OTel's one-shot provider guard, since the resource is fixed
   at provider creation). Add a new stage to `_stage_name` when a new task family
   appears.
-- **Cache decisions live on the task trace.** The remote-cache restore/store run
-  INSIDE the `task part:`/`assembly:` span `dodo` opens (the cached actions open it
-  themselves, not `_run`), so a HIT/MISS/STORE is a `cache.*` **span event** + a
-  `cache` span attribute — a miss (and the build it triggered) is backtraceable from
-  ONE trace, and a HIT still shows a fast task span instead of the task vanishing. A
+- **A COM task is a CHAIN of top-level spans, one per phase — never one span that
+  swallows the lot.** A cached part/assembly/drawing task emits, all as siblings:
+  `cache.probe <label>` (the remote-cache restore attempt — on a HIT this IS the
+  task, an Azure download, so the task never vanishes from the trace),
+  `com.seat.wait <label>` (blocking on the COM seat), `task <label>` (the work,
+  starting once the seat is HELD) and `cache.store <label>` (the publish). Each
+  phase is then timed for what it is: the `task` span can no longer absorb queueing
+  or network transfer, so "how long does this part take to build?" is finally
+  answerable from `traces.jsonl` — which is what the watchdog calibration and every
+  perf audit read. Without the split, the same part read 40 s on an idle seat and
+  20 min behind a cold assembly build.
+    - `_com_seat` opens the wait span and hands the caller the seconds blocked; the
+      `task` span carries them as `seat_wait_s` (`_tag_seat_wait`), so the queue is
+      answerable from the task span alone. On release — the `task` span having
+      already closed — the seat's TOTAL elapsed time goes to a **log** record with
+      `wait_s`/`held_s`/`elapsed_s` fields, not a span event.
+    - **Do not nest these.** Putting the wait inside the task span is what this
+      replaced, and so is the interim fix that moved the task span's start forward
+      to elide the wait: mutating a live span's start is not a spec'd operation
+      (start time is recorded at CREATION; only a creation-time `start_time` may
+      back-date it), and it left the pre-wait cache events dangling before their own
+      span's start. Sibling spans need no timestamp surgery.
+    - Cost, accepted: sibling ROOT spans are separate traces (a root has no parent,
+      so "sibling" and "one trace" cannot both hold). Correlate by the `label`
+      attribute every phase span carries.
+- **Cache decisions stay on the phase spans.** A HIT/MISS/STORE is a `cache.*` **span
+  event** + a `cache` attribute on the phase span that made the decision (`hit`/`miss`
+  on `cache.probe`, `hit-after-wait`/`miss` on `task`), so a miss and the build it
+  triggered are backtraceable from the signals, not just the console. A
   miss/drift/soft-error is a `warn` (`!!`), not routine `info` — it is the signal for
   "why did this rebuild?". (`_artifact_cache.py`; still also appended to
   `cache.jsonl`.)
-- **A task span times WORK, not queueing.** Blocking on the COM seat is not work, so
-  `_com_seat` **discounts its wait from the enclosing `task <label>` span** — without
-  it the same part reads 40 s on an idle seat and 20 min behind a cold assembly build,
-  and every cross-run duration comparison (including the watchdog calibration read off
-  `traces.jsonl`) measures contention instead of the task. A span can't be paused, so
-  `_telemetry.discount_duration(seconds)` moves its START forward by the elided
-  interval and accumulates the amount as `harmonic.discounted_s` (true wall-clock =
-  duration + discounted). Nothing is lost: the wait is a `!!` log per poll, a
-  `seat_wait_s` span attribute, and a **`com.seat` span event carrying the seat's
-  TOTAL elapsed time** (`wait_s`/`held_s`/`elapsed_s`) — which replaced the old
-  point-in-time `com.seat.acquired` event. **Where this sits vs the OTel spec:** an
-  event timestamped before its span's start is explicitly anticipated and needs no
-  normalization (`trace/api.md`), so the pre-wait cache events are fine; but the
-  start timestamp is spec'd as recorded at CREATION (only a creation-time
-  `start_time` argument may back-date it — there is no `UpdateStartTime`), so
-  writing `_start_time` on a live span is a deliberate contract deviation, safe
-  against the pinned SDK (`Span.end()` snapshots it at end, no ordering check) and
-  self-degrading to a no-op if that private field moves. The semantic divergence is
-  the one to remember: a discounted span no longer reports "elapsed real time", so
-  anything summing durations for wall-clock occupancy must add `harmonic.discounted_s`
-  back. Use `discount_duration` for a genuine wait on a shared resource; do NOT use
-  it to hide slow work.
 - **Cross-process trace continuity.** `dodo._exec` (the span-less core `_run` and
   the cached part/assembly actions both call) injects W3C trace context
   (`TRACEPARENT`) into each subprocess env via `_telemetry.inject_env`; the build

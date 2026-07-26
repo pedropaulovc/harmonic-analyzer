@@ -482,8 +482,10 @@ def test_com_seat_acquires_sets_env_and_releases(tmp_path, monkeypatch):
     assert "HARMONIC_COM_SEAT" not in os.environ
 
 
-def test_com_seat_wait_logs_without_opening_a_span(tmp_path, monkeypatch):
-    """A busy-seat poll stays visible in logs without adding a noisy wait span."""
+def test_com_seat_wait_gets_its_own_top_level_span(tmp_path, monkeypatch):
+    """A busy-seat poll is BOTH a log per poll and its own ``com.seat.wait <label>``
+    span. That span is top-level and ends at acquisition, so the caller's ``task``
+    span is its SIBLING, timing the work alone -- the wait can never inflate it."""
     monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))
     dodo = _load_dodo()
     acquire = dodo._COM_LOCK.acquire
@@ -496,16 +498,27 @@ def test_com_seat_wait_logs_without_opening_a_span(tmp_path, monkeypatch):
             raise dodo.Timeout(str(dodo._COM_LOCK_PATH))
         return acquire(*args, **kwargs)
 
-    def reject_span(*args, **kwargs):
-        raise AssertionError("_com_seat must not open a telemetry span while waiting")
+    spans: list[tuple[str, dict]] = []
+    warnings: list[str] = []
 
-    warnings = []
+    @contextlib.contextmanager
+    def record_span(name, **attrs):
+        entry = (name, dict(attrs))
+        spans.append(entry)
+
+        class _Span:
+            def set_attribute(self, key, value):
+                entry[1][key] = value
+
+        yield _Span()
+        assert dodo._COM_LOCK.is_locked, "the wait span must close once the seat is held"
+
     monkeypatch.setattr(dodo._COM_LOCK, "acquire", acquire_after_one_timeout)
-    monkeypatch.setattr(dodo._telemetry, "span", reject_span)
+    monkeypatch.setattr(dodo._telemetry, "span", record_span)
     monkeypatch.setattr(dodo._telemetry, "warn", warnings.append)
 
     with dodo._com_seat("part:x"):
-        pass
+        assert spans == [("com.seat.wait part:x", {"label": "part:x", "polls": 1})],             "the wait must be timed by its own span, opened before the seat is held"
 
     assert attempts == 2
     assert warnings == ["[com.seat] part:x waiting for the SolidWorks seat"]
@@ -524,33 +537,93 @@ class _FakeClock:
         return getattr(time, name)
 
 
-def test_com_seat_discounts_its_wait_and_records_total_elapsed(tmp_path, monkeypatch):
-    """Blocking on the seat is QUEUEING, not work: the wait is discounted from the
-    enclosing ``task <label>`` span so its duration measures the build, not the
-    machine's contention. The wait is not lost -- it lands as a ``seat_wait_s``
-    attribute plus a ``com.seat`` event carrying the seat's TOTAL elapsed time
-    (wait + held), which replaced the old point-in-time ``com.seat.acquired``."""
+def test_com_seat_hands_back_its_wait_and_logs_total_elapsed(tmp_path, monkeypatch):
+    """The wait is yielded so the sibling ``task`` span can carry it as
+    ``seat_wait_s``, and release logs the seat's TOTAL elapsed time (wait + held) --
+    which is where the retired ``com.seat`` span event went, the task span having
+    already closed by then."""
     monkeypatch.setenv("HARMONIC_COM_LOCK", str(tmp_path / "seat.lock"))
     dodo = _load_dodo()
     # entered=100.0, acquired=145.0 (45 s blocked), released=150.5 (5.5 s held).
     monkeypatch.setattr(dodo, "time", _FakeClock(100.0, 145.0, 150.5))
 
-    discounted: list[float] = []
-    attributes: dict[str, object] = {}
-    events: list[tuple[str, dict]] = []
-    monkeypatch.setattr(dodo._telemetry, "discount_duration", discounted.append)
-    monkeypatch.setattr(dodo._telemetry, "set_attribute",
-                        lambda key, value: attributes.__setitem__(key, value))
-    monkeypatch.setattr(dodo._telemetry, "event",
-                        lambda name, **attrs: events.append((name, attrs)))
+    infos: list[tuple[str, dict]] = []
+    monkeypatch.setattr(dodo._telemetry, "info",
+                        lambda message, **fields: infos.append((message, fields)))
 
-    with dodo._com_seat("part:x"):
-        assert discounted == [45.0], "the seat wait must leave the task span duration"
-        assert attributes == {"seat_wait_s": 45.0}
-        assert not events, "the seat event reports the TOTAL, so it lands on release"
+    with dodo._com_seat("part:x") as waited:
+        assert waited == 45.0
+        assert not infos, "the total is only known at release"
 
-    assert events == [("com.seat", {"label": "part:x", "wait_s": 45.0,
-                                    "held_s": 5.5, "elapsed_s": 50.5})]
+    (message, fields) = infos[-1]
+    assert message == ("[com.seat] part:x released after 50.5s total "
+                       "(waited 45.0s, held 5.5s)")
+    assert fields == {"wait_s": 45.0, "held_s": 5.5, "elapsed_s": 50.5}
+
+
+def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
+    """A cached COM task is FOUR top-level spans, never nested: the cache probe (the
+    Azure restore attempt), the seat wait, the task itself (starting once the seat is
+    held), and the publish. Each phase is then timed for what it is -- crucially the
+    ``task`` span cannot absorb the queueing or the network transfers."""
+    dodo = _load_dodo()
+    script = tmp_path / "build_pen_rod.py"
+    script.write_text("", encoding="utf-8")
+    outcomes = iter((False, False))  # probe MISS, re-probe under the seat MISS
+
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
+    monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
+    monkeypatch.setattr(dodo._cache, "store", lambda *_a: None)
+    monkeypatch.setattr(dodo, "_stamp_part_execution", lambda _stem: None)
+    monkeypatch.setattr(dodo, "_exec", lambda *_a, **_kw: None)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(45.0))
+
+    opened: list[str] = []
+    depth = 0
+
+    @contextlib.contextmanager
+    def record_span(name, **_attrs):
+        nonlocal depth
+        opened.append(name)
+        assert depth == 0, f"{name} must be top-level, not nested under a phase span"
+        depth += 1
+
+        class _Span:
+            def set_attribute(self, key, value):
+                pass
+
+        try:
+            yield _Span()
+        finally:
+            depth -= 1
+
+    monkeypatch.setattr(dodo._telemetry, "span", record_span)
+
+    dodo._cached_part_action("pen_rod", script)
+
+    assert opened == ["cache.probe part:pen_rod", "task part:pen_rod",
+                      "cache.store part:pen_rod"]  # the seat wait span is _com_seat's
+
+
+def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():
+    """``check:*`` gates take no seat (``_run`` yields None from nullcontext), so the
+    task span must not grow a meaningless ``seat_wait_s=0``."""
+    dodo = _load_dodo()
+
+    class _Span:
+        def __init__(self):
+            self.attrs = {}
+
+        def set_attribute(self, key, value):
+            self.attrs[key] = value
+
+    com, gate = _Span(), _Span()
+    dodo._tag_seat_wait(com, 45.004)
+    dodo._tag_seat_wait(gate, None)
+    assert com.attrs == {"seat_wait_s": 45.0}
+    assert gate.attrs == {}
 
 
 def test_com_seat_is_reentrant_within_a_process(tmp_path, monkeypatch):
