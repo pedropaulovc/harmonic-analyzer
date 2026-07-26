@@ -30,6 +30,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     )
 
 
+def test_tall_views_stay_below_the_sheet_zone_border() -> None:
+    assert drawing.SIDE_CENTER == (0.190, 0.190)
+    assert drawing.ISO_CENTER == (0.315, 0.175)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.105)' in source
+
+
 def test_catalog_is_the_single_source_of_the_thread() -> None:
     catalog = fastener("slotted-screw")
     assert spec.THREAD == catalog.thread
