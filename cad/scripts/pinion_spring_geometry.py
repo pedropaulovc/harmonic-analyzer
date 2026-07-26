@@ -23,7 +23,10 @@ BLADE_TILT_DEG = 49.86395995847213
 # local pivot onto the live strap pivot.  These are not machine coordinates.
 PIVOT_LX = -7.88
 PIVOT_LY = 12.0
-AXIS_OFFSET = 10.1
+# Signed from the strap centreline along _N. The drum-side support puts the
+# lift/cam on the pinion flank, so the return leaf occupies the opposite flank
+# and resists the engage swing without crossing the cam rod.
+AXIS_OFFSET = -10.1
 KINK_T = 32.0
 FOOT_Y = 0.8
 HOLE_SPEC = HoleSpec("clearance", "#4")

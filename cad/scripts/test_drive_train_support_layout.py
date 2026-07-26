@@ -1,0 +1,40 @@
+"""Offline invariants for the drum-side alignment-pinion support closure."""
+
+from __future__ import annotations
+
+import math
+
+import build_drive_train_assembly as drive
+
+
+def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
+    assert drive.APINION_Y == drive.Y_DRIVE
+    assert math.isclose(
+        drive.APINION_X - drive.X_DRUM,
+        drive.TIP_DRUM120 + drive.TIP_APINION + drive.APINION_GAP,
+        abs_tol=1e-9,
+    )
+    assert drive.APINION_GAP == 2.0
+
+
+def test_complete_support_rig_is_on_the_cylinder_side() -> None:
+    assert drive.X_DRUM < drive.PIVOT_X < drive.LIFT_X < drive.APINION_X
+    assert drive.BLOCK_X < drive.APINION_X
+    assert drive.LEVER_TILT_DEG < 0.0
+    assert drive.HANDLE_TILT_DEG < 0.0
+
+
+def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
+    assert math.isclose(drive._PARK_GAP, 0.15, abs_tol=1e-9)
+    cam_authority = (drive.FPIN_DIA + drive.CAM_OD) / 2.0 - drive._D_ENG
+    assert cam_authority >= 0.25
+    assert drive.LIFT_Y - drive._CAM_SWEEP_R - drive.Y_BASE_TOP >= 0.25
+    assert drive._SPRING_Z_MIN - drive._LAST_CYLINDER_Z_MAX >= 0.25
+    assert drive._FPIN_TIP_S - drive._S_CAM >= 2.0
+
+
+def test_base_holes_follow_the_rederived_support() -> None:
+    for derived, base in zip(drive._BLOCK_SCREW_XZ, drive.BASE_BLOCK_XZ, strict=True):
+        assert math.dist(derived, base) < 1e-9
+    for derived, base in zip(drive._FOOT_SCREW_XZ, drive.BASE_FOOT_XZ, strict=True):
+        assert math.dist(derived, base) < 1e-9

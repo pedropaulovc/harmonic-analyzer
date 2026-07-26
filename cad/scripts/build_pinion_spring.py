@@ -2,10 +2,10 @@ r"""Reproduction script: pinion return spring (book ch. 25; 1 used).
 
 The brass leaf spring that keeps the alignment-pinion drum disengaged by
 default (p. 68-69 close-ups; video frames v4_pinion_013/018/019): a bent
-strip whose foot lies flat on the base east of the BACK swing strap and
-whose blade rises parallel to the parked strap, bearing on its east flank.
-Engaging the drum swings the strap east into the blade and flexes it
-further, so the leaf always pushes the swing back west to the disengaged
+strip whose foot lies flat on the base outside the BACK swing strap and
+whose blade rises parallel on the flank opposite the cam. Engaging the drum
+swings the strap into the blade and flexes it further, so the leaf pushes it
+back to the disengaged
 rest. PR7 (review item 10, page002_img01): the free end is NOT a curl --
 near the top the strip takes a SUBTLE BEND BACK toward the L's base (a
 small-radius kink turning ~20 deg west) and continues as a short flat.
