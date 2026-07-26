@@ -125,7 +125,9 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
         ):
             side_candidates.append((abs(p1[1] - p0[1]), edge))
         flank_rise = BORE_HEIGHT - FOOT_HEIGHT
-        flank_run = FOOT_WIDTH / 2.0 - TOP_RADIUS
+        flank_run = (
+            (FOOT_WIDTH / 2.0 - TOP_RADIUS) * flank_rise / BORE_HEIGHT
+        )
         if (
             min(p0[0], p1[0]) > 0.0
             and abs(abs(p1[1] - p0[1]) - flank_rise) <= 0.01

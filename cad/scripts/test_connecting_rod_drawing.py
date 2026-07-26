@@ -45,6 +45,8 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 2)" in source  # the isometric override
+    assert drawing.LEFT_CENTER == (0.080, 0.171)
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)' in source
     assert connecting_rod_notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
