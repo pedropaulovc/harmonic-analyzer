@@ -20,7 +20,7 @@ the lock knob washer at the south-west). A O6.5 pivot hole takes the
 slotted pivot screw (clearance over its O6.35 shoulder -- the plate
 rotates ON the screw).
 
-The 266 mm envelope and paired 1/4-20 post mounts are the direct platform
+The shortened envelope and paired 1/4-20 post mounts are the direct platform
 cascade from ``cone-pivot-post-v2.SLDPRT``.  Its 42.011 mm casting foot is
 centred at cone station -39.9014; the post's world-X hole pair is transformed
 into this plate's engaged local frame so the two native tapped holes remain
@@ -88,7 +88,7 @@ PART_NAME = "cone-swing-platform"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel plate (p.18 dark wedge)
 
 PLATE_T = PLATE_THICKNESS  # 1/4" plate
-HALF_WIDTH_N = 12.0  # north (pivot/tip) half-width, EAST side (the lock-slot
+HALF_WIDTH_N = 16.0  # north (pivot/tip) half-width, EAST side (the lock-slot
 # region keeps its full seat)
 WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
 # pedestal otherwise clips the flared edge; 8.0 leaves 0.37 mm exact plan
@@ -96,8 +96,6 @@ WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
 EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
 WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
 # the pivot -> lock-knob line solid plate (covers the notch seat + washer)
-PLATE_LEN = 266.0  # extended south for the v2 post at station -39.9014;
-# its Ø42.011 foot retains at least 1.93 mm of plate (guarded below)
 NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
 # Clearance over the O6.35 pivot-screw shoulder: the plate swings ON the screw
 # (build_cone_pivot_screw). 1/4 clearance CLOSE fit (Ø6.756, the wizard twin of
@@ -118,9 +116,12 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 # are a world-X pair at +/-13.44352 mm.  Undoing the engaged Ry(+INCLINE)
 # placement gives this skewed pair in the platform's local (x, z) frame.
 POST_STATION = -39.90136099793
-PIVOT_STATION = 196.0
+PIVOT_STATION = 152.27232594770453
 POST_MAIN_DIA = 42.011
 POST_LOCAL_Z = POST_STATION - PIVOT_STATION
+POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim
+PLATE_SOUTH_Z = POST_LOCAL_Z - POST_MAIN_DIA / 2.0 - POST_SOUTH_MARGIN
+PLATE_LEN = NORTH_OVERHANG - PLATE_SOUTH_Z
 POST_MOUNT_HALF_PITCH = 13.44352
 POST_MOUNT_X = POST_MOUNT_HALF_PITCH * _COS_I
 POST_MOUNT_DZ = POST_MOUNT_HALF_PITCH * _SIN_I
@@ -168,7 +169,7 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 # at the engaged pose -- every west-side feature below (the flare, the lock
 # notch) is authored at local +x, east-side features at local -x.
 SLOT_W = 8.0  # notch width: O6.35 stud + chord-vs-arc slack (see above)
-SLOT_E_X, SLOT_E_Z = 27.5, -190.1  # engaged stud centre (part-local frame).
+SLOT_E_X, SLOT_E_Z = 27.5, -175.0  # engaged stud centre (part-local frame).
 # An exact rotating-solid sweep against T114 proves this 3 mm outward move
 # clears the cone gear through a full tooth pitch while retaining the notch
 # seat on the west flare.
@@ -236,7 +237,7 @@ def _corner_fillet_area(label: str, r: float) -> float:
 # sits EAST of the pivot. This part-local separation is invariant under the
 # v2 installation translation and is asserted against the live cone geometry
 # in the assembly.
-CRANK_AXIS_OFF = 51.1316439009
+CRANK_AXIS_OFF = 41.6536661190548
 CRANK_AXIS_Y = 79.05  # Y_CRANK 129.85 - Y_BASE_TOP 50.8 (above plate BOTTOM)
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan
 # point (the foot of the pivot's perpendicular onto the axis line), built
@@ -411,7 +412,12 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "LockNotch")
     v_slot = NOTCH_EXIT_TRAVEL * SLOT_W * PLATE_T
-    volume = await volume_check(adapter, "lock notch", volume - v_slot, 0.01 * v_slot)
+    # The moved notch exits almost tangent to the east taper; SolidWorks' tiny
+    # open-edge cut carries about 0.4 mm^3 of B-rep tessellation noise, larger
+    # than one percent of this unusually small 6.3 mm^3 removal.
+    volume = await volume_check(
+        adapter, "lock notch", volume - v_slot, max(0.01 * v_slot, 0.5)
+    )
 
     # Closed-end cap at the engaged seat (the mouth end is open -- no W cap).
     v_cap = math.pi * (SLOT_W / 2.0) ** 2 / 2.0 * PLATE_T

@@ -29,7 +29,7 @@ gear faces (stations below quoted from the legacy pivot end):
 * 3/8 in x 141.9 -- 64T at stations 14.9..24.9 + seats T120..T024
 * 1/4 in x 148.8 -- T018 seat
 * 1/8 in x 155.7 -- T012 seat
-* 1/32 in x 190.0 -- T006 seat + thin tip reaching the adjuster cup.
+* 1/32 in x 146.2723 -- shortened T006 tip journal reaching the adjuster cup.
   WARNING: a 0.79 mm x ~34 mm steel tip journal is mechanically
   marginal (it follows from the 62.2 OD anchor, low confidence) --
   flagged for Phase 3 rebuild validation; a real builder would more

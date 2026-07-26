@@ -2,8 +2,8 @@ r"""Reproduction script: harmonic analyzer base (book ch. 6 / legacy part).
 
 Two-plate welded construction based on the legacy 18.0 x 11.0 x 0.5 in
 flange and 17.5 x 10.5 x 1.5 in pad. The v2 post/carrier fit preserves their
-front edges and extends both plates 35.415 mm rearward for its swing envelope;
-the rocker support and frame columns retain their original locations.
+both plates remain on the legacy centred footprint; the v2 post/carrier fit is
+handled by the mechanism installation contracts.
 
 Deferred: the legacy 0.125"/0.0625" edge fillets are cosmetic and need
 edge-selection tooling — re-added with the M4 finishing pass.
@@ -11,8 +11,7 @@ edge-selection tooling — re-added with the M4 finishing pass.
 Dimensions: cad/DIMENSIONS.md "Chapter 6" — annotated (high) footprint,
 legacy thicknesses (photo-verify note).
 
-Layout: plates stay centred in X but are recentered +17.7075 in machine Z by
-the rear-only extension.  Top-plane sketches map sketch x,y -> global X,-Z and
+Layout: plates are centred in X and Z. Top-plane sketches map sketch x,y -> global X,-Z and
 stack along +Y. Top plate boss starts at the bottom plate's upper face via
 extrude_at_offset (raw-COM stopgap until MCP Phase 3).
 
@@ -108,14 +107,14 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 # frame and these holes matched its NEGATED x -- the sign was interference-
 # gate proven: holes at the wrong x left both screws in solid base, 190.0 +
 # 75.4 mm^3, exactly the two embedded shank volumes.)
-_FORMER_PIVOT_SCREW_XZ = (-79.6886620349, 103.292512276)
+_FORMER_PIVOT_SCREW_XZ = (-89.16663981674521, 60.60437088764276)
 PIVOT_SCREW_XZ = (
     _FORMER_PIVOT_SCREW_XZ[0] + POST_X_SHIFT,
     _FORMER_PIVOT_SCREW_XZ[1] + POST_Z_SHIFT,
 )
 # pivot seat: blind #10-24 UNC-2B tap.  The screw's ground shoulder stops on
 # the base top; only its distinct threaded tail enters this seat.
-_FORMER_STOP_SCREW_XZ = (-127.16504133403544, 7.882755974036954)
+_FORMER_STOP_SCREW_XZ = (-141.14905420183916, -33.08089452405298)
 STOP_SCREW_XZ = (
     _FORMER_STOP_SCREW_XZ[0] + POST_X_SHIFT,
     _FORMER_STOP_SCREW_XZ[1] + POST_Z_SHIFT,
@@ -205,7 +204,7 @@ async def _volume(adapter) -> float:
     return res.data.volume if res.is_success and res.data else float("nan")
 
 
-async def _define_rear_extended_rectangle(
+async def _define_fixed_edge_rectangle(
     adapter,
     *,
     half_x: float,
@@ -223,8 +222,8 @@ async def _define_rear_extended_rectangle(
     """Fully define an X-centred rectangle with fixed front/rear Z edges.
 
     A Top-plane sketch's second coordinate is machine ``-Z``.  Anchoring the
-    rear-west corner and driving the full depth keeps the photographed front
-    edge stationary while the v2 delta grows only the rear edge.
+    rear-west corner and driving the full depth keeps the plate footprint
+    explicitly tied to the shared width contract.
     """
     points = [
         (-half_x, -rear_z),
@@ -257,11 +256,9 @@ async def build(adapter) -> dict[str, str]:
     # even though nothing in drive_jobs drives them.
     await set_global(adapter, "BottomLength", f"{BOTTOM_LENGTH}mm")
     await set_global(adapter, "BottomWidth", f"{BOTTOM_WIDTH}mm")
-    await set_global(adapter, "BottomRearLimit", f"{BOTTOM_REAR_Z}mm")
     await set_global(adapter, "BottomThickness", f"{BOTTOM_THICKNESS}mm")
     await set_global(adapter, "TopLength", f"{TOP_LENGTH}mm")
     await set_global(adapter, "TopWidth", f"{TOP_WIDTH}mm")
-    await set_global(adapter, "TopRearLimit", f"{TOP_REAR_Z}mm")
     await set_global(adapter, "TopThickness", f"{TOP_THICKNESS}mm")
     for i, (x, z) in enumerate(HOLE_XZ):
         await set_global(adapter, f"Hole{i}X", f"{x}mm")
@@ -273,14 +270,14 @@ async def build(adapter) -> dict[str, str]:
     # target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Bottom plate: X-centred; front edge unchanged, rear edge extended.
+    # Bottom plate: centred on the origin.
     bottom = SketchDims()
     check("create_sketch bottom", await adapter.create_sketch("Top"))
-    await _define_rear_extended_rectangle(
+    await _define_fixed_edge_rectangle(
         adapter,
         half_x=BOTTOM_LENGTH / 2.0,
-        front_z=BOTTOM_FRONT_Z,
-        rear_z=BOTTOM_REAR_Z,
+        front_z=-BOTTOM_WIDTH / 2.0,
+        rear_z=BOTTOM_WIDTH / 2.0,
         label="bottom plate",
         dims=bottom,
         width_name="BottomLen",
@@ -288,7 +285,7 @@ async def build(adapter) -> dict[str, str]:
         width_drive='"BottomLength"',
         depth_drive='"BottomWidth"',
         half_x_drive='"BottomLength" / 2',
-        rear_z_drive='"BottomRearLimit"',
+        rear_z_drive='"BottomWidth" / 2',
     )
     await ensure_fully_defined(adapter, "bottom plate sketch")
     check("exit_sketch bottom", await adapter.exit_sketch())
@@ -300,16 +297,14 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "BottomPlate")
     _telemetry.info(f"volume after bottom plate: {await _volume(adapter):.1f} mm^3")
-    # The rear-only extension is included in BOTTOM_WIDTH.
-
-    # Top plate shares the same rear-only extension and starts on the flange.
+    # Top plate shares the centred legacy footprint and starts on the flange.
     top = SketchDims()
     check("create_sketch top", await adapter.create_sketch("Top"))
-    await _define_rear_extended_rectangle(
+    await _define_fixed_edge_rectangle(
         adapter,
         half_x=TOP_LENGTH / 2.0,
-        front_z=TOP_FRONT_Z,
-        rear_z=TOP_REAR_Z,
+        front_z=-TOP_WIDTH / 2.0,
+        rear_z=TOP_WIDTH / 2.0,
         label="top plate",
         dims=top,
         width_name="TopLen",
@@ -317,7 +312,7 @@ async def build(adapter) -> dict[str, str]:
         width_drive='"TopLength"',
         depth_drive='"TopWidth"',
         half_x_drive='"TopLength" / 2',
-        rear_z_drive='"TopRearLimit"',
+        rear_z_drive='"TopWidth" / 2',
     )
     await ensure_fully_defined(adapter, "top plate sketch")
     check("exit_sketch top", await adapter.exit_sketch())
@@ -326,7 +321,6 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     name_last_feature(adapter, "TopPlate")
     _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
-    # The rear-only extension is included in TOP_WIDTH.
 
     # M6.10 fastener holes + lag-head recesses: ONE native Hole Wizard
     # counterbored 9/16 FILLISTER feature (4 placement points) drilled from
@@ -424,7 +418,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "base length (annotated 46 cm / 18 in)", "x", BOTTOM_LENGTH
     )
     await bbox_extent_check(
-        adapter, "base depth (rear-extended from the 28 cm plate)", "z", BOTTOM_WIDTH
+        adapter, "base depth (28 cm plate)", "z", BOTTOM_WIDTH
     )
 
     await report_mass_properties(adapter)

@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
+import pytest
+
 import build_cone_swing_platform as part
 import cone_swing_platform_spec
 import draw_cone_swing_platform as drawing
@@ -39,9 +41,9 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "LOCK NOTCH" in notes
     assert "PIVOT HOLE SIZE PER PLAN-VIEW CALLOUT" in notes
     assert "AXIS PERPENDICULARITY TO A: SEE FCF" in notes
-    assert "27.50 +/-0.10 WEST AND 190.10 +/-0.10 SOUTH" in notes
+    assert "27.50 +/-0.10 WEST AND 175.00 +/-0.10 SOUTH" in notes
     assert "2X 1/4-20 UNC-2B THRU" in notes
-    assert "235.901 +/-0.10 SOUTH OF PIVOT" in notes
+    assert "192.174 +/-0.10 SOUTH OF PIVOT" in notes
     assert "26.887" in notes
     assert "12.5182 +/-0.10 DEG NORTH OF WEST" in notes
     assert "8.23 +/-0.10 DEG NORTH" in notes
@@ -107,13 +109,15 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
 
 
 def test_v2_post_foot_and_mount_pattern_cascade() -> None:
-    assert part.PLATE_LEN == 266.0
+    assert part.PLATE_LEN == pytest.approx(223.3541869456341)
+    assert part.POST_SOUTH_MARGIN == pytest.approx(3.175)
+    assert part.PLATE_SOUTH_Z == pytest.approx(-216.3541869456341)
     assert part.WEST_HALF_N == 8.0
     assert part.EAST_HALF_S == 24.0
     assert part.SLOT_E_X == 27.5
     assert part.POST_STATION == -39.90136099793
-    assert part.PIVOT_STATION == 196.0
-    assert math.isclose(part.POST_LOCAL_Z, -235.90136099793, abs_tol=1e-12)
+    assert part.PIVOT_STATION == 152.27232594770453
+    assert math.isclose(part.POST_LOCAL_Z, -192.17368694563453, abs_tol=1e-12)
     assert part.POST_MAIN_DIA == 42.011
     assert part.POST_FOOT_CONTAINMENT >= 0.25
 
