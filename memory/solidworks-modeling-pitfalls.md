@@ -275,13 +275,14 @@ discovered during harmonic-analyzer M6.4:
   `Save()`. General rule: [[sw-assembly-mate-diagnostics-api]].
   → `ret=True, err=0, warn=0`, mtime advances, the change persists on reopen — no
   dialog, no watchdog, ~0.4 s. The modal only appears with parameterless `Save()`
-  AND dirty *referenced* docs; `SaveReferenced (8)` saves those silently too, and
+  AND dirty *referenced* docs; `SaveReferenced` (**4**, NOT 8 -- 8 is
+  `AvoidRebuildOnSave`; confirmed against swSaveAsOptions_e) saves those too, and
   for an assembly-only change (config + mate suppression) the part docs stay clean
-  so even plain `Silent` writes. Proven by `cad/scripts/repro_inplace_save.py`
+  so even plain `Silent` writes. Proven by `cad/scripts/diagnostics/repro_inplace_save.py`
   (open from disk → add config → `Save3` on a copy, real file untouched). Canonical
   per SW docs/forums (CodeStack "save all silently"; SW "Rename Components and Save
   Assembly" notes a bare save errors "without first saving its references" → why
-  the 8 flag). Still gate on `model.GetSaveFlag()` (True = dirty) to skip a clean
+  the SaveReferenced flag). Still gate on `model.GetSaveFlag()` (True = dirty) to skip a clean
   idempotent re-save. `_click_save_all.ps1` + the watchdog are DELETED.
 - **Config-scoped mate suppression** (`SuppressMateParameters(configuration=...)`
   → `SetSuppression2(action, swSpecifyConfiguration=3, [cfg])`): a derived config

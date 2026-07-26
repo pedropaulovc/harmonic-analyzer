@@ -19,7 +19,7 @@ passes ``None, None``, which fails the COM call and falls through to the blockin
 It works on a COPY so the real drive-train.SLDASM stays pristine, and tries the
 candidate save calls in order, logging mtime + GetSaveFlag + error/warning codes.
 
-    uv run python cad\scripts\repro_inplace_save.py
+    uv run python cad\scripts\diagnostics\repro_inplace_save.py
 
 LATE-BOUND PROBE: this script drives SolidWorks through its own
 ``GetObject``/``Dispatch`` (or a raw ``adapter.currentModel``), NOT the makepy
@@ -43,7 +43,11 @@ from win32com.client import VARIANT
 from _common import OUT_SLDASM, _flag, _read_member, check, log, run_build
 
 SILENT = 1           # swSaveAsOptions_Silent
-SAVE_REFERENCED = 8  # swSaveAsOptions_SaveReferenced
+# swSaveAsOptions_SaveReferenced is 4; 8 is AvoidRebuildOnSave (checked against
+# the swSaveAsOptions_e reference, not inferred). This constant said 8, so the
+# retry below silently asked for AvoidRebuildOnSave and never actually saved
+# references -- a false failure on the very path it was written to exercise.
+SAVE_REFERENCED = 4
 SRC = OUT_SLDASM / "drive-train.SLDASM"
 COPY = OUT_SLDASM / "_repro_inplace.SLDASM"
 
