@@ -136,6 +136,7 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
+    assert drawing.ISO_CENTER == (0.345, 0.197)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("scale=(1, 1)") == 2
     assert "scale=(2, 1)" in source

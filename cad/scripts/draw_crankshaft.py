@@ -79,7 +79,7 @@ FRONT_CENTER = (0.060, 0.150)
 # Side view (the *Right orientation: shaft vertical, outboard end at the view
 # bottom) at 1:1 -- the 145 length spans sheet y 0.0775..0.2225.
 RIGHT_CENTER = (0.150, 0.150)
-ISO_CENTER = (0.345, 0.200)
+ISO_CENTER = (0.345, 0.197)
 DATUM_A_RIGHT = (
     FRONT_CENTER[0] + JOURNAL_DIA * END_VIEW_SCALE / 2000.0,
     FRONT_CENTER[1],
