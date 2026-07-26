@@ -235,7 +235,8 @@ def _com_seat(label: str):
     _COM_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     holder = f"{label} pid={os.getpid()}"
     entered = time.monotonic()
-    with _telemetry.span(f"com.seat.wait {label}", label=label) as wait_span:
+    with _telemetry.span(f"com.seat.wait {label}", label=label,
+                        service=_telemetry.BUILD_INFRA_SERVICE) as wait_span:
         polls = 0
         while True:
             try:
@@ -1141,7 +1142,8 @@ def _cached_drawing_action(stem: str) -> None:
     label = f"drawing:{stem}"
     cmd = [sys.executable, str(spec.script.resolve()), spec.artifact_stem]
     outputs = _drawing_cache_outputs(stem)
-    with _telemetry.span(f"cache.probe {label}", label=label) as probe:
+    with _telemetry.span(f"cache.probe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
         key = _cache_key(_drawing_file_deps(stem), label)
         if _cache.restore(key, outputs, label):
             probe.set_attribute("cache", "hit")
@@ -1157,7 +1159,8 @@ def _cached_drawing_action(stem: str) -> None:
             sp.set_attribute("cache", "miss")
             _exec(cmd, label, log_stem=f"drawing-{stem}")
 
-    with _telemetry.span(f"cache.store {label}", label=label):
+    with _telemetry.span(f"cache.store {label}", label=label,
+                         service=_telemetry.BUILD_INFRA_SERVICE):
         _cache.store(key, _drawing_cache_outputs(stem), label)
 
 
@@ -1212,7 +1215,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
     console."""
     label = f"part:{stem}"
     outputs = _part_cache_outputs(stem)
-    with _telemetry.span(f"cache.probe {label}", label=label) as probe:
+    with _telemetry.span(f"cache.probe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
         key = _cache_key(_part_file_deps(script, stem), label)
         if _cache.restore(key, outputs, label):
             probe.set_attribute("cache", "hit")
@@ -1236,7 +1240,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
 
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
     # not hold the seat the next task is waiting for.
-    with _telemetry.span(f"cache.store {label}", label=label):
+    with _telemetry.span(f"cache.store {label}", label=label,
+                         service=_telemetry.BUILD_INFRA_SERVICE):
         _cache.store(key, outputs, label)
 
 
@@ -1460,7 +1465,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # tags by absolute path (machine-local) -- so recompute it here, exactly as the
     # success tail does, to keep the next run's FULL/REFRESH decision correct.
     cache_outputs = _assembly_cache_outputs(stem)
-    with _telemetry.span(f"cache.probe {label}", label=label) as probe:
+    with _telemetry.span(f"cache.probe {label}", label=label,
+                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
         cache_key = _cache_key(_assembly_file_deps(stem), label)
         if _cache.restore(cache_key, cache_outputs, label):
             probe.set_attribute("cache", "hit")
@@ -1515,7 +1521,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # glob-discovered and DID NOT EXIST yet on a clean builder when cache_outputs
     # was first computed, so the early list would publish an incomplete archive
     # (codex review). They exist now.
-    with _telemetry.span(f"cache.store {label}", label=label):
+    with _telemetry.span(f"cache.store {label}", label=label,
+                         service=_telemetry.BUILD_INFRA_SERVICE):
         _cache.store(cache_key, _assembly_cache_outputs(stem), label)
 
 

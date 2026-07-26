@@ -568,6 +568,19 @@ scripts that `from _common import log, check` are instrumented unchanged.
   providers, resetting OTel's one-shot provider guard, since the resource is fixed
   at provider creation). Add a new stage to `_stage_name` when a new task family
   appears.
+    - **`build-infra` owns the seat + cache spans.** Queueing for the COM seat and
+      pulling/publishing artefacts belong to no pipeline stage, so `com.seat.wait`,
+      `cache.probe` and `cache.store` are attributed to a `build-infra` resource
+      (`_telemetry.BUILD_INFRA_SERVICE`) instead of the doit parent's umbrella
+      `harmonic-analyzer` — the resource column then answers "how much of this build
+      was queue and transfer, not work?" in one filter. A resource is fixed per
+      provider, so this is a SECOND `TracerProvider` in the same process
+      (`_provider_for_service`), sharing the primary's span processors — one console
+      stream, one `traces.jsonl`, one OTLP exporter. Pass `service=` to
+      `_telemetry.span` to put a span there; it changes only the resource, never the
+      parent/child shape. (Aux providers are built with `shutdown_on_exit=False` and
+      skipped by `shutdown()`: they don't own their processors, and double-shutting
+      them just re-closes every exporter.)
 - **A COM task is a CHAIN of top-level spans, one per phase — never one span that
   swallows the lot.** A cached part/assembly/drawing task emits, all as siblings:
   `cache.probe <label>` (the remote-cache restore attempt — on a HIT this IS the
@@ -606,6 +619,17 @@ scripts that `from _common import log, check` are instrumented unchanged.
   script's `build_session` extracts it, so the doit task and the process it
   spawns are **one** end-to-end trace. Preserve `env=_telemetry.inject_env()` on any
   new subprocess launch.
+- **The process boundary itself is billed, not dark.** Between a task span starting
+  and the child's first span (`sw.connect`) sat ~2–5 s of nothing: process creation,
+  interpreter boot, and the import graph (`solidworks_mcp` + `_common` ≈ 0.75 s idle,
+  more under `-n` contention). `inject_env` now also stamps `HARMONIC_SPAWN_NS` with
+  the launch instant, and the child's `build_session`/`run_pipeline_span` calls
+  `_telemetry.record_process_startup()` once, drawing `proc.startup` with children
+  `proc.launch` (spawn → `_telemetry` import) and `proc.import` (→ first span). The
+  spans are back-dated with OTel's creation-time `start_time`, which is exactly its
+  documented use ("SHOULD only be set when span creation time has already passed") —
+  no live span is mutated. A process nobody stamped (standalone run) or a stale
+  inherited stamp (>1 h) records nothing.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
   (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to

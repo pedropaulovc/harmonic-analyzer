@@ -45,11 +45,20 @@ def capture():
     _telemetry.configure()
 
     spans = InMemorySpanExporter()
-    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(SimpleSpanProcessor(spans))
+    processor = SimpleSpanProcessor(spans)
+    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(processor)
+    # Auxiliary per-resource providers (build-infra) are built lazily from
+    # ``_span_processors``, so register there too -- and drop any already built -- or
+    # a test would see nothing from spans emitted under another resource.
+    _telemetry._span_processors.append(processor)
+    _telemetry._aux_providers.clear()
 
     logs = InMemoryLogRecordExporter()
     cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(SimpleLogRecordProcessor(logs))
-    return spans, logs
+    yield spans, logs
+
+    _telemetry._span_processors.remove(processor)
+    _telemetry._aux_providers.clear()
 
 
 def test_logs_split_into_severity_levels(capture):
@@ -222,6 +231,71 @@ def test_cross_process_trace_propagation(tmp_path):
         )
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == parent_trace
+
+
+def test_build_infra_spans_carry_their_own_resource(capture):
+    """The COM seat queue and the artefact cache are not a pipeline STAGE, so their
+    spans are attributed to a ``build-infra`` resource instead of this process's --
+    two resources from one process, which takes a second provider (a resource is
+    fixed at provider creation). Only the resource differs: the span still nests
+    normally and rides the same exporters."""
+    spans, _ = capture
+    with _telemetry.span("task part:cone_gear"):
+        with _telemetry.span("com.seat.wait part:cone_gear",
+                             service=_telemetry.BUILD_INFRA_SERVICE) as seat:
+            seat_trace = seat.get_span_context().trace_id
+
+    finished = {s.name: s for s in spans.get_finished_spans()}
+    task, wait = finished["task part:cone_gear"], finished["com.seat.wait part:cone_gear"]
+    assert wait.resource.attributes["service.name"] == "build-infra"
+    assert task.resource.attributes["service.name"] == _telemetry._service_name
+    assert wait.resource.attributes["service.namespace"] == "harmonic-analyzer"
+    # Provider ≠ context: the infra span still parents under the task span.
+    assert seat_trace == task.context.trace_id
+    assert wait.parent.span_id == task.context.span_id
+
+
+def test_process_startup_is_billed_to_the_parent_trace(capture, monkeypatch):
+    """The spawn + interpreter + import region between a parent launching a process
+    and that process's first span is DARK -- ~2-5 s per COM task. ``inject_env``
+    stamps the launch instant and the child draws it as ``proc.startup``
+    (``proc.launch`` + ``proc.import``), back-dated via OTel's creation-time
+    ``start_time`` -- the sanctioned way to record an interval already past."""
+    spans, _ = capture
+    now = time.time_ns()
+    monkeypatch.setattr(_telemetry, "_startup_recorded", False)
+    monkeypatch.setattr(_telemetry, "_IMPORT_NS", now - int(1.5e9))  # imported 1.5 s ago
+    monkeypatch.setenv(_telemetry.SPAWN_ENV, str(now - int(4.0e9)))  # spawned 4 s ago
+
+    with _telemetry.span("task part:cone_gear"):
+        _telemetry.record_process_startup()
+        _telemetry.record_process_startup()  # once per process, not once per call
+
+    finished = [s for s in spans.get_finished_spans() if s.name.startswith("proc.")]
+    assert [s.name for s in finished] == ["proc.launch", "proc.import", "proc.startup"]
+    by_name = {s.name: s for s in finished}
+    dur = lambda s: (s.end_time - s.start_time) / 1e9  # noqa: E731
+    assert 3.9 < dur(by_name["proc.startup"]) < 4.2, "must span back to the spawn"
+    assert 2.4 < dur(by_name["proc.launch"]) < 2.6, "spawn -> _telemetry import"
+    assert 1.4 < dur(by_name["proc.import"]) < 1.6, "_telemetry import -> first span"
+    assert by_name["proc.launch"].end_time == by_name["proc.import"].start_time
+    task = [s for s in spans.get_finished_spans() if s.name == "task part:cone_gear"][0]
+    assert by_name["proc.startup"].parent.span_id == task.context.span_id
+
+
+def test_process_startup_ignores_a_missing_or_stale_stamp(capture, monkeypatch):
+    """No stamp = a standalone run, nothing to bill. A stamp from another era is a
+    stale value inherited through an intermediate process, not our parent's."""
+    spans, _ = capture
+    monkeypatch.delenv(_telemetry.SPAWN_ENV, raising=False)
+    monkeypatch.setattr(_telemetry, "_startup_recorded", False)
+    _telemetry.record_process_startup()
+
+    monkeypatch.setattr(_telemetry, "_startup_recorded", False)
+    monkeypatch.setenv(_telemetry.SPAWN_ENV, str(time.time_ns() - int(2e9 * 3600)))
+    _telemetry.record_process_startup()
+
+    assert not [s for s in spans.get_finished_spans() if s.name.startswith("proc.")]
 
 
 def test_event_records_span_event_on_current_span(capture):

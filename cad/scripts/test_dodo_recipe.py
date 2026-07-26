@@ -518,7 +518,8 @@ def test_com_seat_wait_gets_its_own_top_level_span(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo._telemetry, "warn", warnings.append)
 
     with dodo._com_seat("part:x"):
-        assert spans == [("com.seat.wait part:x", {"label": "part:x", "polls": 1})],             "the wait must be timed by its own span, opened before the seat is held"
+        assert spans == [("com.seat.wait part:x", {"label": "part:x", "polls": 1,
+                                                   "service": "build-infra"})],             "the wait must be timed by its own build-infra span, before the seat is held"
 
     assert attempts == 2
     assert warnings == ["[com.seat] part:x waiting for the SolidWorks seat"]

@@ -98,6 +98,26 @@ _LOGGER_NAME = "harmonic"
 _SERVICE_NAMESPACE = "harmonic-analyzer"
 _DEFAULT_SERVICE_NAME = "harmonic-analyzer"
 
+# The doit PARENT process drives two different things: the pipeline's tasks, and the
+# machinery that decides whether a task runs at all (the COM seat queue, the remote
+# artefact cache). Those belong to no pipeline STAGE -- they are build infrastructure,
+# and lumping them under the umbrella ``harmonic-analyzer`` resource left the Aspire
+# resource column unable to answer "how much of this build was queueing and transfers?".
+# They are emitted through a SECOND provider whose resource says so; see
+# :func:`_provider_for_service`. A resource is fixed per provider, so a process that
+# emits under two resources needs two providers -- they share this process's span
+# PROCESSORS, so there is still one console stream and one traces.jsonl handle.
+BUILD_INFRA_SERVICE = "build-infra"
+
+# Wall-clock (not monotonic -- it must be comparable across processes, exactly like an
+# OTel timestamp) of this module's import, and the env var a parent stamps with its own
+# clock right before spawning a child. Together they light up the otherwise DARK region
+# between "the parent launched a subprocess" and "the subprocess opened its first span":
+# process creation + interpreter boot + the import graph, measured at ~2-5 s per COM
+# task on this seat. See :func:`record_process_startup`.
+_IMPORT_NS = time.time_ns()
+SPAWN_ENV = "HARMONIC_SPAWN_NS"
+
 
 def _resolve_service_name() -> str:
     return os.environ.get("OTEL_SERVICE_NAME") or _DEFAULT_SERVICE_NAME
@@ -195,6 +215,11 @@ class _ActivityFilter(logging.Filter):
 _depth: contextvars.ContextVar[int] = contextvars.ContextVar("_telemetry_depth", default=0)
 
 _configured = False
+# Span processors of the CURRENT configuration, shared with every auxiliary provider
+# (one per extra resource this process emits under) so they all land on the same
+# console stream / traces.jsonl / OTLP exporter instead of duplicating handles.
+_span_processors: list[Any] = []
+_aux_providers: dict[str, Any] = {}
 
 
 def _stamp() -> str:
@@ -318,9 +343,13 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     )
 
     # ---- traces -------------------------------------------------------- #
-    tracer_provider = TracerProvider(resource=resource)
+    # Built ONCE and kept, because the build-infra provider (a second resource in this
+    # same process) reuses these exact processor objects rather than opening its own
+    # console stream and traces.jsonl handle.
+    global _span_processors
+    _span_processors = []
     if want_console:
-        tracer_provider.add_span_processor(
+        _span_processors.append(
             SimpleSpanProcessor(
                 ConsoleSpanExporter(
                     # _LiveStderr is a write/flush proxy (duck-typed IO) that
@@ -334,7 +363,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     if tdir is not None:
         with contextlib.suppress(Exception):
             traces = (tdir / "traces.jsonl").open("a", encoding="utf-8")
-            tracer_provider.add_span_processor(
+            _span_processors.append(
                 SimpleSpanProcessor(
                     ConsoleSpanExporter(
                         out=traces, formatter=lambda s: s.to_json(indent=None) + "\n"
@@ -350,8 +379,15 @@ def configure(*, console: bool = True, force: bool = False) -> None:
                 OTLPSpanExporter,
             )
 
-            tracer_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter()))
+            _span_processors.append(SimpleSpanProcessor(OTLPSpanExporter()))
+
+    tracer_provider = TracerProvider(resource=resource)
+    for processor in _span_processors:
+        tracer_provider.add_span_processor(processor)
     trace.set_tracer_provider(tracer_provider)
+    # A relabelled process must not keep serving spans from providers built on the OLD
+    # resource, so the auxiliary ones are rebuilt lazily against the new processors.
+    _aux_providers.clear()
 
     # ---- logs ---------------------------------------------------------- #
     logger_provider = LoggerProvider(resource=resource)
@@ -397,9 +433,45 @@ def get_logger() -> logging.Logger:
     return logging.getLogger(_LOGGER_NAME)
 
 
-def get_tracer(name: str = _SERVICE_NAME):
+def _provider_for_service(service: str):
+    """A ``TracerProvider`` whose resource names ``service``, built lazily and cached.
+
+    An OTel resource is fixed at provider creation, so a process that wants to emit
+    some spans under a DIFFERENT ``service.name`` than its own stage needs a second
+    provider -- there is no per-span resource. It shares this process's span
+    processors (:data:`_span_processors`), so its spans ride the same console stream,
+    ``traces.jsonl`` and OTLP exporter; only the resource differs. Context
+    propagation is provider-independent, so a span from here still parents/nests
+    exactly as usual."""
     configure()
-    return trace.get_tracer(name)
+    provider = _aux_providers.get(service)
+    if provider is None:
+        provider = TracerProvider(
+            # No atexit hook: this provider does not OWN its processors (they are the
+            # primary provider's), and letting it shut them down at exit would re-close
+            # every exporter -- one "Exporter already shutdown" per extra resource.
+            shutdown_on_exit=False,
+            resource=Resource.create(
+                {
+                    "service.name": service,
+                    "service.namespace": _SERVICE_NAMESPACE,
+                    "service.version": os.environ.get("HARMONIC_VERSION", "dev"),
+                }
+            )
+        )
+        for processor in _span_processors:
+            provider.add_span_processor(processor)
+        _aux_providers[service] = provider
+    return provider
+
+
+def get_tracer(name: str = _SERVICE_NAME, *, service: str | None = None):
+    """Tracer for this process's own resource, or for ``service`` (see
+    :func:`_provider_for_service`) when spans must be attributed elsewhere."""
+    configure()
+    if service is None or service == _service_name:
+        return trace.get_tracer(name)
+    return _provider_for_service(service).get_tracer(name)
 
 
 def set_service(name: str, *, force: bool = False) -> None:
@@ -484,9 +556,10 @@ def event(name: str, **attributes: Any) -> None:
             span.add_event(name, attributes=_extra(attributes) or {})
 
 
-def _enter_span(name: str, attributes: Mapping[str, Any] | None) -> tuple[Span, Any, int]:
+def _enter_span(name: str, attributes: Mapping[str, Any] | None,
+                service: str | None = None) -> tuple[Span, Any, int]:
     _touch_activity(f"span-start {name}")
-    tracer = get_tracer()
+    tracer = get_tracer(service=service)
     depth = _depth.get()
     attrs = {"harmonic.depth": depth}
     if attributes:
@@ -521,14 +594,19 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
 
 
 @contextlib.contextmanager
-def span(name: str, /, **attributes: Any) -> Generator[Span, None, None]:
+def span(name: str, /, *, service: str | None = None,
+         **attributes: Any) -> Generator[Span, None, None]:
     """Span context manager that leaves no gaps.
 
     On a clean exit the span status is set OK; on an exception it records the
     exception, marks the span ERROR, emits an ERROR log, then re-raises — so a
     failure is always attributable to a span rather than vanishing.
+
+    ``service`` attributes the span to another resource than this process's stage
+    (:data:`BUILD_INFRA_SERVICE` for the COM seat queue and the artefact cache); it
+    changes only the resource, never the parent/child shape.
     """
-    sp, handle, _ = _enter_span(name, attributes)
+    sp, handle, _ = _enter_span(name, attributes, service)
     try:
         yield sp
     except BaseException as exc:  # noqa: BLE001 - recorded then re-raised
@@ -608,20 +686,82 @@ def build_session(label: str, /, **attributes: Any) -> Generator[Span | None, No
     if parent is not None:
         token = otel_context.attach(parent)
         try:
+            # Inside the attached parent context, so this process's spawn + import
+            # cost is billed to the task span that paid for it.
+            record_process_startup()
             yield None
         finally:
             otel_context.detach(token)
     else:
         with span(f"build.{label}", label=label, **attributes) as root:
+            record_process_startup()
             yield root
+
+
+_startup_recorded = False
+# A stamp older than this is not our parent's -- it is a stale value inherited through
+# some intermediate process -- so it is ignored rather than drawn as an absurd span.
+_STARTUP_SANITY_S = 3600.0
+
+
+def record_process_startup() -> None:
+    """Account for the DARK region between a parent spawning this process and the
+    first span this process opens: process creation, interpreter boot, and the whole
+    import graph. Measured at ~2-5 s per COM task on the SolidWorks seat -- so a
+    ``task part:<stem>`` span that read 36 s had ~5 s of it unexplained, sitting
+    between the task span's start and ``sw.connect``.
+
+    Emitted as ``proc.startup`` with two children -- ``proc.launch`` (spawn +
+    interpreter, up to the moment THIS module was imported) and ``proc.import`` (the
+    rest of the import graph and the entry preamble) -- so the split between "Windows
+    made a process" and "python read our code" is visible rather than inferred.
+
+    The timestamps are all in the past, which is precisely the case OTel's
+    creation-time ``start_time`` argument exists for ("SHOULD only be set when span
+    creation time has already passed"): nothing here mutates a live span. Call it
+    once the parent's trace context is attached, so the spans land in the parent's
+    trace; a second call, or a process no parent stamped (a standalone run), is a
+    no-op. Best-effort -- never raises."""
+    global _startup_recorded
+    if _startup_recorded:
+        return
+    _startup_recorded = True
+    with contextlib.suppress(Exception):
+        raw = os.environ.get(SPAWN_ENV)
+        if not raw:
+            return
+        spawn_ns = int(raw)
+        now = time.time_ns()
+        if not 0 < now - spawn_ns < _STARTUP_SANITY_S * 1e9:
+            return  # clock skew, or a stale value inherited from a grandparent
+        tracer = get_tracer()
+        depth = _depth.get()
+        parent = tracer.start_span(
+            "proc.startup", start_time=spawn_ns,
+            attributes={"harmonic.depth": depth, "pid": os.getpid()})
+        parent.set_status(Status(StatusCode.OK))
+        child_ctx = trace.set_span_in_context(parent)
+        for name, start, end in (("proc.launch", spawn_ns, _IMPORT_NS),
+                                 ("proc.import", _IMPORT_NS, now)):
+            child = tracer.start_span(name, context=child_ctx, start_time=start,
+                                      attributes={"harmonic.depth": depth + 1})
+            child.set_status(Status(StatusCode.OK))
+            child.end(end_time=end)
+        parent.end(end_time=now)
 
 
 def inject_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
     """Return a copy of ``env`` (default ``os.environ``) with the active span's
     W3C trace context injected (``TRACEPARENT`` / ``TRACESTATE``), ready to hand
     to a subprocess so its root span continues this trace instead of starting a
-    detached one. Best-effort: returns the env unchanged if injection fails."""
+    detached one. Best-effort: returns the env unchanged if injection fails.
+
+    Also stamps :data:`SPAWN_ENV` with the launch instant, so the child can bill its
+    own spawn + import cost to the trace (:func:`record_process_startup`) instead of
+    leaving a dark gap before its first span. Stamped HERE, the one chokepoint every
+    subprocess launch already goes through, so a new launcher gets it for free."""
     out = dict(env if env is not None else os.environ)
+    out[SPAWN_ENV] = str(time.time_ns())
     with contextlib.suppress(Exception):
         carrier: dict[str, str] = {}
         inject(carrier)
@@ -663,6 +803,7 @@ def run_pipeline_span(stage: str, /, **attributes: Any) -> Generator[Span, None,
     token = otel_context.attach(parent) if parent is not None else None
     try:
         with span(f"pipeline.{stage}", **attributes) as sp:
+            record_process_startup()
             yield sp
     finally:
         if token is not None:
@@ -670,7 +811,12 @@ def run_pipeline_span(stage: str, /, **attributes: Any) -> Generator[Span, None,
 
 
 def shutdown() -> None:
-    """Flush + close providers (force-flush exporters). Best-effort."""
+    """Flush + close providers (force-flush exporters). Best-effort.
+
+    The auxiliary per-resource providers (build-infra) are deliberately NOT shut down:
+    they hold the primary provider's processors, not their own, so this one call
+    already closes every exporter -- and shutting them down too would just re-close
+    each exporter and log "Exporter already shutdown" for every extra resource."""
     with contextlib.suppress(Exception):
         trace.get_tracer_provider().shutdown()  # type: ignore[attr-defined]
 
