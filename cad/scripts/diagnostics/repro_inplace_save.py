@@ -19,7 +19,15 @@ passes ``None, None``, which fails the COM call and falls through to the blockin
 It works on a COPY so the real drive-train.SLDASM stays pristine, and tries the
 candidate save calls in order, logging mtime + GetSaveFlag + error/warning codes.
 
-    uv run python cad\scripts\repro_inplace_save.py
+    uv run python cad\scripts\diagnostics\repro_inplace_save.py
+
+LATE-BOUND PROBE: this script drives SolidWorks through its own
+``GetObject``/``Dispatch`` (or a raw ``adapter.currentModel``), NOT the makepy
+wrapper, so its ``[out]`` params land in the ``VT_BYREF`` VARIANTs passed in
+rather than in the return tuple. That is the OPPOSITE of the build path, where
+``_common._early_bound`` guarantees an early-bound object and the outs ride the
+return tuple. Both are correct for their binding -- mixing them is the trap that
+reads as "no data" instead of failing. See memory/sw-assembly-mate-diagnostics-api.md.
 """
 
 from __future__ import annotations
@@ -27,15 +35,33 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+from pathlib import Path
 from typing import Any
 
-import pythoncom
-from win32com.client import VARIANT
+# This probe used to live in cad/scripts/, where _common was a sibling. Moved
+# into diagnostics/, sys.path[0] is this directory, so the import below fails
+# with ModuleNotFoundError before reaching SolidWorks -- same insert every other
+# relocated diagnostic carries.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _common import OUT_SLDASM, _flag, _read_member, check, log, run_build
+import pythoncom  # noqa: E402
+from win32com.client import VARIANT  # noqa: E402
+
+from _common import (  # noqa: E402
+    OUT_SLDASM,
+    _flag,
+    _read_member,
+    check,
+    log,
+    run_build,
+)
 
 SILENT = 1           # swSaveAsOptions_Silent
-SAVE_REFERENCED = 8  # swSaveAsOptions_SaveReferenced
+# swSaveAsOptions_SaveReferenced is 4; 8 is AvoidRebuildOnSave (checked against
+# the swSaveAsOptions_e reference, not inferred). This constant said 8, so the
+# retry below silently asked for AvoidRebuildOnSave and never actually saved
+# references -- a false failure on the very path it was written to exercise.
+SAVE_REFERENCED = 4
 SRC = OUT_SLDASM / "drive-train.SLDASM"
 COPY = OUT_SLDASM / "_repro_inplace.SLDASM"
 

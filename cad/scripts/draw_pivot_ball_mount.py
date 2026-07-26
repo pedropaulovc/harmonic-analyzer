@@ -93,11 +93,7 @@ def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
     """Render the drawing-native stem width as a toleranced diameter."""
     display = _early_bound(
         dimension,
-        "IDisplayDimension",
-        "SetText",
-        "GetText",
-        "GetDimension",
-    )
+        "IDisplayDimension")
     prefix = "<MOD-DIAM>"
     display.SetText(1, prefix)  # swDimensionTextPrefix
     if str(display.GetText(1) or "") != prefix:
@@ -105,11 +101,7 @@ def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
     model_dimension = _early_bound(display.GetDimension(), "IDimension")
     tolerance = _early_bound(
         model_dimension.Tolerance,
-        "IDimensionTolerance",
-        "SetValues",
-        "GetMinValue",
-        "GetMaxValue",
-    )
+        "IDimensionTolerance")
     tolerance.Type = 2  # swTolType_e.swTolBILAT
     limit_m = 0.05 / 1000.0
     if not tolerance.SetValues(-limit_m, limit_m):

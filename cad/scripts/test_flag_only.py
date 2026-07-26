@@ -13,6 +13,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _common import _early_bound, _flag_only  # noqa: E402
@@ -57,21 +59,52 @@ def test_unknown_names_are_skipped() -> None:
     assert obj.flagged == ["GetConstrainedStatus"]
 
 
-def test_early_bound_delegates_with_selective_fallback_names(monkeypatch) -> None:
-    """Shared helpers request a typed wrapper and retain an exact-name fallback."""
+class _Dispatch:
+    """Stand-in for a live pywin32 CDispatch (identified by ``_oleobj_``)."""
+
+    def __init__(self) -> None:
+        self._oleobj_ = object()
+
+
+def _patch_binding(monkeypatch, *, typed, early: bool):
     from solidworks_mcp.adapters import sw_type_info
 
-    original = object()
-    typed = object()
-    calls = []
+    monkeypatch.setattr(sw_type_info, "early_bound", lambda obj, iface: typed)
+    monkeypatch.setattr(
+        sw_type_info, "is_early_bound", lambda obj, iface: early
+    )
 
-    def wrap(obj, interface, *methods):
-        calls.append((obj, interface, methods))
-        return typed
 
-    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", wrap)
-    assert _early_bound(original, "IComponent2", "GetModelDoc2") is typed
-    assert calls == [(original, "IComponent2", ("GetModelDoc2",))]
+def test_early_bound_returns_the_generated_wrapper(monkeypatch) -> None:
+    typed = _Dispatch()
+    _patch_binding(monkeypatch, typed=typed, early=True)
+    assert _early_bound(_Dispatch(), "IComponent2") is typed
+
+
+def test_early_bound_RAISES_rather_than_returning_a_raw_dispatch(monkeypatch)\
+        -> None:
+    """The root-cause fix for the [out]-param trap.
+
+    This replaced ``test_early_bound_delegates_with_selective_fallback_names``,
+    which pinned the OPPOSITE contract: delegate to ``early_bound_or_flag``,
+    which hands back a flagged LATE-BOUND object when no generated class
+    resolves. That silent downgrade is the bug -- it flips where a method's
+    ``[out]`` params land (return tuple vs byref VARIANT) with nothing visible
+    at the call site, and the wrong choice reads as "no data" rather than
+    failing. The old contract was deliberate, so this is a deliberate reversal,
+    not an assertion loosened to make a test pass.
+    """
+    original = _Dispatch()
+    _patch_binding(monkeypatch, typed=original, early=False)
+    with pytest.raises(RuntimeError, match="could not bind"):
+        _early_bound(original, "IComponent2")
+
+
+def test_non_com_objects_still_pass_through_quietly(monkeypatch) -> None:
+    """Test doubles and None never reach a COM boundary, so they are exempt."""
+    double = object()  # no _oleobj_
+    assert _early_bound(double, "IComponent2") is double
+    assert _early_bound(None, "IComponent2") is None
 
 
 if __name__ == "__main__":

@@ -261,20 +261,28 @@ discovered during harmonic-analyzer M6.4:
   earlier "Save3 silently no-ops" reading was an artifact of testing on a doc the
   destructive SaveAs path had already disconnected. The correct call:
   ```python
-  import pythoncom; from win32com.client import VARIANT
-  err  = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-  warn = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-  model.Save3(1 | 8, err, warn)   # swSaveAsOptions_Silent | SaveReferenced
+  # 1|8 = swSaveAsOptions_Silent | AvoidRebuildOnSave (8 is NOT SaveReferenced,
+  # which is 4 -- historically mislabeled here and in io.py).
+  ret, err, warn = model.Save3(1 | 8, 0, 0)
   ```
+  The byref-VARIANT form this entry used to prescribe was WRONG on the build's
+  makepy path (corrected 2026-07-25): early-bound `Save3` returns its two `[out]`
+  codes in the RETURN TUPLE, so the byrefs stay unwritten and `ret` is a truthy
+  tuple rather than a bool. Pass literal `0` for the `[out]` slots and unpack —
+  what `_assembly.py` (`save_assembly_in_place`) and `io.py`
+  (`_silent_save_in_place`) both actually do. Bare `None` is a third wrong
+  answer: it FAILS the COM call and falls through to the blocking parameterless
+  `Save()`. General rule: [[sw-assembly-mate-diagnostics-api]].
   → `ret=True, err=0, warn=0`, mtime advances, the change persists on reopen — no
   dialog, no watchdog, ~0.4 s. The modal only appears with parameterless `Save()`
-  AND dirty *referenced* docs; `SaveReferenced (8)` saves those silently too, and
+  AND dirty *referenced* docs; `SaveReferenced` (**4**, NOT 8 -- 8 is
+  `AvoidRebuildOnSave`; confirmed against swSaveAsOptions_e) saves those too, and
   for an assembly-only change (config + mate suppression) the part docs stay clean
-  so even plain `Silent` writes. Proven by `cad/scripts/repro_inplace_save.py`
+  so even plain `Silent` writes. Proven by `cad/scripts/diagnostics/repro_inplace_save.py`
   (open from disk → add config → `Save3` on a copy, real file untouched). Canonical
   per SW docs/forums (CodeStack "save all silently"; SW "Rename Components and Save
   Assembly" notes a bare save errors "without first saving its references" → why
-  the 8 flag). Still gate on `model.GetSaveFlag()` (True = dirty) to skip a clean
+  the SaveReferenced flag). Still gate on `model.GetSaveFlag()` (True = dirty) to skip a clean
   idempotent re-save. `_click_save_all.ps1` + the watchdog are DELETED.
 - **Config-scoped mate suppression** (`SuppressMateParameters(configuration=...)`
   → `SetSuppression2(action, swSpecifyConfiguration=3, [cfg])`): a derived config

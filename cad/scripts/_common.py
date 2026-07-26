@@ -1262,7 +1262,7 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
     mgr = adapter._attempt(lambda: ext.CustomPropertyManager(""), default=None)
     if mgr is None:
         raise RuntimeError("CustomPropertyManager unavailable")
-    mgr = _early_bound(mgr, "ICustomPropertyManager", "Add3")
+    mgr = _early_bound(mgr, "ICustomPropertyManager")
     written = []
     for name, value in props.items():
         if value in (None, ""):
@@ -1534,20 +1534,57 @@ def _flag(obj: Any, interface: str) -> None:
         pass
 
 
-def _early_bound(obj: Any, interface: str, *method_names: str) -> Any:
-    """Return a generated interface wrapper, selectively flagging as fallback.
+def _early_bound(obj: Any, interface: str) -> Any:
+    """Return the generated interface wrapper, or RAISE -- never a raw dispatch.
 
     Early-bound wrappers invoke known DISPIDs directly and avoid the repeated
-    ``GetIDsOfNames`` calls paid by whole-interface method flagging.  The exact
-    names are used only when makepy metadata is unavailable, preserving support
-    for deliberately minimal test doubles and unusual SolidWorks installs.
+    ``GetIDsOfNames`` calls paid by whole-interface method flagging.
+
+    **This never silently returns the unwrapped object.** It used to
+    (``except Exception: return obj``), and that one line is the root of the
+    ``[out]``-param trap: 542 SolidWorks methods have ``[out]`` params, and
+    which marshalling convention applies depends ENTIRELY on whether the object
+    is early-bound. makepy handles all 542 uniformly -- call bare, read the
+    return tuple -- but on a raw late-bound dispatch that same call needs
+    ``VT_BYREF`` VARIANTs. A silent fallback therefore flipped the convention
+    invisibly, and the failure mode is a WRONG ANSWER, not an error: an
+    unwritten byref reads as "no data" == "no errors found". That cost a full
+    session chasing a non-existent "GetWhatsWrong is blind mid-build" defect.
+
+    So a call site can now TRUST that what it gets back is early-bound, and the
+    single calling convention (consume the tuple) is always correct.
+
+    Two quiet passthroughs remain, both provably not COM: ``None``, and an
+    object with no ``_oleobj_`` (a test double, which never reaches a COM
+    boundary).
+
+    The former ``*method_names`` varargs are GONE, not merely ignored. They only
+    ever fed ``flag_method_names``, the exact-name fallback used when no
+    generated class resolved -- i.e. the silent late-binding path removed above.
+    All 74 call sites that passed them were stripped in the same change, so a
+    lingering name is now a ``TypeError`` at the call site rather than an
+    argument that silently means nothing.
     """
     from solidworks_mcp.adapters import sw_type_info
 
-    try:
-        return sw_type_info.early_bound_or_flag(obj, interface, *method_names)
-    except Exception:
-        return obj
+    if obj is None or getattr(obj, "_oleobj_", None) is None:
+        return obj  # not a COM dispatch -- nothing to bind, nothing to marshal
+
+    # Raises ValueError on an interface absent from the wrapper -- a typo or a
+    # wrapper that needs regenerating. Let it out; that is a bug, not a mode.
+    typed = sw_type_info.early_bound(obj, interface)
+    if sw_type_info.is_early_bound(typed, interface):
+        return typed
+
+    raise RuntimeError(
+        f"_early_bound({interface}) could not bind a generated wrapper to a live"
+        f" COM dispatch ({type(obj).__name__}). Refusing to hand back the raw"
+        " late-bound object: [out] params would then need VT_BYREF VARIANTs"
+        " instead of the return tuple, and getting that wrong reads as 'no"
+        " data' rather than failing. Regenerate the checked-in makepy wrapper"
+        " for this SolidWorks version, or bind the interface that declares the"
+        " member being called."
+    )
 
 
 def _flag_only(obj: Any, *method_names: str) -> None:
@@ -1607,12 +1644,12 @@ def _iter_features(adapter: Any):
     property to find the profile to cut, and a flagged model silently yields no
     profile (``FeatureCut3 ... Parameter not optional``). ``_read_member`` reads
     these accessors property-style whether or not they are flagged."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2", "FirstFeature")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     feat = _read_member(model, "FirstFeature")
     for _ in range(5000):
         if not feat:
             return
-        feat = _early_bound(feat, "IFeature", "GetNextFeature")
+        feat = _early_bound(feat, "IFeature")
         yield feat
         feat = _read_member(feat, "GetNextFeature")
 
@@ -1669,15 +1706,12 @@ def _display_dimensions(feat: Any, owner: str | None = None):
     ``_read_member``."""
     feat = _early_bound(
         feat,
-        "IFeature",
-        "GetFirstDisplayDimension",
-        "GetNextDisplayDimension",
-    )
+        "IFeature")
     disp = _read_member(feat, "GetFirstDisplayDimension")
     for _ in range(1000):
         if not disp:
             return
-        disp = _early_bound(disp, "IDisplayDimension", "GetDimension2")
+        disp = _early_bound(disp, "IDisplayDimension")
         idim = _early_bound(disp.GetDimension2(0), "IDimension")
         if owner is None or _dim_owner_feature(idim) == owner:
             yield idim
@@ -1964,7 +1998,7 @@ def set_isometric_view(adapter: Any) -> None:
     of an empty just-created document -- the orient + zoom-to-fit are best-effort.
     """
     SW_ISOMETRIC = 7  # swStandardViews_e.swIsometricView
-    model = _early_bound(adapter.currentModel, "IModelDoc2", "ShowNamedView2")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     if model is None:
         return
     adapter._attempt(lambda: model.ShowNamedView2("", SW_ISOMETRIC), default=None)

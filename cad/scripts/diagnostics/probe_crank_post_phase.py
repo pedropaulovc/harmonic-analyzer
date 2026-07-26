@@ -38,7 +38,7 @@ def _transform(rows: list[list[float]], position_mm: list[float]) -> list[float]
 
 
 def _put_transform(adapter, name: str, rows, position_mm) -> None:
-    asm = _early_bound(adapter.currentModel, "IAssemblyDoc", "GetComponentByName")
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
     component = asm.GetComponentByName(name)
     if component is None:
         raise RuntimeError(f"component {name!r} not found")
@@ -53,7 +53,7 @@ def _put_transform(adapter, name: str, rows, position_mm) -> None:
 def _interference_volumes(adapter) -> dict[tuple[str, str], float]:
     asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
     manager = _read_member(asm, "InterferenceDetectionManager")
-    manager = _early_bound(manager, "IInterferenceDetectionMgr", "GetInterferences")
+    manager = _early_bound(manager, "IInterferenceDetectionMgr")
     manager.TreatCoincidenceAsInterference = False
     manager.TreatSubAssembliesAsComponents = True
     manager.IncludeMultibodyPartInterferences = True

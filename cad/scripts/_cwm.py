@@ -141,13 +141,6 @@ _ERR_NAMES: dict[int, str] = {
 _ALIGN: dict[int, str] = {0: "ALIGNED", 1: "ANTI_ALIGNED", 2: "CLOSEST"}
 
 
-def _byref() -> Any:
-    import pythoncom
-    from win32com.client import VARIANT
-
-    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
-
-
 def whats_wrong_hard_errors(adapter: Any) -> dict[str, int] | None:
     """Hard feature errors via ``GetWhatsWrong`` -- ~20 ms, no MateGroup walk.
 
@@ -288,15 +281,13 @@ def mate_error_prose(adapter: Any, names: list[str]) -> dict[str, str]:
         return {}
 
     def _drain() -> list[str]:
-        m, i, t = _byref(), _byref(), _byref()
-        ret = app.GetErrorMessages(m, i, t)
-        if m.value:
-            return list(m.value)
-        # `adapter.swApp` is the EARLY-BOUND ISldWorks wrapper, and InvokeTypes
-        # returns the three [out] params in the RETURN tuple
-        # (count, Msgs, MsgIDs, MsgTypes) while leaving the byref VARIANTs
-        # empty. Reading only `m.value` here is why the first version of this
-        # guard reported the code with no prose.
+        # Three [out] params: call BARE and consume the return tuple
+        # (count, Msgs, MsgIDs, MsgTypes). This used to read a byref VARIANT
+        # first and fall back to the tuple, because the call site could not know
+        # whether `adapter.swApp` was early-bound. `_early_bound` now raises
+        # rather than handing back a raw dispatch, so the tuple is the only
+        # possible shape and the dual read is gone.
+        ret = app.GetErrorMessages()
         if isinstance(ret, (list, tuple)) and len(ret) >= 2:
             return list(ret[1] or [])
         return []

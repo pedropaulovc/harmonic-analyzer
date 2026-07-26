@@ -5,7 +5,7 @@ The first geometry probe (diag_hole_wizard.py) showed size tokens like
 ``"#47"`` (number drill) and ``"#8"`` (screw clearance) cutting the WRONG
 diameters, so the tokens are enumerated straight from the wizard database via
 ``ISldWorks::GetHoleStandardsData`` instead of guessed. Late-bound ByRef
-variant out-params are passed as explicit VT_BYREF VARIANTs.
+the generated wrapper returns each [out] param in the return tuple.
 
 Prints a machine-readable table dump to stdout (the dump IS the output; the
 diag_cwm print exemption applies).
@@ -32,12 +32,6 @@ WANT = [
     (0, {0: "binding cbore", 2: "fillister cbore", 3: "hex bolt cbore",
          8: "pan cbore", 9: "socket cap cbore"}),
 ]
-
-
-def _byref():
-    import pythoncom
-    from win32com.client import VARIANT
-    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
 
 
 def _tolist(v):

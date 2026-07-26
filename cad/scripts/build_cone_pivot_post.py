@@ -440,18 +440,16 @@ def _create_feature_cylinder_axis(
     """
     from solidworks_mcp.adapters import sw_type_info
 
-    model = _early_bound(adapter.currentModel, "IModelDoc2", "InsertAxis2")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     part = sw_type_info.early_bound_doc(adapter.currentModel)
     feature = part.FeatureByName(feature_name)
     if feature is None:
         raise RuntimeError(f"axis {label}: feature {feature_name!r} not found")
-    feature = _early_bound(feature, "IFeature", "GetFaces")
+    feature = _early_bound(feature, "IFeature")
     candidates: list[tuple[float, Any]] = []
     for face in feature.GetFaces() or []:
-        face = _early_bound(face, "IFace2", "GetSurface", "GetArea")
-        surface = _early_bound(
-            face.GetSurface(), "ISurface", "IsCylinder", "CylinderParams"
-        )
+        face = _early_bound(face, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
         if not surface.IsCylinder():
             continue
         parameters = tuple(float(value) for value in surface.CylinderParams)
@@ -465,7 +463,7 @@ def _create_feature_cylinder_axis(
 
     face = max(candidates, key=lambda row: row[0])[1]
     model.ClearSelection2(True)
-    selectable = _early_bound(face, "IEntity", "Select2")
+    selectable = _early_bound(face, "IEntity")
     if not selectable.Select2(False, 0):
         raise RuntimeError(f"axis {label}: exact cylindrical face selection failed")
     if not model.InsertAxis2(True):

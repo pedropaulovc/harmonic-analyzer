@@ -82,12 +82,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Interference patches with locations.
     asm = _early_bound(
-        adapter.currentModel, "IAssemblyDoc",
-        "ToolsCheckInterference", "InterferenceDetectionManager",
-    )
+        adapter.currentModel, "IAssemblyDoc")
     adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
     mgr = _read_member(asm, "InterferenceDetectionManager")
-    mgr = _early_bound(mgr, "IInterferenceDetectionMgr", "GetInterferences")
+    mgr = _early_bound(mgr, "IInterferenceDetectionMgr")
     mgr.TreatCoincidenceAsInterference = False
     mgr.TreatSubAssembliesAsComponents = True
     mgr.IncludeMultibodyPartInterferences = True
@@ -102,7 +100,7 @@ async def build(adapter) -> dict[str, str]:
     g0 = dta.cone_station(dta.GEAR64_STATION)
     patch_boxes: list[list[float]] = []
     for i, itf in enumerate(hits):
-        itf = _early_bound(itf, "IInterference", "GetInterferenceBody")
+        itf = _early_bound(itf, "IInterference")
         names = [str(_read_member(c, "Name2"))
                  for c in list(_read_member(itf, "Components") or [])]
         vol = float(_read_member(itf, "Volume") or 0.0) * 1e9
@@ -138,9 +136,7 @@ async def build(adapter) -> dict[str, str]:
     # back to the theoretical contact point when there are no patches).
     OUT.mkdir(parents=True, exist_ok=True)
     mdl = _early_bound(
-        adapter.currentModel, "IModelDoc2",
-        "ViewZoomTo2", "ViewZoomtofit2", "ShowNamedView2", "SaveBMP",
-    )
+        adapter.currentModel, "IModelDoc2")
     adapter._attempt(lambda: mdl.ShowNamedView2("*Front", 1), default=None)
     adapter._attempt(lambda: mdl.ViewZoomtofit2(), default=None)
     ok = adapter._attempt(

@@ -113,8 +113,8 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
         end = edge.GetEndVertex()
         if start is None or end is None:
             continue
-        start = _early_bound(start, "IVertex", "GetPoint")
-        end = _early_bound(end, "IVertex", "GetPoint")
+        start = _early_bound(start, "IVertex")
+        end = _early_bound(end, "IVertex")
         p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
         p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
         if abs(p0[1]) <= 0.01 and abs(p1[1]) <= 0.01:
@@ -179,8 +179,8 @@ def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
         end = edge.GetEndVertex()
         if start is None or end is None:
             continue
-        start = _early_bound(start, "IVertex", "GetPoint")
-        end = _early_bound(end, "IVertex", "GetPoint")
+        start = _early_bound(start, "IVertex")
+        end = _early_bound(end, "IVertex")
         p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
         p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
         if (

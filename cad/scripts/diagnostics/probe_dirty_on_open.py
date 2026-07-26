@@ -25,10 +25,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 
-import pythoncom  # noqa: E402
 import win32com.client  # noqa: E402
-from win32com.client import VARIANT  # noqa: E402
 
+from _common import _early_bound  # noqa: E402
 from solidworks_mcp.adapters import sw_type_info  # noqa: E402
 
 _FEATURE_ERROR = {
@@ -38,20 +37,21 @@ _FEATURE_ERROR = {
 }
 
 
-def _byref():
-    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
-
-
 def whats_wrong(model):
-    ext = sw_type_info.flagged(model.Extension, "IModelDocExtension")
-    f, e, w = _byref(), _byref(), _byref()
+    # EARLY-BOUND: call bare, consume (retval, feats, codes, warns). The byref
+    # form this used belongs to a raw dispatch; through the generated wrapper the
+    # VARIANTs stay unwritten and every model reads "clean".
+    ext = _early_bound(model.Extension, "IModelDocExtension")
     try:
-        ext.GetWhatsWrong(f, e, w)
+        res = ext.GetWhatsWrong()
     except Exception as exc:  # noqa: BLE001
         return [("<GetWhatsWrong failed>", -1, repr(exc), False)]
-    feats = list(f.value or [])
-    codes = list(e.value or [])
-    warns = list(w.value or [])
+    if not isinstance(res, tuple) or len(res) < 4:
+        return [("<GetWhatsWrong shape>", -1, repr(res), False)]
+    _ret, feats, codes, warns = res
+    feats = list(feats or [])
+    codes = list(codes or [])
+    warns = list(warns or [])
     out = []
     for i, feat in enumerate(feats):
         name = "?"

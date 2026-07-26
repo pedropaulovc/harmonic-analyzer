@@ -12,11 +12,8 @@ from __future__ import annotations
 
 import asyncio
 
-import pythoncom
-from win32com.client import VARIANT
-
 import _telemetry
-from _common import OUT_SLDASM, _flag, _flag_only, _read_member, log
+from _common import OUT_SLDASM, _early_bound, _flag, _flag_only, _read_member, log
 from _assembly_postbuild import author_dof_drives, load_dof_manifest
 
 _ERR = {
@@ -29,15 +26,16 @@ _STATUS = {1: "unknown", 2: "UNDER", 3: "fully", 4: "OVER", 5: "no-solution",
 
 def _whats_wrong(adapter, model):
     ext = _read_member(model, "Extension")
-    f_v = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
-    e_v = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
-    w_v = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
-    _flag_only(ext, "GetWhatsWrong")
-    ok = adapter._attempt(lambda: ext.GetWhatsWrong(f_v, e_v, w_v), default=None)
-    log(f"    (GetWhatsWrong returned {ok!r})")
-    feats = list(f_v.value or [])
-    errs = list(e_v.value or [])
-    warns = list(w_v.value or [])
+    # EARLY-BOUND: bare call, outs ride the return tuple.
+    ext = _early_bound(ext, "IModelDocExtension")
+    res = adapter._attempt(lambda: ext.GetWhatsWrong(), default=None)
+    log(f"    (GetWhatsWrong returned {type(res).__name__})")
+    if not isinstance(res, tuple) or len(res) < 4:
+        return []
+    _ret, feats, errs, warns = res
+    feats = list(feats or [])
+    errs = list(errs or [])
+    warns = list(warns or [])
     out = []
     for i, f in enumerate(feats):
         name = "?"

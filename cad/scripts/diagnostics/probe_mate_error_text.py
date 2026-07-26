@@ -22,11 +22,12 @@ cylinder `CopyWithMates2` alignment repro (`Distance32`, code 47).
 
 Traps this probe encodes:
 
-* `GetWhatsWrong` / `GetErrorCode2` / `GetErrorMessages` all take `out` params
-  and need `VT_BYREF|VT_VARIANT` VARIANTs -- a bare call raises.
-* Call them on the RAW late-bound dispatch. Under an ``_early_bound`` wrapper
-  InvokeTypes returns the outs in the RETURN TUPLE and leaves the byref VARIANTs
-  empty, which silently reads as "no errors found".
+* `GetWhatsWrong` / `GetErrorCode2` / `GetErrorMessages` all take `out` params.
+  Call them BARE through the generated wrapper and consume the return tuple --
+  makepy defaults every `[out]` to `pythoncom.Missing`. The byref
+  `VT_BYREF|VT_VARIANT` form is correct ONLY on a raw late-bound dispatch; pass
+  byrefs to an early-bound object and they stay unwritten, which silently reads
+  as "no errors found".
 * `GetErrorMessages` CLEARS the stack and keeps only the last 20 messages --
   drain BEFORE the rebuild or you parse stale text.
 * Every mate problem arrives concatenated into ONE string with no separator
@@ -69,33 +70,32 @@ ERR_NAMES = {
 ALIGN = {0: "ALIGNED", 1: "ANTI_ALIGNED", 2: "CLOSEST"}
 
 
-def _byref():
-    import pythoncom
-    from win32com.client import VARIANT
-
-    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
-
-
-def whats_wrong(raw_doc) -> list[tuple[str, int, bool]]:
+def whats_wrong(doc) -> list[tuple[str, int, bool]]:
     """``[(feature_name, swFeatureError_e, is_warning)]`` for the document.
 
-    ``raw_doc`` must be the RAW late-bound dispatch -- see the byref trap in the
-    module docstring.
+    Bare call, outs consumed from the return tuple -- the generated wrapper
+    defaults each ``[out]`` to ``pythoncom.Missing``. (This used to demand the
+    RAW late-bound dispatch and pass byref VARIANTs; that form is correct only
+    off the makepy path, and mixing them reads as "no errors".)
     """
-    f, e, w = _byref(), _byref(), _byref()
-    raw_doc.Extension.GetWhatsWrong(f, e, w)
+    ext = _early_bound(doc.Extension, "IModelDocExtension")
+    res = ext.GetWhatsWrong()
+    if not isinstance(res, tuple) or len(res) < 4:
+        raise RuntimeError(f"GetWhatsWrong returned {res!r}, expected a 4-tuple")
+    _ret, feats, codes, warns = res
     return [
         (feat.Name, int(code), bool(warn))
         for feat, code, warn in zip(
-            f.value or [], e.value or [], w.value or [], strict=False)
+            feats or [], codes or [], warns or [], strict=False)
     ]
 
 
 def error_messages(sw) -> list[str]:
     """Drain the session message stack. Read-and-CLEAR, last 20 only."""
-    m, i, t = _byref(), _byref(), _byref()
-    sw.GetErrorMessages(m, i, t)
-    return list(m.value or [])
+    res = _early_bound(sw, "ISldWorks").GetErrorMessages()
+    if not isinstance(res, tuple) or len(res) < 2:
+        return []
+    return list(res[1] or [])
 
 
 def rebuild_error_text(sw, model) -> str:
