@@ -22,15 +22,27 @@ DOME_DIA = 2.0 * TOP_RADIUS  # 20.0: the round head around the clamp bore
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525: the 3/8 in cylinder-arbor journal
 BORE_HEIGHT = 54.0  # arbor axis above the foot seat (drive height)
 SCREW_THREAD = "#4"  # flange hold-down clearance hole
-# The #4 NORMAL clearance the wizard ACTUALLY cuts on this seat: the created
-# feature's ThruHoleDiameter reads 3.2512 (build log "1x #4 clearance
-# (Ø3.251)"; the screw-hole volume gate's +0.3 mm^3 offset was exactly this
-# hole). _holes.CLEARANCE_MM pins 3.264 for ("#4", "normal") — a
-# wizard-database dump this seat no longer matches — so resolver-sourcing
-# would print a masking note (3.26) contradicting the sheet's own native hole
-# callout (3.25). build_arbor_pedestal asserts the created hole matches this
-# pin to 0.005 mm, failing loud if the seat's wizard table ever moves again.
-SCREW_CLEARANCE_DIA = 3.2512
+# The #4 NORMAL clearance the wizard ACTUALLY cuts on this seat.
+#
+# 2026-07-26: the seat's wizard table moved BACK to the canonical value and this
+# pin followed it, 3.2512 -> 3.264. History, because the direction matters: the
+# pin was originally 3.2512 because the seat's created feature read
+# ThruHoleDiameter 3.2512 (build log "1x #4 clearance (Ø3.251)") while
+# _holes.CLEARANCE_MM pins 3.264 for ("#4", "normal") -- so resolver-sourcing
+# would have printed a masking note (3.26) contradicting the sheet's own native
+# hole callout (3.25). The seat now cuts 3.2639, i.e. it AGREES with
+# _holes.CLEARANCE_MM, so that contradiction is gone: note and callout both read
+# 3.26.
+#
+# The guard that caught this worked exactly as written -- build_arbor_pedestal
+# asserts the created hole matches this pin to 0.005 mm. It stayed silent for
+# months only because part:arbor_pedestal was being restored from the remote
+# cache; the first real rebuild after a _common.py change surfaced it at once.
+# Kept as a literal rather than sourced from _holes.CLEARANCE_MM on purpose:
+# this module is pure data with no imports, and pulling in _holes would drag
+# _common/_telemetry into its dependency closure and re-key both the part and
+# the drawing.
+SCREW_CLEARANCE_DIA = 3.264
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},
