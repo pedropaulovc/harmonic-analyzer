@@ -177,7 +177,7 @@ expect(DT, "pinion-pivot-block-1", [d.BLOCK_X, d.PIVOT_Y, d.BLOCK_FRONT_Z0 + d.B
 expect(DT, "pinion-pivot-block-2", [d.BLOCK_X, d.PIVOT_Y, d.BLOCK_BACK_Z0 + d.BLOCK_DEPTH], ROT_Y_180, "pinion-pivot-block back")
 expect(DT, "pinion-pivot-shaft-1", [d.PIVOT_X, d.PIVOT_Y, d.PIVOT_SHAFT_Z0], IDENTITY, "pinion-pivot-shaft")
 expect(DT, "pinion-lift-rod-1", [d.LIFT_X, d.LIFT_Y, d.LIFT_ROD_Z0], IDENTITY, "pinion-lift-rod")
-expect(DT, "pinion-spring-1", [d.SPRING_X, d.Y_BASE_TOP, d.SPRING_Z], IDENTITY, "pinion-spring")
+expect(DT, "pinion-spring-1", [d.SPRING_X, d.Y_BASE_TOP, d.SPRING_Z], ROT_Y_180, "pinion-spring")
 expect(DT, "pinion-cam-pin-1", [d._FPIN_ORG[0], d._FPIN_ORG[1], d._STRAP_MID_Z[0]], d.FPIN_ROWS, "pinion-cam-pin front")
 expect(DT, "pinion-cam-pin-2", [d._FPIN_ORG[0], d._FPIN_ORG[1], d._STRAP_MID_Z[1]], d.FPIN_ROWS, "pinion-cam-pin back")
 expect(DT, "pinion-cam-1", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[0]], IDENTITY, "pinion-cam front")

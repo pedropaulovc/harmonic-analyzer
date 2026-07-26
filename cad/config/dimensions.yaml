@@ -1753,13 +1753,13 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.8 × 4.0 brass strip; 31.0 foot, R2 bend, 60.623 straight blade parallel to the 49.864° parked strap, R1.5 × 20° return kink, 2.0 terminal flat
+        - 0.8 × 4.0 brass strip; 31.0 foot, R2 bend, 36.666 straight blade parallel to the 49.864° parked strap, R1.5 × 20° return kink, 2.0 terminal flat
         - —
-        - 'p.68–69 + v4_pinion_013/018/019: a brass leaf bears on the BACK strap''s outer flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). The drum-side support puts the cam on the pinion flank, so the blade is offset 10.1 on the opposite flank (build_pinion_spring / build_drive_train SPRING_*)'
+        - 'p.68–69 + v4_pinion_013/018/019: a brass leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). Sized against the 5.0 strap; blade offset 10.1 east of the strap axis (build_pinion_spring / build_drive_train SPRING_*)'
         - scaled
         - med
       - - Cam-follower pin (per strap)
-        - Ø4 × 22 steel stud, seated 4.0 in a blind west-edge bore 2.0 below the pivot axis; 18 proud reaches the lift cam through the drum-side linkage
+        - Ø4 × 17 steel stud, seated 4.0 in a blind west-edge bore 2.0 below the pivot axis; 13 proud reaches the lift cam through the v2 linkage's steeper swing
         - —
         - 'PR8 re-derivation of the p.69 block close-up (page002_img01): the bright follower reads as a fatter (~Ø4-5) stud at the pivot-height band, resting on the eccentric collar. A 4.0 blind edge seat is the geometry that clears the Ø6.35 pivot bore; contact reach + clearances are asserted analytically (build_drive_train CAM_*)'
         - scaled
@@ -1781,30 +1781,30 @@ sections:
       triangulation, then re-closed vertically around the v2 post. The 2026-06-18 removal argued the Ø22.4 drum could not
       thread the 12.56 mm channel between the rocker-support frustum and the
       64T — but the GT shows the drum never lived there: pinion_front/pinion_back
-      triangulate its axis near machine x −10, y ~104–107. The image evidence is proportional; the
+      triangulate its axis at machine x −10.16/−11.41, y ~104–107. The x evidence survives; the
       exact v2 journal now overrides the image-derived height and keeps the rig LEVEL with
       the drive line and INBOARD of the cylinder drum (between drum and machine
       centreline), not in the frustum/64T channel at all. Modeled layout
-      (`APINION_*` constants): axis at machine (−16.077, 90.518) =
-      X_DRUM + (drum tip 31.10 + pinion tip 11.22 + 2.0 disengaged gap); drum z −71.912..+71.288 (face 143.2,
+      (`APINION_*` constants): axis at machine (−8.900, 90.518) =
+      X_DRUM + (drum tip 31.10 + pinion tip 11.22 + 2.0 disengaged gap); drum z −39.585..+103.615 (face 143.2,
       spans all 20 stations); the front stub and tee
-      handle and arbor front sit at z −140.912 and −131.912, while the arbor back ends
-      at +94.338. Straps: 18 wide (0.8× the 42T tip
+      handle likewise move to z −99.585 and −108.585, while the back stub ends
+      at +126.665. Straps: 18 wide (0.8× the 42T tip
       Ø22.4, `v4_pinion_018` — the teeth stand proud of both flanks), pivot
       y 62.8, bore-to-bore c2c 43.0, parked at a −49.864° west lean after the v2 post moved the drive line; the swing rides the torque shaft as
       the p2 setup DOF (a freed operational DOF, its angle drive spec recorded
       in the DOF manifest; articulated by the mobility probe / motion drives). The brass
-      return spring (table row above) stands on the outer flank of the back
-      strap, foot on the base, and presses the swing to the disengaged rest —
+      return spring (table row above) stands east of the back strap, foot on
+      the base, and presses the swing west to the disengaged rest —
       parked-pose clearances asserted in `build_drive_train_assembly`
       (`SPRING_*`). The engage path (PR5) is the p.69 cam: the lift rod rides
-      the blocks' pinion-side bores at (−36.451, 57.625), 12.5 toward the pinion
-      and 5.175 below the drum-side torque-shaft bore at (−48.951, 62.800), and each strap
+      the blocks' WEST bores at (34.991, 64.570), 12.5 west and 1.770 above the
+      torque-shaft bore after the v2 closure, and each strap
       tail carries a Ø4 follower pin (table row above) the rod's radial cam
       pin lifts. The cam eccentricity is 1.4 and its v2-reclosed Ø10.32 OD
       restores the documented 0.575-mm thin-side wall that the transient Ø9.2
       cascade reduced to 0.015. Parked surface gap is 0.150, engaged surface
-      authority is 1.670 and the 22-mm follower retains 5.236 beyond the cam
+      authority is >0.25 and the 17-mm follower retains 2.047 on the cam
       station. Two open R6.90 bracket scallops cover the collar's complete
       parked-to-engaged swept envelope with 0.25 air and >2.5 pivot-bore
       ligament; the partially exposed follower-stud mouth is silver-brazed
@@ -2051,7 +2051,7 @@ sections:
          restored). See the "Alignment-pinion layout — RESTORED" section
          above. The former entries #10/#11 (0.28 mm face shave, parked
          lift-rod cam pins) remain in git history. PR5 (2026-07-03) made the
-         cam FUNCTIONAL: lift rod moved to the pinion-side bores, strap-tail
+         cam FUNCTIONAL: lift rod moved to the west bores, strap-tail
          follower pins added, contact band proven analytically — the old
          "pins don't touch the straps" simplification is retired.
 

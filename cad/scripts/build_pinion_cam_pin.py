@@ -11,8 +11,8 @@ in a tail cross-bore is retired: the photo reads a fatter (~Ø4-5) stud
 at the pivot's height band, and a blind edge seat is the only geometry
 that clears the Ø6.35 pivot bore there.
 
-Layout: axis Z, root (seated) end at the ORIGIN: 4.0 presses
-into the strap's blind edge bore, 18 proud after the drum-side closure; domed outer end (sagitta
+Layout: axis Z, root (seated) end at the ORIGIN, z 0..15: 4.0 presses
+into the strap's blind edge bore, 13 proud after the v2 linkage closure; domed outer end (sagitta
 0.8, the rod-end crown idiom). Axisymmetric about its local x = 0.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".

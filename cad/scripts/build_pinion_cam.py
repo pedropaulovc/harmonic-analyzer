@@ -4,9 +4,9 @@ The eccentric steel collar pinned to the lift rod at each strap station
 (``page001_img01`` back-tail close-up): the strap's follower pin RESTS
 ON its OD from above, so turning the lever (rod + both cams spin as
 one) raises the surface under the pin and swings the drum into mesh.
-Photo reads at 9.45 px/mm against the Ø6.35 rods: collar OD ~9.5 and a
-~Ø3.2 radial set-pin seat (locks the collar to the rod and stops axial
-drift -- review item 8b), with pin-on-collar tangency at park.
+Photo reads at 9.45 px/mm against the Ø6.35 rods: collar OD ~9.5, a
+~Ø3.2 set-pin dome proud of the OD (locks the collar to the rod and
+stops axial drift -- review item 8b), pin-on-collar tangency at park.
 
 Eccentricity 1.4 after the v2 drive-line closure provides 2.8 full lift.  The
 low-confidence photo OD is reclosed to 10.32 so that the thin side retains the
@@ -14,9 +14,9 @@ stated 0.575-mm wall over the Ø6.37 bore; the former Ø9.2 literal left only
 0.015 mm and was not manufacturable.
 
 Layout: bore axis Z through the ORIGIN (rides the rod), authored in the
-PARK pose -- collar centre at (0, -ECC), heavy side and set-pin seat
-straight DOWN, so the OD top is at its lowest (disengaged rest).
-Collar z 0..9; the radial seat lies along -Y at z 1.7, flush with the OD.
+PARK pose -- collar centre at (0, -ECC), heavy side and the set-pin
+boss straight DOWN, so the OD top is at its lowest (disengaged rest).
+Collar z 0..9; boss along -Y at z 2.5, 2.0 proud of the OD.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -197,8 +197,8 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Bore")
     volume = await volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
 
-    # Set-pin seat (item 8b): a radial tapped pad on the heavy side, flush
-    # with the OD in this closure. Top sketch (u, v) -> (X, -Z);
+    # Set-pin boss (item 8b): a radial stub straight DOWN the heavy side,
+    # 2.0 proud of the OD -- the img01 dome. Top sketch (u, v) -> (X, -Z);
     # extruded -Y from an anchor plane fully inside the collar.
     boss = SketchDims()
     check("create_sketch boss", await adapter.create_sketch("Top"))

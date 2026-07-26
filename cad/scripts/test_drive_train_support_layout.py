@@ -1,4 +1,4 @@
-"""Offline invariants for the drum-side alignment-pinion support closure."""
+"""Offline invariants for the recentered alignment-pinion support closure."""
 
 from __future__ import annotations
 
@@ -17,17 +17,21 @@ def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
     assert drive.APINION_GAP == 2.0
 
 
-def test_complete_support_rig_is_on_the_cylinder_side() -> None:
-    assert drive.X_DRUM < drive.PIVOT_X < drive.LIFT_X < drive.APINION_X
-    assert drive.BLOCK_X < drive.APINION_X
-    assert drive.LEVER_TILT_DEG < 0.0
-    assert drive.HANDLE_TILT_DEG < 0.0
-    assert all(
+def test_support_rig_keeps_its_proven_outboard_topology() -> None:
+    assert drive.X_DRUM < drive.APINION_X < drive.PIVOT_X < drive.LIFT_X
+    assert drive.BLOCK_X > drive.APINION_X
+    assert drive.LEVER_TILT_DEG > 0.0
+    assert drive.HANDLE_TILT_DEG > 0.0
+
+    block_near_edge = drive.BLOCK_X - drive.BLOCK_WIDTH / 2.0
+    cylinder_outboard_tip = drive.X_DRUM + drive.TIP_DRUM120
+    assert block_near_edge - cylinder_outboard_tip >= 0.25
+    throw_angles = (
         drive.LEVER_TILT_DEG
         + math.copysign(step * 0.25, drive.LEVER_TILT_DEG)
-        <= drive.LEVER_TILT_DEG
         for step in range(81)
     )
+    assert all(abs(angle) >= abs(drive.LEVER_TILT_DEG) for angle in throw_angles)
 
 
 def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
@@ -35,7 +39,14 @@ def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
     cam_authority = (drive.FPIN_DIA + drive.CAM_OD) / 2.0 - drive._D_ENG
     assert cam_authority >= 0.25
     assert drive.LIFT_Y - drive._CAM_SWEEP_R - drive.Y_BASE_TOP >= 0.25
-    assert drive._SPRING_Z_MIN - drive._LAST_CYLINDER_Z_MAX >= 0.25
+    assert (
+        math.hypot(
+            drive.X_DRUM - drive.SPRING_CREST[0],
+            drive.Y_DRIVE - drive.SPRING_CREST[1],
+        )
+        - drive.SPRING_T
+        >= drive.TIP_DRUM120 + 0.25
+    )
     assert drive._FPIN_TIP_S - drive._S_CAM >= 2.0
 
 

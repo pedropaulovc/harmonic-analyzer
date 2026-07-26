@@ -194,15 +194,15 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     assert math.isclose(engaged_gap, 7.101970902077434)
 
 
-def test_rederived_support_holes_follow_the_same_installation_delta() -> None:
+def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     former_blocks = (
-        (-50.50785282050067, -98.0),
-        (-23.507852820500673, -98.0),
-        (-50.50785282050067, 82.0),
-        (-23.507852820500673, 82.0),
+        (15.240530460002873, -98.0),
+        (42.24053046000287, -98.0),
+        (15.240530460002873, 82.0),
+        (42.24053046000287, 82.0),
     )
     former_feet = (
-        (-100.84046206685021, 70.95),
+        (48.73610240207359, 70.95),
         (-54.7, -95.5),
         (-54.7, 102.5),
     )
