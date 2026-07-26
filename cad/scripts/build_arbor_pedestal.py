@@ -73,7 +73,7 @@ from arbor_pedestal_spec import (
     STRAP_T,
     TOP_RADIUS,
 )
-from _holes import HoleSpec, wizard_holes
+from _holes import DIAMETER_TOLERANCE_MM, HoleSpec, wizard_holes
 
 PART_NAME = "arbor-pedestal"
 MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
@@ -272,11 +272,16 @@ async def build(adapter) -> dict[str, str]:
         (0.0, -1.0, 0.0), "flange hold-down hole (#4 clearance)", name="ScrewHole",
         placement_dims=[((None, None), ("ScrewZ", '"ScrewZ"'))],
     )
-    if abs(screw_cut.hole_dia_mm - SCREW_CLEARANCE_DIA) > 0.005:
+    # Same constant wizard_holes corrects against, so this can never demand a
+    # precision the wizard declines to deliver (the dead band -- see _holes).
+    if abs(screw_cut.hole_dia_mm - SCREW_CLEARANCE_DIA) > DIAMETER_TOLERANCE_MM:
         raise RuntimeError(
             f"flange hold-down hole cut Ø{screw_cut.hole_dia_mm:.4f} != spec "
-            f"SCREW_CLEARANCE_DIA Ø{SCREW_CLEARANCE_DIA} -- the seat's wizard "
-            "table moved; realign the spec pin (and the sheet masking note)"
+            f"SCREW_CLEARANCE_DIA Ø{SCREW_CLEARANCE_DIA} -- wizard_holes should "
+            f"have forced it to within {DIAMETER_TOLERANCE_MM} mm, so either the "
+            "spec pin no longer matches _holes.CLEARANCE_MM or the override "
+            "write was rejected; dump the table with "
+            "diagnostics/diag_hole_wizard_tables.py before touching the pin"
         )
     drive_jobs += screw_cut.placement_drive_jobs
     v_hole = math.pi * (SCREW_CLEARANCE_DIA / 2.0) ** 2 * FOOT_HEIGHT
