@@ -83,6 +83,42 @@ def _function_body(source: str, name: str) -> str:
     raise AssertionError(f"{name} not found")
 
 
+def _early_bound_arity_offenders(source: str) -> list[str]:
+    """``lineno (why)`` for every ``_early_bound`` call that is not (obj, interface).
+
+    Handles the call shapes a naive check misses -- attribute-style callees,
+    keyword args, and splats -- because the point of this gate is to be
+    un-dodgeable. Kept at module level so a known-bad source can be fed to it.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:  # pragma: no cover - not our file to fix
+        return []
+
+    def callee(func: ast.expr) -> str:
+        if isinstance(func, ast.Name):
+            return func.id
+        if isinstance(func, ast.Attribute):
+            return func.attr
+        return ""
+
+    out: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or callee(node.func) != "_early_bound":
+            continue
+        # The signature is _early_bound(obj, interface) -- those two names are
+        # the ONLY legal keywords; anything else is a leftover method name. A
+        # splat is flagged unconditionally: len(args) cannot see through it.
+        stray = [kw.arg for kw in node.keywords if kw.arg not in ("obj", "interface")]
+        if any(isinstance(arg, ast.Starred) for arg in node.args):
+            out.append(f"{node.lineno} (*splat hides the arg count)")
+        elif stray:
+            out.append(f"{node.lineno} (stray keyword: {', '.join(map(str, stray))})")
+        elif len(node.args) + len(node.keywords) > 2:
+            out.append(f"{node.lineno} ({len(node.args) + len(node.keywords)} args)")
+    return out
+
+
 def _build_path_sources() -> list[Path]:
     """Every script the build/verify path can import (diagnostics excluded)."""
     return sorted(
@@ -151,25 +187,69 @@ def test_no_caller_passes_the_removed_method_names() -> None:
     and a line-based ``rg`` confirmed the false clean. Those callers now raise
     ``TypeError`` before binding, so a full build would die at the interference
     gate (codex #418). Parsing the call is the only check that cannot lie.
+
+    Four call SHAPES are checked, not just the bare positional one. A gate that
+    only understands ``_early_bound(a, b, c)`` is dodgeable, and a dodgeable
+    gate is the folklore this branch exists to delete:
+
+    ==================================  ==================================
+    shape                               why it would otherwise slip
+    ----------------------------------  ----------------------------------
+    ``_common._early_bound(a, b, c)``   ``ast.Attribute``, not ``ast.Name``
+    ``_early_bound(a, b, m="x")``       extra arg is a keyword, not in ``args``
+    ``_early_bound(a, b, *names)``      ``len(args)`` undercounts a splat
+    ``_early_bound(a, b, c)``           the original positional form
+    ==================================  ==================================
+
+    All four are currently absent from the tree; this keeps them absent, and
+    ``test_the_arity_gate_actually_fires`` proves the detector is not merely
+    passing on an empty search.
     """
-    offenders = []
-    for path in sorted(SCRIPTS.rglob("*.py")):
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except SyntaxError:  # pragma: no cover - not our file to fix
-            continue
-        offenders += [
-            f"{path.name}:{node.lineno} ({len(node.args)} args)"
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "_early_bound"
-            and len(node.args) > 2
-        ]
+    offenders = [
+        f"{path.name}:{hit}"
+        for path in sorted(SCRIPTS.rglob("*.py"))
+        for hit in _early_bound_arity_offenders(path.read_text(encoding="utf-8"))
+    ]
     assert not offenders, (
         "_early_bound no longer accepts method names; these raise TypeError:\n  "
         + "\n  ".join(offenders)
     )
+
+
+@pytest.mark.parametrize(
+    ("shape", "source"),
+    [
+        ("positional", '_early_bound(doc, "IModelDoc2", "GetWhatsWrong")'),
+        ("multiline", '_early_bound(\n    doc,\n    "IAssemblyDoc",\n    "GetComponents",\n)'),
+        ("attribute", '_common._early_bound(doc, "IModelDoc2", "Save3")'),
+        ("keyword", '_early_bound(doc, "IModelDoc2", method="Save3")'),
+        ("splat", "_early_bound(doc, iface, *names)"),
+    ],
+)
+def test_the_arity_gate_actually_fires(shape: str, source: str) -> None:
+    """A gate that has never been seen to FAIL is not known to work.
+
+    ``test_no_caller_passes_the_removed_method_names`` asserts a negative over a
+    currently-clean tree, so on its own it cannot distinguish "no offenders"
+    from "detector broken". These are the known-bad inputs: each is a shape that
+    really did (``multiline``) or plausibly could dodge a narrower check.
+    """
+    assert _early_bound_arity_offenders(source), (
+        f"the {shape} shape slipped past the detector -- a caller written that "
+        "way would reach a live build and raise TypeError at bind time"
+    )
+
+
+def test_the_arity_gate_passes_legal_calls(  # noqa: D103 - paired with the above
+) -> None:
+    for source in (
+        '_early_bound(doc, "IModelDoc2")',
+        '_early_bound(adapter.currentModel, interface="IAssemblyDoc")',
+        '_common._early_bound(obj=doc, interface="IModelDoc2")',
+    ):
+        assert not _early_bound_arity_offenders(source), (
+            f"false positive on a legal 2-arg call: {source!r}"
+        )
 
 
 def test_every_scanned_source_is_a_check_recipe_dependency() -> None:
