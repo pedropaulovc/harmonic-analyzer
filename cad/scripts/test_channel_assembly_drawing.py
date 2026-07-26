@@ -69,22 +69,6 @@ def test_dodo_yields_the_assembly_drawing_task() -> None:
     }
 
 
-def test_bom_covers_every_placed_component() -> None:
-    """Every BOM row corresponds to a component the channel build places.
-
-    The channel build places components in per-active-channel loops, a
-    bushing-bank seed + ``LocalLinearPattern``, ``CopyWithMates2`` slice
-    replication and a batched ``place_components_batch`` cosmetic bank, so the
-    check is a string presence test, not a ``place_component`` count -- the
-    runtime ``insert_bom_table`` validates one BOM row per expected component.
-    """
-    source = (Path(__file__).parent / "build_channel_assembly.py").read_text(
-        encoding="utf-8"
-    )
-    for component in drawing.BOM_COMPONENTS:
-        assert f'"{component}"' in source, f"{component} not placed by the build"
-
-
 def test_assembly_stamps_title_block_properties() -> None:
     source = (Path(__file__).parent / "build_channel_assembly.py").read_text(
         encoding="utf-8"
@@ -99,26 +83,43 @@ def test_assembly_stamps_title_block_properties() -> None:
     assert source.count('"Finish": "SEE COMPONENT DRAWINGS"') == 1
 
 
-def test_drawing_places_bom_and_balloons() -> None:
+def test_drawing_is_one_simple_three_view_diagram() -> None:
+    """The curated BOM + balloon sheet is gone; only the three views remain.
+
+    ``AutoBalloon5`` clusters item 4 (pivot-bushing) and item 7
+    (connecting-rod) in the right view and its ring layout does not preserve
+    their attachment order, so their leaders cross and the layout audit fails.
+    It is also nondeterministic about which view it balloons an item from, so
+    the adjacency is luck rather than a tunable. The curated drawing will be
+    recreated with deterministic placement; until then this asserts the sheet
+    really is minimal, so a partial restoration cannot land unnoticed.
+    """
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("insert_identified_bom_table(") == 1
-    assert source.count("add_auto_balloons_across_views(") == 1
-    assert "position_bom_balloon" not in source
-    assert "margin=0.006" in source
-    assert "layout=2" in source
-    assert "add_component_bom_balloons" not in source
-    assert "adapter, (front, right, iso)" in source
+    assert source.count("place_view(") == 3
+    assert source.count("scale=VIEW_SCALE") == 3
+    assert "for view in (front, right, iso):" in source
+    assert '"*Front"' in source
+    assert '"*Right"' in source
+    assert '"*Isometric"' in source
+    assert "insert_identified_bom_table(" not in source
+    assert "add_auto_balloons" not in source
+    assert "add_component_bom_balloons(" not in source
+    assert "isolate_drawing_view_components(" not in source
+    assert "add_note(" not in source
     assert drawing.SHEET_SCALE == (1.0, 7.0)
-    assert source.count("scale=VIEW_SCALE") == 3  # every view pins its scale
-    assert source.count("add_note(") == 1
-    assert "20 CHANNEL CHAINS AT 7.06 PITCH" in drawing.ASSEMBLY_NOTES
-    assert all(
-        token not in drawing.ASSEMBLY_NOTES
-        for token in ("MATERIAL", "FINISH", "UOS", "DEBUR", "BREAK SHARP")
-    )
+    assert drawing.VIEW_SCALE == (1, 7)
+    assert drawing.SHEET_NAMES == ("THREE-VIEW DIAGRAM",)
+    assert "expected_sheet_names=SHEET_NAMES" in source
 
 
 def test_manual_balloon_moves_are_locked_and_read_back() -> None:
+    """The pinning helper stays maintained -- the recreation will need it.
+
+    No drawing calls ``position_bom_balloon`` today (``f375557a`` dropped
+    channel's last two pins for ``layout=2``, which is what broke). Keep it
+    covered rather than delete it: deterministic placement is the way back to a
+    curated channel sheet.
+    """
     source = (Path(__file__).parent / "_drawing_common.py").read_text(encoding="utf-8")
     helper = source[source.index("def position_bom_balloon(") :]
     helper = helper[: helper.index("\ndef stamp_drawing_summary(")]
