@@ -90,9 +90,8 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert re.search(r"\d+\.\d(?!\d)", notes) is None
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert '"Manufacturing Notes", 0.016, 0.078' in source
-    assert 'add_property_linked_note(adapter, "Side View Note", 0.235, 0.088)' in source
+    assert 'adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025' in source
+    assert 'add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)' in source
     assert "insert_hole_table(" in source
     assert "_visible_hole_table_entities(adapter, top)" in source
     assert "datum_entity=datum_entity" in source
@@ -123,6 +122,10 @@ def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     assert len(drawing.TOP_KEEP) == 2
     assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
     assert drawing.HOLE_TABLE_ANCHOR[0] >= 0.274
+
+
+def test_plan_view_clears_top_border_and_lower_notes() -> None:
+    assert drawing.TOP_CENTER == (0.130, 0.163)
 
 
 def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:
