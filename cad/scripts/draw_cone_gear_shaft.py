@@ -27,7 +27,12 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_gear_shaft_spec import JOURNAL_DIA, SECTION_DIAS, SHAFT_LENGTH
+from cone_gear_shaft_spec import (
+    JOURNAL_DIA,
+    JOURNAL_END,
+    SECTION_DIAS,
+    SHAFT_LENGTH,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -222,7 +227,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         side,
-        symbol_xy=(0.215, 0.252),
+        # A datum feature symbol attached to a cylindrical face persists at
+        # the face boundary, not at an arbitrary leader shoulder.  Request the
+        # journal's actual small-end station so the authored and read-back
+        # positions are identical.
+        symbol_xy=(big_end_x - JOURNAL_END / 1000.0, 0.252),
         datum="A",
         label="pivot journal datum feature",
         entity_type="FACE",
@@ -254,7 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.230, 0.242),
+        symbol_xy=(0.255, 0.242),
         roughness_ra="1.6",
         label="pivot journal finish",
         entity_type="FACE",
