@@ -547,15 +547,17 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(
         adapter,
         (
+            # Unnamed offset planes created inside name_bore_axis. Removing
+            # CrankGearReliefPlane shifts these generated ordinals down by one.
+            ("Plane1", "PLANE"),
             ("Plane2", "PLANE"),
-            ("Plane3", "PLANE"),
             ("CrankAxisVert", "PLANE"),
             ("CrankAxisHigh", "PLANE"),
             ("CrankAxisSeat", "PLANE"),
+            ("Plane6", "PLANE"),
             ("Plane7", "PLANE"),
             ("Plane8", "PLANE"),
             ("Plane9", "PLANE"),
-            ("Plane10", "PLANE"),
             ("PlateTop", "PLANE"),
             (swing_axis, "AXIS"),
             (anchor_axis, "AXIS"),
