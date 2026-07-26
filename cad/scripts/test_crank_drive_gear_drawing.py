@@ -29,6 +29,11 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert "+0.050/+0.030" in drawing.DIMENSION_CALLOUTS["BoreDia"]
 
 
+def test_bore_volume_formula_dependency_is_available() -> None:
+    expected = math.pi * (part.BORE_DIAMETER / 2.0) ** 2 * part.FACE_WIDTH
+    assert part.math.pi * (part.BORE_DIAMETER / 2.0) ** 2 * part.FACE_WIDTH == expected
+
+
 def test_gear_data_block_specifies_the_tooth_system() -> None:
     data = spec.GEAR_DATA
     for field in (
