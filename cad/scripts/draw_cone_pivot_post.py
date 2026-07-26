@@ -16,6 +16,7 @@ from _drawing_common import (
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_basic_dimension,
@@ -69,7 +70,7 @@ _S = SHEET_SCALE[0] / 1000.0
 # Third-angle: the front elevation carries the height and crank journal; the
 # plan carries the two body diameters and mounting-hole pattern.
 FRONT_CENTER = (0.105, 0.145)
-TOP_CENTER = (0.105, 0.245)
+TOP_CENTER = (0.105, 0.235)
 ISO_CENTER = (0.340, 0.145)
 
 
@@ -81,8 +82,14 @@ FRONT_KEEP = {
     "MainBodyHt": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1]),
     "HeadHt": (FRONT_CENTER[0] + 0.055, _front_y(BLOCK_HEIGHT - HEAD_HEIGHT / 2.0)),
     "CrankAxisY": (FRONT_CENTER[0] - 0.035, _front_y(CRANK_BORE_HEIGHT / 2.0)),
-    "CrankBossDia": (FRONT_CENTER[0] + 0.050, _front_y(CRANK_BORE_HEIGHT + 0.012)),
-    "CrankBoreDia": (FRONT_CENTER[0] + 0.050, _front_y(CRANK_BORE_HEIGHT - 0.012)),
+    "CrankBossDia": (
+        FRONT_CENTER[0] + 0.050,
+        _front_y(CRANK_BORE_HEIGHT) + 0.018,
+    ),
+    "CrankBoreDia": (
+        FRONT_CENTER[0] + 0.050,
+        _front_y(CRANK_BORE_HEIGHT) - 0.012,
+    ),
 }
 TOP_KEEP = {
     "MainBodyDia": (TOP_CENTER[0] - 0.040, TOP_CENTER[1]),
@@ -214,14 +221,14 @@ def _add_journal_axis_table(adapter: Any) -> None:
         adapter,
         "JOURNAL AXIS COORDINATES (mm)",
         0.225,
-        0.270,
+        0.255,
         label="journal-axis table heading",
     )
     _add_table_note(
         adapter,
         JOURNAL_AXIS_ORIENTATION_NOTE,
         0.225,
-        0.260,
+        0.245,
         label="journal-axis coordinate orientation",
     )
     for column, column_x in zip(
@@ -233,11 +240,11 @@ def _add_journal_axis_table(adapter: Any) -> None:
             adapter,
             column,
             column_x,
-            0.244,
+            0.229,
             label=f"journal-axis coordinate column {column}",
         )
     for row_y, (point, x_value, y_value, z_value) in zip(
-        (0.234, 0.222), JOURNAL_AXIS_POINTS, strict=True
+        (0.219, 0.207), JOURNAL_AXIS_POINTS, strict=True
     ):
         _add_table_note(
             adapter, point, 0.225, row_y, label=f"journal-axis point {point}"
@@ -252,7 +259,7 @@ def _add_journal_axis_table(adapter: Any) -> None:
         adapter,
         "AXIS = LINE THROUGH P AND Q",
         0.285,
-        0.209,
+        0.194,
         label="journal-axis table definition",
     )
     adapter.currentModel.EditRebuild3()
@@ -298,7 +305,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, iso)
     for view in (front, top):
@@ -376,6 +383,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     journal_entity = _bore_rim_edge(adapter, front, diameter_mm=BORE_DIA)
+    journal_center = model_point_in_view(
+        adapter,
+        front,
+        (0.0, BORE_HEIGHT / 1000.0, 0.0),
+        label="inclined journal axis center",
+    )
     add_attached_note(
         adapter,
         front,
@@ -390,16 +403,18 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         front,
-        symbol_xy=(0.160, _front_y(BORE_HEIGHT) - 0.018),
+        # The restricted rim tag normalizes 0.867 mm radially from the
+        # projected axis center; bound that annotation behavior only.
+        symbol_xy=(journal_center[0], journal_center[1] - 0.018),
         datum="C",
         label="inclined journal axis",
         entity=journal_entity,
-        position_tolerance_m=0.020,
+        position_tolerance_m=0.0009,
     )
     add_feature_control_frame(
         adapter,
         front,
-        frame_xy=(0.185, _front_y(BORE_HEIGHT) - 0.004),
+        frame_xy=(0.185, journal_center[1] - 0.023),
         characteristic="position",
         tolerance="0.05",
         datums=("A", "B"),
@@ -422,9 +437,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _add_table_note(
         adapter,
-        "UPPER PLAN (+X RIGHT, +Z DOWN)",
+        "UPPER PLAN SCALE 1:2 (+X RIGHT, +Z DOWN)",
         0.070,
-        0.278,
+        0.263,
         label="upper-plan view label",
     )
     _add_journal_axis_table(adapter)
