@@ -89,11 +89,36 @@ returns the object unwrapped-but-flagged when no typed class resolves; and the
 standalone probes in `cad/scripts/diagnostics/` use `GetObject`/`Dispatch`
 directly, so they are dynamic and genuinely DO need byrefs — which is exactly why
 a probe that works standalone can come back empty in-build. Root-cause fix
-(analysed 2026-07-25, NOT yet implemented): make `_early_bound` raise instead of
-falling back, give diagnostics the same early-bound `connect()`, then ban
-`VT_BYREF` repo-wide with a one-grep gate. Do NOT write a dual-mode
-`call_outs()` helper — that makes the broken mode permanent. See
-[[no-untested-failure-assumptions]].
+(analysed 2026-07-25, IMPLEMENTED on `fix/out-param-trap`): `_early_bound` now
+RAISES instead of falling back, its `*method_names` param is gone, and
+`test_out_param_binding.py` (in `recipe_tests`) bans `VT_BYREF` on the build
+path and forces every late-bound diagnostic to carry a `LATE-BOUND PROBE`
+marker. Do NOT write a dual-mode `call_outs()` helper — that makes the broken
+mode permanent. See [[no-untested-failure-assumptions]].
+
+**The typelib is the OFFLINE authority on any method's out-param shape.** When
+you need to know what a call returns without booting SolidWorks or guessing,
+read the registered type library — `pythoncom.LoadRegTypeLib(SW_TLB_IID, 34, 0, 0)`
+(major 34 = SW 2026), find the interface via `GetDocumentation(i)[0]`, then
+`GetFuncDesc` → `fd.rettype[0]` for the return VT and `fd.args[n][1]` for each
+param's PARAMFLAG bits (1 FIN / **2 FOUT** / 8 FRETVAL); `ti.GetNames(fd.memid)`
+gives `(method, *param_names)` in declaration order. makepy's return tuple is
+then just `(retval, *outs_in_declaration_order)`. Worked example —
+`GetErrorMessages` reads `rettype=3 (VT_I4)` with `Msgs`/`MsgIDs`/`MsgTypes` all
+`vt=(26,12)` (VT_PTR→VT_VARIANT) flagged pure `FOUT`, hence
+`(count, Msgs, MsgIDs, MsgTypes)` and a call taking ZERO args. Confirmed live on
+the seat (`shape=tuple len=4`) — cheap enough that "typelib says X" should
+always be closed out with an observation. Beats both memory and a full-build
+repro: it took seconds where an assembly-level repro could not even reach the
+code path.
+
+**Not every wrong-mate state reaches the error-prose path.** Trying to
+manufacture a `swFeatureError_e 47` by inverting a mate's dimension flip
+(`build_channel_assembly` J1a) does NOT work: the mate still SOLVES, just on the
+wrong side, so the deterministic flip-seed guard raises first
+(`flip-seed MISS … off by 7.06 mm, error=0`) and `_cwm.mate_error_prose` never
+runs. An unsolved-mate repro needs a geometrically IMPOSSIBLE mate, not a
+mirrored one.
 
 Also `FeatureByName` is declared on `IAssemblyDoc`, not `IModelDoc2` (same
 dispatch), and `IMate2` has no feature/error accessor at all — you cannot get an
