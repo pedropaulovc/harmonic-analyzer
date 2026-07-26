@@ -156,8 +156,8 @@ BLOCK_SCREW_XZ = tuple(
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 22 shank - 18.75 block = 3.25 buried + 0.25 air
 BLOCK_SCREW_DRILL_DEPTH = 7.0
 _FORMER_FOOT_SCREW_XZ = (
-    (48.73610240207359, 70.95),  # spring foot (build_pinion_spring hole: the west foot
-    # crosses under the lift rod so its screw lands west of the moving rig)
+    (43.13610240207359, 70.95),  # spring foot: 1-in reach keeps its screw head
+    # clear of the unchanged rocker-arm-support casting after the rig recenter
     (-54.7, -95.5),   # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
     (-54.7, 102.5),   # NORTH arbor-pedestal flange (PR8, ch12 img09: the
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)

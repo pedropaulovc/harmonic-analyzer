@@ -202,7 +202,7 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
         (42.24053046000287, 82.0),
     )
     former_feet = (
-        (48.73610240207359, 70.95),
+        (43.13610240207359, 70.95),
         (-54.7, -95.5),
         (-54.7, 102.5),
     )

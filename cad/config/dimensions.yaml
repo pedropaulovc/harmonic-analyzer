@@ -1753,7 +1753,7 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.8 × 4.0 brass strip; 31.0 foot, R2 bend, 36.666 straight blade parallel to the 49.864° parked strap, R1.5 × 20° return kink, 2.0 terminal flat
+        - 0.8 × 4.0 brass strip; 25.4 foot, R2 bend, 36.666 straight blade parallel to the 49.864° parked strap, R1.5 × 20° return kink, 2.0 terminal flat
         - —
         - 'p.68–69 + v4_pinion_013/018/019: a brass leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). Sized against the 5.0 strap; blade offset 10.1 east of the strap axis (build_pinion_spring / build_drive_train SPRING_*)'
         - scaled

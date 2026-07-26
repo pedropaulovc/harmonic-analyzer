@@ -1212,7 +1212,7 @@ SPRING_CREST = (SPRING_X - SPR_CREST_L[0], Y_BASE_TOP + SPR_CREST_L[1])
 # the parked contact edge (kink start, tangent parallel to the strap axis)
 SPRING_FLAT_TIP = (SPRING_X - SPR_FLAT_TIP_L[0], Y_BASE_TOP + SPR_FLAT_TIP_L[1])
 SPRING_FOOT_TOP = Y_BASE_TOP + SPRING_T  # wall under the foot centreline
-SPRING_HOLE_X = SPRING_X - SPR_FOOT_END_L[0] - SPR_HOLE_FROM_END  # 20.37
+SPRING_HOLE_X = SPRING_X - SPR_FOOT_END_L[0] - SPR_HOLE_FROM_END
 
 if math.hypot(_SPR_PIVOT[0] - PIVOT_X, _SPR_PIVOT[1] - PIVOT_Y) > 0.01:
     raise AssertionError("spring part frame disagrees with the strap pivot")

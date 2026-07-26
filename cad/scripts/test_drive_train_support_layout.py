@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import build_drive_train_assembly as drive
+from rocker_arm_support_spec import SUPPORT_WORLD_X
 
 
 def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
@@ -48,6 +49,17 @@ def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
         >= drive.TIP_DRUM120 + 0.25
     )
     assert drive._FPIN_TIP_S - drive._S_CAM >= 2.0
+
+
+def test_return_spring_foot_clears_the_fixed_rocker_support() -> None:
+    rocker_near_face = SUPPORT_WORLD_X - 31.75
+    spring_foot_end = drive.SPRING_X - drive.SPR_FOOT_END_L[0]
+    assert rocker_near_face - spring_foot_end >= 0.25
+    assert (
+        rocker_near_face
+        - (drive.SPRING_HOLE_X + drive.FSCREW_HEAD_DIA / 2.0)
+        >= 0.25
+    )
 
 
 def test_base_holes_follow_the_rederived_support() -> None:

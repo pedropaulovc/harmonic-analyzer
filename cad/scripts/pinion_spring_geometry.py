@@ -12,7 +12,7 @@ from _holes import HoleSpec, blind_cut_dia_mm
 
 THICK = 0.8
 WIDTH = 4.0
-FOOT_LEN = 31.0
+FOOT_LEN = 25.4  # 1 in; keeps the screw-down foot clear of the fixed rocker casting
 R_BEND = 2.0
 R_KINK = 1.5
 KINK_DEG = 20.0
