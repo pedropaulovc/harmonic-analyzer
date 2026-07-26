@@ -86,9 +86,9 @@ MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 # Keeps the arbor's 7.5 engagement from the north face; the -Z flange carries
 # the screw. Foot-screw shank O2.9 pass-through (build_foot_screw, the flange
 # hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange):
-# #4 clearance NORMAL fit (Ø3.2512, measured from the seat's created feature).
+# #4 clearance NORMAL fit (Ø3.264 = 0.1285 in, the seat wizard-table value).
 SCREW_HOLE_SPEC = HoleSpec("clearance", SCREW_THREAD)
-SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.2512, the seat-proven cut (see the
+SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.264, the seat-proven cut (see the
 # spec's pin rationale); the post-create assert below keeps model, note and
 # drive-train assembly's foot-screw clearance assert (build_drive_train_assembly)
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)

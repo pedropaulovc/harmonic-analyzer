@@ -49,6 +49,29 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     assert tuple(round(value, 3) for value in clearances) == expected
 
 
+def test_screw_clearance_tracks_the_hole_resolver() -> None:
+    """The hand-pinned diameter must equal what the hole resolver would give.
+
+    ``arbor_pedestal_spec`` keeps ``SCREW_CLEARANCE_DIA`` as a LITERAL on
+    purpose -- it is a pure-data module, and importing ``_holes`` would pull
+    ``_common``/``_telemetry`` into its dependency closure and re-key both the
+    part and the drawing. The cost of that choice is a duplicated constant, and
+    this duplicate has now drifted twice (3.2512 <-> 3.264), each time only
+    surfacing when a real rebuild replaced a remote-cache restore.
+
+    A test can import both without touching the part's closure, so the drift is
+    pinned here instead: the literal, ``_holes.CLEARANCE_MM``, and the seat's
+    own wizard table (``#4`` normal = 0.1285 in) must all agree.
+    """
+    import _holes
+
+    assert arbor_pedestal_spec.SCREW_CLEARANCE_DIA == _holes.CLEARANCE_MM[("#4", "normal")]
+    # 0.1285 in is the seat's Screw Clearances row, read via
+    # diagnostics/diag_hole_wizard_tables.py -- the authority the build asserts
+    # against. Rounded to the resolver's 3 dp.
+    assert round(0.1285 * 25.4, 3) == arbor_pedestal_spec.SCREW_CLEARANCE_DIA
+
+
 def test_notes_specify_part_requirements_without_title_block_duplicates() -> None:
     notes = arbor_pedestal_spec.DRAWING_NOTES
     assert "MATING ARBOR LIMITS DIA 9.505-9.525 (REF)" in notes
@@ -67,10 +90,11 @@ def test_notes_specify_part_requirements_without_title_block_duplicates() -> Non
     assert "BOXED 6.00/16.00 LOCATE STRAP NEAR/FAR FACES FROM D" in notes
     assert "DIMENSIONS AND GD&T APPLY BEFORE COATING" in notes
     assert "MASK ARBOR BORE" in notes
-    # 3.25: the live seat's wizard cut (ThruHoleDiameter 3.2512), which the
-    # sheet's native hole callout also prints.  This deliberately follows the
-    # created feature rather than _holes.CLEARANCE_MM's 3.264 resolver value.
-    assert "DIA 3.25\nHOLE" in notes
+    # 3.26: the seat's wizard-table value for #4 NORMAL (0.1285 in = 3.2639),
+    # which the sheet's native hole callout also prints -- so masking note and
+    # callout agree. See the spec's pin rationale for why the 3.25 reading was
+    # a wrong-row artefact rather than a different seat.
+    assert "DIA 3.26\nHOLE" in notes
     assert "FOOT SEAT A, LEFT SIDE B" in notes
     assert "PROFILE-CONTROLLED SURFACES" in notes
     assert "25-50 um" not in notes
