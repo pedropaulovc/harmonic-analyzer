@@ -141,8 +141,11 @@ revolve-pi fix) while the gate was blind to mate errors. The build gates MISSED
 it: `assert_components_fully_defined` passes broken mates (a grounded comp reports
 FIXED regardless of mate health) and `check_no_interference` does not see mate
 state. FIX = new `_common.assert_model_healthy(deep=True)`: ForceRebuild3 +
-`IModelDocExtension.GetWhatsWrong` (byref VT_BYREF|VT_VARIANT out-params — a bare
-pywin32 call RAISES; mirror com_variant.byref_long via `_byref_variant`), raises
+`IModelDocExtension.GetWhatsWrong` (three `[out]` params — through the makepy
+wrapper call it BARE and consume the return tuple; "a bare call RAISES, pass
+VT_BYREF|VT_VARIANT" was folklore that holds only on a late-bound dispatch and
+silently yields "no errors" on the build's early-bound path, see
+[[sw-assembly-mate-diagnostics-api]]), raises
 on any non-warning entry. **deep=True walks each top-level component's OWN doc**
 (GetModelDoc2) — a flexible sub's internal mate errors show ONLY there, the
 parent's What's Wrong shows just a component-level WARNING (code 1, warning=True),

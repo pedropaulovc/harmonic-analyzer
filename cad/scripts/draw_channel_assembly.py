@@ -1,11 +1,24 @@
-r"""Create the curated assembly drawing for the channel subassembly.
+r"""Create a simple three-view diagram of the channel subassembly.
 
-Front / right / isometric views of ``cad/out/sldasm/channel.SLDASM`` plus a
-top-level parts BOM and auto-inserted item-number balloons, on the same
-hand-made ASME B template every part print uses. The title block resolves from
-the custom properties ``build_channel_assembly.py`` stamps on the assembly
-(Number, Revision, component-drawing material/finish, and the TOL_* cells
-``finalize_drawing`` requires).
+The sheet intentionally contains only front, right, and isometric views of
+``cad/out/sldasm/channel.SLDASM``.  It is an arrangement diagram for a
+mechanism that is still changing, not a parts-identification or manufacturing
+drawing.
+
+The curated version -- top-level parts BOM plus auto-inserted item-number
+balloons -- was removed 2026-07-25 and will be recreated later.  It could not
+be kept in the meantime: ``AutoBalloon5`` places item 4 (pivot-bushing) and
+item 7 (connecting-rod) in a tight vertical cluster in the right view, and its
+ring layout does not preserve their attachment order, so their leaders cross
+and the layout audit fails.  An earlier revision pinned those two balloons by
+hand for exactly this reason; ``f375557a`` replaced the pins with SolidWorks'
+native circular layout (``layout=2``) on the premise that "their order follows
+the view ring", which does not hold for this pair -- the ring fills the same
+two slots with the items swapped.  ``AutoBalloon5`` is also nondeterministic in
+which view it balloons a given BOM item from run to run (measured: item 2
+landed in view 3 on one run and view 1 on the next against an identical
+``.SLDASM``), so which pairs end up adjacent is luck.  Whatever replaces this
+needs a deterministic placement, not a tuned auto-layout.
 """
 
 from __future__ import annotations
@@ -15,14 +28,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _assembly_drawing_bom import (
-    configured_part_numbers,
-    insert_identified_bom_table,
-)
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_auto_balloons_across_views,
+    create_blank_drawing_sheets,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -30,7 +39,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["channel_assembly"]
@@ -52,54 +61,22 @@ PNG = OUTPUTS.png
 # mounts at |z| ~111) and the X spread (ring centre -55 to fulcrum 200, ~255 mm)
 # are both far smaller, so Y drives the on-sheet size. 1:7 shrinks the 840 mm
 # tower to a ~120 mm on-sheet view -- in the 100-130 mm target band -- so three
-# views + the BOM + the balloon cloud all clear the borders and the title block.
+# views clear the borders and the title block.
 # (summing's 1:5 fits its shorter ~470 mm head; the taller channel tower needs
 # the extra reduction. 1:4/1:5 would render ~170-210 mm and overflow the sheet.)
 SHEET_SCALE = (1.0, 7.0)
 VIEW_SCALE = (1, 7)
+SHEET_NAMES = ("THREE-VIEW DIAGRAM",)
 
-# One BOM row per UNIQUE top-level component of build_channel_assembly.py. Most
-# components repeat down the 20-channel spine (rocker/rod/bar/lever/spring/hook
-# x20, the two bushings x19, ball mount x4); the standard BOM collapses each
-# family to one row (QTY N) under IgnoreMultiple, so the UNIQUE placed set -- not
-# the raw call count -- fills the list. Descriptions fill the template's
-# DESCRIPTION column (the parts carry no Description custom property, and a blank
-# column reads as an unreleased sheet).
-BOM_COMPONENTS = {
-    "pivot-shaft": "ROCKER PIVOT SHAFT",
-    "fulcrum-shaft": "LEVER FULCRUM SHAFT",
-    "pivot-ball-mount": "BALL PIVOT MOUNT",
-    "pivot-bushing": "ROCKER SHAFT SPACER BUSHING",
-    "lever-bushing": "FULCRUM SHAFT SPACER BUSHING",
-    "rocker-arm": "ROCKER SEESAW ARM",
-    "connecting-rod": "CAM CONNECTING ROD",
-    "amplitude-bar": "AMPLITUDE BAR",
-    "channel-lever": "CHANNEL OUTPUT LEVER",
-    "channel-spring-installed": "CHANNEL RETURN SPRING",
-    "spring-hook": "SPRING-HOOK FASTENER",
-}
-BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
-
-ASSEMBLY_NOTES = "\n".join(
-    (
-        "ASSEMBLY NOTES",
-        "1. INSTALL 20 CHANNEL CHAINS AT 7.06 PITCH AS SHOWN.",
-        "2. SEAT EACH SPRING HOOK IN THE SUMMING-LEVER PLATE AT FINAL ASSEMBLY.",
-        "3. VERIFY EACH ROCKER / ROD / BAR / LEVER CHAIN MOVES FREELY.",
-    )
-)
-
-# Three views on the validated summing layout (left-shifted centers open the
-# right-view/iso gap; the iso balloons spread ~0.05 left of the iso outline, so
-# the right view is pulled left to 0.130 to clear them, while the iso stays at
-# 0.225 -- right balloons clear of the title-block keep-out (x >= 0.264) and
-# above the bottom border).
-FRONT_CENTER = (0.060, 0.150)
-RIGHT_CENTER = (0.130, 0.150)
-ISO_CENTER = (0.225, 0.140)
-# Top-left BOM anchor, top-right of the sheet above the title block, bounded by
-# the sheet ZONE band (0.2667); refined against the render.
-BOM_ANCHOR = (0.248, 0.265)
+# The curated sheet squeezed all three views into the left half so the BOM
+# (anchored 0.248) and the iso balloon cloud (~0.05 left of the iso outline) had
+# room. With both gone that crowding buys nothing, so the views spread across
+# the drawable width. The iso is the widest (~50 mm on sheet) and sits above the
+# title block, whose keep-out is x >= 0.261, y <= 0.069; at y 0.150 its lower
+# edge lands ~0.094, clearing that corner.
+FRONT_CENTER = (0.100, 0.150)
+RIGHT_CENTER = (0.200, 0.150)
+ISO_CENTER = (0.310, 0.150)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -128,14 +105,15 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     drawing_model, _sheet = new_project_drawing(adapter, scale=SHEET_SCALE)
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="channel diagram")
     stamp_drawing_summary(
         adapter,
         drawing_model,
         {
-            0: "Channel Assembly Drawing",
-            1: "Harmonic Analyzer hobby-machinist book drawing",
+            0: "Channel Three-View Diagram",
+            1: "Harmonic Analyzer arrangement diagram",
             2: "Harmonic Analyzer Project",
-            3: "channel motion chain; rocker/rod/bar/lever bank; parts list",
+            3: "channel motion chain; front; right; isometric",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -152,34 +130,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    insert_identified_bom_table(
-        adapter,
-        front,
-        anchor_xy=BOM_ANCHOR,
-        descriptions=BOM_COMPONENTS,
-        part_numbers=BOM_PART_NUMBERS,
-        label="channel assembly",
-    )
-    # No single view exposes all eleven component families in the dense bank.
-    # Cover the BOM across the three projections and validate every item number.
-    # Items 4 and 7 attach in a tight vertical cluster in the right view. Use
-    # SolidWorks' native circular layout so their order follows the view ring;
-    # the measured-radius spread and final layout audit remain the proof that
-    # balloon circles and leaders clear one another.
-    add_auto_balloons_across_views(
-        adapter, (front, right, iso), expected=len(BOM_COMPONENTS),
-        label="channel assembly balloons",
-        margin=0.006,
-        layout=2,
-    )
-    if add_note(adapter, ASSEMBLY_NOTES, 0.018, 0.052) is None:
-        raise RuntimeError("failed to add channel assembly notes")
-
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Channel Assembly Drawing",
+        pdf_title="Channel Three-View Diagram",
         scale=SHEET_SCALE,
+        expected_sheet_names=SHEET_NAMES,
     )
 
 

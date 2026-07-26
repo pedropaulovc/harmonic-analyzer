@@ -41,7 +41,9 @@ tolerated) and routes a hard error into the same delete-and-re-add-flipped
 recovery as a wrong-side move.
 
 Debugging kit: `cad/scripts/diagnostics/probe_magnifier_closure.py` — replays
-the park sidecar, dumps GetWhatsWrong (byref-VARIANT trap!) + per-component
+the park sidecar, dumps GetWhatsWrong (a standalone probe is late-bound so it
+DOES need byrefs; through the makepy wrapper call it bare and read the tuple —
+[[sw-assembly-mate-diagnostics-api]]) + per-component
 GetConstrainedStatus, measures actual pose values vs recorded scalars, and
 isolates the offender by suppressing one driver at a time. Status enum:
 2=under, 3=fully, 4=over, 5=no-solution, 6=INVALID-SOLUTION.
