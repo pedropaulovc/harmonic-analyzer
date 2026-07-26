@@ -486,7 +486,7 @@ CRANK_ARM_ORIGIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS  # the arm origin's world z
 # station (asserted below) use THIS value.
 
 if abs((CRANKSHAFT_Z0 + CS_SEAT_T12) - REMOVABLE_Z0) > 1e-6:
-    raise AssertionError("crankshaft SeatT12 datum off the REMOVABLE_Z0 station")
+    raise AssertionError("crankshaft SEAT_T12 station off the REMOVABLE_Z0 station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) > 1e-6:
     raise AssertionError("crankshaft SeatPinion datum off the 16T station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
@@ -1565,8 +1565,8 @@ async def _seat_on_crank(
         alignment: str = "closest") -> list[float]:
     """Journal a crank-chain part on the crankshaft via SEMANTIC mates: coaxial
     on the crank axis + an axial seat -- the part's Z-normal Front plane
-    COINCIDENT to the crankshaft's named seat datum ('SeatT12'/'SeatPinion'/
-    'SeatArm'). Coincident replaces the old
+    COINCIDENT to the crankshaft's named seat datum ('SeatPinion'/'SeatArm').
+    Coincident replaces the old
     UNSIGNED plane-plane distance, whose two solution branches let the free-
     spinning crank family reflect about the shaft origin on a re-solve: the
     16T rendered floating ~200 south of its seat with every gate green

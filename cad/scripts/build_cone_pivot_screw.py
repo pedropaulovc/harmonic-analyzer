@@ -31,7 +31,6 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     extrude_at_offset,
-    name_bore_axis,
     name_dimensions,
     name_last_feature,
     report_mass_properties,
@@ -230,11 +229,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("InsertCosmeticThread3 rejected the selected tail edge")
     _telemetry.success(f"cosmetic external thread {SPEC.thread} UNC-2A")
 
-    pivot_axis = await name_bore_axis(
-        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "pivot axis"
-    )
     _blank_ref_geometry(adapter, "HeadTop", "PLANE")
-    _blank_ref_geometry(adapter, pivot_axis, "AXIS")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     set_dimension_symmetric_tolerance(adapter, "HeadProfile", "HeadDiaDim", 0.10)

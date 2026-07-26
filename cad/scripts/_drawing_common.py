@@ -1787,6 +1787,7 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
     """Remove automatic cosmetic-thread callouts from model annotation import."""
     draw = adapter.currentModel
     survivors: list[Any] = []
+    deleted = False
     for annotation in annotations:
         annotation = _sw_type_info.early_bound_or_flag(
             annotation, "IAnnotation", "Select2"
@@ -1798,8 +1799,10 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
         if not annotation.Select2(False, 0):
             raise RuntimeError("failed to select an automatic model annotation")
         draw.EditDelete()
+        deleted = True
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    if deleted:
+        draw.EditRebuild3()
     return survivors
 
 

@@ -128,7 +128,12 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to gear bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-    tooth_tip_silhouette = visible_tooth_tip_silhouette(adapter, right, OUTSIDE_DIA)
+    tooth_tip_silhouette = visible_tooth_tip_silhouette(
+        adapter,
+        right,
+        OUTSIDE_DIA,
+        pick_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_OD),
+    )
 
     add_datum_feature(
         adapter,

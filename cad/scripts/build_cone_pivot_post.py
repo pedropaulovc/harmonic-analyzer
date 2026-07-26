@@ -264,14 +264,11 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven post (equations neutral)", volume, 0.01 * v_bore)
 
-    # Named bore/central axis for view-independent assembly mate
-    # selection (M6 mated-DOF drive train).
+    # Named bore/central axis (Axis1) for view-independent assembly mate
+    # selection (M6 mated-DOF drive train): the platform mates Axis1@post
+    # concentric to the cone shaft. The post is otherwise located on the plate
+    # by its Right/Front/Top planes, so no second centreline axis is needed.
     await name_bore_axis(adapter, "Top Plane", BORE_HEIGHT, "Right Plane", 0.0, "journal axis")
-    # Vertical centreline (Axis2), historically named "swing pivot". The p1
-    # swing DOF now lives on the PLATFORM's own pivot axis (the post just rides
-    # the plate); this axis remains the post's plan centreline, used by the
-    # platform seat mates to locate the post on the plate.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "swing pivot")
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

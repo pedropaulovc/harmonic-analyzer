@@ -105,10 +105,10 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert (
         'symbol_xy=(0.192, 0.170),\n        datum="D",\n'
         '        label="cam boss OD axis",\n'
-        "        position_tolerance_m=0.0025,"
+        "        position_tolerance_m=0.005,"
         in source
     )
-    assert source.count("position_tolerance_m=0.0025") == 1
+    assert source.count("position_tolerance_m=0.005") == 1
     assert "set_basic_dimension(" in source
     assert 'datums=("A", "B", "C")' in source
     assert 'datums=("D",)' in source

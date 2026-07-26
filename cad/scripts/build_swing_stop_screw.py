@@ -30,7 +30,6 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
-    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -159,7 +158,6 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven screw (equations neutral)", volume, 0.02 * v_slot)
 
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "stop axis")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)

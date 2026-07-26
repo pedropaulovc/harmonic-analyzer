@@ -41,7 +41,6 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
-    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -188,11 +187,6 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven hook (equations neutral)", v_expected, 0.05 * v_expected)
-
-    # Named shank axis (local Y through the origin) so the hook seats in the plate
-    # hole and the assembly can reference it (the spring pulls through the curl in
-    # the M6 Motion study), mirroring build_boss_hook.
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shank axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

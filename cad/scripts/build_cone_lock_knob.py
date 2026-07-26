@@ -41,7 +41,6 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
-    name_bore_axis,
     name_dimensions,
     name_last_feature,
     report_mass_properties,
@@ -185,10 +184,6 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven knob (equations neutral)", v_expect, 0.005 * v_expect
     )
-
-    # Vertical clamp axis for the assembly (locates by datums today; the axis
-    # names the screw line for any future concentric mate).
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "clamp axis")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

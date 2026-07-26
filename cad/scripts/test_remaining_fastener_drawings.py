@@ -280,7 +280,10 @@ def test_cone_pivot_tail_view_exposes_the_ground_shoulder() -> None:
     assert "InsertCosmeticThread3(" in build_source
     assert 'name_dimensions(adapter, "DriverSlot", ["SlotDepth"])' in build_source
     assert '_blank_ref_geometry(adapter, "HeadTop", "PLANE")' in build_source
-    assert '_blank_ref_geometry(adapter, pivot_axis, "AXIS")' in build_source
+    # The pivot_axis reference axis (Front ∩ Right) was removed as dead
+    # reference geometry: no assembly mate, drawing datum (datum "A" rides the
+    # thread), or later feature consumed it. Pin that it is not re-authored.
+    assert "name_bore_axis" not in build_source
     assert "artefacts = await save_part_and_images" in build_source
     assert 'await _assert_saved_drawing_properties(adapter, artefacts["part"])' in (
         build_source

@@ -184,7 +184,6 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
     for seat_name, station in (
-        ("SeatT12", SEAT_T12),
         ("SeatPinion", SEAT_PINION),
         ("SeatArm", SEAT_ARM),
     ):
