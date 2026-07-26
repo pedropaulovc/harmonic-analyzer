@@ -126,7 +126,7 @@ def make_pair(pid: str, model: str, ref_path: str, source: str, camera: dict,
            "target_mm": None, "perspective": None, **camera}
     if frame:
         # In-context reference: render the whole assembly with the camera
-        # framed on these components (render_compare.resolve_framing).
+        # framed on these components by the offline renderer.
         cam["frame_components"] = frame
     return {
         "id": pid,

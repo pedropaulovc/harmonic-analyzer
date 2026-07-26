@@ -1208,14 +1208,12 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_cone_drawing_batch_contract.py",
         "test_fastener_catalog.py",
         "test_pose_manifest.py",
-        "test_render_compare.py",
         "test_render_offline.py",
     } <= {Path(argument).name for argument in pytest_command}
 
     assert {
         "composite.py",
         "pose_manifest.py",
-        "render_compare.py",
         "render_offline.py",
     } <= deps
 

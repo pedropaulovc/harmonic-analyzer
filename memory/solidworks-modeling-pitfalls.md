@@ -188,8 +188,8 @@ discovered during harmonic-analyzer M6.4:
 - **Shaded-WITH-edges captures paint fine geometry black**: the fluted
   columns (16 grooves × 2 sharp edges over 1070 mm) rendered as solid
   black bars at ~10 px width — the part colour was never wrong. The
-  comparison pipeline (`render_compare.py`) now calls
-  `IModelDoc2::ViewDisplayShaded()` after every open; book plates have
+  offline comparison pipeline now renders shaded geometry without edge ink;
+  book plates have
   no outline ink either. Per-part `export_image` PNGs still show edges,
   so thin parts read dark there — judge colour from assembly renders.
 

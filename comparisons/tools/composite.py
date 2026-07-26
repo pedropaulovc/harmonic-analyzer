@@ -4,7 +4,7 @@
 # ///
 """Composite + scoring helpers for the photo-vs-CAD comparison pairs.
 
-Importable from the SolidWorks build venv (render_compare.py) and runnable
+Importable from the SolidWorks build venv and runnable
 standalone with uv to regenerate composites/scores without SolidWorks:
 
     uv run comparisons/tools/composite.py [--only id1,id2]
@@ -177,14 +177,14 @@ def trim_render_file(path: Path, margin_frac: float = 0.01,
     """Crop a captured render to its content + a small margin, in place.
 
     ViewZoomToFit2 fits the SolidWorks window aspect, not the capture canvas,
-    so raw captures carry large background margins. render_compare captures
+    so raw captures carry large background margins. The offline renderer captures
     on an oversized canvas and calls this to store a content-tight image.
 
     ``background``: the capture's uniform backdrop colour, forwarded to
     ``_content_mask`` so a model region touching a corner is not flood-eaten
     out of the trim bbox (and thereby permanently cropped from the stored
     render). Both callers know their backdrop — render_offline composites onto
-    the pair's reference colour, render_compare forces plain white — so pass
+    the pair's reference colour; legacy white captures remain supported — so pass
     it; ``None`` keeps the legacy unconditional corner flood.
     """
     # Load + close the source handle BEFORE writing back to the same path:
@@ -223,7 +223,7 @@ def render_bg(pair_id: str) -> str | None:
     in its sidecar (``render_bg``). Fallbacks for pre-key sidecars: an
     ``engine: blender`` tag proves the render used the pair's reference
     background, and a sidecar with NO engine key is provably a legacy
-    SolidWorks capture (only render_compare ever wrote engine-less sidecars,
+    legacy SolidWorks capture (older sidecars could omit the engine,
     always under force_plain_white_background) — so it reads as white rather
     than degrading to the model-corner-eating unconditional flood. Only a
     missing/unreadable sidecar returns None (unconditional flood)."""

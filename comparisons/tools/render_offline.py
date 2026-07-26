@@ -5,7 +5,7 @@
 """Offline (Blender) renderer for comparison pairs — no SolidWorks needed.
 
 Consumes the STL/boxes render cache written by cad/scripts/export_models.py
-and the same manifest cameras as cad/scripts/render_compare.py. One Blender
+and the same manifest cameras. One Blender
 headless invocation per model renders all of its pairs; outputs are
 composited onto the reference background and stored with registration metadata.
 Concrete Pose Studio targets preserve their camera frame; legacy target-less

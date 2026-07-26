@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from _common import check, run_build  # noqa: E402
-from render_compare import _flag  # noqa: E402
+from _common import _flag  # noqa: E402
 
 import _telemetry  # noqa: E402
 
