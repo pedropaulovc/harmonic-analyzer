@@ -137,7 +137,7 @@ def _dimensions(feat):
             break
         disp = _early_bound(disp, "IDisplayDimension")
         try:
-            idim = _early_bound(disp.GetDimension2(0), "IDimension", "GetType")
+            idim = _early_bound(disp.GetDimension2(0), "IDimension")
         except Exception:  # noqa: BLE001
             break
         full = str(_g(idim, "FullName"))
@@ -470,8 +470,7 @@ def _refs(model):
 def _extrude_refs(feat, model, name):
     out: dict = {}
     try:
-        d = _early_bound(feat.GetDefinition(), "IExtrudeFeatureData2",
-                         "GetContoursCount", "GetFromEntity", "ReleaseSelectionAccess")
+        d = _early_bound(feat.GetDefinition(), "IExtrudeFeatureData2")
     except Exception:  # noqa: BLE001
         return out
     out["contours_count"] = _g(d, "GetContoursCount")
@@ -503,8 +502,7 @@ def _extrude_refs(feat, model, name):
 def _plane_refs(feat, model, name):
     out: dict = {}
     try:
-        d = _early_bound(feat.GetDefinition(), "IRefPlaneFeatureData",
-                         "ReleaseSelectionAccess")
+        d = _early_bound(feat.GetDefinition(), "IRefPlaneFeatureData")
     except Exception:  # noqa: BLE001
         return out
     try:

@@ -82,9 +82,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Interference patches with locations.
     asm = _early_bound(
-        adapter.currentModel, "IAssemblyDoc",
-        "ToolsCheckInterference", "InterferenceDetectionManager",
-    )
+        adapter.currentModel, "IAssemblyDoc")
     adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
     mgr = _read_member(asm, "InterferenceDetectionManager")
     mgr = _early_bound(mgr, "IInterferenceDetectionMgr")
@@ -138,9 +136,7 @@ async def build(adapter) -> dict[str, str]:
     # back to the theoretical contact point when there are no patches).
     OUT.mkdir(parents=True, exist_ok=True)
     mdl = _early_bound(
-        adapter.currentModel, "IModelDoc2",
-        "ViewZoomTo2", "ViewZoomtofit2", "ShowNamedView2", "SaveBMP",
-    )
+        adapter.currentModel, "IModelDoc2")
     adapter._attempt(lambda: mdl.ShowNamedView2("*Front", 1), default=None)
     adapter._attempt(lambda: mdl.ViewZoomtofit2(), default=None)
     ok = adapter._attempt(

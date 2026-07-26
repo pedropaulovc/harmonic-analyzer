@@ -2242,10 +2242,7 @@ def check_no_interference(
     """
     asm = _early_bound(
         adapter.currentModel,
-        "IAssemblyDoc",
-        "ToolsCheckInterference",
-        "InterferenceDetectionManager",
-    )
+        "IAssemblyDoc")
     with _telemetry.span("gate.interference") as isp:
         log("interference detection: starting ...")
         adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
@@ -2910,11 +2907,7 @@ def select_mates_folder(adapter: Any, model: Any = None) -> bool:
         model = adapter.currentModel
     model = _early_bound(
         model,
-        "IModelDoc2",
-        "GetFeatureCount",
-        "FeatureByPositionReverse",
-        "FirstFeature",
-    )
+        "IModelDoc2")
     count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
     for i in range(min(count, 8)):  # MateGroup is the last top-level feature (i=0)
         feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
@@ -2953,9 +2946,7 @@ def repair_dangling_mates(adapter: Any, model: Any = None) -> int:
     raw_model = adapter.currentModel if model is None else model
     asm = _early_bound(
         raw_model,
-        "IAssemblyDoc",
-        "AutoMateRepair",
-    )
+        "IAssemblyDoc")
     if not select_mates_folder(adapter, raw_model):
         log("AutoMateRepair: could not select the Mates folder -- skipping repair")
         return 0

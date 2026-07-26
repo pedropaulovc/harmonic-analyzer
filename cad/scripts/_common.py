@@ -1706,10 +1706,7 @@ def _display_dimensions(feat: Any, owner: str | None = None):
     ``_read_member``."""
     feat = _early_bound(
         feat,
-        "IFeature",
-        "GetFirstDisplayDimension",
-        "GetNextDisplayDimension",
-    )
+        "IFeature")
     disp = _read_member(feat, "GetFirstDisplayDimension")
     for _ in range(1000):
         if not disp:

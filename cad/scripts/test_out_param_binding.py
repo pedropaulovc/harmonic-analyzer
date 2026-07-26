@@ -119,15 +119,56 @@ def test_late_bound_probes_declare_themselves(path: Path) -> None:
     probe that "works standalone" and the same call coming back EMPTY in-build
     were treated as one mystery rather than two bindings.
     """
-    source = path.read_text(encoding="utf-8")
-    if not _BYREF.search(source):
+    # Tokenized like the build-path check: a probe that merely DISCUSSES the
+    # trap in prose is not using it, and demanding the marker for a comment
+    # would push these files back toward the folklore this branch removed.
+    if not any(_BYREF.search(text) for _n, text in _code_lines(path)):
         return
+    source = path.read_text(encoding="utf-8")
     assert LATE_BOUND_MARKER in source, (
         f"{path.name} passes VT_BYREF VARIANTs but does not declare itself a "
         f"{LATE_BOUND_MARKER!r}. Either add the marker to its module docstring "
         "(with a line saying it connects via its own GetObject/Dispatch, so the "
         "outs land in the byrefs rather than the return tuple), or bind the "
         "interface through the generated wrapper and consume the tuple instead."
+    )
+
+
+def test_no_caller_passes_the_removed_method_names() -> None:
+    """``_early_bound`` takes exactly (obj, interface) -- a third arg is fatal.
+
+    AST, not regex. The regex sweep that first removed these reported a clean
+    sweep while 14 callers survived: it required the closing paren straight
+    after the last string, so every MULTI-LINE call with a trailing comma was
+    invisible to it --
+
+        _early_bound(
+            adapter.currentModel,
+            "IAssemblyDoc",
+            "GetComponents",      # <- survived
+        )
+
+    and a line-based ``rg`` confirmed the false clean. Those callers now raise
+    ``TypeError`` before binding, so a full build would die at the interference
+    gate (codex #418). Parsing the call is the only check that cannot lie.
+    """
+    offenders = []
+    for path in sorted(SCRIPTS.rglob("*.py")):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:  # pragma: no cover - not our file to fix
+            continue
+        offenders += [
+            f"{path.name}:{node.lineno} ({len(node.args)} args)"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_early_bound"
+            and len(node.args) > 2
+        ]
+    assert not offenders, (
+        "_early_bound no longer accepts method names; these raise TypeError:\n  "
+        + "\n  ".join(offenders)
     )
 
 

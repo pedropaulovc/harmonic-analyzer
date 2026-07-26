@@ -5,7 +5,7 @@ The first geometry probe (diag_hole_wizard.py) showed size tokens like
 ``"#47"`` (number drill) and ``"#8"`` (screw clearance) cutting the WRONG
 diameters, so the tokens are enumerated straight from the wizard database via
 ``ISldWorks::GetHoleStandardsData`` instead of guessed. Late-bound ByRef
-variant out-params are passed as explicit VT_BYREF VARIANTs.
+the generated wrapper returns each [out] param in the return tuple.
 
 Prints a machine-readable table dump to stdout (the dump IS the output; the
 diag_cwm print exemption applies).
@@ -13,14 +13,6 @@ diag_cwm print exemption applies).
 Run (SolidWorks open)::
 
     uv run python cad/scripts/diagnostics/diag_hole_wizard_tables.py
-
-LATE-BOUND PROBE: this script drives SolidWorks through its own
-``GetObject``/``Dispatch`` (or a raw ``adapter.currentModel``), NOT the makepy
-wrapper, so its ``[out]`` params land in the ``VT_BYREF`` VARIANTs passed in
-rather than in the return tuple. That is the OPPOSITE of the build path, where
-``_common._early_bound`` guarantees an early-bound object and the outs ride the
-return tuple. Both are correct for their binding -- mixing them is the trap that
-reads as "no data" instead of failing. See memory/sw-assembly-mate-diagnostics-api.md.
 """
 
 from __future__ import annotations
@@ -40,12 +32,6 @@ WANT = [
     (0, {0: "binding cbore", 2: "fillister cbore", 3: "hex bolt cbore",
          8: "pan cbore", 9: "socket cap cbore"}),
 ]
-
-
-def _byref():
-    import pythoncom
-    from win32com.client import VARIANT
-    return VARIANT(pythoncom.VT_BYREF | pythoncom.VT_VARIANT, None)
 
 
 def _tolist(v):

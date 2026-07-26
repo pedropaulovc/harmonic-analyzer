@@ -173,8 +173,7 @@ def _bore_rim_edge(adapter: Any, view: Any, *, diameter_mm: float) -> Any:
 def _format_table_note(note: Any, *, label: str) -> Any:
     note = _early_bound(note, "INote")
     annotation = _early_bound(
-        note.GetAnnotation(), "IAnnotation", "GetTextFormat", "SetTextFormat"
-    )
+        note.GetAnnotation(), "IAnnotation")
     text_format = annotation.GetTextFormat(0)
     if text_format is None:
         raise RuntimeError(f"{label} has no text format")
@@ -196,14 +195,8 @@ def _add_basic_value(adapter: Any, value: float, x: float, y: float) -> Any:
     note = _add_table_note(
         adapter, f"{value:.3f}", x, y, label="journal-axis BASIC coordinate"
     )
-    note = _early_bound(
-        note,
-        "INote",
-        "SetBalloon",
-        "HasBalloon",
-        "GetBalloonStyle",
-        "GetBalloonSize",
-    )
+    note = _early_bound(note, "INote")
+    # swBS_Box=4 and swBF_Tightest=0 produce an ASME-style BASIC frame.
     if not note.SetBalloon(4, 0):
         raise RuntimeError("SolidWorks rejected a BASIC journal-axis coordinate")
     if (

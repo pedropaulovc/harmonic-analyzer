@@ -78,7 +78,7 @@ def _patch_binding(monkeypatch, *, typed, early: bool):
 def test_early_bound_returns_the_generated_wrapper(monkeypatch) -> None:
     typed = _Dispatch()
     _patch_binding(monkeypatch, typed=typed, early=True)
-    assert _early_bound(_Dispatch(), "IComponent2", "GetModelDoc2") is typed
+    assert _early_bound(_Dispatch(), "IComponent2") is typed
 
 
 def test_early_bound_RAISES_rather_than_returning_a_raw_dispatch(monkeypatch)\
