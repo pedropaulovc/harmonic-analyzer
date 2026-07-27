@@ -133,6 +133,10 @@ def test_cross_hole_has_basic_datum_a_station_and_position_control() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "pin_station = add_edge_dimension(" in source
     assert 'label="cross-hole station from datum A"' in source
+    assert "find_edge_near(" in source
+    assert 'label="cross-hole datum-A broad face"' in source
+    assert 'axis="y"' in source
+    assert 'orientation="vertical"' in source
     assert "set_arc_endpoints_to_center(\n        adapter, pin_station" in source
     assert "set_basic_dimension(\n        adapter, pin_station" in source
     assert 'label="cross-hole true position"' in source

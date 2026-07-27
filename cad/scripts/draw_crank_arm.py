@@ -32,6 +32,7 @@ from _drawing_common import (
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
+    find_edge_near,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -281,14 +282,23 @@ async def build(adapter: Any) -> dict[str, str]:
     pin_station = add_edge_dimension(
         adapter,
         top,
-        p0=(
-            _sheet_x(0.0),
-            TOP_CENTER[1] + ARM_THICKNESS * SHEET_SCALE[0] / 2000.0,
+        p0=find_edge_near(
+            adapter,
+            top,
+            (
+                _sheet_x(ARM_C2C / 2.0),
+                TOP_CENTER[1] + ARM_THICKNESS * SHEET_SCALE[0] / 2000.0,
+            ),
+            axis="y",
+            label="cross-hole datum-A broad face",
+            span_m=0.020,
+            entity_type="EDGE",
         ),
         p1=pin_edge,
         text_xy=(0.045, TOP_CENTER[1] + 0.004),
         label="cross-hole station from datum A",
         orientation="vertical",
+        entity_types=("EDGE", "EDGE"),
     )
     set_arc_endpoints_to_center(
         adapter, pin_station, label="cross-hole station from datum A"
