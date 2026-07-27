@@ -11,7 +11,6 @@ import build_cone_swing_platform as part
 import cone_swing_platform_spec
 import draw_cone_swing_platform as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_common import _gtol_frame_xml
 
 
 def test_required_drawing_paths() -> None:
@@ -40,7 +39,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "PIVOT HOLE" in notes
     assert "LOCK NOTCH" in notes
     assert "PIVOT HOLE SIZE PER PLAN-VIEW CALLOUT" in notes
-    assert "AXIS PERPENDICULARITY TO A: SEE FCF" in notes
+    assert "HOLD THE AXIS PERPENDICULAR TO THE" in notes
     assert "27.50 +/-0.10 WEST AND 175.00 +/-0.10 SOUTH" in notes
     assert "2X 1/4-20 UNC-2B THRU" in notes
     assert "192.174 +/-0.10 SOUTH OF PIVOT" in notes
@@ -49,23 +48,25 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "8.23 +/-0.10 DEG NORTH" in notes
     assert "FULL-R CLOSED END (R4.000 REF)" in notes
     assert "VIRTUAL-SHARP INTERSECTIONS" in notes
-    assert "DATUM B IS THE" in notes
     assert "PIVOT-HOLE AXIS" in notes
-    assert "DATUM C IS THE NORTH END PLANE" in notes
-    assert "CENTRELINE THROUGH B NORMAL TO C" in notes
-    assert "LONG STRAIGHT PLAN-EDGE FORM: SEE STRAIGHTNESS FCF" in notes
+    assert "CENTRELINE THROUGH THE PIVOT-HOLE AXIS NORMAL TO THE NORTH END" in notes
+    assert "STRAIGHT WITHIN 0.25" in notes
+    # No GD&T on this sheet: the notes are the sole tolerance carrier, so
+    # nothing may point at a datum tag or a control frame.
+    assert "DATUM" not in notes
+    assert "FCF" not in notes
     assert "OPEN THROUGH EDGE" in notes
     assert "NE R10.00, NW R8.00, SW R10.00, SE R12.00" in notes
-    assert "CRANK-GEAR SWEPT OD CLEARS DATUM A" in notes
+    assert "CRANK-GEAR SWEPT OD CLEARS THE LOWER BROAD FACE" in notes
     assert "KEEP THE PLATE FULL THICKNESS" in notes
     assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
-    assert "OPPOSITE-FACE PARALLELISM: SEE END VIEW" in notes
+    assert "HOLD EACH BROAD FACE FLAT WITHIN 0.10 AND THE TWO PARALLEL WITHIN 0.10" in notes
     assert "AS MODELLED" not in notes
     assert "SEE PLAN" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'adapter, "Manufacturing Notes", 0.016, 0.100, char_height=0.0025' in source
-    assert "pivot_center = _add_cone_axis_centerline(adapter, top)" in source
+    assert "_add_cone_axis_centerline(adapter, top)" in source
     assert "view.ModelToViewTransform" in source
     assert "view.GetVisibleEntities2" in source
     assert "blind_cut_dia_mm(PIVOT_HOLE_SPEC)" in source
@@ -75,36 +76,15 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "projected pivot center" in source
     assert "drawing.EditSheet()" in source
     assert "drawing.EditSketch()" not in source
-    assert "_visible_broad_face_edges(adapter, end)" in source
     assert "_visible_plan_controls(" in source
     assert 'label="pivot-hole size"' in source and "edge=pivot_edge" in source
     assert 'label="v2 post-mount tapped holes"' in source
     assert "edge=mount_edge" in source
-    assert 'datum="B"' in source
-    assert 'label="pivot-hole cylindrical datum feature"' in source
-    assert "symbol_xy=(pivot_center[0] - 0.010, pivot_center[1])" in source
-    assert "entity=pivot_edge" in source
-    assert "shoulder=True" in source
-    assert (
-        '        label="pivot-hole cylindrical datum feature",\n'
-        "        entity=pivot_edge,\n"
-        "        shoulder=True,\n"
-        "        position_tolerance_m=0.004,"
-        in source
-    )
-    assert source.count("position_tolerance_m=0.004") == 1
-    assert "annotation=pivot_callout.GetAnnotation()" not in source
-    assert 'datum="C"' in source and "entity=north_edge" in source
-    assert "symbol_xy=(0.100, 0.135)" in source
-    assert 'characteristic="profile_surface"' not in source
-    assert 'characteristic="straightness"' in source
-    assert 'quantity="2X LONG STRAIGHT PLAN EDGES"' in source
-    assert 'characteristic="perpendicularity"' in source
-    assert 'quantity="PIVOT-HOLE AXIS"' in source
-    assert "diameter=True" in source
-    assert 'datums=("A",)' in source
-    assert 'characteristic="flatness"' in source
-    assert 'characteristic="parallelism"' in source
+    # GD&T removed from this sheet -- no datum tags, no control frames.
+    assert "add_datum_feature" not in source
+    assert "add_feature_control_frame" not in source
+    assert "datum=" not in source
+    assert "characteristic=" not in source
     assert '{"PlateLenDim": "+/-0.25"}' in source
 
 
@@ -145,12 +125,6 @@ def test_recentered_crank_gear_clears_the_full_thickness_platform() -> None:
     assert cone_swing_platform_spec.CRANK_GEAR_PLATFORM_CLEARANCE > 0.5
 
 
-def test_straightness_uses_native_gdt_symbol() -> None:
-    xml = _gtol_frame_xml("straightness", "0.25")
-    assert "GTOL-STRAIGHT" in xml
-    assert "DatumCompartment" not in xml
-
-
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 3.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -162,9 +136,7 @@ def test_rederived_plate_layout_stays_inside_the_sheet_zones() -> None:
     assert drawing.TOP_CENTER == (0.115, 0.195)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "callout_xy=(0.170, 0.135)" in source
-    assert "callout_xy=(0.175, 0.245)" in source
-    assert "frame_xy=(0.195, 0.190)" in source
-    assert "frame_xy=(0.285, 0.080)" in source
+    assert "callout_xy=(0.175, 0.225)" in source
     assert '"Manufacturing Notes", 0.016, 0.100, char_height=0.0025' in source
     assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
     assert (
