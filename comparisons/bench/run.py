@@ -18,6 +18,8 @@ scorer but NEVER shown to a subject.
     uv run comparisons/bench/run.py --task t1 --model codex-sol --limit 10 --arms P1,P2  # smoke
     uv run comparisons/bench/run.py --task t3 --model codex-sol
     uv run comparisons/bench/run.py --task t1 --model opus                # after codex
+    uv run comparisons/bench/run.py --task t1 --model opus-5              # pinned claude-opus-5 (Read-only)
+    uv run comparisons/bench/run.py --task t1 --model opus-5-tools        # side-probe: unrestricted tools
 
 Resume is automatic: rerun the same command; done cells are skipped.
 """
@@ -25,9 +27,11 @@ Resume is automatic: rerun the same command; done cells are skipped.
 import argparse
 import json
 import math
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import zlib
@@ -43,7 +47,29 @@ import gen_cases as gc  # noqa: E402  (bpy-free camera math: _apply, camera_axes
 OUT = BENCH / "out"
 CASES = BENCH / "cases.jsonl"
 RESULTS = OUT / "results.jsonl"
-SANDBOX_ROOT = OUT / "sandbox"
+# The sandbox is the subject's cwd, so it must NOT sit inside the repo: from
+# out/sandbox/<cell> a relative walk reaches cases.jsonl (the per-case delta =
+# the answer key) and results.jsonl (prior rows), and the benchmark contract is
+# that ground truth is never shown to a subject. No cell has ever read one (0
+# non-jpg reads across 168 transcripts), but the isolation should not rest on
+# the subject's good manners. An opaque temp root also means a relative escape
+# finds nothing worth reading. Override with HARMONIC_BENCH_SANDBOX.
+# ...and it is namespaced per CHECKOUT: a machine-global root would let two
+# worktrees running the same cells (say one pinned to the archived v0.19/
+# c8efcf1e assets and one on current assets) land on the same <sandbox_id> leaf
+# and overwrite each other's stimulus while a subject is mid-read. The per-
+# process collision guard cannot see across processes; distinct roots make it
+# structurally impossible. The hash keeps the parent as opaque as the leaf.
+SANDBOX_ROOT = Path(os.environ.get("HARMONIC_BENCH_SANDBOX")
+                    or Path(tempfile.gettempdir())
+                    / f"pose-bench-{sha256(str(BENCH).encode()).hexdigest()[:8]}")
+# Harness generation. Rows are stamped with it and `done_keys` counts ONLY the
+# current one: cell keys did not change across the fixes, so a seat still
+# holding a gitignored results.jsonl from the pre-fix run (cwd leaking the
+# delta, ambient CLAUDE.md in context) would otherwise resume as if those cells
+# were done and publish the mixture. Bump this on any change to what a subject
+# sees or is told.
+HARNESS = "h2-safemode-opaque-cwd"
 SCHEMA_DIR = OUT / "schemas"
 SALT = "pose-bench-v1"
 ARMS = P.ARMS
@@ -164,16 +190,79 @@ def opaque(*parts) -> str:
     return sha256((SALT + ":" + ":".join(str(p) for p in parts)).encode()).hexdigest()[:16]
 
 
+def sandbox_id(cell, model: str) -> str:
+    """The cell's opaque sandbox id -- MUST be unique per cell.
+
+    Two cells sharing a sandbox share filenames, so sibling cells running
+    concurrently overwrite each other's stimulus while a subject is reading it,
+    and an answer gets scored against a delta the subject never saw. T3 is the
+    trap: three `az` and two `ty` entries in T3_PAIRS share a dclass, so keying
+    on the class collapses five cells into two directories (the same collision
+    that bit `cell_key` in #257 -- see memory/bench-opus-run-setup.md). Key on
+    the delta-PAIR. The MODEL is in the key too: the scored `opus-5` run and the
+    `opus-5-tools` side-probe cover the same cells, so without it two concurrent
+    invocations in one checkout share a leaf (the old cell_key-derived path
+    carried the model for free). Stimulus filenames take the same id, for the
+    same reason. Hashing keeps all of it opaque, so nothing here lands back in
+    the subject's cwd. `check_sandbox_ids` enforces uniqueness at run start.
+    """
+    task = cell[0]
+    if task == "t1":
+        _t, cid, arm, rep, grid = cell
+        return opaque("t1", model, cid, arm, rep, grid)
+    if task == "t3":
+        _t, pid, dclass, (c1, c2), arm, rep = cell
+        return opaque("t3", model, pid, dclass, c1, c2, arm, rep)
+    _t, pid, start_key, _sd, arm = cell
+    return opaque("t2", model, pid, start_key, arm)
+
+
+def check_sandbox_ids(cells, model: str) -> None:
+    ids = [sandbox_id(c, model) for c in cells]
+    if len(set(ids)) != len(ids):
+        dup = next(i for i in ids if ids.count(i) > 1)
+        clash = [c for c in cells if sandbox_id(c, model) == dup]
+        raise SystemExit(f"xx sandbox id collision ({len(ids) - len(set(ids))} cells): "
+                         f"{clash[:2]} -- sibling cells would overwrite each other's "
+                         "stimulus mid-read")
+
+
+def _sandbox(oid: str) -> Path:
+    """The cell's cwd, named by its OPAQUE id -- never by the cell key.
+
+    A subject sees its working directory (Claude Code puts it in the prompt
+    context; asked, a probe cell quoted back
+    `/tmp/pose-bench-sandbox/t1_opus-5_..._+az+3_P7_0_0`, read "az+3" out of it
+    AND recognised the directory as an eval harness). Since a T1 cell key
+    embeds the ground-truth delta tag, that path WAS the answer key. The opaque
+    id is the same one the stimulus files already carry, so the cwd now leaks
+    nothing the subject is not meant to see.
+    """
+    sb = SANDBOX_ROOT / oid
+    sb.mkdir(parents=True, exist_ok=True)
+    return sb
+
+
 def done_keys() -> set:
     if not RESULTS.exists():
         return set()
-    keys = set()
+    keys, stale = set(), 0
     for line in RESULTS.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         r = json.loads(line)
+        # A row from an older harness is NOT done: it answered a differently
+        # posed question (see HARNESS). Cell keys are stable across generations,
+        # so without this a stale local results.jsonl silently resumes as if the
+        # contaminated cells were finished.
+        if r.get("harness") != HARNESS:
+            stale += 1
+            continue
         if r.get("response") is not None:   # only successful cells count as done;
             keys.add(r["cell_key"])         # errored cells retry on rerun
+    if stale:
+        print(f"!! ignoring {stale} row(s) from an older harness generation "
+              f"(current: {HARNESS}) -- those cells will be re-run", flush=True)
     return keys
 
 
@@ -245,13 +334,35 @@ def run_codex(prompt: str, images: list[Path], schema_path: Path, sandbox: Path,
 
 
 def run_opus(prompt: str, images: list[Path], sandbox: Path,
-             timeout: int = 240) -> tuple[dict | None, int, str, str]:
+             claude_model: str = "opus", allowed_tools: str | None = None,
+             timeout: int = 240,
+             hermetic: bool = False) -> tuple[dict | None, int, str, str]:
     imgs = ", ".join(f"./{im.name}" for im in images)
     full = (prompt + f"\n\nThe stimulus image(s) are in this directory: {imgs}. "
             "Use the Read tool to view each, then respond with ONLY the JSON object.")
-    cmd = ["claude", "-p", "--model", "opus", "--effort", "high",
+    cmd = ["claude", "-p", "--model", claude_model, "--effort", "high",
            "--output-format", "json",
-           "--permission-mode", "bypassPermissions", full]
+           "--permission-mode", "bypassPermissions"]
+    if allowed_tools:
+        # --tools sets the AVAILABLE built-in set (verified: the subject reports
+        # Read as its only tool). --allowed-tools does NOT work here: it is a
+        # no-prompt allow-list, so under bypassPermissions Bash still runs.
+        # --strict-mcp-config drops the user's MCP servers, which would
+        # otherwise re-open a scripting path. Both in `=` form, never a separate
+        # arg: the flags are variadic and would swallow the trailing prompt
+        # (same trap as codex's `-i`).
+        cmd += [f"--tools={allowed_tools}", "--strict-mcp-config"]
+    if hermetic:
+        # Without this the cell inherits the seat's ambient config -- VERIFIED:
+        # asked what it saw, a default cell quoted back both ~/.claude/CLAUDE.md
+        # and the repo's own CLAUDE.md/AGENTS.md, so every subject was reading
+        # the project's instructions alongside the stimulus. --safe-mode drops
+        # CLAUDE.md, skills, plugins, hooks, MCP servers and custom agents while
+        # leaving auth/model/tools/permissions normal (re-asked under it: NONE).
+        # NOT --bare: it also skips keychain reads, so the CLI lands on
+        # "Not logged in - please run /login".
+        cmd.append("--safe-mode")
+    cmd.append(full)
     try:
         proc = subprocess.run(cmd, cwd=str(sandbox), capture_output=True, text=True,
                               timeout=timeout)
@@ -270,6 +381,14 @@ def run_opus(prompt: str, images: list[Path], sandbox: Path,
                 tokens = u.get("input_tokens", 0) + u.get("output_tokens", 0)
             if not model_id and e.get("message", {}).get("model"):
                 model_id = e["message"]["model"]
+            # Third source, last: the result event's modelUsage is keyed by the
+            # model that actually served the turn, so it survives a system event
+            # that never arrives. (Measured on CLI 2.1.219 the system event is
+            # always present -- 29/29 rows carried a model_id -- but the pinned
+            # -model guard turns a missing id into a rejected cell, so it is
+            # worth a belt-and-braces read rather than a stalled rerun.)
+            if not model_id and e.get("type") == "result" and e.get("modelUsage"):
+                model_id = next(iter(e["modelUsage"]), "")
     except ValueError:
         text = proc.stdout
     data = _extract_json(text)
@@ -287,6 +406,32 @@ CODEX_MODELS = {
     "codex": "gpt-5.5",          # incumbent second subject
     "codex-sol": "gpt-5.6-sol",  # added subject
 }
+# Subjects whose committed archives were collected under the pre-fix harness.
+ARCHIVED_SUBJECTS = ("codex", "codex-sol", "opus")
+# Claude subjects, all at --effort high. The alias "opus" floats with whatever
+# `claude --model opus` resolves to on the day (it recorded claude-opus-4-8 for
+# the archived column), so a NEW generation gets its own pinned id rather than
+# silently reusing that key -- the recorded model_id on each row is what makes a
+# column reproducible.
+#
+# `tools` is the --allowed-tools value, and it is load-bearing: this benchmark
+# measures how well a PRESENTATION conveys pose error to a reader who LOOKS at
+# it. Left unrestricted, claude-opus-5 answers ~6 cells in 7 by shelling out to
+# numpy/PIL (venv + pip install included) to compute the misregistration
+# numerically -- which scores a different question (every arm collapses to the
+# same pixel math) and costs 10+ min/cell against ~30 s for a visual read. So
+# the scored subject is pinned to Read; `opus-5-tools` keeps the unrestricted
+# path as a side-probe that MEASURES that gap instead of assuming it.
+CLAUDE_MODELS = {
+    "opus": {"model": "opus", "tools": None, "timeout": 240, "hermetic": False},
+    # 420 s, not the archived 240: a Read-only claude-opus-5 cell measured
+    # 20-152 s at concurrency 8, so 240 would truncate the slow tail under
+    # concurrency 16 and bias the column toward whatever answers fast.
+    "opus-5": {"model": "claude-opus-5", "tools": "Read", "timeout": 420,
+               "hermetic": True},
+    "opus-5-tools": {"model": "claude-opus-5", "tools": None, "timeout": 900,
+                     "hermetic": True},
+}
 
 
 def invoke(model: str, prompt: str, images: list[Path], schema: dict, sandbox: Path):
@@ -294,7 +439,18 @@ def invoke(model: str, prompt: str, images: list[Path], schema: dict, sandbox: P
         sp = write_schema("t_" + opaque(prompt)[:8], schema)
         data, tokens, err = run_codex(prompt, images, sp, sandbox, CODEX_MODELS[model])
         return data, tokens, err, CODEX_MODELS[model]
-    data, tokens, err, mid = run_opus(prompt, images, sandbox)
+    spec = CLAUDE_MODELS[model]
+    data, tokens, err, mid = run_opus(prompt, images, sandbox, spec["model"],
+                                      spec["tools"], spec["timeout"],
+                                      spec["hermetic"])
+    # A pinned column must contain ONLY that model. `report.py` groups by the
+    # subject key, not by model_id, so an automatic model switch or a configured
+    # fallback would silently seat a different model in the opus-5 column under
+    # a cell_key that then counts as done. Reject the row instead: response=None
+    # makes done_keys() retry the cell on the next pass. Only checked for a
+    # concrete id -- the archived "opus" spec is an alias by design.
+    if data is not None and spec["model"].startswith("claude-") and mid != spec["model"]:
+        return None, tokens, f"model-mismatch:{mid or 'unknown'}", mid
     return data, tokens, err, mid
 
 
@@ -334,10 +490,9 @@ def exec_t1(cases, cell, model):
     _t, cid, arm, rep, grid = cell
     row = cases[cid]
     cell_key = f"t1:{model}:{cid}:{arm}:{rep}:{int(grid)}"
-    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
-    sb.mkdir(parents=True, exist_ok=True)
     side = crc(cid, arm) + rep
-    oid = opaque("t1", cid, arm, rep, grid)
+    oid = opaque("t1", model, cid, arm, rep, grid)
+    sb = _sandbox(sandbox_id(cell, model))
     imgs = P.build_stimulus(row, arm, sb, oid, grid=grid, side=side % 2, order=side % 2)
     prompt = (T1_CONVENTIONS + f"\n\nThe stimulus is {ARM_ENCODING[arm]}\n\n"
               "Return a JSON object with keys az, el, roll, target_x, target_y, zoom, "
@@ -346,7 +501,8 @@ def exec_t1(cases, cell, model):
     t0 = time.monotonic()
     data, tokens, err, mid = invoke(model, prompt, imgs, T1_SCHEMA, sb)
     return {
-        "task": "t1", "cell_key": cell_key, "model": model, "model_id": mid,
+        "task": "t1", "cell_key": cell_key, "harness": HARNESS,
+        "model": model, "model_id": mid,
         "case_id": cid, "pair_id": row["pair_id"], "arm": arm, "repeat": rep,
         "grid": grid, "side": side % 2, "tier": row["tier"], "delta": row["delta"],
         "response": data, "tokens": tokens, "error": err,
@@ -357,14 +513,16 @@ def exec_t1(cases, cell, model):
 def exec_t3(cases, cell, model):
     _t, pid, dclass, (c1, c2), arm, rep = cell
     cell_key = t3_key(model, cell)
-    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
-    sb.mkdir(parents=True, exist_ok=True)
+    # opaque cwd -- a t3 cell key names the delta-pair tag (the answer)
+    sb = _sandbox(sandbox_id(cell, model))
     order = (crc(pid, arm, "t3", dclass) + rep) % 2   # which delta is shown first
     side = crc(pid, arm) % 2                          # arm-internal layout (base-pair keyed)
     first_cid, second_cid = (c1, c2) if order == 0 else (c2, c1)
     imgs = []
     for slot, cid in (("1", first_cid), ("2", second_cid)):
-        oid = opaque("t3", pid, dclass, arm, rep, slot)
+        # c1/c2 in the id: sibling pairs share a dclass, so omitting them
+        # collides the stimulus filenames as well as the sandbox.
+        oid = opaque("t3", model, pid, dclass, c1, c2, arm, rep, slot)
         for im in P.build_stimulus(cases[cid], arm, sb, oid, grid=False, side=side, order=side):
             imgs.append(im)
     # correct answer: the smaller-delta case (c1) = better aligned
@@ -376,7 +534,8 @@ def exec_t3(cases, cell, model):
     t0 = time.monotonic()
     data, tokens, err, mid = invoke(model, prompt, imgs, T3_SCHEMA, sb)
     return {
-        "task": "t3", "cell_key": cell_key, "model": model, "model_id": mid,
+        "task": "t3", "cell_key": cell_key, "harness": HARNESS,
+        "model": model, "model_id": mid,
         "pair_id": pid, "delta_class": dclass, "arm": arm, "repeat": rep,
         "order": order, "side": side, "correct": correct,
         "response": data, "tokens": tokens, "error": err,
@@ -454,8 +613,8 @@ def exec_t2(cases, cell, model, server):
     w, h = meta["frozen"]["canvas"]
     bg, align = meta.get("background", "black"), meta.get("align") or {}
     cell_key = f"t2:{model}:{pid}:{start_key}:{arm}"
-    sb = SANDBOX_ROOT / cell_key.replace(":", "_")
-    sb.mkdir(parents=True, exist_ok=True)
+    # opaque cwd -- a t2 cell key names the starting perturbation
+    sb = _sandbox(sandbox_id(cell, model))
     sd = cases[f"{pid}+mix1"]["delta"] if start_delta == "M1" else start_delta
     cur = gc._apply(base, target0, r0, u0, sd, zoom0)
     row_syn = {"pair_id": pid, "case_id": f"{pid}+ctrl", "align": align, "background": bg}
@@ -463,7 +622,7 @@ def exec_t2(cases, cell, model, server):
     rounds, history, converged, mid, err_break = [], [], False, "", ""
     for rnd in range(6):
         ren = server.render_jpg(cur, w, h, frozen, bg, sb / f"round{rnd}.jpg")
-        oid = opaque("t2", pid, start_key, arm, rnd)
+        oid = opaque("t2", model, pid, start_key, arm, rnd)
         imgs = P.build_stimulus(row_syn, arm, sb, oid, grid=False, side=side, order=side,
                                 render_path=ren)
         hist = ("\n\nPrior rounds (text only, images not reshown):\n" + "\n".join(history)) \
@@ -487,7 +646,8 @@ def exec_t2(cases, cell, model, server):
     # response=None on an error-break so done_keys retries the cell (a genuine
     # non-converged loop that ran its rounds keeps response=rounds and counts done).
     return {
-        "task": "t2", "cell_key": cell_key, "model": model, "model_id": mid,
+        "task": "t2", "cell_key": cell_key, "harness": HARNESS,
+        "model": model, "model_id": mid,
         "pair_id": pid, "start": start_key, "arm": arm,
         "response": None if err_break else rounds, "error": err_break,
         "rounds": rounds, "n_rounds": len(rounds), "converged": converged,
@@ -499,7 +659,8 @@ def exec_t2(cases, cell, model, server):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", required=True, choices=["t1", "t3", "t2"])
-    ap.add_argument("--model", required=True, choices=["codex", "codex-sol", "opus"])
+    ap.add_argument("--model", required=True,
+                    choices=["codex", "codex-sol", "opus", "opus-5", "opus-5-tools"])
     ap.add_argument("--arms", help="comma list, default all 11")
     ap.add_argument("--pairs", help="comma list, default 6 first-pass")
     ap.add_argument("--n", type=int, default=3)
@@ -507,7 +668,24 @@ def main() -> int:
     ap.add_argument("--concurrency", type=int, default=6)
     ap.add_argument("--limit", type=int, help="cap cells (smoke)")
     ap.add_argument("--budget-tokens", type=int, default=16_000_000)
+    ap.add_argument("--allow-archived-subject", action="store_true",
+                    help="run a FROZEN archived subject under the current harness")
     args = ap.parse_args()
+
+    # The archived columns were collected under a harness that no longer exists
+    # here: their cells ran with the seat's CLAUDE.md/AGENTS.md in context and
+    # with a repo-local, cell-key-named cwd (i.e. the delta tag was visible in
+    # the working directory). Both are now fixed, so resuming one of those
+    # unfinished columns -- `opus` is only 770/1584 on T3 with T2 unstarted --
+    # would silently append rows from a DIFFERENT harness under the same cell
+    # keys and publish the mixture as one column. Refuse by default.
+    if args.model in ARCHIVED_SUBJECTS and not args.allow_archived_subject:
+        print(f"xx `{args.model}` is a FROZEN archived subject: its rows predate the "
+              "--safe-mode + opaque-sandbox fixes, so resuming it here would mix two "
+              "harnesses under one cell key. Start a new subject id instead (as "
+              "`opus-5` did), or pass --allow-archived-subject if you accept the mix.",
+              flush=True)
+        return 2
 
     cases = load_cases()
     arms = args.arms.split(",") if args.arms else ARMS
@@ -529,6 +707,7 @@ def main() -> int:
         server = RenderServer()
         runner = lambda cs, c, m: exec_t2(cs, c, m, server)  # noqa: E731
 
+    check_sandbox_ids(cells, args.model)
     done = done_keys()
     todo = []
     for c in cells:
