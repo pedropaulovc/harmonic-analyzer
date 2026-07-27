@@ -350,6 +350,7 @@ def add_datum_feature(
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
     symbol_xy: tuple[float, float],
+    expected_position_xy: tuple[float, float] | None = None,
     datum: str,
     label: str,
     entity_type: str = "EDGE",
@@ -362,7 +363,11 @@ def add_datum_feature(
     """Attach a native datum-feature symbol to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
-    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+    a revolve's flank lines are ``"SILHOUETTE"`` edges. Restricted datum tags
+    can apply a deterministic normalization to ``symbol_xy``; when live
+    readback proves one, ``expected_position_xy`` keeps the persistence guard
+    tight around that normalized point without pretending the raw request is
+    what SolidWorks stores.
 
     SolidWorks may quantize an accepted datum-tag position by a few micrometres;
     the default permits 15 um of annotation-only normalization. Restricted tags
@@ -434,19 +439,21 @@ def add_datum_feature(
     if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position datum {datum} ({label})")
     actual_position = tag_annotation.GetPosition()
+    expected_position = expected_position_xy or symbol_xy
     position_error = (
         math.inf
         if not actual_position
         else math.hypot(
-            float(actual_position[0]) - symbol_xy[0],
-            float(actual_position[1]) - symbol_xy[1],
+            float(actual_position[0]) - expected_position[0],
+            float(actual_position[1]) - expected_position[1],
         )
     )
     if position_error > position_tolerance_m:
         raise RuntimeError(
             f"datum {datum} position did not persist ({label}): "
             f"{tuple(actual_position[:2]) if actual_position else None}; "
-            f"requested={symbol_xy}, error={position_error:.6g} m, "
+            f"requested={symbol_xy}, expected={expected_position}, "
+            f"error={position_error:.6g} m, "
             f"limit={position_tolerance_m:.6g} m"
         )
     if str(tag.GetLabel()) != datum:
