@@ -27,6 +27,21 @@ SolidWorks on this machine is **SOLIDWORKS Design Professional for Makers 2026**
 
 **2026-07-04 — killing SW is FINE; the only rule is how you RESTART it (corrects the 2026-06-14 "leave the running SW alone" note, retracted by Pedro).** `Stop-Process -Force SLDWORKS` is an acceptable way to get rid of a wedged/slow instance. What does NOT work after the kill is letting COM `connect()` cold-start `sldworks.exe` — the Makers licence rejects that with the "must be launched from the 3DEXPERIENCE Platform or from the desktop shortcut" Yes/No dialog and connect fails with `Server execution failed`. Recovery after ANY kill (or crash) is the same single path: launch the Platform shortcut — `Start-Process "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Dassault Systemes SOLIDWORKS 3DEXPERIENCE R2026x\SOLIDWORKS Design.lnk"` — splash clears in ~25 s with the cached session (no interactive re-login), THEN `adapter.connect()` attaches to the licensed instance.
 
+**2026-07-27 — this is now a LIBRARY; stop hand-rolling launch/kill.** The
+recovery this whole memory describes is codified in
+`solidworks_mcp.adapters.sw_recovery` + `cad/scripts/_sw_lifecycle.py` — see
+[[connector-lifecycle-lib]]. `sw_recovery.start_solidworks()` runs
+`CATSTART.exe -run SWXDesktopLauncher.exe …` (the SAME licensed launcher the
+`.lnk` shortcut invokes, with tenant params read from the registry), so it is a
+drop-in programmatic replacement for the `Start-Process …SOLIDWORKS Design.lnk`
+step — no "ask the user", still never a bare `sldworks.exe`/COM-CLSID start.
+`recover_solidworks()` does kill→relaunch→wait-connected, and **every doit COM
+task now auto-runs `_sw_lifecycle.ensure_ready()` before connect**, so a build
+started with SW down or wedged on the ".NET Framework" splash brings it up on its
+own. Caveat unchanged: the lib does NOT clear the Document-Recovery
+([[sw-recovery-dialog]]) or crash dialog — a force-kill with unsaved docs can
+still stall the relaunch.
+
 **2026-07-03 — "critically low on committed memory" modal mid-build.** After a
 day of repeated full-spine builds (~6 FULL drive-train rebuilds + verifies in
 one SW session) SolidWorks popped "Warning! Your system is running critically
