@@ -41,8 +41,6 @@ timeout with ``HARMONIC_COM_OP_TIMEOUT=0``.
 from __future__ import annotations
 
 import contextlib
-import ctypes
-import ctypes.wintypes as wintypes
 import os
 import threading
 import time
@@ -50,11 +48,18 @@ from collections.abc import Callable
 
 import _telemetry
 
+# The SolidWorks-health detection primitives (crash-handler scan + hung-window
+# probe) live in the lifecycle library, next to start/stop/recover, so any
+# consumer shares one definition of "is SolidWorks crashed or hung?". This
+# module owns only the telemetry-idle timeout, the fatal exit contract, and the
+# OTel abort recording — the harmonic-analyzer-specific glue that can't move.
+try:
+    from solidworks_mcp.adapters import sw_recovery as _sw_recovery
+except Exception:  # noqa: BLE001 - lib is always present in the build venv; degrade safely
+    _sw_recovery = None
+
 EXIT_CRASH = 86
 EXIT_OP_TIMEOUT = 87
-
-_CRASH_IMAGE = "sldexitapp.exe"
-_SW_IMAGE = "sldworks.exe"
 
 DEFAULT_OP_TIMEOUT = 900.0
 _POLL_INTERVAL = 15.0
@@ -103,131 +108,26 @@ def _abort(reason: str, message: str, code: int, **fields: object) -> None:
     _telemetry.shutdown()
 
 # --------------------------------------------------------------------------- #
-# Win32 probes (ctypes only -- no psutil dependency). Each is best-effort:    #
-# a probe failure must never take down a healthy build, so callers get the    #
-# benign answer on any error.                                                 #
+# SolidWorks-health probes — delegated to the lifecycle library. Each is        #
+# best-effort (benign answer on any error / when the lib is unavailable), so a  #
+# probe glitch never takes down a healthy build.                                #
 # --------------------------------------------------------------------------- #
 
 
-class _PROCESSENTRY32W(ctypes.Structure):
-    _fields_ = [
-        ("dwSize", wintypes.DWORD),
-        ("cntUsage", wintypes.DWORD),
-        ("th32ProcessID", wintypes.DWORD),
-        ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
-        ("th32ModuleID", wintypes.DWORD),
-        ("cntThreads", wintypes.DWORD),
-        ("th32ParentProcessID", wintypes.DWORD),
-        ("pcPriClassBase", ctypes.c_long),
-        ("dwFlags", wintypes.DWORD),
-        ("szExeFile", ctypes.c_wchar * 260),
-    ]
-
-
-_kernel32 = None
-_INVALID_HANDLE_VALUE = wintypes.HANDLE(-1).value
-
-
-def _toolhelp():
-    """kernel32 with the Toolhelp signatures DECLARED. ctypes defaults every
-    undeclared call to c_int, which would truncate the 64-bit snapshot HANDLE
-    before Process32FirstW/CloseHandle -- the suppressed probe would then just
-    return no pids and a real crash dialog would be missed (codex #344). A
-    private WinDLL instance so the declarations never leak onto the shared
-    ``ctypes.windll`` cache. Lazy + cached: only ever called under os.name=='nt'."""
-    global _kernel32
-    if _kernel32 is None:
-        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        k32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
-        k32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
-        k32.Process32FirstW.restype = wintypes.BOOL
-        k32.Process32FirstW.argtypes = [
-            wintypes.HANDLE, ctypes.POINTER(_PROCESSENTRY32W)]
-        k32.Process32NextW.restype = wintypes.BOOL
-        k32.Process32NextW.argtypes = [
-            wintypes.HANDLE, ctypes.POINTER(_PROCESSENTRY32W)]
-        k32.CloseHandle.restype = wintypes.BOOL
-        k32.CloseHandle.argtypes = [wintypes.HANDLE]
-        _kernel32 = k32
-    return _kernel32
-
-
-def _pids_of(image_name: str) -> set[int]:
-    """Pids of every running process whose image name matches (case-insensitive)."""
-    pids: set[int] = set()
-    if os.name != "nt":
-        return pids
-    with contextlib.suppress(Exception):
-        TH32CS_SNAPPROCESS = 0x2
-        kernel32 = _toolhelp()
-        snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-        if not snap or snap == _INVALID_HANDLE_VALUE:
-            return pids
-        try:
-            entry = _PROCESSENTRY32W()
-            entry.dwSize = ctypes.sizeof(_PROCESSENTRY32W)
-            wanted = image_name.lower()
-            ok = kernel32.Process32FirstW(snap, ctypes.byref(entry))
-            while ok:
-                if entry.szExeFile.lower() == wanted:
-                    pids.add(int(entry.th32ProcessID))
-                ok = kernel32.Process32NextW(snap, ctypes.byref(entry))
-        finally:
-            kernel32.CloseHandle(snap)
-    return pids
-
-
 def _crash_pids() -> set[int]:
-    return _pids_of(_CRASH_IMAGE)
-
-
-_user32 = None
-
-
-def _winuser():
-    """user32 with HWND-taking signatures DECLARED (same truncation hazard as
-    :func:`_toolhelp`, private WinDLL for the same reason). Windows-only."""
-    global _user32
-    if _user32 is None:
-        u32 = ctypes.WinDLL("user32", use_last_error=True)
-        u32.IsWindowVisible.restype = wintypes.BOOL
-        u32.IsWindowVisible.argtypes = [wintypes.HWND]
-        u32.IsHungAppWindow.restype = wintypes.BOOL
-        u32.IsHungAppWindow.argtypes = [wintypes.HWND]
-        u32.GetWindowThreadProcessId.restype = wintypes.DWORD
-        u32.GetWindowThreadProcessId.argtypes = [
-            wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
-        _user32 = u32
-    return _user32
+    """Pids of SolidWorks' crash-report handler (``sldexitapp.exe``); a NEW one
+    means a crash. Delegated to ``sw_recovery.crash_report_pids``."""
+    if _sw_recovery is None:
+        return set()
+    return _sw_recovery.crash_report_pids()
 
 
 def _sw_window_hung() -> bool:
-    """True when a visible SLDWORKS.exe top-level window fails IsHungAppWindow."""
-    if os.name != "nt":
+    """True when a visible ``sldworks.exe`` top-level window fails IsHungAppWindow.
+    Delegated to ``sw_recovery.is_sldworks_window_hung``."""
+    if _sw_recovery is None:
         return False
-    try:
-        sw_pids = _pids_of(_SW_IMAGE)
-        if not sw_pids:
-            return False
-        user32 = _winuser()
-        hung = False
-
-        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-        def _on_window(hwnd, _lparam):
-            nonlocal hung
-            if not user32.IsWindowVisible(hwnd):
-                return True
-            pid = wintypes.DWORD()
-            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-            if pid.value in sw_pids and user32.IsHungAppWindow(hwnd):
-                hung = True
-                return False
-            return True
-
-        user32.EnumWindows(_on_window, 0)
-        return hung
-    except Exception:  # noqa: BLE001 - probe is best-effort, never fatal
-        return False
+    return _sw_recovery.is_sldworks_window_hung()
 
 
 # --------------------------------------------------------------------------- #
@@ -369,7 +269,14 @@ def start() -> Watchdog | None:
         timeout = float(os.environ.get("HARMONIC_COM_OP_TIMEOUT", DEFAULT_OP_TIMEOUT))
     except ValueError:
         timeout = DEFAULT_OP_TIMEOUT
-    _active = Watchdog(op_timeout=timeout)
+    # Poll cadence is the detection granularity: an op timeout is only noticed on
+    # a tick, so keep poll <= timeout. Env-overridable (mirrors the timeout knob)
+    # to drive the crash/recover chain in a live test without a 15 s wait.
+    try:
+        poll = float(os.environ.get("HARMONIC_COM_POLL_INTERVAL", _POLL_INTERVAL))
+    except ValueError:
+        poll = _POLL_INTERVAL
+    _active = Watchdog(op_timeout=timeout, poll_interval=poll)
     _active.start()
     # One armed line per COM session so any post-hoc read of logs.jsonl can
     # tell whether -- and with what limits -- the session was protected.

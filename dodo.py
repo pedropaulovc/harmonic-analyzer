@@ -632,6 +632,20 @@ def _sw_autostart_enabled() -> bool:
         "0", "false", "no", "off")
 
 
+def _com_retry_backoff() -> tuple[int, ...]:
+    """Per-retry backoff seconds. ``HARMONIC_COM_RETRY_BACKOFF_S`` (comma-separated)
+    overrides the 1/2/4-min default — for tuning aggressiveness or driving the
+    crash→recover→retry chain in a live test without minutes of real waiting."""
+    raw = os.environ.get("HARMONIC_COM_RETRY_BACKOFF_S", "").strip()
+    if not raw:
+        return _COM_RETRY_BACKOFF_S
+    try:
+        parsed = tuple(int(x) for x in raw.split(",") if x.strip())
+    except ValueError:
+        return _COM_RETRY_BACKOFF_S
+    return parsed or _COM_RETRY_BACKOFF_S
+
+
 def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     """Run a COM subprocess with SolidWorks autostart + reactive recovery.
 
@@ -657,7 +671,8 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         _sw_lifecycle.ensure_ready()
         _SW_ENSURED = True
 
-    last = len(_COM_RETRY_BACKOFF_S)
+    backoff = _com_retry_backoff()
+    last = len(backoff)
     for attempt in range(last + 1):
         rc = _run_subprocess(cmd, label, log_stem)
         if rc == 0:
@@ -665,7 +680,7 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
         if not sw_broke or attempt == last:
             raise RuntimeError(f"{label} failed (exit {rc})")
-        delay = _COM_RETRY_BACKOFF_S[attempt]
+        delay = backoff[attempt]
         _telemetry.warn(
             f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy; backoff "
             f"{delay}s then force-recover + retry {attempt + 1}/{last}",

@@ -16,6 +16,16 @@ processes → Launch SOLIDWORKS"* run (`winget install Microsoft.Sysinternals.Sy
 - `start_solidworks()` — the exact `CATSTART.exe -run SWXDesktopLauncher.exe -object "-Url=<SpaceURL> --AppName=SWXCSWK_AP -MyAppsURL=… -tenant=<TenantId> -3DRegistryURL=…"` connector launch, params read from `HKCU\…\SOLIDWORKSPDM\Servers\3DEXPERIENCE` (never hardcoded). This is the SAME licensed path the Platform `.lnk` invokes — so it does NOT hit the "must be launched from the 3DEXPERIENCE Platform" rejection that bare `sldworks.exe`/COM-CLSID start does. Supersedes the "Start-Process the .lnk / ask the user" step in [[solidworks-3dx-launch]].
 - `stop_solidworks()` / `kill_connector_processes()` — `taskkill /F` the SW tree + session-scoped connector agents (`SWXDesktopLauncher, CATSTART, ENOUSWCStart2/3, ENOPLMCSAClient, SWConnectorTasksAgent, EdmServerV6`); leaves the persistent platform daemons (`3DEXPERIENCELauncher*`, `sldworks_fs`) that hold the login/CAS session. Waits for `sldworks.exe` to fully exit (a relaunch during teardown trips the "already running" guard and no-ops).
 - `recover_solidworks()` — stop → start → wait-connected. The fix for the **".NET Framework" splash wedge**: SW launches, sits on the splash behind a `#32770` "SOLIDWORKS Design" modal reading "Failed to load Microsoft .NET Framework.", never becomes COM-attachable (the [[sw-crash-watchdog]] does NOT cover this — no crash, no op activity). Detector `find_dotnet_splash_dialog()` keys on that modal owned by the disabled `'splash'` window (structural Win32, no comtypes).
+- **SW-health probes** `crash_report_pids()` / `is_sldworks_window_hung()` /
+  `pids_of_image(image)` — the "is SolidWorks crashed or hung?" Win32 facts the COM
+  watchdog needs (2026-07-27: MOVED here from harmonic's `cad/scripts/_watchdog.py`,
+  fork PR #93, so any consumer shares one definition). `crash_report_pids` scans
+  `sldexitapp.exe` (a NEW pid = crash); `is_sldworks_window_hung` is `IsHungAppWindow`
+  on a visible `sldworks.exe` window (advisory/noisy). They use a PRIVATE `WinDLL`
+  with signatures DECLARED (distinct from the shared `ctypes.windll` splash handles)
+  so a `c_int` default can't truncate the 64-bit Toolhelp HANDLE/HWND (codex #344).
+  `_watchdog.py` keeps only the telemetry-idle timeout + exit codes (86/87) + OTel
+  abort and delegates the probes. See [[sw-crash-watchdog]].
 - Health = registry `HKCU\Software\SolidWorks\SOLIDWORKS 2026\General\Last Run SolidWorks`: connected when `CONNECTED_LOAD_STATUS==2` AND `SOLIDWORKS_ISCONNECTED==1`. These persist across a kill, so `start_solidworks` calls `reset_connector_status()` (zeroes them) before launch and `is_connector_loaded()` requires a live `sldworks.exe` — closing a stale-flag false positive a live test caught.
 
 **Auto-wired into the build — ONCE at startup + REACTIVE retry, driven from
@@ -47,8 +57,15 @@ Start-from-a-doit-build validated: a `doit -n 4` with SW down logged
 `ensure_ready: state=not_running → CATSTART launch → SLDWORKS UP`. Once-per-worker
 validated: a 2-part serial build fired `ensure_ready` exactly once (0.79s no-op, SW
 already up), not on the second part. **The reactive retry / `force_recover` path is
-NOT live-tested** — inducing a real mid-build COM crash to prove the 86/87 →
-backoff → recover → retry loop is still pending.
+now LIVE-VALIDATED too** (2026-07-27): `doit part:nameplate` with
+`HARMONIC_COM_OP_TIMEOUT=10 HARMONIC_COM_POLL_INTERVAL=2` fired the watchdog on the
+real EngravingImport DXF op (a genuine >10s COM op), which exited 87 →
+`_exec_com` logged `failed (exit 87) with SolidWorks unhealthy; backoff … then
+force-recover + retry` → `sw.stop` (1.78s) → CATSTART relaunch → reconnect → retry.
+Two new test/ops knobs made it deterministic and fast: `HARMONIC_COM_POLL_INTERVAL`
+(watchdog poll cadence, in `_watchdog.start`) and `HARMONIC_COM_RETRY_BACKOFF_S`
+(comma-separated per-retry backoff, in `dodo._com_retry_backoff`) — both override
+the production defaults (900s timeout / 15s poll / 1,2,4-min backoff).
 
 **Known gap:** the lib does NOT clear the post-kill **Document Recovery** dialog
 ([[sw-recovery-dialog]]) or the **crash** dialog ([[sw-crash-watchdog]]). If a real build
