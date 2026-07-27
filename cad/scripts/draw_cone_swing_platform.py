@@ -5,7 +5,7 @@ views, the wedge envelope dimensions, and the machining notes; every shared
 sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
 
 The platform is machined from black-oxide 5/16 in minimum steel stock to a
-6.35 mm finished plate: an asymmetric wedge (266 long, 21.5 -> 61 wide) with a
+6.35 mm finished plate: an asymmetric wedge (223.35 long, 20 -> 61 wide) with a
 Ø6.76 pivot hole at the narrow tip, paired 1/4-20 post-mount taps, an open
 lock notch through the west edge, and rounded plan corners. The main plan and
 end views run 1:2; the isometric runs 1:3.
@@ -25,8 +25,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
@@ -45,9 +43,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 from _holes import blind_cut_dia_mm
 from build_cone_swing_platform import (
-    NORTH_OVERHANG,
     PIVOT_HOLE_SPEC,
-    PLATE_T,
     POST_MOUNT_SPEC,
 )
 
@@ -79,8 +75,14 @@ TOP_KEEP = {
 }
 
 
-def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
-    """Draw the plan-view cone axis through the modeled pivot-hole center."""
+def _view_xy_mapper(adapter: Any, view: Any) -> Any:
+    """Return a model-XYZ -> sheet-XY mapper for ``view``.
+
+    Sheet coordinates are what every annotation placement is expressed in, so
+    anything derived from model geometry (a rim centre, a leader attachment on
+    an edge) has to come through this transform rather than a hand-measured
+    literal -- a literal silently goes stale the next time the part is refitted.
+    """
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
 
@@ -92,6 +94,13 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
         mapped = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         values = tuple(float(value) for value in mapped.ArrayData)
         return values[0], values[1]
+
+    return _view_xy
+
+
+def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
+    """Draw the plan-view cone axis through the modeled pivot-hole center."""
+    _view_xy = _view_xy_mapper(adapter, view)
 
     expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
     pivot_centers: list[tuple[float, float]] = []
@@ -152,44 +161,17 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     return pivot
 
 
-def _visible_broad_face_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return bottom datum-A and top broad-face edges in the end view."""
-    bottom: list[tuple[float, Any]] = []
-    top: list[tuple[float, Any]] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
-        for raw_edge in edges:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsLine():
-                continue
-            values = tuple(float(value) for value in curve.LineParams)
-            if abs(values[3]) < 0.99:
-                continue
-            if abs(values[1]) <= 2e-6:
-                bottom.append((values[2], edge))
-            if abs(values[1] - PLATE_T / 1000.0) <= 2e-6:
-                top.append((values[2], edge))
-    if not bottom or not top:
-        raise RuntimeError(
-            "cone-platform end view is missing the broad-face datum edges"
-        )
-    # Prefer the south-end width edges; they are the longest unbroken
-    # representatives of each broad planar face.
-    return min(bottom, key=lambda item: item[0])[1], min(top, key=lambda item: item[0])[1]
+def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """Return the pivot and post-mount rims from the plan view.
 
-
-def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]:
-    """Return pivot/mount rims, north datum edge, and a long straight side."""
+    The north-end and long-straight-side edges were dropped with the GD&T that
+    referenced them (see ``build``) -- nothing else on this sheet attaches to
+    them.
+    """
     expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
     expected_mount_radius_m = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000.0
     pivot_edges: list[Any] = []
     mount_edges: list[Any] = []
-    north_edges: list[Any] = []
-    straight_side_edges: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = adapter._attempt(
@@ -198,38 +180,16 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any]
         for raw_edge in edges:
             edge = _early_bound(raw_edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
-            if curve.IsCircle():
-                values = tuple(float(value) for value in curve.CircleParams)
-                if abs(values[6] - expected_radius_m) <= 1e-6:
-                    pivot_edges.append(edge)
-                if abs(values[6] - expected_mount_radius_m) <= 1e-6:
-                    mount_edges.append(edge)
+            if not curve.IsCircle():
                 continue
-            if not curve.IsLine():
-                continue
-            values = tuple(float(value) for value in curve.LineParams)
-            if abs(values[2] - NORTH_OVERHANG / 1000.0) <= 2e-6 and abs(values[3]) >= 0.99:
-                north_edges.append(edge)
-            start = adapter._attempt(lambda e=edge: e.GetStartVertex(), default=None)
-            end = adapter._attempt(lambda e=edge: e.GetEndVertex(), default=None)
-            if start is None or end is None:
-                continue
-            p0 = tuple(float(value) for value in _early_bound(start, "IVertex").GetPoint())
-            p1 = tuple(float(value) for value in _early_bound(end, "IVertex").GetPoint())
-            length = sum((a - b) ** 2 for a, b in zip(p0, p1, strict=True)) ** 0.5
-            if abs(values[3]) < 0.99:
-                straight_side_edges.append((length, edge))
-    if (
-        not pivot_edges
-        or len(mount_edges) < 2
-        or not north_edges
-        or len(straight_side_edges) < 2
-    ):
-        raise RuntimeError(
-            "cone-platform plan view is missing pivot/mount/north/side controls"
-        )
-    straight_side_edges.sort(key=lambda item: item[0], reverse=True)
-    return pivot_edges[0], mount_edges[0], north_edges[0], straight_side_edges[0][1]
+            values = tuple(float(value) for value in curve.CircleParams)
+            if abs(values[6] - expected_radius_m) <= 1e-6:
+                pivot_edges.append(edge)
+            if abs(values[6] - expected_mount_radius_m) <= 1e-6:
+                mount_edges.append(edge)
+    if not pivot_edges or len(mount_edges) < 2:
+        raise RuntimeError("cone-platform plan view is missing pivot/mount controls")
+    return pivot_edges[0], mount_edges[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -286,11 +246,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, top_annotations, {"PlateLenDim": "+/-0.25"})
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pivot hole")
-    pivot_center = _add_cone_axis_centerline(adapter, top)
+    _add_cone_axis_centerline(adapter, top)
 
-    pivot_edge, mount_edge, north_edge, straight_side_edge = _visible_plan_controls(
-        adapter, top
-    )
+    pivot_edge, mount_edge = _visible_plan_controls(adapter, top)
     add_native_hole_callout(
         adapter,
         top,
@@ -301,92 +259,24 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         top,
-        callout_xy=(0.175, 0.245),
+        # Below the pair, not level with it: the model's own "1/4-20 Tapped
+        # Hole" note drops a leader onto the east hole, and a callout placed
+        # level with the holes routes its leader straight across that descent
+        # (fail-loud layout gate, 2 leader crossings). Coming up from below
+        # keeps this leader clear of the note for the whole span.
+        callout_xy=(0.175, 0.225),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
-    # A datum tag attached to the Hole Wizard callout reports its native
-    # annotation position as sheet (0, 0), so the fail-loud layout gate sees it
-    # off-border even though SetPosition2 succeeds. Attach B to the cylindrical
-    # feature itself instead, with a short radial leader that unmistakably ends
-    # on the projected circumference rather than the centre mark/axis.
-    # SolidWorks normalizes this restricted cylindrical tag by 3.574 mm; the
-    # bound checks annotation placement only, not part geometry or GD&T.
-    add_datum_feature(
-        adapter,
-        top,
-        # Place the native tag one short radial leader from the projected hole
-        # rim.  The former distant tag visually merged with the overall-length
-        # extension line and could be read as a planar datum.
-        symbol_xy=(pivot_center[0] - 0.010, pivot_center[1]),
-        datum="B",
-        label="pivot-hole cylindrical datum feature",
-        entity=pivot_edge,
-        shoulder=True,
-        position_tolerance_m=0.004,
-    )
-    add_datum_feature(
-        adapter,
-        top,
-        symbol_xy=(0.100, 0.135),
-        datum="C",
-        label="north-end datum plane",
-        entity=north_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.195, 0.190),
-        characteristic="straightness",
-        tolerance="0.25",
-        quantity="2X LONG STRAIGHT PLAN EDGES",
-        label="long-side straightness",
-        entity=straight_side_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.150, 0.125),
-        characteristic="perpendicularity",
-        tolerance="0.10",
-        datums=("A",),
-        diameter=True,
-        quantity="PIVOT-HOLE AXIS",
-        label="pivot-hole-axis perpendicularity",
-        entity=pivot_edge,
-    )
-
-    datum_a_edge, opposite_face_edge = _visible_broad_face_edges(adapter, end)
-    add_datum_feature(
-        adapter,
-        end,
-        symbol_xy=(0.330, 0.080),
-        datum="A",
-        label="lower broad face",
-        entity=datum_a_edge,
-        shoulder=True,
-    )
-    add_feature_control_frame(
-        adapter,
-        end,
-        frame_xy=(0.285, 0.080),
-        characteristic="flatness",
-        tolerance="0.10",
-        quantity="DATUM A BROAD FACE",
-        label="datum-A broad-face flatness",
-        entity=datum_a_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        end,
-        frame_xy=(0.355, 0.107),
-        characteristic="parallelism",
-        tolerance="0.10",
-        datums=("A",),
-        quantity="OPPOSITE BROAD FACE",
-        label="opposite broad-face parallelism",
-        entity=opposite_face_edge,
-    )
+    # NO GD&T on this sheet. The datum tags (A/B/C) and the straightness,
+    # perpendicularity, flatness and parallelism frames were removed: the
+    # plan-view cluster packs the pivot rim, the north-end plane and the south
+    # end of the long straight edge into ~1.4 mm of sheet space, so their
+    # leaders cross whenever the wedge is refitted -- and datum B cannot be
+    # moved out of the way (SolidWorks snaps the restricted cylindrical tag
+    # back to the rim, which trips the placement-persistence bound). Every
+    # tolerance those frames carried is now stated in the manufacturing notes
+    # instead, so the sheet keeps the intent without the fragile geometry.
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.100, char_height=0.0025
