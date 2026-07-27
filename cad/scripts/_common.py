@@ -2070,16 +2070,6 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 "COM build launched under doit without holding the SolidWorks seat "
                 "(HARMONIC_COM_SEAT unset) -- a COM task is missing _com_seat(); "
                 "see dodo.py._com_seat")
-        # Ensure SolidWorks is up and the 3DEXPERIENCE connector has loaded BEFORE
-        # we connect: start it when down, recover it from the ".NET Framework"
-        # splash wedge (which never becomes COM-attachable, so connect would just
-        # block). No-op fast path when already connected. This runs only here --
-        # i.e. only for a real COM subprocess -- so a fully-cached build (which
-        # launches none) never starts SolidWorks. Best-effort + spanned; opt out
-        # with HARMONIC_SW_AUTOSTART=0. Done before the watchdog arms so the
-        # kill/relaunch of a wedged session isn't seen as a crash.
-        import _sw_lifecycle
-        _sw_lifecycle.ensure_ready()
         # Crash/hang protection for the whole COM session (see _watchdog.py):
         # a new sldexitapp.exe (SolidWorks' crash-report dialog) or 15 min of
         # telemetry silence hard-exits this process so the doit parent can fail

@@ -11,10 +11,18 @@ of the library's own loguru logs:
     becomes COM-attachable, so a build would otherwise just block on
     ``sw.connect``) or otherwise disconnected.
 
-Called once per COM subprocess from ``_common.run_build`` (so a fully-cached
-build, which launches no COM subprocess, never starts SolidWorks). A no-op fast
-path when already ``CONNECTED``, so a warm seat pays only a process + registry
-probe.
+Driven from ``dodo.py``, NOT per COM subprocess:
+
+- ``ensure_ready()`` runs **once per doit worker**, before the first COM task's
+  build (inside ``_exec_com``), so SolidWorks is up before any COM work — SW-free
+  invocations (``doit list`` / ``check:math``) never reach it, so they never start
+  SolidWorks. A no-op fast path when already ``CONNECTED``.
+- ``force_recover()`` is the **reactive retry** path: when a COM subprocess fails
+  in a SolidWorks way (watchdog crash/op-timeout exit 86/87, or SW no longer
+  connected), ``dodo._exec_com`` retries up to 3× with 1/2/4-min backoff, calling
+  ``force_recover`` between attempts. Unlike ``ensure_ready`` it does NOT trust
+  ``detect_state`` — a crashed SW is a zombie process that still reads
+  ``CONNECTED`` — so it always stop→start and first clears the crash handler.
 
 Opt out with ``HARMONIC_SW_AUTOSTART=0`` (hand-manage SolidWorks); tune the
 post-launch connect wait with ``HARMONIC_SW_CONNECT_TIMEOUT`` (seconds).
@@ -98,6 +106,56 @@ def ensure_ready() -> str:
             _telemetry.error(f"[sw] ensure_ready failed ({exc}); proceeding to connect anyway",
                              exc_info=True)
             return "error"
+
+
+def is_connected() -> bool:
+    """True when SolidWorks is running and the connector reports loaded."""
+    from solidworks_mcp.adapters import sw_recovery
+    from solidworks_mcp.adapters.sw_recovery import SolidWorksState
+
+    return sw_recovery.detect_state() is SolidWorksState.CONNECTED
+
+
+def force_recover() -> str:
+    """Unconditional kill → relaunch → wait-connected for the COM-failure retry path.
+
+    Unlike :func:`ensure_ready`, does NOT trust ``detect_state()`` — a crashed
+    SolidWorks is a zombie process that still reads ``CONNECTED`` — so it always
+    stop→start, and first clears the crash-report handler (``sldexitapp.exe``) so a
+    crashed session's modal can't block the relaunch. Best-effort; returns the final
+    state value.
+    """
+    from solidworks_mcp.adapters import sw_recovery
+
+    timeout = _connect_timeout()
+    with _telemetry.span("sw.force_recover", service=_INFRA) as span:
+        try:
+            _kill_crash_handler()
+            with _telemetry.span("sw.stop", service=_INFRA):
+                _telemetry.event("sw.stop")
+                sw_recovery.stop_solidworks()
+            _start(sw_recovery, timeout)
+            final = sw_recovery.detect_state().value
+            span.set_attribute("final_state", final)
+            return final
+        except Exception as exc:  # noqa: BLE001 - recovery must not harden into a new failure
+            _telemetry.error(f"[sw] force_recover failed ({exc})", exc_info=True)
+            return "error"
+
+
+def _kill_crash_handler() -> None:
+    """Best-effort taskkill of ``sldexitapp.exe`` (SolidWorks' crash-report dialog),
+    so a crashed session doesn't leave a modal that blocks the relaunch."""
+    import subprocess
+
+    try:
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "sldexitapp.exe"],
+            capture_output=True, timeout=15,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
 
 
 def _wait(sw_recovery, timeout: float) -> None:

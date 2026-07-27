@@ -114,6 +114,7 @@ from _buildgraph import (  # noqa: E402
 )
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
+import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 from _drawing_registry import (  # noqa: E402
     DRAWINGS_BY_NAME,
@@ -582,29 +583,95 @@ def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     it, output is inherited straight to the terminal -- the cheap path for the
     non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
+    rc = _run_subprocess(cmd, label, log_stem)
+    if rc:
+        raise RuntimeError(f"{label} failed (exit {rc})")
+
+
+def _run_subprocess(cmd: list[str], label: str, log_stem: str | None = None) -> int:
+    """Run the subprocess (span-less) and return its exit code (the raise-on-failure
+    part is :func:`_exec`; the COM-retry wrapper :func:`_exec_com` needs the raw code
+    to tell a SolidWorks crash/op-timeout (86/87) from an ordinary gate failure)."""
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
     if log_stem is None:
-        rc = subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
-    else:
-        LOGS.mkdir(parents=True, exist_ok=True)
-        with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
-            fh.write(f">>  {label}: {' '.join(cmd)}\n")
+        return subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
+    LOGS.mkdir(parents=True, exist_ok=True)
+    with (LOGS / f"{log_stem}.log").open("w", encoding="utf-8") as fh:
+        fh.write(f">>  {label}: {' '.join(cmd)}\n")
+        fh.flush()
+        proc = subprocess.Popen(
+            cmd, cwd=str(REPO_ROOT), env=env, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+            errors="replace", bufsize=1)
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            fh.write(line)
             fh.flush()
-            proc = subprocess.Popen(
-                cmd, cwd=str(REPO_ROOT), env=env, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                errors="replace", bufsize=1)
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                fh.write(line)
-                fh.flush()
-            rc = proc.wait()
-    if rc:
-        raise RuntimeError(f"{label} failed (exit {rc})")
+        return proc.wait()
+
+
+# SolidWorks autostart + reactive recovery for COM subprocesses (see _sw_lifecycle).
+# Autostart is ONCE PER WORKER: the first COM task to reach _exec_com brings SW up
+# (the flag is a module global, so each doit -n worker ensures once; later tasks see
+# CONNECTED and skip). SW-free tasks never call _exec_com, so `doit list` / check:math
+# never start SolidWorks. Retry is REACTIVE: a COM subprocess that fails in a SW way
+# is retried with backoff, recovering SW in between.
+_SW_ENSURED = False
+# Backoff between COM-failure retries: 1, 2, 4 minutes (=> up to 3 retries, 4 attempts).
+_COM_RETRY_BACKOFF_S: tuple[int, ...] = (60, 120, 240)
+# Watchdog exit codes that unambiguously mean SolidWorks itself broke (see _watchdog).
+_WATCHDOG_EXIT_CODES = frozenset({86, 87})
+
+
+def _sw_autostart_enabled() -> bool:
+    return os.environ.get("HARMONIC_SW_AUTOSTART", "1").strip().lower() not in (
+        "0", "false", "no", "off")
+
+
+def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+    """Run a COM subprocess with SolidWorks autostart + reactive recovery.
+
+    - **Autostart, once per worker:** the first COM task ensures SolidWorks is up and
+      connector-ready (``_sw_lifecycle.ensure_ready``) before its build; later tasks
+      skip (already ``CONNECTED``). Runs while the COM seat is held (the caller wraps
+      ``_com_seat``), so the ~one-time start is serialized like any COM work.
+    - **Retry on a SolidWorks failure:** if the subprocess exits with a watchdog
+      crash/op-timeout code (86/87) or leaves SolidWorks not-connected, retry up to
+      ``len(_COM_RETRY_BACKOFF_S)`` times, waiting 1/2/4 min then force-recovering SW
+      (kill→relaunch) between attempts. An ordinary failure (gate assertion, build
+      error) with SolidWorks still healthy is NOT retried — it raises immediately.
+
+    Fail-loud contract of :func:`_exec` is preserved: a terminal failure still raises
+    ``RuntimeError``. Honors ``HARMONIC_SW_AUTOSTART=0`` (skip autostart + retry, plain
+    ``_exec``)."""
+    if not _sw_autostart_enabled():
+        _exec(cmd, label, log_stem)
+        return
+
+    global _SW_ENSURED
+    if not _SW_ENSURED:
+        _sw_lifecycle.ensure_ready()
+        _SW_ENSURED = True
+
+    last = len(_COM_RETRY_BACKOFF_S)
+    for attempt in range(last + 1):
+        rc = _run_subprocess(cmd, label, log_stem)
+        if rc == 0:
+            return
+        sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
+        if not sw_broke or attempt == last:
+            raise RuntimeError(f"{label} failed (exit {rc})")
+        delay = _COM_RETRY_BACKOFF_S[attempt]
+        _telemetry.warn(
+            f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy; backoff "
+            f"{delay}s then force-recover + retry {attempt + 1}/{last}",
+            exit_code=rc, attempt=attempt + 1, backoff_s=delay)
+        time.sleep(delay)
+        _sw_lifecycle.force_recover()
 
 
 def _run(cmd: list[str], label: str, log_stem: str | None = None,
@@ -625,7 +692,9 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None,
         with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd),
                              service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
-            _exec(cmd, label, log_stem)
+            # COM tasks get SolidWorks autostart + reactive recovery; SW-free tasks
+            # (check:* gates) run the plain fail-loud _exec.
+            (_exec_com if com else _exec)(cmd, label, log_stem)
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -1171,7 +1240,7 @@ def _cached_drawing_action(stem: str) -> None:
                              service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
-            _exec(cmd, label, log_stem=f"drawing-{stem}")
+            _exec_com(cmd, label, log_stem=f"drawing-{stem}")
 
     with _telemetry.span(f"cache.store {label}", label=label,
                          service=_telemetry.BUILD_INFRA_SERVICE) as store:
@@ -1256,7 +1325,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
                              service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
-            _exec([sys.executable, str(script)], label, log_stem=f"part-{stem}")
+            _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
 
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
@@ -1529,15 +1598,15 @@ def build_or_refresh(stem, dependencies, changed, targets):
             if target_missing or recipe_changed:
                 why = "target missing" if target_missing else "recipe changed"
                 sp.set_attribute("mode", "full")
-                _exec([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
-                      log_stem=f"assembly-{stem}")
+                _exec_com([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
+                          log_stem=f"assembly-{stem}")
                 for hook in hooks:
-                    _exec([sys.executable, str(hook)], f"hook {hook.name}",
-                          log_stem=f"hook-{stem}-{hook.stem}")
+                    _exec_com([sys.executable, str(hook)], f"hook {hook.name}",
+                              log_stem=f"hook-{stem}-{hook.stem}")
             else:
                 sp.set_attribute("mode", "refresh")
-                _exec([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
-                      f"REFRESH {stem}", log_stem=f"assembly-{stem}")
+                _exec_com([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
+                          f"REFRESH {stem}", log_stem=f"assembly-{stem}")
             # _exec raised if the build failed, so we only get here on success: record
             # this build's recipe digest for the next run's FULL/REFRESH decision.
             _stamp_assembly_execution(stem)

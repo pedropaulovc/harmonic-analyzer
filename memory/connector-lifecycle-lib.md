@@ -18,20 +18,37 @@ processes → Launch SOLIDWORKS"* run (`winget install Microsoft.Sysinternals.Sy
 - `recover_solidworks()` — stop → start → wait-connected. The fix for the **".NET Framework" splash wedge**: SW launches, sits on the splash behind a `#32770` "SOLIDWORKS Design" modal reading "Failed to load Microsoft .NET Framework.", never becomes COM-attachable (the [[sw-crash-watchdog]] does NOT cover this — no crash, no op activity). Detector `find_dotnet_splash_dialog()` keys on that modal owned by the disabled `'splash'` window (structural Win32, no comtypes).
 - Health = registry `HKCU\Software\SolidWorks\SOLIDWORKS 2026\General\Last Run SolidWorks`: connected when `CONNECTED_LOAD_STATUS==2` AND `SOLIDWORKS_ISCONNECTED==1`. These persist across a kill, so `start_solidworks` calls `reset_connector_status()` (zeroes them) before launch and `is_connector_loaded()` requires a live `sldworks.exe` — closing a stale-flag false positive a live test caught.
 
-**Auto-wired into the build.** `_common.run_build` calls `_sw_lifecycle.ensure_ready()`
-just before `adapter.connect()` (before the watchdog arms), so **any doit COM task —
-`part:`/`assembly:`/`verify:*`/`export`/`release`/`drawing:` — starts SolidWorks when
-down and recovers it from the .NET wedge, automatically.** It runs only in a real COM
-subprocess, so a fully-cached build (which launches none) never starts SW. Fast no-op
-when already `CONNECTED`. Opt out `HARMONIC_SW_AUTOSTART=0`; connect-wait
-`HARMONIC_SW_CONNECT_TIMEOUT` (default 300s). Every action is a `build-infra` span
-(`sw.ensure_ready` with `initial_state`/`action`/`final_state`; `sw.start`/`sw.stop`/
-`sw.wait_connected`), so a trace answers "did this build have to start/recover SW?".
+**Auto-wired into the build — ONCE at startup + REACTIVE retry, driven from
+`dodo._exec_com`** (NOT per COM subprocess — that cost ~0.76s/task, measured).
+`_exec_com` wraps every COM `_exec` call site (`_run(com=True)`, the cached part/
+assembly actions, drawings):
+- **Autostart, once per doit worker**: the first COM task calls
+  `_sw_lifecycle.ensure_ready()` (module flag `_SW_ENSURED`), bringing SolidWorks up
+  before any COM work; later tasks see `CONNECTED` and skip. SW-free tasks
+  (`doit list`, `check:math`) never reach `_exec_com`, so they never start SW.
+  Measured: `ensure_ready` fires exactly once across a multi-part build (~0.8s no-op
+  when SW already up), vs ~0.76s × every task under the old per-`run_build` hook.
+- **Retry on a SolidWorks failure**: if a COM subprocess exits with a watchdog
+  crash/op-timeout code (86/87) or leaves SW not-`CONNECTED`, `_exec_com` retries up
+  to 3× with **1/2/4-min backoff**, calling `_sw_lifecycle.force_recover()` (kill→
+  relaunch) between attempts. An ordinary failure (gate assertion) with SW still
+  healthy is NOT retried — it raises immediately. `force_recover` is unconditional
+  (a crashed SW is a zombie that still reads `CONNECTED`, so it can't trust
+  `detect_state`) and first `taskkill`s `sldexitapp.exe` (crash dialog).
+
+Opt out `HARMONIC_SW_AUTOSTART=0`; connect-wait `HARMONIC_SW_CONNECT_TIMEOUT`
+(default 300s). Every action is a `build-infra` span (`sw.ensure_ready`,
+`sw.force_recover`, `sw.start`/`sw.stop`/`sw.wait_connected`), so a trace answers
+"did this build have to start or recover SolidWorks?".
 
 **Validation state (be honest):** the full stop→start→wait cycle is LIVE-VALIDATED on
-this seat (stop ~1.5s, connector launch, ~135s to `CONNECTED_LOAD_STATUS=2`). The doit
-`ensure_ready` hook is validated on the **no-op path** (already connected → 0.87s span);
-the start-from-a-real-doit-build path is wired but NOT yet exercised end-to-end.
+this seat (stop ~1.5s, connector launch, ~135s to `CONNECTED_LOAD_STATUS=2`).
+Start-from-a-doit-build validated: a `doit -n 4` with SW down logged
+`ensure_ready: state=not_running → CATSTART launch → SLDWORKS UP`. Once-per-worker
+validated: a 2-part serial build fired `ensure_ready` exactly once (0.79s no-op, SW
+already up), not on the second part. **The reactive retry / `force_recover` path is
+NOT live-tested** — inducing a real mid-build COM crash to prove the 86/87 →
+backoff → recover → retry loop is still pending.
 
 **Known gap:** the lib does NOT clear the post-kill **Document Recovery** dialog
 ([[sw-recovery-dialog]]) or the **crash** dialog ([[sw-crash-watchdog]]). If a real build
