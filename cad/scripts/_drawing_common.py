@@ -2036,6 +2036,7 @@ def add_edge_dimension(
     return dimension
 
 
+@_telemetry.traced("drawing.find_edge_near", label_param="label")
 def find_edge_near(
     adapter: Any,
     view: Any,

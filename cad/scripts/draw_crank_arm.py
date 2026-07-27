@@ -285,17 +285,20 @@ async def build(adapter: Any) -> dict[str, str]:
         p0=find_edge_near(
             adapter,
             top,
-            (_sheet_x(-HALF_WIDTH), TOP_CENTER[1]),
-            axis="x",
-            label="cross-hole datum-A end face",
+            (
+                _sheet_x(ARM_C2C / 2.0),
+                TOP_CENTER[1] + ARM_THICKNESS * SHEET_SCALE[0] / 2000.0,
+            ),
+            axis="y",
+            label="cross-hole datum-A broad face",
             span_m=0.020,
-            entity_type="SILHOUETTE",
+            entity_type="EDGE",
         ),
         p1=pin_edge,
         text_xy=(0.045, TOP_CENTER[1] + 0.004),
         label="cross-hole station from datum A",
-        orientation="horizontal",
-        entity_types=("SILHOUETTE", "EDGE"),
+        orientation="vertical",
+        entity_types=("EDGE", "EDGE"),
     )
     set_arc_endpoints_to_center(
         adapter, pin_station, label="cross-hole station from datum A"
