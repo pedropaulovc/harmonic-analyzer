@@ -370,13 +370,17 @@ def add_datum_feature(
     entity: Any | None = None,
     annotation: Any | None = None,
     shoulder: bool = False,
-    position_tolerance_m: float = 1e-6,
+    position_tolerance_m: float = 1.5e-5,
     callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    SolidWorks may quantize an accepted datum-tag position by a few micrometres;
+    the default permits 15 um of annotation-only normalization. Restricted tags
+    retain their tighter call-site bounds.
     """
     draw = adapter.currentModel
     if annotation is None:
