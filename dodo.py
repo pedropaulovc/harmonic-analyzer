@@ -646,30 +646,41 @@ def _com_retry_backoff() -> tuple[int, ...]:
     return parsed or _COM_RETRY_BACKOFF_S
 
 
-def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
-    """Run a COM subprocess with SolidWorks autostart + reactive recovery.
+def _sw_ensure_once() -> None:
+    """Bring SolidWorks up once per doit worker, before this worker's first COM BUILD.
 
-    - **Autostart, once per worker:** the first COM task ensures SolidWorks is up and
-      connector-ready (``_sw_lifecycle.ensure_ready``) before its build; later tasks
-      skip (already ``CONNECTED``). Runs while the COM seat is held (the caller wraps
-      ``_com_seat``), so the ~one-time start is serialized like any COM work.
-    - **Retry on a SolidWorks failure:** if the subprocess exits with a watchdog
-      crash/op-timeout code (86/87) or leaves SolidWorks not-connected, retry up to
-      ``len(_COM_RETRY_BACKOFF_S)`` times, waiting 1/2/4 min then force-recovering SW
-      (kill→relaunch) between attempts. An ordinary failure (gate assertion, build
-      error) with SolidWorks still healthy is NOT retried — it raises immediately.
+    Called at each COM call site as a TOP-LEVEL ``build-infra`` span (a sibling of the
+    ``task`` span, like the seat wait), NOT from inside ``_exec_com``/the task span --
+    so the ``sw.ensure_ready`` cost never inflates the ``task <label>`` "work" timing.
+    Guarded by ``_SW_ENSURED`` (once per worker) and ``HARMONIC_SW_AUTOSTART`` (opt-out).
+    Placed AFTER the under-seat cache re-probe, so a worker whose tasks all hit the
+    cache never starts SolidWorks. Best-effort (``ensure_ready`` swallows its own
+    failures and proceeds to ``connect``)."""
+    global _SW_ENSURED
+    if _SW_ENSURED or not _sw_autostart_enabled():
+        return
+    _sw_lifecycle.ensure_ready()
+    _SW_ENSURED = True
+
+
+def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+    """Run a COM subprocess with reactive SolidWorks recovery.
+
+    If the subprocess exits with a watchdog crash/op-timeout code (86/87) or leaves
+    SolidWorks not-connected, retry up to ``len(_COM_RETRY_BACKOFF_S)`` times, waiting
+    1/2/4 min then force-recovering SW (kill→relaunch) between attempts. An ordinary
+    failure (gate assertion, build error) with SolidWorks still healthy is NOT retried
+    -- it raises immediately.
+
+    Autostart (bringing SolidWorks up before the first build) is separate:
+    :func:`_sw_ensure_once`, called by each COM call site as a top-level sibling span
+    BEFORE the task span -- not here, so it can't nest under the task span.
 
     Fail-loud contract of :func:`_exec` is preserved: a terminal failure still raises
-    ``RuntimeError``. Honors ``HARMONIC_SW_AUTOSTART=0`` (skip autostart + retry, plain
-    ``_exec``)."""
+    ``RuntimeError``. Honors ``HARMONIC_SW_AUTOSTART=0`` (skip retry, plain ``_exec``)."""
     if not _sw_autostart_enabled():
         _exec(cmd, label, log_stem)
         return
-
-    global _SW_ENSURED
-    if not _SW_ENSURED:
-        _sw_lifecycle.ensure_ready()
-        _SW_ENSURED = True
 
     backoff = _com_retry_backoff()
     last = len(backoff)
@@ -704,10 +715,12 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None,
     and its duration is the task's own work. SolidWorks-free tasks (the ``check:*``
     gates) pass ``com=False`` and never take the lock, so they fan out under ``-n``."""
     with (_com_seat(label) if com else contextlib.nullcontext()) as waited:
+        if com:
+            _sw_ensure_once()  # top-level sibling of the task span (once/worker)
         with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd),
                              service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
-            # COM tasks get SolidWorks autostart + reactive recovery; SW-free tasks
+            # COM tasks get reactive SolidWorks recovery; SW-free tasks
             # (check:* gates) run the plain fail-loud _exec.
             (_exec_com if com else _exec)(cmd, label, log_stem)
 
@@ -1251,6 +1264,7 @@ def _cached_drawing_action(stem: str) -> None:
                 return
             reprobe.set_attribute("cache", "miss")
 
+        _sw_ensure_once()  # top-level sibling of the task span (once/worker)
         with _telemetry.span(f"task {label}", label=label,
                              service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
@@ -1336,6 +1350,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
                 return
             reprobe.set_attribute("cache", "miss")
 
+        _sw_ensure_once()  # top-level sibling of the task span (once/worker)
         with _telemetry.span(f"task {label}", label=label,
                              service=_stage_name(label)) as sp:
             _tag_seat_wait(sp, waited)
@@ -1594,6 +1609,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
                 return
             reprobe.set_attribute("cache", "miss")
 
+        _sw_ensure_once()  # top-level sibling of the task span (once/worker)
         # The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks operate on
         # the just-built model without another COM task interleaving.
         with _telemetry.span(f"task {label}", label=label,
