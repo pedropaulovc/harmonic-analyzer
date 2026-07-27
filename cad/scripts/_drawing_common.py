@@ -1987,6 +1987,7 @@ def add_edge_dimension(
     label: str,
     orientation: str = "smart",
     entity_type: Literal["EDGE", "SILHOUETTE"] = "EDGE",
+    entity_types: tuple[str, str] | None = None,
 ) -> Any:
     """Dimension across two view entities picked at explicit sheet points.
 
@@ -2011,12 +2012,13 @@ def add_edge_dimension(
         raise RuntimeError(f"failed to activate drawing view {name!r}")
     draw.ClearSelection2(True)
     for index, (x, y) in enumerate((p0, p1)):
+        selected_type = entity_types[index] if entity_types else entity_type
         selected = draw.Extension.SelectByID2(
-            "", entity_type, x, y, 0.0, index > 0, 0, null_callout(), 0
+            "", selected_type, x, y, 0.0, index > 0, 0, null_callout(), 0
         )
         if not selected:
             raise RuntimeError(
-                f"failed to select {label} {entity_type.lower()} {index} "
+                f"failed to select {label} {selected_type.lower()} {index} "
                 f"at sheet ({x:g}, {y:g})"
             )
     if orientation == "horizontal":
@@ -2032,6 +2034,41 @@ def add_edge_dimension(
     if dimension is None:
         raise RuntimeError(f"failed to add the {label} {orientation} dimension")
     return dimension
+
+
+def find_edge_near(
+    adapter: Any,
+    view: Any,
+    xy: tuple[float, float],
+    *,
+    axis: Literal["x", "y"],
+    label: str,
+    span_m: float = 0.0015,
+    step_m: float = 0.00025,
+    entity_type: str = "EDGE",
+) -> tuple[float, float]:
+    """Refine an approximate sheet point to a selectable drawing edge."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate {label} drawing view")
+    steps = int(round(span_m / step_m))
+    offsets = sorted((index * step_m for index in range(-steps, steps + 1)), key=abs)
+    for offset in offsets:
+        x = xy[0] + (offset if axis == "x" else 0.0)
+        y = xy[1] + (offset if axis == "y" else 0.0)
+        draw.ClearSelection2(True)
+        if not draw.Extension.SelectByID2(
+            "", entity_type, x, y, 0.0, False, 0, null_callout(), 0
+        ):
+            continue
+        draw.ClearSelection2(True)
+        if offset:
+            _telemetry.debug(
+                f"{label}: edge found {offset * 1000:+.2f} mm off nominal"
+            )
+        return x, y
+    raise RuntimeError(f"{label}: no edge within {span_m * 1000:.1f} mm")
 
 
 @_telemetry.traced("drawing.visible_entity_scan", label_param="label")
