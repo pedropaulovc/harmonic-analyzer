@@ -1311,3 +1311,72 @@ def test_submodule_digest_is_checkout_eol_independent(tmp_path):
     module.write_bytes(b"def mate():\r\n    return 1\r\n")
     _reset_submodule_memo(dodo)
     assert dodo._submodule_digest() == lf
+
+
+def test_retry_waits_out_a_cold_start_instead_of_spending_an_attempt(monkeypatch):
+    """A recovery that ends 'starting' must not release the retry immediately.
+
+    Measured on the seat: force_recover ran its full budget, ended
+    final_state=starting, and the retry it released died inside the adapter's
+    60 s COM-attach window -- a slot burned on a SolidWorks that could not have
+    answered. The retry has to wait for the cold start first.
+    """
+    dodo = _load_dodo()
+    calls = []
+    connected = iter([False, True])
+
+    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: True)
+    monkeypatch.setattr(dodo, "_com_retry_backoff", lambda: (0,))
+    monkeypatch.setattr(
+        dodo, "_run_subprocess",
+        lambda *_a, **_kw: (calls.append("run"), 86 if len(calls) == 1 else 0)[1],
+    )
+    monkeypatch.setattr(
+        dodo._sw_lifecycle, "force_recover",
+        lambda: (calls.append("recover"), "starting")[1],
+    )
+    monkeypatch.setattr(
+        dodo._sw_lifecycle, "is_connected", lambda: next(connected),
+    )
+    monkeypatch.setattr(
+        dodo._sw_lifecycle, "wait_until_ready",
+        lambda: (calls.append("wait"), "connected")[1],
+    )
+
+    dodo._exec_com(["x"], "drawing:thing")
+
+    assert calls == ["run", "recover", "wait", "run"], calls
+
+
+def test_retry_does_not_wait_when_recovery_came_back_connected(monkeypatch):
+    """The wait is for a cold start, not a tax on every recovery."""
+    dodo = _load_dodo()
+    calls = []
+
+    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: True)
+    monkeypatch.setattr(dodo, "_com_retry_backoff", lambda: (0,))
+    monkeypatch.setattr(
+        dodo, "_run_subprocess",
+        lambda *_a, **_kw: (calls.append("run"), 86 if len(calls) == 1 else 0)[1],
+    )
+    monkeypatch.setattr(
+        dodo._sw_lifecycle, "force_recover",
+        lambda: (calls.append("recover"), "connected")[1],
+    )
+    monkeypatch.setattr(dodo._sw_lifecycle, "is_connected", lambda: True)
+    monkeypatch.setattr(
+        dodo._sw_lifecycle, "wait_until_ready",
+        lambda: calls.append("wait"),
+    )
+
+    dodo._exec_com(["x"], "drawing:thing")
+
+    assert calls == ["run", "recover", "run"], calls
+
+
+def test_cold_start_connect_budget_exceeds_the_measured_failure(monkeypatch):
+    """300 s was calibrated on a warm relaunch; a cold 3DEXPERIENCE start blew
+    straight through it (sw.start 302 s, still 'starting')."""
+    dodo = _load_dodo()
+    monkeypatch.delenv("HARMONIC_SW_CONNECT_TIMEOUT", raising=False)
+    assert dodo._sw_lifecycle._connect_timeout() >= 900.0

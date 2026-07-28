@@ -42,7 +42,17 @@ import _telemetry
 
 _DISABLE_ENV = "HARMONIC_SW_AUTOSTART"
 _CONNECT_TIMEOUT_ENV = "HARMONIC_SW_CONNECT_TIMEOUT"
-_DEFAULT_CONNECT_TIMEOUT = 300.0
+# A COLD 3DEXPERIENCE start is far slower than a warm attach: the connector
+# authenticates against the cloud tenant before SolidWorks is COM-attachable.
+# Measured on the seat 2026-07-28, recovering from a crash mid-fleet-pass:
+# ``sw.start`` ran the full 302 s and force_recover still ended
+# ``final_state=starting``; the retry it released then died on the adapter's own
+# 60 s attach window ("running but did not become COM-attachable"), burning a
+# retry slot on a SolidWorks that was never going to be ready. The next attempt,
+# ~2 min later, connected first try. 300 s was calibrated on a warm relaunch and
+# is simply too short for a cold one -- 900 s matches the COM watchdog's op
+# timeout and leaves ~3x headroom over what was observed.
+_DEFAULT_CONNECT_TIMEOUT = 900.0
 _INFRA = _telemetry.BUILD_INFRA_SERVICE
 
 
@@ -141,6 +151,34 @@ def force_recover() -> str:
         except Exception as exc:  # noqa: BLE001 - recovery must not harden into a new failure
             _telemetry.error(f"[sw] force_recover failed ({exc})", exc_info=True)
             return "error"
+
+
+def wait_until_ready() -> str:
+    """Block until SolidWorks is CONNECTED, or the connect budget runs out.
+
+    For the retry path after :func:`force_recover` reports anything other than
+    connected. Best-effort like the rest of this module -- it returns the final
+    state rather than raising, because a recovery helper that can itself fail the
+    build defeats its own purpose. The caller retries regardless; this only stops
+    that retry from being spent on a SolidWorks that is still starting.
+    """
+    from solidworks_mcp.adapters import sw_recovery
+
+    with _telemetry.span("sw.wait_ready", service=_INFRA) as span:
+        try:
+            _wait(sw_recovery, _connect_timeout())
+        except Exception as exc:  # noqa: BLE001 - recovery must never fail the build
+            _telemetry.warn(f"[sw] wait_until_ready gave up ({exc})")
+        final = _state_value(sw_recovery)
+        span.set_attribute("final_state", final)
+        return final
+
+
+def _state_value(sw_recovery) -> str:
+    try:
+        return str(sw_recovery.detect_state().value)
+    except Exception:  # noqa: BLE001 - a state read must not fail the build
+        return "unknown"
 
 
 def _kill_crash_handler() -> None:
