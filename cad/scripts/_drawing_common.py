@@ -4084,6 +4084,13 @@ async def finalize_drawing(
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
         if sheet is None:
             raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+        # Inserting a model view lets SolidWorks auto-drift the SHEET scale off
+        # the 1:1 the template pinned (each view still carries its own explicit
+        # scale), so re-pin it once here before asserting the contract.
+        if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+            raise RuntimeError(
+                f"failed to set final drawing sheet {sheet_name!r} scale"
+            )
         assert_asme_b_sheet(
             adapter, sheet, phase=f"before save {sheet_name}", scale=scale
         )
