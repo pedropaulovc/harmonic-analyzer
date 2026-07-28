@@ -331,3 +331,22 @@ def test_exterior_view_labels_do_not_claim_an_isolated_subsystem():
     assert len(set(labels)) == len(labels)
     for label in labels:
         assert "DRIVE TRAIN" in label, f"{label!r} does not name the subject shown"
+
+
+def test_the_setup_view_isolates_exactly_the_items_its_note_promises():
+    """Sheet 7's note says "ITEMS 12-24"; the view must show items 12-24.
+
+    This view carries no balloons -- it exists to show one mechanism at a fixed
+    scale -- so nothing downstream would notice it quietly widening to the whole
+    32-item train while the note kept promising a subset.
+    """
+    low, high = drawing.PINION_SETUP_ITEM_RANGE
+    expected = {
+        stem
+        for index, stem in enumerate(drawing.BOM_COMPONENTS, start=1)
+        if low <= index <= high
+    }
+    assert drawing.PINION_SETUP_VIEW_STEMS == expected
+    assert len(expected) == high - low + 1
+    source = inspect.getsource(drawing.build)
+    assert "visible_stems=PINION_SETUP_VIEW_STEMS" in source

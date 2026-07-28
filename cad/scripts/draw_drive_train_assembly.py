@@ -319,6 +319,15 @@ GEAR_SETUP_VIEW_LABEL_ORIGIN = (0.290, 0.125)
 # Sheet 7: a large parked/disengaged reference view plus scan-friendly setup
 # and functional-acceptance tables.  The saved assembly does not claim to show
 # the engaged pose.
+# Derived from the BOM, not hand-listed: the sheet-7 note promises "ITEMS 12-24",
+# so the isolated set IS items 12-24 by construction. A hand-written set would
+# be free to drift away from the note it is supposed to make true.
+PINION_SETUP_ITEM_RANGE = (12, 24)
+PINION_SETUP_VIEW_STEMS = frozenset(
+    stem
+    for index, stem in enumerate(BOM_COMPONENTS, start=1)
+    if PINION_SETUP_ITEM_RANGE[0] <= index <= PINION_SETUP_ITEM_RANGE[1]
+)
 PINION_SETUP_VIEW_CENTER = (0.095, 0.165)
 PINION_SETUP_VIEW_LABEL_ORIGIN = (0.030, 0.245)
 PINION_PARAMETER_TABLE_ANCHOR = (0.175, 0.232)
@@ -1105,6 +1114,17 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
     )
     set_hidden_lines_removed(adapter, pinion_setup)
+    # This one keeps its isolation. The identification views can show the whole
+    # assembly -- AutoBalloon5 needs to SEE a component to balloon it, and their
+    # labels now say "drive train". This view carries no balloons and exists to
+    # show one mechanism at a fixed scale for setup, so the whole 32-item train
+    # would crowd it while its own note still promised items 12-24 (Codex P2).
+    isolate_drawing_view_components(
+        adapter,
+        pinion_setup,
+        visible_stems=PINION_SETUP_VIEW_STEMS,
+        label="drive-train pinion parked reference",
+    )
     if add_note(
         adapter,
         "PARK / DISENGAGED — SHOWN POSITION; ITEMS 12–24; NOT AN ENGAGED VIEW",
