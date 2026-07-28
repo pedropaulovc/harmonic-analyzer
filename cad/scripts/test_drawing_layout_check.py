@@ -1409,54 +1409,52 @@ def _edge(x):
     return _FakeEdge((x, 0.0, 0.0, x + 0.01, 0.0, 0.0))
 
 
-def test_anchor_edge_is_the_same_whatever_order_com_enumerates():
-    """GetVisibleEntities2 documents no order; the anchor must not inherit one."""
-    low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
-    forward = _anchor({"cone-gear": [low, mid, high]})
-    shuffled = _anchor({"cone-gear": [high, low, mid]})
-    reversed_ = _anchor({"cone-gear": [high, mid, low]})
-    assert forward is low
-    assert shuffled is low and reversed_ is low
 
+def test_anchor_reads_geometry_once_not_once_per_visible_edge():
+    """The measurement must stay cheap enough to leave on in every build.
 
-def test_anchor_prefers_the_first_component_instance_by_name():
-    """Two instances of one family are separate components.
-
-    Sorting on endpoints alone would let the balloon jump between instances
-    whenever a rebuild nudged one of them, so the instance is pinned first.
+    Ordering the edges by geometry WAS tried, to make the anchor deterministic
+    by construction. It costs a GetCurve + GetCurveParams2 pair per visible
+    edge, and a COM property read runs ~250 ms on the seat -- a gear end view
+    has hundreds of tooth edges, so one balloon ran into the minutes and the
+    32-balloon drive-train sheet never finished. This pins the cost at O(1) per
+    balloon so the regression cannot come back quietly.
     """
-    near, far = _edge(0.50), _edge(0.01)
-    view = _anchor_view({})
-    root = _FakeDrawingComponent(
-        "drive-train",
-        # Listed -1 first so the depth-first walk REACHES -2 first: the test has
-        # to fail when the pick falls back to traversal order, not agree with it
-        # by accident.
-        children=[
-            _FakeDrawingComponent("cone-gear-1@dt", path="C:/x/cone-gear.SLDPRT"),
-            _FakeDrawingComponent("cone-gear-2@dt", path="C:/x/cone-gear.SLDPRT"),
-        ],
-    )
-    edges = {"cone-gear-2@dt": [far], "cone-gear-1@dt": [near]}
-    view.RootDrawingComponent2 = lambda _r: root
-    lookup = {id(c.Component): c.Name for c in root.GetChildren()}
-    view.GetVisibleEntities2 = lambda component, _k: edges[lookup[id(component)]]
-    picked = drawing_common._pick_component_anchor_edge(
-        _FakeAdapter(None), view, stem="cone-gear", label="dt"
-    )
-    # -1 sorts before -2, even though -2 carries the smaller endpoint.
-    assert picked is near
+    low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
+    picked = _anchor({"cone-gear": [low, mid, high]})
+    assert picked is low
+    assert [e.curve_reads for e in (low, mid, high)] == [1, 0, 0]
 
 
-def test_anchor_skips_edges_whose_geometry_will_not_read():
+def test_anchor_records_where_it_landed():
+    """Two passes' drawing.balloon_anchor events are the repro for a moving
+    anchor; an event without coordinates could not settle the question."""
+    recorded = []
+    edge = _edge(0.02)
+    original = drawing_common._telemetry.event
+    drawing_common._telemetry.event = lambda name, **kw: recorded.append((name, kw))
+    try:
+        _anchor({"cone-gear": [edge]})
+    finally:
+        drawing_common._telemetry.event = original
+    name, attrs = recorded[-1]
+    assert name == "drawing.balloon_anchor"
+    assert attrs["stem"] == "cone-gear"
+    assert attrs["edges"] == 1
+    assert attrs["anchor"].startswith("0.020000,0.000000")
+
+
+def test_anchor_survives_an_edge_whose_geometry_will_not_read():
+    """The read is telemetry, not selection -- it must not fail the drawing."""
+
     class _Mute(_FakeEdge):
         def GetCurveParams2(self):
             raise RuntimeError("no curve data")
 
-    good = _edge(0.02)
-    assert _anchor({"cone-gear": [_Mute(()), good]}) is good
+    mute = _Mute((0.0,))
+    assert _anchor({"cone-gear": [mute]}) is mute
 
 
-def test_anchor_raises_when_no_edge_yields_geometry():
-    with pytest.raises(RuntimeError, match="readable geometry"):
+def test_anchor_raises_when_the_component_has_no_visible_edge():
+    with pytest.raises(RuntimeError, match="no visible edge"):
         _anchor({"cone-gear": []})

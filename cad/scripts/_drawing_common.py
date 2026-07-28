@@ -3069,32 +3069,42 @@ def _pick_component_anchor_edge(
 ) -> Any:
     """Return the one visible edge a ``stem``'s balloon leader attaches to.
 
-    Chosen by GEOMETRY, never by enumeration position. Both COM enumerations
-    this walks -- the drawing-component tree and ``GetVisibleEntities2`` --
-    document no ordering, so taking ``edges[0]`` off the first matching leaf
-    silently picked a different edge run to run. That is not cosmetic: the
-    anchor becomes the balloon's leader ATTACHMENT point, and
+    The anchor becomes the balloon's leader ATTACHMENT point, and
     :func:`_spread_balloons` assigns ring slots in the attachments' angular
-    order, so a moved anchor can reorder two balloons whose attachments sit at
-    nearly the same angle and turn their leaders into a crossing. It did: the
-    drive-train sheet built clean on one fleet pass and failed
+    order, so an anchor that moves between runs can reorder two balloons
+    attached at nearly the same angle and turn their leaders into a crossing.
+    The drive-train sheet built clean on one fleet pass and failed
     ``check_drawing_layout`` with "1 leader crossing(s)" between items 5 and 27
-    on the very next pass, same commit, same cached assembly.
+    on the next, same commit, same cached assembly -- and ``GetVisibleEntities2``
+    documents no ordering, which makes a moving anchor the obvious suspect.
 
-    So: visit every matching leaf (no early break), and pick the smallest
-    ``(component name, curve endpoints)``. The choice is arbitrary but FIXED,
-    which is the property the layout audit needs to mean anything -- a red gate
-    has to be reproducible before it can be debugged, and a green one has to be
-    more than luck.
+    **Suspect, not culprit -- so this MEASURES before it pays.** Ordering the
+    edges by geometry would settle it, and was tried: it costs a ``GetCurve`` +
+    ``GetCurveParams2`` pair per visible edge, and on this seat a COM property
+    read runs ~250 ms. A gear end view carries hundreds of tooth edges, so one
+    balloon ran into the minutes and the 32-balloon sheet never finished. That
+    is far too much to spend defending against an unproven hypothesis.
+
+    So the pick stays ``edges[0]`` of the first matching leaf -- ONE geometry
+    read, on the chosen edge only, to record WHERE it landed. Diff the
+    ``drawing.balloon_anchor`` events of two passes and the question answers
+    itself: identical anchors mean the enumeration is stable and the crossing
+    came from somewhere else; different anchors prove the instability and earn
+    the cost of fixing it. Nothing in the logs could answer that the first time.
+
+    The traversal order is deterministic given the tree, and the ring sort in
+    :func:`_spread_balloons` no longer breaks ties on arrival order, so those
+    two sources are closed regardless of what the measurement says.
     """
     root = adapter._attempt(
         lambda: view.RootDrawingComponent2(False), default=None
     )
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
-    candidates: list[tuple[tuple[float, ...], str, Any]] = []
+    selected_edge: Any | None = None
+    chosen_name = ""
+    edge_count = 0
     enumerated: list[str] = []
-    scanned = 0
     pending = list(_drawing_component_children(root))
     while pending:
         drawing_component = pending.pop()
@@ -3106,47 +3116,33 @@ def _pick_component_anchor_edge(
             adapter, drawing_component, frozenset({stem})
         ):
             continue
-        name = str(drawing_component.Name or "")
-        enumerated.append(name)
+        chosen_name = str(drawing_component.Name or "")
+        enumerated.append(chosen_name)
         component = adapter._attempt(
             lambda dc=drawing_component: dc.Component, default=None
         )
         edges = adapter._attempt(
             lambda: view.GetVisibleEntities2(component, 1), default=()
         ) or ()
-        for edge in edges:
-            scanned += 1
-            key = _edge_endpoint_key(adapter, edge)
-            if key is None:
-                continue
-            candidates.append((key, name, edge))
-    if not candidates:
+        if not edges:
+            continue
+        edge_count = len(edges)
+        selected_edge = edges[0]
+        break
+    if selected_edge is None:
         raise RuntimeError(
-            f"{label}: {stem} has no visible edge with readable geometry; "
-            f"matching={enumerated}"
+            f"{label}: {stem} has no visible edge; matching={enumerated}"
         )
-    # Leaf name before endpoints: two instances of one family are separate
-    # components, so keep the CHOICE OF INSTANCE stable first, then the edge
-    # within it. Sorting on endpoints alone would let a rebuild that nudged one
-    # instance hand the balloon to the other.
-    chosen_key, chosen_name, selected_edge = min(
-        candidates, key=lambda item: (item[1], item[0])
-    )
-    # Record WHICH edge won, not just that one did. This helper is called once
-    # per ballooned family under the caller's span, so it is an event, not a
-    # span of its own -- and the anchor coordinates are exactly what a repeat of
-    # the crossing needs: diffing two passes' events says whether the anchor
-    # moved, which nothing in the logs could answer the first time.
+    # One geometry read, on the winner only -- the whole point is that this is
+    # cheap enough to leave on in every build, so two passes are comparable
+    # without re-running anything under a special flag.
+    key = _edge_endpoint_key(adapter, selected_edge) or ()
     _telemetry.event(
         "drawing.balloon_anchor",
         stem=stem,
         component=chosen_name,
-        leaves=len(enumerated),
-        edges=scanned,
-        anchors=len(candidates),
-        anchor_x=chosen_key[0],
-        anchor_y=chosen_key[1],
-        anchor_z=chosen_key[2],
+        edges=edge_count,
+        anchor=",".join(f"{value:.6f}" for value in key),
     )
     return selected_edge
 
