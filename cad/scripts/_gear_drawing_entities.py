@@ -11,18 +11,30 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import _telemetry
 from _common import _early_bound
 
 
+@_telemetry.traced("drawing.pick_circle_edge")
 def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
-    """Return the visible circular model edge matching ``diameter_mm``."""
+    """Return the visible circular model edge matching ``diameter_mm``.
+
+    Costs ~5 COM round trips per visible edge (early-bind, GetCurve,
+    early-bind, IsCircle, CircleParams), so a gear end view with hundreds of
+    tooth edges makes this the most expensive step in its drawing. The span
+    carries the edge and candidate counts precisely so that cost is
+    attributable instead of sitting in an unspanned hole -- the per-edge work
+    stays inside ONE span rather than flooding the trace with leaves.
+    """
     candidates: list[tuple[float, Any]] = []
+    edge_count = 0
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = adapter._attempt(
             lambda c=component: view.GetVisibleEntities2(c, 1), default=()
         ) or ()
         for edge in edges:
+            edge_count += 1
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if not curve.IsCircle():
@@ -30,6 +42,12 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
             radius_mm = float(curve.CircleParams[6]) * 1000.0
             candidates.append((radius_mm, edge))
 
+    _telemetry.event(
+        "drawing.circle_edge_scan",
+        edges=edge_count,
+        circles=len(candidates),
+        diameter_mm=diameter_mm,
+    )
     target_radius = diameter_mm / 2.0
     if not candidates:
         raise RuntimeError("drawing view has no visible circular model edge")
@@ -42,6 +60,7 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     return edge
 
 
+@_telemetry.traced("drawing.pick_tooth_silhouette")
 def visible_tooth_tip_silhouette(
     adapter: Any, view: Any, outside_diameter_mm: float
 ) -> Any:
@@ -72,6 +91,7 @@ def visible_tooth_tip_silhouette(
             mean_y = (float(start_xyz[1]) + float(end_xyz[1])) / 2.0
             candidates.append((mean_y, silhouette))
 
+    _telemetry.event("drawing.silhouette_scan", matched=len(candidates))
     if not candidates:
         raise RuntimeError(
             "no visible tooth-tip silhouette matches radius "
