@@ -1,6 +1,6 @@
 ---
 name: drawing-sweep-cost-anatomy
-description: Entity sweeps are the dominant COM cost in a part drawing; kind 1 is per-edge GetCurve (24.6ms each) and kind 4 is a flat ~21s call — and four ways to cut them were measured and all four failed
+description: Entity sweeps dominate a part drawing; kind 1 splits three near-equal ways (sweep 7.5s / COM reads 11.2s / _early_bound wrapper binding 7.0s — binding is NOT COM and is the only attackable third), kind 4 is a flat ~21s call; four ways to cut them were measured and all four failed
 metadata:
   type: project
 ---
@@ -22,14 +22,28 @@ Kind 1 returns hundreds of edges cheaply and the classification loop is the
 bill. Kind 4 makes SolidWorks derive outline geometry: ~21 s flat, *independent
 of how few entities come back*.
 
-**Inside the kind-1 loop, one call is the whole cost** (cone_gear, 481 edges):
-`GetCurve()` 11.8 s (**24.6 ms each**), `IsCircle()` 1.8 s (3.8 ms),
-`CircleParams` 0.4 s (3.6 ms x121), `_early_bound` 2.7 s (5.7 ms). `GetCurve` is
-7x the other two COM reads combined — it is the only thing worth attacking, and
-"drop IsCircle" (the intuitive fix) is worth 1.8 s of 25.3 s.
+**Inside the kind-1 loop the cost splits three near-equal ways** (cone_gear,
+481 edges, 27.7 s, each timer bracketing exactly one operation):
+sweep 7.5 s, `GetCurve()` 8.8 s (**18.2 ms** each), `_early_bound` 7.0 s
+(7.3 ms x2 per edge), `IsCircle()` 2.0 s (4.2 ms), `CircleParams` 0.4 s
+(3.4 ms x121).
 
-**Four optimisations measured, four refuted. Do not re-walk these.**
+An earlier version of this note said `GetCurve` was 24.6 ms and "the entire
+bill". Wrong, and wrong in the way this file warns about: that timer also
+enclosed the `_early_bound` of the returned curve, inflating the call by ~35%.
+**Bracket one operation per timer, including the non-COM ones.**
 
+**`_early_bound` is the lead worth pulling.** 7.0 s of 27.7 s, twice per edge
+(the IEdge, then the returned ICurve), and it is NOT a COM round trip — it is
+local wrapper resolution. It is therefore the only third of this cost
+attackable without a different SolidWorks API. Untested: whether the wrapper
+lookup memoises per interface. Measure before assuming.
+
+**Four optimisations measured, four refuted (and one still open).**
+
+0. **Memoising the `_early_bound` wrapper lookup.** UNTESTED — the one idea
+   below that has not been refuted, and the measurement above says it is worth
+   up to 7.0 s of a 27.7 s pick.
 1. **Per-view memo of the sweep.** 0% hit rate — an audit of every call site
    found no drawing that sweeps the same view twice (each gear print picks a
    circle off `front` and at most a silhouette off `right`). A cross-call cache

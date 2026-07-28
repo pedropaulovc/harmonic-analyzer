@@ -167,18 +167,23 @@ def test_every_gear_sweep_goes_through_the_traced_chokepoint() -> None:
     assert helper_source.count("visible_view_entities(") == 2  # circle + tooth tip
 
 
-def test_the_circle_pick_prices_its_three_com_calls_separately() -> None:
-    """`GetCurve` is 24.6 ms an edge against `IsCircle`'s 3.8 ms and
-    `CircleParams`' 3.6 ms -- a 7x spread that one aggregate duration hides.
+def test_the_circle_pick_prices_each_step_separately() -> None:
+    """Every timer must bracket exactly ONE operation, binding included.
 
-    Without the split, the obvious optimisation reads as "drop IsCircle" (worth
-    1.8 s of 25.3 s) instead of "GetCurve is the entire bill".
+    `curve_s` first enclosed `_early_bound(edge.GetCurve(), "ICurve")`, so it
+    priced the COM call AND the wrapper resolution together and reported
+    24.6 ms for a call that measures 18.2 ms (Codex P2). That inflation hid the
+    real finding: `_early_bound` is 7.0 s of a 27.7 s pick, comparable to
+    `GetCurve`'s 8.8 s, and unlike it is not COM at all.
     """
     helper_source = Path(_gear_drawing_entities.__file__).read_text(
         encoding="utf-8"
     )
-    for attribute in ("curve_s=", "classify_s=", "params_s="):
+    for attribute in ("curve_s=", "classify_s=", "params_s=", "bind_s="):
         assert attribute in helper_source, attribute
+    # The COM call is timed alone -- binding the result happens after the stamp.
+    assert "raw_curve = edge.GetCurve()" in helper_source
+    assert "_early_bound(edge.GetCurve()" not in helper_source
 
 
 def test_the_refuted_sweep_optimisations_keep_their_measurements() -> None:
@@ -191,3 +196,5 @@ def test_the_refuted_sweep_optimisations_keep_their_measurements() -> None:
     assert "closed=1" in helper_source
     # A second identical silhouette sweep costs the same as the first.
     assert "21.2 s" in helper_source
+    # And the corrected per-call price, not the paired one it replaced.
+    assert "18.2 ms" in helper_source

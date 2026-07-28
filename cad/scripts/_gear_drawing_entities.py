@@ -33,22 +33,36 @@ def _span_attrs(**attributes: float) -> None:
 def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """Return the visible circular model edge matching ``diameter_mm``.
 
-    The most expensive step in a gear drawing, and the cost is ONE call.
-    Measured on cone_gear (481 visible edges, 121 of them circles), 25.3 s:
+    The most expensive step in a gear drawing, and it splits three ways, not
+    one. Measured on cone_gear (481 visible edges, 121 of them circles), 27.7 s,
+    every timer bracketing exactly one operation:
 
-    ==================== ======== ==============
-    phase                    time      per edge
-    ==================== ======== ==============
-    sweep (child span)      7.0 s  one COM call
-    ``GetCurve()``         11.8 s       24.6 ms
-    ``IsCircle()``          1.8 s        3.8 ms
-    ``CircleParams``        0.4 s   3.6 ms x121
-    ``_early_bound``        2.7 s        5.7 ms
-    ==================== ======== ==============
+    ===================== ======== ==============
+    phase                     time      per edge
+    ===================== ======== ==============
+    sweep (child span)       7.5 s  one COM call
+    ``GetCurve()``           8.8 s       18.2 ms
+    ``_early_bound`` (x2)    7.0 s   7.3 ms each
+    ``IsCircle()``           2.0 s        4.2 ms
+    ``CircleParams``         0.4 s   3.4 ms x121
+    ===================== ======== ==============
 
-    ``GetCurve`` is 7x the other two COM reads combined, so it -- not the loop
-    body, not the sweep -- is what any optimisation must remove. Two ways to
-    remove it were measured and BOTH FAILED, so do not re-walk them:
+    An earlier version of this table said ``GetCurve`` cost 24.6 ms and was "the
+    entire bill". It was not: that timer also enclosed the ``_early_bound`` of
+    the returned curve, inflating the call it was supposed to isolate by ~35%
+    (Codex P2) -- the same paired-measurement error this table exists to warn
+    about, made one layer down. The corrected split is three near-equal thirds:
+    sweep 7.5 s, COM reads 11.2 s, wrapper binding 7.0 s.
+
+    **``_early_bound`` is the interesting one.** It is 7.0 s of a 27.7 s pick and
+    it is NOT a COM round trip -- it is local wrapper resolution, run twice per
+    edge (once for the IEdge, once for the returned ICurve). Unlike the sweep and
+    unlike ``GetCurve``, it is ordinary Python and therefore the only third of
+    this cost that can be attacked without a different SolidWorks API. Nothing
+    here has tried yet; measure a memoised wrapper lookup before assuming it.
+
+    The COM calls themselves resisted two removals, both measured, so do not
+    re-walk them:
 
     * **Pre-filter on ``IEdge::GetCurveParams2``** (2.6 ms, 10x cheaper) and pay
       ``GetCurve`` only for closed edges. Refuted: a full circle does NOT report
@@ -77,18 +91,27 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """
     candidates: list[tuple[float, tuple[float, float, float], Any]] = []
     raw_edges = visible_view_entities(view, 1, label=f"circle dia {diameter_mm:g}")
+    bind_s = 0.0
     curve_s = 0.0
     classify_s = 0.0
     params_s = 0.0
     for edge in raw_edges:
+        # Each timer brackets ONE thing. _early_bound is wrapper resolution, not
+        # a COM round trip, and folding it into the call it precedes is how a
+        # per-call price gets overstated -- the exact mistake this file's table
+        # was written to stop people making.
+        bind_started = time.perf_counter()
         edge = _early_bound(edge, "IEdge")
-        started = time.perf_counter()
-        curve = _early_bound(edge.GetCurve(), "ICurve")
+        edge_bound = time.perf_counter()
+        raw_curve = edge.GetCurve()
         got_curve = time.perf_counter()
+        curve = _early_bound(raw_curve, "ICurve")
+        curve_bound = time.perf_counter()
         is_circle = curve.IsCircle()
         classified = time.perf_counter()
-        curve_s += got_curve - started
-        classify_s += classified - got_curve
+        bind_s += (edge_bound - bind_started) + (curve_bound - got_curve)
+        curve_s += got_curve - edge_bound
+        classify_s += classified - curve_bound
         if not is_circle:
             continue
         # CircleParams = (centre xyz, axis xyz, radius).
@@ -104,7 +127,8 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     # of the three calls to attack.
     _span_attrs(edges=len(raw_edges), circles=len(candidates),
                 diameter_mm=diameter_mm, curve_s=round(curve_s, 3),
-                classify_s=round(classify_s, 3), params_s=round(params_s, 3))
+                classify_s=round(classify_s, 3), params_s=round(params_s, 3),
+                bind_s=round(bind_s, 3))
     target_radius = diameter_mm / 2.0
     if not candidates:
         raise RuntimeError("drawing view has no visible circular model edge")
