@@ -37,59 +37,62 @@ blind ``InsertGtol(t) for t in range(30)`` sweep is NOT needed.
 Opens a COPY of a built part under the temp dir and closes only that copy, so
 the build artefact is never dirtied.
 
-RESULTS, 2026-07-28, 3DEXPERIENCE R2026x SP3.0 Makers seat
-==========================================================
+RESULTS, 2026-07-28 (second session, fresh SolidWorks), R2026x SP3.0 Makers
+===========================================================================
 
-**Q1 PASSES — the DimXpert API surface is reachable and early-bindable.**
-``ext.DimXpertManager(config, True)`` and ``.DimXpertPart`` both resolve, and
-the recon's "no makepy pass over swdimxpert" blocker is REMOVED: the wrapper
-generates from the installed typelib in ~0.1 s.  Three binding facts, each
-found the hard way and each a prerequisite for any future PMI work:
+**ALL FIVE QUESTIONS NOW PASS (Q5 = save; drawing-side import still open).**
+The morning session's InsertDatum wedge DID NOT REPRODUCE against a freshly
+launched SolidWorks — not even in its exact original form (no ``DatumLength``,
+same part, same selector, same VARIANT array; see
+``probe_dimxpert_authoring.py datum-nolength``).  The wedge was a property of
+that session's SolidWorks state, not of the call.  Full verdict trail:
 
-* the DimXpert dispatch exposes NO type info (``GetTypeInfo`` -> "Invalid
-  index"), so ``Dispatch()`` and ``CastTo()`` BOTH silently fall back to a
-  late-bound ``CDispatch`` and every property PUT is then refused;
-* constructing the generated class around the RAW ``_oleobj_``
-  (``wrapper.IDimXpertPart(obj._oleobj_)``) is the only binding that works —
-  passing the CDispatch nests a dispatch in a dispatch; and
-* ``swDimXpertGtolType_e`` is recoverable from ``swdimxpert.tlb`` even though
-  the offline doc bundle omits it.  ``CircularRunout = 12`` is CONFIRMED (the
-  audit's synthesizer had rejected that value as fabricated; the typelib says
-  otherwise).
+* **Positive control** (``probe_dimxpert_authoring.py auto``):
+  ``AutoDimensionScheme`` with default options authors 3 features +
+  3 annotations on this Makers seat (retval ``False`` = partial scheme — a
+  soft signal, not a failure).  DimXpert authoring is NOT licence-gated.
+* **Q2** ``InsertDatum`` returns ``True`` in ~0.5 s, ``Datum19@Plane1(A)``
+  created — with or without the official example's ``DatumLength = 0.06``.
+* **Q3** ``InsertGtol`` creates cylindricity and circular-runout annotations
+  (also with NO preceding datum — the form-control path works).
+* **Q4** The 2026-07-28-morning "GetFrameCount()=0 / GetFormat()=None" reads
+  were a PROBE BUG: ``IDimXpertAnnotation.GetDisplayEntity`` returns the
+  display-side ``IAnnotation``, and the ``IGtol`` is one hop further via
+  ``IAnnotation::GetSpecificAnnotation`` (None would mean PMI-only).  Behind
+  that hop the Gtol is ALREADY current-format (``GetFormat()=2``,
+  ``GetFrameCount()=1``) and ``IGtolFrame.SetSymbolXml`` applies the same XML
+  payload the drawings use, read-back verified (``GTOL-CYL``/0.01,
+  ``GTOL-SRUN``/0.03).  No old-format migration needed.
+* **Q5** The part saves carrying the DimXpert annotations.  (The DimXpert
+  ``GetAppliedAnnotationCount`` stays 0 for XML-filled gtols — the fill lives
+  on the display annotation, not in DimXpert's feature-association model.)
 
-**Q2 WEDGES THE SEAT — reproducible, twice.** ``InsertDatum`` on a part-space
-planar face hangs SolidWorks: the window goes ``IsHungAppWindow``, the scratch
-part is left open and dirty, COM never returns, and only a full
-``_sw_lifecycle.force_recover()`` (kill + connector relaunch, ~2-5 min)
-recovers the seat.  Reproduced with the ``FeatureSelectorOptions`` array passed
-BOTH as a bare Python list and as an explicit ``VT_ARRAY | VT_I4`` VARIANT (the
-typing trap ``com_variant.double_array`` documents), so the marshalling fix is
-NOT the answer.
+Binding facts (unchanged, now CODIFIED in ``sw_type_info``): the DimXpert
+dispatches expose NO type info, so ``Dispatch()``/``CastTo()`` silently fall
+back late-bound and property PUTs are refused; the ONLY working binding is the
+makepy class generated from ``swdimxpert.tlb`` constructed around the RAW
+``_oleobj_``.  ``sw_type_info.early_bound`` now serves DimXpert interfaces
+through its auxiliary-typelib registry (lazy ``EnsureModule``, version read
+off the installed tlb), so ``_early_bound(obj, "IDimXpertPart")`` is all a
+call site needs.  ``swDimXpertGtolType_e`` is still absent from the offline
+doc bundle (v3.11.0) and still read off the tlb here (``CircularRunout = 12``
+confirmed).
 
-Q3/Q4/Q5 are therefore UNREACHED, not disproven.
+**Still untested:** ``IDrawingDoc::InsertModelAnnotations3`` with the DimXpert
+filter (does part PMI actually land on a sheet?), and whether the morning
+wedge recurs in long/degraded sessions — treat a recurrence as a session-state
+problem (recover via ``_sw_lifecycle.force_recover``), not a call-shape one.
 
-**Untested deltas** — what would have to be tried before calling part-side PMI
-dead: driving ``InsertGtol`` WITHOUT a preceding ``InsertDatum`` (a form control
-like flatness/cylindricity needs no datum, so the wedge may be specific to the
-datum path); a different ``FeatureSelectorOptions`` value (``_Default = -1``
-rather than ``_Plane = 0``); a face selected via ``SelectByID2`` instead of
-``IEntity::Select4``; ``AutoDimensionScheme`` as a positive control that the
-schema accepts ANY authoring on this seat; a non-Makers licence tier; and the
-VBA path the API example is written for.  A positive control matters most: no
-form of DimXpert authoring has yet been shown to work here, so "InsertDatum is
-broken" and "DimXpert authoring is unavailable on a Makers seat" are not yet
-distinguishable.
-
-**Consequence for the drawing-purity work: none.** The unit and drift hazards
-the audit found are fully closed by moving values into ``*_spec.py`` /
-``_fit_limits`` / ``_surface_finish`` and keeping the existing, working,
-read-back-verified DRAWING-side annotation path.  PMI would be an additional
-step, not a prerequisite.
+**Consequence for the drawing-purity work: unchanged.** The unit and drift
+hazards close entirely with the spec relocation; PMI is now PROVEN authorable
+but remains an additional step (blocked only on the sheet-import question),
+not a prerequisite.
 
 .. warning::
 
-   Running this probe COSTS THE SEAT at Q2 until the wedge is understood. Do
-   not run it during a build.
+   The 2026-07-28-morning session wedged at Q2 twice (unreproducible since —
+   see RESULTS).  Still: do not run this probe during a build, and if it
+   hangs, recover with ``_sw_lifecycle.force_recover()``.
 
     uv run python cad/scripts/diagnostics/probe_dimxpert_gtol.py
 """
@@ -106,7 +109,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
-from _drawing_common import _gtol_frame_xml  # noqa: E402
+from _drawing_common import _GTOL_SYMBOLS, _gtol_frame_xml  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import (  # noqa: E402
     PyWin32Adapter,
     null_callout,
@@ -164,26 +167,6 @@ def _gtol_type_map() -> dict[str, int]:
         for name in dir(module)
         if name.startswith(prefix) and not name.endswith("_e")
     }
-
-
-# swdimxpert.tlb identity, read from the installed library (pythoncom
-# LoadTypeLib -> GetLibAttr). Needed because the DimXpert dispatches arrive
-# LATE-bound: pywin32 then refuses a property PUT it has no type info for
-# ("Property '<unknown>.FeatureSelectorOptions' can not be set"). Generating the
-# makepy wrapper for this one typelib makes the DimXpert objects early-bound and
-# their properties settable -- the missing makepy pass the recon flagged.
-_SWDIMXPERT_TLB_GUID = "{582D0D5B-FF58-42CD-8968-A8A001A52454}"
-_SWDIMXPERT_TLB_MAJOR = 34
-_SWDIMXPERT_TLB_MINOR = 0
-
-
-def _ensure_swdimxpert_wrapper() -> object:
-    """makepy-generate (and import) the swdimxpert wrapper, returning the module."""
-    from win32com.client import gencache
-
-    return gencache.EnsureModule(
-        _SWDIMXPERT_TLB_GUID, 0, _SWDIMXPERT_TLB_MAJOR, _SWDIMXPERT_TLB_MINOR
-    )
 
 
 def _close_if_open(adapter: object, title: str) -> None:
@@ -291,31 +274,18 @@ async def _probe() -> int:
             "Q1 DimXpertPart (late-bound, no makepy pass)", dim_part is not None
         ):
             return 1
-        # swdimxpert.tlb is NOT in the vendored makepy wrapper, so this dispatch
-        # is late-bound and pywin32 resolves every unknown name as a PROPERTY --
-        # `GetDimOption()` then invokes the default dispatch and dies with
-        # "Member not found". Flag the zero-argument methods explicitly; this is
-        # exactly the fallback path sw_type_info documents for interfaces the
-        # wrapper cannot reach.
-        wrapper = _ensure_swdimxpert_wrapper()
-        _report(
-            "Q1 swdimxpert makepy wrapper generated",
-            wrapper is not None,
-            getattr(wrapper, "__name__", ""),
-        )
         # The DimXpert dispatch exposes NO type info (GetTypeInfo -> "Invalid
         # index"), so neither Dispatch() nor CastTo() can auto-resolve it -- both
         # fall back to a late-bound CDispatch, and pywin32 then refuses any
-        # property PUT. Constructing the generated wrapper class AROUND the raw
-        # dispatch is the one path that works: the type info comes from the
-        # typelib we just makepy'd, not from the object.
-        # Wrap the RAW IDispatch: the generated class calls InvokeTypes on
-        # self._oleobj_, and handing it a CDispatch nests one dispatch inside
-        # another (AttributeError: DimXpertPart.InvokeTypes).
-        dim_part = wrapper.IDimXpertPart(getattr(dim_part, "_oleobj_", dim_part))
+        # property PUT. sw_type_info's auxiliary-typelib support (added off this
+        # probe's findings) makepy-generates swdimxpert.tlb on first use and
+        # constructs the generated class around the RAW _oleobj_ -- the one
+        # binding that works -- so the ordinary `_early_bound` call now serves
+        # DimXpert interfaces too.
+        dim_part = _early_bound(dim_part, "IDimXpertPart")
         _report(
-            "Q1 IDimXpertPart wrapped early-bound",
-            type(dim_part).__name__ == "IDimXpertPart",
+            "Q1 IDimXpertPart early-bound via aux typelib",
+            type(dim_part).__name__.startswith("IDimXpertPart"),
             type(dim_part).__name__,
         )
         _telemetry.info(
@@ -336,10 +306,7 @@ async def _probe() -> int:
         # Select4 is IEntity, not IFace2, and its ISelectData argument must be a
         # real null VARIANT -- `None` marshals as a type mismatch.
         if _early_bound(planes[0], "IEntity").Select4(False, null_callout()):
-            raw_option = dim_part.GetDimOption()
-            option = wrapper.IDimXpertDimensionOption(
-                getattr(raw_option, "_oleobj_", raw_option)
-            )
+            option = _early_bound(dim_part.GetDimOption(), "IDimXpertDimensionOption")
             option.FeatureSelectorOptions = _long_array([SELECTOR_PLANE])
             datum_ok = bool(dim_part.InsertDatum(option))
         _report("Q2 InsertDatum on a part-space planar face", datum_ok)
@@ -363,46 +330,82 @@ async def _probe() -> int:
                 f"Q3 InsertGtol({member}={gtol_types[member]})", annotation is not None
             ):
                 continue
-            gtol = _read_member(annotation, "GetDisplayEntity")
-            if gtol is None:
-                _report(f"Q4 reach IGtol behind {characteristic}", False)
+            # GetDisplayEntity returns the display-side IAnnotation, NOT the
+            # IGtol (the C# Get_and_Set_Datum example casts it to Annotation and
+            # reads GetName). The IGtol is one hop further, via
+            # IAnnotation::GetSpecificAnnotation — which returns None for a
+            # PMI-only annotation, itself a reportable outcome. The 2026-07-28
+            # run treated the display entity AS the IGtol, so its
+            # GetFrameCount()=0 / GetFormat()=None reads were against the wrong
+            # interface and prove nothing.
+            display = _read_member(annotation, "GetDisplayEntity")
+            if display is None:
+                _report(f"Q4 reach display IAnnotation behind {characteristic}", False)
                 continue
+            display = _early_bound(display, "IAnnotation")
+            _telemetry.info(
+                f"  {characteristic}: display annotation name="
+                f"{display.GetName()!r} type={display.GetType()}"
+            )
+            gtol = display.GetSpecificAnnotation()
+            if gtol is None:
+                _report(
+                    f"Q4 GetSpecificAnnotation behind {characteristic}",
+                    False,
+                    "None — PMI-only annotation (see IAnnotation::GetSpecificAnnotation Remarks)",
+                )
+                continue
+            gtol = _early_bound(gtol, "IGtol")
             fmt = _read_member(gtol, "GetFormat")
             _telemetry.info(
                 f"  {characteristic}: GetFormat()={fmt} "
                 "(2 = swGtolFormatType_e.GTOL_SW2022, the only format "
                 "_drawing_common accepts)"
             )
+            # Mirror the PROVEN drawing-side recipe (_drawing_common.
+            # add_feature_control_frame): count -> AddFrame if none ->
+            # GetFrame(1); a None frame means an OLD-format Gtol, seeded via
+            # SetFrameSymbols2/SetFrameValues2 then ConvertFormat; finally the
+            # current-format IGtolFrame takes the XML payload.
             frame_count = int(_read_member(gtol, "GetFrameCount") or 0)
+            if frame_count == 0 and bool(gtol.AddFrame()):
+                frame_count = int(_read_member(gtol, "GetFrameCount") or 0)
             _telemetry.info(f"  {characteristic}: GetFrameCount()={frame_count}")
-
-            # Path A -- the current-format XML payload the drawings already use.
-            xml = _gtol_frame_xml(characteristic, tolerance, datums=datums)
             frame = gtol.GetFrame(1) if frame_count else None
+            migrated = frame is None
+            if migrated:
+                datum_values = [*datums[:3], "", "", ""][:3]
+                gtol.SetFrameSymbols2(
+                    1, f"<{_GTOL_SYMBOLS[characteristic]}>", "", "", False,
+                    "", "", "", "",
+                )
+                seeded = bool(gtol.SetFrameValues2(1, tolerance, "", *datum_values))
+                converted = seeded and gtol.CanConvertFormat() and int(gtol.ConvertFormat()) == 0
+                _report(
+                    f"Q4b old-format seed + ConvertFormat ({characteristic})",
+                    bool(converted),
+                    f"seeded={seeded}",
+                )
+                frame = gtol.GetFrame(1) if converted else None
+
             xml_ok = False
             if frame is not None:
-                xml_ok = bool(frame.SetSymbolXml(xml))
+                frame = _early_bound(frame, "IGtolFrame")
+                if not migrated:
+                    xml = _gtol_frame_xml(characteristic, tolerance, datums=datums)
+                    frame.SetSymbolXml(xml)
                 applied = str(frame.GetSymbolXml() or "")
-                xml_ok = xml_ok and tolerance in applied
+                xml_ok = tolerance in applied
                 _report(
-                    f"Q4a SetSymbolXml on a DimXpert-created Gtol ({characteristic})",
+                    f"Q4a current-format frame carries the tolerance ({characteristic})",
                     xml_ok,
-                    f"read back {applied[:120]!r}",
+                    f"migrated={migrated}, read back {applied[:120]!r}",
                 )
             else:
                 _report(
-                    f"Q4a GetFrame(1) on a DimXpert-created Gtol ({characteristic})",
+                    f"Q4 no usable IGtolFrame ({characteristic})",
                     False,
-                    "no current-format frame to write XML into",
-                )
-
-            # Path B -- the recipe InsertGtol's own Remarks prescribe.
-            if not xml_ok:
-                seeded = bool(
-                    gtol.SetFrameValues2(1, tolerance, "", *[*datums[:3], "", "", ""][:3])
-                )
-                _report(
-                    f"Q4b SetFrameValues2 (pre-2022 path) ({characteristic})", seeded
+                    "GetFrame(1) is None on both the direct and migrated paths",
                 )
 
             # Whatever path took, does the VALUE read back through DimXpert?

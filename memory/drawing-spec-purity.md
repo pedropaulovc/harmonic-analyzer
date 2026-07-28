@@ -72,6 +72,9 @@ load-bearing and turns every improvement red. `_drawing_contract.py` provides
 `model_toleranced_dimensions(build_module)` (AST, not substring — the calls span
 lines and a text assertion pins the formatting too).
 
-**GD&T is still authored per-sheet** — moving it to model PMI is blocked, see
-[[dimxpert-authoring-probe]]. Not a prerequisite: the unit and drift hazards
+**GD&T is still authored per-sheet** — model PMI is now PROVEN authorable
+(datum + gtol + XML fill + save; the InsertDatum wedge was session state — see
+[[dimxpert-authoring-probe]]), but the sheet-import leg
+(`InsertModelAnnotations3` + DimXpert filter) is untested, so per-sheet
+authoring stays. Not a prerequisite either way: the unit and drift hazards
 close entirely with the spec relocation above.
