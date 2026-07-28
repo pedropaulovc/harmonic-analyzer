@@ -1,13 +1,17 @@
 ---
 name: drawing-fleet-cost-profile
-description: Measured per-span cost breakdown of a drawing build — where the ~32 s median actually goes, and which of it is validation that must not be deleted for speed
+description: Measured per-span cost breakdown of the drawing fleet — where a ~3600 s pass goes, which of it is validation that must not be deleted for speed, and which spans are too thinly sampled to quote as a number
 metadata:
   type: project
 ---
 
 Per-span breakdown of the drawing fleet, from the `drawing.*` spans added in
 #437. Source: nine COMPLETE 93-drawing passes, 2026-07-27/28 (`⟩ <span> <secs>s`
-console lines), median across passes of each span's per-pass total.
+console lines). Sum each span's durations WITHIN a pass, giving one total per
+pass; the tables below then report **min–max across passes**, not a median — a
+median collapses to one scalar and hides exactly the spread that makes the
+thinly-sampled spans untrustworthy. Where a single number appears it is a
+round figure whose spread is narrow (`~350`, `~190`).
 
 **Spans that predate #437 — nine passes, trustworthy:**
 
@@ -62,8 +66,8 @@ removable only after the note is baked into `harmonic-analyzer.DRWDOT` — the f
 
 **How to apply:** treat a proposed drawing-pipeline deletion as needing this
 question answered first — *is this span normalizing, or proving?* Regenerate the
-profile by parsing `⟩ <name> <secs>s` out of every pass log, summing per span
-PER PASS, then taking the median across passes; it costs nothing beyond logs that
+profile by parsing `⟩ <name> <secs>s` out of every pass log and summing per span
+PER PASS, then reporting min–max across passes; it costs nothing beyond logs that
 already exist. Three traps, all hit once: EXCLUDE incomplete passes (an
 in-flight run silently dragged every per-pass total down); do not extrapolate
 one pass (that mis-sized `drawing.save_and_export_pdf` by 1.8×); and never
