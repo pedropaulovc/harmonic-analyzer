@@ -777,33 +777,46 @@ def _set_note_text_height(adapter: Any, note: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: note text height did not persist")
 
 
-def _drawing_component_matches(
-    adapter: Any, drawing_component: Any, stems: frozenset[str]
-) -> set[str]:
-    """Return configured stems represented by one leaf drawing component."""
-    name = str(drawing_component.Name or "")
-    component = adapter._attempt(
-        lambda dc=drawing_component: dc.Component, default=None
-    )
-    path = ""
-    if component is not None:
-        path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
-
-    identities = {Path(str(path)).stem.casefold()}
-    drawing_name = name.split("@", 1)[0].replace("\\", "/")
-    identities.add(drawing_name.rsplit("/", 1)[-1].casefold())
+def _stems_for_identity(identity: str, stems: frozenset[str]) -> set[str]:
+    """Which of ``stems`` one identity string represents (exact, or ``stem-<n>``)."""
     return {
         stem
         for stem in stems
-        if any(
-            identity == stem
-            or (
-                identity.startswith(f"{stem}-")
-                and identity.removeprefix(f"{stem}-").isdigit()
-            )
-            for identity in identities
+        if identity == stem
+        or (
+            identity.startswith(f"{stem}-")
+            and identity.removeprefix(f"{stem}-").isdigit()
         )
     }
+
+
+def _drawing_component_matches(
+    adapter: Any, drawing_component: Any, stems: frozenset[str], *, name: str
+) -> set[str]:
+    """Return configured stems represented by one leaf drawing component.
+
+    ``name`` is passed in because the caller has already paid for it -- reading
+    ``IDrawingComponent::Name`` twice per node is a wasted late-bound round trip.
+
+    The component's PATH is resolved **lazily**: it costs two more round trips
+    (``.Component`` then ``GetPathName``) and is only ever consulted when the
+    name-derived identity matched nothing. Since a match is the union of both
+    identities, skipping the path once the name has already matched cannot change
+    the result. On the drive-train tree most nodes match on name alone or are
+    structure we do not care about, so this removes the majority of the calls.
+    """
+    drawing_name = name.split("@", 1)[0].replace("\\", "/")
+    matched = _stems_for_identity(drawing_name.rsplit("/", 1)[-1].casefold(), stems)
+    if matched:
+        return matched
+
+    component = adapter._attempt(
+        lambda dc=drawing_component: dc.Component, default=None
+    )
+    if component is None:
+        return matched
+    path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
+    return _stems_for_identity(Path(str(path)).stem.casefold(), stems)
 
 
 @_telemetry.traced("drawing.component_balloon", label_param="stem")
@@ -827,11 +840,12 @@ def _create_component_balloon(
             pending.extend(children)
             if children:
                 continue
+            name = str(drawing_component.Name or "")
             if not _drawing_component_matches(
-                adapter, drawing_component, frozenset({stem})
+                adapter, drawing_component, frozenset({stem}), name=name
             ):
                 continue
-            enumerated.append(str(drawing_component.Name or ""))
+            enumerated.append(name)
             component = adapter._attempt(
                 lambda dc=drawing_component: dc.Component, default=None
             )
@@ -911,10 +925,17 @@ def _isolate_balloon_components(
         children = _drawing_component_children(drawing_component)
         pending.extend(children)
 
-        enumerated.append(str(drawing_component.Name or ""))
-        matched = _drawing_component_matches(adapter, drawing_component, visible_stems)
+        name = str(drawing_component.Name or "")
+        enumerated.append(name)
+        # Resolve identity only for LEAVES. This used to run before the
+        # `continue`, so every internal node paid a `.Component` + `GetPathName`
+        # round trip for a `matched` that was then thrown away -- and only leaves
+        # ever have their visibility set.
         if children:
             continue
+        matched = _drawing_component_matches(
+            adapter, drawing_component, visible_stems, name=name
+        )
         drawing_component.Visible = bool(matched)
         if not matched:
             continue
