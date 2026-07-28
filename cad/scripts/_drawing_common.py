@@ -9,6 +9,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import math
+import sys
 from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
@@ -2766,6 +2767,38 @@ def _push_apart_on_ring(
     return result
 
 
+def _balloon_item_key(adapter: Any, note: Any) -> tuple[int, str]:
+    """A balloon's BOM item number, as a sort key that never ties on order.
+
+    The last resort in :func:`_spread_balloons`' ring sort. Every field ahead of
+    it is geometric and can therefore tie exactly -- two overlapping or coaxial
+    components project to one attachment point -- at which point a stable sort
+    silently falls back to ``AutoBalloon5``'s arrival order, which is the very
+    nondeterminism the sort exists to remove.
+
+    The item number is the only identity here that comes from the component's
+    BOM ROW rather than from when its balloon happened to be created, so it is
+    the one that actually terminates the chain. ``IAnnotation::GetName`` would
+    NOT do: names like ``DetailItem347`` are handed out at creation time, in
+    arrival order, so keying on one re-encodes the instability it is meant to
+    break.
+
+    Returns ``(number, text)`` so "2" sorts before "10" rather than after it,
+    with the raw text carrying non-numeric balloons (``A``, ``12A``) and ties
+    among them. An unreadable balloon sorts last under its own text rather than
+    failing the drawing: this is a tie-break, and losing it degrades placement
+    determinism, not correctness.
+    """
+    text = adapter._attempt(lambda n=note: n.GetText(), default="") or ""
+    text = str(text).strip()
+    leading = ""
+    for char in text:
+        if not char.isdigit():
+            break
+        leading += char
+    return (int(leading) if leading else sys.maxsize, text)
+
+
 def _spread_balloons(
     adapter: Any,
     view: Any,
@@ -2814,7 +2847,7 @@ def _spread_balloons(
     radii: list[float] = []
     for note in balloons:
         note = _sw_type_info.early_bound_or_flag(
-            note, "INote", "GetAnnotation", "GetBalloonInfo"
+            note, "INote", "GetAnnotation", "GetBalloonInfo", "GetText"
         )
         # The balloon circle's own rendered radius. GetBalloonInfo returns
         # (centre xyz, arc-point xyz, radius) -- unlike GetExtent it describes
@@ -2851,20 +2884,29 @@ def _spread_balloons(
         # Flat x,y,z stream; the LAST triple is the attachment on the component.
         attach_x, attach_y = float(raw[-3]), float(raw[-2])
         theta = math.atan2(attach_y - center_y, attach_x - center_x)
-        items.append((theta, attach_x, attach_y, annotation))
-    # Sort on (theta, attach x, attach y), never on theta alone. Two balloons
-    # attached at the same angle from the view centre -- coaxial parts in a
-    # pictorial view do this routinely -- would otherwise keep whatever relative
-    # order the balloons arrived in, which is AutoBalloon5's, which is not
-    # stable. Ring order decides whether leaders cross, so an unstable tie-break
-    # is an unstable drawing.
-    order = sorted(range(len(items)), key=lambda i: items[i][:3])
+        items.append((theta, attach_x, attach_y, _balloon_item_key(adapter, note),
+                      annotation))
+    # Sort on (theta, attach x, attach y, BOM item), never on theta alone. Two
+    # balloons attached at the same angle from the view centre -- coaxial parts
+    # in a pictorial view do this routinely -- would otherwise keep whatever
+    # relative order the balloons arrived in, which is AutoBalloon5's, which is
+    # not stable. Ring order decides whether leaders cross, so an unstable
+    # tie-break is an unstable drawing.
+    #
+    # The BOM item number is the LAST key because the three geometric ones can
+    # ALL tie: overlapping or coaxial components can attach at exactly the same
+    # projected point, and then the stable sort just re-emits AutoBalloon5's
+    # arrival order -- the same nondeterminism, one level down. The item number
+    # is the only field here tied to the component's BOM row rather than to when
+    # the balloon happened to be created, so it is the one that ends the chain.
+    order = sorted(range(len(items)), key=lambda i: items[i][:4])
     items = [items[i] for i in order]
     radii = [radii[i] for i in order]
     _telemetry.event(
         "drawing.balloon_ring",
         count=len(items),
-        attachments=[f"{x:.6f},{y:.6f}" for _t, x, y, _a in items],
+        attachments=[f"{x:.6f},{y:.6f}" for _t, x, y, _i, _a in items],
+        items=[str(item) for _t, _x, _y, item, _a in items],
     )
 
     # Place each balloon at its OWN attachment's angle, then separate only the
@@ -2899,8 +2941,10 @@ def _spread_balloons(
     gap = _min_angular_gap(
         min(radius_x, radius_y), max(radii), clearance=clearance
     )
-    angles = _push_apart_on_ring([theta for theta, _x, _y, _a in items], min_gap=gap)
-    for angle, (_theta, _x, _y, annotation) in zip(angles, items):
+    angles = _push_apart_on_ring(
+        [theta for theta, _x, _y, _i, _a in items], min_gap=gap
+    )
+    for angle, (_theta, _x, _y, _item, annotation) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle)
         target_y = center_y + radius_y * math.sin(angle)
         if not annotation.SetPosition(target_x, target_y, 0.0):

@@ -13,6 +13,7 @@ print.
 from __future__ import annotations
 
 import math as _math
+import sys
 from inspect import getsource
 from types import SimpleNamespace
 
@@ -1310,10 +1311,14 @@ def test_edge_key_is_none_when_the_geometry_cannot_be_read():
 
 
 class _FakeNote:
-    def __init__(self, attach_x, attach_y, radius=0.0047):
+    def __init__(self, attach_x, attach_y, radius=0.0047, item="1"):
         self._attach = (attach_x, attach_y)
         self._radius = radius
+        self._item = item
         self.placed = None
+
+    def GetText(self):
+        return self._item
 
     def GetBalloonInfo(self):
         return (0, 0, 0, 0, 0, 0, self._radius)
@@ -1490,3 +1495,43 @@ def test_anchor_span_counts_every_leaf_it_walked_not_just_the_match():
     assert recorded["visited"] == 4, recorded
     assert recorded["matched"] == 1
     assert recorded["edges"] == 1
+
+
+def test_coincident_attachments_break_on_the_bom_item_not_arrival_order():
+    """The last geometric tie-break can itself tie.
+
+    Overlapping or coaxial components project to ONE attachment point, so
+    theta, x and y are all equal and the stable sort quietly re-emits
+    AutoBalloon5's arrival order -- the same nondeterminism the sort exists to
+    remove, one level down (Codex P2). The BOM item number is the only field
+    tied to the component's row rather than to when its balloon was created.
+    """
+    same = (0.1700, 0.1700)
+    two, ten = _FakeNote(*same, item="2"), _FakeNote(*same, item="10")
+    forward = dict(zip(("2", "10"), _ring_positions([two, ten])))
+    two2, ten2 = _FakeNote(*same, item="2"), _FakeNote(*same, item="10")
+    reversed_ = dict(zip(("10", "2"), _ring_positions([ten2, two2])))
+    assert forward == reversed_
+    assert forward["2"] != forward["10"]
+
+
+def test_bom_items_order_numerically_not_lexically():
+    """"10" must not sort between "1" and "2" -- a lexical key would reorder a
+    ring whose items ran into double digits, which every assembly sheet does."""
+    keys = [
+        drawing_common._balloon_item_key(_FakeAdapter(None), _FakeNote(0, 0, item=t))
+        for t in ("10", "2", "3")
+    ]
+    assert [key[0] for key in sorted(keys)] == [2, 3, 10]
+
+
+def test_an_unreadable_balloon_item_sorts_last_instead_of_failing():
+    """This key is a TIE-BREAK. Losing it costs placement determinism, not
+    correctness, so it must not take the drawing down with it."""
+
+    class _Mute(_FakeNote):
+        def GetText(self):
+            raise RuntimeError("no text")
+
+    key = drawing_common._balloon_item_key(_FakeAdapter(None), _Mute(0, 0))
+    assert key == (sys.maxsize, "")
