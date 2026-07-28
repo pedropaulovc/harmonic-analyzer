@@ -26,6 +26,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_auto_balloons_across_views,
     finalize_drawing,
+    isolate_drawing_view_components,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -246,8 +247,43 @@ PINION_IDENTIFICATION_VIEW_INDICES = (1, 2)
 PINION_IDENTIFICATION_VIEW_CENTERS = ((0.120, 0.150), (0.310, 0.150))
 PINION_IDENTIFICATION_LABEL_ORIGINS = ((0.070, 0.235), (0.260, 0.235))
 
-# Sheet 4: selected context makes the three concealed families comprehensible
-# without duplicating their exterior balloons.
+# Sheet 4: the concealed families, made VISIBLE rather than merely drawn in
+# hidden line.
+#
+# AutoBalloon5 balloons the components a view SHOWS, and a hidden-line edge does
+# not count as shown. Measured: with both concealed views set to hidden-lines-
+# visible and nothing isolated, the sheet's two AutoBalloon5 calls returned no
+# new items at all -- coverage sat at 26/32 across the whole drawing and the
+# sheet-6 assert failed on exactly the six buried families
+# (6 cone-tip-bushing, 9 cone-lock-knob, 11 swing-stop-screw, 12 alignment-
+# pinion, 25 cone-gear-shaft, 26 crank-drive-gear). So hidden lines are for the
+# READER; isolation is what earns these views their place.
+#
+# Each view keeps enough surrounding context to stay comprehensible -- the
+# journal stack around the bushing, the crank mesh around the drive gear --
+# rather than isolating the buried part alone into an unreadable floating solid.
+CONCEALED_BOTTOM_VISIBLE_STEMS = frozenset(
+    {
+        "cone-pivot-post",
+        "cone-tip-block",
+        "cone-tip-bushing",
+        "cone-tip-adjuster",
+        "cone-tip-pinch-screw",
+        "cone-gear-shaft",
+        "cone-lock-knob",
+        "swing-stop-screw",
+    }
+)
+CONCEALED_FRONT_VISIBLE_STEMS = frozenset(
+    {
+        "cone-gear-shaft",
+        "crank-drive-gear",
+        "crankshaft",
+        "crank-pinion",
+        "alignment-pinion",
+        "pinion-arbor",
+    }
+)
 CONCEALED_BOTTOM_CENTER = (0.115, 0.135)
 CONCEALED_FRONT_CENTER = (0.285, 0.155)
 CONCEALED_HEADING_ORIGIN = (0.060, 0.255)
@@ -931,6 +967,12 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
     )
     set_hidden_lines_visible(adapter, concealed_bottom)
+    isolate_drawing_view_components(
+        adapter,
+        concealed_bottom,
+        visible_stems=CONCEALED_BOTTOM_VISIBLE_STEMS,
+        label="drive-train concealed bottom",
+    )
 
     concealed_front = place_view(
         adapter,
@@ -940,9 +982,15 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
     )
     set_hidden_lines_visible(adapter, concealed_front)
-    # Hidden lines VISIBLE is what earns these two views their place: AutoBalloon
-    # attaches to entities the view shows, so the cone-journal and crank-mesh
-    # parts buried inside the assembly are reachable here and nowhere else.
+    isolate_drawing_view_components(
+        adapter,
+        concealed_front,
+        visible_stems=CONCEALED_FRONT_VISIBLE_STEMS,
+        label="drive-train concealed front",
+    )
+    # Isolation, not hidden lines, is what earns these two views their place --
+    # see CONCEALED_BOTTOM_VISIBLE_STEMS for the measurement. Hidden lines stay
+    # on so the reader can still see how the exposed families sit in the stack.
     identification_balloons = add_auto_balloons_across_views(
         adapter,
         (concealed_bottom, concealed_front),
