@@ -17,6 +17,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -114,9 +115,12 @@ async def build_fastener_sheet(
         *recipe.iso_center,
         scale=recipe.scale,
     )
+    set_hidden_lines_removed(adapter, side)
+    set_hidden_lines_removed(adapter, iso)
     # The shank is fully occluded in the driver/knob-face view.  Showing its
     # hidden circle reads like a counterbore or boss on these tiny sheets and
     # adds no manufacturing information; the thread callout owns that feature.
+    set_hidden_lines_removed(adapter, end)
 
     if recipe.side_centerline_face_xy is not None:
         add_view_centerline(

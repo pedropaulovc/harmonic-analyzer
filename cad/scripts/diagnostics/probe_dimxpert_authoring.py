@@ -93,6 +93,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
+import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from probe_dimxpert_gtol import (  # noqa: E402
     SELECTOR_PLANE,
@@ -276,6 +277,8 @@ async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object
     frame = _early_bound(gtol.GetFrame(1), "IGtolFrame")
     filled = bool(frame.SetSymbolXml(_gtol_frame_xml("cylindricity", "0.01", datums=())))
     _report("import: gtol XML-filled on the part", filled)
+    if not filled:
+        raise RuntimeError("gtol XML fill failed -- nothing meaningful to import")
 
     scratch = Path(str(_read_member(model, "GetPathName")))
     saved = await adapter.save_file(str(scratch))
@@ -296,12 +299,32 @@ async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object
         _telemetry.info(
             f"  view annotation: name={item.GetName()!r} type={item.GetType()}"
         )
-    ok = len(imported) > before
+    landed = len(imported) > before
     _report(
         "import: IView.ImportAnnotations(DimXpert=True) landed PMI on the sheet",
-        ok,
+        landed,
         f"before={before} after={len(imported)}",
     )
+    # Read back any imported gtol's frame content: an empty frame landing on
+    # the sheet must not count as the XML-filled 0.01 frame surviving the
+    # part-to-drawing path. (Observed: the datum lands in this Front view, the
+    # cylinder-face gtol does not -- the readback gates only gtols that DID
+    # land.)
+    frames_ok = True
+    for item in imported:
+        item = _early_bound(item, "IAnnotation")
+        if int(item.GetType()) != 5:  # swAnnotationType_e.swGTol
+            continue
+        sheet_gtol = _early_bound(item.GetSpecificAnnotation(), "IGtol")
+        xml = str(_early_bound(sheet_gtol.GetFrame(1), "IGtolFrame").GetSymbolXml())
+        frame_ok = "0.01" in xml
+        frames_ok = frames_ok and frame_ok
+        _report(
+            "import: imported gtol frame carries the 0.01 tolerance",
+            frame_ok,
+            xml[:120],
+        )
+    ok = landed and frames_ok
     draw_title = str(_read_member(adapter.currentModel, "GetTitle"))
     adapter.swApp.QuitDoc(draw_title)
     _telemetry.success(f"scratch drawing discarded without saving: {draw_title}")
@@ -339,6 +362,10 @@ async def main() -> int:
     _telemetry.set_service("diagnostics")
     async with _telemetry.aspan(f"probe.dimxpert_authoring.{stage}"):
         adapter = PyWin32Adapter({})
+        # The wedge this probe exists to study blocks the COM call itself, so
+        # without the watchdog neither the finally block nor a timeout could
+        # ever run -- arm the same crash/idle guard run_build uses.
+        _watchdog.start()
         try:
             await adapter.connect()
             model, dim_part = await _open_scratch(adapter, stage)
@@ -362,6 +389,7 @@ async def main() -> int:
             return 0 if passed else 1
         finally:
             await adapter.disconnect()
+            _watchdog.stop()
 
 
 if __name__ == "__main__":

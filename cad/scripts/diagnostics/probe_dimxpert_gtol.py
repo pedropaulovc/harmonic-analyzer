@@ -108,6 +108,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
+import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import _GTOL_SYMBOLS, _gtol_frame_xml  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import (  # noqa: E402
@@ -194,10 +195,20 @@ def _long_array(values: list[int]):
     return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, [int(v) for v in values])
 
 
+_FAILED_CHECKS: list[str] = []
+
+
 def _report(label: str, ok: bool, detail: str = "") -> bool:
-    """Log one probe outcome; returns ``ok`` so callers can branch on it."""
+    """Log one probe outcome; returns ``ok`` so callers can branch on it.
+
+    Failures also accumulate in ``_FAILED_CHECKS`` so ``main`` exits nonzero
+    unless every reported check passed -- a warned-through failure must not
+    record a successful experiment.
+    """
     emit = _telemetry.success if ok else _telemetry.warn
     emit(f"{label}: {ok}" + (f" -- {detail}" if detail else ""))
+    if not ok:
+        _FAILED_CHECKS.append(label)
     return ok
 
 
@@ -250,6 +261,10 @@ async def _probe() -> int:
     scratch = Path(tempfile.gettempdir()) / "probe_dimxpert_gtol.SLDPRT"
 
     adapter = PyWin32Adapter({})
+    # The wedge this probe exists to study blocks the COM call itself, so
+    # without the watchdog neither the finally block nor a timeout could ever
+    # run -- arm the same crash/idle guard run_build uses.
+    _watchdog.start()
     try:
         await adapter.connect()
         # A previous run that raised mid-probe left the scratch part OPEN, and
@@ -434,9 +449,16 @@ async def _probe() -> int:
         title = _read_member(model, "GetTitle")
         adapter.swApp.QuitDoc(title)
         _telemetry.success(f"scratch part closed: {title}")
+        if _FAILED_CHECKS:
+            _telemetry.error(
+                f"probe finished with {len(_FAILED_CHECKS)} failed check(s): "
+                + "; ".join(_FAILED_CHECKS)
+            )
+            return 1
         return 0
     finally:
         await adapter.disconnect()
+        _watchdog.stop()
 
 
 if __name__ == "__main__":
