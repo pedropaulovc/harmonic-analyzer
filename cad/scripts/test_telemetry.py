@@ -544,12 +544,19 @@ f.close()
 
 
 @pytest.mark.skipif(
-    os.environ.get("HARMONIC_TELEMETRY_RACE_REPRO") != "1",
+    os.environ.get("HARMONIC_TELEMETRY_RACE_REPRO") != "1"
+    or sys.platform != "win32",
     reason=(
-        "opt-in: asserts a RACE reproduces, so it cannot gate check:telemetry. "
-        "Run with HARMONIC_TELEMETRY_RACE_REPRO=1 on Windows. Compared against "
-        "'1' exactly, so setting it to 0/false to DISABLE the repro cannot "
-        "accidentally switch it on and turn the gate red."
+        "opt-in AND Windows-only: asserts a RACE reproduces, so it cannot gate "
+        "check:telemetry. Run with HARMONIC_TELEMETRY_RACE_REPRO=1 on Windows. "
+        "Compared against '1' exactly, so setting it to 0/false to DISABLE the "
+        "repro cannot accidentally switch it on and turn the gate red. The "
+        "platform guard is not belt-and-braces: on POSIX `open(path, 'a')` uses "
+        "O_APPEND, whose appends ARE atomic, so the buffered writers this test "
+        "deliberately breaks produce all 2,000 records intact and the assertion "
+        "below fails on a correct system (Codex P1, reproduced on Linux). The "
+        "corruption it reproduces is a Windows behaviour, so the control only "
+        "means anything on Windows."
     ),
 )
 def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
