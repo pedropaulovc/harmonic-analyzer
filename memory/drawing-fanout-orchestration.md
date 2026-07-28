@@ -1,0 +1,185 @@
+---
+name: drawing-fanout-orchestration
+description: Fanning out Fable drawing agents — they yield between steps; verify progress on-disk, not by idle pings; PR each gate-complete slice; watch the Fable weekly quota
+metadata:
+  type: feedback
+---
+
+Orchestrating the manufacturing-drawing fan-out (one Fable subagent per part, each
+in its own git worktree, all serialized on the single SolidWorks COM seat).
+
+**Fable drawing agents END THEIR TURN between steps** (after building the part, or
+while the seat is busy) and emit an `idle_notification ... "available"` — they do
+NOT autonomously run through to the commit. An idle ping is NOT "done" and often
+NOT "blocked" either; it just means the turn ended and the agent is waiting for a
+kick.
+**Why:** left alone they stall the fan-out until re-nudged, wasting the lead's cycles.
+**How to apply:**
+- Bake "run the whole build→iterate→review→commit sequence to completion WITHIN
+  your turns; do not go idle between steps; only stop when committed or hard-blocked"
+  into the agent prompt from the start (now in `cad/scripts/drawing_recipe.md`'s
+  template).
+- On an idle ping, do NOT trust it — check the worktree ON DISK: `git log -1`
+  (committed?), `cad/out/png/<stem>_drawing.png` (drawing built?),
+  `cad/out/reports/codex_machinist_review.txt` (reviewed?). Nudge only if genuinely
+  stalled with work unfinished; a part-built-but-drawing-unbuilt state is the common
+  stall.
+- Gate-complete = commit subject "…curated manufacturing drawing slice" AND PNG AND
+  codex review file AND **the slice's pytest passing**. A PNG only proves the COM task
+  emitted an image; it says nothing about the offline contract the test owns (kept ==
+  marked dims, spec-is-single-source, config metadata), so keying the monitor on the
+  first three advances an UNTESTED slice. The test is a file-less signal, so the monitor
+  cannot poll for it like the other three — have the agent write the pytest result into
+  its report and check it before `gh pr ready`, or run
+  `uv run python -m pytest cad/scripts/test_<part>_drawing.py -q` yourself in the wave
+  sweep. Run a persistent [[com-seat-lock]] Monitor per wave keyed on the three file
+  signals, then open the PR (`gh pr create --draft` → `gh pr ready`) the moment a part
+  flips DONE **and its test is green**.
+- A checkpoint commit (slice files only, no PNG/review) is NOT PR-ready — agents
+  legitimately commit early to rebase onto origin/main, per AGENTS.md.
+
+**Fable quota is the real ceiling** (user: "keep launching until Fable hits the
+wall"). Read it live from `https://api.anthropic.com/api/oauth/usage` with the
+`claudeAiOauth.accessToken` from `~/.claude/.credentials.json` + header
+`anthropic-beta: oauth-2025-04-20`. The binding limit is the model-scoped entry in
+`limits[]` whose `scope.model.display_name == "Fable"` (weekly, resets Mon 08:00 UTC);
+`five_hour`/`weekly_all` are looser. ccusage only shows consumption ($/tokens), NOT
+remaining quota. Extra-usage overage credits are exhausted, so a weekly-limit hit
+blocks hard until reset — no cushion.
+
+**Seat is the throughput bottleneck**, not agent count: N agents author in parallel
+but every `doit part:`/`drawing:` COM build serializes on the machine-global seat
+lock. More agents = deeper queue, same build throughput. See [[com-seat-lock]].
+
+Shared-file merge points across drawing PRs: `_drawing_registry.py` (every slice adds
+a row) and `_drawing_common.py` (shared helpers, e.g. `add_view_centerline` added by
+pivot-bushing #308; a backward-compatible `entity_type="EDGE"` param on
+add_datum_feature/add_feature_control_frame/add_surface_finish added by BOTH pen-marker
+#320 and transgear-stub #324 so GD&T/finish symbols attach to a **revolve's
+`"SILHOUETTE"` edges** — a turned/revolved part has no model edges on its flanks). When
+finalizing a revolve's drawing FOR an agent, `git status` for a modified `_drawing_common.py`
+and FOLD IT INTO the commit — its draw script depends on it, so committing the 6 slice
+files alone breaks the CI build. Expect trivial additive conflicts; land infra PRs first,
+rebase the rest.
+
+**codex-on-this-machine IS blind under the DEFAULT sandbox — and the broken Windows sandbox
+is what makes it so.** A SessionStart hook does force a memory lookup, so `codex exec ...
+-i sheet.png` TRIES to explore the filesystem (rg for MEMORY.md, follow the image path back
+into the repo) even from a neutral cwd with `--skip-git-repo-check`. But on this seat every
+one of those tool calls dies at the sandbox (`orchestrator_helper_launch_failed: failed to
+launch setup helper`), so it never reaches the repo and the verdict is image-only.
+Re-verified 2026-07-16 on `pivot-shaft_drawing.png`: a full machinist review came back that
+volunteered "without the other views, it resembles a rectangular bar" — impossible for a
+reviewer who had read the repo. (An earlier version of this note said the reviews are NOT
+blind and are only advisory; that generalized from a run with the sandbox opened up.)
+
+**So do NOT add `--sandbox danger-full-access` to the image-review command.** It is the right
+flag for a codex task that must read/write ([[codex-windows-sandbox]]) and it would un-break
+exactly the exploration this gate exists to prevent. The tool-call errors in the transcript
+are the gate working; the failure mode to watch for is the ABSENCE of a verdict, not their
+presence. A LEAD VISUAL PASS is still the real gate regardless — see
+[[codex-drawing-image-review]].
+
+**But do not lean on the broken sandbox as the ONLY belt — it is an accident of this
+machine.** Pin `--ignore-user-config --ignore-rules` as well (codex #325): they skip
+`$CODEX_HOME/config.toml` and user/project rules, which is what stops the SessionStart hook
+from firing in the first place, rather than letting it fire and die at the sandbox. That
+makes the isolation intentional and portable to a seat where the sandbox works.
+`comparisons/bench/run.py` pins the same two flags so a benchmark subject cannot vary per
+seat.
+
+**2026-07-15 run outcome:** fanned out ~18 Fable drawing agents in 4 waves; **17 PRs
+landed** (#305-308, #312-324) before Fable hit **96% weekly (critical)** — the wall. The
+finalize-myself pattern (Opus commit+rebase+PR, codex via CLI — neither touches Fable)
+converted the built-but-idle drawings without burning the last Fable. Two didn't converge
+(cone_gear_shaft 4-diameter, crankshaft cross-hole — draw scripts written but the drawing
+build errored); left for the Jul-20 Fable reset. Collisions when committing under a
+still-iterating agent (cylinder_gear_shaft): the agent squashed my pushed commit into its
+better version — reconciled by force-pushing the agent's SHA to the PR. Only commit-for-them
+when the agent is genuinely idle/done, and be ready to reconcile.
+
+**Merge-cascade phase (the "merge all PRs once Codex green" ask).** Every drawing PR appends
+one `DrawingSpec` row to the SAME `DRAWINGS` tuple, so merges are STRICTLY SERIAL — each merge
+dirties the registry of all remaining PRs, forcing a rebase per merge. Mechanics that worked:
+- **Resolve the registry deterministically — do NOT hand-merge it.** The last run used a
+  throwaway `scratchpad/resolve_registry.py`; **that file is GONE and was never committed**, so
+  do not go looking for it — the durable part is the algorithm, which is ~30 lines: take
+  `origin/main`'s registry as authoritative, `ast.parse` both sides, insert ONLY the
+  `DrawingSpec` block(s) whose `name=` is missing from main, then validate the result with BOTH
+  `ast.parse` AND `compile()` — Py3.14 PARSES repeated kwargs but rejects them at compile, and
+  repeated `name=` is the union-merge corruption signature, so parse-only validation passes the
+  exact bug you are guarding against. NEVER set git `merge=union` on the registry: it fuses
+  multi-line specs into one spec with repeated `name=`. Re-implementing this beats hand-resolving
+  N conflicts; reaching for a manual merge because the script is missing is how the corruption
+  gets in.
+- **`_drawing_common.py` conflicts are docstring-only.** Multiple slices add the SAME
+  `entity_type`/`add_view_centerline`/basic helpers — git auto-merges the CODE and only flags
+  the divergent doc prose. Resolve with `git checkout --ours` (main is canonical post-merge);
+  the shared helper the branch's draw script needs is already present from the first merge.
+- One reusable `merge_pr()` bash fn (rebase → resolve registry → `--ours` drawing_common →
+  `rebase --continue` loop → verify registry import + pytest → `push --force-with-lease` →
+  **`uv run python -m doit -n 4` green on the rebased head** → **eye-pass the rebased
+  head's rendered PNGs** → WAIT for Codex on the pushed head → `gh pr merge --merge`).
+  **All THREE AGENTS.md gates apply to every merge in the cascade, not just Codex.** A
+  registry import + the slice's own pytest is NOT the build gate: it proves the module
+  parses and the slice's offline contract holds, and says nothing about whether the other
+  22 drawings still build after this registry rewrite. And the render eye pass is the only
+  gate that sees the two defect families the layout audit is blind to — a datum triangle
+  collapsed inside its own box, and a dimension printed across a note (both are
+  `CollisionScope.NONE`). Skipping either because "the rebase only touched the registry"
+  is the same reasoning the 👍 trap below refutes.
+  Do NOT carry a standing 👍
+  across the rebase: it belongs to the pre-rebase commit, and the force-push lands a head
+  Codex has never reviewed. "The reviewed draw-script bytes are untouched" is not the gate —
+  the gate (AGENTS.md) is a clean Codex review of the LATEST push, and the rebase itself
+  rewrites `_drawing_registry.py`, which is exactly where a union-merge corruption would
+  surface. Re-review is cheap; an unreviewed head is the failure the gate exists to stop.
+
+**Codex RE-REVIEWS after every fix push and often finds a ROUND-2 (and 3) issue** on the same
+PR (e.g. #318 pen_v_block: 2X FCF → then basic-dim boxing + finish-both-bores; #319
+column_clamp: drop _drawing_marks import → then split the geom constants out of the drawing
+spec so assemblies don't rebuild on note edits; #314 crank_pin: 1:45→1:48 taper → then "Ø5.94
+≠ real No. 2 pin, relabel custom 1:48"). Chase to green — they're legit P2 build-hygiene/GD&T.
+Watch all open PRs with ONE persistent Monitor polling codex body-reaction (👍=green,
+👀=reviewing) + last review state; merge on the 👍 transition.
+
+**Counting FRESH findings: key on `original_commit_id`, NEVER `commit_id`.** GitHub
+REWRITES a review comment's `commit_id` to the latest head whenever its line still maps
+after a push, so an old, already-addressed finding re-anchors itself onto the new head and
+a monitor keyed on `commit_id` reports it as a brand-new ROUND-N finding. `original_commit_id`
+is immutable — it stays on the commit Codex actually reviewed. Seen 2026-07-16 on #325: after
+pushing five P2 fixes, `commit_id == head` counted 1 "finding" that was really the old
+mkdir-p comment re-anchored (`created_at` still the previous review's timestamp, a second tell).
+Fresh = `[.[]|select(.original_commit_id==$head)]`; a review landed = `reviews[].commit_id==$head`.
+
+**But "zero fresh findings" is a NOTIFICATION signal, NOT the merge gate** (codex #325
+caught this in the rule above — the fix for one bug introduced its own). The two failure
+modes are opposite, and `original_commit_id` only fixes the first:
+- keying on `commit_id` → an old, already-addressed finding re-anchors to the new head and
+  is reported as a NEW round-N finding (false positive);
+- keying on `original_commit_id` alone → an old finding that is **still unresolved** also
+  has `original_commit_id != $head`, so it is ignored and the PR reads "clean" the moment
+  any review lands on the new head (**false negative — the dangerous direction**).
+
+So: use the fresh-count to decide *when to look*, and gate the merge on the latest review's
+green signal PLUS every previously-raised finding being addressed. Unresolved threads are
+the durable check — `gh api graphql` on `reviewThreads { isResolved }`, or track the
+findings you have actually answered. A finding does not stop applying because you pushed.
+
+**Fix-agents share the SAME 5-hour session quota and die mid-task** ("session limit · resets
+<time>"). When they do, the LEAD (Opus, extra-usage on) takes over the remaining fixes inline —
+verify each dead agent's worktree ON DISK first (idle≠done here too): several had correct-but-
+uncommitted edits (pen_v_block, pen_rod, crank_pin) or a half-done new module (column_clamp
+geom) to finish, not redo. A stray uncommitted edit in a worktree (pinion_pivot_block_spec note
+tweak) BLOCKS the rebase — `git checkout --` it if unrelated to the findings and the PR is
+already green at the committed HEAD.
+
+**COM gotcha — boxing a curated dim BASIC:** `curate_view_dimensions` returns `IAnnotation`;
+`set_basic_dimension` wants the `IDisplayDimension`. Convert via
+`adapter._attempt(lambda a=ann: a.GetSpecificAnnotation())` first, else `AddDimension2`-return
+dims box directly. "Parameter not optional" com_error = you passed the annotation, not the
+display dim.
+
+**All 23 drawing specs merged.** FOLLOW-UP left open: crank_arm (merged) still says "taper-ream
+FOR NO. 2 TAPER PIN" while crank_pin is now a custom 1:48 — reconcile crank_arm's nomenclature
+in a separate PR. Plus the 2 unbuilt (crankshaft, cone_gear_shaft) for the Fable reset.
