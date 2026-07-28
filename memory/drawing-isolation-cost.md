@@ -30,16 +30,28 @@ across 9 × 80 lookups instead of saturating at ~80, and the drawing went
 captured, and a wrong strip mis-resolves a component's identity and silently
 draws the wrong picture. Capture a real `Name` first.
 
-What DOES hold: #440's lazy path — a component whose NAME already matched must
-never pay the `.Component` + `GetPathName` round trips — is the one structural
-saving actually available, and is pinned by a test.
+What DOES hold: #440's lazy path — a component whose NAME already matched skips
+the `.Component` + `GetPathName` round trips — is the one structural saving
+actually landed, and is pinned by a test.
 
-**Why:** the standing rule is that a drawing over 1 min signals something wrong.
-For every assembly drawing the answer is isolation, not the recipe, and the
-per-COM-call cost above is what makes it so. Ceiling on optimising isolation
-without changing approach is ~96 s of 580 s; `visible_s` is not cacheable at all.
+**What is still on the table, with the arithmetic.** Per drawing:
+~180 s resolving (9 × ~20 s) + ~135 s writing visibility (9 × ~15 s). A working
+cross-view cache leaves only the FIRST view's resolution, so it removes ~160 s —
+isolation ~315 s → ~155 s, or ~27% off a 585 s drawing. `visible_s` is not
+cacheable at all, so ~135 s is the floor for this approach. (An earlier version
+of this file said "~96 s"; that was simply wrong arithmetic.)
+
+**Why:** the standing rule is that a drawing over 1 min signals something worth
+investigating. On THIS drawing the answer was isolation, not the recipe. Do not
+read that as a universal — [[drawing-fleet-timings-drift]] makes the opposite
+point, that a large assembly-drawing total can be legitimate (drive-train has
+seven sheets), and one drawing is not a rule. The transferable part is the
+per-COM-call cost: ~200–250 ms, which makes ANY per-component loop the first
+place to look.
 
 **How to apply:** read the span attributes before optimising
-(`rg isolate_balloon_components <log>`); they name which half to attack. Related:
-[[drawing-fleet-cost-profile]], [[autoballoon-density-crossings]],
-[[drawing-recipe-com-pitfalls]].
+(`rg isolate_balloon_components <log>`); they name which half to attack. The
+`resolve_s` / `visible_s` attributes arrive with #446 — a build from before it
+has only the bare `drawing.isolate_balloon_components` duration. Related:
+[[drawing-fleet-cost-profile]], [[drawing-fleet-timings-drift]],
+[[autoballoon-density-crossings]], [[drawing-recipe-com-pitfalls]].

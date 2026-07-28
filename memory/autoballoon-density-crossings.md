@@ -13,8 +13,14 @@ balloons on one un-isolated full-assembly view:
 | `AutoBalloon5` square layout + our `_spread_balloons` re-ring | **6** |
 | `AutoBalloon5` native circular (`swDetailingBalloonLayout_Circle` = 2) | **5** |
 
-Roughly the same either way, so **the placement algorithm is not the variable —
-density is.** The crossed pairs were checked against `_spread_balloons`'s own
+Both cross at this density, and switching between them did not rescue it (6 → 5
+is not a fix). That is evidence that **density is a variable neither of these two
+placements handles** — NOT proof that no placement could. Untested: multiple
+concentric rings, jogged/routed leaders, splitting one view's balloons across
+several views, and AutoBalloon's four edge layouts (top/bottom/left/right). If
+you try one, record the count here.
+
+The crossed pairs were checked against `_spread_balloons`'s own
 non-crossing argument ("balloons placed in their attachments' angular order
 cannot cross") and were in the CORRECT order. The argument cannot hold at this
 density: 32 balloons do not fit on the ring at the minimum gap, so
