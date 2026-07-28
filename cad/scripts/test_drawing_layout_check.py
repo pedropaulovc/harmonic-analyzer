@@ -1458,3 +1458,35 @@ def test_anchor_survives_an_edge_whose_geometry_will_not_read():
 def test_anchor_raises_when_the_component_has_no_visible_edge():
     with pytest.raises(RuntimeError, match="no visible edge"):
         _anchor({"cone-gear": []})
+
+
+def test_anchor_span_counts_every_leaf_it_walked_not_just_the_match():
+    """The duration has to be readable against the workload that produced it.
+
+    The walk stops at the first component of the requested family, so a "matched"
+    count is almost always 1 -- a scan that traversed 80 leaves and one that
+    traversed 3 both read the same. `visited` is the workload.
+    """
+    recorded = {}
+    original = drawing_common._span_scan_attrs
+    drawing_common._span_scan_attrs = lambda **kw: recorded.update(kw)
+    try:
+        # The walk pops from the END of the child list, so the match is listed
+        # FIRST to put three non-matching leaves ahead of it in traversal order.
+        view = _anchor_view({})
+        leaves = [
+            _FakeDrawingComponent(f"{stem}-1@dt", path=f"C:/x/{stem}.SLDPRT")
+            for stem in ("cone-gear", "filler-c", "filler-b", "filler-a")
+        ]
+        root = _FakeDrawingComponent("dt", children=leaves)
+        edges = {"C:/x/cone-gear.SLDPRT": [_edge(0.01)]}
+        view.RootDrawingComponent2 = lambda _r: root
+        view.GetVisibleEntities2 = lambda c, _k: edges.get(c.GetPathName(), [])
+        drawing_common._pick_component_anchor_edge(
+            _FakeAdapter(None), view, stem="cone-gear", label="dt"
+        )
+    finally:
+        drawing_common._span_scan_attrs = original
+    assert recorded["visited"] == 4, recorded
+    assert recorded["matched"] == 1
+    assert recorded["edges"] == 1

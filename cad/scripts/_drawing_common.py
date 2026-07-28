@@ -3106,6 +3106,7 @@ def _pick_component_anchor_edge(
     chosen_name = ""
     edge_count = 0
     enumerated: list[str] = []
+    visited = 0
     pending = list(_drawing_component_children(root))
     while pending:
         drawing_component = pending.pop()
@@ -3113,6 +3114,7 @@ def _pick_component_anchor_edge(
         pending.extend(children)
         if children:
             continue
+        visited += 1
         if stem not in _drawing_component_stems(
             adapter, drawing_component, frozenset({stem})
         ):
@@ -3142,7 +3144,14 @@ def _pick_component_anchor_edge(
     # the span lines the profiling workflow reads, and this span exists so one
     # component's scan can be timed and attributed on its own rather than
     # disappearing into the whole-sheet balloon span.
-    _span_scan_attrs(leaves=len(enumerated), edges=edge_count)
+    #
+    # `visited` is every leaf the walk TOUCHED -- that is the workload, and it is
+    # what the duration has to be read against. `matched` is almost always 1,
+    # because the walk stops at the first component of the requested family, so
+    # reporting only that made the attribute useless for comparing two scans
+    # (Codex P2): a span that traversed 80 leaves and one that traversed 3 both
+    # read "1".
+    _span_scan_attrs(visited=visited, matched=len(enumerated), edges=edge_count)
     _telemetry.event(
         "drawing.balloon_anchor",
         stem=stem,
