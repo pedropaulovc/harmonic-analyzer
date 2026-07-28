@@ -1432,3 +1432,30 @@ def test_a_state_probe_failure_cannot_abort_the_retry_path(monkeypatch):
     dodo._exec_com(["x"], "drawing:thing")  # must not raise
 
     assert calls == ["run", "recover", "wait", "run"], calls
+
+
+def test_abandoning_the_grace_is_recorded_on_the_span(monkeypatch):
+    """Giving up on the wait is a decision inside sw.wait_ready.
+
+    The retry that follows an abandoned grace will probably fail, so the trace
+    has to show WHEN the wait was given up on -- a span that merely ran its
+    full length looks identical to one that waited successfully.
+    """
+    dodo = _load_dodo()
+    lifecycle = dodo._sw_lifecycle
+    events = []
+
+    def blow_up(_r, _t):
+        raise RuntimeError("connector never answered")
+
+    monkeypatch.setattr(lifecycle, "_wait", blow_up)
+    monkeypatch.setattr(lifecycle, "_state_value", lambda _r: "starting")
+    monkeypatch.setattr(
+        lifecycle._telemetry, "event",
+        lambda name, **kw: events.append((name, kw)),
+    )
+
+    assert lifecycle.wait_until_ready() == "starting"  # never raises
+
+    assert [n for n, _ in events] == ["sw.grace_abandoned"], events
+    assert events[0][1]["grace_s"] > 0

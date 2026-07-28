@@ -704,11 +704,10 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         # slot burned for nothing (measured: final_state=starting, retry died on
         # "running but did not become COM-attachable"). Give it one BOUNDED grace
         # window first (see wait_until_ready -- deliberately not a second full
-        # budget), then respawn regardless.
-        # Read the state force_recover already RETURNED rather than probing
-        # again: force_recover returns "error" precisely when detect_state() blew
-        # up, so re-probing would re-raise the same failure out of _exec_com and
-        # abort the task -- the opposite of the best-effort retry this promises.
+        # budget), then respawn regardless. Compare the state force_recover
+        # RETURNED rather than probing again: it returns "error" precisely when
+        # detect_state() blew up, so a second probe would re-raise that failure
+        # out of _exec_com and abort the task -- inverting the best-effort retry.
         if state != _sw_lifecycle.CONNECTED_STATE:
             _telemetry.warn(
                 f"[sw] {label}: recovery ended state={state}, not connected; "

@@ -190,6 +190,10 @@ def wait_until_ready() -> str:
             _wait(sw_recovery, grace)
         except Exception as exc:  # noqa: BLE001 - recovery must never fail the build
             _telemetry.warn(f"[sw] wait_until_ready gave up after {grace:.0f}s ({exc})")
+            # Abandoning the grace is a decision INSIDE this span, and the retry
+            # that follows it will probably fail -- so the trace has to show when
+            # the wait was given up on, not just that the span ran its length.
+            _telemetry.event("sw.grace_abandoned", grace_s=grace, reason=str(exc))
         final = _state_value(sw_recovery)
         span.set_attribute("final_state", final)
         return final
