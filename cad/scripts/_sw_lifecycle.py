@@ -60,6 +60,11 @@ _DEFAULT_CONNECT_TIMEOUT = 900.0
 # wait_until_ready. A third of 900 s is 300 s, comfortably more than the ~110 s
 # the second force_recover needed in both measured incidents.
 _READY_GRACE_FRACTION = 1.0 / 3.0
+# The one state value that means "ready to build". Callers compare the state
+# force_recover RETURNS against this rather than re-probing via is_connected():
+# force_recover returns "error" exactly when detect_state() raised, so a second
+# probe would re-raise that failure into the caller and abort the retry path.
+CONNECTED_STATE = "connected"
 _INFRA = _telemetry.BUILD_INFRA_SERVICE
 
 

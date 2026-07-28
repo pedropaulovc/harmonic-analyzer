@@ -705,11 +705,17 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         # "running but did not become COM-attachable"). Give it one BOUNDED grace
         # window first (see wait_until_ready -- deliberately not a second full
         # budget), then respawn regardless.
-        if not _sw_lifecycle.is_connected():
+        # Read the state force_recover already RETURNED rather than probing
+        # again: force_recover returns "error" precisely when detect_state() blew
+        # up, so re-probing would re-raise the same failure out of _exec_com and
+        # abort the task -- the opposite of the best-effort retry this promises.
+        if state != _sw_lifecycle.CONNECTED_STATE:
             _telemetry.warn(
                 f"[sw] {label}: recovery ended state={state}, not connected; "
                 "waiting for the cold start rather than spending a retry on it",
                 state=state, attempt=attempt + 1)
+            _telemetry.event("sw.cold_start_wait", label=label, state=state,
+                             attempt=attempt + 1)
             _sw_lifecycle.wait_until_ready()
 
 
