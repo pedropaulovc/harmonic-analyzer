@@ -38,6 +38,13 @@ Stages (run each as its OWN process, in this order; stop at the first wedge):
         ``InsertGtol`` (cylindricity — a form control, needs NO datum) with no
         preceding InsertDatum: the "is the wedge datum-specific?" delta from
         the gtol probe's untested list.  WEDGE-RISKY.
+    uv run python cad/scripts/diagnostics/probe_dimxpert_authoring.py import
+        THE SHEET LEG (the gtol probe's unreached Q5 second half): author a
+        datum + an XML-filled gtol on the part, save it, place a view of it on
+        a scratch drawing and pull the PMI in with ``IView::ImportAnnotations
+        (IncludeDimXpertAnnotations=True)`` — the per-view import API (there
+        is NO swInsertAnnotation_e member for DimXpert; InsertModelAnnotations3
+        cannot reach PMI).  Read back what landed.  Nothing is saved.
 
 RESULTS, 2026-07-28 (fresh SolidWorks session), R2026x SP3.0 Makers seat
 ========================================================================
@@ -105,7 +112,7 @@ SOURCE_PART = CAD_ROOT / "out" / "sldprt" / "transgear-stub.SLDPRT"
 # before InsertDatum; the wedged probe_dimxpert_gtol run did not.  Meters.
 EXAMPLE_DATUM_LENGTH = 0.06
 
-STAGES = ("read", "auto", "datum", "datum-nolength", "gtol")
+STAGES = ("read", "auto", "datum", "datum-nolength", "gtol", "import")
 
 
 def _faces_of_type(model: object, surface_kind: int) -> list:
@@ -243,6 +250,64 @@ def _stage_datum(model: object, dim_part: object, *, set_length: bool) -> bool:
     return ok and annotations > 0
 
 
+async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object) -> bool:
+    """Author datum + filled gtol, save the scratch part, import onto a sheet."""
+    from _drawing_common import _gtol_frame_xml
+
+    planes = _faces_of_type(model, 4001)
+    cylinders = _faces_of_type(model, 4002)
+
+    model.ClearSelection2(True)
+    if not _early_bound(planes[0], "IEntity").Select4(False, null_callout()):
+        raise RuntimeError("plane selection failed")
+    option = _early_bound(dim_part.GetDimOption(), "IDimXpertDimensionOption")
+    option.DatumLength = EXAMPLE_DATUM_LENGTH
+    option.FeatureSelectorOptions = _long_array([SELECTOR_PLANE])
+    _report("import: InsertDatum", bool(dim_part.InsertDatum(option)))
+
+    model.ClearSelection2(True)
+    if not _early_bound(cylinders[0], "IEntity").Select4(False, null_callout()):
+        raise RuntimeError("cylinder selection failed")
+    annotation = dim_part.InsertGtol(_gtol_type_map()["Cylindricity"])
+    if annotation is None:
+        raise RuntimeError("InsertGtol returned None")
+    display = _early_bound(_read_member(annotation, "GetDisplayEntity"), "IAnnotation")
+    gtol = _early_bound(display.GetSpecificAnnotation(), "IGtol")
+    frame = _early_bound(gtol.GetFrame(1), "IGtolFrame")
+    filled = bool(frame.SetSymbolXml(_gtol_frame_xml("cylindricity", "0.01", datums=())))
+    _report("import: gtol XML-filled on the part", filled)
+
+    scratch = Path(str(_read_member(model, "GetPathName")))
+    saved = await adapter.save_file(str(scratch))
+    if not saved.is_success:
+        raise RuntimeError(f"save failed: {saved.error}")
+    adapter.swApp.QuitDoc(str(_read_member(model, "GetTitle")))
+
+    from solidworks_mcp.adapters.solidworks.drawing import new_drawing, place_view
+
+    new_drawing(adapter)
+    view = place_view(adapter, str(scratch), "*Front", 0.2, 0.14, scale=(1.0, 1.0))
+    view = _early_bound(view, "IView")
+    before = len(tuple(view.GetAnnotations() or ()))
+    view.ImportAnnotations(False, False, True, False, False)
+    imported = tuple(view.GetAnnotations() or ())
+    for item in imported:
+        item = _early_bound(item, "IAnnotation")
+        _telemetry.info(
+            f"  view annotation: name={item.GetName()!r} type={item.GetType()}"
+        )
+    ok = len(imported) > before
+    _report(
+        "import: IView.ImportAnnotations(DimXpert=True) landed PMI on the sheet",
+        ok,
+        f"before={before} after={len(imported)}",
+    )
+    draw_title = str(_read_member(adapter.currentModel, "GetTitle"))
+    adapter.swApp.QuitDoc(draw_title)
+    _telemetry.success(f"scratch drawing discarded without saving: {draw_title}")
+    return ok
+
+
 def _stage_gtol(model: object, dim_part: object) -> bool:
     """InsertGtol with NO preceding datum — is the wedge datum-specific?"""
     gtol_types = _gtol_type_map()
@@ -277,6 +342,11 @@ async def main() -> int:
         try:
             await adapter.connect()
             model, dim_part = await _open_scratch(adapter, stage)
+            if stage == "import":
+                # closes its own documents (the part is saved + reopened in a view)
+                passed = bool(await _stage_import(adapter, model, dim_part))
+                _report(f"stage {stage}", passed)
+                return 0 if passed else 1
             runner = {
                 "read": lambda: _stage_read(model, dim_part),
                 "auto": lambda: _stage_auto(model, dim_part),

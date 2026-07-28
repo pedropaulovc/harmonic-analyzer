@@ -839,13 +839,11 @@ def add_property_linked_note(
     if char_height is None:
         return note
 
-    note = _early_bound(note, "INote", "GetAnnotation")
+    note = _early_bound(note, "INote")
     annotation = note.GetAnnotation()
     if annotation is None:
         raise RuntimeError(f"linked drawing note {property_name!r} has no annotation")
-    annotation = _early_bound(
-        annotation, "IAnnotation", "GetTextFormat", "SetTextFormat"
-    )
+    annotation = _early_bound(annotation, "IAnnotation")
     text_format = annotation.GetTextFormat(0)
     if text_format is None:
         raise RuntimeError(
@@ -2229,9 +2227,7 @@ def insert_hole_table(
         )
 
     def _select_entity(entity: Any, *, append: bool, mark: int) -> bool:
-        selection_manager = _early_bound(
-            draw.SelectionManager, "ISelectionMgr", "CreateSelectData"
-        )
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
         selection_data = _early_bound(
             selection_manager.CreateSelectData(), "ISelectData"
         )
