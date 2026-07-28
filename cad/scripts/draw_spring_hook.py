@@ -28,6 +28,7 @@ from _drawing_common import (
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from spring_hook_spec import (
@@ -72,41 +73,51 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
+@_telemetry.traced("drawing.pick_shank_silhouette")
 def _shank_silhouette(adapter: Any, view: Any) -> Any:
-    """Return the longest visible straight silhouette of the shank."""
+    """Return the longest visible straight silhouette of the shank.
+
+    Spanned, and sweeping through the shared ``visible_view_entities``
+    chokepoint rather than re-walking GetVisibleComponents/GetVisibleEntities2
+    itself. Both matter for the same reason: this was the ONLY untraced COM work
+    between ``curate_dimensions`` and ``surface_finish``, so on a run where every
+    named span was fast (surface_finish 1.3 s, finalize 8.8 s) 693 s of a 724 s
+    build had nothing to attribute it to. The same drawing has also run 65 s,
+    71 s and 74 s -- a 10x spread living entirely in unspanned code, which is a
+    reliability signal, not just a slow drawing. Counts go on the span's own
+    attributes so the cost is readable off the span line.
+    """
     name = view_name(adapter, view)
     drawing_doc = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not drawing_doc.ActivateView(name):
         raise RuntimeError(f"failed to activate spring-hook drawing view {name!r}")
-    components = adapter._attempt(lambda: view.GetVisibleComponents()) or ()
+    raw_silhouettes = visible_view_entities(view, 4, label="spring-hook shank")
     candidates: list[tuple[float, float, Any]] = []
-    silhouette_count = 0
     endpoint_count = 0
-    for component in components:
-        silhouettes = (
-            adapter._attempt(lambda c=component: view.GetVisibleEntities2(c, 4)) or ()
-        )
-        silhouette_count += len(silhouettes)
-        for raw_silhouette in silhouettes:
-            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
-            start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
-            end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
-            if start is None or end is None:
-                continue
-            endpoint_count += 1
-            start_xyz = adapter._get_attr_or_call(start, "ArrayData")
-            end_xyz = adapter._get_attr_or_call(end, "ArrayData")
-            if not start_xyz or not end_xyz:
-                continue
-            length = sum(
-                (float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz)
-            ) ** 0.5
-            midpoint_x = (float(start_xyz[0]) + float(end_xyz[0])) / 2.0
-            candidates.append((length, midpoint_x, silhouette))
+    for raw_silhouette in raw_silhouettes:
+        silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
+        start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
+        end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
+        if start is None or end is None:
+            continue
+        endpoint_count += 1
+        start_xyz = adapter._get_attr_or_call(start, "ArrayData")
+        end_xyz = adapter._get_attr_or_call(end, "ArrayData")
+        if not start_xyz or not end_xyz:
+            continue
+        length = sum(
+            (float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz)
+        ) ** 0.5
+        midpoint_x = (float(start_xyz[0]) + float(end_xyz[0])) / 2.0
+        candidates.append((length, midpoint_x, silhouette))
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("silhouettes", len(raw_silhouettes))
+    span.set_attribute("endpoint_pairs", endpoint_count)
+    span.set_attribute("candidates", len(candidates))
     if not candidates:
         raise RuntimeError(
             "front view exposes no usable spring-hook silhouette edges: "
-            f"components={len(components)} silhouettes={silhouette_count} "
+            f"silhouettes={len(raw_silhouettes)} "
             f"endpoint pairs={endpoint_count}"
         )
     length, _midpoint_x, silhouette = max(candidates, key=lambda item: item[:2])

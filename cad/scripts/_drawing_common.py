@@ -2137,14 +2137,42 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     core of every per-sheet edge/face scanner — one traced chokepoint here so
     each scanner shows up as a named child span instead of an unspanned gap
     (observability invariant). ``entity_kind`` is swViewEntityType_e (1=edge,
-    2=vertex, 3=face).
+    2=vertex, 3=face, 4=silhouette).
+
+    **Every scanner must come through here, and three did not.**
+    ``visible_circle_edge``, ``visible_tooth_tip_silhouette`` and spring-hook's
+    ``_shank_silhouette`` each re-implemented this walk untraced, which is how
+    43.8 min of 193.7 min of drawing build time sat inside ``drawing.build``
+    covered by no child span. One spring_hook run took 724 s with every NAMED
+    span fast (surface_finish 1.3 s, finalize 8.8 s) — 693 s with nothing to
+    attribute it to, on a drawing that has also run 65 s.
+
+    The cost is wildly kind-dependent, so the ``entity_kind`` attribute is not
+    decoration: kind 1 returned 481 edges in 7.0 s, while kind 4 spends ~21 s
+    deriving outline geometry and returns SIX. Do not reason about "a sweep" as
+    one number.
+
+    Nothing is memoised, deliberately. An audit of every call site found no
+    drawing that sweeps the same view twice — each gear print picks a circle off
+    ``front`` and at most a silhouette off ``right`` — so a per-view cache would
+    have a 0% hit rate. A cross-call cache would also have to invalidate on any
+    visibility change (``set_hidden_lines_removed``, the drive-train isolation
+    walk), and a stale entity list picks the wrong edge SILENTLY.
     """
     drawing_view = _early_bound(view, "IView")
     entities: list[Any] = []
-    for component in drawing_view.GetVisibleComponents() or []:
+    components = drawing_view.GetVisibleComponents() or []
+    for component in components:
         entities.extend(
             drawing_view.GetVisibleEntities2(component, entity_kind) or []
         )
+    # The scan's SIZE, on the span itself. Duration alone cannot separate "this
+    # view is huge" from "this seat is slow", and the callers that classify each
+    # returned entity scale directly with this count.
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("components", len(components))
+    span.set_attribute("entities", len(entities))
+    span.set_attribute("entity_kind", entity_kind)
     return entities
 
 

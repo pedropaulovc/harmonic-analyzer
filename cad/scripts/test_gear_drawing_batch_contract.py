@@ -119,7 +119,10 @@ def test_crank_pair_runout_uses_tooth_tip_silhouette_topology() -> None:
     helper_source = Path(_gear_drawing_entities.__file__).read_text(
         encoding="utf-8"
     )
-    assert "GetVisibleEntities2(c, 4)" in helper_source
+    # Silhouette kind (4), reached through the shared traced chokepoint rather
+    # than a private GetVisibleEntities2 walk -- see
+    # test_every_gear_sweep_goes_through_the_traced_chokepoint.
+    assert "visible_view_entities(\n        view, 4," in helper_source
     for module in CRANK_PAIR_MODULES:
         source = Path(module.__file__).read_text(encoding="utf-8")
         assert "tooth_tip_silhouette = visible_tooth_tip_silhouette(" in source
@@ -140,3 +143,58 @@ def test_tooth_runout_is_stated_against_the_bore_axis_datum() -> None:
             "MEASURED AT THE TOOTH TIPS" in notes
         ), part_name
         assert "WITHIN 0.05 TIR" not in notes, part_name
+
+
+def test_every_gear_sweep_goes_through_the_traced_chokepoint() -> None:
+    """No helper may re-implement the GetVisibleComponents/GetVisibleEntities2
+    walk privately.
+
+    Three of them did, and the walk is the single most expensive COM step in a
+    gear drawing -- so 43.8 min of 193.7 min of drawing build time sat inside
+    `drawing.build` covered by no child span. One spring_hook run took 724 s
+    with every named span fast; 693 s of it was unattributable. Routing through
+    `visible_view_entities` is what makes the sweep show up as its own timed
+    child instead of vanishing into the caller.
+    """
+    helper_source = Path(_gear_drawing_entities.__file__).read_text(
+        encoding="utf-8"
+    )
+    # The CALL forms, not the names -- both docstrings discuss these APIs by
+    # name, and recording why they are expensive is the point of this change.
+    assert "view.GetVisibleComponents(" not in helper_source
+    assert "view.GetVisibleEntities2(" not in helper_source
+    assert "from _drawing_common import visible_view_entities" in helper_source
+    assert helper_source.count("visible_view_entities(") == 2  # circle + tooth tip
+
+
+def test_the_circle_pick_prices_each_step_separately() -> None:
+    """Every timer must bracket exactly ONE operation, binding included.
+
+    `curve_s` first enclosed `_early_bound(edge.GetCurve(), "ICurve")`, so it
+    priced the COM call AND the wrapper resolution together and reported
+    24.6 ms for a call that measures 18.2 ms (Codex P2). That inflation hid the
+    real finding: `_early_bound` is 7.0 s of a 27.7 s pick, comparable to
+    `GetCurve`'s 8.8 s, and unlike it is not COM at all.
+    """
+    helper_source = Path(_gear_drawing_entities.__file__).read_text(
+        encoding="utf-8"
+    )
+    for attribute in ("curve_s=", "classify_s=", "params_s=", "bind_s="):
+        assert attribute in helper_source, attribute
+    # The COM call is timed alone -- binding the result happens after the stamp.
+    assert "raw_curve = edge.GetCurve()" in helper_source
+    assert "_early_bound(edge.GetCurve()" not in helper_source
+
+
+def test_the_refuted_sweep_optimisations_keep_their_measurements() -> None:
+    """Both ways to avoid `GetCurve` were measured and both failed. The numbers
+    stay next to the code so the next pass does not re-walk them."""
+    helper_source = Path(_gear_drawing_entities.__file__).read_text(
+        encoding="utf-8"
+    )
+    # GetCurveParams2 is 10x cheaper but flags 1 of 121 circles as closed.
+    assert "closed=1" in helper_source
+    # A second identical silhouette sweep costs the same as the first.
+    assert "21.2 s" in helper_source
+    # And the corrected per-call price, not the paired one it replaced.
+    assert "18.2 ms" in helper_source
