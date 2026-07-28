@@ -10,14 +10,13 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
     add_edge_dimension,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
+    import_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -27,7 +26,12 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
-from pen_rod_spec import ROD_LENGTH, WIRE_HOLE_DIA, WIRE_HOLE_Y
+from pen_rod_spec import (
+    GEOMETRIC_CONTROLS,
+    ROD_LENGTH,
+    WIRE_HOLE_DIA,
+    WIRE_HOLE_Y,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -140,9 +144,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the wire hole")
 
     front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
-    front_top = (FRONT_CENTER[0], FRONT_CENTER[1] + ROD_LENGTH / 2000.0)
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
-    front_far_side = (FRONT_CENTER[0] + 0.0025, FRONT_CENTER[1])
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
     hole_bottom = (FRONT_CENTER[0], hole_center_y - WIRE_HOLE_DIA / 2000.0)
     hole_side = (FRONT_CENTER[0] + WIRE_HOLE_DIA / 2000.0, hole_center_y)
@@ -175,48 +177,29 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen-rod wire hole",
     )
 
-    add_datum_feature(
+    # GD&T is model PMI (pen_rod_spec.PART_DATUMS/GEOMETRIC_CONTROLS, authored
+    # by build_pen_rod) — import it and place it where the hand-authored
+    # symbols used to sit. All three annotations land in the single front view
+    # (their DimXpert annotation planes all match it), and the importer fails
+    # loud on any mismatch. The squareness frame stays BELOW the rod: up-right
+    # of its target its leader crossed the Ra's leader in an X at the rod's
+    # bottom corner; from below the two run on opposite sides of that corner.
+    import_part_pmi(
         adapter,
-        front,
-        edge_xy=front_side,
-        symbol_xy=(front_side[0] - 0.016, FRONT_CENTER[1] - 0.030),
-        datum="A",
-        label="pen-rod slide face",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=front_far_side,
-        frame_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] - 0.018),
-        characteristic="parallelism",
-        tolerance="0.03",
-        datums=("A",),
-        label="pen-rod opposite slide face parallelism",
-    )
-    # BELOW the rod, not right of it. At (+0.032, -0.042) the frame sat up-right
-    # of its own target, so its leader descended left to the rod's bottom corner
-    # and crossed the Ra's leader -- which rises from its symbol right of the rod
-    # up-left to the slide face -- in an X at (0.0802, 0.0958). Opposite diagonals
-    # through one corner. (The Ra comment below documents why the Ra cannot move:
-    # its target must sit on the slide face, so passing UNDER the frame's terminus
-    # puts it off the face and passing OVER drives it through the frame's box.)
-    #
-    # So the frame moves. Measured against the live leader geometry: the Ra's
-    # leader runs (0.1637, 0.0680) -> (0.0675, 0.1001), i.e. y = 0.0869..0.0976
-    # across this box's x span, clearing its top (0.080) by 6.9 mm. The box also
-    # clears the Section dim's text (ends x=0.0483) by 26.7 mm, the notes
-    # (top y=0.0628) by 10.2 mm, and the right view (y>=0.090, x>=0.137) entirely.
-    # Its leader now approaches the rod's bottom from BELOW, so the two run on
-    # opposite sides of the corner instead of through each other.
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=front_bottom,
-        frame_xy=(FRONT_CENTER[0] + 0.005, FRONT_CENTER[1] - 0.070),
-        characteristic="perpendicularity",
-        tolerance="0.05",
-        datums=("A",),
-        label="pen-rod bottom end squareness",
+        (front,),
+        datum_positions={"A": (front_side[0] - 0.016, FRONT_CENTER[1] - 0.030)},
+        control_positions={
+            "opposite_slide_face_parallelism": (
+                FRONT_CENTER[0] + 0.032,
+                FRONT_CENTER[1] - 0.018,
+            ),
+            "bottom_end_squareness": (
+                FRONT_CENTER[0] + 0.005,
+                FRONT_CENTER[1] - 0.070,
+            ),
+        },
+        controls=GEOMETRIC_CONTROLS,
+        label="pen rod PMI",
     )
     # Sits RIGHT of the rod and BELOW the right view, reaching back up-left to the
     # slide face. At (0.0415, 0.165) the body printed "Ra 1.6" straight across the

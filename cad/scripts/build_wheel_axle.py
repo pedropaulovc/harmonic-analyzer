@@ -48,6 +48,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _part_pmi import author_part_pmi
 from wheel_axle_spec import (
     COLLAR_DIA,
     COLLAR_LEN,
@@ -55,6 +56,8 @@ from wheel_axle_spec import (
     DRAWING_NOTES,
     FLANGE_DIA,
     FLANGE_LEN,
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     STUD_DIA,
     STUD_LEN,
 )
@@ -203,6 +206,8 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # GD&T lives on the MODEL as DimXpert PMI; the drawing imports it.
+    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     apply_drawing_properties(
         adapter,
         PART_NAME,

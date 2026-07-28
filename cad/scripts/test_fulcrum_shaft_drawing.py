@@ -43,12 +43,30 @@ def test_linked_notes_define_remaining_bearing_shaft_operations() -> None:
 
 
 def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
+    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
+    from fulcrum_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+
+    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
+    assert set(by_key) == {
+        "bearing_cylindricity",
+        "plus_z_end_perpendicularity",
+        "minus_z_end_perpendicularity",
+    }
+    assert by_key["bearing_cylindricity"].characteristic == "cylindricity"
+    assert by_key["bearing_cylindricity"].tolerance == "0.01"
+    for key in ("plus_z_end_perpendicularity", "minus_z_end_perpendicularity"):
+        assert by_key[key].characteristic == "perpendicularity"
+        assert by_key[key].tolerance == "0.05"
+        assert by_key[key].datums == ("A",)
+    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
+
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert "position_tolerance_m=0.0001" in source
-    assert source.count("add_feature_control_frame(") == 2
-    assert "characteristic=\"cylindricity\"" in source
-    assert source.count("characteristic=\"perpendicularity\"") == 1
+    assert "import_part_pmi(" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
     assert source.count("add_surface_finish(") == 1
 
 

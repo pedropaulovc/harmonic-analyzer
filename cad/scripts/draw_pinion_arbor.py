@@ -10,12 +10,11 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
+    import_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -24,7 +23,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
-from pinion_arbor_spec import CAP_R, CAP_SAG, SHAFT_DIA, SHAFT_LEN
+from pinion_arbor_spec import (
+    CAP_R,
+    CAP_SAG,
+    GEOMETRIC_CONTROLS,
+    SHAFT_DIA,
+    SHAFT_LEN,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -147,65 +152,25 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to arbor end view")
 
-    # Pick the end circle at 12 o'clock, because the symbol goes straight ABOVE
-    # it. Picked at 3 o'clock (the +r,0 point) with the symbol at 12, the tag
-    # fought SetPosition2's along-the-edge rule -- on a CIRCLE the permitted set
-    # IS the circumference, so the symbol collapsed to the nearest circle point
-    # and its Y went inert: the requested 16 mm standoff rendered as ~1 mm, too
-    # little for the ~3 mm attachment triangle, which then overlapped the box
-    # and struck through the "A". Picking the clock position the symbol actually
-    # sits at lets the leader run radially out to it -- the same spelling
-    # draw_pivot_shaft.py / draw_pivot_bushing.py use. No gate sees this: a
-    # datum symbol exposes no GetExtent, so only the render shows it.
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-    )
     # Screen-right in *Right is model -Z: the flat front tip (z 0) lands on the
     # RIGHT end of the side view, the crowned back end on the LEFT.
     flat_end = (RIGHT_CENTER[0] + OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
-    # Live readback normalizes this restricted axis tag by up to 10.699 um. Bound
-    # only annotation placement; part dimensions and GD&T remain unchanged.
-    add_datum_feature(
+    # GD&T is model PMI (pinion_arbor_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
+    # authored by build_pinion_arbor) — import it and place it where the
+    # hand-authored symbols used to sit. Which VIEW receives each annotation
+    # is decided by its DimXpert annotation plane, and the importer fails
+    # loud on any mismatch. Only the flat FRONT tip carries perpendicularity
+    # -- the back end is the SR crown, which has no face to square to the axis.
+    import_part_pmi(
         adapter,
-        front,
-        edge_xy=end_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-        datum="A",
-        label="pinion arbor axis",
-        position_tolerance_m=0.00002,
-    )
-    # Cylindricity and the bearing finish both control the shaft's CYLINDRICAL
-    # face, which the side view shows edge-on -- so both anchor to its flank
-    # there instead of to the front view's end circle. Anchored on the front
-    # circle they had to sit out at the side view's x to find free sheet, and
-    # the leader then ran the whole way back across the side view (the leader
-    # gate caught both). Off the flank the leader is a short vertical drop into
-    # the empty band above the view. A cylinder carries no model edge along its
-    # side, so these picks are SILHOUETTE entities (as in draw_transgear_stub).
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] - 0.050, SHAFT_FLANK_Y),
-        frame_xy=(RIGHT_CENTER[0] - 0.050, 0.236),
-        characteristic="cylindricity",
-        tolerance="0.01",
-        label="arbor bearing cylindricity",
-        entity_type="SILHOUETTE",
-    )
-    # Only the flat FRONT tip gets a perpendicularity control -- the back end
-    # is the SR crown, which has no face to square to the axis.
-    # Above the view, not below it at y=0.180: the isometric now occupies that
-    # band, and the leader ran across it.
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=flat_end,
-        frame_xy=(flat_end[0] + 0.018, 0.228),
-        characteristic="perpendicularity",
-        tolerance="0.05",
-        datums=("A",),
-        label="front tip perpendicularity",
+        (front, right),
+        datum_positions={"A": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)},
+        control_positions={
+            "bearing_cylindricity": (RIGHT_CENTER[0] - 0.050, 0.236),
+            "flat_tip_perpendicularity": (flat_end[0] + 0.018, 0.228),
+        },
+        controls=GEOMETRIC_CONTROLS,
+        label="pinion arbor PMI",
     )
     # Sits right of the cylindricity frame, whose text ends near x=0.184; the
     # Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.

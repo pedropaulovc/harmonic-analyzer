@@ -51,12 +51,15 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _part_pmi import author_part_pmi
 from pivot_bushing_spec import (
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    GEOMETRIC_CONTROLS,
     LENGTH,
     OUTER_DIA,
+    PART_DATUMS,
 )
 
 PART_NAME = "pivot-bushing"
@@ -119,6 +122,8 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # GD&T lives on the MODEL as DimXpert PMI; the drawing imports it.
+    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     apply_drawing_properties(
         adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
     )

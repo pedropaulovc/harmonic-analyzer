@@ -110,11 +110,32 @@ def test_linked_notes_cover_the_remaining_shaft_operations() -> None:
 
 
 def test_native_gdt_controls_shaft_form_coaxiality_and_finish() -> None:
+    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
+    from cone_gear_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+
+    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
+    assert set(by_key) == {"journal_cylindricity", "tip_runout"}
+    assert by_key["journal_cylindricity"].characteristic == "cylindricity"
+    assert by_key["journal_cylindricity"].tolerance == "0.01"
+    assert by_key["tip_runout"].characteristic == "circular_runout"
+    assert by_key["tip_runout"].tolerance == "0.05"
+    assert by_key["tip_runout"].datums == ("A",)
+    # Both controls resolve their face by diameter alone; the Ø0.79375 tip
+    # carries a tightened match tolerance so the pick stays unique.
+    assert by_key["journal_cylindricity"].face.diameter_mm == (
+        cone_gear_shaft_spec.JOURNAL_DIA
+    )
+    assert by_key["tip_runout"].face.diameter_mm == cone_gear_shaft_spec.SECTION_DIAS[-1]
+    assert by_key["tip_runout"].face.tolerance_mm == 0.01
+    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
+
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert source.count('characteristic="cylindricity"') == 1
-    assert source.count('characteristic="circular_runout"') == 1
+    assert "import_part_pmi(" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
     assert source.count("add_surface_finish(") == 2
 
 
@@ -135,7 +156,9 @@ def test_datum_symbol_requests_the_persisted_journal_boundary() -> None:
     )
     assert math.isclose(expected, 0.21607859347280226, abs_tol=1e-12)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "symbol_xy=(big_end_x - JOURNAL_END / 1000.0, 0.252)" in source
+    # The imported datum tag's placement stays DERIVED from the journal's
+    # small-end station (JOURNAL_END), never a frozen sheet number.
+    assert '"A": (big_end_x - JOURNAL_END / 1000.0, 0.252)' in source
     assert "symbol_xy=(0.255, 0.242)" in source
     assert cone_gear_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source
