@@ -28,6 +28,7 @@ from _drawing_common import (
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
+    set_hidden_lines_removed,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -147,7 +148,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # (this part declares no "Isometric View Note"); nor move left (the hole
     # table ends at x=0.159) or right (its box already reaches x~0.410 against
     # the 0.4191 margin).
-    place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.196, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.196, scale=(1, 1))
+    for view in (front, right, iso):
+        set_hidden_lines_removed(adapter, view)
 
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
     expected_thread_instances = len(BLIND_X)

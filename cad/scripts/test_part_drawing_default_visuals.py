@@ -1,4 +1,4 @@
-"""Fleet-wide contract for part drawing view placement and default visuals."""
+"""Fleet-wide contract for part drawing view placement."""
 
 from __future__ import annotations
 
@@ -10,13 +10,7 @@ from _drawing_registry import DRAWINGS, DrawingSpec
 
 
 PART_DRAWINGS = tuple(spec for spec in DRAWINGS if spec.source_kind == "part")
-VISUAL_OVERRIDE_CALLS = {
-    "SetDisplayMode4",
-    "SetDisplayTangentEdges2",
-    "UpdateViewDisplayGeometry",
-    "set_hidden_lines_removed",
-    "set_hidden_lines_visible",
-}
+
 
 
 def _call_name(node: ast.Call) -> str:
@@ -41,20 +35,11 @@ def _has_precomputed_placements(tree: ast.AST) -> bool:
 
 
 @pytest.mark.parametrize("spec", PART_DRAWINGS, ids=lambda spec: spec.name)
-def test_part_drawing_keeps_explicit_placements_and_default_visuals(
-    spec: DrawingSpec,
-) -> None:
+def test_part_drawing_keeps_explicit_placements(spec: DrawingSpec) -> None:
+    # Per-view display control (hidden lines, tangent edges) is a LAYOUT concern
+    # a recipe may own: several sheets attach datums and callouts to hidden
+    # edges, which are only selectable when the view displays them.
     tree = ast.parse(spec.script.read_text(encoding="utf-8"), filename=str(spec.script))
-    calls = {
-        name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and (name := _call_name(node))
-    }
-
     assert _has_precomputed_placements(tree), (
         f"{spec.name} lost its precomputed view placements"
-    )
-    assert calls.isdisjoint(VISUAL_OVERRIDE_CALLS), (
-        f"{spec.name} overrides SolidWorks drawing visuals: "
-        f"{sorted(calls & VISUAL_OVERRIDE_CALLS)}"
     )

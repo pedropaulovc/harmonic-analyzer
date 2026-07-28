@@ -30,6 +30,8 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -118,7 +120,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    set_hidden_lines_removed(adapter, iso)
+    set_hidden_lines_removed(adapter, top)
+    # The side view shows the vertical rod bore as hidden lines through the body.
+    set_hidden_lines_visible(adapter, front)
+
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):

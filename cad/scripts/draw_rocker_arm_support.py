@@ -33,6 +33,8 @@ from _drawing_common import (
     insert_hole_table,
     new_project_drawing,
     read_required_properties,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -161,7 +163,13 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 2))
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(1, 2))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    for view in (front, bottom, iso):
+        set_hidden_lines_removed(adapter, view)
+    # The taper view carries the internal story: greyed hidden lines show the
+    # central web band and cavity floor, so "window cut from both faces,
+    # leaving the web" is visible rather than prose-only.
+    set_hidden_lines_visible(adapter, right)
     removed_thread_notes = remove_notes_matching(adapter, "9/16-12")
     _telemetry.info(
         f"removed {removed_thread_notes} redundant automatic thread note(s)"

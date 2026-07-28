@@ -35,6 +35,8 @@ from _drawing_common import (
     read_required_properties,
     set_basic_dimension,
     set_dimension_callouts,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -142,8 +144,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # single orthographic view left the step geometry to prose (machinist
     # round 2).  The right-hand column belongs to the title block, so the
     # section lives on the left.
-    place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    for view in (left, iso):
+        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_visible(adapter, front)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"

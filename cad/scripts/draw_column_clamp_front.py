@@ -38,6 +38,8 @@ from _drawing_common import (
     set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -145,9 +147,13 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    for view in (right, iso):
+        set_hidden_lines_removed(adapter, view)
     # The front view shows the relief depth profile and the ear drills edge-on;
     # the top view carries the hidden ear-hole rectangles beside the open arc.
+    for view in (front, top):
+        set_hidden_lines_visible(adapter, view)
 
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"

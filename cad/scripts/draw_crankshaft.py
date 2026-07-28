@@ -39,6 +39,7 @@ from _drawing_common import (
     set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
+    set_hidden_lines_removed,
     stamp_drawing_summary,
     add_view_centerline,
 )
@@ -300,7 +301,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Bottom", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    for view in (front, right, iso):
+        set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"

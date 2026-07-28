@@ -37,6 +37,8 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     set_arc_endpoints_to_center,
     set_basic_dimension,
     stamp_drawing_summary,
@@ -165,7 +167,14 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    for view in (right, iso):
+        set_hidden_lines_removed(adapter, view)
+    # The front view carries the far-side dimple dimensions; HLV exposes its
+    # circular edge. The top view exposes the #9 cross-drill meeting the shaft bore.
+    for view in (front, top):
+        set_hidden_lines_visible(adapter, view)
+
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )

@@ -35,6 +35,8 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -123,6 +125,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     length = place_view(adapter, str(SOURCE), "*Front", *LENGTH_CENTER, scale=(1, 5))
     end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(2, 1))
+    set_hidden_lines_removed(adapter, end)
+    # The length view carries the bore as greyed hidden lines, so the wall shows.
+    set_hidden_lines_visible(adapter, length)
+
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"
     )

@@ -30,6 +30,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -131,6 +132,8 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER, scale=(1, 1))
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     _rotate_ruled_face(adapter, front)
+    for view in (front, iso):
+        set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     _add_scale_labels(adapter)

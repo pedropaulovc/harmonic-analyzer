@@ -31,6 +31,8 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -148,9 +150,13 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(4, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    for view in (right, iso):
+        set_hidden_lines_removed(adapter, view)
     # Front carries the vertical-rod + screw hidden bores; top exposes the rod
     # bore + the tapped screw hole crossing the depth.
+    for view in (front, top):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"

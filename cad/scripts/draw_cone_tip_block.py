@@ -23,6 +23,8 @@ from _drawing_common import (
     set_arc_endpoints_to_center,
     set_basic_dimension,
     view_name,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -206,9 +208,13 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    for view in (right, iso):
+        set_hidden_lines_removed(adapter, view)
     # The elevation carries the journal as a hidden circle and the adjuster/slit
     # detail; the plan shows the footprint with the bore and holes crossing it.
+    for view in (front, top):
+        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"

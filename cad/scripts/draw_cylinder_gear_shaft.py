@@ -21,6 +21,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
+    set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -148,6 +149,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Rotate BEFORE dimension import so the Depth dim lands on the displayed
     # (horizontal) geometry.
     _rotate_view(adapter, profile, PROFILE_ROTATION, label="profile")
+    for view in (end, profile, iso):
+        set_hidden_lines_removed(adapter, view)
 
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"

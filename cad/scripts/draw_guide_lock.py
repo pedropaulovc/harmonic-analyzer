@@ -33,6 +33,8 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     set_basic_dimension,
     stamp_drawing_summary,
 )
@@ -148,7 +150,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    for view in (front, iso):
+        set_hidden_lines_removed(adapter, view)
+    # The right view shows the 2-thick strip edge-on; HLV exposes the screw
+    # holes' through extents.
+    set_hidden_lines_visible(adapter, right)
+
     # No callout/precision overrides: the imported Width/Height/Depth read
     # fine at the document default, and the hole size ships as a native
     # wizard callout below.
