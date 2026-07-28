@@ -10,12 +10,11 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
+    import_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -26,10 +25,10 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
 from transgear_stub_spec import (
-    BASE_DIA,
     BASE_LEN,
     COLLAR_DIA as COLLAR_DIA,
     COLLAR_LEN,
+    GEOMETRIC_CONTROLS,
     SEAT_DIA,
     SEAT_LEN,
 )
@@ -163,46 +162,21 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to stud end view")
 
-    base_circle = (
-        END_CENTER[0] + BASE_DIA / 2.0 * VIEW_MM,
-        END_CENTER[1],
-    )
-    add_datum_feature(
-        adapter,
-        end,
-        edge_xy=base_circle,
-        symbol_xy=(END_CENTER[0] + 0.040, END_CENTER[1] - 0.018),
-        datum="A",
-        label="transgear stud base axis",
-        # The native circular-edge attachment retains a legal point 2.343 mm
-        # inward along this radial leader.  Bound that normalization locally;
-        # the shared persistence check remains strict for unconstrained tags.
-        position_tolerance_m=0.003,
-    )
-    # The stud is a revolve: its side outlines are SILHOUETTE entities (no
-    # model edge runs along a cylinder side), so every front-view attachment
-    # picks entity_type="SILHOUETTE".
-    seat_left = _fx(-SEAT_DIA / 2.0)
-    add_feature_control_frame(
+    # GD&T is model PMI (transgear_stub_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
+    # authored by build_transgear_stub) — import it and place it where the
+    # hand-authored symbols used to sit. Which VIEW receives each annotation
+    # is decided by its DimXpert annotation plane, and the importer fails
+    # loud on any mismatch.
+    import_part_pmi(
         adapter,
         front,
-        edge_xy=(seat_left, _fy(BASE_LEN + 9.0)),
-        frame_xy=(0.038, _fy(BASE_LEN + 9.0)),
-        characteristic="cylindricity",
-        tolerance="0.01",
-        label="gear seat cylindricity",
-        entity_type="SILHOUETTE",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(seat_left, _fy(BASE_LEN + 12.0)),
-        frame_xy=(0.038, _fy(BASE_LEN + 12.0)),
-        characteristic="circular_runout",
-        tolerance="0.03",
-        datums=("A",),
-        label="gear seat runout to base",
-        entity_type="SILHOUETTE",
+        datum_positions={"A": (END_CENTER[0] + 0.040, END_CENTER[1] - 0.018)},
+        control_positions={
+            "seat_cylindricity": (0.038, _fy(BASE_LEN + 9.0)),
+            "seat_runout": (0.038, _fy(BASE_LEN + 12.0)),
+        },
+        controls=GEOMETRIC_CONTROLS,
+        label="transgear stud PMI",
     )
     add_surface_finish(
         adapter,

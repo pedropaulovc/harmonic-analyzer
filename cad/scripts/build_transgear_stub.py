@@ -56,6 +56,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from transgear_stub_spec import (
     BASE_DIA,
     BASE_DIA_BAND,
@@ -64,6 +65,8 @@ from transgear_stub_spec import (
     COLLAR_LEN,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     SEAT_DIA,
     SEAT_DIA_BAND,
     SEAT_LEN,
@@ -207,6 +210,8 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # GD&T lives on the MODEL as DimXpert PMI; the drawing imports it.
+    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     apply_drawing_properties(
         adapter,
         PART_NAME,

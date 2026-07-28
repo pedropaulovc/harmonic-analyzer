@@ -15,10 +15,12 @@ from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
 from typing import Any, Iterable, Literal, Sequence
-from xml.etree import ElementTree
+
 
 import _telemetry
 from _common import _early_bound
+from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
+from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
@@ -208,52 +210,11 @@ class DrawingOutputs:
     png: Path
 
 
-_GTOL_SYMBOLS = {
-    "circular_runout": "GTOL-SRUN",
-    "cylindricity": "GTOL-CYL",
-    "flatness": "GTOL-FLAT",
-    "parallelism": "GTOL-PARA",
-    "position": "GTOL-POSI",
-    "profile_surface": "GTOL-SPROF",
-    "perpendicularity": "GTOL-PERP",
-    "straightness": "GTOL-STRAIGHT",
-    "total_runout": "GTOL-TRUN",
-}
-
-
 def property_link(property_name: str) -> str:
     """Return a source-model property link suitable for a drawing note."""
     if not property_name or '"' in property_name:
         raise ValueError(f"invalid drawing property name: {property_name!r}")
     return f'$PRPSHEET:"{property_name}"'
-
-
-def _gtol_frame_xml(
-    characteristic: str,
-    tolerance: str,
-    *,
-    datums: Sequence[str] = (),
-    diameter: bool = False,
-) -> str:
-    """Build the SOLIDWORKS-2022+ feature-control-frame XML payload."""
-    symbol = _GTOL_SYMBOLS.get(characteristic)
-    if symbol is None:
-        raise ValueError(f"unsupported geometric characteristic: {characteristic!r}")
-    if not tolerance:
-        raise ValueError("feature-control-frame tolerance cannot be blank")
-    if len(datums) > 3 or any(not d or len(d) > 2 for d in datums):
-        raise ValueError(f"invalid datum reference sequence: {tuple(datums)!r}")
-    root = ElementTree.Element("GtolFrame")
-    ElementTree.SubElement(root, "ToleranceSymbol").text = symbol
-    range_info = ElementTree.SubElement(root, "ToleranceRangeInfo")
-    ElementTree.SubElement(range_info, "PrimaryToleranceValue").text = tolerance
-    if diameter:
-        ElementTree.SubElement(range_info, "PrimaryRangeSymbol").text = "phi"
-    for datum in datums:
-        compartment = ElementTree.SubElement(root, "DatumCompartment")
-        detail = ElementTree.SubElement(compartment, "DatumDetail")
-        ElementTree.SubElement(detail, "DatumLetter").text = datum
-    return ElementTree.tostring(root, encoding="unicode", short_empty_elements=True)
 
 
 def _select_view_entity(
@@ -634,6 +595,96 @@ def add_feature_control_frame(
             )
     draw.ClearSelection2(True)
     return gtol
+
+
+@_telemetry.traced("drawing.import_part_pmi", label_param="label")
+def import_part_pmi(
+    adapter: Any,
+    view: Any,
+    *,
+    datum_positions: dict[str, tuple[float, float]],
+    control_positions: dict[str, tuple[float, float]],
+    controls: Sequence[Any],
+    label: str,
+) -> dict[str, Any]:
+    """Import the source part's DimXpert PMI into ``view`` and place it.
+
+    The part authored its GD&T as model PMI (``_part_pmi.author_part_pmi``
+    from the spec's ``PartDatum`` / ``GeometricControl`` rows); this pulls it
+    onto the sheet with ``IView::ImportAnnotations(IncludeDimXpertAnnotations
+    =True)`` — the ONLY import API that reaches PMI (no swInsertAnnotation_e
+    member covers it) — then moves each imported annotation to the sheet
+    coordinates the recipe assigns.  Matching is by CONTENT, never arrival
+    order: a datum tag by its letter, a frame by its symbol + tolerance read
+    back from the frame XML.  Every expected annotation must land and every
+    imported annotation must be expected — a shortfall (e.g. an annotation
+    whose DimXpert annotation plane faces away from this view's orientation)
+    fails loud rather than shipping a sheet silently missing a control.
+
+    ``controls`` is the spec's ``GeometricControl`` sequence (typed loosely to
+    keep the import graph acyclic).  Returns the placed annotations by key.
+    """
+    from _gtol_spec import GTOL_SYMBOLS
+
+    view = _early_bound(view, "IView")
+    view.ImportAnnotations(False, False, True, False, False)
+    imported = []
+    for annotation in view.GetAnnotations() or ():
+        annotation = _early_bound(annotation, "IAnnotation")
+        if bool(annotation.IsDimXpert()):
+            imported.append(annotation)
+
+    controls_by_key = {control.key: control for control in controls}
+    if set(controls_by_key) != set(control_positions):
+        raise RuntimeError(
+            f"{label}: control_positions keys {sorted(control_positions)} != "
+            f"spec controls {sorted(controls_by_key)}"
+        )
+
+    placed: dict[str, Any] = {}
+    unmatched: list[str] = []
+    for annotation in imported:
+        annotation_type = int(annotation.GetType())
+        specific = annotation.GetSpecificAnnotation()
+        key = None
+        if annotation_type == _ANNOT_DATUM and specific is not None:
+            tag = _early_bound(specific, "IDatumTag")
+            letter = str(tag.GetLabel() or "")
+            if letter in datum_positions:
+                key = f"datum:{letter}"
+                target = datum_positions[letter]
+        elif annotation_type == _ANNOT_GTOL and specific is not None:
+            gtol = _early_bound(specific, "IGtol")
+            frame = gtol.GetFrame(1)
+            xml = str(_early_bound(frame, "IGtolFrame").GetSymbolXml() or "") if frame else ""
+            for control in controls_by_key.values():
+                if (
+                    f"<ToleranceSymbol>{GTOL_SYMBOLS[control.characteristic]}<" in xml
+                    and control.tolerance in xml
+                    and control.key not in placed
+                ):
+                    key = control.key
+                    target = control_positions[control.key]
+                    break
+        if key is None:
+            unmatched.append(
+                f"type={annotation_type} name={annotation.GetName()!r}"
+            )
+            continue
+        if not annotation.SetPosition2(target[0], target[1], 0.0):
+            raise RuntimeError(f"{label}: SetPosition2 failed for {key}")
+        placed[key] = annotation
+
+    expected = {f"datum:{letter}" for letter in datum_positions} | set(controls_by_key)
+    missing = expected - set(placed)
+    if missing or unmatched:
+        raise RuntimeError(
+            f"{label}: PMI import mismatch — missing {sorted(missing)}, "
+            f"unmatched imports {unmatched} (a missing control usually means "
+            "its DimXpert annotation plane faces away from this view)"
+        )
+    _telemetry.event("drawing.pmi_imported", count=len(placed))
+    return placed
 
 
 @_telemetry.traced("drawing.surface_finish", label_param="label")

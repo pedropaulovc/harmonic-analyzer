@@ -111,6 +111,11 @@ import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import _GTOL_SYMBOLS, _gtol_frame_xml  # noqa: E402
+from _part_pmi import (  # noqa: E402  — single source of the tlb-read helpers
+    _long_array,
+    gtol_type_ids as _gtol_type_map,
+    swdimxpert_tlb as _swdimxpert_tlb,
+)
 from solidworks_mcp.adapters.pywin32_adapter import (  # noqa: E402
     PyWin32Adapter,
     null_callout,
@@ -133,43 +138,6 @@ PROBE_CONTROLS = (
 )
 
 
-def _swdimxpert_tlb() -> Path:
-    """Locate the installed swdimxpert type library."""
-    roots = sorted(
-        Path(r"C:\Program Files\Dassault Systemes").glob(
-            "SOLIDWORKS*/SOLIDWORKS/swdimxpert.tlb"
-        )
-    ) + sorted(
-        Path(r"C:\Program Files\SOLIDWORKS Corp").glob(
-            "SOLIDWORKS/swdimxpert.tlb"
-        )
-    )
-    if not roots:
-        raise FileNotFoundError("swdimxpert.tlb not found in any SOLIDWORKS install")
-    return roots[-1]
-
-
-def _gtol_type_map() -> dict[str, int]:
-    """Read ``swDimXpertGtolType_e`` off the installed type library.
-
-    The offline API bundle documents ``IDimXpertPart::InsertGtol`` as taking
-    "swDimXpertGtolType_e" but ships no such enum file, and the published help
-    prints no integers.  comtypes' typelib loader recovers every member and its
-    value, so the mapping is SOURCED rather than guessed -- and a SolidWorks
-    upgrade that renumbers it fails this probe instead of silently inserting the
-    wrong characteristic.
-    """
-    import comtypes.client
-
-    module = comtypes.client.GetModule(str(_swdimxpert_tlb()))
-    prefix = "swDimXpertGtolType_"
-    return {
-        name[len(prefix) :]: int(getattr(module, name))
-        for name in dir(module)
-        if name.startswith(prefix) and not name.endswith("_e")
-    }
-
-
 def _close_if_open(adapter: object, title: str) -> None:
     """Close a document by title if this SolidWorks session has it open."""
     app = adapter.swApp
@@ -177,22 +145,6 @@ def _close_if_open(adapter: object, title: str) -> None:
         if str(_read_member(document, "GetTitle")) == title:
             app.CloseDoc(title)
             _telemetry.info(f"closed stale scratch document {title!r}")
-
-
-def _long_array(values: list[int]):
-    """Wrap ints as a ``VT_ARRAY | VT_I4`` VARIANT.
-
-    ``FeatureSelectorOptions`` is documented as "array of long values".  A bare
-    Python list marshals as ``VT_ARRAY | VT_VARIANT``, which is the same trap
-    ``com_variant.double_array`` / ``bool_array`` exist to avoid for other SW
-    setters -- and here it does not merely fail: it WEDGED SolidWorks (window
-    "Not Responding", seat unrecoverable without a force-restart) on the
-    2026-07-28 run.  Type the array explicitly.
-    """
-    import pythoncom
-    from win32com.client import VARIANT
-
-    return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I4, [int(v) for v in values])
 
 
 _FAILED_CHECKS: list[str] = []
