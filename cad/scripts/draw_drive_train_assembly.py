@@ -117,13 +117,6 @@ BOM_COMPONENTS = {
 }
 BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 
-# AutoBalloon lays its balloons on a ring around the view; the margin is how far
-# out that ring sits. The exterior views fill most of their field at 1:3, so they
-# need the wider ring to clear the geometry; the two hidden-line views are
-# smaller and centred, so the same ring reads without crowding the sheet edge.
-EXTERIOR_BALLOON_RING_MARGIN = 0.020
-CONCEALED_BALLOON_RING_MARGIN = 0.020
-
 GENERAL_POINTER_NOTE = (
     "GEAR-TRAIN SETUP: SEE SHEET 5. PINION ITEMS: SEE SHEET 6. "
     "PINION SETUP AND FINAL ACCEPTANCE: SEE SHEET 7."
@@ -957,7 +950,6 @@ async def build(adapter: Any) -> dict[str, str]:
         gear_identification_views,
         expected=len(BOM_COMPONENTS),
         label="drive-train gear identification",
-        margin=EXTERIOR_BALLOON_RING_MARGIN,
         coverage="accumulate",
     )
     for index, origin in zip(
@@ -1016,7 +1008,6 @@ async def build(adapter: Any) -> dict[str, str]:
         expected=len(BOM_COMPONENTS),
         label="drive-train concealed identification",
         existing_balloons=identification_balloons,
-        margin=CONCEALED_BALLOON_RING_MARGIN,
         coverage="accumulate",
     )
     concealed_labels = (
@@ -1086,7 +1077,6 @@ async def build(adapter: Any) -> dict[str, str]:
         expected=len(BOM_COMPONENTS),
         label="drive-train pinion identification",
         existing_balloons=identification_balloons,
-        margin=EXTERIOR_BALLOON_RING_MARGIN,
     )
     for index, origin in zip(
         PINION_IDENTIFICATION_VIEW_INDICES,

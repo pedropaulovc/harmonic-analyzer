@@ -9,6 +9,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import math
+import time
 from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
@@ -195,6 +196,12 @@ _NOMINAL_BALLOON_HALF_M = 0.006
 # is MEASURED per sheet (INote::GetBalloonInfo -- 4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
 _BALLOON_CLEARANCE_M = 0.0015
+# swBalloonLayoutType_e. Circle is "in a circle around the drawing view" -- what
+# add_auto_balloons_across_views uses so SolidWorks rings its own balloons.
+# Square is a box around the view; on a pictorial view it can drop balloons
+# INSIDE the outline, which is what started the hand-rolled re-ring.
+BALLOON_LAYOUT_SQUARE = 1
+BALLOON_LAYOUT_CIRCLE = 2
 
 # The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
 # format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
@@ -3003,18 +3010,39 @@ def isolate_drawing_view_components(
     pending = list(_drawing_component_children(root))
     found: set[str] = set()
     enumerated: list[str] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        enumerated.append(str(drawing_component.Name or ""))
-        if children:
-            continue
-        matched = _drawing_component_stems(
-            adapter, drawing_component, visible_stems
-        )
-        drawing_component.Visible = bool(matched)
-        found.update(matched)
+    hidden = 0
+    resolve_s = 0.0
+    visible_s = 0.0
+    # ONE span around the walk, with the phases TIMED -- not a span per
+    # component (hundreds of near-instant leaves would drown the trace) and not
+    # one opaque number either. At ~35 s per view this is among the most
+    # expensive steps in an assembly drawing, and "which COM call is it?" was
+    # unanswerable from the span line: identity resolution (Component +
+    # GetPathName per leaf) and the Visible writes are entirely different
+    # optimisations, and only one of them is cacheable across views.
+    with _telemetry.span("isolate.walk") as walk:
+        while pending:
+            drawing_component = pending.pop()
+            children = _drawing_component_children(drawing_component)
+            pending.extend(children)
+            enumerated.append(str(drawing_component.Name or ""))
+            if children:
+                continue
+            started = time.perf_counter()
+            matched = _drawing_component_stems(
+                adapter, drawing_component, visible_stems
+            )
+            marked = time.perf_counter()
+            drawing_component.Visible = bool(matched)
+            visible_s += time.perf_counter() - marked
+            resolve_s += marked - started
+            hidden += not matched
+            found.update(matched)
+        walk.set_attribute("nodes", len(enumerated))
+        walk.set_attribute("leaves", hidden + len(found))
+        walk.set_attribute("hidden", hidden)
+        walk.set_attribute("resolve_s", round(resolve_s, 3))
+        walk.set_attribute("visible_s", round(visible_s, 3))
 
     missing = sorted(visible_stems - found)
     if missing:
@@ -3022,7 +3050,8 @@ def isolate_drawing_view_components(
             f"{label}: component families not found: {missing}; "
             f"enumerated={sorted(enumerated)}"
         )
-    adapter.currentModel.EditRebuild3()
+    with _telemetry.span("isolate.rebuild"):
+        adapter.currentModel.EditRebuild3()
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
@@ -3142,8 +3171,7 @@ def add_auto_balloons_across_views(
     expected: int,
     label: str,
     existing_balloons: Sequence[Any] = (),
-    margin: float = 0.014,
-    layout: int = 1,
+    layout: int = BALLOON_LAYOUT_CIRCLE,
     coverage: str = "assert",
 ) -> list[Any]:
     """Balloon successive views until every BOM item number is represented.
@@ -3152,7 +3180,20 @@ def add_auto_balloons_across_views(
     AutoBalloon5 only balloons items visible in the selected view, so run it on
     each orthographic and pictorial view, preserve every placed balloon, and
     validate the union of displayed BOM item numbers against the table's full
-    contiguous item range. Each view's balloons are spread around that view.
+    contiguous item range.
+
+    **SolidWorks rings the balloons, not us.** ``swDetailingBalloonLayout_Circle``
+    is AutoBalloon5's own "in a circle around the drawing view" arrangement --
+    the same job ``_spread_balloons`` hand-rolls, done by the tool that owns the
+    leaders. Re-ringing this path was measured to be actively worse: on a
+    32-balloon drive-train view it produced SIX leader crossings, and the pairs
+    it crossed were in the correct attachment order, so the "order preservation
+    rules out crossings" argument it rests on simply does not hold at that
+    density. (It cannot: with 32 balloons the ring cannot fit them at the
+    minimum gap, so the solver falls back to EVEN spacing, which its own
+    docstring records as the placement that hauls leaders across the model.)
+    ``_spread_balloons`` stays for :func:`add_component_bom_balloons`, whose
+    handful of hand-picked anchors is the sparse case it was written for.
 
     An identification package spread over several SHEETS cannot balloon all its
     views in one call -- AutoBalloon5 works on the active sheet -- so pass
@@ -3165,8 +3206,6 @@ def add_auto_balloons_across_views(
     """
     if coverage not in {"assert", "accumulate"}:
         raise ValueError(f"{label}: unknown balloon coverage mode {coverage!r}")
-    if margin <= 0.0:
-        raise ValueError(f"{label}: balloon ring margin must be positive")
     all_balloons = list(existing_balloons)
     item_numbers = {
         _balloon_item_number(adapter, note, label=f"{label} existing")
@@ -3179,7 +3218,6 @@ def add_auto_balloons_across_views(
         )
         if not balloons:
             continue
-        _spread_balloons(adapter, view, balloons, margin=margin)
         for note in balloons:
             item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
         all_balloons.extend(balloons)
