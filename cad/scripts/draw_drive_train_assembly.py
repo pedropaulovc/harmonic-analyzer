@@ -811,16 +811,16 @@ def _drawing_component_matches(
     the result. On the drive-train tree most nodes match on name alone or are
     structure we do not care about, so this removes the majority of the calls.
 
-    It does not remove enough. This drawing isolates NINE views, each walking the
-    same ~80-leaf tree, and the leaves that need the path are exactly the ones no
-    view matches by name -- so every view re-resolves the same misses. Measured:
-    ~35 s per isolation, of which ~20 s is this resolution, ~315 s of a 585 s
-    drawing. ``cache`` therefore memoises the path-derived identity across views.
-
-    Keyed on ``Name`` (``cone-gear-1@drive-train``), which names one INSTANCE in
-    one assembly, so the same name in another view of that assembly is the same
-    component and resolves to the same document. The identity is cached, NOT the
-    match: ``stems`` differs per view, and filtering it is free.
+    It does not remove enough, and there is no cross-view memo to add. This
+    drawing isolates NINE views, each walking the same ~80-leaf tree, and the
+    leaves needing the path are exactly the ones no view matches by name -- so
+    every view re-resolves the same misses (~20 s of the ~35 s per isolation,
+    ~315 s of a 585 s drawing). Caching the identity on ``Name`` was tried and
+    does NOT work: ``IDrawingComponent::Name`` carries the VIEW, so the same
+    physical component is a different key in each of the nine views and the
+    cache never saturates (measured: entries climbing 52 -> 105 -> 569 instead
+    of settling at ~80, for 585 s -> 580 s). Any future memo needs a key that
+    is view-independent; the span attributes below are what would prove it.
     """
     drawing_name = name.split("@", 1)[0].replace("\\", "/")
     matched = _stems_for_identity(drawing_name.rsplit("/", 1)[-1].casefold(), stems)
@@ -945,7 +945,7 @@ def _create_component_balloon(
     return note, selected_view
 
 
-@_telemetry.traced("drawing.isolate_balloon_components")
+@_telemetry.traced("drawing.isolate_balloon_components", label_param="label")
 def _isolate_balloon_components(
     adapter: Any,
     view: Any,
@@ -955,9 +955,9 @@ def _isolate_balloon_components(
 ) -> None:
     """Show only the requested enclosed BOM families in an auxiliary view.
 
-    Pass ONE ``cache`` dict across every isolated view of the drawing -- see
-    :func:`_drawing_component_matches` for what it holds and why the nine views
-    of this sheet set otherwise re-resolve the same components nine times.
+    Nine views call this, so the span carries the view ``label`` -- otherwise
+    the nine rows are indistinguishable and a slow ``resolve_s`` cannot be
+    pinned to the view that spent it.
 
     The walk is ONE span with its phases TIMED, not a span per component
     (hundreds of near-instant leaves would drown the trace) and not one opaque

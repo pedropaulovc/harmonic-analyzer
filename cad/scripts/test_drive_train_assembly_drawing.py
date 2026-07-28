@@ -411,3 +411,23 @@ def test_drive_train_balloons_record_their_own_anchor():
     # One read, on the winner -- not one per visible edge. Ordering every edge
     # by geometry ran a single balloon into the minutes.
     assert source.count('_edge_endpoint_key') == 1
+
+
+def test_each_isolation_span_names_the_view_it_isolated():
+    """Nine views share this span name, so the timings need a discriminator.
+
+    resolve_s/visible_s exist to say WHICH view is worth attacking; nine
+    identically-named rows cannot answer that, and the view label is already a
+    parameter (Codex P1).
+    """
+    source = inspect.getsource(drawing._isolate_balloon_components)
+    assert 'label_param="label"' in source.splitlines()[0]
+
+
+def test_the_isolation_docstrings_do_not_promise_a_cache_that_is_not_there():
+    """A docstring describing an argument the function does not take sends the
+    next profiling pass down a path already measured and rejected."""
+    for fn in (drawing._isolate_balloon_components, drawing._drawing_component_matches):
+        source = inspect.getsource(fn)
+        assert "``cache``" not in source, fn.__name__
+        assert "cache" not in inspect.signature(fn).parameters, fn.__name__
