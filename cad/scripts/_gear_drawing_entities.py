@@ -72,15 +72,21 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
 def visible_tooth_tip_silhouette(
     adapter: Any, view: Any, outside_diameter_mm: float
 ) -> Any:
-    """Return the upper side-view silhouette at the specified tooth-tip radius."""
+    """Return the upper side-view silhouette at the specified tooth-tip radius.
+
+    Like its circle-edge sibling, the aggregate scan counts go on the span's own
+    attributes so the cost is attributable from the span line alone.
+    """
     target_radius_m = outside_diameter_mm / 2000.0
     candidates: list[tuple[float, Any]] = []
+    silhouette_count = 0
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         silhouettes = adapter._attempt(
             lambda c=component: view.GetVisibleEntities2(c, 4), default=()
         ) or ()
         for raw_silhouette in silhouettes:
+            silhouette_count += 1
             silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
             start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
             end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
@@ -99,7 +105,11 @@ def visible_tooth_tip_silhouette(
             mean_y = (float(start_xyz[1]) + float(end_xyz[1])) / 2.0
             candidates.append((mean_y, silhouette))
 
-    _span_attrs(matched=len(candidates), outside_diameter_mm=outside_diameter_mm)
+    # scanned, not just matched: the COM cost is per silhouette PROCESSED (each
+    # costs an early-bind plus two endpoint reads), so two views with the same
+    # match count but wildly different scan counts must not look alike.
+    _span_attrs(silhouettes=silhouette_count, matched=len(candidates),
+                outside_diameter_mm=outside_diameter_mm)
     if not candidates:
         raise RuntimeError(
             "no visible tooth-tip silhouette matches radius "
