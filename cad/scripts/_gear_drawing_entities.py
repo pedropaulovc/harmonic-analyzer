@@ -15,16 +15,28 @@ import _telemetry
 from _common import _early_bound
 
 
+def _span_attrs(**attributes: float) -> None:
+    """Attach aggregate scan counts to the CURRENT span.
+
+    ``@traced`` owns the span, so there is no handle to set attributes on --
+    reach for the active one. A no-op when nothing is recording, so callers
+    never guard.
+    """
+    span = _telemetry.trace.get_current_span()
+    for key, value in attributes.items():
+        span.set_attribute(key, value)
+
+
 @_telemetry.traced("drawing.pick_circle_edge")
 def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """Return the visible circular model edge matching ``diameter_mm``.
 
     Costs ~5 COM round trips per visible edge (early-bind, GetCurve,
     early-bind, IsCircle, CircleParams), so a gear end view with hundreds of
-    tooth edges makes this the most expensive step in its drawing. The span
-    carries the edge and candidate counts precisely so that cost is
-    attributable instead of sitting in an unspanned hole -- the per-edge work
-    stays inside ONE span rather than flooding the trace with leaves.
+    tooth edges makes this the most expensive step in its drawing. The counts go
+    on the SPAN's own attributes, not just a span event: the profiling workflow
+    reads span lines, where an event's attributes do not appear. The per-edge
+    work stays inside ONE span rather than flooding the trace with leaves.
     """
     candidates: list[tuple[float, Any]] = []
     edge_count = 0
@@ -42,12 +54,8 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
             radius_mm = float(curve.CircleParams[6]) * 1000.0
             candidates.append((radius_mm, edge))
 
-    _telemetry.event(
-        "drawing.circle_edge_scan",
-        edges=edge_count,
-        circles=len(candidates),
-        diameter_mm=diameter_mm,
-    )
+    _span_attrs(edges=edge_count, circles=len(candidates),
+                diameter_mm=diameter_mm)
     target_radius = diameter_mm / 2.0
     if not candidates:
         raise RuntimeError("drawing view has no visible circular model edge")
@@ -91,7 +99,7 @@ def visible_tooth_tip_silhouette(
             mean_y = (float(start_xyz[1]) + float(end_xyz[1])) / 2.0
             candidates.append((mean_y, silhouette))
 
-    _telemetry.event("drawing.silhouette_scan", matched=len(candidates))
+    _span_attrs(matched=len(candidates), outside_diameter_mm=outside_diameter_mm)
     if not candidates:
         raise RuntimeError(
             "no visible tooth-tip silhouette matches radius "
