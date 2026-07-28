@@ -26,6 +26,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _edge_endpoint_key,
     _balloon_item_number,
     _spread_balloons,
     finalize_drawing,
@@ -842,6 +843,8 @@ def _create_component_balloon(
     """Insert one BOM balloon on a real visible edge of the requested component."""
     selected_view: Any | None = None
     selected_edge: Any | None = None
+    selected_name = ""
+    selected_edge_count = 0
     enumerated: list[str] = []
     for view in views:
         root = adapter._attempt(
@@ -872,6 +875,8 @@ def _create_component_balloon(
                 continue
             selected_view = view
             selected_edge = edges[0]
+            selected_name = name
+            selected_edge_count = len(edges)
             break
         if selected_edge is not None:
             break
@@ -880,6 +885,28 @@ def _create_component_balloon(
             f"drive-train {stem} balloon has no visible edge across drawing views; "
             f"matching components={enumerated}"
         )
+    # Record WHERE the anchor landed. This is the drawing whose sheet built clean
+    # on one fleet pass and failed with "1 leader crossing(s)" on the next, and
+    # `edges[0]` off an enumeration SolidWorks does not order is the obvious
+    # suspect -- but nothing had ever shown it moving, because nothing recorded
+    # it. Diffing two passes' drawing.balloon_anchor events answers that: same
+    # anchors mean the enumeration is stable and the crossing came from
+    # elsewhere; different anchors prove it and earn the cost of ordering them.
+    #
+    # ONE geometry read, on the winner only. Ordering every visible edge by its
+    # curve endpoints was tried and is unusable here -- a GetCurve +
+    # GetCurveParams2 pair per edge at ~250 ms a COM read, over the hundreds of
+    # tooth edges a gear view carries, ran a single balloon into the minutes.
+    _telemetry.event(
+        "drawing.balloon_anchor",
+        stem=stem,
+        component=selected_name,
+        edges=selected_edge_count,
+        anchor=",".join(
+            f"{value:.6f}"
+            for value in (_edge_endpoint_key(adapter, selected_edge) or ())
+        ),
+    )
 
     draw = adapter.currentModel
     ddoc = _sw_type_info.early_bound_or_flag(draw, "IDrawingDoc", "ActivateView")

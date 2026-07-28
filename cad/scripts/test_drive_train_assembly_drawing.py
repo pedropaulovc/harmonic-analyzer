@@ -394,3 +394,20 @@ def test_a_name_match_still_never_costs_a_path_read():
     )
     assert matched == {"cone-gear"}
     assert adapter.path_reads == 0
+
+
+def test_drive_train_balloons_record_their_own_anchor():
+    """The measurement has to be on the drawing that motivated it.
+
+    drive-train does NOT go through _drawing_common's anchor helper -- it has
+    its own _create_component_balloon -- so instrumenting the shared one left
+    the sheet whose crossing started this with no anchor record at all
+    (Codex P1). Diffing two passes' events is the whole repro, and it only works
+    if the events exist here.
+    """
+    source = inspect.getsource(drawing._create_component_balloon)
+    assert 'drawing.balloon_anchor' in source
+    assert '_edge_endpoint_key(adapter, selected_edge)' in source
+    # One read, on the winner -- not one per visible edge. Ordering every edge
+    # by geometry ran a single balloon into the minutes.
+    assert source.count('_edge_endpoint_key') == 1

@@ -3064,6 +3064,7 @@ def isolate_drawing_view_components(
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
+@_telemetry.traced("drawing.pick_balloon_anchor", label_param="stem")
 def _pick_component_anchor_edge(
     adapter: Any, view: Any, *, stem: str, label: str
 ) -> Any:
@@ -3137,6 +3138,11 @@ def _pick_component_anchor_edge(
     # cheap enough to leave on in every build, so two passes are comparable
     # without re-running anything under a special flag.
     key = _edge_endpoint_key(adapter, selected_edge) or ()
+    # On the SPAN as well as the event: an event's attributes do not appear in
+    # the span lines the profiling workflow reads, and this span exists so one
+    # component's scan can be timed and attributed on its own rather than
+    # disappearing into the whole-sheet balloon span.
+    _span_scan_attrs(leaves=len(enumerated), edges=edge_count)
     _telemetry.event(
         "drawing.balloon_anchor",
         stem=stem,
