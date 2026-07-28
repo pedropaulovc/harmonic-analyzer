@@ -1853,6 +1853,33 @@ def _span_scan_attrs(**attributes: float) -> None:
         span.set_attribute(key, value)
 
 
+def _edge_endpoint_key(adapter: Any, edge: Any) -> tuple[float, ...] | None:
+    """Return one model edge's endpoints as a sortable key, or ``None``.
+
+    The stable identity of an edge, for picking purposes. ``IEdge`` offers no
+    usable id -- ``GetID`` is documented for IMPORTED bodies only, is not saved
+    with the document, and any add-in may reassign it -- so geometry is what
+    there is. ``GetCurveParams2`` returns
+    ``(start xyz, end xyz, start/end u, 3 packed doubles)``; the first six are
+    the endpoints in model space, which is enough to order the visible edges of
+    one component totally and identically on every run.
+
+    ``GetCurve()`` must precede it: SolidWorks does not retain the underlying
+    curve, and ``GetCurveParams2`` reads what ``GetCurve`` generated.
+
+    ``None`` when the geometry cannot be read, so an unreadable edge drops out
+    of the running instead of failing the drawing -- the caller raises only if
+    NO edge on the component yields a key.
+    """
+    edge = _early_bound(edge, "IEdge")
+    if adapter._attempt(lambda e=edge: e.GetCurve(), default=None) is None:
+        return None
+    params = adapter._attempt(lambda e=edge: e.GetCurveParams2(), default=None)
+    if not params or len(params) < 6:
+        return None
+    return tuple(float(value) for value in params[:6])
+
+
 @_telemetry.traced("drawing.dimension_precision")
 def set_dimension_precision(
     adapter: Any, annotations: Iterable[Any], precision: dict[str, int]
@@ -2824,10 +2851,21 @@ def _spread_balloons(
         # Flat x,y,z stream; the LAST triple is the attachment on the component.
         attach_x, attach_y = float(raw[-3]), float(raw[-2])
         theta = math.atan2(attach_y - center_y, attach_x - center_x)
-        items.append((theta, annotation))
-    order = sorted(range(len(items)), key=lambda i: items[i][0])
+        items.append((theta, attach_x, attach_y, annotation))
+    # Sort on (theta, attach x, attach y), never on theta alone. Two balloons
+    # attached at the same angle from the view centre -- coaxial parts in a
+    # pictorial view do this routinely -- would otherwise keep whatever relative
+    # order the balloons arrived in, which is AutoBalloon5's, which is not
+    # stable. Ring order decides whether leaders cross, so an unstable tie-break
+    # is an unstable drawing.
+    order = sorted(range(len(items)), key=lambda i: items[i][:3])
     items = [items[i] for i in order]
     radii = [radii[i] for i in order]
+    _telemetry.event(
+        "drawing.balloon_ring",
+        count=len(items),
+        attachments=[f"{x:.6f},{y:.6f}" for _t, x, y, _a in items],
+    )
 
     # Place each balloon at its OWN attachment's angle, then separate only the
     # circles that actually collide. Two earlier placements both failed, each in
@@ -2861,8 +2899,8 @@ def _spread_balloons(
     gap = _min_angular_gap(
         min(radius_x, radius_y), max(radii), clearance=clearance
     )
-    angles = _push_apart_on_ring([theta for theta, _ in items], min_gap=gap)
-    for angle, (_theta, annotation) in zip(angles, items):
+    angles = _push_apart_on_ring([theta for theta, _x, _y, _a in items], min_gap=gap)
+    for angle, (_theta, _x, _y, annotation) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle)
         target_y = center_y + radius_y * math.sin(angle)
         if not annotation.SetPosition(target_x, target_y, 0.0):
@@ -3026,22 +3064,37 @@ def isolate_drawing_view_components(
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
-def _create_component_bom_balloon(
-    adapter: Any,
-    view: Any,
-    *,
-    stem: str,
-    expected_item: str,
-    label: str,
+def _pick_component_anchor_edge(
+    adapter: Any, view: Any, *, stem: str, label: str
 ) -> Any:
-    """Attach one BOM balloon to a visible edge of a requested component."""
+    """Return the one visible edge a ``stem``'s balloon leader attaches to.
+
+    Chosen by GEOMETRY, never by enumeration position. Both COM enumerations
+    this walks -- the drawing-component tree and ``GetVisibleEntities2`` --
+    document no ordering, so taking ``edges[0]`` off the first matching leaf
+    silently picked a different edge run to run. That is not cosmetic: the
+    anchor becomes the balloon's leader ATTACHMENT point, and
+    :func:`_spread_balloons` assigns ring slots in the attachments' angular
+    order, so a moved anchor can reorder two balloons whose attachments sit at
+    nearly the same angle and turn their leaders into a crossing. It did: the
+    drive-train sheet built clean on one fleet pass and failed
+    ``check_drawing_layout`` with "1 leader crossing(s)" between items 5 and 27
+    on the very next pass, same commit, same cached assembly.
+
+    So: visit every matching leaf (no early break), and pick the smallest
+    ``(component name, curve endpoints)``. The choice is arbitrary but FIXED,
+    which is the property the layout audit needs to mean anything -- a red gate
+    has to be reproducible before it can be debugged, and a green one has to be
+    more than luck.
+    """
     root = adapter._attempt(
         lambda: view.RootDrawingComponent2(False), default=None
     )
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
-    selected_edge: Any | None = None
+    candidates: list[tuple[tuple[float, ...], str, Any]] = []
     enumerated: list[str] = []
+    scanned = 0
     pending = list(_drawing_component_children(root))
     while pending:
         drawing_component = pending.pop()
@@ -3053,22 +3106,63 @@ def _create_component_bom_balloon(
             adapter, drawing_component, frozenset({stem})
         ):
             continue
-        enumerated.append(str(drawing_component.Name or ""))
+        name = str(drawing_component.Name or "")
+        enumerated.append(name)
         component = adapter._attempt(
             lambda dc=drawing_component: dc.Component, default=None
         )
         edges = adapter._attempt(
             lambda: view.GetVisibleEntities2(component, 1), default=()
         ) or ()
-        if not edges:
-            continue
-        selected_edge = edges[0]
-        break
-    if selected_edge is None:
+        for edge in edges:
+            scanned += 1
+            key = _edge_endpoint_key(adapter, edge)
+            if key is None:
+                continue
+            candidates.append((key, name, edge))
+    if not candidates:
         raise RuntimeError(
-            f"{label}: {stem} has no visible edge; matching={enumerated}"
+            f"{label}: {stem} has no visible edge with readable geometry; "
+            f"matching={enumerated}"
         )
+    # Leaf name before endpoints: two instances of one family are separate
+    # components, so keep the CHOICE OF INSTANCE stable first, then the edge
+    # within it. Sorting on endpoints alone would let a rebuild that nudged one
+    # instance hand the balloon to the other.
+    chosen_key, chosen_name, selected_edge = min(
+        candidates, key=lambda item: (item[1], item[0])
+    )
+    # Record WHICH edge won, not just that one did. This helper is called once
+    # per ballooned family under the caller's span, so it is an event, not a
+    # span of its own -- and the anchor coordinates are exactly what a repeat of
+    # the crossing needs: diffing two passes' events says whether the anchor
+    # moved, which nothing in the logs could answer the first time.
+    _telemetry.event(
+        "drawing.balloon_anchor",
+        stem=stem,
+        component=chosen_name,
+        leaves=len(enumerated),
+        edges=scanned,
+        anchors=len(candidates),
+        anchor_x=chosen_key[0],
+        anchor_y=chosen_key[1],
+        anchor_z=chosen_key[2],
+    )
+    return selected_edge
 
+
+def _create_component_bom_balloon(
+    adapter: Any,
+    view: Any,
+    *,
+    stem: str,
+    expected_item: str,
+    label: str,
+) -> Any:
+    """Attach one BOM balloon to a visible edge of a requested component."""
+    selected_edge = _pick_component_anchor_edge(
+        adapter, view, stem=stem, label=label
+    )
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):

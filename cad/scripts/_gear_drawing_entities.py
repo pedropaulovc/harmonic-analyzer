@@ -37,8 +37,16 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     on the SPAN's own attributes, not just a span event: the profiling workflow
     reads span lines, where an event's attributes do not appear. The per-edge
     work stays inside ONE span rather than flooding the trace with leaves.
+
+    Ties break on the circle's CENTRE, never on enumeration order --
+    ``GetVisibleEntities2`` documents no ordering, and a part with coaxial or
+    mirrored circles of one radius (every through-bore has two, one per face)
+    would otherwise return a different edge run to run. See
+    :func:`_drawing_common._spread_balloons` for what that non-determinism cost.
+    The centre comes out of ``CircleParams`` this loop already reads, so the
+    guarantee is free.
     """
-    candidates: list[tuple[float, Any]] = []
+    candidates: list[tuple[float, tuple[float, float, float], Any]] = []
     edge_count = 0
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
@@ -51,15 +59,20 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if not curve.IsCircle():
                 continue
-            radius_mm = float(curve.CircleParams[6]) * 1000.0
-            candidates.append((radius_mm, edge))
+            # CircleParams = (centre xyz, axis xyz, radius).
+            params = curve.CircleParams
+            radius_mm = float(params[6]) * 1000.0
+            centre = (float(params[0]), float(params[1]), float(params[2]))
+            candidates.append((radius_mm, centre, edge))
 
     _span_attrs(edges=edge_count, circles=len(candidates),
                 diameter_mm=diameter_mm)
     target_radius = diameter_mm / 2.0
     if not candidates:
         raise RuntimeError("drawing view has no visible circular model edge")
-    radius_mm, edge = min(candidates, key=lambda item: abs(item[0] - target_radius))
+    radius_mm, _centre, edge = min(
+        candidates, key=lambda item: (abs(item[0] - target_radius), item[1])
+    )
     if abs(radius_mm - target_radius) > 0.01:
         raise RuntimeError(
             f"no visible circle matches radius {target_radius:.4f} mm; "
@@ -75,10 +88,14 @@ def visible_tooth_tip_silhouette(
     """Return the upper side-view silhouette at the specified tooth-tip radius.
 
     Like its circle-edge sibling, the aggregate scan counts go on the span's own
-    attributes so the cost is attributable from the span line alone.
+    attributes so the cost is attributable from the span line alone, and ties
+    break on geometry rather than on ``GetVisibleEntities2``'s undocumented
+    order: a gear's tooth tips are periodic, so several silhouettes share one
+    ``mean_y`` by construction and picking among them by enumeration index makes
+    the drawing irreproducible.
     """
     target_radius_m = outside_diameter_mm / 2000.0
-    candidates: list[tuple[float, Any]] = []
+    candidates: list[tuple[tuple[float, ...], Any]] = []
     silhouette_count = 0
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
@@ -103,7 +120,12 @@ def visible_tooth_tip_silhouette(
             if abs(end_radius - target_radius_m) > 0.00001:
                 continue
             mean_y = (float(start_xyz[1]) + float(end_xyz[1])) / 2.0
-            candidates.append((mean_y, silhouette))
+            # mean_y first (the actual selection criterion), then the endpoints
+            # verbatim so equal-height silhouettes order by geometry.
+            key = (mean_y,) + tuple(float(v) for v in start_xyz[:3]) + tuple(
+                float(v) for v in end_xyz[:3]
+            )
+            candidates.append((key, silhouette))
 
     # scanned, not just matched: the COM cost is per silhouette PROCESSED (each
     # costs an early-bind plus two endpoint reads), so two views with the same

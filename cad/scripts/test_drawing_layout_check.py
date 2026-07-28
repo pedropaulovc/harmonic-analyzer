@@ -1258,3 +1258,286 @@ def test_min_angular_gap_clears_the_audits_SQUARE_not_just_the_circle():
     ring, balloon = 0.05, 0.00472
     gap = drawing_common._min_angular_gap(ring, balloon, clearance=0.0)
     assert gap * ring == pytest.approx(2.0 * _math.sqrt(2.0) * balloon, rel=1e-9)
+
+
+def _balloon_coverage_harness(monkeypatch, per_view):
+    """Drive add_auto_balloons_across_views with fake AutoBalloon results.
+
+    ``per_view`` is one list of item-number strings per view. The real COM
+    calls (AutoBalloon5, the spread, the item-number read) are replaced so the
+    test exercises only the coverage bookkeeping, which is where a multi-sheet
+    package can silently stop proving anything.
+    """
+    notes = {}
+
+    def fake_create(adapter, view, *, label, allow_empty=False, layout=1):
+        made = [object() for _ in per_view[view]]
+        for note, item in zip(made, per_view[view], strict=True):
+            notes[id(note)] = item
+        return made
+
+    monkeypatch.setattr(drawing_common, "_create_auto_balloons", fake_create)
+    monkeypatch.setattr(
+        drawing_common, "_spread_balloons", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        drawing_common,
+        "_balloon_item_number",
+        lambda adapter, note, *, label: notes[id(note)],
+    )
+    return _FakeAdapter(SimpleNamespace(EditRebuild3=lambda: True))
+
+
+def test_accumulating_call_does_not_require_full_coverage(monkeypatch):
+    """Sheets 3 and 4 of a multi-sheet package cannot each cover every item."""
+    per_view = {"v1": ["1", "2"]}
+    adapter = _balloon_coverage_harness(monkeypatch, per_view)
+    got = drawing_common.add_auto_balloons_across_views(
+        adapter, ["v1"], expected=4, label="sheet3", coverage="accumulate"
+    )
+    assert len(got) == 2
+
+
+def test_final_call_fails_when_the_union_misses_an_item(monkeypatch):
+    """The whole point of accumulating: the LAST call still proves coverage."""
+    per_view = {"v1": ["1", "2"], "v2": ["3"]}
+    adapter = _balloon_coverage_harness(monkeypatch, per_view)
+    carried = drawing_common.add_auto_balloons_across_views(
+        adapter, ["v1"], expected=4, label="sheet3", coverage="accumulate"
+    )
+    with pytest.raises(RuntimeError, match=r"missing=\['4'\]"):
+        drawing_common.add_auto_balloons_across_views(
+            adapter, ["v2"], expected=4, label="sheet6", existing_balloons=carried
+        )
+
+
+def test_union_across_sheets_satisfies_the_final_assertion(monkeypatch):
+    per_view = {"v1": ["1", "2"], "v2": ["3", "4"]}
+    adapter = _balloon_coverage_harness(monkeypatch, per_view)
+    carried = drawing_common.add_auto_balloons_across_views(
+        adapter, ["v1"], expected=4, label="sheet3", coverage="accumulate"
+    )
+    got = drawing_common.add_auto_balloons_across_views(
+        adapter, ["v2"], expected=4, label="sheet6", existing_balloons=carried
+    )
+    assert len(got) == 4
+
+
+def test_accumulating_call_still_rejects_an_item_outside_the_bom(monkeypatch):
+    """A stale BOM must not ride along unnoticed to the last sheet."""
+    per_view = {"v1": ["1", "9"]}
+    adapter = _balloon_coverage_harness(monkeypatch, per_view)
+    with pytest.raises(RuntimeError, match=r"outside the BOM range"):
+        drawing_common.add_auto_balloons_across_views(
+            adapter, ["v1"], expected=4, label="sheet3", coverage="accumulate"
+        )
+
+
+def test_unknown_coverage_mode_is_rejected(monkeypatch):
+    adapter = _balloon_coverage_harness(monkeypatch, {})
+    with pytest.raises(ValueError, match="unknown balloon coverage mode"):
+        drawing_common.add_auto_balloons_across_views(
+            adapter, [], expected=1, label="x", coverage="assert_all"
+        )
+
+
+# --- Determinism of the picks that feed the ring order -----------------------
+#
+# The layout audit above is only worth running if the drawing it audits is
+# reproducible. It was not: drive-train built clean on one fleet pass and failed
+# with "1 leader crossing(s)" between items 5 and 27 on the next, same commit,
+# same cached assembly. Every pick below sits upstream of the ring order, and
+# each one used to resolve ties by COM enumeration position -- an order neither
+# GetVisibleEntities2 nor the drawing-component tree documents.
+
+
+class _FakeEdge:
+    """A model edge whose GetCurveParams2 returns fixed endpoints."""
+
+    def __init__(self, params):
+        self._params = params
+        self.curve_reads = 0
+
+    def GetCurve(self):
+        self.curve_reads += 1
+        return object()
+
+    def GetCurveParams2(self):
+        return self._params
+
+
+def test_edge_key_reads_the_endpoints_after_generating_the_curve():
+    edge = _FakeEdge((1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 1.0, 0, 0, 0))
+    key = drawing_common._edge_endpoint_key(_FakeAdapter(None), edge)
+    assert key == (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+    # GetCurveParams2 reads what GetCurve generated; SolidWorks keeps no curve
+    # of its own, so skipping the call returns stale or empty parameters.
+    assert edge.curve_reads == 1
+
+
+def test_edge_key_is_none_when_the_geometry_cannot_be_read():
+    """An unreadable edge drops out of the running; it must not fail the sheet."""
+
+    class _Mute(_FakeEdge):
+        def GetCurveParams2(self):
+            raise RuntimeError("no curve data")
+
+    assert drawing_common._edge_endpoint_key(
+        _FakeAdapter(None), _Mute(())
+    ) is None
+    assert drawing_common._edge_endpoint_key(
+        _FakeAdapter(None), _FakeEdge((1.0, 2.0))
+    ) is None
+
+
+class _FakeNote:
+    def __init__(self, attach_x, attach_y, radius=0.0047):
+        self._attach = (attach_x, attach_y)
+        self._radius = radius
+        self.placed = None
+
+    def GetBalloonInfo(self):
+        return (0, 0, 0, 0, 0, 0, self._radius)
+
+    def GetAnnotation(self):
+        return self
+
+    def GetLeaderPointsAtIndex(self, _index):
+        # Flat x,y,z stream: balloon end first, attachment LAST.
+        return (0.0, 0.0, 0.0, self._attach[0], self._attach[1], 0.0)
+
+    def SetPosition(self, x, y, _z):
+        self.placed = (x, y)
+        return True
+
+
+def _ring_positions(notes):
+    view = SimpleNamespace(GetOutline=lambda: (0.10, 0.10, 0.20, 0.20))
+    adapter = _FakeAdapter(SimpleNamespace(EditRebuild3=lambda: None))
+    drawing_common._spread_balloons(adapter, view, list(notes))
+    return [note.placed for note in notes]
+
+
+def test_balloons_attached_at_one_angle_ring_in_a_fixed_order():
+    """Coaxial attachments tie on theta; the tie must not fall to arrival order.
+
+    Both attachments sit on the +45 deg ray from the view centre, so atan2
+    returns the same theta for each. Sorting on theta alone left whatever
+    relative order AutoBalloon5 happened to hand over, and that order decides
+    which balloon gets which ring slot -- i.e. whether the leaders cross.
+    """
+    near, far = _FakeNote(0.1600, 0.1600), _FakeNote(0.1800, 0.1800)
+    forward = dict(zip(("near", "far"), _ring_positions([near, far])))
+    near2, far2 = _FakeNote(0.1600, 0.1600), _FakeNote(0.1800, 0.1800)
+    reversed_ = dict(zip(("far", "near"), _ring_positions([far2, near2])))
+    assert forward == reversed_
+    assert forward["near"] != forward["far"]
+
+
+def test_ring_order_survives_any_arrival_order():
+    """Shuffling the input must not move a single balloon."""
+    # (0.16, 0.16) and (0.18, 0.18) are collinear with the view centre, so the
+    # set carries a theta tie -- without one a rotation test passes on the
+    # theta-only sort it is meant to guard against.
+    attachments = [
+        (0.1153, 0.1370), (0.1600, 0.1600), (0.1800, 0.1800),
+        (0.1200, 0.1800), (0.1600, 0.1200),
+    ]
+    baseline = dict(
+        zip(attachments, _ring_positions([_FakeNote(x, y) for x, y in attachments]))
+    )
+    for rotation in range(1, len(attachments)):
+        rotated = attachments[rotation:] + attachments[:rotation]
+        got = dict(zip(rotated, _ring_positions([_FakeNote(x, y) for x, y in rotated])))
+        assert got == baseline
+
+
+class _FakeDrawingComponent:
+    def __init__(self, name, children=(), path=""):
+        self.Name = name
+        self._children = tuple(children)
+        self.Component = SimpleNamespace(GetPathName=lambda p=path: p)
+
+    def GetChildren(self):
+        return self._children
+
+
+def _anchor_view(edges_by_component):
+    """A drawing view whose visible edges come back in a caller-chosen order."""
+    leaves = [
+        _FakeDrawingComponent(f"{stem}-1@drive-train", path=f"C:/x/{stem}.SLDPRT")
+        for stem in edges_by_component
+    ]
+    by_path = {
+        leaf.Component.GetPathName(): edges_by_component[stem]
+        for leaf, stem in zip(leaves, edges_by_component)
+    }
+    root = _FakeDrawingComponent("drive-train", children=leaves)
+    return SimpleNamespace(
+        RootDrawingComponent2=lambda _resolve: root,
+        GetVisibleEntities2=lambda component, _kind: by_path[component.GetPathName()],
+    )
+
+
+def _anchor(edges_by_component, stem="cone-gear"):
+    view = _anchor_view(edges_by_component)
+    return drawing_common._pick_component_anchor_edge(
+        _FakeAdapter(None), view, stem=stem, label="drive-train"
+    )
+
+
+def _edge(x):
+    return _FakeEdge((x, 0.0, 0.0, x + 0.01, 0.0, 0.0))
+
+
+def test_anchor_edge_is_the_same_whatever_order_com_enumerates():
+    """GetVisibleEntities2 documents no order; the anchor must not inherit one."""
+    low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
+    forward = _anchor({"cone-gear": [low, mid, high]})
+    shuffled = _anchor({"cone-gear": [high, low, mid]})
+    reversed_ = _anchor({"cone-gear": [high, mid, low]})
+    assert forward is low
+    assert shuffled is low and reversed_ is low
+
+
+def test_anchor_prefers_the_first_component_instance_by_name():
+    """Two instances of one family are separate components.
+
+    Sorting on endpoints alone would let the balloon jump between instances
+    whenever a rebuild nudged one of them, so the instance is pinned first.
+    """
+    near, far = _edge(0.50), _edge(0.01)
+    view = _anchor_view({})
+    root = _FakeDrawingComponent(
+        "drive-train",
+        # Listed -1 first so the depth-first walk REACHES -2 first: the test has
+        # to fail when the pick falls back to traversal order, not agree with it
+        # by accident.
+        children=[
+            _FakeDrawingComponent("cone-gear-1@dt", path="C:/x/cone-gear.SLDPRT"),
+            _FakeDrawingComponent("cone-gear-2@dt", path="C:/x/cone-gear.SLDPRT"),
+        ],
+    )
+    edges = {"cone-gear-2@dt": [far], "cone-gear-1@dt": [near]}
+    view.RootDrawingComponent2 = lambda _r: root
+    lookup = {id(c.Component): c.Name for c in root.GetChildren()}
+    view.GetVisibleEntities2 = lambda component, _k: edges[lookup[id(component)]]
+    picked = drawing_common._pick_component_anchor_edge(
+        _FakeAdapter(None), view, stem="cone-gear", label="dt"
+    )
+    # -1 sorts before -2, even though -2 carries the smaller endpoint.
+    assert picked is near
+
+
+def test_anchor_skips_edges_whose_geometry_will_not_read():
+    class _Mute(_FakeEdge):
+        def GetCurveParams2(self):
+            raise RuntimeError("no curve data")
+
+    good = _edge(0.02)
+    assert _anchor({"cone-gear": [_Mute(()), good]}) is good
+
+
+def test_anchor_raises_when_no_edge_yields_geometry():
+    with pytest.raises(RuntimeError, match="readable geometry"):
+        _anchor({"cone-gear": []})
