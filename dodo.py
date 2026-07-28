@@ -702,8 +702,9 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         # coming up, and the retry we are about to release would spend its whole
         # 60 s COM-attach window on a process that cannot answer yet -- a retry
         # slot burned for nothing (measured: final_state=starting, retry died on
-        # "running but did not become COM-attachable"). Give the cold start the
-        # rest of its budget instead; only then respawn.
+        # "running but did not become COM-attachable"). Give it one BOUNDED grace
+        # window first (see wait_until_ready -- deliberately not a second full
+        # budget), then respawn regardless.
         if not _sw_lifecycle.is_connected():
             _telemetry.warn(
                 f"[sw] {label}: recovery ended state={state}, not connected; "

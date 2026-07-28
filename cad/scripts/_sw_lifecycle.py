@@ -44,14 +44,17 @@ _DISABLE_ENV = "HARMONIC_SW_AUTOSTART"
 _CONNECT_TIMEOUT_ENV = "HARMONIC_SW_CONNECT_TIMEOUT"
 # A COLD 3DEXPERIENCE start is far slower than a warm attach: the connector
 # authenticates against the cloud tenant before SolidWorks is COM-attachable.
-# Measured on the seat 2026-07-28, recovering from a crash mid-fleet-pass:
-# ``sw.start`` ran the full 302 s and force_recover still ended
-# ``final_state=starting``; the retry it released then died on the adapter's own
-# 60 s attach window ("running but did not become COM-attachable"), burning a
-# retry slot on a SolidWorks that was never going to be ready. The next attempt,
-# ~2 min later, connected first try. 300 s was calibrated on a warm relaunch and
-# is simply too short for a cold one -- 900 s matches the COM watchdog's op
-# timeout and leaves ~3x headroom over what was observed.
+# 300 s was calibrated on a warm relaunch and is simply too short for a cold one.
+# Measured across two crash recoveries mid-fleet-pass (2026-07-28), identically:
+#
+#   1st force_recover  307 / 309 s -> final_state=starting   (budget ran out)
+#   2nd force_recover  110 / 114 s -> connected
+#
+# So the seat needs ~420 s to become attachable. Each first attempt then released
+# a retry that died on the adapter's own 60 s attach window ("running but did not
+# become COM-attachable") -- a slot burned on a SolidWorks that could not answer.
+# 900 s matches the COM watchdog's op timeout and clears the measured 420 s with
+# ~2x headroom.
 _DEFAULT_CONNECT_TIMEOUT = 900.0
 # Post-recovery grace window, as a fraction of the connect budget -- see
 # wait_until_ready. A third of 900 s is 300 s, comfortably more than the ~110 s
