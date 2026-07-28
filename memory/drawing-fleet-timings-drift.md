@@ -36,7 +36,11 @@ different sessions.
   between arms, or interleave/repeat the arms and report a spread.
 - Prefer the **span-level** signal over wall clock: a count (reopens 186 -> 93)
   or a named span's own duration survives session drift far better than a fleet
-  total. See [[otel-trace-local-viewing]] for reading `traces.jsonl`.
+  total. Measured with #437's spans in place, `drawing.reopen` is 393.9 s over
+  93 drawings (4.2 s mean, 10.4 s max) -- so #436 removing one of the two
+  reopens takes ~394 s off the fleet, about 13% of the 2995 s baseline, which
+  the fleet total could never have shown. See [[otel-trace-local-viewing]] for
+  reading `traces.jsonl`.
 - Absolute per-drawing costs from one run are still usable for finding
   *outliers* (drive_train at 583 s vs a 32 s fleet mean is far outside the drift
   band) — just not for comparing two similar numbers.
