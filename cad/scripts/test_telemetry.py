@@ -613,11 +613,12 @@ def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
 def test_short_append_is_never_retried_with_a_second_append(tmp_path, monkeypatch):
     """One record = one append operation, even when the write comes up short.
 
-    Finishing a short write with a SECOND append is worse than losing the
-    record: another process can append in between, giving
+    Finishing a short write with a SECOND append of the SUFFIX is worse than
+    losing the record: another process can append in between, giving
     ``prefix + their record + suffix`` and destroying two records instead of
-    truncating one (Codex P2). So the contract is exactly one append attempt,
-    and no exception either way.
+    truncating one (Codex P2). So the record itself gets exactly one append
+    attempt, and no exception either way. The lone newline that follows is not
+    a retry -- it carries no record bytes; see the orphan-termination test.
     """
     record = '{"hello": "world"}\n'
     writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
@@ -635,8 +636,9 @@ def test_short_append_is_never_retried_with_a_second_append(tmp_path, monkeypatc
         assert writer.dropped == 1
     finally:
         writer.close()
-    assert len(calls) == 1, f"record was split across {len(calls)} appends"
     assert calls[0] == record.encode()
+    # The record is never re-attempted; only its orphaned line gets closed.
+    assert calls[1:] == [b"\n"], f"record was split across {len(calls)} appends"
 
 
 def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypatch):
@@ -656,9 +658,9 @@ def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypa
 def test_a_partial_write_retires_the_writer_instead_of_corrupting_the_next(tmp_path):
     """A short append leaves an unterminated prefix that the NEXT append lands on.
 
-    Nothing can repair that prefix -- padding it is another racy append and
-    retrying is the splice this class exists to prevent -- so the writer goes
-    quiet. One trailing line is damaged instead of every record after it.
+    The record itself is unrecoverable -- retrying the suffix is the splice this
+    class exists to prevent -- so the writer goes quiet. One trailing line is
+    damaged instead of every record after it.
     """
     target = tmp_path / "traces.jsonl"
     writer = _telemetry._AtomicJsonlWriter(target)
@@ -670,12 +672,66 @@ def test_a_partial_write_retires_the_writer_instead_of_corrupting_the_next(tmp_p
 
     writer._raw_write = short_once
     writer.write('{"name":"a"}\n')
-    assert len(calls) == 1  # NOT finished with a second append
+    # The record is NOT finished with a second append -- the only follow-up is
+    # the lone newline that closes the line it orphaned.
+    assert calls == [b'{"name":"a"}\n', b"\n"]
 
     writer.write('{"name":"b"}\n')
     writer.write('{"name":"c"}\n')
-    assert len(calls) == 1, "retired writer must not append after a short write"
+    assert len(calls) == 2, "retired writer must not append after a short write"
     assert writer.dropped == 3
+
+
+def test_a_partial_write_closes_the_line_it_orphaned(tmp_path):
+    """The orphan gets a newline so a PEER's next record stays parsable.
+
+    Not a contradiction of "never retry": a suffix landing after a peer's record
+    splices prefix+their-record+suffix and destroys two records, but peers'
+    records already end in a newline, so a lone newline can only ever add a
+    blank line -- which every reader skips. Win the race and the peer's record
+    survives intact; lose it and the damage is what it would have been anyway.
+    """
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    appends = []
+
+    def short_once(payload):
+        appends.append(payload)
+        return len(payload) - 3 if len(appends) == 1 else len(payload)
+
+    writer._raw_write = short_once
+    writer.write('{"name":"a"}\n')
+    assert appends[-1] == b"\n", "orphaned prefix must be terminated"
+
+
+def test_a_zero_length_write_orphans_nothing_so_adds_no_newline(tmp_path):
+    """No bytes landed, so no line is open -- a newline there would be litter."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    appends = []
+
+    def wrote_nothing(payload):
+        appends.append(payload)
+        return 0
+
+    writer._raw_write = wrote_nothing
+    writer.write('{"name":"a"}\n')
+    assert appends == [b'{"name":"a"}\n']
+    assert writer.dropped == 1
+
+
+def test_a_failing_repair_never_escapes_the_writer(tmp_path):
+    """The newline is best-effort like every other append here."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    state = {"n": 0}
+
+    def short_then_raise(payload):
+        state["n"] += 1
+        if state["n"] == 1:
+            return len(payload) - 3
+        raise OSError("disk gone")
+
+    writer._raw_write = short_then_raise
+    writer.write('{"name":"a"}\n')  # must not raise
+    assert writer.dropped == 1
 
 
 def test_shutdown_reports_once_even_though_atexit_shuts_down_again(tmp_path, capsys):

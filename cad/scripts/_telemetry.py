@@ -369,15 +369,27 @@ class _AtomicJsonlWriter:
         this needs a disk already failing mid-write, at which point the capture
         is doomed either way -- but the failure must stay contained.)
 
-        **A PARTIAL write retires the writer.** A short write leaves an
-        unterminated prefix at EOF, so the next append -- from this process or
-        any other -- lands on the same line and corrupts that record too. Since
-        the prefix cannot be repaired (padding it is another racy append, and
-        retrying is the splice this class exists to prevent), the writer goes
-        quiet instead: every later record is counted as dropped and nothing more
-        is written. The damage stays one trailing line rather than cascading, and
-        a short write means the disk is already failing, so there is nothing left
-        to capture anyway.
+        **A PARTIAL write retires the writer, after closing its line.** A short
+        write leaves an unterminated prefix at EOF, so the next append -- from
+        this process or any other -- lands on the same line and corrupts that
+        record too. So terminate the orphan with a lone newline, then go quiet:
+        every later record is counted as dropped and nothing more is written.
+
+        Terminating is safe even though "never retry" forbids appending the
+        SUFFIX, and this file previously claimed the prefix "cannot be repaired
+        (padding it is another racy append)". That conflated two different
+        appends. A suffix landing after a peer's record splices
+        ``prefix + their record + suffix`` and destroys both. A lone NEWLINE
+        cannot: peers' records already end in one, so the worst case is a blank
+        line, which every reader skips. Win the race and the orphan becomes its
+        own (unparsable) line with the peer's record intact after it; lose it
+        and the damage is exactly what it would have been anyway. Never worse,
+        often better -- so the one-line repair is worth the append the old
+        comment ruled out on a rule that did not apply to it.
+
+        The damage stays one trailing line rather than cascading, and a short
+        write means the disk is already failing, so there is nothing left to
+        capture anyway.
 
         A lost record is COUNTED in :attr:`dropped` rather than logged --
         routing it through ``_telemetry``'s own logging would re-enter this
@@ -388,12 +400,27 @@ class _AtomicJsonlWriter:
             return len(value)
         payload = value.encode("utf-8")
         try:
-            if self._raw_write(payload) != len(payload):  # exactly once
+            written = self._raw_write(payload)  # exactly once
+            if written != len(payload):
                 self.dropped += 1
                 self._retired = True
+                self._terminate_orphan(written)
         except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
             self.dropped += 1
         return len(value)
+
+    def _terminate_orphan(self, written: int) -> None:
+        """Close the line a short write left open at EOF. See :meth:`write`.
+
+        Only when the write landed SOMETHING: a zero-length write left no
+        orphan, so a newline there would append a blank line for nothing.
+        """
+        if written <= 0:
+            return
+        try:
+            self._raw_write(b"\n")
+        except Exception:  # noqa: BLE001 - a repair must not out-fail the failure
+            pass
 
     def flush(self) -> None:
         # The record is already in the kernel's hands. Do NOT FlushFileBuffers /
