@@ -1380,3 +1380,25 @@ def test_cold_start_connect_budget_exceeds_the_measured_failure(monkeypatch):
     dodo = _load_dodo()
     monkeypatch.delenv("HARMONIC_SW_CONNECT_TIMEOUT", raising=False)
     assert dodo._sw_lifecycle._connect_timeout() >= 900.0
+
+
+def test_post_recovery_grace_is_bounded_not_a_second_full_budget(monkeypatch):
+    """A dead seat must not cost two full connect budgets per retry.
+
+    force_recover already waits the whole budget; if wait_until_ready waited
+    another, a genuinely dead SolidWorks would burn ~30 min per retry and ~90 min
+    before the build failed -- worse than the wasted retry the wait prevents.
+    """
+    dodo = _load_dodo()
+    lifecycle = dodo._sw_lifecycle
+    waited = []
+    monkeypatch.setattr(lifecycle, "_wait", lambda _r, t: waited.append(t))
+    monkeypatch.setattr(lifecycle, "_state_value", lambda _r: "starting")
+    monkeypatch.delenv("HARMONIC_SW_CONNECT_TIMEOUT", raising=False)
+
+    lifecycle.wait_until_ready()
+
+    budget = lifecycle._connect_timeout()
+    assert waited and waited[0] < budget, (waited, budget)
+    # Still has to clear the ~110 s the second force_recover needed, measured.
+    assert waited[0] >= 200.0, waited

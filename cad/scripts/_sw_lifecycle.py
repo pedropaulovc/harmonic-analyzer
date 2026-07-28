@@ -53,6 +53,10 @@ _CONNECT_TIMEOUT_ENV = "HARMONIC_SW_CONNECT_TIMEOUT"
 # is simply too short for a cold one -- 900 s matches the COM watchdog's op
 # timeout and leaves ~3x headroom over what was observed.
 _DEFAULT_CONNECT_TIMEOUT = 900.0
+# Post-recovery grace window, as a fraction of the connect budget -- see
+# wait_until_ready. A third of 900 s is 300 s, comfortably more than the ~110 s
+# the second force_recover needed in both measured incidents.
+_READY_GRACE_FRACTION = 1.0 / 3.0
 _INFRA = _telemetry.BUILD_INFRA_SERVICE
 
 
@@ -154,21 +158,30 @@ def force_recover() -> str:
 
 
 def wait_until_ready() -> str:
-    """Block until SolidWorks is CONNECTED, or the connect budget runs out.
+    """Give a still-starting SolidWorks a SHORT grace window, then give up.
 
     For the retry path after :func:`force_recover` reports anything other than
-    connected. Best-effort like the rest of this module -- it returns the final
-    state rather than raising, because a recovery helper that can itself fail the
-    build defeats its own purpose. The caller retries regardless; this only stops
-    that retry from being spent on a SolidWorks that is still starting.
+    connected. Deliberately a fraction of the connect budget, not another full
+    one: ``force_recover`` has already waited that budget out, and the measured
+    cold start needs ~420 s total, which the 900 s budget covers on its own. This
+    is the safety net for a start slower than anything measured -- so a genuinely
+    DEAD seat costs one extra grace window per retry, not a second full budget.
+    Doubling up would turn a dead seat into ~30 min per retry and ~90 min before
+    the build finally fails, which is worse than the wasted retry it prevents.
+
+    Best-effort like the rest of this module -- returns the final state rather
+    than raising, because a recovery helper that can itself fail the build
+    defeats its own purpose. The caller retries either way.
     """
     from solidworks_mcp.adapters import sw_recovery
 
+    grace = _connect_timeout() * _READY_GRACE_FRACTION
     with _telemetry.span("sw.wait_ready", service=_INFRA) as span:
+        span.set_attribute("grace_s", grace)
         try:
-            _wait(sw_recovery, _connect_timeout())
+            _wait(sw_recovery, grace)
         except Exception as exc:  # noqa: BLE001 - recovery must never fail the build
-            _telemetry.warn(f"[sw] wait_until_ready gave up ({exc})")
+            _telemetry.warn(f"[sw] wait_until_ready gave up after {grace:.0f}s ({exc})")
         final = _state_value(sw_recovery)
         span.set_attribute("final_state", final)
         return final
