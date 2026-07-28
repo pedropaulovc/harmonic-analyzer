@@ -9,10 +9,12 @@ radius and pass that entity to the drawing annotation helpers.
 from __future__ import annotations
 
 import math
+import time
 from typing import Any
 
 import _telemetry
 from _common import _early_bound
+from _drawing_common import visible_view_entities
 
 
 def _span_attrs(**attributes: float) -> None:
@@ -31,12 +33,39 @@ def _span_attrs(**attributes: float) -> None:
 def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     """Return the visible circular model edge matching ``diameter_mm``.
 
-    Costs ~5 COM round trips per visible edge (early-bind, GetCurve,
-    early-bind, IsCircle, CircleParams), so a gear end view with hundreds of
-    tooth edges makes this the most expensive step in its drawing. The counts go
-    on the SPAN's own attributes, not just a span event: the profiling workflow
-    reads span lines, where an event's attributes do not appear. The per-edge
-    work stays inside ONE span rather than flooding the trace with leaves.
+    The most expensive step in a gear drawing, and the cost is ONE call.
+    Measured on cone_gear (481 visible edges, 121 of them circles), 25.3 s:
+
+    ==================== ======== ==============
+    phase                    time      per edge
+    ==================== ======== ==============
+    sweep (child span)      7.0 s  one COM call
+    ``GetCurve()``         11.8 s       24.6 ms
+    ``IsCircle()``          1.8 s        3.8 ms
+    ``CircleParams``        0.4 s   3.6 ms x121
+    ``_early_bound``        2.7 s        5.7 ms
+    ==================== ======== ==============
+
+    ``GetCurve`` is 7x the other two COM reads combined, so it -- not the loop
+    body, not the sweep -- is what any optimisation must remove. Two ways to
+    remove it were measured and BOTH FAILED, so do not re-walk them:
+
+    * **Pre-filter on ``IEdge::GetCurveParams2``** (2.6 ms, 10x cheaper) and pay
+      ``GetCurve`` only for closed edges. Refuted: a full circle does NOT report
+      coincident endpoints -- the probe flagged ``closed=1`` out of 121 circles.
+    * **Drop ``IsCircle()``** and read ``CircleParams`` defensively. Worth 1.8 s
+      of 25.3 s; not worth losing the explicit type check.
+
+    A start-point-radius pre-filter (the trick
+    :func:`visible_tooth_tip_silhouette` uses) is NOT available here: that one
+    is sound only because a gear's tooth tips are coaxial with the view origin,
+    and this helper is also called for OFF-AXIS holes (adjuster passages, flange
+    hold-downs) whose start points sit nowhere near their own radius.
+
+    The counts go on the SPAN's own attributes, not just a span event: the
+    profiling workflow reads span lines, where an event's attributes do not
+    appear. The per-edge work stays inside ONE span rather than flooding the
+    trace with leaves.
 
     Ties break on the circle's CENTRE, never on enumeration order --
     ``GetVisibleEntities2`` documents no ordering, and a part with coaxial or
@@ -47,26 +76,35 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     guarantee is free.
     """
     candidates: list[tuple[float, tuple[float, float, float], Any]] = []
-    edge_count = 0
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
-        for edge in edges:
-            edge_count += 1
-            edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            # CircleParams = (centre xyz, axis xyz, radius).
-            params = curve.CircleParams
-            radius_mm = float(params[6]) * 1000.0
-            centre = (float(params[0]), float(params[1]), float(params[2]))
-            candidates.append((radius_mm, centre, edge))
+    raw_edges = visible_view_entities(view, 1, label=f"circle dia {diameter_mm:g}")
+    curve_s = 0.0
+    classify_s = 0.0
+    params_s = 0.0
+    for edge in raw_edges:
+        edge = _early_bound(edge, "IEdge")
+        started = time.perf_counter()
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        got_curve = time.perf_counter()
+        is_circle = curve.IsCircle()
+        classified = time.perf_counter()
+        curve_s += got_curve - started
+        classify_s += classified - got_curve
+        if not is_circle:
+            continue
+        # CircleParams = (centre xyz, axis xyz, radius).
+        params = curve.CircleParams
+        params_s += time.perf_counter() - classified
+        radius_mm = float(params[6]) * 1000.0
+        centre = (float(params[0]), float(params[1]), float(params[2]))
+        candidates.append((radius_mm, centre, edge))
 
-    _span_attrs(edges=edge_count, circles=len(candidates),
-                diameter_mm=diameter_mm)
+    # Three COM round trips per edge, priced SEPARATELY. The sweep that produced
+    # these edges is its own child span, so without this split the remainder is
+    # one opaque number and any optimisation here would be guesswork about which
+    # of the three calls to attack.
+    _span_attrs(edges=len(raw_edges), circles=len(candidates),
+                diameter_mm=diameter_mm, curve_s=round(curve_s, 3),
+                classify_s=round(classify_s, 3), params_s=round(params_s, 3))
     target_radius = diameter_mm / 2.0
     if not candidates:
         raise RuntimeError("drawing view has no visible circular model edge")
@@ -87,6 +125,20 @@ def visible_tooth_tip_silhouette(
 ) -> Any:
     """Return the upper side-view silhouette at the specified tooth-tip radius.
 
+    Costed the OPPOSITE way round from its circle-edge sibling: here the loop is
+    nearly free and the single sweep is the bill. Measured on crank_drive_gear,
+    35.2 s total = **26.7 s inside one ``GetVisibleEntities2(..., 4)`` call**
+    that returned NINE silhouettes, plus 8.5 s of endpoint reads. Silhouette
+    kind makes SolidWorks derive the view's outline geometry, and the price is
+    flat in the result count -- spring_hook pays 20.6 s for SIX.
+
+    That call is not warm-up, and cannot be amortised: a second identical sweep
+    on the same view in the same session measured 21.2 s against the first
+    sweep's 20.8 s. There is nothing to reorder behind and nothing to cache --
+    it recomputes every time. The only lever left is calling it FEWER times,
+    which is a drawing-design question (does this print need a tooth-tip
+    silhouette at all?), not something this helper can decide.
+
     Like its circle-edge sibling, the aggregate scan counts go on the span's own
     attributes so the cost is attributable from the span line alone, and ties
     break on geometry rather than on ``GetVisibleEntities2``'s undocumented
@@ -96,41 +148,37 @@ def visible_tooth_tip_silhouette(
     """
     target_radius_m = outside_diameter_mm / 2000.0
     candidates: list[tuple[tuple[float, ...], Any]] = []
-    silhouette_count = 0
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        silhouettes = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 4), default=()
-        ) or ()
-        for raw_silhouette in silhouettes:
-            silhouette_count += 1
-            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
-            start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
-            end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
-            if start is None or end is None:
-                continue
-            start_xyz = adapter._get_attr_or_call(start, "ArrayData")
-            end_xyz = adapter._get_attr_or_call(end, "ArrayData")
-            if not start_xyz or not end_xyz:
-                continue
-            start_radius = math.hypot(float(start_xyz[0]), float(start_xyz[1]))
-            end_radius = math.hypot(float(end_xyz[0]), float(end_xyz[1]))
-            if abs(start_radius - target_radius_m) > 0.00001:
-                continue
-            if abs(end_radius - target_radius_m) > 0.00001:
-                continue
-            mean_y = (float(start_xyz[1]) + float(end_xyz[1])) / 2.0
-            # mean_y first (the actual selection criterion), then the endpoints
-            # verbatim so equal-height silhouettes order by geometry.
-            key = (mean_y,) + tuple(float(v) for v in start_xyz[:3]) + tuple(
-                float(v) for v in end_xyz[:3]
-            )
-            candidates.append((key, silhouette))
+    raw_silhouettes = visible_view_entities(
+        view, 4, label=f"tooth tip od {outside_diameter_mm:g}"
+    )
+    for raw_silhouette in raw_silhouettes:
+        silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
+        start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
+        end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
+        if start is None or end is None:
+            continue
+        start_xyz = adapter._get_attr_or_call(start, "ArrayData")
+        end_xyz = adapter._get_attr_or_call(end, "ArrayData")
+        if not start_xyz or not end_xyz:
+            continue
+        start_radius = math.hypot(float(start_xyz[0]), float(start_xyz[1]))
+        end_radius = math.hypot(float(end_xyz[0]), float(end_xyz[1]))
+        if abs(start_radius - target_radius_m) > 0.00001:
+            continue
+        if abs(end_radius - target_radius_m) > 0.00001:
+            continue
+        mean_y = (float(start_xyz[1]) + float(end_xyz[1])) / 2.0
+        # mean_y first (the actual selection criterion), then the endpoints
+        # verbatim so equal-height silhouettes order by geometry.
+        key = (mean_y,) + tuple(float(v) for v in start_xyz[:3]) + tuple(
+            float(v) for v in end_xyz[:3]
+        )
+        candidates.append((key, silhouette))
 
     # scanned, not just matched: the COM cost is per silhouette PROCESSED (each
     # costs an early-bind plus two endpoint reads), so two views with the same
     # match count but wildly different scan counts must not look alike.
-    _span_attrs(silhouettes=silhouette_count, matched=len(candidates),
+    _span_attrs(silhouettes=len(raw_silhouettes), matched=len(candidates),
                 outside_diameter_mm=outside_diameter_mm)
     if not candidates:
         raise RuntimeError(
