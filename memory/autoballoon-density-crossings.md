@@ -27,10 +27,14 @@ density: 32 balloons do not fit on the ring at the minimum gap, so
 `_push_apart_on_ring` falls back to even spacing, which its own docstring
 records as the placement that hauls leaders across the model.
 
-This independently reproduces the claim already written into
-`draw_channel_assembly.py` (that `f375557a` replaced hand-pinned balloons with
-`layout=2` on the premise that "their order follows the view ring", and it does
-not). Two assemblies now.
+`draw_channel_assembly.py` records a DIFFERENT native-layout defect
+(that `f375557a` replaced hand-pinned balloons with `layout=2` on the premise
+that "their order follows the view ring", and it does not). This run does NOT
+reproduce that one: the observation above is that the crossed pairs WERE in the
+correct attachment order, which is evidence that order-preserving placement
+still crosses at this density — it says nothing about whether `layout=2`
+followed ring order here, because ring order was never read back. What both
+assemblies now share is only the outcome: the native layout crossed.
 
 Two related facts measured at the same time:
 
@@ -46,8 +50,16 @@ Two related facts measured at the same time:
   deterministic from the recipe side.
 
 **Why:** #442 tried to replace ~200 s of hand-placed drive-train balloons with
-AutoBalloon on un-isolated views. It got 277 s → 188 s by deleting the isolation
-that made the drawing correct, and could not pass `check_drawing_layout`.
+AutoBalloon on un-isolated views. It could not pass `check_drawing_layout`, and
+that structural failure — not any timing — is why it was parked.
+
+The run also showed 277 s against 188 s, but do NOT read that as a speedup from
+deleting isolation. It is a single A/B pair, which
+[[drawing-fleet-timings-drift]] says proves no performance effect without
+repeated counterbalanced runs, and it does not even survive internal
+consistency: [[drawing-isolation-cost]] measures isolation ALONE at ~315 s,
+already more than the 277 s "before". One of the two numbers is measuring
+something other than what its label says, and neither has been re-run.
 
 **How to apply:** keep each identification view isolated to a handful of
 families — that is what makes a balloon sheet clean, and it is a code-write-time

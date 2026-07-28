@@ -22,12 +22,14 @@ region does not cover.
 
 **Do not turn those into a per-call price.** They are a pair and a write, not
 two samples of one number. Individually-instrumented calls, measured
-2026-07-28 on the same seat (see [[drawing-sweep-cost-anatomy]]), span an order
-of magnitude: `IEdge::GetCurve` 24.6 ms, `GetCurveParams2` 2.6 ms,
+2026-07-28 on the same seat, span an order of magnitude: `IEdge::GetCurve` 24.6 ms, `GetCurveParams2` 2.6 ms,
 `ICurve::IsCircle` 3.8 ms, `CircleParams` 3.6 ms. So "a COM read costs ~250 ms"
 is wrong by 10–70x; what IS true is that the isolation pair costs ~250 ms and a
 `Visible` write ~190 ms. Price a per-component loop from a call actually
-instrumented, never from a paired total.
+instrumented, never from a paired total. (Those four call timings and the
+sweep-cost breakdown they came from land with #449 as
+[[drawing-sweep-cost-anatomy]]; until that merges the link is a forward
+reference, and the numbers above stand on their own.)
 
 **The obvious cache does not work.** Nine views walk the SAME component tree, so
 memoising the path-derived identity looks free. It is not:
