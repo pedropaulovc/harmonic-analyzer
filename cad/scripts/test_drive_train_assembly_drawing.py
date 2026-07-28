@@ -147,79 +147,42 @@ def test_sheet_two_parts_list_fits_the_drawing_zone() -> None:
     assert "table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)" in source
 
 
-def test_sheet_three_identifies_four_disjoint_subsystems_deliberately() -> None:
-    expected = (
-        frozenset(
-            {
-                "cone-swing-platform",
-                "cone-pivot-post",
-                "cone-tip-block",
-                "cone-tip-adjuster",
-                "cone-tip-pinch-screw",
-                "cone-lock-knob",
-                "cone-pivot-screw",
-                "swing-stop-screw",
-                "cone-gear",
-            }
-        ),
-        frozenset(
-            {
-                "alignment-pinion",
-                "pinion-bracket",
-                "pinion-pivot-block",
-                "pinion-pivot-shaft",
-                "pinion-lift-rod",
-                "pinion-spring",
-            }
-        ),
-        frozenset(
-            {
-                "pinion-cam-pin",
-                "pinion-cam",
-                "pinion-lever",
-                "pinion-handle",
-                "pinion-arbor",
-                "slotted-screw",
-                "foot-screw",
-            }
-        ),
-        frozenset(
-            {
-                "cylinder-gear-shaft",
-                "arbor-pedestal",
-                "cylinder-gear",
-                "crankshaft",
-                "crank-pinion",
-                "crank-arm",
-                "crank-handle",
-            }
-        ),
-    )
-    assert drawing.EXTERIOR_VIEW_STEMS == expected
-    assert drawing.EXTERIOR_VIEW_LABELS == (
-        "VIEW A — CONE PLATFORM / GEAR TRAIN",
-        "VIEW B — PINION SUPPORT / STRAPS",
-        "VIEW C — PINION CAM / CONTROLS",
-        "VIEW D — CYLINDER / CRANK",
-    )
-    groups = expected
-    assert not any(
-        left & right
-        for i, left in enumerate(groups)
-        for right in groups[i + 1 :]
-    )
-    assert set().union(*groups) == set(drawing.BOM_COMPONENTS) - set(
-        drawing.CONCEALED_BALLOON_ITEMS
-    )
+def test_identification_sheets_balloon_by_autoballoon_and_prove_full_coverage() -> None:
+    """The three identification sheets use the stock AutoBalloon path.
+
+    Balloons used to be placed one component at a time: walk the view's
+    drawing-component tree, hide everything that is not the target, find a
+    visible edge, InsertBOMBalloon2, rebuild. That cost ~200 s of the drawing's
+    277 s and it is exactly the kind of runtime placement tweaking the project
+    no longer does. AutoBalloon5 balloons a whole view in one call, so coverage
+    is accumulated across the sheets instead and proved once at the end.
+    """
+    build_source = inspect.getsource(drawing.build)
+    assert build_source.count("add_auto_balloons_across_views(") == 3
+
+    # Sheets 3 and 4 accumulate; sheet 6 -- the last one -- asserts. Getting
+    # this backwards would silently stop proving that every BOM item is
+    # identified somewhere, which is the whole point of the package.
+    assert build_source.count('coverage="accumulate"') == 2
+    assert build_source.count("existing_balloons=identification_balloons") == 2
+    tail = build_source.split("SHEET_NAMES[5]", 1)[1]
+    assert "add_auto_balloons_across_views(" in tail
+    assert 'coverage="accumulate"' not in tail
+    assert "expected=len(BOM_COMPONENTS)" in tail
 
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    build_source = inspect.getsource(drawing.build)
-    assert "_create_auto_balloons(" not in build_source
-    assert "_add_component_balloons(" in build_source
-    assert "_create_component_balloon(" in source
-    assert "_spread_balloons(" in source
-    assert "EXTERIOR_VIEW_STEMS" in build_source
-    assert "_isolate_balloon_components(" in build_source
+    # No runtime component-visibility toggling anywhere: a view shows what it
+    # shows, decided at code-write time.
+    for gone in (
+        "_isolate_balloon_components",
+        "_create_component_balloon",
+        "_add_component_balloons",
+        "_drawing_component_matches",
+        "_drawing_component_children",
+        ".Visible = ",
+        "EXTERIOR_VIEW_STEMS",
+    ):
+        assert gone not in source, gone
     assert "position_bom_balloon(" not in source
 
 
@@ -341,15 +304,49 @@ def test_assembly_notes_preserve_the_source_backed_manufacturing_contract() -> N
     )
 
 
-def test_drawing_component_children_accepts_both_pywin32_shapes() -> None:
-    assert drawing._drawing_component_children(_CallableChildren()) == ("a", "b")
-    assert drawing._drawing_component_children(_MaterializedChildren()) == ("a", "b")
 
 
-def test_live_hierarchical_drawing_names_are_matched_by_leaf() -> None:
-    name = "drive-train-4/cone-gear-shaft-1"
-    drawing_name = name.split("@", 1)[0].replace("\\", "/")
-    identity = drawing_name.rsplit("/", 1)[-1].casefold()
-    stem = "cone-gear-shaft"
-    assert identity.startswith(f"{stem}-")
-    assert identity.removeprefix(f"{stem}-").isdigit()
+def test_every_exterior_view_is_a_distinct_orientation():
+    """Two sheets share this tuple; a repeated name is the same picture twice.
+
+    These views used to carry per-view component isolation, which made two
+    *Isometric entries different pictures. Without it, sheet 6 rendered the
+    identical complete assembly under two labels (Codex P2). Nothing else would
+    catch that -- the drawing builds clean and the layout audits pass; it is
+    only WRONG to a reader.
+    """
+    names = drawing.EXTERIOR_VIEW_NAMES
+    assert len(set(names)) == len(names), f"repeated orientation in {names}"
+
+
+def test_exterior_view_labels_do_not_claim_an_isolated_subsystem():
+    """One label per view, and the label describes what the view shows.
+
+    With isolation gone every exterior view shows the WHOLE assembly, so a label
+    naming a subsystem ("PINION CAM / CONTROLS") is a caption for a picture that
+    is not on the sheet.
+    """
+    labels = drawing.EXTERIOR_VIEW_LABELS
+    assert len(labels) == len(drawing.EXTERIOR_VIEW_NAMES)
+    assert len(set(labels)) == len(labels)
+    for label in labels:
+        assert "DRIVE TRAIN" in label, f"{label!r} does not name the subject shown"
+
+
+def test_the_setup_view_isolates_exactly_the_items_its_note_promises():
+    """Sheet 7's note says "ITEMS 12-24"; the view must show items 12-24.
+
+    This view carries no balloons -- it exists to show one mechanism at a fixed
+    scale -- so nothing downstream would notice it quietly widening to the whole
+    32-item train while the note kept promising a subset.
+    """
+    low, high = drawing.PINION_SETUP_ITEM_RANGE
+    expected = {
+        stem
+        for index, stem in enumerate(drawing.BOM_COMPONENTS, start=1)
+        if low <= index <= high
+    }
+    assert drawing.PINION_SETUP_VIEW_STEMS == expected
+    assert len(expected) == high - low + 1
+    source = inspect.getsource(drawing.build)
+    assert "visible_stems=PINION_SETUP_VIEW_STEMS" in source

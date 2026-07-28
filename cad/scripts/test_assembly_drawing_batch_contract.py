@@ -278,16 +278,11 @@ def test_drive_train_uses_dedicated_multisheet_identification_views() -> None:
         "PINION ITEM IDENTIFICATION",
         "PINION SETUP AND ACCEPTANCE",
     )
-    assert set().union(
-        *draw_drive_train_assembly.EXTERIOR_VIEW_STEMS
-    ) == set(draw_drive_train_assembly.BOM_COMPONENTS) - set(
-        draw_drive_train_assembly.CONCEALED_BALLOON_ITEMS
-    )
     assert len(draw_drive_train_assembly.GEAR_PAIR_ROWS) == 20
     assert draw_drive_train_assembly.PINION_PARAMETER_ROWS
     assert draw_drive_train_assembly.ACCEPTANCE_ROWS
-    assert "_add_component_balloons(" in source
-    assert "_isolate_balloon_components(" in source
+    assert source.count("add_auto_balloons_across_views(") == 3
+    assert "_isolate_balloon_components(" not in source
     assert "insert_identified_bom_table(" in source
     assert "part_numbers=BOM_PART_NUMBERS" in source
     assert "HorizontalAutoSplit(" not in source

@@ -697,7 +697,25 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
             f"{delay}s then force-recover + retry {attempt + 1}/{last}",
             exit_code=rc, attempt=attempt + 1, backoff_s=delay)
         time.sleep(delay)
-        _sw_lifecycle.force_recover()
+        state = _sw_lifecycle.force_recover()
+        # A recovery that ends anywhere but CONNECTED means SolidWorks is still
+        # coming up, and the retry we are about to release would spend its whole
+        # 60 s COM-attach window on a process that cannot answer yet -- a retry
+        # slot burned for nothing (measured: final_state=starting, retry died on
+        # "running but did not become COM-attachable"). Give it one BOUNDED grace
+        # window first (see wait_until_ready -- deliberately not a second full
+        # budget), then respawn regardless. Compare the state force_recover
+        # RETURNED rather than probing again: it returns "error" precisely when
+        # detect_state() blew up, so a second probe would re-raise that failure
+        # out of _exec_com and abort the task -- inverting the best-effort retry.
+        if state != _sw_lifecycle.CONNECTED_STATE:
+            _telemetry.warn(
+                f"[sw] {label}: recovery ended state={state}, not connected; "
+                "waiting for the cold start rather than spending a retry on it",
+                state=state, attempt=attempt + 1)
+            _telemetry.event("sw.cold_start_wait", label=label, state=state,
+                             attempt=attempt + 1)
+            _sw_lifecycle.wait_until_ready()
 
 
 def _run(cmd: list[str], label: str, log_stem: str | None = None,

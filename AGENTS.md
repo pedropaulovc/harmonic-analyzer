@@ -35,7 +35,11 @@ A PR is not mergeable until ALL THREE hold — no exceptions, no partial
 credit:
 
 1. **Build green** — the full `uv run python -m doit -n 4` pipeline (every
-   part, assembly and gate) passes on the PR's head.
+   part, assembly and gate) passes on the PR's head. **One** successful build
+   is the bar for changes to non-drawing code; a change to drawing code must
+   additionally build the drawing fleet **twice in sequence**, since a drawing
+   that only builds from a clean slate is not actually reproducible (parts and
+   assemblies may come from the remote cache for both passes).
 2. **Codex happy** — the Codex auto-review of the latest push found nothing
    (👍 reaction, or its findings were addressed and re-reviewed clean).
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
@@ -43,6 +47,16 @@ credit:
    read; move the camera off the standard axes when needed). The CAD gates
    prove volumes and mates, not that the geometry LOOKS like the machine —
    a shape can pass every check and still be visibly wrong.
+
+**Stacked PRs share gates 1 and 3.** A successful build at the TOP of a stack
+covers every PR in that stack, and so does the visual inspection of the renders
+it produces — the top commit contains all of them, so building or eyeballing
+each branch separately re-proves the same artefacts on one COM seat. Gate 2 is
+NOT shared: Codex reviews each PR's own diff, so every PR in the stack still
+needs its own clean review. Order the stack so the riskiest change sits on top —
+if it fails, drop it off and gate the remainder, rather than having it block
+everything beneath it. Merge bottom-up and do NOT pass `--delete-branch`:
+deleting a parent branch auto-closes the children still targeting it.
 
 **Rebase on `main` proactively, not reactively.** Check the branch against
 `origin/main` (`git fetch origin main && git status`/`git log HEAD..origin/main`)

@@ -42,7 +42,29 @@ import _telemetry
 
 _DISABLE_ENV = "HARMONIC_SW_AUTOSTART"
 _CONNECT_TIMEOUT_ENV = "HARMONIC_SW_CONNECT_TIMEOUT"
-_DEFAULT_CONNECT_TIMEOUT = 300.0
+# A COLD 3DEXPERIENCE start is far slower than a warm attach: the connector
+# authenticates against the cloud tenant before SolidWorks is COM-attachable.
+# 300 s was calibrated on a warm relaunch and is simply too short for a cold one.
+# Measured across two crash recoveries mid-fleet-pass (2026-07-28), identically:
+#
+#   1st force_recover  307 / 309 s -> final_state=starting   (budget ran out)
+#   2nd force_recover  110 / 114 s -> connected
+#
+# So the seat needs ~420 s to become attachable. Each first attempt then released
+# a retry that died on the adapter's own 60 s attach window ("running but did not
+# become COM-attachable") -- a slot burned on a SolidWorks that could not answer.
+# 900 s matches the COM watchdog's op timeout and clears the measured 420 s with
+# ~2x headroom.
+_DEFAULT_CONNECT_TIMEOUT = 900.0
+# Post-recovery grace window, as a fraction of the connect budget -- see
+# wait_until_ready. A third of 900 s is 300 s, comfortably more than the ~110 s
+# the second force_recover needed in both measured incidents.
+_READY_GRACE_FRACTION = 1.0 / 3.0
+# The one state value that means "ready to build". Callers compare the state
+# force_recover RETURNS against this rather than re-probing via is_connected():
+# force_recover returns "error" exactly when detect_state() raised, so a second
+# probe would re-raise that failure into the caller and abort the retry path.
+CONNECTED_STATE = "connected"
 _INFRA = _telemetry.BUILD_INFRA_SERVICE
 
 
@@ -141,6 +163,47 @@ def force_recover() -> str:
         except Exception as exc:  # noqa: BLE001 - recovery must not harden into a new failure
             _telemetry.error(f"[sw] force_recover failed ({exc})", exc_info=True)
             return "error"
+
+
+def wait_until_ready() -> str:
+    """Give a still-starting SolidWorks a SHORT grace window, then give up.
+
+    For the retry path after :func:`force_recover` reports anything other than
+    connected. Deliberately a fraction of the connect budget, not another full
+    one: ``force_recover`` has already waited that budget out, and the measured
+    cold start needs ~420 s total, which the 900 s budget covers on its own. This
+    is the safety net for a start slower than anything measured -- so a genuinely
+    DEAD seat costs one extra grace window per retry, not a second full budget.
+    Doubling up would turn a dead seat into ~30 min per retry and ~90 min before
+    the build finally fails, which is worse than the wasted retry it prevents.
+
+    Best-effort like the rest of this module -- returns the final state rather
+    than raising, because a recovery helper that can itself fail the build
+    defeats its own purpose. The caller retries either way.
+    """
+    from solidworks_mcp.adapters import sw_recovery
+
+    grace = _connect_timeout() * _READY_GRACE_FRACTION
+    with _telemetry.span("sw.wait_ready", service=_INFRA) as span:
+        span.set_attribute("grace_s", grace)
+        try:
+            _wait(sw_recovery, grace)
+        except Exception as exc:  # noqa: BLE001 - recovery must never fail the build
+            _telemetry.warn(f"[sw] wait_until_ready gave up after {grace:.0f}s ({exc})")
+            # Abandoning the grace is a decision INSIDE this span, and the retry
+            # that follows it will probably fail -- so the trace has to show when
+            # the wait was given up on, not just that the span ran its length.
+            _telemetry.event("sw.grace_abandoned", grace_s=grace, reason=str(exc))
+        final = _state_value(sw_recovery)
+        span.set_attribute("final_state", final)
+        return final
+
+
+def _state_value(sw_recovery) -> str:
+    try:
+        return str(sw_recovery.detect_state().value)
+    except Exception:  # noqa: BLE001 - a state read must not fail the build
+        return "unknown"
 
 
 def _kill_crash_handler() -> None:

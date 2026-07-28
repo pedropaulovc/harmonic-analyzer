@@ -9,6 +9,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import math
+import time
 from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
@@ -195,6 +196,12 @@ _NOMINAL_BALLOON_HALF_M = 0.006
 # is MEASURED per sheet (INote::GetBalloonInfo -- 4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
 _BALLOON_CLEARANCE_M = 0.0015
+# swBalloonLayoutType_e. Circle is "in a circle around the drawing view" -- what
+# add_auto_balloons_across_views uses so SolidWorks rings its own balloons.
+# Square is a box around the view; on a pictorial view it can drop balloons
+# INSIDE the outline, which is what started the hand-rolled re-ring.
+BALLOON_LAYOUT_SQUARE = 1
+BALLOON_LAYOUT_CIRCLE = 2
 
 # The hand-made harmonic-analyzer.DRWDOT bakes its title block in as sheet-
 # format lines + notes rather than a queryable ITitleBlock (sheet.TitleBlock is
@@ -1842,6 +1849,18 @@ def set_reference_dimension(
     return display
 
 
+def _span_scan_attrs(**attributes: float) -> None:
+    """Attach aggregate scan counts to the CURRENT span.
+
+    ``@traced`` owns the span, so there is no handle to set attributes on.
+    A no-op when nothing is recording, so callers never guard.
+    """
+    span = _telemetry.trace.get_current_span()
+    for key, value in attributes.items():
+        span.set_attribute(key, value)
+
+
+@_telemetry.traced("drawing.dimension_precision")
 def set_dimension_precision(
     adapter: Any, annotations: Iterable[Any], precision: dict[str, int]
 ) -> None:
@@ -1853,12 +1872,20 @@ def set_dimension_precision(
     display 3 so the view matches the note (otherwise 9.53-on-view vs
     9.525-in-note reads as a contradiction).  Keyed on the parametric dimension
     name so a value collision can never repick the wrong dimension.
+
+    The span carries how many annotations were SCANNED alongside how many were
+    changed: recipes hand this collections of very different sizes, so without
+    the scan count the duration cannot be attributed to its workload -- the same
+    distinction the geometry scans in ``_gear_drawing_entities`` record.
     """
     # swDimensionPrecisionSettings_e.swDoNotChangePrecisionSetting: leave the
     # dual / tolerance precisions untouched, override only the primary.
     do_not_change = -1
     remaining = dict(precision)
+    scanned = 0
+    changed = 0
     for annotation in annotations:
+        scanned += 1
         annotation = _sw_type_info.early_bound_or_flag(
             annotation, "IAnnotation", "GetSpecificAnnotation"
         )
@@ -1890,6 +1917,8 @@ def set_dimension_precision(
                 f"precision override on dimension {name!r} did not take: "
                 f"requested {digits} decimals, dimension reports {applied}"
             )
+        changed += 1
+    _span_scan_attrs(scanned=scanned, changed=changed)
     if remaining:
         raise RuntimeError(
             f"dimension precision not applied: {sorted(remaining)}"
@@ -2981,18 +3010,39 @@ def isolate_drawing_view_components(
     pending = list(_drawing_component_children(root))
     found: set[str] = set()
     enumerated: list[str] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-        enumerated.append(str(drawing_component.Name or ""))
-        if children:
-            continue
-        matched = _drawing_component_stems(
-            adapter, drawing_component, visible_stems
-        )
-        drawing_component.Visible = bool(matched)
-        found.update(matched)
+    hidden = 0
+    resolve_s = 0.0
+    visible_s = 0.0
+    # ONE span around the walk, with the phases TIMED -- not a span per
+    # component (hundreds of near-instant leaves would drown the trace) and not
+    # one opaque number either. At ~35 s per view this is among the most
+    # expensive steps in an assembly drawing, and "which COM call is it?" was
+    # unanswerable from the span line: identity resolution (Component +
+    # GetPathName per leaf) and the Visible writes are entirely different
+    # optimisations, and only one of them is cacheable across views.
+    with _telemetry.span("isolate.walk") as walk:
+        while pending:
+            drawing_component = pending.pop()
+            children = _drawing_component_children(drawing_component)
+            pending.extend(children)
+            enumerated.append(str(drawing_component.Name or ""))
+            if children:
+                continue
+            started = time.perf_counter()
+            matched = _drawing_component_stems(
+                adapter, drawing_component, visible_stems
+            )
+            marked = time.perf_counter()
+            drawing_component.Visible = bool(matched)
+            visible_s += time.perf_counter() - marked
+            resolve_s += marked - started
+            hidden += not matched
+            found.update(matched)
+        walk.set_attribute("nodes", len(enumerated))
+        walk.set_attribute("leaves", hidden + len(found))
+        walk.set_attribute("hidden", hidden)
+        walk.set_attribute("resolve_s", round(resolve_s, 3))
+        walk.set_attribute("visible_s", round(visible_s, 3))
 
     missing = sorted(visible_stems - found)
     if missing:
@@ -3000,7 +3050,8 @@ def isolate_drawing_view_components(
             f"{label}: component families not found: {missing}; "
             f"enumerated={sorted(enumerated)}"
         )
-    adapter.currentModel.EditRebuild3()
+    with _telemetry.span("isolate.rebuild"):
+        adapter.currentModel.EditRebuild3()
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
@@ -3120,8 +3171,8 @@ def add_auto_balloons_across_views(
     expected: int,
     label: str,
     existing_balloons: Sequence[Any] = (),
-    margin: float = 0.014,
-    layout: int = 1,
+    layout: int = BALLOON_LAYOUT_CIRCLE,
+    coverage: str = "assert",
 ) -> list[Any]:
     """Balloon successive views until every BOM item number is represented.
 
@@ -3129,10 +3180,32 @@ def add_auto_balloons_across_views(
     AutoBalloon5 only balloons items visible in the selected view, so run it on
     each orthographic and pictorial view, preserve every placed balloon, and
     validate the union of displayed BOM item numbers against the table's full
-    contiguous item range. Each view's balloons are spread around that view.
+    contiguous item range.
+
+    **SolidWorks rings the balloons, not us.** ``swDetailingBalloonLayout_Circle``
+    is AutoBalloon5's own "in a circle around the drawing view" arrangement --
+    the same job ``_spread_balloons`` hand-rolls, done by the tool that owns the
+    leaders. Re-ringing this path was measured to be actively worse: on a
+    32-balloon drive-train view it produced SIX leader crossings, and the pairs
+    it crossed were in the correct attachment order, so the "order preservation
+    rules out crossings" argument it rests on simply does not hold at that
+    density. (It cannot: with 32 balloons the ring cannot fit them at the
+    minimum gap, so the solver falls back to EVEN spacing, which its own
+    docstring records as the placement that hauls leaders across the model.)
+    ``_spread_balloons`` stays for :func:`add_component_bom_balloons`, whose
+    handful of hand-picked anchors is the sparse case it was written for.
+
+    An identification package spread over several SHEETS cannot balloon all its
+    views in one call -- AutoBalloon5 works on the active sheet -- so pass
+    ``coverage="accumulate"`` on every call but the last, feeding each call's
+    return into the next as ``existing_balloons``. Only the final
+    ``coverage="assert"`` call proves the union covers items 1..``expected``,
+    which is what keeps the multi-sheet package as strict as the single-sheet
+    one. Accumulating calls still reject an item number OUTSIDE that range, so a
+    stale BOM cannot ride along unnoticed to the last sheet.
     """
-    if margin <= 0.0:
-        raise ValueError(f"{label}: balloon ring margin must be positive")
+    if coverage not in {"assert", "accumulate"}:
+        raise ValueError(f"{label}: unknown balloon coverage mode {coverage!r}")
     all_balloons = list(existing_balloons)
     item_numbers = {
         _balloon_item_number(adapter, note, label=f"{label} existing")
@@ -3145,13 +3218,24 @@ def add_auto_balloons_across_views(
         )
         if not balloons:
             continue
-        _spread_balloons(adapter, view, balloons, margin=margin)
         for note in balloons:
             item_numbers.add(_balloon_item_number(adapter, note, label=view_label))
         all_balloons.extend(balloons)
     expected_numbers = {str(item) for item in range(1, expected + 1)}
     missing = sorted(expected_numbers - item_numbers, key=int)
     unexpected = sorted(item_numbers - expected_numbers)
+    if coverage == "accumulate":
+        if unexpected:
+            raise RuntimeError(
+                f"{label}: balloon item numbers outside the BOM range: "
+                f"{unexpected}; seen={sorted(item_numbers)}"
+            )
+        adapter.currentModel.EditRebuild3()
+        _telemetry.success(
+            f"{label}: {len(all_balloons)} balloons so far cover "
+            f"{len(item_numbers)}/{expected} BOM items"
+        )
+        return all_balloons
     if missing or unexpected:
         raise RuntimeError(
             f"{label}: balloon item coverage mismatch; missing={missing}, "
