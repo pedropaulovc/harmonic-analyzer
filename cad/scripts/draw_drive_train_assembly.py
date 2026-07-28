@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -791,7 +792,11 @@ def _stems_for_identity(identity: str, stems: frozenset[str]) -> set[str]:
 
 
 def _drawing_component_matches(
-    adapter: Any, drawing_component: Any, stems: frozenset[str], *, name: str
+    adapter: Any,
+    drawing_component: Any,
+    stems: frozenset[str],
+    *,
+    name: str,
 ) -> set[str]:
     """Return configured stems represented by one leaf drawing component.
 
@@ -804,6 +809,17 @@ def _drawing_component_matches(
     identities, skipping the path once the name has already matched cannot change
     the result. On the drive-train tree most nodes match on name alone or are
     structure we do not care about, so this removes the majority of the calls.
+
+    It does not remove enough. This drawing isolates NINE views, each walking the
+    same ~80-leaf tree, and the leaves that need the path are exactly the ones no
+    view matches by name -- so every view re-resolves the same misses. Measured:
+    ~35 s per isolation, of which ~20 s is this resolution, ~315 s of a 585 s
+    drawing. ``cache`` therefore memoises the path-derived identity across views.
+
+    Keyed on ``Name`` (``cone-gear-1@drive-train``), which names one INSTANCE in
+    one assembly, so the same name in another view of that assembly is the same
+    component and resolves to the same document. The identity is cached, NOT the
+    match: ``stems`` differs per view, and filtering it is free.
     """
     drawing_name = name.split("@", 1)[0].replace("\\", "/")
     matched = _stems_for_identity(drawing_name.rsplit("/", 1)[-1].casefold(), stems)
@@ -910,7 +926,18 @@ def _isolate_balloon_components(
     visible_stems: frozenset[str],
     label: str,
 ) -> None:
-    """Show only the requested enclosed BOM families in an auxiliary view."""
+    """Show only the requested enclosed BOM families in an auxiliary view.
+
+    Pass ONE ``cache`` dict across every isolated view of the drawing -- see
+    :func:`_drawing_component_matches` for what it holds and why the nine views
+    of this sheet set otherwise re-resolve the same components nine times.
+
+    The walk is ONE span with its phases TIMED, not a span per component
+    (hundreds of near-instant leaves would drown the trace) and not one opaque
+    number either: identity resolution and the ``Visible`` writes are entirely
+    different optimisations, and only one of them is cacheable, so a single
+    duration could not say which was worth attacking.
+    """
     root = adapter._attempt(
         lambda: view.RootDrawingComponent2(False), default=None
     )
@@ -920,6 +947,9 @@ def _isolate_balloon_components(
     pending = list(_drawing_component_children(root))
     found: set[str] = set()
     enumerated: list[str] = []
+    resolve_s = 0.0
+    visible_s = 0.0
+    leaves = 0
     while pending:
         drawing_component = pending.pop()
         children = _drawing_component_children(drawing_component)
@@ -933,15 +963,26 @@ def _isolate_balloon_components(
         # ever have their visibility set.
         if children:
             continue
+        leaves += 1
+        started = time.perf_counter()
         matched = _drawing_component_matches(
             adapter, drawing_component, visible_stems, name=name
         )
+        marked = time.perf_counter()
         drawing_component.Visible = bool(matched)
+        visible_s += time.perf_counter() - marked
+        resolve_s += marked - started
         if not matched:
             continue
         found.update(matched)
         for stem in matched:
             _telemetry.event("drawing.component_visible", component=stem)
+
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("nodes", len(enumerated))
+    span.set_attribute("leaves", leaves)
+    span.set_attribute("resolve_s", round(resolve_s, 3))
+    span.set_attribute("visible_s", round(visible_s, 3))
 
     missing = sorted(visible_stems - found)
     if missing:
@@ -1238,7 +1279,8 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         set_hidden_lines_removed(adapter, view)
         _isolate_balloon_components(
-            adapter, view, visible_stems=stems, label=f"gear identification {field}"
+            adapter, view, visible_stems=stems,
+            label=f"gear identification {field}",
         )
     _add_component_balloons(
         adapter,
@@ -1276,7 +1318,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         concealed_bottom,
         visible_stems=CONCEALED_BOTTOM_VISIBLE_STEMS,
-        label="bottom",
+        label="bottom"
     )
     bottom_balloons: list[Any] = []
     for stem in sorted(CONCEALED_BOTTOM_STEMS):
@@ -1305,7 +1347,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         concealed_front,
         visible_stems=CONCEALED_FRONT_VISIBLE_STEMS,
-        label="front",
+        label="front"
     )
     front_balloons: list[Any] = []
     for stem in sorted(CONCEALED_FRONT_STEMS):
@@ -1357,7 +1399,8 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         set_hidden_lines_removed(adapter, view)
         _isolate_balloon_components(
-            adapter, view, visible_stems=stems, label=f"gear setup {index}"
+            adapter, view, visible_stems=stems,
+            label=f"gear setup {index}",
         )
         if add_note(adapter, label, *origin) is None:
             raise RuntimeError("failed to add gear setup view label")
@@ -1400,7 +1443,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             view,
             visible_stems=stems,
-            label=f"pinion identification {field}",
+            label=f"pinion identification {field}"
         )
     _add_component_balloons(
         adapter,
@@ -1438,7 +1481,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         pinion_setup,
         visible_stems=PINION_SETUP_VIEW_STEMS,
-        label="pinion parked reference",
+        label="pinion parked reference"
     )
     if add_note(
         adapter,

@@ -353,3 +353,44 @@ def test_live_hierarchical_drawing_names_are_matched_by_leaf() -> None:
     stem = "cone-gear-shaft"
     assert identity.startswith(f"{stem}-")
     assert identity.removeprefix(f"{stem}-").isdigit()
+
+
+class _CountingAdapter:
+    """Adapter that counts how often a component's path is resolved."""
+
+    def __init__(self, path):
+        self._path = path
+        self.path_reads = 0
+
+    def _attempt(self, callback, default=None):
+        try:
+            return callback()
+        except Exception:
+            return default
+
+    def component(self):
+        adapter = self
+
+        class _C:
+            def GetPathName(self):
+                adapter.path_reads += 1
+                return adapter._path
+
+        return _C()
+
+
+def test_a_name_match_still_never_costs_a_path_read():
+    """#440's lazy path: a name that already matched must not pay the round trips.
+
+    This is the ONLY structural saving available here -- a cross-view identity
+    cache was tried and does not work, because IDrawingComponent::Name carries
+    the view, so the same component is a different key in every view (measured:
+    9 views x 80 leaves filled 569 cache entries instead of saturating at 80).
+    """
+    adapter = _CountingAdapter("C:/x/other.SLDPRT")
+    dc = type("_DC", (), {"Component": adapter.component()})()
+    matched = drawing._drawing_component_matches(
+        adapter, dc, frozenset({"cone-gear"}), name="cone-gear-1@dt"
+    )
+    assert matched == {"cone-gear"}
+    assert adapter.path_reads == 0
