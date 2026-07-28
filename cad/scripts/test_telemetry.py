@@ -458,6 +458,9 @@ target, worker, count, pad = Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4
 w = _telemetry._AtomicJsonlWriter(target)
 for i in range(count):
     w.write(json.dumps({"worker": worker, "i": i, "pad": "x" * pad}) + "\n")
+# Report accepted-but-lost records, so the parent can tell a WRITER bug (records
+# vanish while dropped == 0) from best-effort I/O loss (dropped accounts for them).
+Path(str(target) + ".dropped.%d" % worker).write_text(str(w.dropped), encoding="utf-8")
 w.close()
 """
 
@@ -502,16 +505,31 @@ def test_concurrent_appends_never_splice_a_record(tmp_path):
         seen.add((record["worker"], record["i"]))
 
     expected = {(w, i) for w in range(workers) for i in range(per_worker)}
-    diagnosis = (
-        f"lines={len(lines)} (expected {workers * per_worker}), "
-        f"unparseable={unparseable}, wrong_pad={wrong_pad}, "
-        f"missing={len(expected - seen)}, duplicated={len(lines) - len(seen)}"
+    missing = expected - seen
+    dropped = sum(
+        int(Path(f"{target}.dropped.{w}").read_text(encoding="utf-8") or 0)
+        for w in range(workers)
     )
-    # The class's actual guarantee: no record is ever spliced into another.
+    diagnosis = (
+        f"lines={len(lines)} (attempted {workers * per_worker}), "
+        f"unparseable={unparseable}, wrong_pad={wrong_pad}, "
+        f"missing={len(missing)}, dropped_by_writer={dropped}, "
+        f"duplicated={len(lines) - len(seen)}"
+    )
+
+    # THE guarantee: a record is never spliced into another, and never appears twice.
     assert unparseable == 0 and wrong_pad == 0, f"records were spliced -- {diagnosis}"
-    # And nothing was lost: with one WriteFile per record to a local file, a
-    # short write means the environment is failing, not the writer.
-    assert seen == expected, diagnosis
+    assert len(lines) == len(seen), f"records were duplicated -- {diagnosis}"
+
+    # Completeness is asserted only up to records the writer ADMITS it lost.
+    # `write` deliberately drops a record on a short write or I/O error rather
+    # than raising (capture is best-effort and never fatal), so demanding all
+    # 2,000 survive would let an explicitly accepted loss fail this mandatory
+    # gate (Codex P1). Instead require the accounting to balance: every attempted
+    # record is either on disk or counted in `dropped`. A writer bug -- records
+    # vanishing with nothing admitted -- still fails, which is the case worth
+    # catching.
+    assert len(missing) == dropped, diagnosis
 
 
 _BUFFERED_WORKER = r"""
@@ -612,6 +630,9 @@ def test_short_append_is_never_retried_with_a_second_append(tmp_path, monkeypatc
 
         monkeypatch.setattr(writer, "_raw_write", short)
         assert writer.write(record) == len(record)  # must not raise
+        # The loss must be COUNTED -- the stress test's accounting assertion
+        # silently degrades back to a strict count if this stops incrementing.
+        assert writer.dropped == 1
     finally:
         writer.close()
     assert len(calls) == 1, f"record was split across {len(calls)} appends"
@@ -627,6 +648,7 @@ def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypa
 
         monkeypatch.setattr(writer, "_raw_write", explode)
         assert writer.write('{"hello": "world"}\n') == 19  # swallowed
+        assert writer.dropped == 1  # swallowed, but not invisible
     finally:
         writer.close()
 

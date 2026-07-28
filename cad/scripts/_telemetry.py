@@ -315,6 +315,11 @@ class _AtomicJsonlWriter:
     def __init__(self, path: Path):
         self._handle: Any | None = None
         self._fd: int | None = None
+        # Records this writer accepted but could not put on disk (short write or
+        # I/O error). Capture is best-effort, so losing one must not raise -- but
+        # the loss must not be INVISIBLE either, or "the file is short" and "the
+        # writer is broken" become indistinguishable (Codex P1).
+        self.dropped = 0
         if os.name == "nt":
             import win32con
             import win32file
@@ -363,14 +368,16 @@ class _AtomicJsonlWriter:
         this needs a disk already failing mid-write, at which point the capture
         is doomed either way -- but the failure must stay contained.)
 
-        Errors are not routed through ``_telemetry``'s own logging: that would
-        re-enter this exporter.
+        A lost record is COUNTED in :attr:`dropped` rather than logged --
+        routing it through ``_telemetry``'s own logging would re-enter this
+        exporter -- so the loss is still observable to anyone who asks.
         """
         payload = value.encode("utf-8")
         try:
-            self._raw_write(payload)  # exactly once -- see "Never retry" above
+            if self._raw_write(payload) != len(payload):  # exactly once
+                self.dropped += 1
         except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
-            pass
+            self.dropped += 1
         return len(value)
 
     def flush(self) -> None:
