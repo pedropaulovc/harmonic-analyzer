@@ -653,6 +653,28 @@ def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypa
         writer.close()
 
 
+def test_shutdown_reports_dropped_records_to_stderr(tmp_path, capsys):
+    """A silent drop must be announced once, at the only safe moment.
+
+    Without this the counter would be test-only instrumentation and a short
+    .jsonl would be indistinguishable from a writer bug. It goes straight to
+    stderr rather than through this module's logging, which would re-enter the
+    exporter being shut down.
+    """
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    writer.dropped = 3
+    _telemetry._close_jsonl_writer(writer, "span")
+    err = capsys.readouterr().err
+    assert "dropped 3 span record(s)" in err
+    assert "incomplete" in err
+
+
+def test_shutdown_is_silent_when_nothing_was_dropped(tmp_path, capsys):
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    _telemetry._close_jsonl_writer(writer, "span")
+    assert "dropped" not in capsys.readouterr().err
+
+
 def test_jsonl_stream_falls_back_when_the_atomic_path_is_unavailable(tmp_path, monkeypatch):
     """Capture must never go dark: an unusable atomic writer degrades to buffered."""
     def boom(_path):

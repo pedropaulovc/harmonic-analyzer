@@ -409,20 +409,38 @@ def _jsonl_stream(path: Path) -> IO[str]:
         return path.open("a", encoding="utf-8")
 
 
+def _close_jsonl_writer(out: Any, what: str) -> None:
+    """Close an atomic writer, reporting anything it silently dropped.
+
+    ``_AtomicJsonlWriter.write`` swallows a failed append so capture can never
+    fail a build, but a silent drop would leave ``traces.jsonl`` quietly short
+    with no way to tell that from a writer bug. Shutdown is the one moment it is
+    safe to say so: straight to stderr, NOT through this module's own logging,
+    which would re-enter the exporter being shut down.
+    """
+    with contextlib.suppress(Exception):
+        dropped = int(getattr(out, "dropped", 0) or 0)
+        if dropped:
+            sys.stderr.write(
+                f"  !!  telemetry capture dropped {dropped} {what} record(s) "
+                f"(disk or I/O failure); the .jsonl is incomplete\n"
+            )
+    with contextlib.suppress(Exception):
+        out.close()
+
+
 class _JsonlSpanExporter(ConsoleSpanExporter):
     """``ConsoleSpanExporter`` that closes its atomic writer on shutdown."""
 
     def shutdown(self) -> None:
-        with contextlib.suppress(Exception):
-            cast(Any, self.out).close()
+        _close_jsonl_writer(self.out, "span")
 
 
 class _JsonlLogRecordExporter(ConsoleLogRecordExporter):
     """``ConsoleLogRecordExporter`` that closes its atomic writer on shutdown."""
 
     def shutdown(self) -> None:
-        with contextlib.suppress(Exception):
-            cast(Any, self.out).close()
+        _close_jsonl_writer(self.out, "log")
 
 
 class _LiveStderr:
