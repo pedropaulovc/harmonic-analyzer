@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 import time
@@ -502,16 +503,29 @@ f.close()
 """
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="the buffered path is only broken on Windows; POSIX 'a' is already O_APPEND",
+)
 def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
     """Positive control for the fix above -- pin WHY the atomic writer exists.
 
-    Python's ``open(path, "a")`` is not an append-only kernel handle on Windows:
-    each process picks its own end-of-file offset, so concurrent writers both
+    **Windows only, and that is the point.** CPython's ``open(path, "a")`` maps
+    to ``O_APPEND`` on POSIX, where the kernel places each write, so the
+    buffered path is already safe there and this control correctly finds all
+    2,000 records intact (Codex reproduced exactly that on Linux). On Windows
+    there is no ``O_APPEND``: append mode is emulated by seeking to
+    end-of-file and writing, so two processes pick the same offset and both
     splice records AND overwrite each other. Measured on this repo's seat with
     8 x 250 x 20 KB records: 1516 of 2000 lines survived, 18 structurally
-    malformed. Without this control, "the buffered path is broken" would be a
-    claim with no repro -- and the atomic test above would prove only that
-    SOMETHING passes, not that it fixed anything.
+    malformed.
+
+    So the bug -- and the value of ``_AtomicJsonlWriter`` -- is Windows-specific.
+    The POSIX branch of the writer is an explicit spelling of what CPython
+    already does, kept so the class does not depend on that implementation
+    detail. Without this control, "the buffered path is broken" would be a claim
+    with no repro, and the atomic test above would prove only that SOMETHING
+    passes, not that it fixed anything.
     """
     workers, per_worker, pad = 8, 250, 20_000
     target = tmp_path / "traces.jsonl"

@@ -299,10 +299,15 @@ class _AtomicJsonlWriter:
     break the ``rg``/``jq`` workflow AGENTS.md points at for debugging.
 
     Opening the file APPEND-ONLY hands end-of-file placement to the kernel for
-    every write, which is what makes a single write indivisible. On Windows that
-    is ``FILE_APPEND_DATA`` **alone** (0x0004 -- combining it with
-    ``FILE_WRITE_DATA`` silently loses the guarantee); on POSIX it is ``O_APPEND``.
-    Either way there is no cross-process lock on the telemetry hot path.
+    every write, which is what makes a single write indivisible: on Windows that
+    is ``FILE_APPEND_DATA`` **alone** (0x0004 -- OR-ing in ``FILE_WRITE_DATA``
+    silently loses the guarantee). No cross-process lock on the telemetry hot path.
+
+    The defect is Windows-specific, which is where this project runs: Windows has
+    no ``O_APPEND``, so CPython emulates append mode by seeking to end-of-file and
+    writing, and concurrent writers race on that offset. The ``O_APPEND`` branch
+    below exists only so the SolidWorks-free telemetry tests stay meaningful in a
+    Linux review sandbox -- CPython's ``"a"`` already does exactly that there.
 
     A short write is raised rather than ignored: half a record is exactly the
     malformed JSONL this exists to prevent.
