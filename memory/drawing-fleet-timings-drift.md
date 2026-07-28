@@ -1,6 +1,6 @@
 ---
 name: drawing-fleet-timings-drift
-description: "Drawing-build wall clock varies wildly run to run (−30% to +21% fleet-wide, −98% to +61% per drawing) with no code change — single-run A/B fleet timings are unusable; compare span counts/durations instead"
+description: "Drawing-build wall clock varied −30% to +21% fleet-wide (−98% to +61% per drawing) with no code change — single-run A/B fleet timings prove nothing, and span DURATIONS are not a safe fallback; only span COUNTS are"
 metadata:
   node_type: memory
   type: project
@@ -9,10 +9,10 @@ metadata:
 Measured 2026-07-28 across six full cache-cold 93-drawing fleet builds (cache
 off, parts/assemblies from cache, `doit drawing` serial, three branches).
 
-Running the **same code** twice back-to-back gives fleet totals that differ by
-tens of percent, **in both directions**:
+Running the **same code** twice back-to-back gave fleet totals differing by tens
+of percent, **in both directions**:
 
-| branch | pass 1 | pass 2 | delta | per-drawing direction |
+| branch | pass 1 | pass 2 | delta | per-drawing |
 |---|---|---|---|---|
 | `main` @ 26f419a9 | 2995 s | 3227 s | +7.7% | — |
 | PR #436 | 3830 s | 4629 s | **+20.9%** | 93 slower / 0 faster |
@@ -21,31 +21,43 @@ tens of percent, **in both directions**:
 Per-drawing extremes on identical code: `swing_stop_screw` −97.7%,
 `hanger_screw` −60.3%, `pen_assembly` +61.2%, `channel_assembly` +28.6%.
 
-**Do not read a mechanism into this.** The #436 pair was perfectly monotonic
-(every one of 93 drawings slower), which looks like session-age degradation —
-but the #437 pair went the other way and was mixed, which falsifies that.
-Whatever drives it (machine load, OS file cache, SolidWorks internal state), it
-is not a clean function of session age, and the −97.7% outlier is extreme
-enough that it probably is not a "speedup" at all. This memory records the
-*variance*, not an explanation.
+## What this does NOT establish
 
-**Why it matters:** single-run A/B fleet comparisons are unusable below roughly
-30%. Every perf claim in the abandoned #382-#391 stack was exactly that — one
-"paired fleet measurement" — at 1.24% (#389), 5.7% (#384) and 12.84% (#388),
-all far inside the noise. #436 removed one of two reopens per drawing and the
-fleet total reported it as **slower**.
+**No mechanism.** The #436 pair was perfectly monotonic (all 93 slower), which
+looks like session-age degradation; the #437 pair went the other way and was
+mixed, which falsifies that. This memory records the *variance*, not a cause.
 
-**How to apply:**
-- Never claim a drawing perf win from one A/B fleet pair. Repeat the arms, or
-  don't make the claim.
-- Prefer **span-level** evidence, which survives this: a count (`reopen saved
-  drawing` 186 -> 93) or one named span's own duration. With #437's spans in
-  place `drawing.reopen` measures 393.9 s over 93 drawings (4.2 s mean, 10.4 s
-  max), so #436's saving is ~394 s / ~13% of baseline — a number the fleet
-  total could never have produced. See [[otel-trace-local-viewing]].
-- Absolute costs from one run are still fine for finding **outliers**:
-  drive_train at 583 s against a 32 s fleet mean is far outside any noise band
-  (see [[drawing-recipe-com-pitfalls]] and issue #438).
-- Distinct from [[build-gdi-session-accumulation]], which is GDI exhaustion
-  inside one large *assembly* build; this is ~93 short drawing subprocesses
-  against one long-lived `SLDWORKS.exe`.
+Candidates to rule out before blaming session age, per
+[[build-gdi-session-accumulation]] — whose SECOND failure mode is precisely a
+progressive per-operation slowdown, and explicitly is *not* session age and is
+*not* fixed by restarting SolidWorks:
+- **runaway `TextInputHost.exe`** — checked here and **ruled out**: 62 CPU-seconds
+  accumulated over two days, against 33,605 s in the documented incident.
+- GDI handle pressure, other machine load, OS file cache state. None were
+  measured, so the cause remains **unidentified**.
+
+**No bound.** Two consecutive passes establish neither a ceiling nor what a
+third or fourth pass does. Do not read "±30%" as a threshold above which a
+result is trustworthy — it is the spread that happened to be observed, nothing
+more.
+
+## How to apply
+
+- **A single A/B fleet pair proves nothing**, at any effect size. Every perf
+  claim in the abandoned #382-#391 stack was exactly that: 1.24% (#389), 5.7%
+  (#384), 12.84% (#388). #436 removed one of two reopens per drawing and the
+  fleet total reported it as *slower*.
+- **Prefer span COUNTS, which are inherently drift-immune** — `reopen saved
+  drawing` 186 -> 93 across the fleet is a fact no timing variance can touch.
+- **Span DURATIONS are NOT a safe fallback.** They inflate with whatever causes
+  the drift; [[build-gdi-session-accumulation]]'s own diagnosis recipe detects
+  that slowdown by watching identical labelled mate spans go 4.7 s -> 35.5 s. So
+  `drawing.reopen` measuring 4.2 s (393.9 s over 93 drawings) is *indicative* of
+  #436's saving, not proof of it — it was measured in one session.
+- **If you must benchmark**, match the initial session state across both arms and
+  counterbalance the order (paired AB/BA runs, or randomize per-drawing order).
+  Restarting SolidWorks only between arms makes arm A aged and arm B fresh, and a
+  plain ABAB interleave still puts B later than A in every pair. Note also that a
+  restart does not clear the TextInputHost mode at all.
+- **Outlier detection still works** off a single run: drive_train at 583 s against
+  a 32 s fleet mean is orders outside any observed drift (issue #438).
