@@ -1317,7 +1317,9 @@ class _FakeNote:
         self._item = item
         self.placed = None
 
-    def GetText(self):
+    def GetBomBalloonText(self, _upper):
+        # The balloon-specific API. INote.GetText returns the note's generic
+        # text, which for a BOM balloon need not be the item number at all.
         return self._item
 
     def GetBalloonInfo(self):
@@ -1531,8 +1533,32 @@ def test_an_unreadable_balloon_item_sorts_last_instead_of_failing():
     correctness, so it must not take the drawing down with it."""
 
     class _Mute(_FakeNote):
-        def GetText(self):
+        def GetBomBalloonText(self, _upper):
             raise RuntimeError("no text")
 
     key = drawing_common._balloon_item_key(_FakeAdapter(None), _Mute(0, 0))
     assert key == (sys.maxsize, "")
+
+
+def test_the_item_key_reads_the_balloon_api_not_the_note_text():
+    """A tie-break that reads the wrong API is a no-op that looks like a fix.
+
+    `INote::GetText` returns the note's GENERIC text, which for a BOM balloon
+    need not be the item number and can come back empty -- every key would then
+    collapse to (sys.maxsize, "") and the sort would tie on all four fields,
+    restoring exactly the AutoBalloon5 arrival order this exists to break
+    (Codex P2). `GetBomBalloonText(True)` is the displayed upper item, and is
+    what `_balloon_item_number` already uses in this same file.
+    """
+    source = getsource(drawing_common._balloon_item_key)
+    assert "GetBomBalloonText(True)" in source
+    assert "n.GetText()" not in source
+
+
+def test_a_balloon_whose_item_reads_empty_does_not_tie_every_key():
+    """The degenerate case the wrong API would have produced everywhere."""
+    blank = _FakeNote(0.17, 0.17, item="")
+    real = _FakeNote(0.17, 0.17, item="7")
+    adapter = _FakeAdapter(None)
+    assert drawing_common._balloon_item_key(adapter, blank) == (sys.maxsize, "")
+    assert drawing_common._balloon_item_key(adapter, real) == (7, "7")

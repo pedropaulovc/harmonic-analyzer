@@ -2783,13 +2783,23 @@ def _balloon_item_key(adapter: Any, note: Any) -> tuple[int, str]:
     arrival order, so keying on one re-encodes the instability it is meant to
     break.
 
+    Read through ``GetBomBalloonText(True)`` -- the balloon-specific API for the
+    displayed UPPER item, the same one :func:`_balloon_item_number` uses -- and
+    NOT through ``INote::GetText``. GetText returns the note's generic text,
+    which for a BOM balloon is not guaranteed to be the item number and can come
+    back empty; every key would then collapse to ``(sys.maxsize, "")``, the sort
+    would tie on all four fields, and this tie-break would silently be a no-op
+    that still LOOKS like a fix.
+
     Returns ``(number, text)`` so "2" sorts before "10" rather than after it,
     with the raw text carrying non-numeric balloons (``A``, ``12A``) and ties
     among them. An unreadable balloon sorts last under its own text rather than
     failing the drawing: this is a tie-break, and losing it degrades placement
-    determinism, not correctness.
+    determinism, not correctness. (:func:`_balloon_item_number` raises on the
+    same read because there the item IS the product; here it is a sort key.)
     """
-    text = adapter._attempt(lambda n=note: n.GetText(), default="") or ""
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetBomBalloonText")
+    text = adapter._attempt(lambda n=note: n.GetBomBalloonText(True), default="") or ""
     text = str(text).strip()
     leading = ""
     for char in text:
@@ -2847,7 +2857,7 @@ def _spread_balloons(
     radii: list[float] = []
     for note in balloons:
         note = _sw_type_info.early_bound_or_flag(
-            note, "INote", "GetAnnotation", "GetBalloonInfo", "GetText"
+            note, "INote", "GetAnnotation", "GetBalloonInfo", "GetBomBalloonText"
         )
         # The balloon circle's own rendered radius. GetBalloonInfo returns
         # (centre xyz, arc-point xyz, radius) -- unlike GetExtent it describes
