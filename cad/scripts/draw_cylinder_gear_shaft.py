@@ -145,7 +145,7 @@ async def build(adapter: Any) -> dict[str, str]:
     profile = place_view(
         adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=(1, 1)
     )
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # Rotate BEFORE dimension import so the Depth dim lands on the displayed
     # (horizontal) geometry.
     _rotate_view(adapter, profile, PROFILE_ROTATION, label="profile")

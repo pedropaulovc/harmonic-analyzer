@@ -130,7 +130,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # actual ruled face.  The old front view showed an untouched rectangle and
     # forced the machinist to infer every graduation from prose.
     front = place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER, scale=(1, 1))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     _rotate_ruled_face(adapter, front)
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)

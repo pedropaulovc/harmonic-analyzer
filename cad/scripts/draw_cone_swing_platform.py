@@ -237,7 +237,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
     end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(1, 2))
     for view in (top, iso, end):
         set_hidden_lines_removed(adapter, view)
