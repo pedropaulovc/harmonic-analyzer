@@ -44,7 +44,13 @@ Stages (run each as its OWN process, in this order; stop at the first wedge):
         a scratch drawing and pull the PMI in with ``IView::ImportAnnotations
         (IncludeDimXpertAnnotations=True)`` — the per-view import API (there
         is NO swInsertAnnotation_e member for DimXpert; InsertModelAnnotations3
-        cannot reach PMI).  Read back what landed.  Nothing is saved.
+        cannot reach PMI).  Imports into a *Front AND a *Right view (an
+        annotation lands only in a view its annotation plane faces: observed
+        2026-07-28, the plane-face datum landed in *Front — before=0 after=1 —
+        while the cylinder-face gtol did not).  The stage passes only if the
+        datum landed somewhere AND at least one imported gtol frame reads back
+        the 0.01 value; the *Right leg is authored from that routing model and
+        is still unproven live.  Nothing is saved.
 
 RESULTS, 2026-07-28 (fresh SolidWorks session), R2026x SP3.0 Makers seat
 ========================================================================
@@ -289,42 +295,59 @@ async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object
     from solidworks_mcp.adapters.solidworks.drawing import new_drawing, place_view
 
     new_drawing(adapter)
-    view = place_view(adapter, str(scratch), "*Front", 0.2, 0.14, scale=(1.0, 1.0))
-    view = _early_bound(view, "IView")
-    before = len(tuple(view.GetAnnotations() or ()))
-    view.ImportAnnotations(False, False, True, False, False)
-    imported = tuple(view.GetAnnotations() or ())
-    for item in imported:
-        item = _early_bound(item, "IAnnotation")
-        _telemetry.info(
-            f"  view annotation: name={item.GetName()!r} type={item.GetType()}"
-        )
-    landed = len(imported) > before
-    _report(
-        "import: IView.ImportAnnotations(DimXpert=True) landed PMI on the sheet",
-        landed,
-        f"before={before} after={len(imported)}",
-    )
-    # Read back any imported gtol's frame content: an empty frame landing on
-    # the sheet must not count as the XML-filled 0.01 frame surviving the
-    # part-to-drawing path. (Observed: the datum lands in this Front view, the
-    # cylinder-face gtol does not -- the readback gates only gtols that DID
-    # land.)
+    # A DimXpert annotation imports only into a view its annotation plane
+    # faces, so one view cannot prove the whole path: the plane-face datum
+    # lands in *Front while the cylinder-face gtol does not. Import into both
+    # a Front and a Right view and demand (a) the datum landed somewhere and
+    # (b) at least one imported gtol whose frame reads back the 0.01 value --
+    # zero validated gtols means the XML-filled frame did NOT survive the
+    # part-to-drawing path, which must fail this stage, not pass vacuously.
+    landed_any = False
+    validated_gtols = 0
     frames_ok = True
-    for item in imported:
-        item = _early_bound(item, "IAnnotation")
-        if int(item.GetType()) != 5:  # swAnnotationType_e.swGTol
-            continue
-        sheet_gtol = _early_bound(item.GetSpecificAnnotation(), "IGtol")
-        xml = str(_early_bound(sheet_gtol.GetFrame(1), "IGtolFrame").GetSymbolXml())
-        frame_ok = "0.01" in xml
-        frames_ok = frames_ok and frame_ok
-        _report(
-            "import: imported gtol frame carries the 0.01 tolerance",
-            frame_ok,
-            xml[:120],
+    for orientation, center_x in (("*Front", 0.13), ("*Right", 0.30)):
+        view = place_view(
+            adapter, str(scratch), orientation, center_x, 0.14, scale=(1.0, 1.0)
         )
-    ok = landed and frames_ok
+        view = _early_bound(view, "IView")
+        before = len(tuple(view.GetAnnotations() or ()))
+        view.ImportAnnotations(False, False, True, False, False)
+        imported = tuple(view.GetAnnotations() or ())
+        for item in imported:
+            item = _early_bound(item, "IAnnotation")
+            _telemetry.info(
+                f"  {orientation} annotation: name={item.GetName()!r} "
+                f"type={item.GetType()}"
+            )
+        landed = len(imported) > before
+        landed_any = landed_any or landed
+        _report(
+            f"import: ImportAnnotations(DimXpert=True) landed PMI in {orientation}",
+            landed,
+            f"before={before} after={len(imported)}",
+        )
+        for item in imported:
+            item = _early_bound(item, "IAnnotation")
+            if int(item.GetType()) != 5:  # swAnnotationType_e.swGTol
+                continue
+            sheet_gtol = _early_bound(item.GetSpecificAnnotation(), "IGtol")
+            xml = str(
+                _early_bound(sheet_gtol.GetFrame(1), "IGtolFrame").GetSymbolXml()
+            )
+            frame_ok = "0.01" in xml
+            frames_ok = frames_ok and frame_ok
+            validated_gtols += frame_ok
+            _report(
+                f"import: {orientation} gtol frame carries the 0.01 tolerance",
+                frame_ok,
+                xml[:120],
+            )
+    _report(
+        "import: at least one XML-filled gtol survived to a sheet view",
+        validated_gtols >= 1,
+        f"validated_gtols={validated_gtols}",
+    )
+    ok = landed_any and frames_ok and validated_gtols >= 1
     draw_title = str(_read_member(adapter.currentModel, "GetTitle"))
     adapter.swApp.QuitDoc(draw_title)
     _telemetry.success(f"scratch drawing discarded without saving: {draw_title}")
