@@ -1863,6 +1863,7 @@ def add_edge_dimension(
     label: str,
     orientation: str = "smart",
     entity_type: Literal["EDGE", "SILHOUETTE"] = "EDGE",
+    entity_types: tuple[str, str] | None = None,
 ) -> Any:
     """Dimension across two view entities picked at explicit sheet points.
 
@@ -1887,12 +1888,13 @@ def add_edge_dimension(
         raise RuntimeError(f"failed to activate drawing view {name!r}")
     draw.ClearSelection2(True)
     for index, (x, y) in enumerate((p0, p1)):
+        selected_type = entity_types[index] if entity_types else entity_type
         selected = draw.Extension.SelectByID2(
-            "", entity_type, x, y, 0.0, index > 0, 0, null_callout(), 0
+            "", selected_type, x, y, 0.0, index > 0, 0, null_callout(), 0
         )
         if not selected:
             raise RuntimeError(
-                f"failed to select {label} {entity_type.lower()} {index} "
+                f"failed to select {label} {selected_type.lower()} {index} "
                 f"at sheet ({x:g}, {y:g})"
             )
     if orientation == "horizontal":
