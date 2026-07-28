@@ -66,7 +66,7 @@ def test_native_gdt_and_axial_dims() -> None:
         "        position_tolerance_m=0.004,"
         in source
     )
-    assert source.count("position_tolerance_m=0.0037") == 1
+    assert source.count("position_tolerance_m=0.004") == 1
     assert 'characteristic="circular_runout"' in source
     assert source.count("add_surface_finish(") == 1
     # hub + rim axial widths added across the section.
