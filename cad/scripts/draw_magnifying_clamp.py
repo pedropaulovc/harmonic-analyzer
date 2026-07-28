@@ -82,11 +82,11 @@ def _front_y(model_y_mm: float) -> float:
 
 
 FRONT_KEEP = {
-    # In the 0.176..0.201 free band between the notes paragraph (whose longest
-    # line reaches ~0.175) and the right view's left edge: at a centred or
-    # +0.052 position the 20.00 text landed inside the notes text (eye pass;
-    # display dims are overlap-exempt in the audit, so only the eye catches it).
-    "Width": (FRONT_CENTER[0] + 0.072, _front_y(0.0) - 0.014),
+    # ABOVE the view: the band under the view is only ~6 mm tall before the
+    # notes paragraph starts, so any below-view placement strikes the notes
+    # (eye pass, twice); the front-top to plan-bottom gap is ~50 mm and the
+    # perpendicularity frame sits right at +0.052, so a centred dim clears.
+    "Width": (FRONT_CENTER[0], _front_y(BLOCK_HEIGHT) + 0.014),
     "Height": (FRONT_CENTER[0] - BLOCK_WIDTH * 2.0 / 1000.0 - 0.022, FRONT_CENTER[1]),
     "LeverBoreYDim": (FRONT_CENTER[0] + BLOCK_WIDTH * 2.0 / 1000.0 + 0.020, _front_y(LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (FRONT_CENTER[0] - 0.045, _front_y(LEVER_BORE_Y) + 0.030),
