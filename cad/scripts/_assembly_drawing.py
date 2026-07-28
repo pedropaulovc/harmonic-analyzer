@@ -5,11 +5,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import _telemetry
 from _common import check
-from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing
+from _drawing_common import (
+    DrawingOutputs,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+)
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
+@_telemetry.traced("drawing.simple_three_view", label_param="pdf_title")
 async def build_simple_three_view_drawing(
     adapter: Any,
     *,
@@ -26,6 +33,26 @@ async def build_simple_three_view_drawing(
         raise FileNotFoundError(f"source assembly is missing: {source}")
 
     check("open assembly drawing source", await adapter.open_model(str(source)))
+    # An assembly missing its title-block properties would render blank
+    # $PRPSHEET cells; finalize_drawing validates only the TOL_* set.
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+        ),
+        required=(
+            "Number",
+            "Revision",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+        ),
+    )
     new_project_drawing(adapter, scale=sheet_scale)
 
     for view_name, center in (

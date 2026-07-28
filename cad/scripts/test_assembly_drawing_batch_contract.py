@@ -126,7 +126,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         pdf=tmp_path / "assembly.pdf",
         png=tmp_path / "assembly.png",
     )
-    adapter = SimpleNamespace(open_model=lambda _path: None)
+    adapter = SimpleNamespace(open_model=lambda _path: None, currentModel=object())
 
     async def open_model(path: str) -> bool:
         calls.append(("open", path))
@@ -138,6 +138,11 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         _assembly_drawing,
         "check",
         lambda _label, result: result,
+    )
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "read_required_properties",
+        lambda model, names, *, required: calls.append(("props", names, required)),
     )
     monkeypatch.setattr(
         _assembly_drawing,

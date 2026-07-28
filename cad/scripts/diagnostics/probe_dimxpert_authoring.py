@@ -102,12 +102,24 @@ import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from probe_dimxpert_gtol import (  # noqa: E402
+    _FAILED_CHECKS,
     SELECTOR_PLANE,
     _close_if_open,
     _gtol_type_map,
     _long_array,
     _report,
 )
+
+
+def _failed_checks() -> list[str]:
+    """Failures accumulated by the shared ``_report`` (lives in the gtol
+    probe's module); nonempty means some required check warned through."""
+    if _FAILED_CHECKS:
+        _telemetry.error(
+            f"probe finished with {len(_FAILED_CHECKS)} failed check(s): "
+            + "; ".join(_FAILED_CHECKS)
+        )
+    return _FAILED_CHECKS
 from solidworks_mcp.adapters.pywin32_adapter import (  # noqa: E402
     PyWin32Adapter,
     null_callout,
@@ -302,7 +314,7 @@ async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object
     # (b) at least one imported gtol whose frame reads back the 0.01 value --
     # zero validated gtols means the XML-filled frame did NOT survive the
     # part-to-drawing path, which must fail this stage, not pass vacuously.
-    landed_any = False
+    datum_landed = False
     validated_gtols = 0
     frames_ok = True
     for orientation, center_x in (("*Front", 0.13), ("*Right", 0.30)):
@@ -320,11 +332,14 @@ async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object
                 f"type={item.GetType()}"
             )
         landed = len(imported) > before
-        landed_any = landed_any or landed
         _report(
             f"import: ImportAnnotations(DimXpert=True) landed PMI in {orientation}",
             landed,
             f"before={before} after={len(imported)}",
+        )
+        datum_landed = datum_landed or any(
+            int(_early_bound(item, "IAnnotation").GetType()) == 2  # swDatumTag
+            for item in imported
         )
         for item in imported:
             item = _early_bound(item, "IAnnotation")
@@ -343,11 +358,15 @@ async def _stage_import(adapter: PyWin32Adapter, model: object, dim_part: object
                 xml[:120],
             )
     _report(
+        "import: the datum survived to a sheet view",
+        datum_landed,
+    )
+    _report(
         "import: at least one XML-filled gtol survived to a sheet view",
         validated_gtols >= 1,
         f"validated_gtols={validated_gtols}",
     )
-    ok = landed_any and frames_ok and validated_gtols >= 1
+    ok = datum_landed and frames_ok and validated_gtols >= 1
     draw_title = str(_read_member(adapter.currentModel, "GetTitle"))
     adapter.swApp.QuitDoc(draw_title)
     _telemetry.success(f"scratch drawing discarded without saving: {draw_title}")
@@ -371,8 +390,11 @@ def _stage_gtol(model: object, dim_part: object) -> bool:
 
 
 async def main() -> int:
+    _telemetry.set_service("diagnostics")
     if len(sys.argv) != 2 or sys.argv[1] not in STAGES:
-        print(f"usage: {Path(sys.argv[0]).name} {{{'|'.join(STAGES)}}}", file=sys.stderr)
+        _telemetry.error(
+            f"usage: {Path(sys.argv[0]).name} {{{'|'.join(STAGES)}}}"
+        )
         return 2
     stage = sys.argv[1]
 
@@ -382,7 +404,6 @@ async def main() -> int:
             "(uv run python -m doit part:transgear_stub)"
         )
 
-    _telemetry.set_service("diagnostics")
     async with _telemetry.aspan(f"probe.dimxpert_authoring.{stage}"):
         adapter = PyWin32Adapter({})
         # The wedge this probe exists to study blocks the COM call itself, so
@@ -396,7 +417,7 @@ async def main() -> int:
                 # closes its own documents (the part is saved + reopened in a view)
                 passed = bool(await _stage_import(adapter, model, dim_part))
                 _report(f"stage {stage}", passed)
-                return 0 if passed else 1
+                return 0 if passed and not _failed_checks() else 1
             runner = {
                 "read": lambda: _stage_read(model, dim_part),
                 "auto": lambda: _stage_auto(model, dim_part),
@@ -409,7 +430,7 @@ async def main() -> int:
             title = _read_member(model, "GetTitle")
             adapter.swApp.QuitDoc(title)
             _telemetry.success(f"scratch part closed without saving: {title}")
-            return 0 if passed else 1
+            return 0 if passed and not _failed_checks() else 1
         finally:
             await adapter.disconnect()
             _watchdog.stop()
