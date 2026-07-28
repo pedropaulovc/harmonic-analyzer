@@ -82,18 +82,39 @@ class _FakeAdapter:
         return member() if callable(member) else member
 
 
-def test_finalize_exports_pdf_before_reopen_and_skips_clean_save():
+def test_finalize_saves_once_exports_pdf_then_reopens_once_to_validate():
+    """The finalize contract, pinned in ONE place for all 93 drawings.
+
+    The PDF must still be exported while the just-authored drawing is fully
+    loaded (a large drawing can reopen view-only and reject SaveAs3 with
+    0x1001), and the persisted SLDDRW must still be reopened and validated.
+
+    What is gone is the scale REPAIR: finalize used to reopen, re-apply
+    ``SetScale``, check ``GetSaveFlag``, conditionally save + re-export the
+    PDF, then reopen a second time to prove whatever it had just written. The
+    scale is already pinned at creation and again before the save, so that
+    branch could only ever mask a scale that failed to persist -- and across a
+    full 93-drawing fleet build it fired zero times. ``assert_asme_b_sheet``
+    reads the reopened scale and fails loud instead.
+    """
     source = getsource(drawing_common.finalize_drawing)
-    first_reopen = source.index("reopen_drawing")
     pdf_export = source.index("pdf_path=str(outputs.pdf)")
-    assert pdf_export < first_reopen
-    # The dirty-scale branch saves a NEWER SLDDRW after that first export, so
-    # it must re-export the PDF to match the persisted drawing (codex review
-    # #361); the clean path keeps the single early export.
-    assert source.count("save_drawing(") == 2
-    assert source.rindex("save_drawing(") > source.index("if sheet_scale_dirty:")
-    assert '"GetSaveFlag"' in source
-    assert "save skipped" in source
+    reopen = source.index("reopen_drawing")
+    assert pdf_export < reopen, "PDF must be exported before the reopen"
+    assert source.count("reopen_drawing") == 1, "finalize reopens exactly once"
+    assert source.count("save_drawing(") == 1, "finalize saves exactly once"
+    # The retired repair path, pinned so it cannot creep back in.
+    assert "GetSaveFlag" not in source
+    assert "sheet_scale_dirty" not in source
+    # The pre-save SetScale stays -- inserting a view can pull the sheet onto an
+    # auto scale, so it is re-pinned once while authoring, then validated. What
+    # must not come back is rewriting the sheet AFTER it has been persisted.
+    assert "SetScale" not in source[reopen:], (
+        "the reopened sheet is validated, not rewritten"
+    )
+    # ...and the validation that replaces the repair is still there.
+    assert "assert_asme_b_sheet" in source[reopen:]
+    assert "scale=scale" in source[reopen:]
 
 
 def _el(label, x0, y0, x1, y1, kind="view", scope=CollisionScope.ALL, owner=""):
