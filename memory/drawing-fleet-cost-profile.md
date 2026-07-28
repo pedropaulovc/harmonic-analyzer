@@ -6,27 +6,40 @@ metadata:
 ---
 
 Per-span breakdown of the drawing fleet, from the `drawing.*` spans added in
-#437. Source: **837 drawing builds across nine COMPLETE 93-drawing passes**
-(2026-07-27/28 console logs, `⟩ <span> <secs>s` lines). Figures are the MEDIAN
-ACROSS PASSES of each span's per-pass total.
+#437. Source: nine COMPLETE 93-drawing passes, 2026-07-27/28 (`⟩ <span> <secs>s`
+console lines), median across passes of each span's per-pass total.
 
-| span | s/pass | passes | what it is |
-|---|---:|---:|---|
-| `drawing.build` | 3730 | 9 | the whole fleet's recipe bodies |
-| `drawing.finalize` | 1311 | 3 | audit → save → PDF → reopen → validate |
-| `drawing.new_from_template` | 444 | 3 | template instantiation |
-| `drawing.layout_audit` | 414 | 9 | `check_drawing_layout`, BEFORE the save |
-| `drawing.reopen` | 394 | 3 | round-trip the saved artefact |
-| `drawing.save_and_export_pdf` | 337 | 3 | |
-| `drawing.curate_dimensions` | 236 | 3 | |
-| `drawing.normalize_edge_break` | 192 | 9 | rewrite one template note, per drawing |
-| `drawing.render_png` | 28 | 3 | |
+**Spans that predate #437 — nine passes, trustworthy:**
 
-`drawing.finalize` is NOT fully accounted: subtracting its four traced children
-**within each pass** leaves 100–128 s/pass in `sanitize_pdf_metadata`, the
-post-reopen `assert_asme_b_sheet`, and the property-link validation — none of
-them spanned. (Only the `passes: 9` spans predate #437; the rest exist only in
-logs from #437 on.)
+| span | s/pass | what it is |
+|---|---:|---|
+| `drawing.build` | 3579–3730 | the whole fleet's recipe bodies |
+| `drawing.layout_audit` | 411–414 | `check_drawing_layout`, BEFORE the save |
+| `drawing.isolate_balloon_components` | ~350 | drive-train only; deleted by #442 |
+| `drawing.normalize_edge_break` | ~190 | rewrite one template note, per drawing |
+
+**Spans added by #437 — only THREE passes, and NOT well determined:**
+
+| span | range across the 3 passes |
+|---|---|
+| `drawing.finalize` | 1054 – 1418 |
+| `drawing.new_from_template` | 373 – 523 |
+| `drawing.save_and_export_pdf` | 323 – 391 |
+| `drawing.reopen` | **198 – 400** |
+| `drawing.curate_dimensions` | 183 – 264 |
+| `drawing.render_png` | 26 – 31 |
+
+Quote these as RANGES, never as a median. `drawing.reopen` spans a 2× spread
+across three passes — that is the fleet drift in
+[[drawing-fleet-timings-drift]] (−30% to +21% with no code change), not a
+measurement. Two of the three passes also contain a crash-retried drawing,
+whose pre-crash spans are emitted once by the failed attempt and again by the
+retry; measured against the nine-pass spans that double-count is ≤4%, but with
+n=3 it cannot be separated from the drift.
+
+`drawing.finalize` is NOT fully accounted by its traced children: subtracting
+them **within each pass** leaves 100–128 s/pass in `sanitize_pdf_metadata`, the
+post-reopen `assert_asme_b_sheet`, and the property-link validation.
 
 **The two validations prove DIFFERENT things — do not conflate them.**
 `check_drawing_layout` runs *before* `save_drawing`, so it proves the authored
@@ -36,13 +49,14 @@ sheet scale and format. Neither substitutes for the other.
 
 **Why:** the reassessment of #382/#384/#389/#407 proposed deleting the reopen,
 the layout audit and the edge-break normalizer together as "runtime normalizers"
-— ~1000 s/pass, 27% of the fleet. This profile says two of those three are
+— on the order of 600–1000 s/pass. This profile says two of those three are
 *validation*, not normalization, and as the section above shows they prove
 different things: the audit proves the authored layout, the reopen proves the
 persisted file (#436 deliberately kept the reopen and deleted only its repair
-half). Deleting both buys 808 s/pass by removing the only proof a drawing is
-correct — a reliability-for-speed trade that is explicitly out of bounds here.
-Only `drawing.normalize_edge_break` (192 s/pass) is pure normalization, and it is
+half). Deleting both removes the only proof a drawing is correct, for a saving
+whose own measurement spans 2× — a reliability-for-speed trade that is
+explicitly out of bounds here, at any of those numbers.
+Only `drawing.normalize_edge_break` (~190 s/pass) is pure normalization, and it is
 removable only after the note is baked into `harmonic-analyzer.DRWDOT` — the fix
 #382 attempted and botched by regressing the template binary.
 
