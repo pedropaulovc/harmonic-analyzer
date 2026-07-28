@@ -320,6 +320,7 @@ class _AtomicJsonlWriter:
         # the loss must not be INVISIBLE either, or "the file is short" and "the
         # writer is broken" become indistinguishable (Codex P1).
         self.dropped = 0
+        self._retired = False
         if os.name == "nt":
             import win32con
             import win32file
@@ -368,14 +369,28 @@ class _AtomicJsonlWriter:
         this needs a disk already failing mid-write, at which point the capture
         is doomed either way -- but the failure must stay contained.)
 
+        **A PARTIAL write retires the writer.** A short write leaves an
+        unterminated prefix at EOF, so the next append -- from this process or
+        any other -- lands on the same line and corrupts that record too. Since
+        the prefix cannot be repaired (padding it is another racy append, and
+        retrying is the splice this class exists to prevent), the writer goes
+        quiet instead: every later record is counted as dropped and nothing more
+        is written. The damage stays one trailing line rather than cascading, and
+        a short write means the disk is already failing, so there is nothing left
+        to capture anyway.
+
         A lost record is COUNTED in :attr:`dropped` rather than logged --
         routing it through ``_telemetry``'s own logging would re-enter this
         exporter -- so the loss is still observable to anyone who asks.
         """
+        if self._retired:
+            self.dropped += 1
+            return len(value)
         payload = value.encode("utf-8")
         try:
             if self._raw_write(payload) != len(payload):  # exactly once
                 self.dropped += 1
+                self._retired = True
         except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
             self.dropped += 1
         return len(value)
@@ -417,10 +432,16 @@ def _close_jsonl_writer(out: Any, what: str) -> None:
     with no way to tell that from a writer bug. Shutdown is the one moment it is
     safe to say so: straight to stderr, NOT through this module's own logging,
     which would re-enter the exporter being shut down.
+
+    Reports at most ONCE. A COM build calls ``shutdown()`` explicitly, but the
+    providers keep their default interpreter-exit callbacks, so each exporter is
+    shut down again at ``atexit`` -- without the latch the same warning would
+    print twice and read as two separate failures.
     """
     with contextlib.suppress(Exception):
         dropped = int(getattr(out, "dropped", 0) or 0)
-        if dropped:
+        if dropped and not getattr(out, "_reported", False):
+            out._reported = True
             sys.stderr.write(
                 f"  !!  telemetry capture dropped {dropped} {what} record(s) "
                 f"(disk or I/O failure); the .jsonl is incomplete\n"

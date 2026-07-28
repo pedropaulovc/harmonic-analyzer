@@ -653,6 +653,42 @@ def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypa
         writer.close()
 
 
+def test_a_partial_write_retires_the_writer_instead_of_corrupting_the_next(tmp_path):
+    """A short append leaves an unterminated prefix that the NEXT append lands on.
+
+    Nothing can repair that prefix -- padding it is another racy append and
+    retrying is the splice this class exists to prevent -- so the writer goes
+    quiet. One trailing line is damaged instead of every record after it.
+    """
+    target = tmp_path / "traces.jsonl"
+    writer = _telemetry._AtomicJsonlWriter(target)
+    calls = []
+
+    def short_once(payload):
+        calls.append(payload)
+        return len(payload) - 3  # a genuine positive-length short write
+
+    writer._raw_write = short_once
+    writer.write('{"name":"a"}\n')
+    assert len(calls) == 1  # NOT finished with a second append
+
+    writer.write('{"name":"b"}\n')
+    writer.write('{"name":"c"}\n')
+    assert len(calls) == 1, "retired writer must not append after a short write"
+    assert writer.dropped == 3
+
+
+def test_shutdown_reports_once_even_though_atexit_shuts_down_again(tmp_path, capsys):
+    """OTel providers keep their interpreter-exit callbacks, so an explicit
+    shutdown() is followed by a second one at atexit. Two identical warnings
+    would read as two separate failures."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    writer.dropped = 2
+    _telemetry._close_jsonl_writer(writer, "span")
+    _telemetry._close_jsonl_writer(writer, "span")
+    assert capsys.readouterr().err.count("dropped 2 span record(s)") == 1
+
+
 def test_shutdown_reports_dropped_records_to_stderr(tmp_path, capsys):
     """A silent drop must be announced once, at the only safe moment.
 
