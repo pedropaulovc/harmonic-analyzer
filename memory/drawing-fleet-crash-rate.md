@@ -1,6 +1,6 @@
 ---
 name: drawing-fleet-crash-rate
-description: Measured SolidWorks crash rate across drawing fleet passes (~2 in ~750 builds), both auto-recovered — the bar for calling a red gate "flaky" vs a real regression
+description: Measured SolidWorks crash rate across drawing fleet passes (2 in 837 builds across nine passes), both auto-recovered — the bar for calling a red gate "flaky" vs a real regression
 metadata:
   type: project
 ---
