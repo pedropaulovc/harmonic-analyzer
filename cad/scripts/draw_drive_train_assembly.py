@@ -262,13 +262,13 @@ CONE_SCHEDULE_ROW_HEIGHT = 0.006
 GEAR_REQUIREMENTS_ANCHOR = (0.275, 0.232)
 GEAR_REQUIREMENTS_COLUMN_WIDTHS = (0.028, 0.072, 0.040)
 GEAR_REQUIREMENTS_ROW_HEIGHT = 0.012
-GEAR_SETUP_VIEW_CENTERS = ((0.310, 0.095), (0.375, 0.095))
+GEAR_SETUP_VIEW_CENTER = (0.340, 0.095)
 GEAR_SETUP_VIEW_SCALE = (1, 5)
-GEAR_SETUP_VIEW_LABELS = (
-    "ITEMS 25/27\nCONE STACK — SCALE 1:5",
-    "ITEMS 1/28\nDRUM STACK — SCALE 1:5",
+GEAR_SETUP_VIEW_LABEL = (
+    "GEAR TRAIN — ITEMS 1/25/27/28 — SCALE 1:5\n"
+    "SEE SCHEDULE AND REQUIREMENTS AT LEFT"
 )
-GEAR_SETUP_VIEW_LABEL_ORIGINS = ((0.285, 0.125), (0.350, 0.125))
+GEAR_SETUP_VIEW_LABEL_ORIGIN = (0.290, 0.125)
 
 # Sheet 7: a large parked/disengaged reference view plus scan-friendly setup
 # and functional-acceptance tables.  The saved assembly does not claim to show
@@ -973,18 +973,19 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate gear-train setup sheet")
     _insert_cone_gear_schedule(adapter, bom_table, bom_iso)
     _insert_gear_requirements_table(adapter)
-    for center, label, origin in zip(
-        GEAR_SETUP_VIEW_CENTERS,
-        GEAR_SETUP_VIEW_LABELS,
-        GEAR_SETUP_VIEW_LABEL_ORIGINS,
-        strict=True,
-    ):
-        view = place_view(
-            adapter, str(SOURCE), "*Right", *center, scale=GEAR_SETUP_VIEW_SCALE
-        )
-        set_hidden_lines_removed(adapter, view)
-        if add_note(adapter, label, *origin) is None:
-            raise RuntimeError("failed to add gear setup view label")
+    # ONE view, not two. This used to be a pair -- "CONE STACK" and "DRUM
+    # STACK" -- distinguished only by hiding the other stack's components at
+    # runtime. Without that hiding they are the same right view twice under two
+    # labels, which is worse than not drawing them: the reader would take two
+    # identical pictures for two different subsystems. The stacks are called out
+    # by item number in the schedule and requirements tables beside it.
+    gear_setup = place_view(
+        adapter, str(SOURCE), "*Right", *GEAR_SETUP_VIEW_CENTER,
+        scale=GEAR_SETUP_VIEW_SCALE,
+    )
+    set_hidden_lines_removed(adapter, gear_setup)
+    if add_note(adapter, GEAR_SETUP_VIEW_LABEL, *GEAR_SETUP_VIEW_LABEL_ORIGIN) is None:
+        raise RuntimeError("failed to add gear setup view label")
     if add_note(
         adapter,
         "SHEET 5 OF 7 — GEAR-TRAIN SETUP",
