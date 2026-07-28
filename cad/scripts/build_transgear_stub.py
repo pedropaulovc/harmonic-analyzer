@@ -53,15 +53,19 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from transgear_stub_spec import (
     BASE_DIA,
+    BASE_DIA_BAND,
     BASE_LEN,
     COLLAR_DIA,
     COLLAR_LEN,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     SEAT_DIA,
+    SEAT_DIA_BAND,
     SEAT_LEN,
 )
 
@@ -190,6 +194,16 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    # Tolerance the MODEL dimensions, not the sheet text. SolidWorks renders
+    # and re-renders these; a callout override on the drawing would be a frozen
+    # string beside a live numeral. `deviations` fixes the (upper, lower) ->
+    # (lower, upper) transposition at one chokepoint.
+    set_dimension_bilateral_tolerance(
+        adapter, "StubProfile", "BaseDia", *deviations(BASE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "StubProfile", "SeatDia", *deviations(SEAT_DIA_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

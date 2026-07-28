@@ -5,12 +5,33 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-import pytest
-
+import _fit_limits
 import build_cone_gear_shaft as part
 import cone_gear_shaft_spec
 import draw_cone_gear_shaft as drawing
+import pytest
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def test_section_fits_are_toleranced_on_the_model() -> None:
+    """All five turned lands ride ONE shared fit class, applied to the model.
+
+    Spelled as callout text the band is frozen: SolidWorks prints it verbatim
+    and never re-renders it, so the mm->inch flip in issue #290 would leave
+    "+0.00/-0.02" reading as inches on every land. The identity assertion also
+    stops a local retype from silently forking the shared class.
+    """
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert cone_gear_shaft_spec.SECTION_DIA_BAND is _fit_limits.SHAFT_H
+    # Applied in a loop over the five sections, so the AST reports the f-string
+    # source rather than five literal keys.
+    assert model_toleranced_dimensions(part) == {
+        ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): (
+            "*deviations(SECTION_DIA_BAND)"
+        )
+    }
+    assert 'for section in range(5)' in Path(part.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -61,10 +82,9 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         )
         + (cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION,)
     )
-    # Every seat diameter gets a snug-fit callout and exact-conversion display.
-    assert drawing.DIMENSION_CALLOUTS == {
-        name: "+0.00/-0.02" for name in drawing.END_KEEP
-    }
+    # Every seat diameter carries the snug fit as a NATIVE model tolerance --
+    # see test_section_fits_are_toleranced_on_the_model. Display precision stays
+    # a sheet decision (an exact-conversion nominal needs its decimals shown).
     assert drawing.DIMENSION_PRECISION == {
         name: 4 if name == "Sec0Dia" else 3 for name in drawing.END_KEEP
     }

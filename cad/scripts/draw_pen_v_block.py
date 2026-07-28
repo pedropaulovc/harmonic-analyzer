@@ -38,6 +38,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from pen_v_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -305,7 +306,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=(_sheet_x(BORE_X[0]), TOP_CENTER[1] + 0.016),  # bore 0, top edge
         symbol_xy=(0.205, 0.244),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="pen bore finish (bore 0)",
     )
     bore1_edge = (_sheet_x(BORE_X[1]) + 0.016, TOP_CENTER[1])
@@ -314,7 +315,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=bore1_edge,
         symbol_xy=(0.205, 0.220),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="pen bore finish (bore 1)",
     )
 

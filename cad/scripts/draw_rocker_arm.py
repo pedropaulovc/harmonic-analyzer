@@ -40,6 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from rocker_arm_spec import (
     ARM_THICKNESS,
     PIVOT_HOLE_DIA,
@@ -235,7 +236,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=pivot_bottom,
         symbol_xy=(pivot_bottom[0] + 0.010, pivot_bottom[1] - 0.020),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="pivot bore finish",
     )
     # Datum B (broad face, on the end view) orients the hole axes; datum C

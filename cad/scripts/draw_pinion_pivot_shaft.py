@@ -34,6 +34,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_limits import SHAFT_H, fit_limits
+from _surface_finish import MACHINED
 from pinion_pivot_shaft_spec import (
     CAP_RADIUS,
     CAP_SAG,
@@ -201,7 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=body_face,
         symbol_xy=(0.155, 0.205),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="pinion pivot bearing finish",
         entity_type="FACE",
     )

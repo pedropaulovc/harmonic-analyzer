@@ -18,9 +18,9 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_basic_dimension,
     set_dimension_callouts,
     set_dimension_precision,
-    set_basic_dimension,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -32,8 +32,8 @@ from cone_pivot_post_spec import (
     BORE_HEIGHT,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
-    CRANK_AXIS_ORIENTATION_NOTE,
-    CRANK_AXIS_POINTS,
+    JOURNAL_AXIS_ORIENTATION_NOTE,
+    JOURNAL_AXIS_POINTS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -41,7 +41,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
 )
-
 
 SPEC = DRAWINGS_BY_NAME["cone_pivot_post"]
 PART_STEM = SPEC.artifact_stem
@@ -187,7 +186,7 @@ def _add_basic_value(adapter: Any, value: float, x: float, y: float) -> Any:
         f"{value:.3f}",
         x,
         y,
-        label="crank-axis BASIC coordinate",
+        label="journal-axis BASIC coordinate",
     )
     note = _early_bound(
         note,
@@ -199,13 +198,13 @@ def _add_basic_value(adapter: Any, value: float, x: float, y: float) -> Any:
     )
     # swBS_Box=4 and swBF_Tightest=0 produce an ASME-style BASIC frame.
     if not note.SetBalloon(4, 0):
-        raise RuntimeError("SolidWorks rejected a BASIC crank-axis coordinate")
+        raise RuntimeError("SolidWorks rejected a BASIC journal-axis coordinate")
     if (
         not note.HasBalloon()
         or int(note.GetBalloonStyle()) != 4
         or int(note.GetBalloonSize()) != 0
     ):
-        raise RuntimeError("BASIC crank-axis coordinate box did not persist")
+        raise RuntimeError("BASIC journal-axis coordinate box did not persist")
     return note
 
 
@@ -214,17 +213,17 @@ def _add_crank_axis_table(adapter: Any) -> None:
     """Add a conventional two-point BASIC coordinate definition."""
     _add_table_note(
         adapter,
-        "CRANK-BORE AXIS COORDINATES (mm)",
+        "JOURNAL AXIS COORDINATES (mm)",
         0.220,
         0.265,
-        label="crank-axis table heading",
+        label="journal-axis table heading",
     )
     _add_table_note(
         adapter,
-        CRANK_AXIS_ORIENTATION_NOTE,
+        JOURNAL_AXIS_ORIENTATION_NOTE,
         0.220,
         0.256,
-        label="crank-axis coordinate orientation",
+        label="journal-axis coordinate orientation",
     )
     for column, column_x in zip(
         ("POINT", "X", "Y", "Z"),
@@ -236,13 +235,13 @@ def _add_crank_axis_table(adapter: Any) -> None:
             column,
             column_x,
             0.241,
-            label=f"crank-axis coordinate column {column}",
+            label=f"journal-axis coordinate column {column}",
         )
     for row_y, (point, x_value, y_value, z_value) in zip(
-        (0.232, 0.221), CRANK_AXIS_POINTS, strict=True
+        (0.232, 0.221), JOURNAL_AXIS_POINTS, strict=True
     ):
         _add_table_note(
-            adapter, point, 0.220, row_y, label=f"crank-axis point {point}"
+            adapter, point, 0.220, row_y, label=f"journal-axis point {point}"
         )
         for column_x, value in zip(
             (0.248, 0.290, 0.332),
@@ -255,7 +254,7 @@ def _add_crank_axis_table(adapter: Any) -> None:
         "AXIS = LINE THROUGH P AND Q",
         0.280,
         0.209,
-        label="crank-axis table definition",
+        label="journal-axis table definition",
     )
     adapter.currentModel.EditRebuild3()
 

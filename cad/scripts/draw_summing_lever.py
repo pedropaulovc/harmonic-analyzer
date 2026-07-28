@@ -41,6 +41,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from summing_lever_spec import (
     ANCHOR_BORE_R,
     ANCHOR_R,
@@ -188,7 +189,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=knife_edge,
         symbol_xy=(knife_edge[0] + 0.015, knife_edge[1] + 0.015),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="knife-edge ridge finish",
     )
     # Use a separate point on the bore rim so the position-frame leader does

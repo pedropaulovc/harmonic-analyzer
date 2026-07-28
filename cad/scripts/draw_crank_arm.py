@@ -42,6 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from crank_arm_spec import (
     ARM_C2C,
     ARM_END_X,
@@ -483,7 +484,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=shaft_edge_lower,
         symbol_xy=(0.022, 0.125),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="shaft bore finish",
     )
 

@@ -48,13 +48,18 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from cone_tip_adjuster_spec import (
     CHAMFER,
     CUP_DEPTH,
     CUP_DIA,
+    CUP_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    GENERAL_TOL_MM,
     SLOT_D,
     SLOT_W,
 )
@@ -253,6 +258,13 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "screw axis")
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    # Tolerance the MODEL dimensions so SolidWorks renders (and re-renders)
+    # them; the sheet used to append "+/-0.10" and "+0.05/-0.00" as frozen text.
+    set_dimension_symmetric_tolerance(adapter, "Body", "BodyLenDim", GENERAL_TOL_MM)
+    set_dimension_symmetric_tolerance(adapter, "SlotProfile", "SlotWDim", GENERAL_TOL_MM)
+    set_dimension_bilateral_tolerance(
+        adapter, "CupProfile", "CupDiaDim", *deviations(CUP_DIA_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

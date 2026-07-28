@@ -2011,6 +2011,42 @@ def add_edge_dimension(
     return dimension
 
 
+@_telemetry.traced("drawing.find_edge_near", label_param="label")
+def find_edge_near(
+    adapter: Any,
+    view: Any,
+    xy: tuple[float, float],
+    *,
+    axis: Literal["x", "y"],
+    label: str,
+    span_m: float = 0.0015,
+    step_m: float = 0.00025,
+    entity_type: str = "EDGE",
+) -> tuple[float, float]:
+    """Refine an approximate sheet point to a selectable drawing edge."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate {label} drawing view")
+    steps = int(round(span_m / step_m))
+    offsets = sorted((index * step_m for index in range(-steps, steps + 1)), key=abs)
+    for offset in offsets:
+        x = xy[0] + (offset if axis == "x" else 0.0)
+        y = xy[1] + (offset if axis == "y" else 0.0)
+        draw.ClearSelection2(True)
+        if not draw.Extension.SelectByID2(
+            "", entity_type, x, y, 0.0, False, 0, null_callout(), 0
+        ):
+            continue
+        draw.ClearSelection2(True)
+        if offset:
+            _telemetry.debug(
+                f"{label}: edge found {offset * 1000:+.2f} mm off nominal"
+            )
+        return x, y
+    raise RuntimeError(f"{label}: no edge within {span_m * 1000:.1f} mm")
+
+
 @_telemetry.traced("drawing.visible_entity_scan", label_param="label")
 def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[Any]:
     """All visible entities of ``entity_kind`` across the view's components.

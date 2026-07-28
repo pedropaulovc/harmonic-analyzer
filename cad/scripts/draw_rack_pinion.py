@@ -28,6 +28,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
+from _surface_finish import MACHINED
 from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -150,7 +151,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.055),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="rack pinion bore finish",
         entity=bore_edge,
     )

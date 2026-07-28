@@ -21,6 +21,17 @@ SLOT_W = 1.5  # driver slot width
 SLOT_D = 1.5  # driver slot depth
 CHAMFER = 0.4  # both thread starts, 45 degrees
 
+# Machining tolerances, applied to the MODEL dimension by
+# build_cone_tip_adjuster -- never typed as sheet callout text, which
+# SolidWorks freezes and never re-renders on a unit change.
+#
+# The general turned/milled class for this part: the body length and the driver
+# slot are ordinary machined features with no fit partner.
+GENERAL_TOL_MM = 0.10
+# The cup is a blind bore the cone-shaft tip rests in; it may run oversize (more
+# end-play takeup) but never under, so the band is unilateral.
+CUP_DIA_BAND = (0.050, 0.000)
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BodyProfile": {"BodyDiaDim"},
     "Body": {"BodyLenDim"},

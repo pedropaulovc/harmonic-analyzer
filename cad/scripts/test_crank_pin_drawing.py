@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _surface_finish
 import build_crank_pin as part
 import crank_pin_spec
 import draw_crank_pin as drawing
+from _drawing_contract import assert_sheet_references
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -57,7 +59,7 @@ def test_linked_notes_define_remaining_pin_operations() -> None:
 def test_native_finish_symbol_controls_taper_seat() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_surface_finish(") == 1
-    assert 'roughness_ra="1.6"' in source
+    assert_sheet_references(drawing, "MACHINED", _surface_finish.MACHINED)
 
 
 def test_view_scales_are_explicit() -> None:

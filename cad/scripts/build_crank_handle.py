@@ -57,7 +57,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 
 PART_NAME = "crank-handle"
@@ -73,6 +75,7 @@ from crank_handle_spec import (  # noqa: E402
     DRAWING_NOTES,
     FRONT_PROFILE_R,
     HANDLE_LENGTH,
+    HANDLE_LENGTH_BAND,
     HANDLE_MAX_DIA,
     ISOMETRIC_VIEW_NOTE,
     NECK_R,
@@ -331,6 +334,11 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: mark exactly the print's axial dimensions
     # and stamp the make-critical title-block properties.
+    # Wood-overall band on the MODEL dimension; the sheet used to append
+    # "+0.00/-0.25 OVERALL" as frozen callout text beside a live numeral.
+    set_dimension_bilateral_tolerance(
+        adapter, "HandleProfile", "HandleLength", *deviations(HANDLE_LENGTH_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

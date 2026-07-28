@@ -34,6 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from magnifying_clamp_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -215,7 +216,7 @@ async def build(adapter: Any) -> dict[str, str]:
             _front_y(LEVER_BORE_Y),
         ),
         symbol_xy=(FRONT_CENTER[0] + 0.030, _front_y(LEVER_BORE_Y) + 0.008),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="lever bore finish",
     )
 

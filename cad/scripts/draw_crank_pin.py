@@ -19,6 +19,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from crank_pin_spec import BIG_END_DIA, PIN_LENGTH, SMALL_END_DIA
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -183,7 +184,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=BIG_END_EDGE,
         symbol_xy=(FRONT_CENTER[0] - 0.018, FRONT_CENTER[1] + 0.022),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="taper seating finish",
     )
 

@@ -23,6 +23,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from transgear_stub_spec import (
     BASE_DIA,
     BASE_LEN,
@@ -97,7 +98,10 @@ FRONT_KEEP = {
     "SeatLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN + SEAT_LEN / 2.0)),
     "CollarLength": (_LENGTH_CHAIN_X, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
 }
-DIMENSION_CALLOUTS = {"BaseDia": "+0.00/-0.05", "SeatDia": "+0.00/-0.02"}
+# No callout overrides: both diameter bands are toleranced on the MODEL
+# dimension by build_transgear_stub (transgear_stub_spec.BASE_DIA_BAND /
+# SEAT_DIA_BAND), so SolidWorks renders the limits natively.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 # The base is a 3/8" conversion: display 9.525, not a false-precision 9.53.
 DIMENSION_PRECISION = {"BaseDia": 3}
 
@@ -202,7 +206,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(_fx(SEAT_DIA / 2.0), _fy(BASE_LEN + SEAT_LEN / 2.0)),
         symbol_xy=(_fx(SEAT_DIA / 2.0) + 0.008, _fy(BASE_LEN + SEAT_LEN / 2.0) + 0.004),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="gear seat finish",
         entity_type="SILHOUETTE",
     )
