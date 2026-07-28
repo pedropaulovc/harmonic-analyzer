@@ -504,11 +504,23 @@ f.close()
 
 
 @pytest.mark.skipif(
-    os.name != "nt",
-    reason="the buffered path is only broken on Windows; POSIX 'a' is already O_APPEND",
+    not os.environ.get("HARMONIC_TELEMETRY_RACE_REPRO"),
+    reason=(
+        "opt-in: asserts a RACE reproduces, so it cannot gate check:telemetry. "
+        "Run with HARMONIC_TELEMETRY_RACE_REPRO=1 on Windows."
+    ),
 )
 def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
-    """Positive control for the fix above -- pin WHY the atomic writer exists.
+    """Opt-in repro for WHY the atomic writer exists. NOT a gating test.
+
+    This asserts that a race *reproduces*, which is inherently nondeterministic:
+    nothing forces the workers to overlap, so a lucky scheduler or a fast enough
+    filesystem can let all 2,000 records through intact and fail this assertion
+    even though ``_AtomicJsonlWriter`` is perfectly correct (Codex P2). A
+    mandatory gate must never be able to go red that way -- the repo's rule is
+    that there are no flaky tests, only broken ones -- so it is gated behind
+    ``HARMONIC_TELEMETRY_RACE_REPRO=1`` and kept as executable documentation of
+    the measurement, not as a check.
 
     **Windows only, and that is the point.** CPython's ``open(path, "a")`` maps
     to ``O_APPEND`` on POSIX, where the kernel places each write, so the
@@ -556,18 +568,40 @@ def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
     )
 
 
-def test_short_append_raises_rather_than_writing_half_a_record(tmp_path, monkeypatch):
-    """A partial write is the malformed JSONL this exists to prevent -- fail loud."""
+def test_short_append_finishes_the_record_and_never_raises(tmp_path, monkeypatch):
+    """A partial write is completed, not raised.
+
+    ``write`` runs synchronously inside ``SimpleSpanProcessor`` on the calling
+    thread, so raising here would let a low-disk or I/O error abort real pipeline
+    work -- and AGENTS.md makes capture best-effort, never fatal (Codex P2). The
+    record is still finished rather than left truncated, which is the malformed
+    JSONL this class exists to prevent.
+    """
+    record = '{"hello": "world"}\n'
     writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
     try:
-        if writer._handle is not None:
-            import win32file
+        chunks: list[bytes] = []
 
-            monkeypatch.setattr(win32file, "WriteFile", lambda *a, **k: (0, 3))
-        else:
-            monkeypatch.setattr(_telemetry.os, "write", lambda *a, **k: 3)
-        with pytest.raises(OSError, match="short telemetry append"):
-            writer.write('{"hello": "world"}\n')
+        def dribble(payload: bytes) -> int:
+            chunks.append(payload[:3])
+            return 3  # always short: 3 bytes at a time
+
+        monkeypatch.setattr(writer, "_raw_write", dribble)
+        assert writer.write(record) == len(record)  # must not raise
+    finally:
+        writer.close()
+    assert b"".join(chunks).decode() == record, "the record was left truncated"
+
+
+def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypatch):
+    """An I/O error during capture drops the record; it does not fail the build."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    try:
+        def explode(_payload: bytes) -> int:
+            raise OSError("disk full")
+
+        monkeypatch.setattr(writer, "_raw_write", explode)
+        assert writer.write('{"hello": "world"}\n') == 19  # swallowed
     finally:
         writer.close()
 

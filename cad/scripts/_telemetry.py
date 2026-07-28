@@ -309,8 +309,7 @@ class _AtomicJsonlWriter:
     below exists only so the SolidWorks-free telemetry tests stay meaningful in a
     Linux review sandbox -- CPython's ``"a"`` already does exactly that there.
 
-    A short write is raised rather than ignored: half a record is exactly the
-    malformed JSONL this exists to prevent.
+    Writing is best-effort and never raises -- see ``write``.
     """
 
     def __init__(self, path: Path):
@@ -335,17 +334,39 @@ class _AtomicJsonlWriter:
             return
         self._fd = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o666)
 
-    def write(self, value: str) -> int:
-        payload = value.encode("utf-8")
+    def _raw_write(self, payload: bytes) -> int:
         if self._handle is not None:
             import win32file
 
             _, written = win32file.WriteFile(self._handle, payload)
-        else:
-            assert self._fd is not None
-            written = os.write(self._fd, payload)
-        if written != len(payload):
-            raise OSError(f"short telemetry append: {written}/{len(payload)} bytes")
+            return int(written)
+        assert self._fd is not None
+        return os.write(self._fd, payload)
+
+    def write(self, value: str) -> int:
+        """Append one record, best-effort.
+
+        This runs SYNCHRONOUSLY inside ``SimpleSpanProcessor`` /
+        ``SimpleLogRecordProcessor``, so it executes on the calling thread every
+        time a span ends or a log is emitted. It therefore must NEVER raise:
+        AGENTS.md makes file capture best-effort ("telemetry capture must never
+        be the reason a build fails"), and a low-disk or I/O error here would
+        otherwise abort real pipeline work (Codex P2).
+
+        A short write is finished rather than ignored -- leaving a truncated line
+        behind is the malformed JSONL this class exists to prevent -- but if even
+        that fails the record is dropped silently. Errors are not routed through
+        ``_telemetry``'s own logging: that would re-enter this exporter.
+        """
+        payload = value.encode("utf-8")
+        try:
+            while payload:
+                written = self._raw_write(payload)
+                if written <= 0:
+                    break
+                payload = payload[written:]
+        except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
+            pass
         return len(value)
 
     def flush(self) -> None:
