@@ -894,9 +894,9 @@ def _create_component_balloon(
     # elsewhere; different anchors prove it and earn the cost of ordering them.
     #
     # ONE geometry read, on the winner only. Ordering every visible edge by its
-    # curve endpoints was tried and is unusable here -- a GetCurve +
-    # GetCurveParams2 pair per edge at ~250 ms a COM read, over the hundreds of
-    # tooth edges a gear view carries, ran a single balloon into the minutes.
+    # curve endpoints was tried and is unusable here -- a GetCurve (24.6 ms,
+    # measured) + GetCurveParams2 (2.6 ms) pair per edge, over the 481-577
+    # visible edges a gear view carries, is ~13 s for a SINGLE balloon.
     _telemetry.event(
         "drawing.balloon_anchor",
         stem=stem,

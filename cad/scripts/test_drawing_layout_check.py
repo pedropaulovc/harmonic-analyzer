@@ -1420,10 +1420,11 @@ def test_anchor_reads_geometry_once_not_once_per_visible_edge():
 
     Ordering the edges by geometry WAS tried, to make the anchor deterministic
     by construction. It costs a GetCurve + GetCurveParams2 pair per visible
-    edge, and a COM property read runs ~250 ms on the seat -- a gear end view
-    has hundreds of tooth edges, so one balloon ran into the minutes and the
-    32-balloon drive-train sheet never finished. This pins the cost at O(1) per
-    balloon so the regression cannot come back quietly.
+    edge -- 24.6 ms + 2.6 ms, each MEASURED on this seat rather than inferred
+    from a paired total. A gear end view carries 481-577 visible edges, so that
+    is ~13 s per balloon and ~7 min for the 32-balloon drive-train sheet, which
+    is why it never finished. This pins the cost at O(1) per balloon so the
+    regression cannot come back quietly.
     """
     low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
     picked = _anchor({"cone-gear": [low, mid, high]})

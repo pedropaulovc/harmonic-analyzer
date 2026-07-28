@@ -3125,10 +3125,11 @@ def _pick_component_anchor_edge(
 
     **Suspect, not culprit -- so this MEASURES before it pays.** Ordering the
     edges by geometry would settle it, and was tried: it costs a ``GetCurve`` +
-    ``GetCurveParams2`` pair per visible edge, and on this seat a COM property
-    read runs ~250 ms. A gear end view carries hundreds of tooth edges, so one
-    balloon ran into the minutes and the 32-balloon sheet never finished. That
-    is far too much to spend defending against an unproven hypothesis.
+    ``GetCurveParams2`` pair per visible edge -- 24.6 ms + 2.6 ms, MEASURED per
+    call, not inferred from a paired total. A gear end view carries 481-577
+    visible edges, so that is ~13 s per balloon and ~7 min for the 32-balloon
+    sheet, which is why it never finished. Far too much to spend defending
+    against an unproven hypothesis.
 
     So the pick stays ``edges[0]`` of the first matching leaf -- ONE geometry
     read, on the chosen edge only, to record WHERE it landed. Diff the
