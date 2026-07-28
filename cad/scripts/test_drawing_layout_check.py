@@ -13,6 +13,7 @@ print.
 from __future__ import annotations
 
 import math as _math
+import sys
 from inspect import getsource
 from types import SimpleNamespace
 
@@ -1258,3 +1259,306 @@ def test_min_angular_gap_clears_the_audits_SQUARE_not_just_the_circle():
     ring, balloon = 0.05, 0.00472
     gap = drawing_common._min_angular_gap(ring, balloon, clearance=0.0)
     assert gap * ring == pytest.approx(2.0 * _math.sqrt(2.0) * balloon, rel=1e-9)
+
+
+# --- Determinism of the picks that feed the ring order -----------------------
+#
+# The layout audit above is only worth running if the drawing it audits is
+# reproducible. It was not: drive-train built clean on one fleet pass and failed
+# with "1 leader crossing(s)" between items 5 and 27 on the next, same commit,
+# same cached assembly. Every pick below sits upstream of the ring order, and
+# each one used to resolve ties by COM enumeration position -- an order neither
+# GetVisibleEntities2 nor the drawing-component tree documents.
+
+
+class _FakeEdge:
+    """A model edge whose GetCurveParams2 returns fixed endpoints."""
+
+    def __init__(self, params):
+        self._params = params
+        self.curve_reads = 0
+
+    def GetCurve(self):
+        self.curve_reads += 1
+        return object()
+
+    def GetCurveParams2(self):
+        return self._params
+
+
+def test_edge_key_reads_the_endpoints_after_generating_the_curve():
+    edge = _FakeEdge((1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 1.0, 0, 0, 0))
+    key = drawing_common._edge_endpoint_key(_FakeAdapter(None), edge)
+    assert key == (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
+    # GetCurveParams2 reads what GetCurve generated; SolidWorks keeps no curve
+    # of its own, so skipping the call returns stale or empty parameters.
+    assert edge.curve_reads == 1
+
+
+def test_edge_key_is_none_when_the_geometry_cannot_be_read():
+    """An unreadable edge drops out of the running; it must not fail the sheet."""
+
+    class _Mute(_FakeEdge):
+        def GetCurveParams2(self):
+            raise RuntimeError("no curve data")
+
+    assert drawing_common._edge_endpoint_key(
+        _FakeAdapter(None), _Mute(())
+    ) is None
+    assert drawing_common._edge_endpoint_key(
+        _FakeAdapter(None), _FakeEdge((1.0, 2.0))
+    ) is None
+
+
+class _FakeNote:
+    def __init__(self, attach_x, attach_y, radius=0.0047, item="1"):
+        self._attach = (attach_x, attach_y)
+        self._radius = radius
+        self._item = item
+        self.placed = None
+
+    def GetBomBalloonText(self, _upper):
+        # The balloon-specific API. INote.GetText returns the note's generic
+        # text, which for a BOM balloon need not be the item number at all.
+        return self._item
+
+    def GetBalloonInfo(self):
+        return (0, 0, 0, 0, 0, 0, self._radius)
+
+    def GetAnnotation(self):
+        return self
+
+    def GetLeaderPointsAtIndex(self, _index):
+        # Flat x,y,z stream: balloon end first, attachment LAST.
+        return (0.0, 0.0, 0.0, self._attach[0], self._attach[1], 0.0)
+
+    def SetPosition(self, x, y, _z):
+        self.placed = (x, y)
+        return True
+
+
+def _ring_positions(notes):
+    view = SimpleNamespace(GetOutline=lambda: (0.10, 0.10, 0.20, 0.20))
+    adapter = _FakeAdapter(SimpleNamespace(EditRebuild3=lambda: None))
+    drawing_common._spread_balloons(adapter, view, list(notes))
+    return [note.placed for note in notes]
+
+
+def test_balloons_attached_at_one_angle_ring_in_a_fixed_order():
+    """Coaxial attachments tie on theta; the tie must not fall to arrival order.
+
+    Both attachments sit on the +45 deg ray from the view centre, so atan2
+    returns the same theta for each. Sorting on theta alone left whatever
+    relative order AutoBalloon5 happened to hand over, and that order decides
+    which balloon gets which ring slot -- i.e. whether the leaders cross.
+    """
+    near, far = _FakeNote(0.1600, 0.1600), _FakeNote(0.1800, 0.1800)
+    forward = dict(zip(("near", "far"), _ring_positions([near, far])))
+    near2, far2 = _FakeNote(0.1600, 0.1600), _FakeNote(0.1800, 0.1800)
+    reversed_ = dict(zip(("far", "near"), _ring_positions([far2, near2])))
+    assert forward == reversed_
+    assert forward["near"] != forward["far"]
+
+
+def test_ring_order_survives_any_arrival_order():
+    """Shuffling the input must not move a single balloon."""
+    # (0.16, 0.16) and (0.18, 0.18) are collinear with the view centre, so the
+    # set carries a theta tie -- without one a rotation test passes on the
+    # theta-only sort it is meant to guard against.
+    attachments = [
+        (0.1153, 0.1370), (0.1600, 0.1600), (0.1800, 0.1800),
+        (0.1200, 0.1800), (0.1600, 0.1200),
+    ]
+    baseline = dict(
+        zip(attachments, _ring_positions([_FakeNote(x, y) for x, y in attachments]))
+    )
+    for rotation in range(1, len(attachments)):
+        rotated = attachments[rotation:] + attachments[:rotation]
+        got = dict(zip(rotated, _ring_positions([_FakeNote(x, y) for x, y in rotated])))
+        assert got == baseline
+
+
+class _FakeDrawingComponent:
+    def __init__(self, name, children=(), path=""):
+        self.Name = name
+        self._children = tuple(children)
+        self.Component = SimpleNamespace(GetPathName=lambda p=path: p)
+
+    def GetChildren(self):
+        return self._children
+
+
+def _anchor_view(edges_by_component):
+    """A drawing view whose visible edges come back in a caller-chosen order."""
+    leaves = [
+        _FakeDrawingComponent(f"{stem}-1@drive-train", path=f"C:/x/{stem}.SLDPRT")
+        for stem in edges_by_component
+    ]
+    by_path = {
+        leaf.Component.GetPathName(): edges_by_component[stem]
+        for leaf, stem in zip(leaves, edges_by_component)
+    }
+    root = _FakeDrawingComponent("drive-train", children=leaves)
+    return SimpleNamespace(
+        RootDrawingComponent2=lambda _resolve: root,
+        GetVisibleEntities2=lambda component, _kind: by_path[component.GetPathName()],
+    )
+
+
+def _anchor(edges_by_component, stem="cone-gear"):
+    view = _anchor_view(edges_by_component)
+    return drawing_common._pick_component_anchor_edge(
+        _FakeAdapter(None), view, stem=stem, label="drive-train"
+    )
+
+
+def _edge(x):
+    return _FakeEdge((x, 0.0, 0.0, x + 0.01, 0.0, 0.0))
+
+
+
+def test_anchor_reads_geometry_once_not_once_per_visible_edge():
+    """The measurement must stay cheap enough to leave on in every build.
+
+    Ordering the edges by geometry WAS tried, to make the anchor deterministic
+    by construction. It costs a GetCurve + GetCurveParams2 pair per visible
+    edge -- 24.6 ms + 2.6 ms, each MEASURED on this seat rather than inferred
+    from a paired total. A gear end view carries 481-577 visible edges, so that
+    is ~13 s per balloon and ~7 min for the 32-balloon drive-train sheet, which
+    is why it never finished. This pins the cost at O(1) per balloon so the
+    regression cannot come back quietly.
+    """
+    low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
+    picked = _anchor({"cone-gear": [low, mid, high]})
+    assert picked is low
+    assert [e.curve_reads for e in (low, mid, high)] == [1, 0, 0]
+
+
+def test_anchor_records_where_it_landed():
+    """Two passes' drawing.balloon_anchor events are the repro for a moving
+    anchor; an event without coordinates could not settle the question."""
+    recorded = []
+    edge = _edge(0.02)
+    original = drawing_common._telemetry.event
+    drawing_common._telemetry.event = lambda name, **kw: recorded.append((name, kw))
+    try:
+        _anchor({"cone-gear": [edge]})
+    finally:
+        drawing_common._telemetry.event = original
+    name, attrs = recorded[-1]
+    assert name == "drawing.balloon_anchor"
+    assert attrs["stem"] == "cone-gear"
+    assert attrs["edges"] == 1
+    assert attrs["anchor"].startswith("0.020000,0.000000")
+
+
+def test_anchor_survives_an_edge_whose_geometry_will_not_read():
+    """The read is telemetry, not selection -- it must not fail the drawing."""
+
+    class _Mute(_FakeEdge):
+        def GetCurveParams2(self):
+            raise RuntimeError("no curve data")
+
+    mute = _Mute((0.0,))
+    assert _anchor({"cone-gear": [mute]}) is mute
+
+
+def test_anchor_raises_when_the_component_has_no_visible_edge():
+    with pytest.raises(RuntimeError, match="no visible edge"):
+        _anchor({"cone-gear": []})
+
+
+def test_anchor_span_counts_every_leaf_it_walked_not_just_the_match():
+    """The duration has to be readable against the workload that produced it.
+
+    The walk stops at the first component of the requested family, so a "matched"
+    count is almost always 1 -- a scan that traversed 80 leaves and one that
+    traversed 3 both read the same. `visited` is the workload.
+    """
+    recorded = {}
+    original = drawing_common._span_scan_attrs
+    drawing_common._span_scan_attrs = lambda **kw: recorded.update(kw)
+    try:
+        # The walk pops from the END of the child list, so the match is listed
+        # FIRST to put three non-matching leaves ahead of it in traversal order.
+        view = _anchor_view({})
+        leaves = [
+            _FakeDrawingComponent(f"{stem}-1@dt", path=f"C:/x/{stem}.SLDPRT")
+            for stem in ("cone-gear", "filler-c", "filler-b", "filler-a")
+        ]
+        root = _FakeDrawingComponent("dt", children=leaves)
+        edges = {"C:/x/cone-gear.SLDPRT": [_edge(0.01)]}
+        view.RootDrawingComponent2 = lambda _r: root
+        view.GetVisibleEntities2 = lambda c, _k: edges.get(c.GetPathName(), [])
+        drawing_common._pick_component_anchor_edge(
+            _FakeAdapter(None), view, stem="cone-gear", label="dt"
+        )
+    finally:
+        drawing_common._span_scan_attrs = original
+    assert recorded["visited"] == 4, recorded
+    assert recorded["matched"] == 1
+    assert recorded["edges"] == 1
+
+
+def test_coincident_attachments_break_on_the_bom_item_not_arrival_order():
+    """The last geometric tie-break can itself tie.
+
+    Overlapping or coaxial components project to ONE attachment point, so
+    theta, x and y are all equal and the stable sort quietly re-emits
+    AutoBalloon5's arrival order -- the same nondeterminism the sort exists to
+    remove, one level down (Codex P2). The BOM item number is the only field
+    tied to the component's row rather than to when its balloon was created.
+    """
+    same = (0.1700, 0.1700)
+    two, ten = _FakeNote(*same, item="2"), _FakeNote(*same, item="10")
+    forward = dict(zip(("2", "10"), _ring_positions([two, ten])))
+    two2, ten2 = _FakeNote(*same, item="2"), _FakeNote(*same, item="10")
+    reversed_ = dict(zip(("10", "2"), _ring_positions([ten2, two2])))
+    assert forward == reversed_
+    assert forward["2"] != forward["10"]
+
+
+def test_bom_items_order_numerically_not_lexically():
+    """"10" must not sort between "1" and "2" -- a lexical key would reorder a
+    ring whose items ran into double digits, which every assembly sheet does."""
+    keys = [
+        drawing_common._balloon_item_key(_FakeAdapter(None), _FakeNote(0, 0, item=t))
+        for t in ("10", "2", "3")
+    ]
+    assert [key[0] for key in sorted(keys)] == [2, 3, 10]
+
+
+def test_an_unreadable_balloon_item_sorts_last_instead_of_failing():
+    """This key is a TIE-BREAK. Losing it costs placement determinism, not
+    correctness, so it must not take the drawing down with it."""
+
+    class _Mute(_FakeNote):
+        def GetBomBalloonText(self, _upper):
+            raise RuntimeError("no text")
+
+    key = drawing_common._balloon_item_key(_FakeAdapter(None), _Mute(0, 0))
+    assert key == (sys.maxsize, "")
+
+
+def test_the_item_key_reads_the_balloon_api_not_the_note_text():
+    """A tie-break that reads the wrong API is a no-op that looks like a fix.
+
+    `INote::GetText` returns the note's GENERIC text, which for a BOM balloon
+    need not be the item number and can come back empty -- every key would then
+    collapse to (sys.maxsize, "") and the sort would tie on all four fields,
+    restoring exactly the AutoBalloon5 arrival order this exists to break
+    (Codex P2). `GetBomBalloonText(True)` is the displayed upper item, and is
+    what `_balloon_item_number` already uses in this same file.
+    """
+    source = getsource(drawing_common._balloon_item_key)
+    assert "GetBomBalloonText(True)" in source
+    assert "n.GetText()" not in source
+
+
+def test_a_balloon_whose_item_reads_empty_does_not_tie_every_key():
+    """The degenerate case the wrong API would have produced everywhere."""
+    blank = _FakeNote(0.17, 0.17, item="")
+    real = _FakeNote(0.17, 0.17, item="7")
+    adapter = _FakeAdapter(None)
+    assert drawing_common._balloon_item_key(adapter, blank) == (sys.maxsize, "")
+    assert drawing_common._balloon_item_key(adapter, real) == (7, "7")

@@ -353,3 +353,81 @@ def test_live_hierarchical_drawing_names_are_matched_by_leaf() -> None:
     stem = "cone-gear-shaft"
     assert identity.startswith(f"{stem}-")
     assert identity.removeprefix(f"{stem}-").isdigit()
+
+
+class _CountingAdapter:
+    """Adapter that counts how often a component's path is resolved."""
+
+    def __init__(self, path):
+        self._path = path
+        self.path_reads = 0
+
+    def _attempt(self, callback, default=None):
+        try:
+            return callback()
+        except Exception:
+            return default
+
+    def component(self):
+        adapter = self
+
+        class _C:
+            def GetPathName(self):
+                adapter.path_reads += 1
+                return adapter._path
+
+        return _C()
+
+
+def test_a_name_match_still_never_costs_a_path_read():
+    """#440's lazy path: a name that already matched must not pay the round trips.
+
+    This is the ONLY structural saving available here -- a cross-view identity
+    cache was tried and does not work, because IDrawingComponent::Name carries
+    the view, so the same component is a different key in every view (measured:
+    9 views x 80 leaves filled 569 cache entries instead of saturating at 80).
+    """
+    adapter = _CountingAdapter("C:/x/other.SLDPRT")
+    dc = type("_DC", (), {"Component": adapter.component()})()
+    matched = drawing._drawing_component_matches(
+        adapter, dc, frozenset({"cone-gear"}), name="cone-gear-1@dt"
+    )
+    assert matched == {"cone-gear"}
+    assert adapter.path_reads == 0
+
+
+def test_drive_train_balloons_record_their_own_anchor():
+    """The measurement has to be on the drawing that motivated it.
+
+    drive-train does NOT go through _drawing_common's anchor helper -- it has
+    its own _create_component_balloon -- so instrumenting the shared one left
+    the sheet whose crossing started this with no anchor record at all
+    (Codex P1). Diffing two passes' events is the whole repro, and it only works
+    if the events exist here.
+    """
+    source = inspect.getsource(drawing._create_component_balloon)
+    assert 'drawing.balloon_anchor' in source
+    assert '_edge_endpoint_key(adapter, selected_edge)' in source
+    # One read, on the winner -- not one per visible edge. Ordering every edge
+    # by geometry ran a single balloon into the minutes.
+    assert source.count('_edge_endpoint_key') == 1
+
+
+def test_each_isolation_span_names_the_view_it_isolated():
+    """Nine views share this span name, so the timings need a discriminator.
+
+    resolve_s/visible_s exist to say WHICH view is worth attacking; nine
+    identically-named rows cannot answer that, and the view label is already a
+    parameter (Codex P1).
+    """
+    source = inspect.getsource(drawing._isolate_balloon_components)
+    assert 'label_param="label"' in source.splitlines()[0]
+
+
+def test_the_isolation_docstrings_do_not_promise_a_cache_that_is_not_there():
+    """A docstring describing an argument the function does not take sends the
+    next profiling pass down a path already measured and rejected."""
+    for fn in (drawing._isolate_balloon_components, drawing._drawing_component_matches):
+        source = inspect.getsource(fn)
+        assert "``cache``" not in source, fn.__name__
+        assert "cache" not in inspect.signature(fn).parameters, fn.__name__

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _edge_endpoint_key,
     _balloon_item_number,
     _spread_balloons,
     finalize_drawing,
@@ -791,7 +793,11 @@ def _stems_for_identity(identity: str, stems: frozenset[str]) -> set[str]:
 
 
 def _drawing_component_matches(
-    adapter: Any, drawing_component: Any, stems: frozenset[str], *, name: str
+    adapter: Any,
+    drawing_component: Any,
+    stems: frozenset[str],
+    *,
+    name: str,
 ) -> set[str]:
     """Return configured stems represented by one leaf drawing component.
 
@@ -804,6 +810,17 @@ def _drawing_component_matches(
     identities, skipping the path once the name has already matched cannot change
     the result. On the drive-train tree most nodes match on name alone or are
     structure we do not care about, so this removes the majority of the calls.
+
+    It does not remove enough, and there is no cross-view memo to add. This
+    drawing isolates NINE views, each walking the same ~80-leaf tree, and the
+    leaves needing the path are exactly the ones no view matches by name -- so
+    every view re-resolves the same misses (~20 s of the ~35 s per isolation,
+    ~315 s of a 585 s drawing). Caching the identity on ``Name`` was tried and
+    does NOT work: ``IDrawingComponent::Name`` carries the VIEW, so the same
+    physical component is a different key in each of the nine views and the
+    cache never saturates (measured: entries climbing 52 -> 105 -> 569 instead
+    of settling at ~80, for 585 s -> 580 s). Any future memo needs a key that
+    is view-independent; the span attributes below are what would prove it.
     """
     drawing_name = name.split("@", 1)[0].replace("\\", "/")
     matched = _stems_for_identity(drawing_name.rsplit("/", 1)[-1].casefold(), stems)
@@ -826,6 +843,8 @@ def _create_component_balloon(
     """Insert one BOM balloon on a real visible edge of the requested component."""
     selected_view: Any | None = None
     selected_edge: Any | None = None
+    selected_name = ""
+    selected_edge_count = 0
     enumerated: list[str] = []
     for view in views:
         root = adapter._attempt(
@@ -856,6 +875,8 @@ def _create_component_balloon(
                 continue
             selected_view = view
             selected_edge = edges[0]
+            selected_name = name
+            selected_edge_count = len(edges)
             break
         if selected_edge is not None:
             break
@@ -864,6 +885,28 @@ def _create_component_balloon(
             f"drive-train {stem} balloon has no visible edge across drawing views; "
             f"matching components={enumerated}"
         )
+    # Record WHERE the anchor landed. This is the drawing whose sheet built clean
+    # on one fleet pass and failed with "1 leader crossing(s)" on the next, and
+    # `edges[0]` off an enumeration SolidWorks does not order is the obvious
+    # suspect -- but nothing had ever shown it moving, because nothing recorded
+    # it. Diffing two passes' drawing.balloon_anchor events answers that: same
+    # anchors mean the enumeration is stable and the crossing came from
+    # elsewhere; different anchors prove it and earn the cost of ordering them.
+    #
+    # ONE geometry read, on the winner only. Ordering every visible edge by its
+    # curve endpoints was tried and is unusable here -- a GetCurve (24.6 ms,
+    # measured) + GetCurveParams2 (2.6 ms) pair per edge, over the 481-577
+    # visible edges a gear view carries, is ~13 s for a SINGLE balloon.
+    _telemetry.event(
+        "drawing.balloon_anchor",
+        stem=stem,
+        component=selected_name,
+        edges=selected_edge_count,
+        anchor=",".join(
+            f"{value:.6f}"
+            for value in (_edge_endpoint_key(adapter, selected_edge) or ())
+        ),
+    )
 
     draw = adapter.currentModel
     ddoc = _sw_type_info.early_bound_or_flag(draw, "IDrawingDoc", "ActivateView")
@@ -902,7 +945,7 @@ def _create_component_balloon(
     return note, selected_view
 
 
-@_telemetry.traced("drawing.isolate_balloon_components")
+@_telemetry.traced("drawing.isolate_balloon_components", label_param="label")
 def _isolate_balloon_components(
     adapter: Any,
     view: Any,
@@ -910,7 +953,18 @@ def _isolate_balloon_components(
     visible_stems: frozenset[str],
     label: str,
 ) -> None:
-    """Show only the requested enclosed BOM families in an auxiliary view."""
+    """Show only the requested enclosed BOM families in an auxiliary view.
+
+    Nine views call this, so the span carries the view ``label`` -- otherwise
+    the nine rows are indistinguishable and a slow ``resolve_s`` cannot be
+    pinned to the view that spent it.
+
+    The walk is ONE span with its phases TIMED, not a span per component
+    (hundreds of near-instant leaves would drown the trace) and not one opaque
+    number either: identity resolution and the ``Visible`` writes are entirely
+    different optimisations, and only one of them is cacheable, so a single
+    duration could not say which was worth attacking.
+    """
     root = adapter._attempt(
         lambda: view.RootDrawingComponent2(False), default=None
     )
@@ -920,6 +974,9 @@ def _isolate_balloon_components(
     pending = list(_drawing_component_children(root))
     found: set[str] = set()
     enumerated: list[str] = []
+    resolve_s = 0.0
+    visible_s = 0.0
+    leaves = 0
     while pending:
         drawing_component = pending.pop()
         children = _drawing_component_children(drawing_component)
@@ -933,15 +990,26 @@ def _isolate_balloon_components(
         # ever have their visibility set.
         if children:
             continue
+        leaves += 1
+        started = time.perf_counter()
         matched = _drawing_component_matches(
             adapter, drawing_component, visible_stems, name=name
         )
+        marked = time.perf_counter()
         drawing_component.Visible = bool(matched)
+        visible_s += time.perf_counter() - marked
+        resolve_s += marked - started
         if not matched:
             continue
         found.update(matched)
         for stem in matched:
             _telemetry.event("drawing.component_visible", component=stem)
+
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("nodes", len(enumerated))
+    span.set_attribute("leaves", leaves)
+    span.set_attribute("resolve_s", round(resolve_s, 3))
+    span.set_attribute("visible_s", round(visible_s, 3))
 
     missing = sorted(visible_stems - found)
     if missing:
@@ -1238,7 +1306,8 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         set_hidden_lines_removed(adapter, view)
         _isolate_balloon_components(
-            adapter, view, visible_stems=stems, label=f"gear identification {field}"
+            adapter, view, visible_stems=stems,
+            label=f"gear identification {field}",
         )
     _add_component_balloons(
         adapter,
@@ -1276,7 +1345,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         concealed_bottom,
         visible_stems=CONCEALED_BOTTOM_VISIBLE_STEMS,
-        label="bottom",
+        label="bottom"
     )
     bottom_balloons: list[Any] = []
     for stem in sorted(CONCEALED_BOTTOM_STEMS):
@@ -1305,7 +1374,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         concealed_front,
         visible_stems=CONCEALED_FRONT_VISIBLE_STEMS,
-        label="front",
+        label="front"
     )
     front_balloons: list[Any] = []
     for stem in sorted(CONCEALED_FRONT_STEMS):
@@ -1357,7 +1426,8 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         set_hidden_lines_removed(adapter, view)
         _isolate_balloon_components(
-            adapter, view, visible_stems=stems, label=f"gear setup {index}"
+            adapter, view, visible_stems=stems,
+            label=f"gear setup {index}",
         )
         if add_note(adapter, label, *origin) is None:
             raise RuntimeError("failed to add gear setup view label")
@@ -1400,7 +1470,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             view,
             visible_stems=stems,
-            label=f"pinion identification {field}",
+            label=f"pinion identification {field}"
         )
     _add_component_balloons(
         adapter,
@@ -1438,7 +1508,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         pinion_setup,
         visible_stems=PINION_SETUP_VIEW_STEMS,
-        label="pinion parked reference",
+        label="pinion parked reference"
     )
     if add_note(
         adapter,
