@@ -304,3 +304,30 @@ def test_assembly_notes_preserve_the_source_backed_manufacturing_contract() -> N
     )
 
 
+
+
+def test_every_exterior_view_is_a_distinct_orientation():
+    """Two sheets share this tuple; a repeated name is the same picture twice.
+
+    These views used to carry per-view component isolation, which made two
+    *Isometric entries different pictures. Without it, sheet 6 rendered the
+    identical complete assembly under two labels (Codex P2). Nothing else would
+    catch that -- the drawing builds clean and the layout audits pass; it is
+    only WRONG to a reader.
+    """
+    names = drawing.EXTERIOR_VIEW_NAMES
+    assert len(set(names)) == len(names), f"repeated orientation in {names}"
+
+
+def test_exterior_view_labels_do_not_claim_an_isolated_subsystem():
+    """One label per view, and the label describes what the view shows.
+
+    With isolation gone every exterior view shows the WHOLE assembly, so a label
+    naming a subsystem ("PINION CAM / CONTROLS") is a caption for a picture that
+    is not on the sheet.
+    """
+    labels = drawing.EXTERIOR_VIEW_LABELS
+    assert len(labels) == len(drawing.EXTERIOR_VIEW_NAMES)
+    assert len(set(labels)) == len(labels)
+    for label in labels:
+        assert "DRIVE TRAIN" in label, f"{label!r} does not name the subject shown"

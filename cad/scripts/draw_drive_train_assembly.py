@@ -230,15 +230,25 @@ BOM_ROW_HEIGHT = 0.0075
 BOM_MAX_ROW_HEIGHT = 0.0103
 BOM_ISO_CENTER = (0.310, 0.165)
 
-# Sheets 3 and 6: four isolated subsystem views replace the black, overlapping gear
-# bands in the former full-assembly identification views.  Every exterior BOM
-# family appears in exactly one group and gets one deliberately attached balloon.
-EXTERIOR_VIEW_NAMES = ("*Front", "*Isometric", "*Isometric", "*Isometric")
+# Sheets 3 and 6: four exterior views of the WHOLE assembly, each a different
+# standard orientation, ballooned by AutoBalloon5.
+#
+# Four DISTINCT orientations, and the labels name the orientation. Both of those
+# are consequences of dropping the per-view component isolation these views used
+# to carry. Under isolation each view showed one subsystem, so "VIEW B — PINION
+# SUPPORT / STRAPS" was true and two views could share *Isometric and still be
+# different pictures. Without it, entries 1 and 2 were the same picture printed
+# twice under two labels (Codex P2), and all four labels named subsets the sheet
+# no longer shows. Sheet 5's setup views hit this too and were collapsed to one;
+# these carry a real second viewpoint, so they get one instead -- *Trimetric is
+# a genuinely different pictorial with the same footprint, so the sheet layout
+# is unchanged.
+EXTERIOR_VIEW_NAMES = ("*Front", "*Isometric", "*Trimetric", "*Dimetric")
 EXTERIOR_VIEW_LABELS = (
-    "VIEW A — CONE PLATFORM / GEAR TRAIN",
-    "VIEW B — PINION SUPPORT / STRAPS",
-    "VIEW C — PINION CAM / CONTROLS",
-    "VIEW D — CYLINDER / CRANK",
+    "VIEW A — DRIVE TRAIN, FRONT",
+    "VIEW B — DRIVE TRAIN, ISOMETRIC",
+    "VIEW C — DRIVE TRAIN, TRIMETRIC",
+    "VIEW D — DRIVE TRAIN, DIMETRIC",
 )
 GEAR_IDENTIFICATION_VIEW_INDICES = (0, 3)
 GEAR_IDENTIFICATION_VIEW_CENTERS = ((0.120, 0.150), (0.320, 0.150))
