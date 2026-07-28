@@ -4185,53 +4185,25 @@ async def finalize_drawing(
     # Export the PDF while the just-authored drawing is still fully loaded.
     # A large drawing can reopen view-only even when its referenced views report
     # loaded; SolidWorks then rejects PDF SaveAs3 with 0x1001. The SLDDRW is
-    # still reopened below twice and validated as the persisted source artifact.
+    # still reopened once below and validated as the persisted source artifact.
     artifacts = save_drawing(
         adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
     )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
-    drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
-    ddoc = _early_bound(drawing_model, "IDrawingDoc")
-    reopened_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
-    if reopened_names != sheet_names:
-        raise RuntimeError(
-            f"reopened drawing sheets changed: {reopened_names!r} != {sheet_names!r}"
-        )
-    for sheet_name in sheet_names:
-        if not ddoc.ActivateSheet(sheet_name):
-            raise RuntimeError(
-                f"failed to activate reopened drawing sheet {sheet_name!r}"
-            )
-        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-        if sheet is None or not sheet.SetScale(
-            float(scale[0]), float(scale[1]), False, False
-        ):
-            raise RuntimeError(
-                f"failed to persist reopened drawing sheet {sheet_name!r} scale"
-            )
-    sheet_scale_dirty = bool(
-        adapter._get_attr_or_call(drawing_model, "GetSaveFlag")
-    )
-    if sheet_scale_dirty:
-        check(
-            "save final drawing sheet scale",
-            await adapter.save_file(str(outputs.slddrw)),
-        )
-        # The PDF exported above predates this save, so the packaged PDF (and
-        # the PNG rendered from it below) would not match the persisted native
-        # drawing. Re-export while the just-saved doc is still fully loaded
-        # (codex review #361).
-        _telemetry.info("dirty-scale save: re-exporting PDF to match")
-        retry = save_drawing(
-            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
-        )
-        if "pdf" not in retry:
-            raise RuntimeError(
-                "PDF re-export after dirty-scale save failed: " f"{retry!r}"
-            )
-    if not sheet_scale_dirty:
-        _telemetry.info("final drawing sheet scale already persisted; save skipped")
+    # ONE reopen, and it only VALIDATES. The sheet scale is already pinned twice
+    # before this point -- at creation (new_project_drawing) and again just
+    # before the save -- so re-applying it on the reopened document could only
+    # ever paper over a scale that failed to persist. That repair is what forced
+    # the whole reopen -> SetScale -> maybe-save -> re-export-PDF -> reopen-again
+    # dance: a second reopen was needed to prove whatever the repair had written.
+    #
+    # assert_asme_b_sheet below reads the reopened scale and fails loud if it
+    # drifted, which is the outcome we actually want -- a drawing whose scale did
+    # not survive the save is a bug to fix at author time, not something to
+    # silently rewrite on every one of the 93 drawings. Dropping the repair drops
+    # the second reopen with it (~2 s/drawing) and takes a conditional save +
+    # conditional PDF re-export off the COM seat.
     drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
     final_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())

@@ -10,7 +10,6 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-import _drawing_common as common
 import cut_release
 import draw_platen_guide as drawing
 import build_platen_guide as guide
@@ -249,20 +248,6 @@ def test_drawing_registry_is_unique_and_extensible() -> None:
     assert PROJECT_DRWDOT.suffix.lower() == ".drwdot"
     assert PROJECT_DRWDOT.is_file() and PROJECT_DRWDOT.stat().st_size > 0
 
-
-def test_dirty_reopened_scale_is_reexported_to_pdf() -> None:
-    source = Path(common.__file__).read_text(encoding="utf-8")
-    first_reopen = source.index("await reopen_drawing(adapter, outputs.slddrw)")
-    dirty_branch = source.index("if sheet_scale_dirty:", first_reopen)
-    persisted_pdf_export = source.index(
-        "adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)",
-        dirty_branch,
-    )
-    second_reopen = source.index(
-        "await reopen_drawing(adapter, outputs.slddrw)", first_reopen + 1
-    )
-    assert dirty_branch < persisted_pdf_export < second_reopen
-    assert "PDF re-export after dirty-scale save failed" in source
 
 
 def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:
