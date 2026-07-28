@@ -288,6 +288,106 @@ def _telemetry_dir() -> Path | None:
         return None
 
 
+class _AtomicJsonlWriter:
+    """Append one JSONL record per kernel write, so concurrent processes interleave
+    whole records instead of splicing them.
+
+    Every COM subprocess appends to the SAME ``traces.jsonl``/``logs.jsonl``, and
+    under ``-n N`` a dozen of them are open at once. A buffered ``TextIOWrapper``
+    picks its write offset in user space, so two processes flushing a >4 KB record
+    can land the tail of one inside the other -- observed as malformed lines that
+    break the ``rg``/``jq`` workflow AGENTS.md points at for debugging.
+
+    Opening the file APPEND-ONLY hands end-of-file placement to the kernel for
+    every write, which is what makes a single write indivisible. On Windows that
+    is ``FILE_APPEND_DATA`` **alone** (0x0004 -- combining it with
+    ``FILE_WRITE_DATA`` silently loses the guarantee); on POSIX it is ``O_APPEND``.
+    Either way there is no cross-process lock on the telemetry hot path.
+
+    A short write is raised rather than ignored: half a record is exactly the
+    malformed JSONL this exists to prevent.
+    """
+
+    def __init__(self, path: Path):
+        self._handle: Any | None = None
+        self._fd: int | None = None
+        if os.name == "nt":
+            import win32con
+            import win32file
+
+            _FILE_APPEND_DATA = 0x0004
+            self._handle = win32file.CreateFile(
+                str(path),
+                _FILE_APPEND_DATA,
+                win32con.FILE_SHARE_READ
+                | win32con.FILE_SHARE_WRITE
+                | win32con.FILE_SHARE_DELETE,
+                None,
+                win32con.OPEN_ALWAYS,
+                win32con.FILE_ATTRIBUTE_NORMAL,
+                None,
+            )
+            return
+        self._fd = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o666)
+
+    def write(self, value: str) -> int:
+        payload = value.encode("utf-8")
+        if self._handle is not None:
+            import win32file
+
+            _, written = win32file.WriteFile(self._handle, payload)
+        else:
+            assert self._fd is not None
+            written = os.write(self._fd, payload)
+        if written != len(payload):
+            raise OSError(f"short telemetry append: {written}/{len(payload)} bytes")
+        return len(value)
+
+    def flush(self) -> None:
+        # The record is already in the kernel's hands. Do NOT FlushFileBuffers /
+        # fsync per span -- that would put a disk round-trip on the COM seat.
+        return
+
+    def close(self) -> None:
+        if self._handle is not None:
+            import win32file
+
+            win32file.CloseHandle(self._handle)
+            self._handle = None
+        if self._fd is not None:
+            os.close(self._fd)
+            self._fd = None
+
+
+def _jsonl_stream(path: Path) -> IO[str]:
+    """Atomic-append writer for ``path``, falling back to a buffered append.
+
+    Capture must never be the reason a build fails (or goes dark), so a seat
+    without the Win32 extensions still gets its JSONL -- just without the
+    interleaving guarantee.
+    """
+    try:
+        return cast(IO[str], _AtomicJsonlWriter(path))
+    except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
+        return path.open("a", encoding="utf-8")
+
+
+class _JsonlSpanExporter(ConsoleSpanExporter):
+    """``ConsoleSpanExporter`` that closes its atomic writer on shutdown."""
+
+    def shutdown(self) -> None:
+        with contextlib.suppress(Exception):
+            cast(Any, self.out).close()
+
+
+class _JsonlLogRecordExporter(ConsoleLogRecordExporter):
+    """``ConsoleLogRecordExporter`` that closes its atomic writer on shutdown."""
+
+    def shutdown(self) -> None:
+        with contextlib.suppress(Exception):
+            cast(Any, self.out).close()
+
+
 class _LiveStderr:
     """A write proxy that always targets the CURRENT ``sys.stderr``.
 
@@ -417,10 +517,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     tdir = _telemetry_dir()
     if tdir is not None:
         with contextlib.suppress(Exception):
-            traces = (tdir / "traces.jsonl").open("a", encoding="utf-8")
+            traces = _jsonl_stream(tdir / "traces.jsonl")
             _span_processors.append(
                 SimpleSpanProcessor(
-                    ConsoleSpanExporter(
+                    _JsonlSpanExporter(
                         out=traces, formatter=lambda s: s.to_json(indent=None) + "\n"
                     )
                 )
@@ -442,10 +542,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     logger_provider = LoggerProvider(resource=resource)
     if tdir is not None:
         with contextlib.suppress(Exception):
-            logs = (tdir / "logs.jsonl").open("a", encoding="utf-8")
+            logs = _jsonl_stream(tdir / "logs.jsonl")
             logger_provider.add_log_record_processor(
                 SimpleLogRecordProcessor(
-                    ConsoleLogRecordExporter(
+                    _JsonlLogRecordExporter(
                         out=logs, formatter=lambda r: r.to_json(indent=None) + "\n"
                     )
                 )

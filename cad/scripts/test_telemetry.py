@@ -12,6 +12,7 @@ log<->trace correlation, and cross-process trace-context propagation.
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 import sys
 import time
@@ -438,6 +439,139 @@ def test_set_service_relabels_resource_fallback_only():
         assert _telemetry._service_name == "verify-kinematics"
     finally:
         _telemetry.set_service(original, force=True)
+
+
+# --------------------------------------------------------------------------- #
+# Atomic JSONL appends. Every COM subprocess appends to the SAME traces.jsonl /
+# logs.jsonl, so a record must cross the process boundary whole -- a spliced line
+# breaks the rg/jq debugging workflow AGENTS.md relies on.
+# --------------------------------------------------------------------------- #
+
+_APPEND_WORKER = r"""
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import _telemetry
+
+target, worker, count, pad = Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+w = _telemetry._AtomicJsonlWriter(target)
+for i in range(count):
+    w.write(json.dumps({"worker": worker, "i": i, "pad": "x" * pad}) + "\n")
+w.close()
+"""
+
+
+def test_concurrent_appends_never_splice_a_record(tmp_path):
+    """8 processes x 250 oversized records land as 2000 intact, unique JSON lines."""
+    workers, per_worker, pad = 8, 250, 20_000  # pad >> the 8 KB default buffer
+    target = tmp_path / "traces.jsonl"
+    script = tmp_path / "append_worker.py"
+    script.write_text(_APPEND_WORKER, encoding="utf-8")
+    scripts_dir = str(Path(__file__).resolve().parent)
+
+    procs = [
+        subprocess.Popen(
+            [sys.executable, str(script), scripts_dir, str(target),
+             str(w), str(per_worker), str(pad)],
+        )
+        for w in range(workers)
+    ]
+    for proc in procs:
+        assert proc.wait(timeout=180) == 0
+
+    lines = target.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == workers * per_worker, (
+        f"expected {workers * per_worker} lines, got {len(lines)}"
+    )
+    seen = set()
+    for n, line in enumerate(lines):
+        record = json.loads(line)  # a spliced record raises here
+        assert len(record["pad"]) == pad, f"line {n} truncated"
+        seen.add((record["worker"], record["i"]))
+    assert seen == {(w, i) for w in range(workers) for i in range(per_worker)}
+
+
+_BUFFERED_WORKER = r"""
+import json, sys
+from pathlib import Path
+target, worker, count, pad = Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+f = target.open("a", encoding="utf-8")          # the pre-fix buffered path
+for i in range(count):
+    f.write(json.dumps({"worker": worker, "i": i, "pad": "x" * pad}) + "\n")
+f.close()
+"""
+
+
+def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
+    """Positive control for the fix above -- pin WHY the atomic writer exists.
+
+    Python's ``open(path, "a")`` is not an append-only kernel handle on Windows:
+    each process picks its own end-of-file offset, so concurrent writers both
+    splice records AND overwrite each other. Measured on this repo's seat with
+    8 x 250 x 20 KB records: 1516 of 2000 lines survived, 18 structurally
+    malformed. Without this control, "the buffered path is broken" would be a
+    claim with no repro -- and the atomic test above would prove only that
+    SOMETHING passes, not that it fixed anything.
+    """
+    workers, per_worker, pad = 8, 250, 20_000
+    target = tmp_path / "traces.jsonl"
+    script = tmp_path / "buffered_worker.py"
+    script.write_text(_BUFFERED_WORKER, encoding="utf-8")
+
+    procs = [
+        subprocess.Popen(
+            [sys.executable, str(script), str(target),
+             str(w), str(per_worker), str(pad)],
+        )
+        for w in range(workers)
+    ]
+    for proc in procs:
+        assert proc.wait(timeout=180) == 0
+
+    lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
+    intact = 0
+    for line in lines:
+        try:
+            json.loads(line)
+            intact += 1
+        except Exception:  # noqa: BLE001 - counting damage, not handling it
+            pass
+    assert intact < workers * per_worker, (
+        "buffered concurrent appends survived intact -- if this ever passes "
+        "cleanly, the platform changed and _AtomicJsonlWriter may be redundant"
+    )
+
+
+def test_short_append_raises_rather_than_writing_half_a_record(tmp_path, monkeypatch):
+    """A partial write is the malformed JSONL this exists to prevent -- fail loud."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    try:
+        if writer._handle is not None:
+            import win32file
+
+            monkeypatch.setattr(win32file, "WriteFile", lambda *a, **k: (0, 3))
+        else:
+            monkeypatch.setattr(_telemetry.os, "write", lambda *a, **k: 3)
+        with pytest.raises(OSError, match="short telemetry append"):
+            writer.write('{"hello": "world"}\n')
+    finally:
+        writer.close()
+
+
+def test_jsonl_stream_falls_back_when_the_atomic_path_is_unavailable(tmp_path, monkeypatch):
+    """Capture must never go dark: an unusable atomic writer degrades to buffered."""
+    def boom(_path):
+        raise RuntimeError("no win32 extensions here")
+
+    monkeypatch.setattr(_telemetry, "_AtomicJsonlWriter", boom)
+    stream = _telemetry._jsonl_stream(tmp_path / "logs.jsonl")
+    try:
+        stream.write('{"fallback": true}\n')
+    finally:
+        stream.close()
+    assert json.loads((tmp_path / "logs.jsonl").read_text(encoding="utf-8")) == {
+        "fallback": True
+    }
 
 
 if __name__ == "__main__":
