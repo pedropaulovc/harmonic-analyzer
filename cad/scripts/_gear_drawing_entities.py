@@ -11,18 +11,42 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import _telemetry
 from _common import _early_bound
 
 
+def _span_attrs(**attributes: float) -> None:
+    """Attach aggregate scan counts to the CURRENT span.
+
+    ``@traced`` owns the span, so there is no handle to set attributes on --
+    reach for the active one. A no-op when nothing is recording, so callers
+    never guard.
+    """
+    span = _telemetry.trace.get_current_span()
+    for key, value in attributes.items():
+        span.set_attribute(key, value)
+
+
+@_telemetry.traced("drawing.pick_circle_edge")
 def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
-    """Return the visible circular model edge matching ``diameter_mm``."""
+    """Return the visible circular model edge matching ``diameter_mm``.
+
+    Costs ~5 COM round trips per visible edge (early-bind, GetCurve,
+    early-bind, IsCircle, CircleParams), so a gear end view with hundreds of
+    tooth edges makes this the most expensive step in its drawing. The counts go
+    on the SPAN's own attributes, not just a span event: the profiling workflow
+    reads span lines, where an event's attributes do not appear. The per-edge
+    work stays inside ONE span rather than flooding the trace with leaves.
+    """
     candidates: list[tuple[float, Any]] = []
+    edge_count = 0
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         edges = adapter._attempt(
             lambda c=component: view.GetVisibleEntities2(c, 1), default=()
         ) or ()
         for edge in edges:
+            edge_count += 1
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if not curve.IsCircle():
@@ -30,6 +54,8 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
             radius_mm = float(curve.CircleParams[6]) * 1000.0
             candidates.append((radius_mm, edge))
 
+    _span_attrs(edges=edge_count, circles=len(candidates),
+                diameter_mm=diameter_mm)
     target_radius = diameter_mm / 2.0
     if not candidates:
         raise RuntimeError("drawing view has no visible circular model edge")
@@ -42,18 +68,25 @@ def visible_circle_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
     return edge
 
 
+@_telemetry.traced("drawing.pick_tooth_silhouette")
 def visible_tooth_tip_silhouette(
     adapter: Any, view: Any, outside_diameter_mm: float
 ) -> Any:
-    """Return the upper side-view silhouette at the specified tooth-tip radius."""
+    """Return the upper side-view silhouette at the specified tooth-tip radius.
+
+    Like its circle-edge sibling, the aggregate scan counts go on the span's own
+    attributes so the cost is attributable from the span line alone.
+    """
     target_radius_m = outside_diameter_mm / 2000.0
     candidates: list[tuple[float, Any]] = []
+    silhouette_count = 0
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
         silhouettes = adapter._attempt(
             lambda c=component: view.GetVisibleEntities2(c, 4), default=()
         ) or ()
         for raw_silhouette in silhouettes:
+            silhouette_count += 1
             silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
             start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
             end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
@@ -72,6 +105,11 @@ def visible_tooth_tip_silhouette(
             mean_y = (float(start_xyz[1]) + float(end_xyz[1])) / 2.0
             candidates.append((mean_y, silhouette))
 
+    # scanned, not just matched: the COM cost is per silhouette PROCESSED (each
+    # costs an early-bind plus two endpoint reads), so two views with the same
+    # match count but wildly different scan counts must not look alike.
+    _span_attrs(silhouettes=silhouette_count, matched=len(candidates),
+                outside_diameter_mm=outside_diameter_mm)
     if not candidates:
         raise RuntimeError(
             "no visible tooth-tip silhouette matches radius "

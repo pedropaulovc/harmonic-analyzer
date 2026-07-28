@@ -1842,6 +1842,18 @@ def set_reference_dimension(
     return display
 
 
+def _span_scan_attrs(**attributes: float) -> None:
+    """Attach aggregate scan counts to the CURRENT span.
+
+    ``@traced`` owns the span, so there is no handle to set attributes on.
+    A no-op when nothing is recording, so callers never guard.
+    """
+    span = _telemetry.trace.get_current_span()
+    for key, value in attributes.items():
+        span.set_attribute(key, value)
+
+
+@_telemetry.traced("drawing.dimension_precision")
 def set_dimension_precision(
     adapter: Any, annotations: Iterable[Any], precision: dict[str, int]
 ) -> None:
@@ -1853,12 +1865,20 @@ def set_dimension_precision(
     display 3 so the view matches the note (otherwise 9.53-on-view vs
     9.525-in-note reads as a contradiction).  Keyed on the parametric dimension
     name so a value collision can never repick the wrong dimension.
+
+    The span carries how many annotations were SCANNED alongside how many were
+    changed: recipes hand this collections of very different sizes, so without
+    the scan count the duration cannot be attributed to its workload -- the same
+    distinction the geometry scans in ``_gear_drawing_entities`` record.
     """
     # swDimensionPrecisionSettings_e.swDoNotChangePrecisionSetting: leave the
     # dual / tolerance precisions untouched, override only the primary.
     do_not_change = -1
     remaining = dict(precision)
+    scanned = 0
+    changed = 0
     for annotation in annotations:
+        scanned += 1
         annotation = _sw_type_info.early_bound_or_flag(
             annotation, "IAnnotation", "GetSpecificAnnotation"
         )
@@ -1890,6 +1910,8 @@ def set_dimension_precision(
                 f"precision override on dimension {name!r} did not take: "
                 f"requested {digits} decimals, dimension reports {applied}"
             )
+        changed += 1
+    _span_scan_attrs(scanned=scanned, changed=changed)
     if remaining:
         raise RuntimeError(
             f"dimension precision not applied: {sorted(remaining)}"
