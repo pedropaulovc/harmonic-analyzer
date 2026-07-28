@@ -5,41 +5,49 @@ metadata:
   type: project
 ---
 
-First real per-span breakdown of the drawing fleet, from the `drawing.*` spans
-added in #437. Source: the 34 drawings completed in #440's pass-1 console log on
-2026-07-28 (`⟩ <span> <secs>s` lines; medians, so the assembly outliers do not
-skew them).
+Per-span breakdown of the drawing fleet, from the `drawing.*` spans added in
+#437. Source: **826 drawing builds across nine 93-drawing passes** (2026-07-27/28
+console logs, `⟩ <span> <secs>s` lines). Figures are the MEDIAN ACROSS PASSES of
+each span's per-pass total — not one pass extrapolated, and not a per-drawing
+median, which understates the skewed spans badly (`drawing.reopen` reads 2.1 s
+median but 4.0 s mean).
 
-| span | median | × 93 | what it is |
+| span | s/pass | passes | what it is |
 |---|---:|---:|---|
-| `drawing.build` | 32.2 s | — | the whole recipe body |
-| `drawing.finalize` | 12.5 s | — | save → PDF → reopen → validate (39% of build) |
-| `drawing.new_from_template` | 5.4 s | 506 s | template instantiation |
-| `drawing.reopen` | 4.7 s | 435 s | round-trip the saved artefact |
-| `drawing.layout_audit` | 4.3 s | 400 s | `check_drawing_layout` on the reopened doc |
-| `drawing.normalize_edge_break` | 2.2 s | 200 s | rewrite one template note, per drawing |
-| `drawing.save_and_export_pdf` | 1.9 s | 177 s | |
+| `drawing.build` | 3579 | 9 | the whole fleet's recipe bodies |
+| `drawing.finalize` | 1095 | 3 | save → PDF → reopen → validate |
+| `drawing.new_from_template` | 444 | 3 | template instantiation |
+| `drawing.layout_audit` | 411 | 9 | `check_drawing_layout` on the reopened doc |
+| `drawing.reopen` | 372 | 3 | round-trip the saved artefact |
+| `drawing.save_and_export_pdf` | 323 | 3 | |
+| `drawing.curate_dimensions` | 236 | 3 | |
+| `drawing.normalize_edge_break` | 192 | 9 | rewrite one template note, per drawing |
 
-`drawing.finalize` is ~87% accounted for by reopen + layout_audit +
-save_and_export_pdf, so there is no hidden cost left in it to find.
+`drawing.finalize` = reopen + layout_audit + save_and_export_pdf (372 + 411 +
+323 = 1106 ≈ 1095), so it is fully accounted and has no hidden cost left in it.
+Only the spans with `passes: 9` predate #437; the rest exist only in logs from
+#437 onward, which is why their sample is 3 passes.
 
 **Why:** the reassessment of #382/#384/#389/#407 proposed deleting the reopen,
 the layout audit and the edge-break normalizer together as "runtime normalizers"
-— about 1035 s/pass, ~26% of the fleet. This profile says two of those three are
+— ~975 s/pass, 27% of the fleet. This profile says two of those three are
 *validation*, not normalization: `drawing.reopen` is what makes the saved
 artefact prove its own sheet scale and format (deliberately kept by #436, which
 deleted only the repair half), and `drawing.layout_audit` runs on that reopened
-doc. Deleting them buys 835 s/pass by removing the only proof the persisted file
+doc. Deleting them buys 783 s/pass by removing the only proof the persisted file
 is correct — a reliability-for-speed trade that is explicitly out of bounds here.
-Only `drawing.normalize_edge_break` (200 s/pass) is pure normalization, and it is
+Only `drawing.normalize_edge_break` (192 s/pass) is pure normalization, and it is
 removable only after the note is baked into `harmonic-analyzer.DRWDOT` — the fix
 #382 attempted and botched by regressing the template binary.
 
 **How to apply:** treat a proposed drawing-pipeline deletion as needing this
 question answered first — *is this span normalizing, or proving?* Regenerate the
-profile from any pass-1 log with the one-liner that parses `⟩ <name> <secs>s`
-lines and reports median + count per span name; it costs nothing beyond a log
-that already exists. Do not compare two runs' wall clock to judge a change —
+profile by parsing `⟩ <name> <secs>s` out of every pass log, summing per span
+PER PASS, then taking the median across passes; it costs nothing beyond logs that
+already exist. Pool across passes rather than extrapolating one — a single pass
+carries ~4 hung-window stalls worth ~3 min (see [[drawing-fleet-crash-rate]]),
+and extrapolating one pass mis-sized `drawing.save_and_export_pdf` by 1.8×. Do
+not compare two runs' wall clock to judge a change —
 see [[drawing-fleet-timings-drift]]. Related: [[checks-perf-value-audit]],
 [[release-perf-incremental]].
 
