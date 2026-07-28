@@ -169,7 +169,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # loud on any mismatch.
     import_part_pmi(
         adapter,
-        front,
+        (front, end),
         datum_positions={"A": (END_CENTER[0] + 0.040, END_CENTER[1] - 0.018)},
         control_positions={
             "seat_cylindricity": (0.038, _fy(BASE_LEN + 9.0)),

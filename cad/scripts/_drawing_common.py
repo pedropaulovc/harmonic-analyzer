@@ -600,7 +600,7 @@ def add_feature_control_frame(
 @_telemetry.traced("drawing.import_part_pmi", label_param="label")
 def import_part_pmi(
     adapter: Any,
-    view: Any,
+    views: Any,
     *,
     datum_positions: dict[str, tuple[float, float]],
     control_positions: dict[str, tuple[float, float]],
@@ -617,22 +617,27 @@ def import_part_pmi(
     coordinates the recipe assigns.  Matching is by CONTENT, never arrival
     order: a datum tag by its letter, a frame by its symbol + tolerance read
     back from the frame XML.  Every expected annotation must land and every
-    imported annotation must be expected — a shortfall (e.g. an annotation
-    whose DimXpert annotation plane faces away from this view's orientation)
-    fails loud rather than shipping a sheet silently missing a control.
+    imported annotation must be expected — a shortfall (an annotation whose DimXpert
+    annotation plane matches none of the given views) fails loud rather than shipping a sheet silently missing a control.
 
     ``controls`` is the spec's ``GeometricControl`` sequence (typed loosely to
     keep the import graph acyclic).  Returns the placed annotations by key.
     """
     from _gtol_spec import GTOL_SYMBOLS
 
-    view = _early_bound(view, "IView")
-    view.ImportAnnotations(False, False, True, False, False)
+    # Accept one view or a sequence: SolidWorks routes each PMI annotation to
+    # the view whose orientation matches its DimXpert annotation plane, so a
+    # sheet importing into several views gathers the union and matches it
+    # globally — the placements are SHEET coordinates, not view-local.
+    views = views if isinstance(views, (list, tuple)) else (views,)
     imported = []
-    for annotation in view.GetAnnotations() or ():
-        annotation = _early_bound(annotation, "IAnnotation")
-        if bool(annotation.IsDimXpert()):
-            imported.append(annotation)
+    for view in views:
+        view = _early_bound(view, "IView")
+        view.ImportAnnotations(False, False, True, False, False)
+        for annotation in view.GetAnnotations() or ():
+            annotation = _early_bound(annotation, "IAnnotation")
+            if bool(annotation.IsDimXpert()):
+                imported.append(annotation)
 
     controls_by_key = {control.key: control for control in controls}
     if set(controls_by_key) != set(control_positions):
