@@ -480,16 +480,38 @@ def test_concurrent_appends_never_splice_a_record(tmp_path):
     for proc in procs:
         assert proc.wait(timeout=180) == 0
 
+    # Diagnose before asserting. This test failed ONCE in ~16 local runs and the
+    # bare "expected 2000, got N" told us nothing about why, so classify every
+    # line first and put the classification in the failure message. A recurrence
+    # should be explicable from the message alone: splicing (unparseable /
+    # wrong-length pad) is a real defect in _AtomicJsonlWriter; whole records
+    # simply MISSING points instead at a short write, which `write` accepts as a
+    # lost record by design rather than retrying into someone else's append.
     lines = target.read_text(encoding="utf-8").splitlines()
-    assert len(lines) == workers * per_worker, (
-        f"expected {workers * per_worker} lines, got {len(lines)}"
-    )
-    seen = set()
-    for n, line in enumerate(lines):
-        record = json.loads(line)  # a spliced record raises here
-        assert len(record["pad"]) == pad, f"line {n} truncated"
+    seen: set[tuple[int, int]] = set()
+    unparseable, wrong_pad = 0, 0
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except Exception:  # noqa: BLE001 - counting damage, not handling it
+            unparseable += 1
+            continue
+        if len(record.get("pad", "")) != pad:
+            wrong_pad += 1
+            continue
         seen.add((record["worker"], record["i"]))
-    assert seen == {(w, i) for w in range(workers) for i in range(per_worker)}
+
+    expected = {(w, i) for w in range(workers) for i in range(per_worker)}
+    diagnosis = (
+        f"lines={len(lines)} (expected {workers * per_worker}), "
+        f"unparseable={unparseable}, wrong_pad={wrong_pad}, "
+        f"missing={len(expected - seen)}, duplicated={len(lines) - len(seen)}"
+    )
+    # The class's actual guarantee: no record is ever spliced into another.
+    assert unparseable == 0 and wrong_pad == 0, f"records were spliced -- {diagnosis}"
+    # And nothing was lost: with one WriteFile per record to a local file, a
+    # short write means the environment is failing, not the writer.
+    assert seen == expected, diagnosis
 
 
 _BUFFERED_WORKER = r"""
@@ -504,10 +526,12 @@ f.close()
 
 
 @pytest.mark.skipif(
-    not os.environ.get("HARMONIC_TELEMETRY_RACE_REPRO"),
+    os.environ.get("HARMONIC_TELEMETRY_RACE_REPRO") != "1",
     reason=(
         "opt-in: asserts a RACE reproduces, so it cannot gate check:telemetry. "
-        "Run with HARMONIC_TELEMETRY_RACE_REPRO=1 on Windows."
+        "Run with HARMONIC_TELEMETRY_RACE_REPRO=1 on Windows. Compared against "
+        "'1' exactly, so setting it to 0/false to DISABLE the repro cannot "
+        "accidentally switch it on and turn the gate red."
     ),
 )
 def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
@@ -568,29 +592,30 @@ def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
     )
 
 
-def test_short_append_finishes_the_record_and_never_raises(tmp_path, monkeypatch):
-    """A partial write is completed, not raised.
+def test_short_append_is_never_retried_with_a_second_append(tmp_path, monkeypatch):
+    """One record = one append operation, even when the write comes up short.
 
-    ``write`` runs synchronously inside ``SimpleSpanProcessor`` on the calling
-    thread, so raising here would let a low-disk or I/O error abort real pipeline
-    work -- and AGENTS.md makes capture best-effort, never fatal (Codex P2). The
-    record is still finished rather than left truncated, which is the malformed
-    JSONL this class exists to prevent.
+    Finishing a short write with a SECOND append is worse than losing the
+    record: another process can append in between, giving
+    ``prefix + their record + suffix`` and destroying two records instead of
+    truncating one (Codex P2). So the contract is exactly one append attempt,
+    and no exception either way.
     """
     record = '{"hello": "world"}\n'
     writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
     try:
-        chunks: list[bytes] = []
+        calls: list[bytes] = []
 
-        def dribble(payload: bytes) -> int:
-            chunks.append(payload[:3])
-            return 3  # always short: 3 bytes at a time
+        def short(payload: bytes) -> int:
+            calls.append(payload)
+            return 3  # short: only 3 of the bytes land
 
-        monkeypatch.setattr(writer, "_raw_write", dribble)
+        monkeypatch.setattr(writer, "_raw_write", short)
         assert writer.write(record) == len(record)  # must not raise
     finally:
         writer.close()
-    assert b"".join(chunks).decode() == record, "the record was left truncated"
+    assert len(calls) == 1, f"record was split across {len(calls)} appends"
+    assert calls[0] == record.encode()
 
 
 def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypatch):

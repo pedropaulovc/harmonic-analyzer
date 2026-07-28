@@ -344,27 +344,31 @@ class _AtomicJsonlWriter:
         return os.write(self._fd, payload)
 
     def write(self, value: str) -> int:
-        """Append one record, best-effort.
+        """Append one record with EXACTLY ONE append operation, best-effort.
 
-        This runs SYNCHRONOUSLY inside ``SimpleSpanProcessor`` /
-        ``SimpleLogRecordProcessor``, so it executes on the calling thread every
-        time a span ends or a log is emitted. It therefore must NEVER raise:
-        AGENTS.md makes file capture best-effort ("telemetry capture must never
-        be the reason a build fails"), and a low-disk or I/O error here would
-        otherwise abort real pipeline work (Codex P2).
+        Two hard rules, both learned from review:
 
-        A short write is finished rather than ignored -- leaving a truncated line
-        behind is the malformed JSONL this class exists to prevent -- but if even
-        that fails the record is dropped silently. Errors are not routed through
-        ``_telemetry``'s own logging: that would re-enter this exporter.
+        **Never raise.** This runs synchronously inside ``SimpleSpanProcessor`` /
+        ``SimpleLogRecordProcessor``, on the calling thread, every time a span
+        ends or a log is emitted. AGENTS.md makes file capture best-effort
+        ("telemetry capture must never be the reason a build fails"), so a
+        low-disk or I/O error here must not abort real pipeline work.
+
+        **Never retry.** A short write must NOT be finished with a second append.
+        The whole guarantee of this class is one record = one kernel append; a
+        follow-up append can land after some other process's record, producing
+        ``prefix + their record + suffix`` and destroying TWO records instead of
+        leaving one truncated. So a short write is accepted as a lost record and
+        nothing further is written. (Under ``FILE_APPEND_DATA`` on a local file
+        this needs a disk already failing mid-write, at which point the capture
+        is doomed either way -- but the failure must stay contained.)
+
+        Errors are not routed through ``_telemetry``'s own logging: that would
+        re-enter this exporter.
         """
         payload = value.encode("utf-8")
         try:
-            while payload:
-                written = self._raw_write(payload)
-                if written <= 0:
-                    break
-                payload = payload[written:]
+            self._raw_write(payload)  # exactly once -- see "Never retry" above
         except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
             pass
         return len(value)
