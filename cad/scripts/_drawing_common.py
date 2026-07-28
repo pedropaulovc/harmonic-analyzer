@@ -3144,6 +3144,7 @@ def add_auto_balloons_across_views(
     existing_balloons: Sequence[Any] = (),
     margin: float = 0.014,
     layout: int = 1,
+    coverage: str = "assert",
 ) -> list[Any]:
     """Balloon successive views until every BOM item number is represented.
 
@@ -3152,7 +3153,18 @@ def add_auto_balloons_across_views(
     each orthographic and pictorial view, preserve every placed balloon, and
     validate the union of displayed BOM item numbers against the table's full
     contiguous item range. Each view's balloons are spread around that view.
+
+    An identification package spread over several SHEETS cannot balloon all its
+    views in one call -- AutoBalloon5 works on the active sheet -- so pass
+    ``coverage="accumulate"`` on every call but the last, feeding each call's
+    return into the next as ``existing_balloons``. Only the final
+    ``coverage="assert"`` call proves the union covers items 1..``expected``,
+    which is what keeps the multi-sheet package as strict as the single-sheet
+    one. Accumulating calls still reject an item number OUTSIDE that range, so a
+    stale BOM cannot ride along unnoticed to the last sheet.
     """
+    if coverage not in {"assert", "accumulate"}:
+        raise ValueError(f"{label}: unknown balloon coverage mode {coverage!r}")
     if margin <= 0.0:
         raise ValueError(f"{label}: balloon ring margin must be positive")
     all_balloons = list(existing_balloons)
@@ -3174,6 +3186,18 @@ def add_auto_balloons_across_views(
     expected_numbers = {str(item) for item in range(1, expected + 1)}
     missing = sorted(expected_numbers - item_numbers, key=int)
     unexpected = sorted(item_numbers - expected_numbers)
+    if coverage == "accumulate":
+        if unexpected:
+            raise RuntimeError(
+                f"{label}: balloon item numbers outside the BOM range: "
+                f"{unexpected}; seen={sorted(item_numbers)}"
+            )
+        adapter.currentModel.EditRebuild3()
+        _telemetry.success(
+            f"{label}: {len(all_balloons)} balloons so far cover "
+            f"{len(item_numbers)}/{expected} BOM items"
+        )
+        return all_balloons
     if missing or unexpected:
         raise RuntimeError(
             f"{label}: balloon item coverage mismatch; missing={missing}, "

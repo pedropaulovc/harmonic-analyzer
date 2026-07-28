@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from pathlib import Path
 from typing import Any
 
 import _config
@@ -25,8 +24,7 @@ from _assembly_drawing_bom import (
 from _common import check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    _balloon_item_number,
-    _spread_balloons,
+    add_auto_balloons_across_views,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -41,7 +39,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     iter_views,
     place_view,
-    view_name,
 )
 from pinion_spring_geometry import BLADE_TILT_DEG as PINION_PARK_ANGLE_DEG
 
@@ -119,14 +116,13 @@ BOM_COMPONENTS = {
 }
 BOM_PART_NUMBERS = configured_part_numbers(tuple(BOM_COMPONENTS))
 
-BOTTOM_VISIBILITY_STEMS = frozenset(
-    {"cone-tip-bushing", "cone-gear-shaft", "crank-drive-gear"}
-)
-CONCEALED_BALLOON_ITEMS = {
-    stem: str(index)
-    for index, stem in enumerate(BOM_COMPONENTS, start=1)
-    if stem in BOTTOM_VISIBILITY_STEMS
-}
+# AutoBalloon lays its balloons on a ring around the view; the margin is how far
+# out that ring sits. The exterior views fill most of their field at 1:3, so they
+# need the wider ring to clear the geometry; the two hidden-line views are
+# smaller and centred, so the same ring reads without crowding the sheet edge.
+EXTERIOR_BALLOON_RING_MARGIN = 0.020
+CONCEALED_BALLOON_RING_MARGIN = 0.020
+
 GENERAL_POINTER_NOTE = (
     "GEAR-TRAIN SETUP: SEE SHEET 5. PINION ITEMS: SEE SHEET 6. "
     "PINION SETUP AND FINAL ACCEPTANCE: SEE SHEET 7."
@@ -243,53 +239,6 @@ EXTERIOR_VIEW_LABELS = (
     "VIEW C — PINION CAM / CONTROLS",
     "VIEW D — CYLINDER / CRANK",
 )
-EXTERIOR_VIEW_STEMS = (
-    frozenset(
-        {
-            "cone-swing-platform",
-            "cone-pivot-post",
-            "cone-tip-block",
-            "cone-tip-adjuster",
-            "cone-tip-pinch-screw",
-            "cone-lock-knob",
-            "cone-pivot-screw",
-            "swing-stop-screw",
-            "cone-gear",
-        }
-    ),
-    frozenset(
-        {
-            "alignment-pinion",
-            "pinion-bracket",
-            "pinion-pivot-block",
-            "pinion-pivot-shaft",
-            "pinion-lift-rod",
-            "pinion-spring",
-        }
-    ),
-    frozenset(
-        {
-            "pinion-cam-pin",
-            "pinion-cam",
-            "pinion-lever",
-            "pinion-handle",
-            "pinion-arbor",
-            "slotted-screw",
-            "foot-screw",
-        }
-    ),
-    frozenset(
-        {
-            "cylinder-gear-shaft",
-            "arbor-pedestal",
-            "cylinder-gear",
-            "crankshaft",
-            "crank-pinion",
-            "crank-arm",
-            "crank-handle",
-        }
-    ),
-)
 GEAR_IDENTIFICATION_VIEW_INDICES = (0, 3)
 GEAR_IDENTIFICATION_VIEW_CENTERS = ((0.120, 0.150), (0.320, 0.150))
 GEAR_IDENTIFICATION_LABEL_ORIGINS = ((0.070, 0.235), (0.270, 0.235))
@@ -301,24 +250,6 @@ PINION_IDENTIFICATION_LABEL_ORIGINS = ((0.070, 0.235), (0.260, 0.235))
 # without duplicating their exterior balloons.
 CONCEALED_BOTTOM_CENTER = (0.115, 0.135)
 CONCEALED_FRONT_CENTER = (0.285, 0.155)
-CONCEALED_BOTTOM_VISIBLE_STEMS = frozenset(
-    {
-        "cone-pivot-post",
-        "cone-tip-block",
-        "cone-tip-bushing",
-        "cone-tip-adjuster",
-        "cone-tip-pinch-screw",
-        "cone-gear-shaft",
-    }
-)
-CONCEALED_FRONT_VISIBLE_STEMS = frozenset(
-    {"cone-gear-shaft", "crank-drive-gear", "crankshaft", "crank-pinion"}
-)
-CONCEALED_BOTTOM_STEMS = frozenset({"cone-tip-bushing", "cone-gear-shaft"})
-CONCEALED_FRONT_STEMS = frozenset({"crank-drive-gear"})
-CONCEALED_BOTTOM_BALLOON_RING_MARGIN = 0.015
-CONCEALED_FRONT_BALLOON_RING_MARGIN = 0.025
-CONCEALED_BALLOON_CLEARANCE = 0.006
 CONCEALED_HEADING_ORIGIN = (0.060, 0.255)
 CONCEALED_VIEW_LABEL_ORIGINS = ((0.045, 0.225), (0.245, 0.225))
 
@@ -333,10 +264,6 @@ GEAR_REQUIREMENTS_COLUMN_WIDTHS = (0.028, 0.072, 0.040)
 GEAR_REQUIREMENTS_ROW_HEIGHT = 0.012
 GEAR_SETUP_VIEW_CENTERS = ((0.310, 0.095), (0.375, 0.095))
 GEAR_SETUP_VIEW_SCALE = (1, 5)
-GEAR_SETUP_VIEW_STEMS = (
-    frozenset({"cone-gear-shaft", "cone-gear"}),
-    frozenset({"cylinder-gear-shaft", "cylinder-gear"}),
-)
 GEAR_SETUP_VIEW_LABELS = (
     "ITEMS 25/27\nCONE STACK — SCALE 1:5",
     "ITEMS 1/28\nDRUM STACK — SCALE 1:5",
@@ -347,7 +274,6 @@ GEAR_SETUP_VIEW_LABEL_ORIGINS = ((0.285, 0.125), (0.350, 0.125))
 # and functional-acceptance tables.  The saved assembly does not claim to show
 # the engaged pose.
 PINION_SETUP_VIEW_CENTER = (0.095, 0.165)
-PINION_SETUP_VIEW_STEMS = EXTERIOR_VIEW_STEMS[1] | EXTERIOR_VIEW_STEMS[2]
 PINION_SETUP_VIEW_LABEL_ORIGIN = (0.030, 0.245)
 PINION_PARAMETER_TABLE_ANCHOR = (0.175, 0.232)
 PINION_PARAMETER_COLUMN_WIDTHS = (0.048, 0.058, 0.050, 0.075)
@@ -363,8 +289,6 @@ BOM_COLUMN_WIDTHS = {
     "DESCRIPTION": 0.074,
     "QTY.": 0.012,
 }
-EXTERIOR_BALLOON_RING_MARGINS = (0.020, 0.014)
-EXTERIOR_BALLOON_CLEARANCES = (0.002, 0.002)
 
 CONE_GEAR_SCHEDULE = tuple(
     (position, f"T{int(channel['cone_teeth']):03d}", int(channel["cone_teeth"]))
@@ -747,276 +671,18 @@ def _insert_acceptance_table(adapter: Any) -> Any:
     )
 
 
-def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
-    """Return children across callable and materialized pywin32 dispatch shapes."""
-    member = drawing_component.GetChildren
-    children = member() if callable(member) else member
-    return tuple(children or ())
 
 
-def _set_note_text_height(adapter: Any, note: Any, *, label: str) -> None:
-    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
-    annotation = note.GetAnnotation()
-    if annotation is None:
-        raise RuntimeError(f"{label}: note has no annotation")
-    annotation = _sw_type_info.early_bound_or_flag(
-        annotation, "IAnnotation", "GetTextFormat", "SetTextFormat"
-    )
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label}: note has no text format")
-    text_format = _sw_type_info.early_bound_or_flag(text_format, "ITextFormat")
-    text_format.CharHeight = SETUP_NOTE_TEXT_HEIGHT
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"{label}: failed to set note text height")
-    applied = annotation.GetTextFormat(0)
-    if (
-        applied is None
-        or abs(float(applied.CharHeight) - SETUP_NOTE_TEXT_HEIGHT) > 1e-5
-    ):
-        raise RuntimeError(f"{label}: note text height did not persist")
 
 
-def _stems_for_identity(identity: str, stems: frozenset[str]) -> set[str]:
-    """Which of ``stems`` one identity string represents (exact, or ``stem-<n>``)."""
-    return {
-        stem
-        for stem in stems
-        if identity == stem
-        or (
-            identity.startswith(f"{stem}-")
-            and identity.removeprefix(f"{stem}-").isdigit()
-        )
-    }
 
 
-def _drawing_component_matches(
-    adapter: Any, drawing_component: Any, stems: frozenset[str], *, name: str
-) -> set[str]:
-    """Return configured stems represented by one leaf drawing component.
-
-    ``name`` is passed in because the caller has already paid for it -- reading
-    ``IDrawingComponent::Name`` twice per node is a wasted late-bound round trip.
-
-    The component's PATH is resolved **lazily**: it costs two more round trips
-    (``.Component`` then ``GetPathName``) and is only ever consulted when the
-    name-derived identity matched nothing. Since a match is the union of both
-    identities, skipping the path once the name has already matched cannot change
-    the result. On the drive-train tree most nodes match on name alone or are
-    structure we do not care about, so this removes the majority of the calls.
-    """
-    drawing_name = name.split("@", 1)[0].replace("\\", "/")
-    matched = _stems_for_identity(drawing_name.rsplit("/", 1)[-1].casefold(), stems)
-    if matched:
-        return matched
-
-    component = adapter._attempt(
-        lambda dc=drawing_component: dc.Component, default=None
-    )
-    if component is None:
-        return matched
-    path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
-    return _stems_for_identity(Path(str(path)).stem.casefold(), stems)
 
 
-@_telemetry.traced("drawing.component_balloon", label_param="stem")
-def _create_component_balloon(
-    adapter: Any, views: tuple[Any, ...], *, stem: str, expected_item: str
-) -> tuple[Any, Any]:
-    """Insert one BOM balloon on a real visible edge of the requested component."""
-    selected_view: Any | None = None
-    selected_edge: Any | None = None
-    enumerated: list[str] = []
-    for view in views:
-        root = adapter._attempt(
-            lambda v=view: v.RootDrawingComponent2(False), default=None
-        )
-        if root is None:
-            continue
-        pending = list(_drawing_component_children(root))
-        while pending:
-            drawing_component = pending.pop()
-            children = _drawing_component_children(drawing_component)
-            pending.extend(children)
-            if children:
-                continue
-            name = str(drawing_component.Name or "")
-            if not _drawing_component_matches(
-                adapter, drawing_component, frozenset({stem}), name=name
-            ):
-                continue
-            enumerated.append(name)
-            component = adapter._attempt(
-                lambda dc=drawing_component: dc.Component, default=None
-            )
-            edges = adapter._attempt(
-                lambda v=view, c=component: v.GetVisibleEntities2(c, 1), default=()
-            ) or ()
-            if not edges:
-                continue
-            selected_view = view
-            selected_edge = edges[0]
-            break
-        if selected_edge is not None:
-            break
-    if selected_view is None or selected_edge is None:
-        raise RuntimeError(
-            f"drive-train {stem} balloon has no visible edge across drawing views; "
-            f"matching components={enumerated}"
-        )
-
-    draw = adapter.currentModel
-    ddoc = _sw_type_info.early_bound_or_flag(draw, "IDrawingDoc", "ActivateView")
-    if not ddoc.ActivateView(view_name(adapter, selected_view)):
-        raise RuntimeError(f"failed to activate drive-train {stem} balloon view")
-    draw.ClearSelection2(True)
-    if not selected_view.SelectEntity(selected_edge, False):
-        raise RuntimeError(f"failed to select drive-train {stem} visible edge")
-    extension = _sw_type_info.early_bound_or_flag(
-        draw.Extension,
-        "IModelDocExtension",
-        "CreateBalloonOptions",
-        "InsertBOMBalloon2",
-    )
-    options = extension.CreateBalloonOptions()
-    if options is None:
-        raise RuntimeError(f"failed to create drive-train {stem} balloon options")
-    options = _sw_type_info.early_bound_or_flag(options, "IBalloonOptions")
-    options.Style = 1
-    options.Size = 2
-    options.UpperTextContent = 1
-    options.ShowQuantity = False
-    options.ItemNumberStart = 1
-    options.ItemNumberIncrement = 1
-    options.ItemOrder = 1
-    note = extension.InsertBOMBalloon2(options)
-    draw.ClearSelection2(True)
-    if note is None:
-        raise RuntimeError(f"failed to insert drive-train {stem} BOM balloon")
-    item = _balloon_item_number(adapter, note, label=f"drive-train {stem} balloon")
-    if item != expected_item:
-        raise RuntimeError(
-            f"drive-train {stem} balloon resolved item {item}, expected {expected_item}"
-        )
-    _telemetry.success(f"drive-train {stem} component balloon -> item {item}")
-    return note, selected_view
 
 
-@_telemetry.traced("drawing.isolate_balloon_components")
-def _isolate_balloon_components(
-    adapter: Any,
-    view: Any,
-    *,
-    visible_stems: frozenset[str],
-    label: str,
-) -> None:
-    """Show only the requested enclosed BOM families in an auxiliary view."""
-    root = adapter._attempt(
-        lambda: view.RootDrawingComponent2(False), default=None
-    )
-    if root is None:
-        raise RuntimeError("drive-train bottom view has no root drawing component")
-
-    pending = list(_drawing_component_children(root))
-    found: set[str] = set()
-    enumerated: list[str] = []
-    while pending:
-        drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
-
-        name = str(drawing_component.Name or "")
-        enumerated.append(name)
-        # Resolve identity only for LEAVES. This used to run before the
-        # `continue`, so every internal node paid a `.Component` + `GetPathName`
-        # round trip for a `matched` that was then thrown away -- and only leaves
-        # ever have their visibility set.
-        if children:
-            continue
-        matched = _drawing_component_matches(
-            adapter, drawing_component, visible_stems, name=name
-        )
-        drawing_component.Visible = bool(matched)
-        if not matched:
-            continue
-        found.update(matched)
-        for stem in matched:
-            _telemetry.event("drawing.component_visible", component=stem)
-
-    missing = sorted(visible_stems - found)
-    if missing:
-        raise RuntimeError(
-            f"drive-train {label} view is missing enclosed components: "
-            f"{missing}; enumerated drawing components: {sorted(enumerated)}"
-        )
-    adapter.currentModel.EditRebuild3()
 
 
-@_telemetry.traced("drawing.grouped_component_balloons")
-def _add_component_balloons(
-    adapter: Any,
-    views: tuple[Any, ...],
-    groups: tuple[frozenset[str], ...],
-    *,
-    label: str,
-) -> list[Any]:
-    """Attach one validated BOM balloon per exterior family in isolated views."""
-    field_count = len(groups)
-    if not (
-        len(views)
-        == field_count
-        == len(EXTERIOR_BALLOON_RING_MARGINS)
-        == len(EXTERIOR_BALLOON_CLEARANCES)
-    ):
-        raise ValueError(f"{label}: grouped view, component, and ring counts differ")
-
-    observed_stems = frozenset().union(*groups)
-    unexpected_stems = observed_stems - frozenset(BOM_COMPONENTS)
-    if unexpected_stems:
-        raise RuntimeError(
-            f"{label}: unexpected BOM families: {sorted(unexpected_stems)}"
-        )
-    duplicates = [
-        stem for stem in observed_stems if sum(stem in group for group in groups) != 1
-    ]
-    if duplicates:
-        raise RuntimeError(
-            f"drive-train exterior families appear in multiple groups: {duplicates}"
-        )
-
-    item_by_stem = {
-        stem: str(index) for index, stem in enumerate(BOM_COMPONENTS, start=1)
-    }
-    all_balloons: list[Any] = []
-    for index, (view, stems) in enumerate(zip(views, groups, strict=True), start=1):
-        view_balloons: list[Any] = []
-        for stem in BOM_COMPONENTS:
-            if stem not in stems:
-                continue
-            note, owner_view = _create_component_balloon(
-                adapter,
-                (view,),
-                stem=stem,
-                expected_item=item_by_stem[stem],
-            )
-            if owner_view is not view:
-                raise RuntimeError(
-                    f"drive-train exterior group {index}: {stem} balloon changed views"
-                )
-            view_balloons.append(note)
-        _spread_balloons(
-            adapter,
-            view,
-            view_balloons,
-            margin=EXTERIOR_BALLOON_RING_MARGINS[index - 1],
-            clearance=EXTERIOR_BALLOON_CLEARANCES[index - 1],
-        )
-        all_balloons.extend(view_balloons)
-        _telemetry.success(
-            f"{label} group {index}: "
-            f"{len(view_balloons)} deliberately attached balloons"
-        )
-    return all_balloons
 
 
 @_telemetry.traced("drawing.create_drive_train_sheets")
@@ -1215,9 +881,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("failed to activate exterior-identification sheet")
-    gear_identification_groups = tuple(
-        EXTERIOR_VIEW_STEMS[index] for index in GEAR_IDENTIFICATION_VIEW_INDICES
-    )
     gear_identification_views = tuple(
         place_view(
             adapter,
@@ -1232,19 +895,15 @@ async def build(adapter: Any) -> dict[str, str]:
             strict=True,
         )
     )
-    for field, (view, stems) in enumerate(
-        zip(gear_identification_views, gear_identification_groups, strict=True),
-        start=1,
-    ):
+    for view in gear_identification_views:
         set_hidden_lines_removed(adapter, view)
-        _isolate_balloon_components(
-            adapter, view, visible_stems=stems, label=f"gear identification {field}"
-        )
-    _add_component_balloons(
+    identification_balloons = add_auto_balloons_across_views(
         adapter,
         gear_identification_views,
-        gear_identification_groups,
+        expected=len(BOM_COMPONENTS),
         label="drive-train gear identification",
+        margin=EXTERIOR_BALLOON_RING_MARGIN,
+        coverage="accumulate",
     )
     for index, origin in zip(
         GEAR_IDENTIFICATION_VIEW_INDICES,
@@ -1272,26 +931,6 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
     )
     set_hidden_lines_visible(adapter, concealed_bottom)
-    _isolate_balloon_components(
-        adapter,
-        concealed_bottom,
-        visible_stems=CONCEALED_BOTTOM_VISIBLE_STEMS,
-        label="bottom",
-    )
-    bottom_balloons: list[Any] = []
-    for stem in sorted(CONCEALED_BOTTOM_STEMS):
-        item = CONCEALED_BALLOON_ITEMS[stem]
-        note, _owner_view = _create_component_balloon(
-            adapter, (concealed_bottom,), stem=stem, expected_item=item
-        )
-        bottom_balloons.append(note)
-    _spread_balloons(
-        adapter,
-        concealed_bottom,
-        bottom_balloons,
-        margin=CONCEALED_BOTTOM_BALLOON_RING_MARGIN,
-        clearance=CONCEALED_BALLOON_CLEARANCE,
-    )
 
     concealed_front = place_view(
         adapter,
@@ -1301,25 +940,17 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
     )
     set_hidden_lines_visible(adapter, concealed_front)
-    _isolate_balloon_components(
+    # Hidden lines VISIBLE is what earns these two views their place: AutoBalloon
+    # attaches to entities the view shows, so the cone-journal and crank-mesh
+    # parts buried inside the assembly are reachable here and nowhere else.
+    identification_balloons = add_auto_balloons_across_views(
         adapter,
-        concealed_front,
-        visible_stems=CONCEALED_FRONT_VISIBLE_STEMS,
-        label="front",
-    )
-    front_balloons: list[Any] = []
-    for stem in sorted(CONCEALED_FRONT_STEMS):
-        item = CONCEALED_BALLOON_ITEMS[stem]
-        note, _owner_view = _create_component_balloon(
-            adapter, (concealed_front,), stem=stem, expected_item=item
-        )
-        front_balloons.append(note)
-    _spread_balloons(
-        adapter,
-        concealed_front,
-        front_balloons,
-        margin=CONCEALED_FRONT_BALLOON_RING_MARGIN,
-        clearance=CONCEALED_BALLOON_CLEARANCE,
+        (concealed_bottom, concealed_front),
+        expected=len(BOM_COMPONENTS),
+        label="drive-train concealed identification",
+        existing_balloons=identification_balloons,
+        margin=CONCEALED_BALLOON_RING_MARGIN,
+        coverage="accumulate",
     )
     concealed_labels = (
         "VIEW A — CONE JOURNAL / ENDPLAY STACK, BOTTOM VIEW",
@@ -1342,23 +973,16 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate gear-train setup sheet")
     _insert_cone_gear_schedule(adapter, bom_table, bom_iso)
     _insert_gear_requirements_table(adapter)
-    for index, (center, stems, label, origin) in enumerate(
-        zip(
-            GEAR_SETUP_VIEW_CENTERS,
-            GEAR_SETUP_VIEW_STEMS,
-            GEAR_SETUP_VIEW_LABELS,
-            GEAR_SETUP_VIEW_LABEL_ORIGINS,
-            strict=True,
-        ),
-        start=1,
+    for center, label, origin in zip(
+        GEAR_SETUP_VIEW_CENTERS,
+        GEAR_SETUP_VIEW_LABELS,
+        GEAR_SETUP_VIEW_LABEL_ORIGINS,
+        strict=True,
     ):
         view = place_view(
             adapter, str(SOURCE), "*Right", *center, scale=GEAR_SETUP_VIEW_SCALE
         )
         set_hidden_lines_removed(adapter, view)
-        _isolate_balloon_components(
-            adapter, view, visible_stems=stems, label=f"gear setup {index}"
-        )
         if add_note(adapter, label, *origin) is None:
             raise RuntimeError("failed to add gear setup view label")
     if add_note(
@@ -1370,9 +994,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not ddoc.ActivateSheet(SHEET_NAMES[5]):
         raise RuntimeError("failed to activate pinion-identification sheet")
-    pinion_identification_groups = tuple(
-        EXTERIOR_VIEW_STEMS[index] for index in PINION_IDENTIFICATION_VIEW_INDICES
-    )
     pinion_identification_views = tuple(
         place_view(
             adapter,
@@ -1387,26 +1008,17 @@ async def build(adapter: Any) -> dict[str, str]:
             strict=True,
         )
     )
-    for field, (view, stems) in enumerate(
-        zip(
-            pinion_identification_views,
-            pinion_identification_groups,
-            strict=True,
-        ),
-        start=1,
-    ):
+    for view in pinion_identification_views:
         set_hidden_lines_removed(adapter, view)
-        _isolate_balloon_components(
-            adapter,
-            view,
-            visible_stems=stems,
-            label=f"pinion identification {field}",
-        )
-    _add_component_balloons(
+    # Last identification sheet, so this call ASSERTS: the union of every
+    # balloon placed across sheets 3, 4 and 6 must cover BOM items 1..N.
+    add_auto_balloons_across_views(
         adapter,
         pinion_identification_views,
-        pinion_identification_groups,
+        expected=len(BOM_COMPONENTS),
         label="drive-train pinion identification",
+        existing_balloons=identification_balloons,
+        margin=EXTERIOR_BALLOON_RING_MARGIN,
     )
     for index, origin in zip(
         PINION_IDENTIFICATION_VIEW_INDICES,
@@ -1434,12 +1046,6 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
     )
     set_hidden_lines_removed(adapter, pinion_setup)
-    _isolate_balloon_components(
-        adapter,
-        pinion_setup,
-        visible_stems=PINION_SETUP_VIEW_STEMS,
-        label="pinion parked reference",
-    )
     if add_note(
         adapter,
         "PARK / DISENGAGED — SHOWN POSITION; ITEMS 12–24; NOT AN ENGAGED VIEW",
