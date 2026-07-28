@@ -1104,6 +1104,7 @@ def read_required_properties(
     return properties
 
 
+@_telemetry.traced("drawing.cosmetic_threads")
 def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     """Import a view's cosmetic threads and count seed plus pattern instances.
 
@@ -1193,6 +1194,7 @@ def _pin_dimension_text_and_leader_style(draw: Any) -> None:
     )
 
 
+@_telemetry.traced("drawing.new_from_template")
 def new_project_drawing(
     adapter: Any,
     *,
@@ -1252,6 +1254,7 @@ def new_project_drawing(
     return draw, sheet
 
 
+@_telemetry.traced("drawing.create_sheets", label_param="label")
 def create_blank_drawing_sheets(
     adapter: Any, sheet_names: Sequence[str], *, label: str
 ) -> None:
@@ -1422,6 +1425,7 @@ def assert_asme_b_sheet(
         raise RuntimeError(f"{phase}: drawing sheet is not ASME B size: {properties!r}")
 
 
+@_telemetry.traced("drawing.reopen")
 async def reopen_drawing(adapter: Any, path: Path) -> tuple[Any, Any]:
     model = adapter.currentModel
     title = str(adapter._get_attr_or_call(model, "GetTitle") or "")
@@ -1447,6 +1451,7 @@ def _contact_preview_grid(page_count: int) -> tuple[int, int]:
     return (columns, math.ceil(page_count / columns))
 
 
+@_telemetry.traced("drawing.render_png")
 def render_pdf_png(pdf: Path, png: Path, *, expected_pages: int = 1) -> None:
     """Render a drawing PDF to its preview PNG.
 
@@ -1623,6 +1628,7 @@ def add_hole_group_tags(
     return notes
 
 
+@_telemetry.traced("drawing.marked_dimensions")
 def insert_marked_dimensions(adapter: Any, view: Any) -> list[Any]:
     """Import the source part's marked-for-drawing dimensions into ``view``.
 
@@ -1690,6 +1696,7 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
     return survivors
 
 
+@_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
 def curate_view_dimensions(
     adapter: Any,
     view: Any,
@@ -4042,6 +4049,7 @@ def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
         )
 
 
+@_telemetry.traced("drawing.finalize")
 async def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
@@ -4186,9 +4194,10 @@ async def finalize_drawing(
     # A large drawing can reopen view-only even when its referenced views report
     # loaded; SolidWorks then rejects PDF SaveAs3 with 0x1001. The SLDDRW is
     # still reopened once below and validated as the persisted source artifact.
-    artifacts = save_drawing(
-        adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
-    )
+    with _telemetry.span("drawing.save_and_export_pdf"):
+        artifacts = save_drawing(
+            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
+        )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
     # ONE reopen, and it only VALIDATES. The sheet scale is already pinned twice
