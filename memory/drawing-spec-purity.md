@@ -48,11 +48,22 @@ sheets expressed a TWO-value vocabulary → `_surface_finish.py` (`GROUND` 0.8,
 tiers without tripping `check:partiso`. Creating 39 per-spec constants would
 have institutionalised the duplication at 39 new addresses.
 
-**Move the value and its NOTE in the same commit.** The `*_spec.py`
+**Move the value and its NOTE in the same commit** — use `_fit_limits.band_text`. The `*_spec.py`
 `DRAWING_NOTES` are a second copy: the nominal is f-stringed while the band
 beside it is hardcoded (`f"{HANDLE_LENGTH:.2f}+0.00/-0.25"`). Render the note
-from the same constant, and PROVE the rendered text is byte-identical before and
-after — that is what makes the relocation a refactor rather than a print change.
+from the same constant via `_fit_limits.band_text(band)`, and PROVE the rendered
+text is byte-identical before and after — that is what makes the relocation a
+refactor rather than a print change. `band_text` deliberately keeps a nil
+deviation's SIGN (`-0.00`), which is what the released sheets print; Y14.5
+§2.3.2 prefers a bare `0`, and switching is a deliberate drawing change to make
+on its own, never a side effect of moving a constant.
+
+**STATUS 2026-07-28 — partially applied.** 4 parts migrated (transgear-stub,
+cone-gear-shaft, cone-tip-adjuster, crank-handle). Still outstanding: **33
+sheets** carry a band in `DIMENSION_CALLOUTS`, **23 specs** hardcode a band
+inside `DRAWING_NOTES`, and all **125** `tolerance="..."` FCF literals are
+untouched (the `GEOMETRIC_CONTROLS` spec-table convention and the
+`add_feature_control_frame` row overload were NOT built).
 
 **Tests must assert IDENTITY, not source text.** `test_*_drawing.py` pinned
 literals (`assert 'roughness_ra="1.6"' in source`), which makes the literal
@@ -61,6 +72,6 @@ load-bearing and turns every improvement red. `_drawing_contract.py` provides
 `model_toleranced_dimensions(build_module)` (AST, not substring — the calls span
 lines and a text assertion pins the formatting too).
 
-**GD&T stays on the sheet for now** — moving it to model PMI is blocked, see
+**GD&T is still authored per-sheet** — moving it to model PMI is blocked, see
 [[dimxpert-authoring-probe]]. Not a prerequisite: the unit and drift hazards
 close entirely with the spec relocation above.

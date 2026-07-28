@@ -15,6 +15,8 @@ marks and drawing keeps in lockstep (``test_crank_handle_drawing.py``).
 
 from __future__ import annotations
 
+from _fit_limits import band_text
+
 HANDLE_LENGTH = 90.0  # overall length (collar face to butt cap)
 HANDLE_MAX_DIA = 22.0  # max diameter at the swell
 COLLAR_LENGTH = 6.0  # brass collar length
@@ -35,11 +37,6 @@ HANDLE_LENGTH_BAND = (0.000, -0.250)
 COLLAR_DIA_TOL_MM = 0.10
 
 
-def _band_text(band: tuple[float, float]) -> str:
-    """Render an (upper, lower) band the way a note quotes it: upper first."""
-    upper, lower = band
-    return f"{upper:+.2f}/{lower:+.2f}"
-
 _FRONT_DX = PEAK_X - COLLAR_LENGTH
 _FRONT_DH = HANDLE_MAX_DIA / 2.0 - NECK_R
 FRONT_PROFILE_R = (_FRONT_DX**2 + _FRONT_DH**2) / (2.0 * _FRONT_DH)
@@ -57,14 +54,14 @@ DRAWING_NOTES = "\n".join(
         f"DATUM A IS THE <MOD-DIAM>{COLLAR_DIA:.2f}+/-{COLLAR_DIA_TOL_MM:.2f} COLLAR OD DERIVED AXIS; THE A SYMBOL",
         "  ATTACHES TO THAT OD. DATUM B IS THE FLAT COLLAR END FACE.",
         "TURN COLLAR INTEGRAL. FINAL BORE LIMITS APPLY FULL LENGTH.",
-        f"ALL AXIAL STATIONS ARE FROM B; {HANDLE_LENGTH:.2f}{_band_text(HANDLE_LENGTH_BAND)} IS WOOD OVERALL.",
+        f"ALL AXIAL STATIONS ARE FROM B; {HANDLE_LENGTH:.2f}{band_text(HANDLE_LENGTH_BAND)} IS WOOD OVERALL.",
         f"BASIC TRUE GRIP PROFILE (ALL VALUES BASIC): <MOD-DIAM>{2.0 * NECK_R:.2f} AT X{COLLAR_LENGTH:.2f};",
         f"  <MOD-DIAM>{HANDLE_MAX_DIA:.2f} AT X{PEAK_X:.2f}; <MOD-DIAM>{2.0 * CAP_R:.2f} AT X{HANDLE_LENGTH:.2f}. TWO CIRCULAR ARCS",
         f"  TANGENT AT X{PEAK_X:.2f}: R{FRONT_PROFILE_R:.6f} FROM X{COLLAR_LENGTH:.2f} TO X{PEAK_X:.2f};",
         f"  R{REAR_PROFILE_R:.6f} FROM X{PEAK_X:.2f} TO X{HANDLE_LENGTH:.2f}.",
         "PROFILE 0.50 | A | B APPLIES TO SHOULDER FACE AND BOTH ARCS FROM BASIC",
         f"  X{COLLAR_LENGTH:.2f} TO ACTUAL BUTT TRIM FACE; THEORETICAL PROFILE EXTENDS TO X{HANDLE_LENGTH:.2f}.",
-        f"ACTUAL BUTT FACE AT {HANDLE_LENGTH:.2f}{_band_text(HANDLE_LENGTH_BAND)} TRIMS THE BASIC PROFILE; ITS EDGE AND",
+        f"ACTUAL BUTT FACE AT {HANDLE_LENGTH:.2f}{band_text(HANDLE_LENGTH_BAND)} TRIMS THE BASIC PROFILE; ITS EDGE AND",
         f"  THE BASIC-{COLLAR_LENGTH:.2f} JUNCTION ARE SHARP. NO BLEND, RADIUS, OR CHAMFER.",
         "USE CLEAR STRAIGHT GRAIN PARALLEL TO TURNING AXIS.",
     )

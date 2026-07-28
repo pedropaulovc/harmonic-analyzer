@@ -22,6 +22,28 @@ SHAFT_H = (0.000, -0.020)
 REAM_H7 = (0.012, 0.000)
 
 
+def band_text(band: tuple[float, float]) -> str:
+    """Render an ``(upper, lower)`` band the way a shop note quotes it.
+
+    Upper deviation first (ASME Y14.5 §2.3.2).  A note that quotes a band beside
+    a nominal must render it from the SAME constant the model dimension is
+    toleranced with, or the two drift — the half-migrated pattern where the
+    nominal is f-stringed and the band beside it is typed.
+
+    A nil deviation keeps its band's SIGN (``-0.00`` on the low side of a
+    unilateral band), because that is what the released sheets print today and
+    this helper exists to make a relocation a pure refactor.  Y14.5 §2.3.2
+    actually prefers a bare ``0`` for a nil limit; switching to it changes ink on
+    every affected sheet, so it is a deliberate drawing change to make on its
+    own, not a side effect of moving a constant.
+    """
+    upper, lower = band
+    if upper <= lower:
+        raise ValueError(f"fit band is inverted: {band!r}")
+    low = f"{lower:+.2f}" if lower else "-0.00"
+    return f"{upper:+.2f}/{low}"
+
+
 def deviations(band: tuple[float, float]) -> tuple[float, float]:
     """Return ``(lower, upper)`` — the argument order the model setter takes.
 
