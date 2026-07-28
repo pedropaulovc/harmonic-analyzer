@@ -63,8 +63,10 @@ def assert_sheet_references(module: Any, name: str, expected: Any) -> None:
 
     * the name is bound in the sheet's namespace and equals ``expected`` — so a
       catalog retune that the sheet did not intend fails here; and
-    * the name actually APPEARS in the sheet's source — so an import left behind
-      after the last call site was deleted does not keep passing.
+    * the name is actually LOADED inside ``build()`` (an ``ast.Name`` read, not
+      a substring — a comment or docstring mentioning it must not count) — so
+      an import left behind after the last call site was deleted, or a literal
+      retyped beside a stale mention, does not keep passing.
     """
     actual = getattr(module, name, None)
     if actual is None:
@@ -76,9 +78,23 @@ def assert_sheet_references(module: Any, name: str, expected: Any) -> None:
         raise AssertionError(
             f"{module.__name__}.{name} is {actual!r}, expected {expected!r}"
         )
-    source = inspect.getsource(module)
-    body = source.split("async def build", 1)[-1]
-    if name not in body:
+    tree = ast.parse(inspect.getsource(module))
+    builds = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef))
+        and node.name == "build"
+    ]
+    if not builds:
+        raise AssertionError(f"{module.__name__} has no build() to inspect")
+    loaded = any(
+        isinstance(node, ast.Name)
+        and node.id == name
+        and isinstance(node.ctx, ast.Load)
+        for build in builds
+        for node in ast.walk(build)
+    )
+    if not loaded:
         raise AssertionError(
-            f"{module.__name__} imports {name!r} but never uses it in build()"
+            f"{module.__name__} imports {name!r} but never loads it in build()"
         )
