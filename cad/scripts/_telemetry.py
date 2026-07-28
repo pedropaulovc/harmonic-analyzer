@@ -288,6 +288,209 @@ def _telemetry_dir() -> Path | None:
         return None
 
 
+class _AtomicJsonlWriter:
+    """Append one JSONL record per kernel write, so concurrent processes interleave
+    whole records instead of splicing them.
+
+    Every COM subprocess appends to the SAME ``traces.jsonl``/``logs.jsonl``, and
+    under ``-n N`` a dozen of them are open at once. A buffered ``TextIOWrapper``
+    picks its write offset in user space, so two processes flushing a >4 KB record
+    can land the tail of one inside the other -- observed as malformed lines that
+    break the ``rg``/``jq`` workflow AGENTS.md points at for debugging.
+
+    Opening the file APPEND-ONLY hands end-of-file placement to the kernel for
+    every write, which is what makes a single write indivisible: on Windows that
+    is ``FILE_APPEND_DATA`` **alone** (0x0004 -- OR-ing in ``FILE_WRITE_DATA``
+    silently loses the guarantee). No cross-process lock on the telemetry hot path.
+
+    The defect is Windows-specific, which is where this project runs: Windows has
+    no ``O_APPEND``, so CPython emulates append mode by seeking to end-of-file and
+    writing, and concurrent writers race on that offset. The ``O_APPEND`` branch
+    below exists only so the SolidWorks-free telemetry tests stay meaningful in a
+    Linux review sandbox -- CPython's ``"a"`` already does exactly that there.
+
+    Writing is best-effort and never raises -- see ``write``.
+    """
+
+    def __init__(self, path: Path):
+        self._handle: Any | None = None
+        self._fd: int | None = None
+        # Records this writer accepted but could not put on disk (short write or
+        # I/O error). Capture is best-effort, so losing one must not raise -- but
+        # the loss must not be INVISIBLE either, or "the file is short" and "the
+        # writer is broken" become indistinguishable (Codex P1).
+        self.dropped = 0
+        self._retired = False
+        if os.name == "nt":
+            import win32con
+            import win32file
+
+            _FILE_APPEND_DATA = 0x0004
+            self._handle = win32file.CreateFile(
+                str(path),
+                _FILE_APPEND_DATA,
+                win32con.FILE_SHARE_READ
+                | win32con.FILE_SHARE_WRITE
+                | win32con.FILE_SHARE_DELETE,
+                None,
+                win32con.OPEN_ALWAYS,
+                win32con.FILE_ATTRIBUTE_NORMAL,
+                None,
+            )
+            return
+        self._fd = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o666)
+
+    def _raw_write(self, payload: bytes) -> int:
+        if self._handle is not None:
+            import win32file
+
+            _, written = win32file.WriteFile(self._handle, payload)
+            return int(written)
+        assert self._fd is not None
+        return os.write(self._fd, payload)
+
+    def write(self, value: str) -> int:
+        """Append one record with EXACTLY ONE append operation, best-effort.
+
+        Two hard rules, both learned from review:
+
+        **Never raise.** This runs synchronously inside ``SimpleSpanProcessor`` /
+        ``SimpleLogRecordProcessor``, on the calling thread, every time a span
+        ends or a log is emitted. AGENTS.md makes file capture best-effort
+        ("telemetry capture must never be the reason a build fails"), so a
+        low-disk or I/O error here must not abort real pipeline work.
+
+        **Never retry.** A short write must NOT be finished with a second append.
+        The whole guarantee of this class is one record = one kernel append; a
+        follow-up append can land after some other process's record, producing
+        ``prefix + their record + suffix`` and destroying TWO records instead of
+        leaving one truncated. So a short write is accepted as a lost record and
+        nothing further is written. (Under ``FILE_APPEND_DATA`` on a local file
+        this needs a disk already failing mid-write, at which point the capture
+        is doomed either way -- but the failure must stay contained.)
+
+        **A PARTIAL write retires the writer, after closing its line.** A short
+        write leaves an unterminated prefix at EOF, so the next append -- from
+        this process or any other -- lands on the same line and corrupts that
+        record too. So terminate the orphan with a lone newline, then go quiet:
+        every later record is counted as dropped and nothing more is written.
+
+        Terminating is safe even though "never retry" forbids appending the
+        SUFFIX, and this file previously claimed the prefix "cannot be repaired
+        (padding it is another racy append)". That conflated two different
+        appends. A suffix landing after a peer's record splices
+        ``prefix + their record + suffix`` and destroys both. A lone NEWLINE
+        cannot: peers' records already end in one, so the worst case is a blank
+        line, which every reader skips. Win the race and the orphan becomes its
+        own (unparsable) line with the peer's record intact after it; lose it
+        and the damage is exactly what it would have been anyway. Never worse,
+        often better -- so the one-line repair is worth the append the old
+        comment ruled out on a rule that did not apply to it.
+
+        The damage stays one trailing line rather than cascading, and a short
+        write means the disk is already failing, so there is nothing left to
+        capture anyway.
+
+        A lost record is COUNTED in :attr:`dropped` rather than logged --
+        routing it through ``_telemetry``'s own logging would re-enter this
+        exporter -- so the loss is still observable to anyone who asks.
+        """
+        if self._retired:
+            self.dropped += 1
+            return len(value)
+        payload = value.encode("utf-8")
+        try:
+            written = self._raw_write(payload)  # exactly once
+            if written != len(payload):
+                self.dropped += 1
+                self._retired = True
+                self._terminate_orphan(written)
+        except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
+            self.dropped += 1
+        return len(value)
+
+    def _terminate_orphan(self, written: int) -> None:
+        """Close the line a short write left open at EOF. See :meth:`write`.
+
+        Only when the write landed SOMETHING: a zero-length write left no
+        orphan, so a newline there would append a blank line for nothing.
+        """
+        if written <= 0:
+            return
+        try:
+            self._raw_write(b"\n")
+        except Exception:  # noqa: BLE001 - a repair must not out-fail the failure
+            pass
+
+    def flush(self) -> None:
+        # The record is already in the kernel's hands. Do NOT FlushFileBuffers /
+        # fsync per span -- that would put a disk round-trip on the COM seat.
+        return
+
+    def close(self) -> None:
+        if self._handle is not None:
+            import win32file
+
+            win32file.CloseHandle(self._handle)
+            self._handle = None
+        if self._fd is not None:
+            os.close(self._fd)
+            self._fd = None
+
+
+def _jsonl_stream(path: Path) -> IO[str]:
+    """Atomic-append writer for ``path``, falling back to a buffered append.
+
+    Capture must never be the reason a build fails (or goes dark), so a seat
+    without the Win32 extensions still gets its JSONL -- just without the
+    interleaving guarantee.
+    """
+    try:
+        return cast(IO[str], _AtomicJsonlWriter(path))
+    except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
+        return path.open("a", encoding="utf-8")
+
+
+def _close_jsonl_writer(out: Any, what: str) -> None:
+    """Close an atomic writer, reporting anything it silently dropped.
+
+    ``_AtomicJsonlWriter.write`` swallows a failed append so capture can never
+    fail a build, but a silent drop would leave ``traces.jsonl`` quietly short
+    with no way to tell that from a writer bug. Shutdown is the one moment it is
+    safe to say so: straight to stderr, NOT through this module's own logging,
+    which would re-enter the exporter being shut down.
+
+    Reports at most ONCE. A COM build calls ``shutdown()`` explicitly, but the
+    providers keep their default interpreter-exit callbacks, so each exporter is
+    shut down again at ``atexit`` -- without the latch the same warning would
+    print twice and read as two separate failures.
+    """
+    with contextlib.suppress(Exception):
+        dropped = int(getattr(out, "dropped", 0) or 0)
+        if dropped and not getattr(out, "_reported", False):
+            out._reported = True
+            sys.stderr.write(
+                f"  !!  telemetry capture dropped {dropped} {what} record(s) "
+                f"(disk or I/O failure); the .jsonl is incomplete\n"
+            )
+    with contextlib.suppress(Exception):
+        out.close()
+
+
+class _JsonlSpanExporter(ConsoleSpanExporter):
+    """``ConsoleSpanExporter`` that closes its atomic writer on shutdown."""
+
+    def shutdown(self) -> None:
+        _close_jsonl_writer(self.out, "span")
+
+
+class _JsonlLogRecordExporter(ConsoleLogRecordExporter):
+    """``ConsoleLogRecordExporter`` that closes its atomic writer on shutdown."""
+
+    def shutdown(self) -> None:
+        _close_jsonl_writer(self.out, "log")
+
+
 class _LiveStderr:
     """A write proxy that always targets the CURRENT ``sys.stderr``.
 
@@ -417,10 +620,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     tdir = _telemetry_dir()
     if tdir is not None:
         with contextlib.suppress(Exception):
-            traces = (tdir / "traces.jsonl").open("a", encoding="utf-8")
+            traces = _jsonl_stream(tdir / "traces.jsonl")
             _span_processors.append(
                 SimpleSpanProcessor(
-                    ConsoleSpanExporter(
+                    _JsonlSpanExporter(
                         out=traces, formatter=lambda s: s.to_json(indent=None) + "\n"
                     )
                 )
@@ -442,10 +645,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     logger_provider = LoggerProvider(resource=resource)
     if tdir is not None:
         with contextlib.suppress(Exception):
-            logs = (tdir / "logs.jsonl").open("a", encoding="utf-8")
+            logs = _jsonl_stream(tdir / "logs.jsonl")
             logger_provider.add_log_record_processor(
                 SimpleLogRecordProcessor(
-                    ConsoleLogRecordExporter(
+                    _JsonlLogRecordExporter(
                         out=logs, formatter=lambda r: r.to_json(indent=None) + "\n"
                     )
                 )

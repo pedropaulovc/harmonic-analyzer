@@ -12,6 +12,8 @@ log<->trace correlation, and cross-process trace-context propagation.
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 import subprocess
 import sys
 import time
@@ -438,6 +440,354 @@ def test_set_service_relabels_resource_fallback_only():
         assert _telemetry._service_name == "verify-kinematics"
     finally:
         _telemetry.set_service(original, force=True)
+
+
+# --------------------------------------------------------------------------- #
+# Atomic JSONL appends. Every COM subprocess appends to the SAME traces.jsonl /
+# logs.jsonl, so a record must cross the process boundary whole -- a spliced line
+# breaks the rg/jq debugging workflow AGENTS.md relies on.
+# --------------------------------------------------------------------------- #
+
+_APPEND_WORKER = r"""
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import _telemetry
+
+target, worker, count, pad = Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+w = _telemetry._AtomicJsonlWriter(target)
+for i in range(count):
+    w.write(json.dumps({"worker": worker, "i": i, "pad": "x" * pad}) + "\n")
+# Report accepted-but-lost records, so the parent can tell a WRITER bug (records
+# vanish while dropped == 0) from best-effort I/O loss (dropped accounts for them).
+Path(str(target) + ".dropped.%d" % worker).write_text(str(w.dropped), encoding="utf-8")
+w.close()
+"""
+
+
+def test_concurrent_appends_never_splice_a_record(tmp_path):
+    """8 processes x 250 oversized records land as 2000 intact, unique JSON lines."""
+    workers, per_worker, pad = 8, 250, 20_000  # pad >> the 8 KB default buffer
+    target = tmp_path / "traces.jsonl"
+    script = tmp_path / "append_worker.py"
+    script.write_text(_APPEND_WORKER, encoding="utf-8")
+    scripts_dir = str(Path(__file__).resolve().parent)
+
+    procs = [
+        subprocess.Popen(
+            [sys.executable, str(script), scripts_dir, str(target),
+             str(w), str(per_worker), str(pad)],
+        )
+        for w in range(workers)
+    ]
+    for proc in procs:
+        assert proc.wait(timeout=180) == 0
+
+    # Diagnose before asserting. This test failed ONCE in ~16 local runs and the
+    # bare "expected 2000, got N" told us nothing about why, so classify every
+    # line first and put the classification in the failure message. A recurrence
+    # should be explicable from the message alone: splicing (unparseable /
+    # wrong-length pad) is a real defect in _AtomicJsonlWriter; whole records
+    # simply MISSING points instead at a short write, which `write` accepts as a
+    # lost record by design rather than retrying into someone else's append.
+    lines = target.read_text(encoding="utf-8").splitlines()
+    seen: set[tuple[int, int]] = set()
+    unparseable, wrong_pad = 0, 0
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except Exception:  # noqa: BLE001 - counting damage, not handling it
+            unparseable += 1
+            continue
+        if len(record.get("pad", "")) != pad:
+            wrong_pad += 1
+            continue
+        seen.add((record["worker"], record["i"]))
+
+    expected = {(w, i) for w in range(workers) for i in range(per_worker)}
+    missing = expected - seen
+    dropped = sum(
+        int(Path(f"{target}.dropped.{w}").read_text(encoding="utf-8") or 0)
+        for w in range(workers)
+    )
+    diagnosis = (
+        f"lines={len(lines)} (attempted {workers * per_worker}), "
+        f"unparseable={unparseable}, wrong_pad={wrong_pad}, "
+        f"missing={len(missing)}, dropped_by_writer={dropped}, "
+        f"duplicated={len(lines) - len(seen)}"
+    )
+
+    # THE guarantee: a record is never spliced into another, and never appears twice.
+    assert unparseable == 0 and wrong_pad == 0, f"records were spliced -- {diagnosis}"
+    assert len(lines) == len(seen), f"records were duplicated -- {diagnosis}"
+
+    # Completeness is asserted only up to records the writer ADMITS it lost.
+    # `write` deliberately drops a record on a short write or I/O error rather
+    # than raising (capture is best-effort and never fatal), so demanding all
+    # 2,000 survive would let an explicitly accepted loss fail this mandatory
+    # gate (Codex P1). Instead require the accounting to balance: every attempted
+    # record is either on disk or counted in `dropped`. A writer bug -- records
+    # vanishing with nothing admitted -- still fails, which is the case worth
+    # catching.
+    assert len(missing) == dropped, diagnosis
+
+
+_BUFFERED_WORKER = r"""
+import json, sys
+from pathlib import Path
+target, worker, count, pad = Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+f = target.open("a", encoding="utf-8")          # the pre-fix buffered path
+for i in range(count):
+    f.write(json.dumps({"worker": worker, "i": i, "pad": "x" * pad}) + "\n")
+f.close()
+"""
+
+
+@pytest.mark.skipif(
+    os.environ.get("HARMONIC_TELEMETRY_RACE_REPRO") != "1"
+    or sys.platform != "win32",
+    reason=(
+        "opt-in AND Windows-only: asserts a RACE reproduces, so it cannot gate "
+        "check:telemetry. Run with HARMONIC_TELEMETRY_RACE_REPRO=1 on Windows. "
+        "Compared against '1' exactly, so setting it to 0/false to DISABLE the "
+        "repro cannot accidentally switch it on and turn the gate red. The "
+        "platform guard is not belt-and-braces: on POSIX `open(path, 'a')` uses "
+        "O_APPEND, whose appends ARE atomic, so the buffered writers this test "
+        "deliberately breaks produce all 2,000 records intact and the assertion "
+        "below fails on a correct system (Codex P1, reproduced on Linux). The "
+        "corruption it reproduces is a Windows behaviour, so the control only "
+        "means anything on Windows."
+    ),
+)
+def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
+    """Opt-in repro for WHY the atomic writer exists. NOT a gating test.
+
+    This asserts that a race *reproduces*, which is inherently nondeterministic:
+    nothing forces the workers to overlap, so a lucky scheduler or a fast enough
+    filesystem can let all 2,000 records through intact and fail this assertion
+    even though ``_AtomicJsonlWriter`` is perfectly correct (Codex P2). A
+    mandatory gate must never be able to go red that way -- the repo's rule is
+    that there are no flaky tests, only broken ones -- so it is gated behind
+    ``HARMONIC_TELEMETRY_RACE_REPRO=1`` and kept as executable documentation of
+    the measurement, not as a check.
+
+    **Windows only, and that is the point.** CPython's ``open(path, "a")`` maps
+    to ``O_APPEND`` on POSIX, where the kernel places each write, so the
+    buffered path is already safe there and this control correctly finds all
+    2,000 records intact (Codex reproduced exactly that on Linux). On Windows
+    there is no ``O_APPEND``: append mode is emulated by seeking to
+    end-of-file and writing, so two processes pick the same offset and both
+    splice records AND overwrite each other. Measured on this repo's seat with
+    8 x 250 x 20 KB records: 1516 of 2000 lines survived, 18 structurally
+    malformed.
+
+    So the bug -- and the value of ``_AtomicJsonlWriter`` -- is Windows-specific.
+    The POSIX branch of the writer is an explicit spelling of what CPython
+    already does, kept so the class does not depend on that implementation
+    detail. Without this control, "the buffered path is broken" would be a claim
+    with no repro, and the atomic test above would prove only that SOMETHING
+    passes, not that it fixed anything.
+    """
+    workers, per_worker, pad = 8, 250, 20_000
+    target = tmp_path / "traces.jsonl"
+    script = tmp_path / "buffered_worker.py"
+    script.write_text(_BUFFERED_WORKER, encoding="utf-8")
+
+    procs = [
+        subprocess.Popen(
+            [sys.executable, str(script), str(target),
+             str(w), str(per_worker), str(pad)],
+        )
+        for w in range(workers)
+    ]
+    for proc in procs:
+        assert proc.wait(timeout=180) == 0
+
+    lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
+    intact = 0
+    for line in lines:
+        try:
+            json.loads(line)
+            intact += 1
+        except Exception:  # noqa: BLE001 - counting damage, not handling it
+            pass
+    assert intact < workers * per_worker, (
+        "buffered concurrent appends survived intact -- if this ever passes "
+        "cleanly, the platform changed and _AtomicJsonlWriter may be redundant"
+    )
+
+
+def test_short_append_is_never_retried_with_a_second_append(tmp_path, monkeypatch):
+    """One record = one append operation, even when the write comes up short.
+
+    Finishing a short write with a SECOND append of the SUFFIX is worse than
+    losing the record: another process can append in between, giving
+    ``prefix + their record + suffix`` and destroying two records instead of
+    truncating one (Codex P2). So the record itself gets exactly one append
+    attempt, and no exception either way. The lone newline that follows is not
+    a retry -- it carries no record bytes; see the orphan-termination test.
+    """
+    record = '{"hello": "world"}\n'
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    try:
+        calls: list[bytes] = []
+
+        def short(payload: bytes) -> int:
+            calls.append(payload)
+            return 3  # short: only 3 of the bytes land
+
+        monkeypatch.setattr(writer, "_raw_write", short)
+        assert writer.write(record) == len(record)  # must not raise
+        # The loss must be COUNTED -- the stress test's accounting assertion
+        # silently degrades back to a strict count if this stops incrementing.
+        assert writer.dropped == 1
+    finally:
+        writer.close()
+    assert calls[0] == record.encode()
+    # The record is never re-attempted; only its orphaned line gets closed.
+    assert calls[1:] == [b"\n"], f"record was split across {len(calls)} appends"
+
+
+def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypatch):
+    """An I/O error during capture drops the record; it does not fail the build."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    try:
+        def explode(_payload: bytes) -> int:
+            raise OSError("disk full")
+
+        monkeypatch.setattr(writer, "_raw_write", explode)
+        assert writer.write('{"hello": "world"}\n') == 19  # swallowed
+        assert writer.dropped == 1  # swallowed, but not invisible
+    finally:
+        writer.close()
+
+
+def test_a_partial_write_retires_the_writer_instead_of_corrupting_the_next(tmp_path):
+    """A short append leaves an unterminated prefix that the NEXT append lands on.
+
+    The record itself is unrecoverable -- retrying the suffix is the splice this
+    class exists to prevent -- so the writer goes quiet. One trailing line is
+    damaged instead of every record after it.
+    """
+    target = tmp_path / "traces.jsonl"
+    writer = _telemetry._AtomicJsonlWriter(target)
+    calls = []
+
+    def short_once(payload):
+        calls.append(payload)
+        return len(payload) - 3  # a genuine positive-length short write
+
+    writer._raw_write = short_once
+    writer.write('{"name":"a"}\n')
+    # The record is NOT finished with a second append -- the only follow-up is
+    # the lone newline that closes the line it orphaned.
+    assert calls == [b'{"name":"a"}\n', b"\n"]
+
+    writer.write('{"name":"b"}\n')
+    writer.write('{"name":"c"}\n')
+    assert len(calls) == 2, "retired writer must not append after a short write"
+    assert writer.dropped == 3
+
+
+def test_a_partial_write_closes_the_line_it_orphaned(tmp_path):
+    """The orphan gets a newline so a PEER's next record stays parsable.
+
+    Not a contradiction of "never retry": a suffix landing after a peer's record
+    splices prefix+their-record+suffix and destroys two records, but peers'
+    records already end in a newline, so a lone newline can only ever add a
+    blank line -- which every reader skips. Win the race and the peer's record
+    survives intact; lose it and the damage is what it would have been anyway.
+    """
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    appends = []
+
+    def short_once(payload):
+        appends.append(payload)
+        return len(payload) - 3 if len(appends) == 1 else len(payload)
+
+    writer._raw_write = short_once
+    writer.write('{"name":"a"}\n')
+    assert appends[-1] == b"\n", "orphaned prefix must be terminated"
+
+
+def test_a_zero_length_write_orphans_nothing_so_adds_no_newline(tmp_path):
+    """No bytes landed, so no line is open -- a newline there would be litter."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    appends = []
+
+    def wrote_nothing(payload):
+        appends.append(payload)
+        return 0
+
+    writer._raw_write = wrote_nothing
+    writer.write('{"name":"a"}\n')
+    assert appends == [b'{"name":"a"}\n']
+    assert writer.dropped == 1
+
+
+def test_a_failing_repair_never_escapes_the_writer(tmp_path):
+    """The newline is best-effort like every other append here."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    state = {"n": 0}
+
+    def short_then_raise(payload):
+        state["n"] += 1
+        if state["n"] == 1:
+            return len(payload) - 3
+        raise OSError("disk gone")
+
+    writer._raw_write = short_then_raise
+    writer.write('{"name":"a"}\n')  # must not raise
+    assert writer.dropped == 1
+
+
+def test_shutdown_reports_once_even_though_atexit_shuts_down_again(tmp_path, capsys):
+    """OTel providers keep their interpreter-exit callbacks, so an explicit
+    shutdown() is followed by a second one at atexit. Two identical warnings
+    would read as two separate failures."""
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    writer.dropped = 2
+    _telemetry._close_jsonl_writer(writer, "span")
+    _telemetry._close_jsonl_writer(writer, "span")
+    assert capsys.readouterr().err.count("dropped 2 span record(s)") == 1
+
+
+def test_shutdown_reports_dropped_records_to_stderr(tmp_path, capsys):
+    """A silent drop must be announced once, at the only safe moment.
+
+    Without this the counter would be test-only instrumentation and a short
+    .jsonl would be indistinguishable from a writer bug. It goes straight to
+    stderr rather than through this module's logging, which would re-enter the
+    exporter being shut down.
+    """
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    writer.dropped = 3
+    _telemetry._close_jsonl_writer(writer, "span")
+    err = capsys.readouterr().err
+    assert "dropped 3 span record(s)" in err
+    assert "incomplete" in err
+
+
+def test_shutdown_is_silent_when_nothing_was_dropped(tmp_path, capsys):
+    writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
+    _telemetry._close_jsonl_writer(writer, "span")
+    assert "dropped" not in capsys.readouterr().err
+
+
+def test_jsonl_stream_falls_back_when_the_atomic_path_is_unavailable(tmp_path, monkeypatch):
+    """Capture must never go dark: an unusable atomic writer degrades to buffered."""
+    def boom(_path):
+        raise RuntimeError("no win32 extensions here")
+
+    monkeypatch.setattr(_telemetry, "_AtomicJsonlWriter", boom)
+    stream = _telemetry._jsonl_stream(tmp_path / "logs.jsonl")
+    try:
+        stream.write('{"fallback": true}\n')
+    finally:
+        stream.close()
+    assert json.loads((tmp_path / "logs.jsonl").read_text(encoding="utf-8")) == {
+        "fallback": True
+    }
 
 
 if __name__ == "__main__":
