@@ -1842,6 +1842,7 @@ def set_reference_dimension(
     return display
 
 
+@_telemetry.traced("drawing.dimension_precision")
 def set_dimension_precision(
     adapter: Any, annotations: Iterable[Any], precision: dict[str, int]
 ) -> None:
