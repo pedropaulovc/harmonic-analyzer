@@ -238,12 +238,13 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
         lambda key, outputs, label: restores.append((key, outputs, label)) or next(outcomes),
     )
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
 
     def build(*_args, **_kwargs):
         builds.append(True)
         output.write_bytes(b"drawing")
 
-    monkeypatch.setattr(dodo, "_exec", build)
+    monkeypatch.setattr(dodo, "_exec_com", build)
     monkeypatch.setattr(
         dodo._cache, "store",
         lambda key, outputs, label: stores.append((key, outputs, label)) or "stored",
@@ -578,7 +579,8 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
     monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
     monkeypatch.setattr(dodo, "_stamp_part_execution", lambda _stem: None)
-    monkeypatch.setattr(dodo, "_exec", lambda *_a, **_kw: None)
+    monkeypatch.setattr(dodo, "_exec_com", lambda *_a, **_kw: None)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(45.0))
 
     opened: list[str] = []
@@ -607,6 +609,80 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     # The seat wait span is _com_seat's, so it is not in this list.
     assert opened == ["cache.probe part:pen_rod", "cache.reprobe part:pen_rod",
                       "task part:pen_rod", "cache.store part:pen_rod"]
+
+
+def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(tmp_path, monkeypatch):
+    """With autostart ON, the first COM build brings SolidWorks up via a TOP-LEVEL
+    ``sw.ensure_ready`` span positioned AFTER the under-seat re-probe and BEFORE the
+    ``task`` span -- never nested inside it, so the task span stays pure build-work
+    timing (regression guard: an earlier cut called ensure_ready inside _exec_com,
+    nesting it under the task span)."""
+    dodo = _load_dodo()
+    script = tmp_path / "build_pen_rod.py"
+    script.write_text("", encoding="utf-8")
+    outcomes = iter((False, False))  # probe MISS, re-probe MISS -> builds
+
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
+    monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
+    monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
+    monkeypatch.setattr(dodo, "_stamp_part_execution", lambda _stem: None)
+    monkeypatch.setattr(dodo, "_exec_com", lambda *_a, **_kw: None)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(45.0))
+    monkeypatch.setattr(dodo, "_SW_ENSURED", False)
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "1")
+
+    opened: list[str] = []
+    depth = 0
+
+    @contextlib.contextmanager
+    def record_span(name, **_attrs):
+        nonlocal depth
+        opened.append(name)
+        assert depth == 0, f"{name} must be top-level, not nested under a phase span"
+        depth += 1
+
+        class _Span:
+            def set_attribute(self, key, value):
+                pass
+
+        try:
+            yield _Span()
+        finally:
+            depth -= 1
+
+    monkeypatch.setattr(dodo._telemetry, "span", record_span)
+
+    def fake_ensure():
+        with dodo._telemetry.span("sw.ensure_ready"):
+            pass
+
+    monkeypatch.setattr(dodo._sw_lifecycle, "ensure_ready", fake_ensure)
+
+    dodo._cached_part_action("pen_rod", script)
+
+    assert opened == ["cache.probe part:pen_rod", "cache.reprobe part:pen_rod",
+                      "sw.ensure_ready", "task part:pen_rod", "cache.store part:pen_rod"]
+
+
+def test_sw_ensure_once_runs_once_and_respects_the_opt_out(monkeypatch):
+    """``_sw_ensure_once`` calls ``ensure_ready`` at most once per worker (the
+    ``_SW_ENSURED`` guard) and not at all under ``HARMONIC_SW_AUTOSTART=0``."""
+    dodo = _load_dodo()
+    calls: list[int] = []
+    monkeypatch.setattr(dodo._sw_lifecycle, "ensure_ready", lambda: calls.append(1))
+
+    monkeypatch.setattr(dodo, "_SW_ENSURED", False)
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "1")
+    dodo._sw_ensure_once()
+    dodo._sw_ensure_once()  # guard: second call is a no-op
+    assert calls == [1]
+
+    monkeypatch.setattr(dodo, "_SW_ENSURED", False)
+    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+    dodo._sw_ensure_once()  # opt-out: never calls ensure_ready
+    assert calls == [1]
 
 
 def test_task_span_carries_its_pipeline_stage_resource():

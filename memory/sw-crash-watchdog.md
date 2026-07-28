@@ -47,3 +47,12 @@ default in every `run_build` COM session (exit 86 crash / 87 op-timeout;
 `HARMONIC_COM_WATCHDOG=0` kill switch, `HARMONIC_COM_OP_TIMEOUT` override).
 Recovery stays [[solidworks-3dx-launch]]: clear the dialog, Platform desktop
 shortcut, never COM-start. See also [[sw-recovery-dialog]].
+
+**Distinct failure this watchdog does NOT catch:** the ".NET Framework" splash
+wedge — SW launches, sits on the splash behind a `#32770` "SOLIDWORKS Design"
+modal ("Failed to load Microsoft .NET Framework."), and never becomes
+COM-attachable. No crash (no NEW `sldexitapp.exe`) and no op activity, so
+neither watchdog signal fires; a build just blocks on `sw.connect`. That case
+is detected + recovered by [[connector-lifecycle-lib]]
+(`sw_recovery.find_dotnet_splash_dialog` / `recover_solidworks`), now auto-run
+before connect in every COM task.
