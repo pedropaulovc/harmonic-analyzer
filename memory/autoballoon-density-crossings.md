@@ -1,6 +1,6 @@
 ---
 name: autoballoon-density-crossings
-description: AutoBalloon5 crosses leaders at ~32 balloons/view under BOTH its native circular layout and our _spread_balloons re-ring — density, not algorithm; per-view component isolation is what keeps a balloon sheet clean
+description: AutoBalloon5 crosses leaders at ~32 balloons/view under BOTH of the two layouts tried (its native circular layout, 5 crossings, and our _spread_balloons re-ring, 6) — untested: multiple rings, routed leaders; per-view component isolation is what keeps a balloon sheet clean today
 metadata:
   type: project
 ---
