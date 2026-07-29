@@ -649,7 +649,7 @@ def import_part_pmi(
     ddoc = _early_bound(draw, "IDrawingDoc")
     views = views if isinstance(views, (list, tuple)) else (views,)
 
-    def _match(annotation: Any) -> tuple[str, tuple[float, float]] | None:
+    def _content_key(annotation: Any) -> str | None:
         annotation_type = int(annotation.GetType())
         specific = annotation.GetSpecificAnnotation()
         if specific is None:
@@ -657,7 +657,7 @@ def import_part_pmi(
         if annotation_type == _ANNOT_DATUM:
             letter = str(_early_bound(specific, "IDatumTag").GetLabel() or "")
             if letter in datum_positions:
-                return (f"datum:{letter}", datum_positions[letter])
+                return f"datum:{letter}"
         elif annotation_type == _ANNOT_GTOL:
             frame = _early_bound(specific, "IGtol").GetFrame(1)
             xml = (
@@ -670,14 +670,14 @@ def import_part_pmi(
                     f"<ToleranceSymbol>{GTOL_SYMBOLS[control.characteristic]}<"
                     in xml
                     and control.tolerance in xml
-                    and control.key not in placed
                 ):
-                    return (control.key, control_positions[control.key])
+                    return control.key
         return None
 
     placed: dict[str, Any] = {}
     targets: dict[str, tuple[float, float]] = {}
     unmatched: list[str] = []
+    duplicates: list[Any] = []
     for view in views:
         want_datums = set(datum_positions) - {
             key.removeprefix("datum:") for key in placed if key.startswith("datum:")
@@ -700,16 +700,34 @@ def import_part_pmi(
         draw.ClearSelection2(True)
         for annotation in tuple(inserted or ()):
             annotation = _early_bound(annotation, "IAnnotation")
-            matched = _match(annotation)
-            if matched is None:
+            key = _content_key(annotation)
+            if key is None:
                 unmatched.append(
                     f"type={annotation.GetType()} name={annotation.GetName()!r} "
                     f"view={view.GetName2()!r}"
                 )
                 continue
-            key, target = matched
+            if key in placed:
+                # A view asked for a still-missing TYPE re-inserts every model
+                # annotation of that type, including ones an earlier view
+                # already imported — a duplicate copy, not a recipe error.
+                duplicates.append(annotation)
+                continue
             placed[key] = annotation
-            targets[key] = target
+            targets[key] = (
+                datum_positions[key.removeprefix("datum:")]
+                if key.startswith("datum:")
+                else control_positions[key]
+            )
+
+    for annotation in duplicates:
+        draw.ClearSelection2(True)
+        if not annotation.Select2(False, 0):
+            raise RuntimeError(f"{label}: failed to select a duplicate PMI import")
+        draw.EditDelete()
+    if duplicates:
+        draw.ClearSelection2(True)
+        _telemetry.event("drawing.pmi_duplicates_deleted", count=len(duplicates))
 
     for key, annotation in placed.items():
         target = targets[key]
