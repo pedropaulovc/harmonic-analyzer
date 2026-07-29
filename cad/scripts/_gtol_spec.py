@@ -111,7 +111,11 @@ class PartDatum:
 
     letter: str
     face: FaceSpec
-    leader_length_m: float = 0.06
+    # DimXpert offsets the tag from the face by this much; 60 mm (the old
+    # default) threw the tag far off the model and poisoned every auto-arrange
+    # pass (zoom-to-fit, sheet import placement). ~8 mm matches a hand-placed
+    # tag.
+    leader_length_m: float = 0.008
 
 
 @dataclass(frozen=True)

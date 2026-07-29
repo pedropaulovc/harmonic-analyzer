@@ -190,7 +190,24 @@ def author_part_pmi(
             raise RuntimeError("DimXpertManager returned None")
         dim_part = _early_bound(_read_member(manager, "DimXpertPart"), "IDimXpertPart")
 
+        import os as _os
+        _author_view = _os.environ.get("HARMONIC_PMI_AUTHOR_VIEW")
+
+        def _orient(orientation: str) -> None:
+            if not _author_view:
+                return
+            # DimXpert routes a new annotation to the annotation view matching
+            # the CURRENT viewing direction.  An FCF on a cylindrical face is
+            # only LEGAL in the view perpendicular to the face's axis (*Top for
+            # this repo's Y-axis turned parts); authoring it into any other
+            # view leaves it in a corrupted state — unselectable, positions
+            # revert on save, glyphs render rotated on sheets.
+            model.ShowNamedView2(orientation, -1)
+            model.GraphicsRedraw2()
+            _telemetry.info(f"viewport oriented {orientation} for PMI authoring")
+
         selector_ids = feature_selector_ids() if datums else {}
+        _orient("*Top")
         for datum in datums:
             face = _resolve_face(model, datum.face, label=f"datum {datum.letter}")
             _select_face(model, face, label=f"datum {datum.letter}")
@@ -213,6 +230,7 @@ def author_part_pmi(
             _telemetry.event("pmi.datum", letter=datum.letter)
 
         type_ids = gtol_type_ids() if controls else {}
+        _orient("*Top")
         for control in controls:
             face = _resolve_face(model, control.face, label=control.key)
             _select_face(model, face, label=control.key)
@@ -249,7 +267,9 @@ def author_part_pmi(
                 tolerance=control.tolerance,
             )
         model.ClearSelection2(True)
-        _consolidate_pmi_annotation_views(model)
+        import os as _os
+        if _os.environ.get("HARMONIC_PMI_SKIP_CONSOLIDATE") != "1":
+            _consolidate_pmi_annotation_views(model)
         _telemetry.success(
             f"part PMI authored: {len(datums)} datums, {len(controls)} controls"
         )
@@ -259,41 +279,43 @@ _ANNOT_GTOL = 5  # swAnnotationType_e.swGTol
 
 
 def _consolidate_pmi_annotation_views(model: Any) -> None:
-    """Move every DimXpert annotation into the annotation view the gtols use.
+    """Move every DimXpert annotation into the axis-perpendicular view.
 
-    DimXpert picks an annotation plane per feature: a datum tag on a cylinder
-    routinely lands in its OWN annotation view whose orientation matches no
-    standard drawing orientation, and ``IView::ImportAnnotations`` then never
-    carries it to any sheet view (measured 2026-07-28 on transgear-stub: the
-    datum imported into none of the seven standard orientations while its two
-    gtols imported into *Front).  Consolidating into the gtol view makes the
-    whole PMI set import into one drawing view, which is what
-    ``import_part_pmi`` sweeps for.
+    An FCF on a cylindrical face is only LEGAL in the annotation view
+    perpendicular to the face's axis (UI: right-click > Select Annotation
+    View > Top) — this repo's turned parts have their axes along Y.
+    ``InsertGtol`` nevertheless routes new gtols to the front-ish default
+    view regardless of viewport orientation, leaving them in a corrupted
+    state: unmovable on sheets, positions revert at save, glyphs render
+    rotated.  Consolidating into the ±Y view — which MUST already exist as
+    one of DimXpert's auto-created views, since ``MoveAnnotations`` only
+    persists into those — is the COM equivalent of the manual fix
+    (established 2026-07-29).
     """
     ext = _read_member(model, "Extension")
+    target = None
     populated: list[tuple[Any, list[Any]]] = []
     for raw in tuple(ext.AnnotationViews or ()):
         view = _early_bound(raw, "IAnnotationView")
         if bool(view.UnassignedView):
             continue
+        rotation = tuple(view.GetViewRotation() or ())
+        if len(rotation) == 9 and abs(rotation[7]) > 0.999:
+            target = view
         items = list(view.GetAnnotations2(True, True) or ())
         if items:
             populated.append((view, items))
-    if len(populated) <= 1:
-        return
-    target = None
-    for view, items in populated:
-        for item in items:
-            if int(_early_bound(item, "IAnnotation").GetType()) == _ANNOT_GTOL:
-                target = view
-                break
-        if target is not None:
-            break
     if target is None:
-        target = max(populated, key=lambda entry: len(entry[1]))[0]
+        raise RuntimeError(
+            "no ±Y annotation view exists — DimXpert did not auto-create the "
+            "axis-perpendicular view (MoveAnnotations only persists into "
+            "DimXpert's own auto views, so it cannot be inserted here)"
+        )
     strays = [
         item for view, items in populated if view is not target for item in items
     ]
+    if not strays:
+        return
     # Same VT_ARRAY trap as FeatureSelectorOptions (_long_array): a bare list
     # marshals as VT_ARRAY|VT_VARIANT and MoveAnnotations rejects it with
     # "Memory is locked"; type the dispatch array explicitly.
@@ -307,7 +329,7 @@ def _consolidate_pmi_annotation_views(model: Any) -> None:
     if not _early_bound(target, "IAnnotationView").MoveAnnotations(stray_array):
         raise RuntimeError(
             f"MoveAnnotations refused to consolidate {len(strays)} DimXpert "
-            "annotations into the gtol annotation view"
+            "annotations into the axis-perpendicular annotation view"
         )
     remaining = [
         view

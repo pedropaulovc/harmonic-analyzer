@@ -676,8 +676,35 @@ def import_part_pmi(
                 f"type={annotation_type} name={annotation.GetName()!r}"
             )
             continue
-        if not annotation.SetPosition2(target[0], target[1], 0.0):
-            raise RuntimeError(f"{label}: SetPosition2 failed for {key}")
+        # Imported PMI ignores IAnnotation::SetPosition2 — it returns True with
+        # the position unchanged — and any rebuild re-runs DimXpert's
+        # auto-arrange over every setter.  IGtol::SetPosition DOES take on a
+        # gtol frame provided no rebuild runs afterwards (finalize_drawing
+        # deliberately never rebuilds before save), so use it and verify by
+        # READBACK, never the returned bool.
+        if annotation_type == _ANNOT_GTOL:
+            gtol.SetPosition(target[0], target[1], 0.0)
+        else:
+            annotation.SetPosition2(target[0], target[1], 0.0)
+        after = tuple(annotation.GetPosition() or (0.0, 0.0, 0.0))
+        drift = math.hypot(after[0] - target[0], after[1] - target[1])
+        if annotation_type == _ANNOT_GTOL and drift > 0.0005:
+            raise RuntimeError(
+                f"{label}: {key} did not move to {target}: read back "
+                f"{after[:2]} (drift {drift * 1000:.2f} mm)"
+            )
+        if annotation_type == _ANNOT_DATUM and drift > 0.002:
+            # Datum tags attached to an edge only slide along it, and no
+            # position API has been observed to move an imported one at all —
+            # record where it actually sits so the render eye-pass judges it.
+            _telemetry.warn(
+                f"{label}: {key} ignored its spec position {target}: read "
+                f"back {after[:2]} (drift {drift * 1000:.1f} mm)"
+            )
+        annotation.Color = 0x000000  # override DimXpert teal for print
+        _telemetry.event(
+            "drawing.pmi_placed", key=key, x=after[0], y=after[1], drift=drift
+        )
         placed[key] = annotation
 
     expected = {f"datum:{letter}" for letter in datum_positions} | set(controls_by_key)
