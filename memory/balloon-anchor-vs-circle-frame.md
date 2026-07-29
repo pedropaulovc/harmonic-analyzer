@@ -1,67 +1,62 @@
 ---
 name: balloon-anchor-vs-circle-frame
-description: OPEN — drive-train sheet 4's concealed-bottom balloon ring is never spread (SetPosition returns True, no effect); three mechanisms refuted with measurements
+description: A deterministic "edge nearest the component centroid" anchor rule CLUSTERS anchors of physically adjacent components — it regressed drive-train sheet 4 into a balloon overlap; plus three refuted theories for that overlap
 metadata:
   type: project
 ---
 
-**The defect (mechanism still OPEN):** on drive-train sheet 4 the
-concealed-BOTTOM ring is not spread on the saved sheet — `SetPosition` returns
-True and the balloons stay at their default creation placement. Cause not yet
-identified; three candidate mechanisms have been refuted (below). This BLOCKS
-`drawing:drive_train_assembly`.
+**What happened (2026-07-28).** Replacing the arrival-order anchor edge
+(`edges[0]`) with a deterministic "edge whose midpoint is nearest the mean of
+midpoints" pulled every anchor toward its component's CENTROID. For two
+components in the same physical stack — `cone-gear-shaft` and
+`cone-tip-bushing`, both in the cone journal stack — that puts their anchors on
+top of each other. Recorded attachments for drive-train sheet 4's two-balloon
+ring:
 
-Repro (2026-07-28, drive-train sheet 4): on the saved sheet both bottom balloons sat
-`(0.0176, 0.0114)` m from their own attachments — **the same delta to 0.1 mm**,
-i.e. the creation offset, not a ring position. Their circles therefore kept the
-attachments' 6.86 mm spacing (measured 6.99 mm) instead of the ring's 15.2 mm,
-and the layout audit failed with a 7.7 × 3.0 mm overlap between items 25 and 6.
+| code | item A | item B | separation |
+|---|---|---|---|
+| main | `0.087730, 0.123821` | `0.102846, 0.187109` | **65.1 mm** |
+| centroid rule | `0.102557, 0.185808` | `0.100503, 0.179268` | **6.86 mm** |
 
-Subtracting the recorded anchor offsets, both ANCHORS sit a constant
-`(13.50, 13.44)` mm from their attachment — a 45° default placement. The
-identical-delta signature is the diagnostic: **balloons at a constant offset
-from their own attachments were never re-ringed.**
+One anchor moved ~57 mm onto its neighbour, and the layout audit failed with a
+7.7 × 3.0 mm overlap on 9.7 mm boxes. **This was a regression, not a latent
+main-branch defect** — main's anchors were 65 mm apart, so nothing ever needed
+separating and the drawing was solidly green.
 
-Contrast the grouped rings on the same drawing, which ARE spread (two of their
-attachments are 0.9 mm apart and the audit passes them) — so whatever loses the
-concealed ring's placement does not affect `_add_component_balloons`. That
-difference is the live lead.
+**The general trap.** A deterministic anchor rule is not automatically a SAFE
+one. Any global geometric rule (most-negative corner, nearest-centroid, …)
+applies the same bias to every component, so components that are physically
+adjacent get anchors that are adjacent too. Arrival order was nondeterministic
+but spatially arbitrary, which is what kept anchors apart by luck. **Determinism
+and spread are separate properties; a fix for one can destroy the other.**
+Before shipping an anchor rule, diff the resulting attachment points against
+main and look for pairs that moved TOGETHER — the `drawing.balloon_ring` span
+event records them per ring.
 
-**Three theories measured and REFUTED for this same overlap.** Each was specific,
-plausible, and wrong; none is worth re-walking:
+**Corollary:** any anchor rule that clusters makes the drawing depend on
+`_spread_balloons` actually separating the balloons. On this ring it did not —
+anchors 6.86 mm apart produced circles 6.99 mm apart, where the gap formula
+demands 15.2 mm. Whether the spread works on that view AT ALL is untested;
+main never exercised it, because its anchors were already far apart.
+
+**Three theories measured and REFUTED for that non-separation.** Each was
+specific, plausible, and wrong:
 
 1. *Anchor-vs-circle frame.* `SetPosition` moves the annotation ANCHOR while the
-   ink and the audit (`_note_element`) measure the CIRCLE (`GetBalloonInfo`), so
-   a differing per-balloon offset would eat the gap. The offset is REAL — every
-   drive-train balloon carries ~`(+4.2, -2.0)` mm — but it is UNIFORM, so the
-   differential is `(0.05, 0.14)` mm, two orders of magnitude too small. The
-   corrected build produced byte-identical boxes: a confident no-op. The offsets
-   are still recorded on the `drawing.balloon_ring` span event, which is what
-   refuted it.
-2. *Spread-before-the-second-view.* That placing `concealed_front` re-solved
-   the sheet and undid the bottom ring, since `_add_component_balloons` gets its
-   views already placed. Moving BOTH concealed spreads after both views exist
-   changed nothing — byte-identical boxes for the third time.
-3. *Ellipse eccentricity.* That `_min_angular_gap`'s use of `min(Rx, Ry)` is
-   conservative only for infinitesimal gaps, since an eccentric ellipse doubles
-   back at its pointy end. Probed as a pure function to 5:1 — separation holds
-   at every ratio.
+   ink and the audit (`_note_element`) measure the CIRCLE (`GetBalloonInfo`).
+   The offset is REAL — every drive-train balloon carries ~`(+4.2, -2.0)` mm —
+   but UNIFORM, so the differential is `(0.05, 0.14)` mm, ~100x too small.
+2. *Spread ran before the second view was placed*, so the sheet re-solve undid
+   it. Moving both concealed spreads after both views changed nothing.
+3. *Ellipse eccentricity* makes `min(Rx, Ry)` non-conservative. Probed as a pure
+   function to 5:1 — separation holds at every ratio.
 
-**Three code changes, byte-identical output every time.** That repetition was
-itself the signal, and it was under-weighted twice: when a change provably
-cannot move the artefact, stop proposing mechanisms for the artefact and go
-measure whether the code path runs at all. The next step is telemetry on the
-ring geometry (centre, radii, gap, and each computed target) plus a read-back of
-the balloon positions immediately after `SetPosition`, to separate "never
-applied" from "applied then reverted" — a distinction none of the evidence so
-far can make.
-
-**Lesson.** An overlap on a ring has three candidate causes and they are
-cheaply distinguishable from the recorded data before touching COM: crowding
-(count vs ring circumference), a frame/units mismatch (compare the offsets), or
-the spread not having taken effect at all (compare each balloon's final position
-to its own ATTACHMENT — a constant delta across balloons means un-spread). Check
-the third first; it is the only one that needs no geometry reasoning.
+Three code changes, byte-identical boxes every time. **That repetition was the
+signal and it was under-weighted twice**: when a change provably cannot move the
+artefact, stop proposing mechanisms and go measure whether the code path runs.
+The cheap discriminator, before any COM run: compare each balloon's final
+position to its OWN attachment — a constant delta across balloons means the ring
+was never applied.
 
 See [[load-bearing-claims-need-a-repro]] and
 [[negative-result-needs-a-positive-control]]. Related:
