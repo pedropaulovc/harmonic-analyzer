@@ -649,15 +649,22 @@ def import_part_pmi(
     ddoc = _early_bound(draw, "IDrawingDoc")
     views = views if isinstance(views, (list, tuple)) else (views,)
 
-    def _content_key(annotation: Any) -> str | None:
+    def _candidate_keys(annotation: Any) -> list[str]:
+        """Every spec key whose CONTENT matches this annotation.
+
+        Controls can share identical frame content (e.g. the same
+        perpendicularity on both end faces), so content alone can yield
+        several candidates — the caller assigns the first still-unplaced one,
+        which keeps arrival order as the tiebreak.
+        """
         annotation_type = int(annotation.GetType())
         specific = annotation.GetSpecificAnnotation()
         if specific is None:
-            return None
+            return []
         if annotation_type == _ANNOT_DATUM:
             letter = str(_early_bound(specific, "IDatumTag").GetLabel() or "")
             if letter in datum_positions:
-                return f"datum:{letter}"
+                return [f"datum:{letter}"]
         elif annotation_type == _ANNOT_GTOL:
             frame = _early_bound(specific, "IGtol").GetFrame(1)
             xml = (
@@ -665,14 +672,14 @@ def import_part_pmi(
                 if frame
                 else ""
             )
-            for control in controls_by_key.values():
-                if (
-                    f"<ToleranceSymbol>{GTOL_SYMBOLS[control.characteristic]}<"
-                    in xml
-                    and control.tolerance in xml
-                ):
-                    return control.key
-        return None
+            return [
+                control.key
+                for control in controls_by_key.values()
+                if f"<ToleranceSymbol>{GTOL_SYMBOLS[control.characteristic]}<"
+                in xml
+                and control.tolerance in xml
+            ]
+        return []
 
     placed: dict[str, Any] = {}
     targets: dict[str, tuple[float, float]] = {}
@@ -700,19 +707,21 @@ def import_part_pmi(
         draw.ClearSelection2(True)
         for annotation in tuple(inserted or ()):
             annotation = _early_bound(annotation, "IAnnotation")
-            key = _content_key(annotation)
-            if key is None:
+            candidates = _candidate_keys(annotation)
+            if not candidates:
                 unmatched.append(
                     f"type={annotation.GetType()} name={annotation.GetName()!r} "
                     f"view={view.GetName2()!r}"
                 )
                 continue
-            if key in placed:
+            open_keys = [key for key in candidates if key not in placed]
+            if not open_keys:
                 # A view asked for a still-missing TYPE re-inserts every model
                 # annotation of that type, including ones an earlier view
                 # already imported — a duplicate copy, not a recipe error.
                 duplicates.append(annotation)
                 continue
+            key = open_keys[0]
             placed[key] = annotation
             targets[key] = (
                 datum_positions[key.removeprefix("datum:")]
