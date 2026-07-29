@@ -1,6 +1,6 @@
 ---
 name: balloon-anchor-vs-circle-frame
-description: A balloon ring spread before every view on the sheet is placed gets undone by the sheet re-solve — plus two refuted theories for the same overlap (anchor/circle frame, ellipse eccentricity)
+description: OPEN — drive-train sheet 4's concealed-bottom balloon ring is never spread (SetPosition returns True, no effect); three mechanisms refuted with measurements
 metadata:
   type: project
 ---
@@ -27,8 +27,8 @@ attachments are 0.9 mm apart and the audit passes them) — so whatever loses th
 concealed ring's placement does not affect `_add_component_balloons`. That
 difference is the live lead.
 
-**Two theories measured and REFUTED for this same overlap.** Both were specific,
-plausible, and wrong; neither is worth re-walking:
+**Three theories measured and REFUTED for this same overlap.** Each was specific,
+plausible, and wrong; none is worth re-walking:
 
 1. *Anchor-vs-circle frame.* `SetPosition` moves the annotation ANCHOR while the
    ink and the audit (`_note_element`) measure the CIRCLE (`GetBalloonInfo`), so
