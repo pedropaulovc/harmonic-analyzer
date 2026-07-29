@@ -216,7 +216,7 @@ class PmiDrawingPlacement:
     edge_entity: Any | None = None
     entity: Any | None = None
     attachment_type: str = "EDGE"
-    position_tolerance_m: float = 0.0005
+    position_tolerance_m: float = 1.5e-5
     leader_attachment_xy: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:

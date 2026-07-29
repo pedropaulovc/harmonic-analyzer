@@ -5,8 +5,9 @@ This probe tests whether ORDINARY model annotations — IModelDoc2::InsertGtol
 and ::InsertDatumTag2, attached to the same spec faces, filled with the same
 frame XML — are fully COM-controllable end to end:
 
-1. PART: author datum tag A (base) + two gtols (seat) on a COPY of the built
-   part; SetPosition to distinct spots; save; reopen; positions persisted?
+1. PART: exercise the datum tag A (base) + two gtols (seat) already authored
+   on a COPY of the built part; SetPosition to distinct spots; save; reopen;
+   positions persisted?
 2. SHEET: front + section drawing; InsertModelAnnotations3(datums|gtols);
    where do they land; SetPosition on sheet; save; reopen; persisted?
 3. B&W PDF render for the eye pass.
@@ -31,7 +32,6 @@ import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import create_section_view, model_point_in_view  # noqa: E402
-from _part_pmi import _resolve_faces, _select_face  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 from transgear_stub_spec import GEOMETRIC_CONTROLS, PART_DATUMS  # noqa: E402
 
@@ -83,6 +83,7 @@ def _sheet_items(draw):
     return out
 
 
+@_telemetry.traced("diagnostic.pmi_plain_annotations")
 async def main() -> int:
     _telemetry.set_service("diagnostics")
     adapter = PyWin32Adapter({})
@@ -97,63 +98,15 @@ async def main() -> int:
         if not check.is_success:
             raise RuntimeError(f"part open failed: {check.error}")
         model = adapter.currentModel
-        requests = {datum.key: datum.face for datum in PART_DATUMS}
-        requests.update({control.key: control.face for control in GEOMETRIC_CONTROLS})
-        resolved_faces = _resolve_faces(model, requests)
-
-        datum = PART_DATUMS[0]
-        face = resolved_faces[datum.key]
-        _select_face(model, face, label="plain datum A")
-        tag = model.InsertDatumTag2()
-        if tag is None:
-            raise RuntimeError("InsertDatumTag2 returned None")
-        tag = _early_bound(tag, "IDatumTag")
-        if not tag.SetLabel(datum.letter):
-            raise RuntimeError("datum tag SetLabel failed")
-        tag_ann = _early_bound(tag.GetAnnotation(), "IAnnotation")
-        authored = {"datum:A": tag_ann}
-
-        for control in GEOMETRIC_CONTROLS:
-            face = resolved_faces[control.key]
-            _select_face(model, face, label=control.key)
-            gtol = model.InsertGtol()
-            if gtol is None:
-                raise RuntimeError(f"InsertGtol returned None for {control.key}")
-            gtol = _early_bound(gtol, "IGtol")
-            if int(gtol.GetFormat()) != 2:
-                # same flow as add_feature_control_frame's migrated branch:
-                # SW 2026 drops the tolerance display if an EMPTY old-format
-                # gtol is converted first and populated afterward — seed the
-                # simple compartments, THEN convert.
-                from _gtol_spec import GTOL_SYMBOLS
-
-                datum_values = [*control.datums[:3], "", "", ""][:3]
-                gtol.SetFrameSymbols2(
-                    1,
-                    f"<{GTOL_SYMBOLS[control.characteristic]}>",
-                    control.tolerance_zone == "diametral",
-                    "",
-                    False,
-                    "",
-                    "",
-                    "",
-                    "",
-                )
-                if not gtol.SetFrameValues2(1, control.tolerance, "", *datum_values):
-                    raise RuntimeError(f"{control.key}: SetFrameValues2 failed")
-                converted = int(gtol.ConvertFormat())
-                if converted != 0:
-                    raise RuntimeError(
-                        f"{control.key}: ConvertFormat error {converted}"
-                    )
-            frame = _early_bound(gtol.GetFrame(1), "IGtolFrame")
-            applied = str(frame.GetSymbolXml() or "")
-            if control.tolerance not in applied:
+        existing = _plain_gtols_and_datums(model)
+        authored = {}
+        for row in (*PART_DATUMS, *GEOMETRIC_CONTROLS):
+            item = existing.get(row.annotation_name)
+            if item is None:
                 raise RuntimeError(
-                    f"{control.key}: tolerance missing after seed+convert "
-                    f"(read back {applied[:120]!r})"
+                    f"built source is missing {row.key} ({row.annotation_name})"
                 )
-            authored[control.key] = _early_bound(gtol.GetAnnotation(), "IAnnotation")
+            authored[row.key] = item
 
         for key, item in authored.items():
             target = PART_TARGETS[key]
@@ -233,11 +186,12 @@ async def main() -> int:
             )
         draw.ClearSelection2(True)
         sw = adapter.swApp
+        pdf_color_before = bool(sw.GetUserPreferenceToggle(323))
         sw.SetUserPreferenceToggle(323, False)
         try:
             draw.SaveAs3(os.path.abspath(OUT_PDF), 0, 0)
         finally:
-            sw.SetUserPreferenceToggle(323, True)
+            sw.SetUserPreferenceToggle(323, pdf_color_before)
         draw.SaveAs3(os.path.abspath(SCRATCH_DRW), 0, 0)
         adapter.swApp.CloseAllDocuments(True)
 

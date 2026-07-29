@@ -201,8 +201,8 @@ def author_part_pmi(
     model = adapter.currentModel
     requests = {datum.key: datum.face for datum in datums}
     requests.update({control.key: control.face for control in controls})
-    resolved_faces = _resolve_faces(model, requests)
     with _telemetry.span("part.pmi", datums=len(datums), controls=len(controls)):
+        resolved_faces = _resolve_faces(model, requests)
         for datum in datums:
             face = resolved_faces[datum.key]
             _select_face(model, face, label=f"datum {datum.letter}")
