@@ -28,6 +28,8 @@ from _drawing_common import (
     DrawingOutputs,
     _edge_endpoint_key,
     _balloon_item_number,
+    _pick_stable_edge,
+    _sorted_drawing_children,
     _spread_balloons,
     finalize_drawing,
     new_project_drawing,
@@ -852,11 +854,15 @@ def _create_component_balloon(
         )
         if root is None:
             continue
-        pending = list(_drawing_component_children(root))
+        # Sorted, and reversed because pop() is LIFO. Without this the walk
+        # returns a DIFFERENT INSTANCE of the same family run to run --
+        # measured, six of this sheet's 32 balloons moved between two fleet
+        # passes (cylinder-gear-19 vs -6, foot-screw-2 vs -3).
+        pending = list(reversed(_sorted_drawing_children(adapter, root)))
         while pending:
             drawing_component = pending.pop()
-            children = _drawing_component_children(drawing_component)
-            pending.extend(children)
+            children = _sorted_drawing_children(adapter, drawing_component)
+            pending.extend(reversed(children))
             if children:
                 continue
             name = str(drawing_component.Name or "")
@@ -873,8 +879,10 @@ def _create_component_balloon(
             ) or ()
             if not edges:
                 continue
+            # Geometry decides, not GetVisibleEntities2's undocumented order.
+            # Shared with the other picker so the two cannot drift apart again.
             selected_view = view
-            selected_edge = edges[0]
+            selected_edge = _pick_stable_edge(adapter, edges)
             selected_name = name
             selected_edge_count = len(edges)
             break

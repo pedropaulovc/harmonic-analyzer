@@ -1865,16 +1865,26 @@ def _edge_endpoint_key(adapter: Any, edge: Any) -> tuple[float, ...] | None:
     the endpoints in model space, which is enough to order the visible edges of
     one component totally and identically on every run.
 
-    ``GetCurve()`` must precede it: SolidWorks does not retain the underlying
-    curve, and ``GetCurveParams2`` reads what ``GetCurve`` generated.
+    **No ``GetCurve()`` guard, because it is not needed.** This used to call
+    ``GetCurve()`` first, on the claim that "SolidWorks does not retain the
+    underlying curve, and ``GetCurveParams2`` reads what ``GetCurve``
+    generated". That claim shipped without a repro and is FALSE: probed on
+    cone_gear's front view, all 481 visible edges returned >= 6 params with
+    non-zero values on a cold ``GetCurveParams2``, no ``GetCurve`` anywhere
+    (``cold_ok=481 cold_nonzero=481``). Re-run the probe by timing a bare
+    ``GetCurveParams2`` over ``visible_view_entities(view, 1, ...)``.
+
+    It mattered: ``GetCurve`` is 18.2 ms a call against ``GetCurveParams2``'s
+    2.6 ms, so the guard was ~8x the cost of the thing it guarded. It is what
+    made ordering a component's edges by geometry look unaffordable (~13 s per
+    balloon) when it actually costs ~1.25 s for the largest component on the
+    sheet -- and that ordering is what stops the anchor moving between runs.
 
     ``None`` when the geometry cannot be read, so an unreadable edge drops out
     of the running instead of failing the drawing -- the caller raises only if
     NO edge on the component yields a key.
     """
     edge = _early_bound(edge, "IEdge")
-    if adapter._attempt(lambda e=edge: e.GetCurve(), default=None) is None:
-        return None
     params = adapter._attempt(lambda e=edge: e.GetCurveParams2(), default=None)
     if not params or len(params) < 6:
         return None
@@ -2922,8 +2932,29 @@ def _spread_balloons(
         # Flat x,y,z stream; the LAST triple is the attachment on the component.
         attach_x, attach_y = float(raw[-3]), float(raw[-2])
         theta = math.atan2(attach_y - center_y, attach_x - center_x)
+        # The ring must carry the CIRCLE, not the annotation ANCHOR. SetPosition
+        # moves the anchor, which sits a text- and leader-dependent offset away
+        # from the circle centre -- exactly the offset :func:`_note_element`
+        # documents when it refuses GetPosition for boxing ("measurably offset
+        # from the circle centre"). Separating anchors while the ink AND the
+        # audit measure circles leaves the real gap short by the DIFFERENTIAL
+        # offset, which is up to a full balloon diameter: drive-train's
+        # concealed-bottom ring placed a 2-character balloon ('25') and a
+        # 1-character one ('6') and the circles landed 6.99 mm apart where the
+        # gap formula had demanded 15.2 mm, failing the layout audit. Correcting
+        # by the measured offset makes placement satisfy the model that grades
+        # it, which is the whole premise of _min_angular_gap.
+        anchor = adapter._attempt(
+            lambda a=annotation: adapter._get_attr_or_call(a, "GetPosition")
+        )
+        offset = (0.0, 0.0)
+        if anchor and len(anchor) >= 2:
+            offset = (
+                float(info[0]) - float(anchor[0]),
+                float(info[1]) - float(anchor[1]),
+            )
         items.append((theta, attach_x, attach_y, _balloon_item_key(adapter, note),
-                      annotation))
+                      annotation, offset))
     # Sort on (theta, attach x, attach y, BOM item), never on theta alone. Two
     # balloons attached at the same angle from the view centre -- coaxial parts
     # in a pictorial view do this routinely -- would otherwise keep whatever
@@ -2943,8 +2974,12 @@ def _spread_balloons(
     _telemetry.event(
         "drawing.balloon_ring",
         count=len(items),
-        attachments=[f"{x:.6f},{y:.6f}" for _t, x, y, _i, _a in items],
-        items=[str(item) for _t, _x, _y, item, _a in items],
+        attachments=[f"{x:.6f},{y:.6f}" for _t, x, y, _i, _a, _o in items],
+        items=[str(item) for _t, _x, _y, item, _a, _o in items],
+        # The anchor->circle offset each placement is corrected by. A ring whose
+        # balloons carry DIFFERENT offsets is one that would have under-separated
+        # by their difference before the correction below existed.
+        anchor_offsets=[f"{ox:.6f},{oy:.6f}" for *_r, (ox, oy) in items],
     )
 
     # Place each balloon at its OWN attachment's angle, then separate only the
@@ -2980,12 +3015,16 @@ def _spread_balloons(
         min(radius_x, radius_y), max(radii), clearance=clearance
     )
     angles = _push_apart_on_ring(
-        [theta for theta, _x, _y, _i, _a in items], min_gap=gap
+        [theta for theta, _x, _y, _i, _a, _o in items], min_gap=gap
     )
-    for angle, (_theta, _x, _y, _item, annotation) in zip(angles, items):
+    for angle, (_theta, _x, _y, _item, annotation, offset) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle)
         target_y = center_y + radius_y * math.sin(angle)
-        if not annotation.SetPosition(target_x, target_y, 0.0):
+        # Aim the CIRCLE at the ring point by pre-subtracting the anchor->centre
+        # offset measured above; SetPosition moves the anchor.
+        if not annotation.SetPosition(
+            target_x - offset[0], target_y - offset[1], 0.0
+        ):
             raise RuntimeError("failed to re-ring a BOM balloon")
 
 
@@ -3071,6 +3110,94 @@ def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
     member = drawing_component.GetChildren
     children = member() if callable(member) else member
     return tuple(children or ())
+
+
+def _pick_stable_edge(adapter: Any, edges: Sequence[Any]) -> Any:
+    """Choose one of a component's visible edges, the same way every run.
+
+    Shared by both balloon anchor pickers. They are separate functions for
+    historical reasons and that duplication has already cost two bugs, so the
+    CHOICE at least lives in one place.
+
+    **Not the minimum of the sort key.** Ordering by raw ``(start, end)`` and
+    taking ``[0]`` is deterministic but picks the most-negative corner of every
+    component -- a systematic directional bias. Attachment points then cluster
+    on one side, the angular spread :func:`_spread_balloons` places balloons by
+    collapses, and balloons collide: measured, items 25 and 6 overlapped by
+    7.7 x 4.4 mm on boxes only 9.7 mm square, failing the layout audit.
+
+    So: the edge whose midpoint is NEAREST the mean of all midpoints. That is
+    a central, representative anchor rather than a corner one, it carries no
+    directional bias, and it is fully determined by geometry. Ties break on the
+    endpoint key, so coincident midpoints still order identically.
+
+    Falls back to the enumeration's first edge when no geometry reads --
+    ordering is a determinism guarantee, not a correctness precondition, and a
+    component whose curves will not read still deserves its balloon.
+    """
+    keyed = [
+        (key, edge)
+        for edge in edges
+        if (key := _edge_endpoint_key(adapter, edge)) is not None
+    ]
+    if not keyed:
+        return edges[0]
+    mids = [
+        ((k[0] + k[3]) / 2.0, (k[1] + k[4]) / 2.0, (k[2] + k[5]) / 2.0)
+        for k, _e in keyed
+    ]
+    count = len(mids)
+    centre = tuple(sum(m[axis] for m in mids) / count for axis in range(3))
+    return min(
+        zip(mids, keyed),
+        key=lambda pair: (
+            sum((pair[0][axis] - centre[axis]) ** 2 for axis in range(3)),
+            pair[1][0],
+        ),
+    )[1][1]
+
+
+def _instance_sort_key(name: str) -> tuple[str, int, str]:
+    """Order sibling drawing components by family, then instance NUMBER.
+
+    ``GetChildren`` documents no ordering, and measurement says it does not
+    have one: diffing two fleet passes' ``drawing.balloon_anchor`` events, six
+    of drive-train's 32 balloons picked a DIFFERENT instance of the same family
+    run to run (``cylinder-gear-19`` vs ``cylinder-gear-6``, ``foot-screw-2``
+    vs ``-3``, ``slotted-screw-1`` vs ``-4``). Four of those landed on the same
+    coordinates -- identical parts, so the balloon did not move -- but
+    ``pinion-bracket`` and ``pinion-cam`` moved the attachment point outright.
+
+    Sorting on the raw string would be deterministic but reads wrong, putting
+    ``-19`` ahead of ``-6``. The trailing integer is split out so the order is
+    the one a human would write down.
+    """
+    head = name.rstrip("0123456789")
+    tail = name[len(head):]
+    return (head.casefold(), int(tail) if tail else -1, name.casefold())
+
+
+def _sorted_drawing_children(adapter: Any, drawing_component: Any) -> list[Any]:
+    """``_drawing_component_children`` in a deterministic order.
+
+    Sorting the CHILDREN rather than collecting every match and sorting at the
+    end is deliberate: it keeps the caller's early exit, which matters because
+    a leaf that fails the name match falls through to a ``.Component`` +
+    ``GetPathName`` pair (~250 ms). Walking the whole tree to sort matches
+    would pay that for every non-matching leaf on the sheet.
+    """
+    children = _drawing_component_children(drawing_component)
+    named = [
+        (
+            _instance_sort_key(
+                str(adapter._attempt(lambda c=child: c.Name, default="") or "")
+            ),
+            child,
+        )
+        for child in children
+    ]
+    named.sort(key=lambda item: item[0])
+    return [child for _key, child in named]
 
 
 def _drawing_component_stems(
@@ -3190,11 +3317,12 @@ def _pick_component_anchor_edge(
     edge_count = 0
     enumerated: list[str] = []
     visited = 0
-    pending = list(_drawing_component_children(root))
+    # Reversed, because pop() is LIFO: pushing ascending would visit descending.
+    pending = list(reversed(_sorted_drawing_children(adapter, root)))
     while pending:
         drawing_component = pending.pop()
-        children = _drawing_component_children(drawing_component)
-        pending.extend(children)
+        children = _sorted_drawing_children(adapter, drawing_component)
+        pending.extend(reversed(children))
         if children:
             continue
         visited += 1
@@ -3212,8 +3340,13 @@ def _pick_component_anchor_edge(
         ) or ()
         if not edges:
             continue
+        # Geometry decides, not GetVisibleEntities2's undocumented order --
+        # the second drift mode the two-pass anchor diff exposed (crankshaft-1
+        # moved from y=0 to y=0.032755; top-crossbar-1 flipped to the mirrored
+        # edge). Affordable at 2.6 ms a key only because the GetCurve guard is
+        # gone; see _pick_stable_edge for why it is not simply the minimum.
         edge_count = len(edges)
-        selected_edge = edges[0]
+        selected_edge = _pick_stable_edge(adapter, edges)
         break
     if selected_edge is None:
         raise RuntimeError(

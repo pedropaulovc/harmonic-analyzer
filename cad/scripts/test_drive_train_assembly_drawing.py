@@ -408,8 +408,8 @@ def test_drive_train_balloons_record_their_own_anchor():
     source = inspect.getsource(drawing._create_component_balloon)
     assert 'drawing.balloon_anchor' in source
     assert '_edge_endpoint_key(adapter, selected_edge)' in source
-    # One read, on the winner -- not one per visible edge. Ordering every edge
-    # by geometry ran a single balloon into the minutes.
+    # The per-edge keys now live in _pick_stable_edge; what stays here is the
+    # single read on the winner that REPORTS where the balloon landed.
     assert source.count('_edge_endpoint_key') == 1
 
 
@@ -431,3 +431,30 @@ def test_the_isolation_docstrings_do_not_promise_a_cache_that_is_not_there():
         source = inspect.getsource(fn)
         assert "``cache``" not in source, fn.__name__
         assert "cache" not in inspect.signature(fn).parameters, fn.__name__
+
+
+def test_drive_train_orders_its_own_walk_and_edges_like_the_shared_helper():
+    """This sheet has its OWN picker and does not call the shared one.
+
+    That duplication has now bitten twice: first when the anchor telemetry was
+    added to `_drawing_common` and left this sheet unmeasured (Codex P1), then
+    again when the determinism fix landed in the shared helper only. Measured
+    proof of the second: after that fix, harmonic-analyzer's 8 anchors were
+    IDENTICAL across two passes while this sheet still drifted on 7 of 32.
+    """
+    # RESOLVE the names, do not just grep for them. The first version of this
+    # change used _sorted_drawing_children without importing it: every
+    # getsource assertion below still passed, and the drawing died at runtime
+    # with a NameError 97 s into a COM build. A source-text test cannot catch
+    # an unbound name -- so bind them.
+    assert callable(drawing._sorted_drawing_children)
+    assert callable(drawing._edge_endpoint_key)
+
+    source = inspect.getsource(drawing._create_component_balloon)
+    # Instance order -- not GetChildren's undocumented order.
+    assert "_sorted_drawing_children(adapter, root)" in source
+    assert "_drawing_component_children(root)" not in source
+    # Edge choice -- shared with the other picker, so the two cannot drift
+    # apart again. The fallback for unreadable geometry lives there too.
+    assert "_pick_stable_edge(adapter, edges)" in source
+    assert "selected_edge = edges[0]" not in source

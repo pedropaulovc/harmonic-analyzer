@@ -1286,14 +1286,19 @@ class _FakeEdge:
         return self._params
 
 
-def test_edge_key_reads_the_endpoints_after_generating_the_curve():
-    edge = _FakeEdge((1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 0.0, 1.0, 0, 0, 0))
-    key = drawing_common._edge_endpoint_key(_FakeAdapter(None), edge)
-    assert key == (1.0, 2.0, 3.0, 4.0, 5.0, 6.0)
-    # GetCurveParams2 reads what GetCurve generated; SolidWorks keeps no curve
-    # of its own, so skipping the call returns stale or empty parameters.
-    assert edge.curve_reads == 1
+def test_edge_key_reads_the_endpoints_without_generating_the_curve():
+    """The GetCurve guard is gone, and its removal is the whole optimisation.
 
+    The docstring used to claim GetCurve "must precede" GetCurveParams2. Probed
+    on cone_gear's front view, all 481 visible edges returned >=6 non-zero
+    params on a cold GetCurveParams2 (cold_ok=481). Since GetCurve is 18.2 ms
+    against GetCurveParams2's 2.6 ms, the guard cost 8x what it guarded and is
+    what made ordering edges by geometry look unaffordable.
+    """
+    edge = _FakeEdge((0.01, 0.0, 0.0, 0.02, 0.0, 0.0))
+    key = drawing_common._edge_endpoint_key(_FakeAdapter(None), edge)
+    assert key == (0.01, 0.0, 0.0, 0.02, 0.0, 0.0)
+    assert edge.curve_reads == 0, "GetCurve is not needed and must not be paid"
 
 def test_edge_key_is_none_when_the_geometry_cannot_be_read():
     """An unreadable edge drops out of the running; it must not fail the sheet."""
@@ -1311,19 +1316,37 @@ def test_edge_key_is_none_when_the_geometry_cannot_be_read():
 
 
 class _FakeNote:
-    def __init__(self, attach_x, attach_y, radius=0.0047, item="1"):
+    def __init__(
+        self, attach_x, attach_y, radius=0.0047, item="1", offset=(0.0, 0.0)
+    ):
         self._attach = (attach_x, attach_y)
         self._radius = radius
         self._item = item
+        # The annotation ANCHOR -- what GetPosition reports and SetPosition
+        # moves. The drawn CIRCLE sits `offset` away from it; SolidWorks derives
+        # that offset from the balloon's text and leader side, so a 2-character
+        # balloon and a 1-character one on the same ring carry different ones.
+        self._anchor = (0.0, 0.0)
+        self._offset = offset
         self.placed = None
+
+    @property
+    def circle(self):
+        """Where the balloon is actually INKED -- and what the audit boxes."""
+        return (self._anchor[0] + self._offset[0],
+                self._anchor[1] + self._offset[1])
 
     def GetBomBalloonText(self, _upper):
         # The balloon-specific API. INote.GetText returns the note's generic
         # text, which for a BOM balloon need not be the item number at all.
         return self._item
 
+    def GetPosition(self):
+        return (self._anchor[0], self._anchor[1], 0.0)
+
     def GetBalloonInfo(self):
-        return (0, 0, 0, 0, 0, 0, self._radius)
+        cx, cy = self.circle
+        return (cx, cy, 0, 0, 0, 0, self._radius)
 
     def GetAnnotation(self):
         return self
@@ -1334,6 +1357,7 @@ class _FakeNote:
 
     def SetPosition(self, x, y, _z):
         self.placed = (x, y)
+        self._anchor = (x, y)
         return True
 
 
@@ -1342,6 +1366,54 @@ def _ring_positions(notes):
     adapter = _FakeAdapter(SimpleNamespace(EditRebuild3=lambda: None))
     drawing_common._spread_balloons(adapter, view, list(notes))
     return [note.placed for note in notes]
+
+
+def test_placement_aims_the_circle_at_the_ring_point_not_the_anchor():
+    """SetPosition moves the ANCHOR; the ring must carry the CIRCLE.
+
+    `_note_element` already refuses GetPosition for boxing a balloon because the
+    anchor is "measurably offset from the circle centre", and boxes
+    GetBalloonInfo's circle instead. The spread was still aiming the ANCHOR at
+    the ring point, so the two disagreed by that offset.
+    """
+    offset = (0.002, -0.003)
+    note = _FakeNote(0.1600, 0.1500, item="25", offset=offset)
+    _ring_positions([note])
+    # View outline (0.10, 0.10) - (0.20, 0.20); attachment due east of centre,
+    # so the ring point is at theta = 0: centre + (0.05 + 0.014 margin).
+    ring_point = (0.15 + 0.064, 0.15)
+    assert note.placed == pytest.approx(
+        (ring_point[0] - offset[0], ring_point[1] - offset[1])
+    )
+    assert note.circle == pytest.approx(ring_point)
+
+
+def test_offset_balloons_clear_each_other_under_the_audits_square_model():
+    """The separation guarantee must hold for the CIRCLES, not the anchors.
+
+    Repro of drive-train's concealed-bottom ring: a 2-character balloon ('25')
+    and a 1-character one ('6'), whose anchor->circle offsets differ. Anchors
+    separated by the full `_min_angular_gap` still left the circles 6.99 mm
+    apart where the formula demanded 15.2 mm, and the layout audit failed with
+    a 7.7 x 3.0 mm overlap. The shortfall is the DIFFERENTIAL offset, which is
+    bounded only by a full balloon diameter.
+    """
+    r = 0.00485  # the radius implied by drive-train's 9.7 mm audit boxes
+    # The offsets must OPPOSE along the axis the ring separates these two on
+    # (they ring one above the other, so along y) -- the lower balloon's circle
+    # riding up and the upper one's riding down is what eats the gap. Offsets
+    # perpendicular to the separation cannot close it and would leave this test
+    # green with or without the correction.
+    wide = _FakeNote(0.1600, 0.1500, radius=r, item="25", offset=(0.0, r))
+    narrow = _FakeNote(0.1610, 0.1520, radius=r, item="6", offset=(0.0, -r))
+    _ring_positions([wide, narrow])
+    (ax, ay), (bx, by) = wide.circle, narrow.circle
+    side = 2.0 * r  # _note_element boxes the circle's circumscribed square
+    assert max(abs(ax - bx), abs(ay - by)) >= side, (
+        f"circles overlap under the audit's square model: "
+        f"dx={abs(ax - bx) * 1000:.2f} dy={abs(ay - by) * 1000:.2f} mm "
+        f"against a {side * 1000:.2f} mm box"
+    )
 
 
 def test_balloons_attached_at_one_angle_ring_in_a_fixed_order():
@@ -1417,22 +1489,40 @@ def _edge(x):
 
 
 
-def test_anchor_reads_geometry_once_not_once_per_visible_edge():
-    """The measurement must stay cheap enough to leave on in every build.
+def test_anchor_picks_the_same_edge_from_any_arrival_order():
+    """Mode 2 of the measured drift: same component, different edges[0].
 
-    Ordering the edges by geometry WAS tried, to make the anchor deterministic
-    by construction. It costs a GetCurve + GetCurveParams2 pair per visible
-    edge -- 24.6 ms + 2.6 ms, each MEASURED on this seat rather than inferred
-    from a paired total. A gear end view carries 481-577 visible edges, so that
-    is ~13 s per balloon and ~7 min for the 32-balloon drive-train sheet, which
-    is why it never finished. This pins the cost at O(1) per balloon so the
-    regression cannot come back quietly.
+    Two fleet passes moved crankshaft-1's anchor from y=0 to y=0.032755 and
+    flipped top-crossbar-1 to its mirrored edge. GetVisibleEntities2 documents
+    no order, so the only fix is to impose one -- affordable at 2.6 ms a key
+    now that the GetCurve guard is gone.
     """
     low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
-    picked = _anchor({"cone-gear": [low, mid, high]})
-    assert picked is low
-    assert [e.curve_reads for e in (low, mid, high)] == [1, 0, 0]
+    picked = {
+        _anchor({"cone-gear": list(order)})
+        for order in ((mid, high, low), (high, low, mid), (low, mid, high))
+    }
+    assert len(picked) == 1, "arrival order must not change the pick"
 
+
+def test_the_anchor_is_central_not_a_corner():
+    """Determinism alone is not enough -- the CHOICE must not bias direction.
+
+    Ordering by the raw endpoint key and taking [0] is deterministic, but picks
+    the most-negative corner of every component. Attachment points then cluster
+    on one side, the angular spread _spread_balloons places balloons by
+    collapses, and balloons collide: items 25 and 6 overlapped by 7.7 x 4.4 mm
+    on 9.7 mm boxes and failed the layout audit. The midpoint nearest the mean
+    of all midpoints is central, unbiased and still fully determined.
+    """
+    low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
+    assert _anchor({"cone-gear": [low, mid, high]}) is mid, "central, not min"
+
+
+def test_a_two_edge_component_still_resolves_deterministically():
+    """No mean-nearest tie may fall back to arrival order."""
+    a, b = _edge(0.01), _edge(0.02)
+    assert _anchor({"cone-gear": [a, b]}) is _anchor({"cone-gear": [b, a]})
 
 def test_anchor_records_where_it_landed():
     """Two passes' drawing.balloon_anchor events are the repro for a moving
@@ -1460,6 +1550,9 @@ def test_anchor_survives_an_edge_whose_geometry_will_not_read():
             raise RuntimeError("no curve data")
 
     mute = _Mute((0.0,))
+    # Ordering is a determinism guarantee, not a correctness precondition: a
+    # component whose geometry will not read still gets its balloon, on the
+    # enumeration's first edge.
     assert _anchor({"cone-gear": [mute]}) is mute
 
 
@@ -1484,14 +1577,16 @@ def test_anchor_span_counts_every_leaf_it_walked_not_just_the_match():
         view = _anchor_view({})
         leaves = [
             _FakeDrawingComponent(f"{stem}-1@dt", path=f"C:/x/{stem}.SLDPRT")
-            for stem in ("cone-gear", "filler-c", "filler-b", "filler-a")
+            # Children are visited in sorted order now, so the match is named
+            # to sort LAST -- that is what makes visited=4 the workload.
+            for stem in ("filler-a", "filler-b", "filler-c", "zone-gear")
         ]
         root = _FakeDrawingComponent("dt", children=leaves)
-        edges = {"C:/x/cone-gear.SLDPRT": [_edge(0.01)]}
+        edges = {"C:/x/zone-gear.SLDPRT": [_edge(0.01)]}
         view.RootDrawingComponent2 = lambda _r: root
         view.GetVisibleEntities2 = lambda c, _k: edges.get(c.GetPathName(), [])
         drawing_common._pick_component_anchor_edge(
-            _FakeAdapter(None), view, stem="cone-gear", label="dt"
+            _FakeAdapter(None), view, stem="zone-gear", label="dt"
         )
     finally:
         drawing_common._span_scan_attrs = original
@@ -1562,3 +1657,41 @@ def test_a_balloon_whose_item_reads_empty_does_not_tie_every_key():
     adapter = _FakeAdapter(None)
     assert drawing_common._balloon_item_key(adapter, blank) == (sys.maxsize, "")
     assert drawing_common._balloon_item_key(adapter, real) == (7, "7")
+
+
+def test_sibling_components_are_visited_in_instance_order():
+    """Mode 1 of the measured drift: a different INSTANCE of the same family.
+
+    Diffing two fleet passes, six of drive-train's 32 balloons picked a
+    different instance run to run -- cylinder-gear-19 vs -6, foot-screw-2 vs
+    -3, slotted-screw-1 vs -4. Four landed on identical coordinates (identical
+    parts, so the balloon did not move), but pinion-bracket and pinion-cam
+    moved the attachment point outright.
+    """
+    key = drawing_common._instance_sort_key
+    names = ["cylinder-gear-19", "cylinder-gear-6", "cylinder-gear-2"]
+    assert sorted(names, key=key) == [
+        "cylinder-gear-2", "cylinder-gear-6", "cylinder-gear-19",
+    ], "instance NUMBER, not the raw string -- -19 must not precede -6"
+
+
+def test_instance_order_survives_names_without_a_number():
+    key = drawing_common._instance_sort_key
+    assert sorted(["part-2", "part", "part-1"], key=key) == [
+        "part", "part-1", "part-2",
+    ]
+
+
+def test_children_are_sorted_before_the_walk_consumes_them():
+    """The sort is on CHILDREN, not on collected matches, so the caller keeps
+    its early exit -- a leaf that fails the name match falls through to a
+    .Component + GetPathName pair (~250 ms), and walking the whole tree to sort
+    matches would pay that for every non-matching leaf on the sheet."""
+    kids = [
+        _FakeDrawingComponent("gear-10"),
+        _FakeDrawingComponent("gear-2"),
+        _FakeDrawingComponent("arm-1"),
+    ]
+    root = _FakeDrawingComponent("root", children=kids)
+    got = drawing_common._sorted_drawing_children(_FakeAdapter(None), root)
+    assert [c.Name for c in got] == ["arm-1", "gear-2", "gear-10"]
