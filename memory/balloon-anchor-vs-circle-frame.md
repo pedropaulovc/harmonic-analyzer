@@ -5,6 +5,15 @@ metadata:
   type: project
 ---
 
+> [!IMPORTANT]
+> **The code this describes was DELETED from `main` on 2026-07-28** (#445 and the
+> commits around it). Every assembly drawing is now
+> `build_simple_three_view_drawing` — default-visual Front/Right/Isometric — and
+> NO `draw_*.py` references balloons, anchors or `_spread_balloons` any more.
+> `_spread_balloons` / `_pick_component_anchor_edge` / `_min_angular_gap` survive
+> only as unreferenced helpers in `_drawing_common.py`. Keep this memory for the
+> LESSON, which applies to any future anchor rule; do not go looking for the bug.
+
 **What happened (2026-07-28).** Replacing the arrival-order anchor edge
 (`edges[0]`) with a deterministic "edge whose midpoint is nearest the mean of
 midpoints" pulled every anchor toward its component's CENTROID. For two
