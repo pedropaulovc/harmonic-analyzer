@@ -62,3 +62,7 @@ defaults: `DatumLength=0.05`, `TextPosition`=uninitialized denormal garbage
 **Consequence: PMI is proven authorable but still not on the drawing-purity
 critical path** — the unit/drift hazards close entirely with the spec
 relocation ([[drawing-spec-purity]]); sheet import is the one open question.
+
+**2026-07-29 update:** sheet import and placement are now mapped — see
+[[dimxpert-pmi-placement]] (legal annotation view rule, drag-only
+persistence, sheet→part write-back, section-view display recipe).
