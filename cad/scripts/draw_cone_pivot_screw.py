@@ -19,6 +19,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_drawing import FastenerSheet, build_fastener_sheet
+from _surface_finish import GROUND
 from cone_pivot_screw_spec import (
     HEAD_DIA,
     SHOULDER_DIA,
@@ -198,7 +199,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         end,
         edge_xy=(0.08400, 0.13600),
         symbol_xy=(0.125, 0.136),
-        roughness_ra="0.8",
+        roughness_ra=GROUND,
         label="ground shoulder finish",
     )
 RECIPE = FastenerSheet(

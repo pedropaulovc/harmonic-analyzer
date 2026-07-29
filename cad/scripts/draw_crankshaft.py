@@ -44,6 +44,7 @@ from _drawing_common import (
     add_view_centerline,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from crankshaft_spec import (
     JOURNAL_DIA,
     JOURNAL_LENGTH,
@@ -421,7 +422,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         symbol_xy=(0.205, 0.145),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="crankshaft bearing-journal finish",
         edge_entity=journal_silhouette,
         production_method="BEARING JOURNAL",

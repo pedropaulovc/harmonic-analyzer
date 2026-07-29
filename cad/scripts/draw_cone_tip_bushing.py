@@ -26,6 +26,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from cone_tip_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -267,7 +268,7 @@ async def build(adapter: Any) -> dict[str, str]:
         end,
         edge_xy=bore_edge,
         symbol_xy=(0.115, 0.200),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="bushing bore finish",
     )
 

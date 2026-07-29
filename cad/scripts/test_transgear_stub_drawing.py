@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _fit_limits
 import build_transgear_stub as part
 import draw_transgear_stub as drawing
 import transgear_stub_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -66,10 +68,28 @@ def test_lands_carry_true_diametric_dimensions() -> None:
     assert {"BaseLength", "SeatLength", "CollarLength"} <= marked
 
 
-def test_linked_notes_and_fit_callouts() -> None:
+def test_diameter_bands_are_toleranced_on_the_model_not_the_sheet() -> None:
+    """The fit bands must reach the print as NATIVE dimension tolerances.
+
+    A band spelled as callout text (``SetText``) is frozen: SolidWorks prints it
+    verbatim beside a live numeral and never re-renders it, so the mm->inch flip
+    in issue #290 would leave "+0.00/-0.02" reading as inches. Tolerancing the
+    model dimension instead is the only path that survives a unit change, so the
+    sheet must carry NO override for either diameter.
+    """
+    assert drawing.DIMENSION_CALLOUTS == {}
+    # The seat is the shared ground-shaft class, not a value peculiar to this
+    # stud -- assert the IDENTITY so a local retype cannot silently fork it.
+    assert transgear_stub_spec.SEAT_DIA_BAND is _fit_limits.SHAFT_H
+    assert transgear_stub_spec.BASE_DIA_BAND == (0.000, -0.050)
+    assert model_toleranced_dimensions(part) == {
+        ("StubProfile", "BaseDia"): "*deviations(BASE_DIA_BAND)",
+        ("StubProfile", "SeatDia"): "*deviations(SEAT_DIA_BAND)",
+    }
+
+
+def test_linked_notes() -> None:
     notes = transgear_stub_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["SeatDia"] == "+0.00/-0.02"
-    assert drawing.DIMENSION_CALLOUTS["BaseDia"] == "+0.00/-0.05"
     # 3/8" conversions display all three decimals so the view matches the note.
     assert drawing.DIMENSION_PRECISION == {"BaseDia": 3}
     # Deburr/edge-break is a title-block note; repeating it here would duplicate it.

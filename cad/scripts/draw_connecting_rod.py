@@ -40,6 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from connecting_rod_spec import (
     CENTER_DISTANCE,
     HEAD_TOP_Y,
@@ -229,7 +230,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=BORE_FINISH_EDGE,
         symbol_xy=BORE_FINISH_SYMBOL,
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="strap bore finish",
     )
     # The hole callout owns the 9-o'clock rim and routes down-right to its

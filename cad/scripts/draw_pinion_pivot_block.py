@@ -40,6 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from pinion_pivot_block_spec import (
     BLOCK_BOTTOM_Y,
     BLOCK_DEPTH,
@@ -329,7 +330,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=pivot_right_edge,
         symbol_xy=(0.200, 0.163),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="pivot bore finish",
     )
 

@@ -97,8 +97,12 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "PivotBoreDia": (0.360, 0.220),
 }
+# The HandleLength band moved onto the model dimension in build_crank_handle
+# (crank_handle_spec.HANDLE_LENGTH_BAND). PivotBoreDia keeps a callout because
+# it states the FINAL REAMED limits, which differ from the modelled nominal --
+# and it already renders them through _fit_limits.fit_limits rather than typing
+# them, so the released limits track the spec band.
 DIMENSION_CALLOUTS = {
-    "HandleLength": "+0.00/-0.25 OVERALL",
     "PivotBoreDia": (
         "NOMINAL REF ONLY\n"
         f"FINAL LIMITS {fit_limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND, decimals=2)} THRU"

@@ -37,6 +37,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from magnifying_wheel_spec import (
     BORE_DIA,
     HUB_AXIAL,
@@ -167,10 +168,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Datum A = the axle BORE rim (round 1: the old pick landed on the hub OD,
     # so the rotational datum read as the drum, not the functional bore).
-    # SolidWorks restricts this axis-attached tag and current live readback
-    # normalizes the intended sheet point by 3.572 mm. Keep 0.128 mm of
-    # annotation-only slack for template/render normalization; this never
-    # relaxes the part geometry or GD&T contract.
+    # SolidWorks restricts this axis-attached tag and normalizes the intended
+    # sheet point inward -- and the normalized distance is NOT repeatable
+    # across from-scratch part rebuilds (observed 3.572 mm, then 3.718 mm from
+    # the same byte-identical scripts). Keep ~0.28 mm of annotation-only slack
+    # over the largest observation; this never relaxes the part geometry or
+    # GD&T contract.
     add_datum_feature(
         adapter,
         front,
@@ -178,7 +181,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),
         datum="A",
         label="axle bore axis",
-        position_tolerance_m=0.0037,
+        position_tolerance_m=0.004,
     )
     add_feature_control_frame(
         adapter,
@@ -201,7 +204,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0] + HUB_DIA * SHEET_SCALE[0] / 2000.0, FRONT_CENTER[1]),
         # up-right of the hub, clear of the Ø20 leader (round 1: crossed it)
         symbol_xy=(FRONT_CENTER[0] + _HUB_R + 0.024, FRONT_CENTER[1] + 0.024),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="hub drum finish",
     )
 

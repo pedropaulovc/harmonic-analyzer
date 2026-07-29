@@ -39,6 +39,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_limits import fit_limits
+from _surface_finish import MACHINED
 from pinion_cam_spec import (
     BORE,
     BORE_BAND,
@@ -315,7 +316,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=bore_right,
         symbol_xy=(0.155, 0.175),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="cam bore finish",
     )
 

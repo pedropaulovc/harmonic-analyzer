@@ -2,6 +2,8 @@ r"""Pure-data dimensional contract shared by the cone gear shaft and drawing."""
 
 from __future__ import annotations
 
+from _fit_limits import SHAFT_H
+
 from cone_pivot_post_installation import GEAR_AXIS_SHIFT
 
 
@@ -42,6 +44,12 @@ SECTIONS: tuple[tuple[float, float], ...] = (
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
 SECTION_ENDS = tuple(end for _dia_in, end in SECTIONS)
 SHAFT_LENGTH = SECTION_ENDS[-1]
+
+# Every turned section is a ground-shaft h fit: the cone gear, the cylinder
+# gear and the bearing bushings all slide onto these lands.  ONE shared class,
+# applied to the model dimension by build_cone_gear_shaft -- not five copies of
+# "+0.00/-0.02" typed as sheet callout text.
+SECTION_DIA_BAND = SHAFT_H
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec0Profile": {"Sec0Dia"},

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _surface_finish
 import build_pivot_ball_mount as part
 import draw_pivot_ball_mount as drawing
 import pivot_ball_mount_spec
+from _drawing_contract import assert_sheet_references
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -92,8 +94,8 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert "position_tolerance_m=0.020" in source
     assert "set_basic_dimension(" in source
     assert "add_view_centerline(" in source
-    assert 'roughness_ra="1.6"' in source
-    assert 'roughness_ra="0.8"' in source
+    assert_sheet_references(drawing, "MACHINED", _surface_finish.MACHINED)
+    assert_sheet_references(drawing, "GROUND", _surface_finish.GROUND)
     assert "INTERSECT DATUM B WITHIN" not in pivot_ball_mount_spec.DRAWING_NOTES
     assert 'quantity="PAD OD"' in source
     assert source.count("add_attached_note(") == 2

@@ -36,6 +36,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import GROUND
 from knife_mount_spec import BLK_BOT, BLK_TOP, BORE_CY, R_BORE, SUPPORT_Z_THICK
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -178,7 +179,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(FRONT_CENTER[0] + R_BORE * SHEET_SCALE[0] / 1000.0, _front_y(BORE_CY)),
         symbol_xy=(FRONT_CENTER[0] + 0.052, _front_y(BORE_CY) - 0.020),
-        roughness_ra="0.8",
+        roughness_ra=GROUND,
         label="knife bore finish",
     )
 

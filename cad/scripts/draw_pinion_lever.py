@@ -51,7 +51,6 @@ from pinion_lever_spec import (
     ROD_Y0,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     place_view,
 )
@@ -287,7 +286,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_note(adapter, "HUB LONGITUDINAL VIEW - HIDDEN LINES SHOWN", 0.155, 0.095)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.085)
 
     return await finalize_drawing(

@@ -24,6 +24,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from fulcrum_shaft_spec import SHAFT_DIA, SHAFT_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -262,7 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=end_circle,
         symbol_xy=(0.075, 0.222),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="fulcrum bearing finish",
     )
 

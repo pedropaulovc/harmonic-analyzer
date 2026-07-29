@@ -249,7 +249,6 @@ def test_drawing_registry_is_unique_and_extensible() -> None:
     assert PROJECT_DRWDOT.is_file() and PROJECT_DRWDOT.stat().st_size > 0
 
 
-
 def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:
     sources: dict[str, Path] = {}
     for kind, name in (

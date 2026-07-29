@@ -81,12 +81,15 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _gear import volume_check
 from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
+    SECTION_DIA_BAND,
     SECTIONS,
 )
 
@@ -182,6 +185,16 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    # The five turned diameters carry their fit on the MODEL dimension, so
+    # SolidWorks renders the limits and re-renders them on a unit change. The
+    # sheet used to append "+0.00/-0.02" as frozen callout text instead.
+    for section in range(5):
+        set_dimension_bilateral_tolerance(
+            adapter,
+            f"Sec{section}Profile",
+            f"Sec{section}Dia",
+            *deviations(SECTION_DIA_BAND),
+        )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

@@ -30,6 +30,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import GROUND, MACHINED
 from pivot_ball_mount_spec import (
     BALL_CENTER_H,
     BALL_DIA,
@@ -371,7 +372,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(0.152, _front_y(BALL_CENTER_H) - 0.026),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="cross-bore finish",
         entity=bore_entity,
     )
@@ -380,7 +381,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=ball_outline,
         symbol_xy=(0.286, 0.178),
-        roughness_ra="0.8",
+        roughness_ra=GROUND,
         label="turned exterior finish before plate",
         entity_type="SILHOUETTE",
     )

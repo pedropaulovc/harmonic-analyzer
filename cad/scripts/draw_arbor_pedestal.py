@@ -28,6 +28,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from arbor_pedestal_spec import (
     BORE_DIA,
     BORE_HEIGHT,
@@ -430,7 +431,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(0.155, 0.225),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="arbor bore finish",
         entity=bore_entity,
         leader_attach_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),

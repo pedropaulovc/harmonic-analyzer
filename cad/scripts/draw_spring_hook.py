@@ -31,6 +31,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from spring_hook_spec import (
     ARM_HEIGHT,
     SHANK_RISE,
@@ -198,7 +199,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_entity=shank_edge,
         symbol_xy=(0.140, 0.120),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="shank seating finish",
     )
 

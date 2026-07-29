@@ -230,5 +230,3 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "mask" not in finish
     assert config["process"] == "machined from solid stock"
     assert int(config["quantity"]) == 1
-
-

@@ -23,6 +23,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from pivot_shaft_spec import SHAFT_DIA, SHAFT_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -212,7 +213,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=(RIGHT_CENTER[0] + 0.045, SHAFT_FLANK_Y),
         symbol_xy=(RIGHT_CENTER[0] + 0.045, 0.222),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="pivot bearing finish",
         entity_type="SILHOUETTE",
     )

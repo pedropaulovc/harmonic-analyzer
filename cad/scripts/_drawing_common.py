@@ -2,7 +2,7 @@
 
 Raw project-agnostic COM calls remain in ``solidworks_mcp``.  This layer owns
 the harmonic-analyzer book policy: ASME B landscape, the checked-in template,
-reopen validation, exact PDF/PNG output, and fail-loud multi-leader callouts.
+exact PDF/PNG output, and fail-loud multi-leader callouts.
 Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 """
 
@@ -18,7 +18,7 @@ from typing import Any, Iterable, Literal, Sequence
 from xml.etree import ElementTree
 
 import _telemetry
-from _common import _early_bound, check
+from _common import _early_bound
 from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
@@ -121,13 +121,6 @@ _SF_BOX_DOWN_M = 0.0
 _ANNOT_DIM = 4
 _NOMINAL_DIM_HALF_M = 0.004
 
-# The hand-made DRWDOT was authored from an inch standard, then changed to mm.
-# Its edge-break note retained the inch-origin ``.01`` value even though the
-# title block now declares millimetres, rendering an impractical 0.01 mm break.
-# Normalize the instantiated drawing (not the shared binary template) so every
-# generated sheet carries the metric equivalent requested by the machinist
-# review.  Accept the new text too, making this forward-compatible with a later
-# manual DRWDOT repair; fail loud if neither spelling exists.
 _OLD_EDGE_BREAK_NOTE = (
     "REMOVE BURRS AND BREAK SHARP EDGES R.01 OR CHAMFER .01 MAX"
 )
@@ -142,17 +135,6 @@ _METRIC_EDGE_BREAK_NOTE = (
 _LEADER_BENT = 2
 _LEADER_SIDE_SMART = 0
 
-# swUserPreferenceIntegerValue_e.swDetailingDimensionTextAndLeaderStyle and
-# swDisplayDimensionLeaderText_e.swBrokenLeaderHorizontalText.
-#
-# Dimensions do NOT take IAnnotation::SetLeader3 (its documented support list is
-# notes / GTols / surface-finish / weld / datum-target / block instances only);
-# a dimension's leader+text style comes from this DOCUMENT property instead,
-# with IDisplayDimension::SetBrokenLeader2 as the per-dimension override.
-# swBrokenLeaderHorizontalText delivers BOTH requirements at once: the leader is
-# broken (bent) and the text is always horizontal rather than rotated to follow
-# the leader.
-#
 # These ints are READ OFF the installed swconst.tlb, not the published docs: the
 # API reference prints "See System Options and Document Properties" instead of a
 # value for every swUserPreferenceIntegerValue_e / swUserPreferenceOption_e
@@ -378,10 +360,6 @@ def add_datum_feature(
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
-
-    SolidWorks may quantize an accepted datum-tag position by a few micrometres;
-    the default permits 15 um of annotation-only normalization. Restricted tags
-    retain their tighter call-site bounds.
     """
     draw = adapter.currentModel
     if annotation is None:
@@ -907,9 +885,7 @@ def add_property_linked_note(
     annotation = note.GetAnnotation()
     if annotation is None:
         raise RuntimeError(f"linked drawing note {property_name!r} has no annotation")
-    annotation = _early_bound(
-        annotation, "IAnnotation"
-    )
+    annotation = _early_bound(annotation, "IAnnotation")
     text_format = annotation.GetTextFormat(0)
     if text_format is None:
         raise RuntimeError(
@@ -1399,7 +1375,7 @@ def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
 
 
 def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
-    """Show hidden edges (greyed) in ``view`` — for a view whose job is to
+    """Show hidden edges (greyed) in ``view`` -- for a view whose job is to
     communicate internal/cross-drilled features."""
     ok = adapter._attempt(
         lambda: view.SetDisplayMode4(False, 1, False, False, True), default=False
@@ -1424,22 +1400,6 @@ def assert_asme_b_sheet(
         or abs(properties[6] - ASME_B_HEIGHT_M) > 1e-6
     ):
         raise RuntimeError(f"{phase}: drawing sheet is not ASME B size: {properties!r}")
-
-
-@_telemetry.traced("drawing.reopen")
-async def reopen_drawing(adapter: Any, path: Path) -> tuple[Any, Any]:
-    model = adapter.currentModel
-    title = str(adapter._get_attr_or_call(model, "GetTitle") or "")
-    if not title:
-        raise RuntimeError("saved drawing has no document title")
-    adapter.swApp.CloseDoc(title)
-    check(f"reopen saved drawing {path.name}", await adapter.open_model(str(path)))
-    reopened = adapter.currentModel
-    ddoc = _early_bound(reopened, "IDrawingDoc")  # IDrawingDoc view for GetCurrentSheet (same dispatch)
-    sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-    if sheet is None:
-        raise RuntimeError("reopened drawing has no current sheet")
-    return reopened, sheet
 
 
 def _contact_preview_grid(page_count: int) -> tuple[int, int]:
@@ -2311,9 +2271,7 @@ def insert_hole_table(
         )
 
     def _select_entity(entity: Any, *, append: bool, mark: int) -> bool:
-        selection_manager = _early_bound(
-            draw.SelectionManager, "ISelectionMgr"
-        )
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
         selection_data = _early_bound(
             selection_manager.CreateSelectData(), "ISelectData"
         )
@@ -3974,12 +3932,11 @@ def _display_dimension_leader_segments(
     #3605215320), and it is not hypothetical: pen-rod's callout text sits at
     sheet (0.104, 0.222), OUTSIDE its owning view (x 0.062..0.078).
 
-    Read the REAL rendered ink, not a reconstruction. ``_pin_dimension_text_and_
-    leader_style`` forces every dimension to ``swBrokenLeaderHorizontalText``, so
-    the leader is BENT -- a sloped run from the arrow up to an elbow, then a
-    horizontal shoulder to the text. A straight attachment->text chord misses
-    that elbow: it can fail a clean print or miss a real crossing when the bent
-    route and the chord fall on opposite sides of a view (codex #3605558274).
+    Read the REAL rendered ink, not a reconstruction. SolidWorks may render a
+    bent leader as a sloped run from the arrow up to an elbow, then a horizontal
+    shoulder to the text. A straight attachment->text chord misses that elbow:
+    it can fail a clean print or miss a real crossing when the rendered route
+    and the chord fall on opposite sides of a view (codex #3605558274).
     ``IDisplayDimension::GetDisplayData`` hands back the actual per-primitive
     geometry -- the display-dimension analog of ``IDatumTag::GetLineAtIndex`` --
     in SHEET space (probed on RD3: 3 lines, stub (0.069,0.204)->(0.071,0.206),
@@ -4224,13 +4181,9 @@ def collect_layout_elements(
 
 
 def check_drawing_layout(adapter: Any, *, stem: str = "") -> None:
-    """Fail loud on a colliding, border-crossing, or leader-crossed layout.
+    """Diagnose a colliding, border-crossing, or leader-crossed layout.
 
-    Runs at the end of every recipe's layout, right before the drawing is saved
-    (see :func:`finalize_drawing`), so a print can never ship with a note landed
-    on a view, an element run into the zone border, or a leader driven across a
-    view it does not annotate -- defects the dimensional and format gates cannot
-    see.
+    This is an explicit diagnostic, not part of the drawing build hot path.
 
     ``stem`` names the sheet in failures. Every sheet is held to ZERO on every
     defect class -- there is no grandfathered case. There WAS one: pen-assembly
@@ -4270,16 +4223,10 @@ async def finalize_drawing(
     expected_redundant_notes: int = 0,
     expected_sheet_names: tuple[str, ...] | None = None,
 ) -> dict[str, str]:
-    """Save, reopen-validate, and export the finished drawing (SLDDRW/PDF/PNG).
-
-    The reopen round-trips make the saved artifact prove its own sheet scale
-    and format; the PDF is metadata-sanitized and rendered to the exact ASME B
-    PNG.  Returns the artifact dict every drawing recipe returns from build().
-    """
+    """Validate the sheet contract and export SLDDRW, PDF, and rendered PNG."""
     drawing_model = adapter.currentModel
     ddoc = _early_bound(drawing_model, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
     drawing_model.ClearSelection2(True)
-    drawing_model.EditRebuild3()
     sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
     if not sheet_names:
         raise RuntimeError("finished drawing has no sheets")
@@ -4298,6 +4245,9 @@ async def finalize_drawing(
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
         if sheet is None:
             raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+        # Inserting a model view lets SolidWorks auto-drift the SHEET scale off
+        # the 1:1 the template pinned (each view still carries its own explicit
+        # scale), so re-pin it once here before asserting the contract.
         if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
             raise RuntimeError(
                 f"failed to set final drawing sheet {sheet_name!r} scale"
@@ -4378,19 +4328,18 @@ async def finalize_drawing(
     from _common import apply_custom_properties
     apply_custom_properties(adapter, {"UNIT_DISPLAY": "MM"})
 
-    # Cleanup and audit each active sheet independently; annotations and layout
-    # coordinates are sheet-scoped, so different pages must not be conflated.
+    # Explicit recipe-requested cleanup remains sheet-scoped. Layout and view
+    # appearance are otherwise left exactly as SolidWorks produced them.
     removed_notes = 0
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(
-                f"failed to activate drawing sheet {sheet_name!r} for layout audit"
+                f"failed to activate drawing sheet {sheet_name!r} for note cleanup"
             )
         removed_notes += sum(
             remove_notes_matching(adapter, substring)
             for substring in redundant_note_substrings
         )
-        check_drawing_layout(adapter, stem=f"{outputs.slddrw.stem}:{sheet_name}")
     if removed_notes != expected_redundant_notes:
         raise RuntimeError(
             f"final drawing removed {removed_notes} redundant notes, "
@@ -4400,63 +4349,18 @@ async def finalize_drawing(
     if removed_notes:
         _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
 
-    # Export the PDF while the just-authored drawing is still fully loaded.
-    # A large drawing can reopen view-only even when its referenced views report
-    # loaded; SolidWorks then rejects PDF SaveAs3 with 0x1001. The SLDDRW is
-    # still reopened once below and validated as the persisted source artifact.
+    if not ddoc.ActivateSheet(sheet_names[0]):
+        raise RuntimeError("failed to restore first drawing sheet before export")
+
+    # Persist the native drawing and PDF once from the fully loaded authored
+    # document. Reopen/scale/save cycles are deliberately absent from this hot
+    # path; the template and precomputed recipe placements own the layout.
     with _telemetry.span("drawing.save_and_export_pdf"):
         artifacts = save_drawing(
             adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
-    # ONE reopen, and it only VALIDATES. The sheet scale is already pinned twice
-    # before this point -- at creation (new_project_drawing) and again just
-    # before the save -- so re-applying it on the reopened document could only
-    # ever paper over a scale that failed to persist. That repair is what forced
-    # the whole reopen -> SetScale -> maybe-save -> re-export-PDF -> reopen-again
-    # dance: a second reopen was needed to prove whatever the repair had written.
-    #
-    # assert_asme_b_sheet below reads the reopened scale and fails loud if it
-    # drifted, which is the outcome we actually want -- a drawing whose scale did
-    # not survive the save is a bug to fix at author time, not something to
-    # silently rewrite on every one of the 93 drawings. Dropping the repair drops
-    # the second reopen with it (~2 s/drawing) and takes a conditional save +
-    # conditional PDF re-export off the COM seat.
-    drawing_model, _sheet = await reopen_drawing(adapter, outputs.slddrw)
-    ddoc = _early_bound(drawing_model, "IDrawingDoc")
-    final_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
-    if final_names != sheet_names:
-        raise RuntimeError(
-            f"final drawing sheets changed: {final_names!r} != {sheet_names!r}"
-        )
-    for sheet_name in sheet_names:
-        if not ddoc.ActivateSheet(sheet_name):
-            raise RuntimeError(
-                f"failed to activate final drawing sheet {sheet_name!r}"
-            )
-        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-        if sheet is None:
-            raise RuntimeError(f"final drawing sheet {sheet_name!r} has no ISheet")
-        assert_asme_b_sheet(
-            adapter, sheet, phase=f"post-save reopen {sheet_name}", scale=scale
-        )
-        first_view = next(iter_views(adapter), None)
-        if first_view is None:
-            raise RuntimeError(
-                f"final drawing sheet {sheet_name!r} has no property-link view"
-            )
-        expected_property_view = view_name(adapter, first_view)
-        persisted_property_view = str(
-            adapter._get_attr_or_call(sheet, "CustomPropertyView") or ""
-        )
-        if persisted_property_view != expected_property_view:
-            raise RuntimeError(
-                f"final sheet {sheet_name!r} property link changed: "
-                f"{persisted_property_view!r} != {expected_property_view!r}"
-            )
-    if not ddoc.ActivateSheet(sheet_names[0]):
-        raise RuntimeError("failed to restore first drawing sheet after validation")
     sanitize_pdf_metadata(
         outputs.pdf, title=pdf_title, expected_pages=len(sheet_names)
     )

@@ -27,6 +27,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from cone_gear_shaft_spec import (
     JOURNAL_DIA,
     JOURNAL_END,
@@ -81,7 +82,9 @@ END_KEEP = {
     "Sec3Dia": (0.105, 0.108),
     "Sec4Dia": (0.105, 0.096),
 }
-DIMENSION_CALLOUTS = {name: "+0.00/-0.02" for name in END_KEEP}
+# No callout overrides: the shared fit band is toleranced on each model
+# dimension by build_cone_gear_shaft (cone_gear_shaft_spec.SECTION_DIA_BAND).
+DIMENSION_CALLOUTS: dict[str, str] = {}
 # The bearing journal is a metric 12.2308 fit dimension and needs four decimal
 # places; the other four are exact inch conversions and display three.
 DIMENSION_PRECISION = {name: 4 if name == "Sec0Dia" else 3 for name in END_KEEP}
@@ -264,7 +267,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         side,
         symbol_xy=(0.255, 0.242),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="pivot journal finish",
         entity_type="FACE",
         entity=pivot_face,
@@ -274,7 +277,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         side,
         symbol_xy=(0.102, 0.240),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="tip journal finish",
         entity_type="FACE",
         entity=tip_face,

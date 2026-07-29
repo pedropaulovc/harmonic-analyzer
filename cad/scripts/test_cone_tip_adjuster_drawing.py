@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import math
+from pathlib import Path
 
 import build_cone_tip_adjuster as part
 import cone_tip_adjuster_spec
 import draw_cone_tip_adjuster as drawing
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -104,3 +105,26 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["finish"]
     assert "fit_class" not in config
     assert int(config["quantity"]) == 1
+
+
+def test_machining_bands_are_toleranced_on_the_model_not_the_sheet() -> None:
+    """No fit or size band may reach the print as frozen callout text.
+
+    ``set_dimension_callouts`` appends its string via ``SetText``; SolidWorks
+    prints it verbatim beside a natively-rendered numeral and never re-renders
+    it, so "+/-0.10" survives the mm->inch flip in issue #290 unchanged and
+    reads as inches. Only NON-tolerance annotation is allowed to stay.
+    """
+    assert model_toleranced_dimensions(part) == {
+        ("Body", "BodyLenDim"): "GENERAL_TOL_MM",
+        ("SlotProfile", "SlotWDim"): "GENERAL_TOL_MM",
+        ("CupProfile", "CupDiaDim"): "*deviations(CUP_DIA_BAND)",
+    }
+    # What remains on the sheet is annotation, not specification: a thread
+    # designation and a depth with no model dimension to carry it. Both are
+    # derived from the spec, so neither can drift from the part.
+    assert set(drawing.DIMENSION_CALLOUTS) == {"BodyDiaDim", "CupDiaDim"}
+    assert cone_tip_adjuster_spec.THREAD in drawing.DIMENSION_CALLOUTS["BodyDiaDim"]
+    depth = drawing.DIMENSION_CALLOUTS["CupDiaDim"]
+    assert f"{cone_tip_adjuster_spec.CUP_DEPTH:.2f}" in depth
+    assert f"{cone_tip_adjuster_spec.GENERAL_TOL_MM:.2f}" in depth

@@ -25,6 +25,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import MACHINED
 from wheel_axle_spec import (
     COLLAR_DIA,
     COLLAR_LEN,
@@ -379,7 +380,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Text lands at x~0.058..0.084: clear of the stud flank (x=0.0975) and
         # of the O9 collar (x>=0.0915), which starts a further 9 mm up.
         symbol_xy=fpt(0.045, stud_flank_y),
-        roughness_ra="1.6",
+        roughness_ra=MACHINED,
         label="stud bearing finish",
         entity_type="SILHOUETTE",
     )
