@@ -10,7 +10,7 @@ MM_PER_IN = 25.4
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_LENGTH = 203.2
 
-# Geometric controls, authored on the MODEL as DimXpert PMI by the part build
+# Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
 # tolerance strings. The shaft is one plain cylinder (mid-plane extrude, z
 # ±SHAFT_LENGTH/2), so the bearing face resolves by diameter alone and each

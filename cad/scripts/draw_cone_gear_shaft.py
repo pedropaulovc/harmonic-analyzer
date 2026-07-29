@@ -10,12 +10,13 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
-    import_part_pmi,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -31,6 +32,7 @@ from cone_gear_shaft_spec import (
     JOURNAL_DIA,
     JOURNAL_END,
     SECTION_DIAS,
+    PART_DATUMS,
     SHAFT_LENGTH,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -87,6 +89,22 @@ DIMENSION_CALLOUTS: dict[str, str] = {}
 # The bearing journal is a metric 12.2308 fit dimension and needs four decimal
 # places; the other four are exact inch conversions and display three.
 DIMENSION_PRECISION = {name: 4 if name == "Sec0Dia" else 3 for name in END_KEEP}
+
+
+def _outer_end_edge(adapter: Any, view: Any) -> Any:
+    """Return the largest visible circular model edge in the end view."""
+    circles: list[tuple[float, Any]] = []
+    for edge in visible_view_entities(view, 1, label="gear-shaft end edges"):
+        edge = _early_bound(edge, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = curve.CircleParams
+        if params is not None and len(params) >= 7:
+            circles.append((float(params[6]), edge))
+    if not circles:
+        raise RuntimeError("end view has no visible circular model edge")
+    return max(circles, key=lambda item: item[0])[1]
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -187,6 +205,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
+    pivot_edge = _outer_end_edge(adapter, end)
     # Leader anchor points for the surface-finish symbols (sheet meters).
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
@@ -195,19 +214,33 @@ async def build(adapter: Any) -> dict[str, str]:
         SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
     )
     # GD&T is model PMI (cone_gear_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_cone_gear_shaft) — import it and place it where the
+    # authored by build_cone_gear_shaft) — project it and place it where the
     # hand-authored symbols used to sit. Which VIEW receives each annotation
     # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the importer fails loud on any mismatch. The datum tag keeps its placement derived from
+    # with its face), and the projection fails loud on any mismatch. The datum tag keeps its placement derived from
     # the journal's actual small-end station, not a frozen sheet number.
-    import_part_pmi(
+    project_part_pmi(
         adapter,
-        (side, end),
-        datum_positions={"A": (big_end_x - JOURNAL_END / 1000.0, 0.252)},
-        control_positions={
-            "journal_cylindricity": (0.150, 0.142),
-            "tip_runout": (0.070, 0.245),
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=side,
+                position=(big_end_x - JOURNAL_END / 1000.0, 0.252),
+                entity=pivot_face,
+                attachment_type="FACE",
+            ),
+            "journal_cylindricity": PmiDrawingPlacement(
+                view=end,
+                position=(0.150, 0.142),
+                edge_entity=pivot_edge,
+            ),
+            "tip_runout": PmiDrawingPlacement(
+                view=side,
+                position=(0.070, 0.245),
+                attachment_xy=tip_top,
+                attachment_type="SILHOUETTE",
+            ),
         },
+        datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="cone gear shaft PMI",
     )

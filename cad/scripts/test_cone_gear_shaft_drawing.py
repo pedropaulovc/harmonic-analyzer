@@ -31,7 +31,7 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
             "*deviations(SECTION_DIA_BAND)"
         )
     }
-    assert 'for section in range(5)' in Path(part.__file__).read_text(encoding="utf-8")
+    assert "for section in range(5)" in Path(part.__file__).read_text(encoding="utf-8")
 
 
 def test_required_drawing_paths() -> None:
@@ -125,14 +125,16 @@ def test_native_gdt_controls_shaft_form_coaxiality_and_finish() -> None:
     assert by_key["journal_cylindricity"].face.diameter_mm == (
         cone_gear_shaft_spec.JOURNAL_DIA
     )
-    assert by_key["tip_runout"].face.diameter_mm == cone_gear_shaft_spec.SECTION_DIAS[-1]
+    assert (
+        by_key["tip_runout"].face.diameter_mm == cone_gear_shaft_spec.SECTION_DIAS[-1]
+    )
     assert by_key["tip_runout"].face.tolerance_mm == 0.01
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "import_part_pmi(" in source
+    assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
     assert "add_feature_control_frame(" not in source
     assert "add_datum_feature(" not in source
@@ -158,7 +160,7 @@ def test_datum_symbol_requests_the_persisted_journal_boundary() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     # The imported datum tag's placement stays DERIVED from the journal's
     # small-end station (JOURNAL_END), never a frozen sheet number.
-    assert '"A": (big_end_x - JOURNAL_END / 1000.0, 0.252)' in source
+    assert "position=(big_end_x - JOURNAL_END / 1000.0, 0.252)" in source
     assert "symbol_xy=(0.255, 0.242)" in source
     assert cone_gear_shaft_spec.END_VIEW_NOTE == "END VIEW SCALE 4:1"
     assert 'add_property_linked_note(adapter, "End View Note"' in source

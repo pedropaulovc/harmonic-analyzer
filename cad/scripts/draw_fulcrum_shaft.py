@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the lever fulcrum shaft."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -10,11 +11,12 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    import_part_pmi,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -23,7 +25,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
-from fulcrum_shaft_spec import GEOMETRIC_CONTROLS, SHAFT_DIA, SHAFT_LENGTH
+from fulcrum_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS, SHAFT_DIA, SHAFT_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -141,22 +143,45 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
+    end_top = (
+        FRONT_CENTER[0],
+        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+    )
+    end_upper = (
+        FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
+        FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
+    )
     # GD&T is model PMI (fulcrum_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_fulcrum_shaft) — import it and place it where the
+    # authored by build_fulcrum_shaft) — project it and place it where the
     # hand-authored symbols used to sit (sheet-LEFT of the *Right view is the
     # model +Z end, so the +Z squareness frame takes the left-end spot). Which
     # VIEW receives each annotation depends on its attachment (a datum tag
-    # only lands in a view aligned with its face), and the importer fails
+    # only lands in a view aligned with its face), and the projection fails
     # loud on any mismatch.
-    import_part_pmi(
+    project_part_pmi(
         adapter,
-        (front, right),
-        datum_positions={"A": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)},
-        control_positions={
-            "bearing_cylindricity": (0.065, 0.250),
-            "plus_z_end_perpendicularity": (left_end[0] - 0.042, 0.180),
-            "minus_z_end_perpendicularity": (right_end[0] + 0.014, 0.180),
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=front,
+                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
+                attachment_xy=end_top,
+                position_tolerance_m=0.0001,
+            ),
+            "bearing_cylindricity": PmiDrawingPlacement(
+                view=front, position=(0.065, 0.250), attachment_xy=end_upper
+            ),
+            "plus_z_end_perpendicularity": PmiDrawingPlacement(
+                view=right,
+                position=(left_end[0] - 0.042, 0.180),
+                attachment_xy=left_end,
+            ),
+            "minus_z_end_perpendicularity": PmiDrawingPlacement(
+                view=right,
+                position=(right_end[0] + 0.014, 0.180),
+                attachment_xy=right_end,
+            ),
         },
+        datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="fulcrum shaft PMI",
     )

@@ -52,7 +52,7 @@ SHAFT_LENGTH = SECTION_ENDS[-1]
 # "+0.00/-0.02" typed as sheet callout text.
 SECTION_DIA_BAND = SHAFT_H
 
-# Geometric controls, authored on the MODEL as DimXpert PMI by the part build
+# Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
 # tolerance strings. The shaft is five distinct-diameter lands, so each
 # control's face resolves by diameter alone; the Ø0.79375 tip needs the

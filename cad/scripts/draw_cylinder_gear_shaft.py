@@ -11,11 +11,12 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    import_part_pmi,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -25,7 +26,12 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
-from cylinder_gear_shaft_spec import GEOMETRIC_CONTROLS, SHAFT_DIA, SHAFT_LENGTH
+from cylinder_gear_shaft_spec import (
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
+    SHAFT_DIA,
+    SHAFT_LENGTH,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -83,17 +89,14 @@ DIMENSION_PRECISION = {"ShaftDia": 3}
 
 def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
     """Rotate a placed drawing view about its center and verify it took."""
-    ok = adapter._attempt(
-        lambda: setattr(view, "Angle", float(angle)), default=False
-    )
+    ok = adapter._attempt(lambda: setattr(view, "Angle", float(angle)), default=False)
     if ok is False:
         raise RuntimeError(f"failed to rotate {label} drawing view")
     adapter.currentModel.EditRebuild3()
     applied = float(adapter._get_attr_or_call(view, "Angle") or 0.0)
     if abs(math.remainder(applied - angle, 2.0 * math.pi)) > 1e-6:
         raise RuntimeError(
-            f"{label} view rotation did not take: {applied:g} rad, "
-            f"expected {angle:g}"
+            f"{label} view rotation did not take: {applied:g} rad, expected {angle:g}"
         )
 
 
@@ -141,9 +144,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(2, 1))
-    profile = place_view(
-        adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=(1, 1)
-    )
+    profile = place_view(adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # Rotate BEFORE dimension import so the Depth dim lands on the displayed
     # (horizontal) geometry.
@@ -182,22 +183,42 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     left_end = (PROFILE_CENTER[0] - SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
     right_end = (PROFILE_CENTER[0] + SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
+    end_top = (END_CENTER[0], END_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0)
+    end_upper = (
+        END_CENTER[0] + end_radius * math.cos(math.radians(55.0)),
+        END_CENTER[1] + end_radius * math.sin(math.radians(55.0)),
+    )
     # GD&T is model PMI (cylinder_gear_shaft_spec.PART_DATUMS/
-    # GEOMETRIC_CONTROLS, authored by build_cylinder_gear_shaft) — import it
+    # GEOMETRIC_CONTROLS, authored by build_cylinder_gear_shaft) — project it
     # and place it where the hand-authored symbols used to sit (the profile
     # view is rotated -pi/2, so sheet-LEFT is model y=0 and the y0 squareness
     # frame takes the left-end spot). Which VIEW receives each annotation
     # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the importer fails loud on any mismatch.
-    import_part_pmi(
+    # with its face), and the projection fails loud on any mismatch.
+    project_part_pmi(
         adapter,
-        (end, profile),
-        datum_positions={"A": (END_CENTER[0], END_CENTER[1] + 0.024)},
-        control_positions={
-            "bearing_cylindricity": (0.068, 0.252),
-            "y0_end_perpendicularity": (left_end[0] - 0.042, 0.180),
-            "y187_end_perpendicularity": (right_end[0] + 0.014, 0.180),
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=end,
+                position=(END_CENTER[0], END_CENTER[1] + 0.024),
+                attachment_xy=end_top,
+                position_tolerance_m=0.0001,
+            ),
+            "bearing_cylindricity": PmiDrawingPlacement(
+                view=end, position=(0.068, 0.252), attachment_xy=end_upper
+            ),
+            "y0_end_perpendicularity": PmiDrawingPlacement(
+                view=profile,
+                position=(left_end[0] - 0.042, 0.180),
+                attachment_xy=left_end,
+            ),
+            "y187_end_perpendicularity": PmiDrawingPlacement(
+                view=profile,
+                position=(right_end[0] + 0.014, 0.180),
+                attachment_xy=right_end,
+            ),
         },
+        datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="cylinder gear shaft PMI",
     )

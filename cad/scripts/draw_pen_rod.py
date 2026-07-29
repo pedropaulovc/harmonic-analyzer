@@ -10,13 +10,14 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    import_part_pmi,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -28,6 +29,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
 from pen_rod_spec import (
     GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     ROD_LENGTH,
     WIRE_HOLE_DIA,
     WIRE_HOLE_Y,
@@ -145,6 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
+    front_far_side = (FRONT_CENTER[0] + 0.0025, FRONT_CENTER[1])
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
     hole_bottom = (FRONT_CENTER[0], hole_center_y - WIRE_HOLE_DIA / 2000.0)
     hole_side = (FRONT_CENTER[0] + WIRE_HOLE_DIA / 2000.0, hole_center_y)
@@ -178,25 +181,31 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # GD&T is model PMI (pen_rod_spec.PART_DATUMS/GEOMETRIC_CONTROLS, authored
-    # by build_pen_rod) — import it and place it where the hand-authored
+    # by build_pen_rod) — project it and place it where the hand-authored
     # symbols used to sit. All three annotations land in the single front view,
-    # and the importer fails loud on any mismatch. The squareness frame stays BELOW the rod: up-right
+    # and the projection fails loud on any mismatch. The squareness frame stays BELOW the rod: up-right
     # of its target its leader crossed the Ra's leader in an X at the rod's
     # bottom corner; from below the two run on opposite sides of that corner.
-    import_part_pmi(
+    project_part_pmi(
         adapter,
-        (front,),
-        datum_positions={"A": (front_side[0] - 0.016, FRONT_CENTER[1] - 0.030)},
-        control_positions={
-            "opposite_slide_face_parallelism": (
-                FRONT_CENTER[0] + 0.032,
-                FRONT_CENTER[1] - 0.018,
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=front,
+                position=(front_side[0] - 0.016, FRONT_CENTER[1] - 0.030),
+                attachment_xy=front_side,
             ),
-            "bottom_end_squareness": (
-                FRONT_CENTER[0] + 0.005,
-                FRONT_CENTER[1] - 0.070,
+            "opposite_slide_face_parallelism": PmiDrawingPlacement(
+                view=front,
+                position=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] - 0.018),
+                attachment_xy=front_far_side,
+            ),
+            "bottom_end_squareness": PmiDrawingPlacement(
+                view=front,
+                position=(FRONT_CENTER[0] + 0.005, FRONT_CENTER[1] - 0.070),
+                attachment_xy=front_bottom,
             ),
         },
+        datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="pen rod PMI",
     )

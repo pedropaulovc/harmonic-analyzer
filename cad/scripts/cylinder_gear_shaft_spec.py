@@ -18,7 +18,7 @@ SHAFT_LENGTH = 187.0  # ch13 stack + journals; installed -54.585..+132.415:
 # as a unit; the south end still stops inside its pedestal bore. See
 # build_drive_train_assembly.ARBOR_LENGTH / ARBOR_SOUTH_Z.
 
-# Geometric controls, authored on the MODEL as DimXpert PMI by the part build
+# Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
 # tolerance strings. The arbor is one plain cylinder extruded +Y from the
 # origin (y 0..SHAFT_LENGTH, NOT mid-plane), so the bearing face resolves by

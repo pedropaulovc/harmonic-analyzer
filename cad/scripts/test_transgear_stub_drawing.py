@@ -43,7 +43,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         part.COLLAR_LEN,
     ) == nominals
     # BASE_DIA left this tuple with the hand-authored datum tag: the drawing
-    # no longer draws anything from it (datum A is imported model PMI).
+    # no longer types anything from it (datum A comes from the model PMI spec).
     assert (
         drawing.BASE_LEN,
         drawing.SEAT_DIA,
@@ -118,7 +118,7 @@ def test_native_gdt_controls_seat_form_runout_and_finish() -> None:
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "import_part_pmi(" in source
+    assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
     assert "add_feature_control_frame(" not in source
     assert "add_datum_feature(" not in source

@@ -67,7 +67,7 @@ def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
     assert by_key["stud_perpendicularity"].characteristic == "perpendicularity"
     assert by_key["stud_perpendicularity"].tolerance == "0.05"
     assert by_key["stud_perpendicularity"].datums == ("A",)
-    assert by_key["stud_perpendicularity"].diameter is True
+    assert by_key["stud_perpendicularity"].tolerance_zone == "diametral"
     assert by_key["collar_runout"].characteristic == "circular_runout"
     assert by_key["collar_runout"].tolerance == "0.05"
     assert by_key["collar_runout"].datums == ("B",)
@@ -76,7 +76,7 @@ def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "import_part_pmi(" in source
+    assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
     assert "add_feature_control_frame(" not in source
     assert "add_datum_feature(" not in source

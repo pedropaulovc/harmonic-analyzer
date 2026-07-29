@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the magnifying-wheel axle."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -10,11 +11,13 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    import_part_pmi,
+    find_edge_near,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -30,6 +33,7 @@ from wheel_axle_spec import (
     FLANGE_DIA,
     FLANGE_LEN,
     GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     STUD_DIA,
     STUD_LEN,
 )
@@ -103,11 +107,12 @@ END_KEEP = {
 # 0.02..0.05 running clearance against the nominal-on-nominal bore.
 DIMENSION_CALLOUTS = {"StudDia": "-0.02/-0.05"}
 
-# Datum B's imported-symbol offset from the end-view centre. Placed off-axis at
+# Datum B's projected-symbol offset from the end-view centre. Placed off-axis at
 # ~-54 deg so the tag's leader runs radially out of the stud circle clear of the
 # O35 dimension ray and the O5.00 text (measured live while this tag was still
-# sheet-authored; the placement survives the move to imported model PMI).
+# sheet-authored; the same placement is now driven from the model PMI spec).
 _DATUM_B_OFFSET = (0.038, -0.052)
+_DATUM_B_ANGLE = math.atan2(_DATUM_B_OFFSET[1], _DATUM_B_OFFSET[0])
 
 
 def _view_center_delta(
@@ -209,29 +214,80 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to axle end view")
 
+    flange_face_edge = find_edge_near(
+        adapter,
+        front,
+        fpt(FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K, _front_y(0.0)),
+        axis="y",
+        label="flange seating face pick",
+    )
+    stud_circle_top = find_edge_near(
+        adapter,
+        end,
+        ept(END_CENTER[0], END_CENTER[1] + STUD_DIA / 2.0 * _K),
+        axis="y",
+        label="stud circle top pick",
+    )
+    collar_circle_left = find_edge_near(
+        adapter,
+        end,
+        ept(END_CENTER[0] - COLLAR_DIA / 2.0 * _K, END_CENTER[1]),
+        axis="x",
+        label="collar circle left pick",
+    )
+    stud_circle_at_datum_b = find_edge_near(
+        adapter,
+        end,
+        ept(
+            END_CENTER[0] + STUD_DIA / 2.0 * _K * math.cos(_DATUM_B_ANGLE),
+            END_CENTER[1] + STUD_DIA / 2.0 * _K * math.sin(_DATUM_B_ANGLE),
+        ),
+        axis="y",
+        label="stud circle datum-B pick",
+    )
+
     # GD&T is model PMI (wheel_axle_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_wheel_axle) — import it and place it where the
+    # authored by build_wheel_axle) — project it and place it where the
     # hand-authored symbols used to sit. Which VIEW receives each annotation
     # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the importer fails loud on any mismatch. Placements track the measured view-centre deltas
+    # with its face), and the projection fails loud on any mismatch. Placements track the measured view-centre deltas
     # (fpt/ept), the same corrections the retired edge picks used.
-    import_part_pmi(
+    project_part_pmi(
         adapter,
-        (front, end),
-        datum_positions={
-            "A": fpt(FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K + 0.006,
-                     _front_y(0.0) - 0.016),
-            "B": ept(END_CENTER[0] + _DATUM_B_OFFSET[0],
-                     END_CENTER[1] + _DATUM_B_OFFSET[1]),
-        },
-        control_positions={
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=front,
+                position=fpt(
+                    FRONT_CENTER[0] + FLANGE_DIA / 4.0 * _K + 0.006,
+                    _front_y(0.0) - 0.016,
+                ),
+                attachment_xy=flange_face_edge,
+            ),
+            "datum:B": PmiDrawingPlacement(
+                view=end,
+                position=ept(
+                    END_CENTER[0] + _DATUM_B_OFFSET[0],
+                    END_CENTER[1] + _DATUM_B_OFFSET[1],
+                ),
+                attachment_xy=stud_circle_at_datum_b,
+                position_tolerance_m=0.00003,
+            ),
             # +0.052 in y put the frame's 8 mm half-box 8.3 mm over the top
             # margin. Held to +0.045 and pushed out to +0.058 in x, which keeps
             # it clear of the flange circle (52.5 mm radius) without reaching
             # the 0.4191 right margin (a frame grows RIGHT by its full width).
-            "stud_perpendicularity": ept(END_CENTER[0] + 0.058, END_CENTER[1] + 0.045),
-            "collar_runout": ept(END_CENTER[0] - 0.075, END_CENTER[1] - 0.045),
+            "stud_perpendicularity": PmiDrawingPlacement(
+                view=end,
+                position=ept(END_CENTER[0] + 0.058, END_CENTER[1] + 0.045),
+                attachment_xy=stud_circle_top,
+            ),
+            "collar_runout": PmiDrawingPlacement(
+                view=end,
+                position=ept(END_CENTER[0] - 0.075, END_CENTER[1] - 0.045),
+                attachment_xy=collar_circle_left,
+            ),
         },
+        datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="wheel axle PMI",
     )

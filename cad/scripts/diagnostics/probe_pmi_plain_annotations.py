@@ -31,7 +31,7 @@ import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import create_section_view, model_point_in_view  # noqa: E402
-from _part_pmi import _resolve_face, _select_face  # noqa: E402
+from _part_pmi import _resolve_faces, _select_face  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
 from transgear_stub_spec import GEOMETRIC_CONTROLS, PART_DATUMS  # noqa: E402
 
@@ -97,9 +97,12 @@ async def main() -> int:
         if not check.is_success:
             raise RuntimeError(f"part open failed: {check.error}")
         model = adapter.currentModel
+        requests = {datum.key: datum.face for datum in PART_DATUMS}
+        requests.update({control.key: control.face for control in GEOMETRIC_CONTROLS})
+        resolved_faces = _resolve_faces(model, requests)
 
         datum = PART_DATUMS[0]
-        face = _resolve_face(model, datum.face, label="plain datum A")
+        face = resolved_faces[datum.key]
         _select_face(model, face, label="plain datum A")
         tag = model.InsertDatumTag2()
         if tag is None:
@@ -111,7 +114,7 @@ async def main() -> int:
         authored = {"datum:A": tag_ann}
 
         for control in GEOMETRIC_CONTROLS:
-            face = _resolve_face(model, control.face, label=control.key)
+            face = resolved_faces[control.key]
             _select_face(model, face, label=control.key)
             gtol = model.InsertGtol()
             if gtol is None:
@@ -128,7 +131,7 @@ async def main() -> int:
                 gtol.SetFrameSymbols2(
                     1,
                     f"<{GTOL_SYMBOLS[control.characteristic]}>",
-                    control.diameter,
+                    control.tolerance_zone == "diametral",
                     "",
                     False,
                     "",
@@ -136,9 +139,7 @@ async def main() -> int:
                     "",
                     "",
                 )
-                if not gtol.SetFrameValues2(
-                    1, control.tolerance, "", *datum_values
-                ):
+                if not gtol.SetFrameValues2(1, control.tolerance, "", *datum_values):
                     raise RuntimeError(f"{control.key}: SetFrameValues2 failed")
                 converted = int(gtol.ConvertFormat())
                 if converted != 0:
@@ -254,8 +255,7 @@ async def main() -> int:
                     f"drift={drift * 1000:.2f}mm"
                 )
             _telemetry.info(
-                f"reopened sheet {label}: "
-                f"{tuple(round(v, 5) for v in final)}{verdict}"
+                f"reopened sheet {label}: {tuple(round(v, 5) for v in final)}{verdict}"
             )
         adapter.swApp.QuitDoc(str(_read_member(adapter.currentModel, "GetTitle")))
         _telemetry.success(f"plain-annotation probe complete: {OUT_PDF}")

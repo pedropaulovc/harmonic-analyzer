@@ -66,7 +66,7 @@ def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "import_part_pmi(" in source
+    assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
     assert "add_feature_control_frame(" not in source
     assert "add_datum_feature(" not in source

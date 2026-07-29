@@ -11,7 +11,7 @@ WIRE_HOLE_Y = 115.0  # wire tie-off near the top (build_pen_assembly imports thi
 WIRE_HOLE_DRILL = "#47"  # number drill (see _holes.NUMBER_DRILL_MM)
 WIRE_HOLE_DIA = 1.994
 
-# Geometric controls, authored on the MODEL as DimXpert PMI by the part build
+# Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
 # tolerance strings. The rod is a square bar (zero cylinders): datum A is the
 # -X slide face, its opposite +X face rides parallel to it in the v-block, and

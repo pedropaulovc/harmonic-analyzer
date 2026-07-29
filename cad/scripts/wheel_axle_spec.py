@@ -12,7 +12,7 @@ STUD_LEN = 14.0
 COLLAR_DIA = 9.0
 COLLAR_LEN = 4.0
 
-# Geometric controls, authored on the MODEL as DimXpert PMI by the part build
+# Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
 # tolerance strings. Axis +Y from the flange's bar-side face: flange Ø35
 # y 0..3, stud Ø5 y 3..17, collar Ø9 y 13..17, so each face resolves by its
@@ -29,10 +29,14 @@ GEOMETRIC_CONTROLS = (
         "0.05",
         CylinderFace(STUD_DIA),
         datums=("A",),
-        diameter=True,
+        tolerance_zone="diametral",
     ),
     GeometricControl(
-        "collar_runout", "circular_runout", "0.05", CylinderFace(COLLAR_DIA), datums=("B",)
+        "collar_runout",
+        "circular_runout",
+        "0.05",
+        CylinderFace(COLLAR_DIA),
+        datums=("B",),
     ),
 )
 

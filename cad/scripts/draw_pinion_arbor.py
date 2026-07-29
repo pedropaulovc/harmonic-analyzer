@@ -10,11 +10,12 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    import_part_pmi,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -27,6 +28,7 @@ from pinion_arbor_spec import (
     CAP_R,
     CAP_SAG,
     GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     SHAFT_DIA,
     SHAFT_LEN,
 )
@@ -155,20 +157,38 @@ async def build(adapter: Any) -> dict[str, str]:
     # Screen-right in *Right is model -Z: the flat front tip (z 0) lands on the
     # RIGHT end of the side view, the crowned back end on the LEFT.
     flat_end = (RIGHT_CENTER[0] + OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
+    end_top = (
+        FRONT_CENTER[0],
+        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+    )
     # GD&T is model PMI (pinion_arbor_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_pinion_arbor) — import it and place it where the
+    # authored by build_pinion_arbor) — project it and place it where the
     # hand-authored symbols used to sit. Which VIEW receives each annotation
     # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the importer fails loud on any mismatch. Only the flat FRONT tip carries perpendicularity
+    # with its face), and the projection fails loud on any mismatch. Only the flat FRONT tip carries perpendicularity
     # -- the back end is the SR crown, which has no face to square to the axis.
-    import_part_pmi(
+    project_part_pmi(
         adapter,
-        (front, right),
-        datum_positions={"A": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.024)},
-        control_positions={
-            "bearing_cylindricity": (RIGHT_CENTER[0] - 0.050, 0.236),
-            "flat_tip_perpendicularity": (flat_end[0] + 0.018, 0.228),
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=front,
+                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
+                attachment_xy=end_top,
+                position_tolerance_m=0.00002,
+            ),
+            "bearing_cylindricity": PmiDrawingPlacement(
+                view=right,
+                position=(RIGHT_CENTER[0] - 0.050, 0.236),
+                attachment_xy=(RIGHT_CENTER[0] - 0.050, SHAFT_FLANK_Y),
+                attachment_type="SILHOUETTE",
+            ),
+            "flat_tip_perpendicularity": PmiDrawingPlacement(
+                view=right,
+                position=(flat_end[0] + 0.018, 0.228),
+                attachment_xy=flat_end,
+            ),
         },
+        datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="pinion arbor PMI",
     )

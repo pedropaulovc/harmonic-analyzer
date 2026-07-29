@@ -3,6 +3,7 @@ r"""Create the curated machinist drawing for the lever-bank spacer bushing."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -10,11 +11,12 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    import_part_pmi,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -24,7 +26,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
-from lever_bushing_spec import BORE_DIA, GEOMETRIC_CONTROLS, LENGTH, OUTER_DIA
+from lever_bushing_spec import (
+    BORE_DIA,
+    GEOMETRIC_CONTROLS,
+    LENGTH,
+    OUTER_DIA,
+    PART_DATUMS,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -131,25 +139,47 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
         FRONT_CENTER[1],
     )
+    bore_top = (
+        FRONT_CENTER[0],
+        FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
+    )
+    outer_radius = OUTER_DIA * SHEET_SCALE[0] / 2000.0
+    outer_runout = (
+        FRONT_CENTER[0] + outer_radius * math.cos(math.radians(45.0)),
+        FRONT_CENTER[1] + outer_radius * math.sin(math.radians(45.0)),
+    )
     half_depth = LENGTH * SHEET_SCALE[0] / 2000.0
     left_end = (RIGHT_CENTER[0] - half_depth, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + half_depth, RIGHT_CENTER[1])
     # GD&T is model PMI (lever_bushing_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_lever_bushing) — import it and place it where the
+    # authored by build_lever_bushing) — project it and place it where the
     # hand-authored symbols used to sit. Which VIEW receives each annotation
     # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the importer fails loud on any mismatch.
-    import_part_pmi(
+    # with its face), and the projection fails loud on any mismatch.
+    project_part_pmi(
         adapter,
-        (front, right),
-        datum_positions={
-            "A": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
-            "B": (left_end[0] - 0.018, RIGHT_CENTER[1]),
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=front,
+                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
+                attachment_xy=bore_top,
+                position_tolerance_m=0.0001,
+            ),
+            "datum:B": PmiDrawingPlacement(
+                view=right,
+                position=(left_end[0] - 0.018, RIGHT_CENTER[1]),
+                attachment_xy=left_end,
+            ),
+            "od_runout": PmiDrawingPlacement(
+                view=front, position=(0.115, 0.255), attachment_xy=outer_runout
+            ),
+            "end_face_parallelism": PmiDrawingPlacement(
+                view=right,
+                position=(right_end[0] + 0.014, 0.180),
+                attachment_xy=right_end,
+            ),
         },
-        control_positions={
-            "od_runout": (0.115, 0.255),
-            "end_face_parallelism": (right_end[0] + 0.014, 0.180),
-        },
+        datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS,
         label="lever bushing PMI",
     )

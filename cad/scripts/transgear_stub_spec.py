@@ -33,7 +33,7 @@ SEAT_DIA_BAND = SHAFT_H
 # _fit_limits class and specific to this stud, so it lives here beside BASE_DIA.
 BASE_DIA_BAND = (0.000, -0.050)
 
-# Geometric controls, authored on the MODEL as DimXpert PMI by the part build
+# Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
 # tolerance strings. The stud is one revolve, so each control's face resolves
 # by diameter alone.
@@ -42,7 +42,9 @@ PART_DATUMS = (
     PartDatum("A", CylinderFace(BASE_DIA)),
 )
 GEOMETRIC_CONTROLS = (
-    GeometricControl("seat_cylindricity", "cylindricity", "0.01", CylinderFace(SEAT_DIA)),
+    GeometricControl(
+        "seat_cylindricity", "cylindricity", "0.01", CylinderFace(SEAT_DIA)
+    ),
     GeometricControl(
         "seat_runout", "circular_runout", "0.03", CylinderFace(SEAT_DIA), datums=("A",)
     ),

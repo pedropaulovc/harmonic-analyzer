@@ -10,7 +10,7 @@ SHAFT_LEN = 226.25
 CAP_SAG = 1.2
 CAP_R = (SHAFT_DIA / 2.0) ** 2 / (2.0 * CAP_SAG) + CAP_SAG / 2.0  # 7.27
 
-# Geometric controls, authored on the MODEL as DimXpert PMI by the part build
+# Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
 # tolerance strings. The arbor is one Ø8 bearing cylinder plus the flat front
 # tip (the -Z face at z=0; the back end is the crown, which has no face to
