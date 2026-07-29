@@ -1,47 +1,52 @@
 ---
 name: balloon-anchor-vs-circle-frame
-description: SetPosition moves a balloon's annotation ANCHOR, but the ink and the layout audit are the CIRCLE — separation enforced in the wrong frame under-delivers by up to a full balloon diameter
+description: A balloon ring spread before every view on the sheet is placed gets undone by the sheet re-solve — plus two refuted theories for the same overlap (anchor/circle frame, ellipse eccentricity)
 metadata:
   type: project
 ---
 
-`IAnnotation::SetPosition` moves a BOM balloon's **annotation anchor**.
-`INote::GetBalloonInfo` returns the **circle** (centre + radius). SolidWorks
-derives the anchor→centre offset from the balloon's TEXT and LEADER SIDE, so it
-differs per balloon on the same ring — a 2-character item and a 1-character one
-carry different offsets.
+**The defect:** `_spread_balloons` places balloons on a ring around a view. If
+it runs while another view is still to be PLACED on that sheet, placing that
+view re-solves the sheet and the balloons snap back to their creation offset
+from their own attachments — the ring is silently undone, `SetPosition` having
+returned True.
 
-`_drawing_common._spread_balloons` computed a separation with `_min_angular_gap`
-and then aimed the **anchor** at the ring point, while both the drawn ink and
-`_note_element` (the layout audit) measure the **circle**. The real gap is
-therefore short by the DIFFERENTIAL offset, bounded only by a full balloon
-diameter — a silent, geometry-dependent shortfall, not a constant one.
+Repro (2026-07-28, drive-train sheet 4): the concealed-BOTTOM ring was spread
+before `concealed_front` was placed. On the saved sheet both its balloons sat
+`(0.0176, 0.0114)` m from their own attachments — **the same delta to 0.1 mm**,
+i.e. the creation offset, not a ring position. Their circles therefore kept the
+attachments' 6.86 mm spacing (measured 6.99 mm) instead of the ring's 15.2 mm,
+and the layout audit failed with a 7.7 × 3.0 mm overlap between items 25 and 6.
 
-Repro (2026-07-28, drive-train sheet 4 concealed-bottom ring): two balloons
-ALONE on a ring with the whole circle free — '25' (cone-gear-shaft) and '6'
-(cone-tip-bushing). Circles landed **6.99 mm** apart where the formula demanded
-**15.2 mm**; the layout audit failed with a 7.7 × 3.0 mm overlap on 9.7 mm
-boxes. Offline model of the same pair: 5.42 mm against a 9.7 mm box.
+The identical-delta signature is the diagnostic: **balloons at a constant offset
+from their own attachments were never re-ringed.** Contrast the grouped rings on
+the same drawing, which are fine — `_add_component_balloons` receives its views
+already placed. The invariant is therefore about ORDER, not about the spread:
+*no ring may be spread while a view is still to be placed on that sheet.*
 
-**Fix:** the placement loop already calls `GetBalloonInfo` for the radius, so
-one extra `GetPosition` per balloon gives the offset; placement pre-subtracts
-it. Cost is one COM read per balloon — no rebuild, no second pass. The offset
-is recorded on the `drawing.balloon_ring` span event, so a ring that WOULD have
-under-separated is visible in `traces.jsonl`.
+**Two theories measured and REFUTED for this same overlap.** Both were specific,
+plausible, and wrong; neither is worth re-walking:
 
-**The generalisable rule: placement must be enforced in the frame the GRADER
-measures.** `_min_angular_gap`'s docstring already said this in words — it
-separates against the audit's circumscribed SQUARE rather than the circle,
-because "placement must satisfy the model that grades it" — and the code then
-broke the same rule one level down, on the frame rather than the shape. When a
-checker and a placer read different APIs for the same object, verify they agree
-on the ORIGIN, not just the size.
+1. *Anchor-vs-circle frame.* `SetPosition` moves the annotation ANCHOR while the
+   ink and the audit (`_note_element`) measure the CIRCLE (`GetBalloonInfo`), so
+   a differing per-balloon offset would eat the gap. The offset is REAL — every
+   drive-train balloon carries ~`(+4.2, -2.0)` mm — but it is UNIFORM, so the
+   differential is `(0.05, 0.14)` mm, two orders of magnitude too small. The
+   corrected build produced byte-identical boxes: a confident no-op. The offsets
+   are still recorded on the `drawing.balloon_ring` span event, which is what
+   refuted it.
+2. *Ellipse eccentricity.* That `_min_angular_gap`'s use of `min(Rx, Ry)` is
+   conservative only for infinitesimal gaps, since an eccentric ellipse doubles
+   back at its pointy end. Probed as a pure function to 5:1 — separation holds
+   at every ratio.
 
-**Refuted en route, so nobody re-walks it:** the hypothesis that
-`_min_angular_gap`'s use of `min(Rx, Ry)` is only conservative for infinitesimal
-gaps (the ellipse "doubling back" at its pointy end). Probed as a pure function
-to 5:1 eccentricity — separation holds at every ratio. The frame mismatch, not
-the ellipse, was the defect. See [[load-bearing-claims-need-a-repro]] and
-[[negative-result-needs-a-positive-control]].
+**Lesson.** An overlap on a ring has three candidate causes and they are
+cheaply distinguishable from the recorded data before touching COM: crowding
+(count vs ring circumference), a frame/units mismatch (compare the offsets), or
+the spread not having taken effect at all (compare each balloon's final position
+to its own ATTACHMENT — a constant delta across balloons means un-spread). Check
+the third first; it is the only one that needs no geometry reasoning.
 
-Related: [[drawing-recipe-com-pitfalls]], [[drawing-text-leader-style]].
+See [[load-bearing-claims-need-a-repro]] and
+[[negative-result-needs-a-positive-control]]. Related:
+[[drawing-recipe-com-pitfalls]], [[drawing-text-leader-style]].

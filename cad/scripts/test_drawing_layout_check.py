@@ -1368,52 +1368,6 @@ def _ring_positions(notes):
     return [note.placed for note in notes]
 
 
-def test_placement_aims_the_circle_at_the_ring_point_not_the_anchor():
-    """SetPosition moves the ANCHOR; the ring must carry the CIRCLE.
-
-    `_note_element` already refuses GetPosition for boxing a balloon because the
-    anchor is "measurably offset from the circle centre", and boxes
-    GetBalloonInfo's circle instead. The spread was still aiming the ANCHOR at
-    the ring point, so the two disagreed by that offset.
-    """
-    offset = (0.002, -0.003)
-    note = _FakeNote(0.1600, 0.1500, item="25", offset=offset)
-    _ring_positions([note])
-    # View outline (0.10, 0.10) - (0.20, 0.20); attachment due east of centre,
-    # so the ring point is at theta = 0: centre + (0.05 + 0.014 margin).
-    ring_point = (0.15 + 0.064, 0.15)
-    assert note.placed == pytest.approx(
-        (ring_point[0] - offset[0], ring_point[1] - offset[1])
-    )
-    assert note.circle == pytest.approx(ring_point)
-
-
-def test_offset_balloons_clear_each_other_under_the_audits_square_model():
-    """The separation guarantee must hold for the CIRCLES, not the anchors.
-
-    Repro of drive-train's concealed-bottom ring: a 2-character balloon ('25')
-    and a 1-character one ('6'), whose anchor->circle offsets differ. Anchors
-    separated by the full `_min_angular_gap` still left the circles 6.99 mm
-    apart where the formula demanded 15.2 mm, and the layout audit failed with
-    a 7.7 x 3.0 mm overlap. The shortfall is the DIFFERENTIAL offset, which is
-    bounded only by a full balloon diameter.
-    """
-    r = 0.00485  # the radius implied by drive-train's 9.7 mm audit boxes
-    # The offsets must OPPOSE along the axis the ring separates these two on
-    # (they ring one above the other, so along y) -- the lower balloon's circle
-    # riding up and the upper one's riding down is what eats the gap. Offsets
-    # perpendicular to the separation cannot close it and would leave this test
-    # green with or without the correction.
-    wide = _FakeNote(0.1600, 0.1500, radius=r, item="25", offset=(0.0, r))
-    narrow = _FakeNote(0.1610, 0.1520, radius=r, item="6", offset=(0.0, -r))
-    _ring_positions([wide, narrow])
-    (ax, ay), (bx, by) = wide.circle, narrow.circle
-    side = 2.0 * r  # _note_element boxes the circle's circumscribed square
-    assert max(abs(ax - bx), abs(ay - by)) >= side, (
-        f"circles overlap under the audit's square model: "
-        f"dx={abs(ax - bx) * 1000:.2f} dy={abs(ay - by) * 1000:.2f} mm "
-        f"against a {side * 1000:.2f} mm box"
-    )
 
 
 def test_balloons_attached_at_one_angle_ring_in_a_fixed_order():

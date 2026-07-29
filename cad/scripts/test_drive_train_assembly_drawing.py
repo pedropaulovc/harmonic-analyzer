@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import re
 import math
 from pathlib import Path
 
@@ -221,6 +222,37 @@ def test_sheet_three_identifies_four_disjoint_subsystems_deliberately() -> None:
     assert "EXTERIOR_VIEW_STEMS" in build_source
     assert "_isolate_balloon_components(" in build_source
     assert "position_bom_balloon(" not in source
+
+
+def test_concealed_rings_are_spread_only_once_both_views_exist() -> None:
+    """Placing a view re-solves the sheet and undoes an earlier ring.
+
+    The bottom ring used to be spread immediately, before `concealed_front` was
+    placed. On the saved sheet it was NOT spread: both bottom balloons sat
+    (0.0176, 0.0114) m from their own attachments -- the same delta to 0.1 mm,
+    i.e. their creation offset -- so their circles kept the attachments' 6.86 mm
+    spacing instead of the ring's, and the layout audit failed with a
+    7.7 x 3.0 mm overlap between items 25 and 6.
+
+    The grouped rings never showed this because `_add_component_balloons` gets
+    its views already placed. So the invariant is ordering, not the spread: no
+    ring may be spread while a view is still to be placed on that sheet.
+    """
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    spreads = [
+        m.start()
+        for m in re.finditer(
+            r"_spread_balloons\(\n        adapter,\n        concealed_", source
+        )
+    ]
+    assert len(spreads) == 2, "expected one spread per concealed ring"
+    last_view = source.index("concealed_front = place_view(")
+    last_balloon = source.index("front_balloons.append(note)")
+    assert all(at > last_view for at in spreads), (
+        "a concealed ring is spread before the second view is placed -- the "
+        "sheet re-solve will undo it"
+    )
+    assert all(at > last_balloon for at in spreads)
 
 
 def test_sheet_five_has_an_explicit_twenty_pair_station_contract() -> None:

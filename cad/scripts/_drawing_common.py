@@ -2932,18 +2932,19 @@ def _spread_balloons(
         # Flat x,y,z stream; the LAST triple is the attachment on the component.
         attach_x, attach_y = float(raw[-3]), float(raw[-2])
         theta = math.atan2(attach_y - center_y, attach_x - center_x)
-        # The ring must carry the CIRCLE, not the annotation ANCHOR. SetPosition
-        # moves the anchor, which sits a text- and leader-dependent offset away
-        # from the circle centre -- exactly the offset :func:`_note_element`
-        # documents when it refuses GetPosition for boxing ("measurably offset
-        # from the circle centre"). Separating anchors while the ink AND the
-        # audit measure circles leaves the real gap short by the DIFFERENTIAL
-        # offset, which is up to a full balloon diameter: drive-train's
-        # concealed-bottom ring placed a 2-character balloon ('25') and a
-        # 1-character one ('6') and the circles landed 6.99 mm apart where the
-        # gap formula had demanded 15.2 mm, failing the layout audit. Correcting
-        # by the measured offset makes placement satisfy the model that grades
-        # it, which is the whole premise of _min_angular_gap.
+        # SetPosition moves the annotation ANCHOR while the ink and the layout
+        # audit both measure the CIRCLE (:func:`_note_element` refuses
+        # GetPosition for boxing: "measurably offset from the circle centre").
+        # That offset is recorded -- NOT corrected for.
+        #
+        # It was corrected for once, on the theory that the DIFFERENTIAL offset
+        # between a 2-character balloon and a 1-character one was eating the
+        # gap. MEASURED and refuted: every balloon on every drive-train ring
+        # carries the SAME offset, ~(+4.2, -2.0) mm, so the differential is
+        # (0.05, 0.14) mm -- two orders of magnitude too small to explain the
+        # 7.7 x 3.0 mm overlap it was meant to fix, and the corrected build
+        # produced byte-identical boxes. Keep the read: it is one COM call per
+        # balloon and it is what refuted the theory.
         anchor = adapter._attempt(
             lambda a=annotation: adapter._get_attr_or_call(a, "GetPosition")
         )
@@ -3017,14 +3018,10 @@ def _spread_balloons(
     angles = _push_apart_on_ring(
         [theta for theta, _x, _y, _i, _a, _o in items], min_gap=gap
     )
-    for angle, (_theta, _x, _y, _item, annotation, offset) in zip(angles, items):
+    for angle, (_theta, _x, _y, _item, annotation, _offset) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle)
         target_y = center_y + radius_y * math.sin(angle)
-        # Aim the CIRCLE at the ring point by pre-subtracting the anchor->centre
-        # offset measured above; SetPosition moves the anchor.
-        if not annotation.SetPosition(
-            target_x - offset[0], target_y - offset[1], 0.0
-        ):
+        if not annotation.SetPosition(target_x, target_y, 0.0):
             raise RuntimeError("failed to re-ring a BOM balloon")
 
 
