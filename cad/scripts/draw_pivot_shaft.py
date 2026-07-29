@@ -149,8 +149,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # authored by build_pivot_shaft) — import it and place it where the
     # hand-authored symbols used to sit (sheet-LEFT of the *Right view is the
     # model +Z end, so the +Z squareness frame takes the left-end spot). Which
-    # VIEW receives each annotation is decided by its DimXpert annotation
-    # plane, and the importer fails loud on any mismatch.
+    # VIEW receives each annotation depends on its attachment (a datum tag
+    # only lands in a view aligned with its face), and the importer fails
+    # loud on any mismatch.
     import_part_pmi(
         adapter,
         (front, right),

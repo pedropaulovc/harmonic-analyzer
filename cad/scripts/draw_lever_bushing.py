@@ -137,8 +137,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # GD&T is model PMI (lever_bushing_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
     # authored by build_lever_bushing) — import it and place it where the
     # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # is decided by its DimXpert annotation plane, and the importer fails
-    # loud on any mismatch.
+    # depends on its attachment (a datum tag only lands in a view aligned
+    # with its face), and the importer fails loud on any mismatch.
     import_part_pmi(
         adapter,
         (front, right),

@@ -212,8 +212,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # GD&T is model PMI (wheel_axle_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
     # authored by build_wheel_axle) — import it and place it where the
     # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # is decided by its DimXpert annotation plane, and the importer fails
-    # loud on any mismatch. Placements track the measured view-centre deltas
+    # depends on its attachment (a datum tag only lands in a view aligned
+    # with its face), and the importer fails loud on any mismatch. Placements track the measured view-centre deltas
     # (fpt/ept), the same corrections the retired edge picks used.
     import_part_pmi(
         adapter,

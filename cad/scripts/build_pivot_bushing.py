@@ -122,7 +122,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as DimXpert PMI; the drawing imports it.
+    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
     author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     apply_drawing_properties(
         adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}

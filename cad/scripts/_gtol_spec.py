@@ -2,16 +2,16 @@
 
 A ``<part>_spec.py`` describes its geometric controls as rows of
 :class:`GeometricControl` / :class:`PartDatum`; the PART build authors them as
-DimXpert model PMI (``_part_pmi.author_part_pmi``) and the DRAWING imports the
-resulting annotations onto the sheet (``_drawing_common.import_part_pmi``)
-instead of typing frozen ``tolerance="..."`` strings per sheet.  Like
-``_fit_limits`` / ``_surface_finish`` this module carries NO COM and imports
-nothing from either tier, so ``check:partiso`` stays clean.
+plain model annotations (``_part_pmi.author_part_pmi``) and the DRAWING
+imports the resulting annotations onto the sheet
+(``_drawing_common.import_part_pmi``) instead of typing frozen
+``tolerance="..."`` strings per sheet.  Like ``_fit_limits`` /
+``_surface_finish`` this module carries NO COM and imports nothing from
+either tier, so ``check:partiso`` stays clean.
 
 ``gtol_frame_xml`` moved here from ``_drawing_common`` (which now re-exports
-it): the SAME current-format frame XML fills a sheet-authored ``IGtol`` and a
-DimXpert-created one (probed 2026-07-28, ``probe_dimxpert_gtol.py`` Q4), and
-the part tier may not import a drawing module.
+it): the same current-format frame XML fills a sheet-authored ``IGtol`` and a
+model-authored one, and the part tier may not import a drawing module.
 """
 
 from __future__ import annotations
@@ -32,22 +32,6 @@ GTOL_SYMBOLS = {
     "straightness": "GTOL-STRAIGHT",
     "total_runout": "GTOL-TRUN",
 }
-
-# characteristic -> swDimXpertGtolType_e MEMBER NAME. The integer values are
-# read off the installed swdimxpert.tlb at author time (`_part_pmi`), never
-# hard-coded here — the offline API bundle does not ship this enum.
-DIMXPERT_GTOL_MEMBERS = {
-    "circular_runout": "CircularRunout",
-    "cylindricity": "Cylindricity",
-    "flatness": "Flatness",
-    "parallelism": "Parallelism",
-    "position": "Position",
-    "profile_surface": "SurfaceProfile",
-    "perpendicularity": "Perpendicularity",
-    "straightness": "Straightness",
-    "total_runout": "TotalRunout",
-}
-
 
 def gtol_frame_xml(
     characteristic: str,
@@ -102,25 +86,15 @@ FaceSpec = Union[CylinderFace, PlanarFace]
 
 @dataclass(frozen=True)
 class PartDatum:
-    """A DimXpert datum authored on the model.
-
-    ``letter`` is ASSERTED, not chosen: DimXpert auto-assigns identifiers in
-    insertion order, so author datums in alphabetical order and the helper
-    fails loud if the read-back identifier differs.
-    """
+    """A datum feature symbol authored on the model (``InsertDatumTag2``)."""
 
     letter: str
     face: FaceSpec
-    # DimXpert offsets the tag from the face by this much; 60 mm (the old
-    # default) threw the tag far off the model and poisoned every auto-arrange
-    # pass (zoom-to-fit, sheet import placement). ~8 mm matches a hand-placed
-    # tag.
-    leader_length_m: float = 0.008
 
 
 @dataclass(frozen=True)
 class GeometricControl:
-    """One feature-control frame authored on the model as DimXpert PMI."""
+    """One feature-control frame authored on the model (``InsertGtol``)."""
 
     key: str
     characteristic: str
@@ -133,10 +107,6 @@ class GeometricControl:
         if self.characteristic not in GTOL_SYMBOLS:
             raise ValueError(
                 f"{self.key}: unsupported characteristic {self.characteristic!r}"
-            )
-        if self.characteristic not in DIMXPERT_GTOL_MEMBERS:
-            raise ValueError(
-                f"{self.key}: no DimXpert gtol type for {self.characteristic!r}"
             )
 
     @property

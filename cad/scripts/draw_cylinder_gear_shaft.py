@@ -186,9 +186,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # GEOMETRIC_CONTROLS, authored by build_cylinder_gear_shaft) — import it
     # and place it where the hand-authored symbols used to sit (the profile
     # view is rotated -pi/2, so sheet-LEFT is model y=0 and the y0 squareness
-    # frame takes the left-end spot). Which VIEW receives each annotation is
-    # decided by its DimXpert annotation plane, and the importer fails loud on
-    # any mismatch.
+    # frame takes the left-end spot). Which VIEW receives each annotation
+    # depends on its attachment (a datum tag only lands in a view aligned
+    # with its face), and the importer fails loud on any mismatch.
     import_part_pmi(
         adapter,
         (end, profile),

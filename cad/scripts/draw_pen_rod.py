@@ -179,9 +179,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # GD&T is model PMI (pen_rod_spec.PART_DATUMS/GEOMETRIC_CONTROLS, authored
     # by build_pen_rod) — import it and place it where the hand-authored
-    # symbols used to sit. All three annotations land in the single front view
-    # (their DimXpert annotation planes all match it), and the importer fails
-    # loud on any mismatch. The squareness frame stays BELOW the rod: up-right
+    # symbols used to sit. All three annotations land in the single front view,
+    # and the importer fails loud on any mismatch. The squareness frame stays BELOW the rod: up-right
     # of its target its leader crossed the Ra's leader in an X at the rod's
     # bottom corner; from below the two run on opposite sides of that corner.
     import_part_pmi(

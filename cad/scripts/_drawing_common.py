@@ -597,6 +597,10 @@ def add_feature_control_frame(
     return gtol
 
 
+_INSERT_DATUMS = 0x2  # swInsertAnnotation_e.swInsertDatums
+_INSERT_GTOLS = 0x20  # swInsertAnnotation_e.swInsertGTols
+
+
 @_telemetry.traced("drawing.import_part_pmi", label_param="label")
 def import_part_pmi(
     adapter: Any,
@@ -607,37 +611,32 @@ def import_part_pmi(
     controls: Sequence[Any],
     label: str,
 ) -> dict[str, Any]:
-    """Import the source part's DimXpert PMI into ``view`` and place it.
+    """Import the source part's model GD&T annotations and place them.
 
-    The part authored its GD&T as model PMI (``_part_pmi.author_part_pmi``
-    from the spec's ``PartDatum`` / ``GeometricControl`` rows); this pulls it
-    onto the sheet with ``IView::ImportAnnotations(IncludeDimXpertAnnotations
-    =True)`` — the ONLY import API that reaches PMI (no swInsertAnnotation_e
-    member covers it) — then moves each imported annotation to the sheet
-    coordinates the recipe assigns.  Matching is by CONTENT, never arrival
-    order: a datum tag by its letter, a frame by its symbol + tolerance read
-    back from the frame XML.  Every expected annotation must land and every
-    imported annotation must be expected — a shortfall (an annotation whose DimXpert
-    annotation plane matches none of the given views) fails loud rather than shipping a sheet silently missing a control.
+    The part authored its GD&T as plain model annotations
+    (``_part_pmi.author_part_pmi`` from the spec's ``PartDatum`` /
+    ``GeometricControl`` rows); this pulls them onto the sheet with
+    ``IDrawingDoc::InsertModelAnnotations3`` and moves each to the sheet
+    coordinates the recipe assigns — ``IAnnotation::SetPosition2`` persists
+    exactly for plain gtols (unlike DimXpert PMI, whose display positions
+    were UI-drag-only; see ``memory/dimxpert-pmi-placement.md``).
+
+    ``views`` is one view or a sequence tried IN ORDER: each import call
+    selects one view and requests only the annotation TYPES still missing
+    (SolidWorks re-inserts an already-imported gtol into every further view
+    it is asked about, so re-requesting a satisfied type would duplicate it).
+    A datum tag only imports into a view aligned with its attachment — for
+    the turned parts that is the axis (end) view — so recipes list the views
+    that together can host everything.  Matching is by CONTENT, never
+    arrival order: a datum tag by its letter, a frame by its symbol +
+    tolerance read back from the frame XML.  Every expected annotation must
+    land and every imported annotation must be expected — any shortfall
+    fails loud rather than shipping a sheet silently missing a control.
 
     ``controls`` is the spec's ``GeometricControl`` sequence (typed loosely to
     keep the import graph acyclic).  Returns the placed annotations by key.
     """
     from _gtol_spec import GTOL_SYMBOLS
-
-    # Accept one view or a sequence: SolidWorks routes each PMI annotation to
-    # the view whose orientation matches its DimXpert annotation plane, so a
-    # sheet importing into several views gathers the union and matches it
-    # globally — the placements are SHEET coordinates, not view-local.
-    views = views if isinstance(views, (list, tuple)) else (views,)
-    imported = []
-    for view in views:
-        view = _early_bound(view, "IView")
-        view.ImportAnnotations(False, False, True, False, False)
-        for annotation in view.GetAnnotations() or ():
-            annotation = _early_bound(annotation, "IAnnotation")
-            if bool(annotation.IsDimXpert()):
-                imported.append(annotation)
 
     controls_by_key = {control.key: control for control in controls}
     if set(controls_by_key) != set(control_positions):
@@ -646,74 +645,101 @@ def import_part_pmi(
             f"spec controls {sorted(controls_by_key)}"
         )
 
-    placed: dict[str, Any] = {}
-    unmatched: list[str] = []
-    for annotation in imported:
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    views = views if isinstance(views, (list, tuple)) else (views,)
+
+    def _match(annotation: Any) -> tuple[str, tuple[float, float]] | None:
         annotation_type = int(annotation.GetType())
         specific = annotation.GetSpecificAnnotation()
-        key = None
-        if annotation_type == _ANNOT_DATUM and specific is not None:
-            tag = _early_bound(specific, "IDatumTag")
-            letter = str(tag.GetLabel() or "")
+        if specific is None:
+            return None
+        if annotation_type == _ANNOT_DATUM:
+            letter = str(_early_bound(specific, "IDatumTag").GetLabel() or "")
             if letter in datum_positions:
-                key = f"datum:{letter}"
-                target = datum_positions[letter]
-        elif annotation_type == _ANNOT_GTOL and specific is not None:
-            gtol = _early_bound(specific, "IGtol")
-            frame = gtol.GetFrame(1)
-            xml = str(_early_bound(frame, "IGtolFrame").GetSymbolXml() or "") if frame else ""
+                return (f"datum:{letter}", datum_positions[letter])
+        elif annotation_type == _ANNOT_GTOL:
+            frame = _early_bound(specific, "IGtol").GetFrame(1)
+            xml = (
+                str(_early_bound(frame, "IGtolFrame").GetSymbolXml() or "")
+                if frame
+                else ""
+            )
             for control in controls_by_key.values():
                 if (
-                    f"<ToleranceSymbol>{GTOL_SYMBOLS[control.characteristic]}<" in xml
+                    f"<ToleranceSymbol>{GTOL_SYMBOLS[control.characteristic]}<"
+                    in xml
                     and control.tolerance in xml
                     and control.key not in placed
                 ):
-                    key = control.key
-                    target = control_positions[control.key]
-                    break
-        if key is None:
-            unmatched.append(
-                f"type={annotation_type} name={annotation.GetName()!r}"
+                    return (control.key, control_positions[control.key])
+        return None
+
+    placed: dict[str, Any] = {}
+    targets: dict[str, tuple[float, float]] = {}
+    unmatched: list[str] = []
+    for view in views:
+        want_datums = set(datum_positions) - {
+            key.removeprefix("datum:") for key in placed if key.startswith("datum:")
+        }
+        want_controls = set(controls_by_key) - set(placed)
+        mask = (_INSERT_DATUMS if want_datums else 0) | (
+            _INSERT_GTOLS if want_controls else 0
+        )
+        if mask == 0:
+            break
+        view = _early_bound(view, "IView")
+        draw.ClearSelection2(True)
+        if not draw.Extension.SelectByID2(
+            str(view.GetName2()), "DRAWINGVIEW", 0, 0, 0, False, 0, None, 0
+        ):
+            raise RuntimeError(
+                f"{label}: failed to select view {view.GetName2()!r} for import"
             )
-            continue
-        # Imported PMI ignores IAnnotation::SetPosition2 — it returns True with
-        # the position unchanged — and any rebuild re-runs DimXpert's
-        # auto-arrange over every setter.  IGtol::SetPosition DOES take on a
-        # gtol frame provided no rebuild runs afterwards (finalize_drawing
-        # deliberately never rebuilds before save), so use it and verify by
-        # READBACK, never the returned bool.
-        if annotation_type == _ANNOT_GTOL:
-            gtol.SetPosition(target[0], target[1], 0.0)
-        else:
-            annotation.SetPosition2(target[0], target[1], 0.0)
+        inserted = ddoc.InsertModelAnnotations3(0, mask, False, True, False, False)
+        draw.ClearSelection2(True)
+        for annotation in tuple(inserted or ()):
+            annotation = _early_bound(annotation, "IAnnotation")
+            matched = _match(annotation)
+            if matched is None:
+                unmatched.append(
+                    f"type={annotation.GetType()} name={annotation.GetName()!r} "
+                    f"view={view.GetName2()!r}"
+                )
+                continue
+            key, target = matched
+            placed[key] = annotation
+            targets[key] = target
+
+    for key, annotation in placed.items():
+        target = targets[key]
+        annotation.SetPosition2(target[0], target[1], 0.0)
         after = tuple(annotation.GetPosition() or (0.0, 0.0, 0.0))
         drift = math.hypot(after[0] - target[0], after[1] - target[1])
-        if annotation_type == _ANNOT_GTOL and drift > 0.0005:
+        if int(annotation.GetType()) == _ANNOT_GTOL and drift > 0.0005:
             raise RuntimeError(
                 f"{label}: {key} did not move to {target}: read back "
                 f"{after[:2]} (drift {drift * 1000:.2f} mm)"
             )
-        if annotation_type == _ANNOT_DATUM and drift > 0.002:
-            # Datum tags attached to an edge only slide along it, and no
-            # position API has been observed to move an imported one at all —
-            # record where it actually sits so the render eye-pass judges it.
+        if int(annotation.GetType()) == _ANNOT_DATUM and drift > 0.002:
+            # A datum tag slides along its leader-consistent locus rather than
+            # taking an arbitrary point — record where it actually sits so the
+            # render eye-pass judges it.
             _telemetry.warn(
                 f"{label}: {key} ignored its spec position {target}: read "
                 f"back {after[:2]} (drift {drift * 1000:.1f} mm)"
             )
-        annotation.Color = 0x000000  # override DimXpert teal for print
         _telemetry.event(
             "drawing.pmi_placed", key=key, x=after[0], y=after[1], drift=drift
         )
-        placed[key] = annotation
 
     expected = {f"datum:{letter}" for letter in datum_positions} | set(controls_by_key)
     missing = expected - set(placed)
     if missing or unmatched:
         raise RuntimeError(
             f"{label}: PMI import mismatch — missing {sorted(missing)}, "
-            f"unmatched imports {unmatched} (a missing control usually means "
-            "its DimXpert annotation plane faces away from this view)"
+            f"unmatched imports {unmatched} (a missing datum usually means "
+            "none of the given views is aligned with its attachment face)"
         )
     _telemetry.event("drawing.pmi_imported", count=len(placed))
     return placed

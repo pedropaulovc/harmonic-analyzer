@@ -197,8 +197,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # GD&T is model PMI (cone_gear_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
     # authored by build_cone_gear_shaft) — import it and place it where the
     # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # is decided by its DimXpert annotation plane, and the importer fails
-    # loud on any mismatch. The datum tag keeps its placement derived from
+    # depends on its attachment (a datum tag only lands in a view aligned
+    # with its face), and the importer fails loud on any mismatch. The datum tag keeps its placement derived from
     # the journal's actual small-end station, not a frozen sheet number.
     import_part_pmi(
         adapter,
