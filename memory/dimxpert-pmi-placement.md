@@ -1,6 +1,6 @@
 ---
 name: dimxpert-pmi-placement
-description: "DimXpert PMI display/placement rules (2026-07-29, user-discovered + probe-verified): FCFs on cylindrical faces are only LEGAL in the axis-perpendicular (Top) annotation view; InsertGtol ignores viewport routing (datums honor it) so consolidation must move gtols into the ±Y auto view; COM SetPosition reverts at save in EVERY state, UI drag is the only durable move and a SHEET drag writes back into the part; sheet import projects part-side positions."
+description: "Why the pipeline uses PLAIN model annotations for GD&T, not DimXpert (2026-07-29): DimXpert display positions are UI-drag-only (every COM setter reverts at save; FCFs on cylindrical faces only legal in the axis-perpendicular view; imported frames stack). Plain InsertGtol/InsertDatumTag2: SetPosition2 persists exactly on part AND sheet — but seed frame compartments BEFORE ConvertFormat, and import per view requesting only still-missing types (re-requesting duplicates; datum tags need the axis-aligned view)."
 metadata:
   type: project
 ---
@@ -48,12 +48,23 @@ view at the annotated feature's height (`create_section_view` +
 `model_point_in_view`), import DimXpert annotations into the section view
 only.
 
-**Open half (blocked on unlocked desktop when last tried):** whether a
-SYNTHESIZED drag on the sheet persists + writes back like the manual one —
-`probe_pmi_sheet_drag2.py`. If yes, the pipeline places PMI at part-build
-time via a throwaway section drawing. Synthesized input needs an UNLOCKED
-interactive desktop + foreground (locked desktop ⇒ `GetForegroundWindow()=0`,
-every foreground trick fails) — that fragility is inherent; fail loud.
+**RESOLUTION (2026-07-29): the pipeline uses PLAIN annotations, not
+DimXpert.** `IModelDoc2::InsertGtol` / `::InsertDatumTag2` on the same spec
+faces have NONE of the pathologies: `SetPosition2` persists EXACTLY (0.00 mm)
+through save+reopen on both part and sheet
+(`probe_pmi_plain_annotations.py`). Two plain-gtol gotchas: (1) `InsertGtol`
+creates an OLD-format gtol with no frame API — seed the simple compartments
+(`SetFrameSymbols2`/`SetFrameValues2`) BEFORE `ConvertFormat`; converting an
+empty frame first permanently drops the tolerance display. (2)
+`IDrawingDoc::InsertModelAnnotations3` re-inserts an already-imported gtol
+into every further view it is asked about — import per view requesting only
+the annotation types still missing (gtols land in any view; a datum tag only
+lands in a view aligned with its attachment face, i.e. the axis/end view for
+turned parts). A datum tag's position snaps to its leader-consistent locus
+at SET time — constrained but deterministic. Plain annotations print black
+natively (no PDF-color toggle needed). The synthesized-drag path for
+DimXpert placement was abandoned untested (needs unlocked desktop +
+foreground; `GetForegroundWindow()=0` when locked).
 
 **COM gotchas hit on the way:** `IMathUtility.CreatePoint` with a bare Python
 list MIS-MARSHALS (elements shift one slot; transforms silently wrong) — pass
