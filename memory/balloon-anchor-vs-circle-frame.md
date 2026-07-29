@@ -5,24 +5,27 @@ metadata:
   type: project
 ---
 
-**The defect:** `_spread_balloons` places balloons on a ring around a view. If
-it runs while another view is still to be PLACED on that sheet, placing that
-view re-solves the sheet and the balloons snap back to their creation offset
-from their own attachments — the ring is silently undone, `SetPosition` having
-returned True.
+**The defect (mechanism still OPEN):** on drive-train sheet 4 the
+concealed-BOTTOM ring is not spread on the saved sheet — `SetPosition` returns
+True and the balloons stay at their default creation placement. Cause not yet
+identified; three candidate mechanisms have been refuted (below). This BLOCKS
+`drawing:drive_train_assembly`.
 
-Repro (2026-07-28, drive-train sheet 4): the concealed-BOTTOM ring was spread
-before `concealed_front` was placed. On the saved sheet both its balloons sat
+Repro (2026-07-28, drive-train sheet 4): on the saved sheet both bottom balloons sat
 `(0.0176, 0.0114)` m from their own attachments — **the same delta to 0.1 mm**,
 i.e. the creation offset, not a ring position. Their circles therefore kept the
 attachments' 6.86 mm spacing (measured 6.99 mm) instead of the ring's 15.2 mm,
 and the layout audit failed with a 7.7 × 3.0 mm overlap between items 25 and 6.
 
-The identical-delta signature is the diagnostic: **balloons at a constant offset
-from their own attachments were never re-ringed.** Contrast the grouped rings on
-the same drawing, which are fine — `_add_component_balloons` receives its views
-already placed. The invariant is therefore about ORDER, not about the spread:
-*no ring may be spread while a view is still to be placed on that sheet.*
+Subtracting the recorded anchor offsets, both ANCHORS sit a constant
+`(13.50, 13.44)` mm from their attachment — a 45° default placement. The
+identical-delta signature is the diagnostic: **balloons at a constant offset
+from their own attachments were never re-ringed.**
+
+Contrast the grouped rings on the same drawing, which ARE spread (two of their
+attachments are 0.9 mm apart and the audit passes them) — so whatever loses the
+concealed ring's placement does not affect `_add_component_balloons`. That
+difference is the live lead.
 
 **Two theories measured and REFUTED for this same overlap.** Both were specific,
 plausible, and wrong; neither is worth re-walking:
@@ -35,10 +38,23 @@ plausible, and wrong; neither is worth re-walking:
    corrected build produced byte-identical boxes: a confident no-op. The offsets
    are still recorded on the `drawing.balloon_ring` span event, which is what
    refuted it.
-2. *Ellipse eccentricity.* That `_min_angular_gap`'s use of `min(Rx, Ry)` is
+2. *Spread-before-the-second-view.* That placing `concealed_front` re-solved
+   the sheet and undid the bottom ring, since `_add_component_balloons` gets its
+   views already placed. Moving BOTH concealed spreads after both views exist
+   changed nothing — byte-identical boxes for the third time.
+3. *Ellipse eccentricity.* That `_min_angular_gap`'s use of `min(Rx, Ry)` is
    conservative only for infinitesimal gaps, since an eccentric ellipse doubles
    back at its pointy end. Probed as a pure function to 5:1 — separation holds
    at every ratio.
+
+**Three code changes, byte-identical output every time.** That repetition was
+itself the signal, and it was under-weighted twice: when a change provably
+cannot move the artefact, stop proposing mechanisms for the artefact and go
+measure whether the code path runs at all. The next step is telemetry on the
+ring geometry (centre, radii, gap, and each computed target) plus a read-back of
+the balloon positions immediately after `SetPosition`, to separate "never
+applied" from "applied then reverted" — a distinction none of the evidence so
+far can make.
 
 **Lesson.** An overlap on a ring has three candidate causes and they are
 cheaply distinguishable from the recorded data before touching COM: crowding

@@ -1362,6 +1362,14 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, (concealed_bottom,), stem=stem, expected_item=item
         )
         bottom_balloons.append(note)
+    _spread_balloons(
+        adapter,
+        concealed_bottom,
+        bottom_balloons,
+        margin=CONCEALED_BOTTOM_BALLOON_RING_MARGIN,
+        clearance=CONCEALED_BALLOON_CLEARANCE,
+    )
+
     concealed_front = place_view(
         adapter,
         str(SOURCE),
@@ -1383,23 +1391,6 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, (concealed_front,), stem=stem, expected_item=item
         )
         front_balloons.append(note)
-    # Spread BOTH concealed rings only once BOTH views exist. Spreading the
-    # bottom ring before `concealed_front` was placed left it un-spread on the
-    # saved sheet: placing a view (and isolating its components) re-solves the
-    # sheet, and the balloons snapped back to their creation offset from their
-    # own attachments. MEASURED on the failing build -- both bottom balloons sat
-    # (0.0176, 0.0114) m from their attachments, the same delta to 0.1 mm, so
-    # their circles kept their attachments' 6.86 mm spacing instead of taking
-    # the ring's, and the layout audit failed with a 7.7 x 3.0 mm overlap.
-    # The grouped rings never showed this because their views are all placed up
-    # front, before any balloon is created.
-    _spread_balloons(
-        adapter,
-        concealed_bottom,
-        bottom_balloons,
-        margin=CONCEALED_BOTTOM_BALLOON_RING_MARGIN,
-        clearance=CONCEALED_BALLOON_CLEARANCE,
-    )
     _spread_balloons(
         adapter,
         concealed_front,
