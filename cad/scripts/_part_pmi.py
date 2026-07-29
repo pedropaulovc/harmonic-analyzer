@@ -249,9 +249,78 @@ def author_part_pmi(
                 tolerance=control.tolerance,
             )
         model.ClearSelection2(True)
+        _consolidate_pmi_annotation_views(model)
         _telemetry.success(
             f"part PMI authored: {len(datums)} datums, {len(controls)} controls"
         )
+
+
+_ANNOT_GTOL = 5  # swAnnotationType_e.swGTol
+
+
+def _consolidate_pmi_annotation_views(model: Any) -> None:
+    """Move every DimXpert annotation into the annotation view the gtols use.
+
+    DimXpert picks an annotation plane per feature: a datum tag on a cylinder
+    routinely lands in its OWN annotation view whose orientation matches no
+    standard drawing orientation, and ``IView::ImportAnnotations`` then never
+    carries it to any sheet view (measured 2026-07-28 on transgear-stub: the
+    datum imported into none of the seven standard orientations while its two
+    gtols imported into *Front).  Consolidating into the gtol view makes the
+    whole PMI set import into one drawing view, which is what
+    ``import_part_pmi`` sweeps for.
+    """
+    ext = _read_member(model, "Extension")
+    populated: list[tuple[Any, list[Any]]] = []
+    for raw in tuple(ext.AnnotationViews or ()):
+        view = _early_bound(raw, "IAnnotationView")
+        if bool(view.UnassignedView):
+            continue
+        items = list(view.GetAnnotations2(True, True) or ())
+        if items:
+            populated.append((view, items))
+    if len(populated) <= 1:
+        return
+    target = None
+    for view, items in populated:
+        for item in items:
+            if int(_early_bound(item, "IAnnotation").GetType()) == _ANNOT_GTOL:
+                target = view
+                break
+        if target is not None:
+            break
+    if target is None:
+        target = max(populated, key=lambda entry: len(entry[1]))[0]
+    strays = [
+        item for view, items in populated if view is not target for item in items
+    ]
+    # Same VT_ARRAY trap as FeatureSelectorOptions (_long_array): a bare list
+    # marshals as VT_ARRAY|VT_VARIANT and MoveAnnotations rejects it with
+    # "Memory is locked"; type the dispatch array explicitly.
+    import pythoncom
+    from win32com.client import VARIANT
+
+    stray_array = VARIANT(
+        pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH,
+        [getattr(item, "_oleobj_", item) for item in strays],
+    )
+    if not _early_bound(target, "IAnnotationView").MoveAnnotations(stray_array):
+        raise RuntimeError(
+            f"MoveAnnotations refused to consolidate {len(strays)} DimXpert "
+            "annotations into the gtol annotation view"
+        )
+    remaining = [
+        view
+        for raw in tuple(ext.AnnotationViews or ())
+        if not (view := _early_bound(raw, "IAnnotationView")).UnassignedView
+        and tuple(view.GetAnnotations2(True, True) or ())
+    ]
+    if len(remaining) != 1:
+        raise RuntimeError(
+            "annotation-view consolidation did not persist: "
+            f"{len(remaining)} populated views remain"
+        )
+    _telemetry.event("pmi.views_consolidated", moved=len(strays))
 
 
 def _last_datum_identifier(dim_part: Any) -> str:
