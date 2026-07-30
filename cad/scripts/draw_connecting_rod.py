@@ -19,6 +19,8 @@ import argparse
 import sys
 from typing import Any
 
+from connecting_rod_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -242,7 +244,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=pin_fcf_rim,
         frame_xy=(0.222, 0.222),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["rocker pin hole position"],
         datums=("A", "B"),
         diameter=True,
         label="rocker pin hole position",

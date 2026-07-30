@@ -21,6 +21,8 @@ import argparse
 import sys
 from typing import Any
 
+from crankshaft_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -374,7 +376,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         frame_xy=(0.185, 0.235),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["end-face perpendicularity"],
         datums=("A",),
         quantity="2X END FACES",
         label="end-face perpendicularity",
@@ -408,7 +410,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         frame_xy=(0.100, 0.055),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cross-hole true position"],
         datums=("A", "B"),
         diameter=True,
         label="cross-hole true position",

@@ -52,9 +52,7 @@ DIMPLE_DEPTH = 0.5  # fiducial indentation (low)
 DIMPLE_X = 30.0  # on the arm near the boss (low)
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "shaft_bore", MACHINED_UM, CylinderFace(SHAFT_BORE_DIA)
-    ),
+    SurfaceFinishControl("shaft_bore", MACHINED_UM, CylinderFace(SHAFT_BORE_DIA)),
 )
 
 # Derived spans (equations of the primitives above).
@@ -87,3 +85,11 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "cross-hole true position": "0.20",
+    "handle pivot position": "0.20",
+    "crank broad-face parallelism": "0.10",
+}

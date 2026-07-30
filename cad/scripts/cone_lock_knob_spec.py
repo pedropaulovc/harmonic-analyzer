@@ -59,3 +59,10 @@ DRAWING_NOTES = "\n".join(
         "  DIMENSIONS APPLY BEFORE PLATING.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "washer flange runout": "0.10",
+    "clamp seat perpendicularity": "0.05",
+}

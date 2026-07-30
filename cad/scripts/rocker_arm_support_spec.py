@@ -34,3 +34,10 @@ SUPPORT_HOLD_DOWN_XZ = (
         SUPPORT_WORLD_Z - HOLD_DOWN_LOCAL_HALF_X,
     ),
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "support mounting-seat flatness": "0.10",
+    "support hole-pattern position": "0.40",
+}

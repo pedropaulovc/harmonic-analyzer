@@ -78,3 +78,10 @@ HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92
 # ``build_summing_assembly`` / ``build_knife_mount`` import this module, so
 # drawing-only data here would put every notes edit in their rebuild
 # closures (codex #354).
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "summation anchor position": "0.30",
+    "spring-hole pattern position": "0.30",
+}

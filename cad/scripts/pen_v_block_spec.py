@@ -87,3 +87,10 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "pen bore position": "0.20",
+    "block top-face parallelism": "0.10",
+}

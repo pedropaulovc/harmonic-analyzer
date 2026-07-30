@@ -51,7 +51,9 @@ _RAD_X = TOP_END_X / R_TOP
 ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
 
 # Rod-pin hole Y (low in the strap, ch14 fan photo).
-ROD_HOLE_Y = (CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_HOLE_X * ROD_HOLE_X)) + ROD_HOLE_ABOVE_BOTTOM
+ROD_HOLE_Y = (
+    CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_HOLE_X * ROD_HOLE_X)
+) + ROD_HOLE_ABOVE_BOTTOM
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -68,3 +70,9 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # rocker_arm_notes.py -- see connecting_rod_notes for the rationale.
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "rod-pin hole position": "0.20",
+}

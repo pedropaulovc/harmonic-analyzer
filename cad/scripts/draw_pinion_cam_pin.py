@@ -17,6 +17,8 @@ import math
 import sys
 from typing import Any
 
+from pinion_cam_pin_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -186,7 +188,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=seated_flat_face,
         frame_xy=(0.220, 0.210),
         characteristic="flatness",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cam-pin seated-end flatness"],
         quantity="SEATED END",
         label="cam-pin seated-end flatness",
         entity_type="SILHOUETTE",
@@ -209,7 +211,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=outer_crown_face,
         frame_xy=(0.245, 0.235),
         characteristic="profile_surface",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion cam-pin crown profile"],
         datums=(),
         quantity="OUTER CROWN",
         label="pinion cam-pin crown profile",

@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_lift_rod_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -184,7 +186,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(RIGHT_CENTER[0] - 0.045, ROD_FLANK_Y),
         frame_xy=(RIGHT_CENTER[0] - 0.045, 0.236),
         characteristic="cylindricity",
-        tolerance="0.01",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lift rod bearing cylindricity"],
         label="lift rod bearing cylindricity",
         entity_type="SILHOUETTE",
     )
@@ -198,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=flat_end,
         frame_xy=(flat_end[0] + 0.018, 0.228),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["front end perpendicularity"],
         datums=("A",),
         label="front end perpendicularity",
     )

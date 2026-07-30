@@ -1287,6 +1287,7 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_drawing_specification_purity.py",
         "test_drawing_surface_finish_validation.py",
         "test_gtol_spec.py",
+        "test_part_owned_geometric_tolerances.py",
         "test_probe_surface_finish_pmi_telemetry.py",
         "test_surface_finish.py",
         "test_surface_finish_ownership_a.py",

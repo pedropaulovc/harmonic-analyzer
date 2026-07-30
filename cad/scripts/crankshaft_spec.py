@@ -70,3 +70,10 @@ DRAWING_NOTES = "\n".join(
 )
 END_VIEW_NOTE = "CRANK-END VIEW SCALE 2:1"
 CRANK_END_NOTE = "CRANK / OUTBOARD END = LOWER END OF LENGTH VIEW"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "end-face perpendicularity": "0.05",
+    "cross-hole true position": "0.20",
+}

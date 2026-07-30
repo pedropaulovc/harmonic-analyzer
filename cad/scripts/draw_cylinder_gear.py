@@ -14,6 +14,8 @@ import math
 import sys
 from typing import Any
 
+from cylinder_gear_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -83,9 +85,12 @@ def _largest_visible_planar_face(adapter: Any, view: Any) -> Any:
     candidates: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        faces = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 3), default=()
-        ) or ()
+        faces = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 3), default=()
+            )
+            or ()
+        )
         for face in faces:
             face = _early_bound(face, "IFace2")
             surface = _early_bound(face.GetSurface(), "ISurface")
@@ -184,7 +189,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.175, RIGHT_CENTER[1] + half_od + 0.010),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["gear face squareness to bore"],
         datums=("A",),
         label="gear face squareness to bore",
         entity_type="FACE",

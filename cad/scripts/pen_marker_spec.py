@@ -29,3 +29,9 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "marker tip runout": "0.10",
+}

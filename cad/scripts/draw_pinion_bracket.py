@@ -19,6 +19,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_bracket_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -251,7 +253,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(_front_x(0.0), _front_y(-R_END)),
         frame_xy=(0.048, 0.082),
         characteristic="profile_surface",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lower end-arc profile"],
         datums=("A",),
         quantity=f"LOWER R{R_END:.2f} ARC",
         label="lower end-arc profile",
@@ -262,7 +264,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(_front_x(0.0), _front_y(C2C + R_END)),
         frame_xy=(0.060, 0.224),
         characteristic="profile_surface",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["upper end-arc profile"],
         datums=("B",),
         quantity=f"UPPER R{R_END:.2f} ARC",
         label="upper end-arc profile",

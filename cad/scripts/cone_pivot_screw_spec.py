@@ -56,7 +56,9 @@ if THREAD_TAIL_LEN < THREAD_MAJOR_DIA:
 if THREAD_MAJOR_DIA >= SHOULDER_DIA:
     raise ValueError("cone pivot thread must leave a positive annular shoulder seat")
 if THREAD_SOLID_DIA >= THREAD_MAJOR_DIA:
-    raise ValueError("cone pivot solid thread envelope must remain below major diameter")
+    raise ValueError(
+        "cone pivot solid thread envelope must remain below major diameter"
+    )
 if (
     THREAD_TAIL_LEN
     - THREAD_LENGTH_TOL
@@ -93,3 +95,13 @@ END_VIEW_NOTE = (
     f"THREAD-END VIEW: INNER CIRCLE = {THREAD} EXTERNAL THREAD\n"
     "MIDDLE CIRCLE = GROUND SHOULDER OD"
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "head bearing face perpendicularity": "0.05",
+    "shoulder end perpendicularity": "0.05",
+    "slot median-plane position": "0.10",
+    "shoulder total runout": "0.05",
+    "head total runout": "0.05",
+}

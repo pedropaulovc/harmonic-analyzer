@@ -73,3 +73,13 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "lever hub OD runout": "0.05",
+    "lever flat-face perpendicularity": "0.05",
+    "lever crown profile": "0.05",
+    "grip tip face flatness": "0.05",
+    "grip tip face perpendicularity": "0.10",
+}

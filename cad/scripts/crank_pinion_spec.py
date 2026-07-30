@@ -25,22 +25,27 @@ OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
 
-BORE_DIA = 0.375 * MM_PER_IN       # 9.525 (3/8" crankshaft)
+BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" crankshaft)
 BORE_DIA_BAND = (0.050, 0.030)  # (upper, lower) deviations
 FACE_WIDTH = 10.8
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "crank_pinion_bore", MACHINED_UM, CylinderFace(BORE_DIA)
-    ),
+    SurfaceFinishControl("crank_pinion_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
 NORMAL_MODULE_MM = MODULE_MM
 NORMAL_PRESSURE_ANGLE_DEG = PRESSURE_ANGLE_DEG
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 BASE_TANGENT_SPAN_TEETH = 2
-BASE_TANGENT_SPAN = MODULE_MM * math.cos(math.radians(PRESSURE_ANGLE_DEG)) * (
-    math.pi * (BASE_TANGENT_SPAN_TEETH - 0.5)
-    + TEETH * (math.tan(math.radians(PRESSURE_ANGLE_DEG))
-               - math.radians(PRESSURE_ANGLE_DEG))
+BASE_TANGENT_SPAN = (
+    MODULE_MM
+    * math.cos(math.radians(PRESSURE_ANGLE_DEG))
+    * (
+        math.pi * (BASE_TANGENT_SPAN_TEETH - 0.5)
+        + TEETH
+        * (
+            math.tan(math.radians(PRESSURE_ANGLE_DEG))
+            - math.radians(PRESSURE_ANGLE_DEG)
+        )
+    )
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -71,9 +76,14 @@ GEAR_DATA = gear_data_note(
         ("PROFILE SHIFT COEFFICIENT (BASIC)", "x = 0.000"),
         ("ACTIVE FLANK DEFINITION", "ANALYTIC INVOLUTE, BASE CIRCLE TO OD"),
         ("PROFILE / LEAD MODIFICATION", "NONE; THICKNESS PER CONTROLLED SPAN"),
-        ("BASE-TANGENT SPAN, EVERY 2 TEETH (mm)",
-         f"{BASE_TANGENT_SPAN:.3f} +0.000/-0.020"),
-        ("TOOTH-FLANK ACCURACY", "ISO 1328-1:2013 GRADE 10; PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK"),
+        (
+            "BASE-TANGENT SPAN, EVERY 2 TEETH (mm)",
+            f"{BASE_TANGENT_SPAN:.3f} +0.000/-0.020",
+        ),
+        (
+            "TOOTH-FLANK ACCURACY",
+            "ISO 1328-1:2013 GRADE 10; PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK",
+        ),
         ("PAIR GEOMETRY", "CUSTOM NONCONJUGATE"),
         ("PAIR SHAFT ANGLE", "12.52 +/-0.10 DEG"),
         ("MID-FACE TRANSVERSE C2C (mm)", "39.735 +/-0.050"),
@@ -109,3 +119,10 @@ DRAWING_NOTES = "\n".join(
         "CORRECTED MAGNITUDE 0.10 N*m MAX; PEAK-TO-PEAK 0.05 N*m MAX; NO FILTERING.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "pinion end-face squareness to bore": "0.05",
+    "pinion tooth-tip circular runout": "0.05",
+}

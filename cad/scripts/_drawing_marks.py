@@ -91,6 +91,7 @@ def _tolerance_precision_mm(*deviations_mm: float) -> int:
     )
 
 
+@_telemetry.traced("dim.tolerance_precision", label_param="label")
 def _set_tolerance_precision(
     display: Any, deviations_mm: tuple[float, ...], *, label: str
 ) -> int:
@@ -283,7 +284,9 @@ async def add_diametric_linear_dimension(
     )
     model.ClearSelection2(True)
     if display is None:
-        raise RuntimeError(f"{label}: AddSpecificDimension(diametric) failed ({status})")
+        raise RuntimeError(
+            f"{label}: AddSpecificDimension(diametric) failed ({status})"
+        )
     display = _early_bound(display, "IDisplayDimension")
     if not bool(_read_member(display, "Diametric")):
         raise RuntimeError(f"{label}: new dimension is not diametric")
@@ -333,7 +336,10 @@ async def add_angular_reference_dimension(
     actual_rad = abs(float(_read_member(dimension, "SystemValue")))
     if abs(actual_rad - expected_rad) > 1e-8:
         supplement_rad = abs(math.pi - actual_rad)
-        if abs(supplement_rad - expected_rad) > 1e-8 or not display.SupplementaryAngle():
+        if (
+            abs(supplement_rad - expected_rad) > 1e-8
+            or not display.SupplementaryAngle()
+        ):
             raise RuntimeError(
                 f"{label}: angular dimension measured {math.degrees(actual_rad):.6f} "
                 f"deg, expected {expected_degrees:.6f} deg"

@@ -94,3 +94,16 @@ DRAWING_NOTES = "\n".join(
         "HOLE, FOOT SEAT A, LEFT SIDE B, AND PROFILE-CONTROLLED SURFACES.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "datum-A seat flatness": "0.05",
+    "datum-B side perpendicularity": "0.05",
+    "arbor bore true position": "0.10",
+    "controlled exterior surface profile": "0.10",
+    "datum-D face perpendicularity": "0.05",
+    "flange-hole true position": "0.20",
+    "strap near-face profile": "0.10",
+    "coplanar far-face profile": "0.10",
+}

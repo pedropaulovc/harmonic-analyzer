@@ -11,6 +11,8 @@ import argparse
 import sys
 from typing import Any
 
+from crank_drive_gear_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -147,7 +149,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["gear end-face squareness to bore"],
         datums=("A",),
         quantity="2X AXIAL END FACES",
         label="gear end-face squareness to bore",
@@ -158,7 +160,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=tooth_tip_silhouette,
         frame_xy=(0.270, 0.260),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["gear tooth-tip circular runout"],
         datums=("A",),
         quantity="TOOTH TIPS",
         label="gear tooth-tip circular runout",
@@ -177,9 +179,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
 
-    add_property_linked_note(
-        adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025
-    )
+    add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.018, 0.102, char_height=0.0025
     )

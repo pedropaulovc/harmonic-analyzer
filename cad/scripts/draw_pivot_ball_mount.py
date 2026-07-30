@@ -7,6 +7,8 @@ import math
 import sys
 from typing import Any
 
+from pivot_ball_mount_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -90,6 +92,8 @@ TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "THRU",
 }
+
+
 def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
     """Return real seat and cross-bore edges from the front view."""
     circles: list[tuple[float, float, Any]] = []
@@ -263,7 +267,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=STEM_DIM_TEXT,
         frame_xy=(0.180, _front_y(12.0) - 0.014),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["datum-B axis perpendicularity"],
         datums=("A",),
         diameter=True,
         label="datum-B axis perpendicularity",
@@ -284,7 +288,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # left-side bore leader necessarily intersects that diagonal.
         frame_xy=(0.205, 0.165),
         characteristic="position",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cross-bore true position"],
         datums=("A", "B"),
         diameter=True,
         label="cross-bore true position",
@@ -296,7 +300,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=ball_outline,
         frame_xy=(0.255, 0.202),
         characteristic="profile_surface",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["sphere profile and center location"],
         datums=("A", "B"),
         quantity="SPHERE",
         label="sphere profile and center location",
@@ -308,7 +312,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0] + BASE_DIA / 2.0 * _S, _front_y(BASE_H / 2.0)),
         frame_xy=(0.255, _front_y(BASE_H / 2.0)),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pad-to-stem runout"],
         datums=("B",),
         quantity="PAD OD",
         label="pad-to-stem runout",
@@ -327,9 +331,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=ball_outline,
         symbol_xy=(0.286, 0.178),
-        control=surface_finish_by_key(
-            SURFACE_FINISHES, "turned_exterior_before_plate"
-        ),
+        control=surface_finish_by_key(SURFACE_FINISHES, "turned_exterior_before_plate"),
         label="turned exterior finish before plate",
         entity_type="SILHOUETTE",
     )

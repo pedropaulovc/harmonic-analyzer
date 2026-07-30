@@ -15,6 +15,8 @@ import math
 import sys
 from typing import Any
 
+from pen_marker_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -103,7 +105,9 @@ def _add_picked_dimension(
     apex is a VERTEX, so the overall length needs a mixed-type pick.
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
@@ -140,7 +144,9 @@ def _display_as_diameter(adapter: Any, dimension: Any, *, label: str) -> None:
 def _add_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
     """Insert the turned-part axis centerline between the barrel silhouettes."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
@@ -272,7 +278,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=CONE_FLANK,
         frame_xy=(APEX[0] - 0.032, FRONT_CENTER[1] + 0.032),
         characteristic="circular_runout",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["marker tip runout"],
         datums=("A",),
         label="marker tip runout",
         entity_type="SILHOUETTE",

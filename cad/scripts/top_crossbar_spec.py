@@ -35,10 +35,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "1. GRAY-IRON CASTING; AS-CAST SURFACES +/-0.8.",
-        "2. MAY BE MACHINED FROM SOLID ASTM A48 CLASS 30 BAR; "
-        "NO DRAFT MODELLED.",
+        "2. MAY BE MACHINED FROM SOLID ASTM A48 CLASS 30 BAR; NO DRAFT MODELLED.",
         "3. STUD HOLE FOR 5/16 STUD, CLOSE FIT.",
     )
 )
 TOP_VIEW_NOTE = "TOP VIEW SCALE 1:2"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "crossbar stud-hole position": "0.20",
+    "crossbar reference-end squareness": "0.10",
+    "crossbar end-seat parallelism": "0.10",
+}

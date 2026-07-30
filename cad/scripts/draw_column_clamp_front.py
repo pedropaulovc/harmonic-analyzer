@@ -22,6 +22,8 @@ import argparse
 import sys
 from typing import Any
 
+from column_clamp_front_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -234,7 +236,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         frame_xy=(0.297, 0.108),
         characteristic="position",
-        tolerance="0.25",
+        tolerance=GEOMETRIC_TOLERANCES_MM["ear-hole position"],
         datums=("A", "B"),
         diameter=True,
         quantity="2X",
@@ -246,7 +248,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(_plan_x(0.0), FRONT_CENTER[1]),
         frame_xy=(0.040, 0.096),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["mating-face parallelism"],
         datums=("A",),
         label="mating-face parallelism",
     )

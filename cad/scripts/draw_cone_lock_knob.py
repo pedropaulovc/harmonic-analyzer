@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from cone_lock_knob_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -141,19 +143,14 @@ def _outline_center(adapter: Any, view: Any) -> tuple[float, float]:
     so its midpoint IS the geometry center; measuring it and shifting every
     pick keeps the recipe correct whatever the placement anchored.
     """
-    x0, y0, x1, y1 = (
-        float(v) for v in adapter._get_attr_or_call(view, "GetOutline")
-    )
+    x0, y0, x1, y1 = (float(v) for v in adapter._get_attr_or_call(view, "GetOutline"))
     return ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
 
 
 def _shifted(
     positions: dict[str, tuple[float, float]], delta: tuple[float, float]
 ) -> dict[str, tuple[float, float]]:
-    return {
-        name: (x + delta[0], y + delta[1])
-        for name, (x, y) in positions.items()
-    }
+    return {name: (x + delta[0], y + delta[1]) for name, (x, y) in positions.items()}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -240,7 +237,7 @@ async def build(adapter: Any) -> dict[str, str]:
     seat_half_x = (STUD_DIA / 2.0 + WASHER_DIA / 2.0) / 2.0 * _S
     seat_right = (FRONT_CENTER[0] + fdx + seat_half_x, seat_y)
     crown_flat = (FRONT_CENTER[0] + fdx, _front_y(BODY_TOP) + fdy)
-    _diag = 2.0 ** -0.5
+    _diag = 2.0**-0.5
     body_circle = (
         TOP_CENTER[0] + tdx + BODY_DIA * _S / 2.0 * _diag,
         TOP_CENTER[1] + tdy + BODY_DIA * _S / 2.0 * _diag,
@@ -287,7 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=washer_circle,
         frame_xy=(0.140, 0.238),
         characteristic="circular_runout",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["washer flange runout"],
         datums=("A",),
         label="washer flange runout",
     )
@@ -297,7 +294,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=seat_right,
         frame_xy=(seat_right[0] + 0.026, seat_y - 0.020),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["clamp seat perpendicularity"],
         datums=("A",),
         label="clamp seat perpendicularity",
     )

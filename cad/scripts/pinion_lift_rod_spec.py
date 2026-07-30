@@ -32,3 +32,10 @@ DRAWING_NOTES = "\n".join(
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "lift rod bearing cylindricity": "0.01",
+    "front end perpendicularity": "0.05",
+}

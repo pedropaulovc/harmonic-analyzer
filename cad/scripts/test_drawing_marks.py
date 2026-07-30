@@ -36,9 +36,7 @@ class _Feature:
         self._displays = displays or []
         self._children = children or []
         self._next_subfeature: _Feature | None = None
-        for current, following in zip(
-            self._children, self._children[1:], strict=False
-        ):
+        for current, following in zip(self._children, self._children[1:], strict=False):
             current._next_subfeature = following
 
     def GetFirstDisplayDimension(self) -> _Display | None:
@@ -83,9 +81,7 @@ def test_rejects_ambiguous_dimension_names_below_one_feature(
     monkeypatch.setattr(_drawing_marks, "_feature_by_name", lambda *_args: feature)
 
     with pytest.raises(RuntimeError, match="drawing dimension 'PinchZ' is ambiguous"):
-        _drawing_marks.mark_dimensions_for_drawing(
-            object(), "PinchBore", {"PinchZ"}
-        )
+        _drawing_marks.mark_dimensions_for_drawing(object(), "PinchBore", {"PinchZ"})
 
 
 def test_angular_tolerance_helper_has_an_operation_span(
@@ -225,3 +221,29 @@ def test_tolerance_precision_rejects_silent_com_failure(
         _drawing_marks._set_tolerance_precision(
             display, (-0.004, 0.004), label="PinDia@PinProfile"
         )
+
+
+def test_tolerance_precision_has_dimension_labeled_operation_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans: list[tuple[str, dict[str, Any]]] = []
+
+    @contextmanager
+    def capture_span(name: str, **attributes: Any):
+        spans.append((name, attributes))
+        yield
+
+    display = SimpleNamespace(
+        SetPrecision3=lambda *_args: 0,
+        GetPrimaryTolPrecision2=lambda: 3,
+    )
+    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+
+    assert (
+        _drawing_marks._set_tolerance_precision(
+            display, (-0.004, 0.004), label="PinDia@PinProfile"
+        )
+        == 3
+    )
+    assert spans == [("dim.tolerance_precision", {"label": "PinDia@PinProfile"})]

@@ -12,6 +12,8 @@ import argparse
 import sys
 from typing import Any
 
+from alignment_pinion_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -53,8 +55,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-FRONT_CENTER = (0.150, 0.185)   # toothed end view
-RIGHT_CENTER = (0.285, 0.185)   # long drum profile (143 mm face)
+FRONT_CENTER = (0.150, 0.185)  # toothed end view
+RIGHT_CENTER = (0.285, 0.185)  # long drum profile (143 mm face)
 
 BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
@@ -153,7 +155,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(LEFT_END_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
         frame_xy=(LEFT_END_X - 0.030, RIGHT_CENTER[1] + HALF_OD + 0.014),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["drum end squareness to bore"],
         datums=("A",),
         label="drum end squareness to bore",
     )

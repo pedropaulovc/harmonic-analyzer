@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from cone_pivot_screw_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, run_build
 from _drawing_common import (
@@ -145,7 +147,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
             edge_xy=edge_xy,
             frame_xy=frame_xy,
             characteristic="total_runout",
-            tolerance="0.05",
+            tolerance=GEOMETRIC_TOLERANCES_MM[label],
             datums=("A",),
             quantity=below_text,
             label=label,
@@ -162,7 +164,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         ),
         frame_xy=(0.240, 0.212),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["head bearing face perpendicularity"],
         datums=("A",),
         quantity="HEAD BEARING FACE",
         label="head bearing face perpendicularity",
@@ -179,7 +181,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         ),
         frame_xy=(0.125, 0.170),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["shoulder end perpendicularity"],
         datums=("A",),
         quantity="SHOULDER END FACE",
         label="shoulder end perpendicularity",
@@ -190,7 +192,7 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         edge_xy=(0.2898, 0.219),
         frame_xy=(0.325, 0.245),
         characteristic="position",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["slot median-plane position"],
         datums=("A",),
         quantity="SLOT MEDIAN PLANE",
         label="slot median-plane position",
@@ -203,6 +205,8 @@ def _decorate(adapter: Any, side: Any, end: Any, _iso: Any) -> None:
         control=surface_finish_by_key(SURFACE_FINISHES, "ground_shoulder"),
         label="ground shoulder finish",
     )
+
+
 RECIPE = FastenerSheet(
     title="Cone Pivot Screw Manufacturing Drawing",
     keywords="cone pivot screw; slotted shoulder screw; made fastener",

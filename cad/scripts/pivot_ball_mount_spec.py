@@ -60,3 +60,12 @@ DRAWING_NOTES = "\n".join(
         "EXTERIOR FINISH SYMBOL APPLIES TO BALL, STEM, AND PAD OD AFTER PLATE.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "datum-B axis perpendicularity": "0.05",
+    "cross-bore true position": "0.05",
+    "sphere profile and center location": "0.10",
+    "pad-to-stem runout": "0.05",
+}

@@ -17,6 +17,8 @@ import math
 import sys
 from typing import Any
 
+from pinion_pivot_shaft_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -161,7 +163,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=end_upper,
         frame_xy=(0.065, 0.232),
         characteristic="cylindricity",
-        tolerance="0.01",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot cylindrical body"],
         label="pinion pivot cylindrical body",
     )
     add_datum_feature(
@@ -189,7 +191,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=right_crown_face,
         frame_xy=(0.245, 0.228),
         characteristic="profile_surface",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot crown profile"],
         datums=(),
         quantity="BOTH CROWNS",
         label="pinion pivot crown profile",

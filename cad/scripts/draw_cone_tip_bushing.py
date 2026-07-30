@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from cone_tip_bushing_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -241,7 +243,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=outer_upper_left,
         frame_xy=(0.072, 0.254),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["bushing OD runout"],
         datums=("A",),
         label="bushing OD runout",
     )
@@ -251,7 +253,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=top_end,
         frame_xy=(SIDE_CENTER[0] + 0.016, top_end[1] + 0.024),
         characteristic="parallelism",
-        tolerance="0.03",
+        tolerance=GEOMETRIC_TOLERANCES_MM["bushing end-face parallelism"],
         datums=("B",),
         label="bushing end-face parallelism",
     )

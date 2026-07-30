@@ -1960,6 +1960,7 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_specification_purity.py",
         SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
         SCRIPTS_DIR / "test_gtol_spec.py",
+        SCRIPTS_DIR / "test_part_owned_geometric_tolerances.py",
         SCRIPTS_DIR / "test_probe_surface_finish_pmi_telemetry.py",
         SCRIPTS_DIR / "test_surface_finish.py",
         SCRIPTS_DIR / "test_surface_finish_ownership_a.py",

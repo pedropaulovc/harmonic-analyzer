@@ -33,9 +33,7 @@ HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # crown top (150.07)
 RING_BOTTOM_Y = -RING_OUTER_RADIUS  # -20.4
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "strap_bore", MACHINED_UM, CylinderFace(RING_BORE_DIA)
-    ),
+    SurfaceFinishControl("strap_bore", MACHINED_UM, CylinderFace(RING_BORE_DIA)),
 )
 
 
@@ -49,3 +47,9 @@ SURFACE_FINISHES = (
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # connecting_rod_notes.py so assemblies importing this spec never inherit a
 # notes edit into their rebuild closure (codex #354).
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "rocker pin hole position": "0.20",
+}

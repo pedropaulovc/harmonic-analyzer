@@ -34,9 +34,7 @@ COLLAR_DEPTH_TOLERANCE_MM = 0.05
 BOSS_DIA_TOLERANCE_MM = 0.05
 BOSS_PROJECTION_TOLERANCE_MM = 0.05
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE)),
-)
+SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE)),)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},
@@ -62,3 +60,10 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1\n(SET-SCREW BOSS HIDDEN AT REAR)"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "cam boss axis position": "0.03",
+    "cam tap pitch axis position": "0.03",
+}

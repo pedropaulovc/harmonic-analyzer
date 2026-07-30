@@ -17,6 +17,8 @@ import math
 import sys
 from typing import Any
 
+from pinion_lever_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -223,7 +225,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=hub_right,
         frame_xy=(0.145, 0.120),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lever hub OD runout"],
         datums=("A",),
         label="lever hub OD runout",
     )
@@ -233,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=flat_face,
         frame_xy=(0.145, 0.165),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lever flat-face perpendicularity"],
         datums=("A",),
         label="lever flat-face perpendicularity",
         entity_type="SILHOUETTE",
@@ -249,9 +251,10 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         text=(
             "STRAIGHT CONICAL GRIP\n"
-            "TIP FACE FLAT WITHIN 0.05\n"
+            "TIP FACE FLAT WITHIN "
+            f"{GEOMETRIC_TOLERANCES_MM['grip tip face flatness']}\n"
             "PERPENDICULAR TO GRIP AXIS\n"
-            "WITHIN 0.10"
+            f"WITHIN {GEOMETRIC_TOLERANCES_MM['grip tip face perpendicularity']}"
         ),
         entity_xy=grip_edge,
         note_xy=(0.105, 0.235),
@@ -288,7 +291,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=crown_face,
         frame_xy=(0.315, 0.205),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lever crown profile"],
         datums=("A",),
         quantity="CROWN",
         label="lever crown profile",

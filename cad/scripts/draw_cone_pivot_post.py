@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from cone_pivot_post_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -169,8 +171,7 @@ def _bore_rim_edge(adapter: Any, view: Any, *, diameter_mm: float) -> Any:
 
 def _format_table_note(note: Any, *, label: str) -> Any:
     note = _early_bound(note, "INote")
-    annotation = _early_bound(
-        note.GetAnnotation(), "IAnnotation")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     text_format = annotation.GetTextFormat(0)
     if text_format is None:
         raise RuntimeError(f"{label} has no text format")
@@ -320,9 +321,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if axis_height_display is None:
         raise RuntimeError("CrankAxisY has no display dimension to box")
-    set_basic_dimension(
-        adapter, axis_height_display, label="crank-axis basic height"
-    )
+    set_basic_dimension(adapter, axis_height_display, label="crank-axis basic height")
     for view in (front, top):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError("failed to add ASME center marks")
@@ -343,7 +342,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.150, _front_y(0.0) + 0.012),
         characteristic="flatness",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["datum-A seat flatness"],
         label="datum-A seat flatness",
         entity=foot_entity,
     )
@@ -366,7 +365,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=body_side_xy,
         frame_xy=(0.190, _front_y(25.0) + 0.012),
         characteristic="cylindricity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["datum-B outside-diameter form"],
         quantity="DATUM B OD",
         label="datum-B outside-diameter form",
         entity_type="SILHOUETTE",
@@ -406,7 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.185, journal_center[1] - 0.023),
         characteristic="position",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["journal-axis true position"],
         datums=("A", "B"),
         diameter=True,
         label="journal-axis true position",
@@ -419,7 +418,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.185, _front_y(CRANK_BORE_HEIGHT) + 0.012),
         characteristic="position",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["crank-bore true position"],
         datums=("A", "B", "C"),
         diameter=True,
         label="crank-bore true position",

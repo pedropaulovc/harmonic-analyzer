@@ -18,6 +18,8 @@ import argparse
 import sys
 from typing import Any
 
+from magnifying_wheel_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -73,7 +75,10 @@ _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
 _HUB_R = HUB_DIA * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "RimOuterDiaDim": (FRONT_CENTER[0] - _RIM_R - 0.028, FRONT_CENTER[1] + _RIM_R + 0.006),
+    "RimOuterDiaDim": (
+        FRONT_CENTER[0] - _RIM_R - 0.028,
+        FRONT_CENTER[1] + _RIM_R + 0.006,
+    ),
     "HubDiaDim": (FRONT_CENTER[0] + _HUB_R + 0.030, FRONT_CENTER[1] - 0.006),
     "BoreDiaDim": (FRONT_CENTER[0] - _HUB_R - 0.030, FRONT_CENTER[1] + 0.004),
     "SpokeWidthDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + _HUB_R + 0.020),
@@ -195,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0] + _RIM_R * 0.5, FRONT_CENTER[1] + _RIM_R * 0.866),
         frame_xy=(FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] + _RIM_R + 0.012),
         characteristic="circular_runout",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["rim runout to the bore"],
         datums=("A",),
         label="rim runout to the bore",
     )
@@ -210,7 +215,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Section View Note", RIGHT_CENTER[0] - 0.022, 0.075)
+    add_property_linked_note(
+        adapter, "Section View Note", RIGHT_CENTER[0] - 0.022, 0.075
+    )
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.085)
 
     return await finalize_drawing(

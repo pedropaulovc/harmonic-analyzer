@@ -20,6 +20,8 @@ import argparse
 import sys
 from typing import Any
 
+from top_frame_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -67,7 +69,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 2.0)   # 1:2 whole sheet (442 mm finished envelope)
+SHEET_SCALE = (1.0, 2.0)  # 1:2 whole sheet (442 mm finished envelope)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5
 
 # Sheet layout (meters). The plan defines the profile and bore pattern; the
@@ -96,9 +98,12 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
     circles: list[tuple[float, float, float, Any]] = []
     lines: list[tuple[tuple[float, ...], Any]] = []
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+            )
+            or ()
+        )
         for edge in edges:
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -126,7 +131,9 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
             <= 5e-5
         ]
         if not matches or (len(matches) != 1 and not allow_coincident):
-            raise RuntimeError(f"top-frame plan expected one visible {label}, got {len(matches)}")
+            raise RuntimeError(
+                f"top-frame plan expected one visible {label}, got {len(matches)}"
+            )
         # A boss projects both coincident end rims in the plan view. They are
         # the same cylindrical feature at the same model coordinates, so either
         # visible rim is a valid annotation attachment.
@@ -140,8 +147,7 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
     datum_c = [
         edge
         for values, edge in lines
-        if abs(values[2] - OUTER_REAR_Z / 1000.0) <= 2e-6
-        and abs(values[3]) >= 0.99
+        if abs(values[2] - OUTER_REAR_Z / 1000.0) <= 2e-6 and abs(values[3]) >= 0.99
     ]
     if not datum_b or not datum_c:
         raise RuntimeError("top-frame plan is missing the B/C outer rail datum edges")
@@ -167,9 +173,12 @@ def _visible_front_datum_a(adapter: Any, view: Any) -> Any:
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     matches: list[Any] = []
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
+            )
+            or ()
+        )
         for edge in edges:
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -245,33 +254,64 @@ async def build(adapter: Any) -> dict[str, str]:
     ) = _visible_plan_controls(adapter, top)
     datum_a_edge = _visible_front_datum_a(adapter, front)
     add_datum_feature(
-        adapter, front, symbol_xy=(0.285, 0.125), datum="A",
-        label="finished bottom-face datum", entity=datum_a_edge, shoulder=True,
+        adapter,
+        front,
+        symbol_xy=(0.285, 0.125),
+        datum="A",
+        label="finished bottom-face datum",
+        entity=datum_a_edge,
+        shoulder=True,
     )
     add_datum_feature(
-        adapter, top, symbol_xy=(0.020, 0.175), datum="B",
-        label="left outer rail-face datum", entity=datum_b_edge, shoulder=True,
+        adapter,
+        top,
+        symbol_xy=(0.020, 0.175),
+        datum="B",
+        label="left outer rail-face datum",
+        entity=datum_b_edge,
+        shoulder=True,
     )
     add_datum_feature(
-        adapter, top, symbol_xy=DATUM_C_SYMBOL_XY, datum="C",
-        label="lower outer rail-face datum", entity=datum_c_edge, shoulder=True,
+        adapter,
+        top,
+        symbol_xy=DATUM_C_SYMBOL_XY, datum="C",
+        label="lower outer rail-face datum", entity=datum_c_edge,
+        shoulder=True,
     )
     add_feature_control_frame(
-        adapter, top, frame_xy=(0.175, 0.150), characteristic="position",
-        tolerance="0.20", datums=("A", "B", "C"), diameter=True,
-        quantity="4X COLUMN BORES", label="column-bore true position",
+        adapter,
+        top,
+        frame_xy=(0.175, 0.150),
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_MM["column-bore true position"],
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="4X COLUMN BORES",
+        label="column-bore true position",
         entity=column_bore,
     )
     add_feature_control_frame(
-        adapter, top, frame_xy=(0.130, 0.220), characteristic="position",
-        tolerance="0.20", datums=("A", "B", "C"), diameter=True,
-        quantity="4X BOSS ODS", label="column-boss true position",
+        adapter,
+        top,
+        frame_xy=(0.130, 0.220),
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_MM["column-boss true position"],
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="4X BOSS ODS",
+        label="column-boss true position",
         entity=column_boss,
     )
     add_feature_control_frame(
-        adapter, top, frame_xy=(0.080, 0.165), characteristic="position",
-        tolerance="0.20", datums=("A", "B", "C"), diameter=True,
-        quantity="GOOSENECK BORE", label="gooseneck-bore true position",
+        adapter,
+        top,
+        frame_xy=(0.080, 0.165),
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_MM["gooseneck-bore true position"],
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="GOOSENECK BORE",
+        label="gooseneck-bore true position",
         entity=gooseneck_bore,
     )
 

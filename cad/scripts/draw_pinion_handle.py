@@ -18,6 +18,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_handle_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -261,7 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=grip_right,
         frame_xy=(0.105, 0.205),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle grip OD runout"],
         datums=("A",),
         label="handle grip OD runout",
     )
@@ -271,7 +273,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=hub_right,
         frame_xy=(0.112, 0.120),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle hub OD runout"],
         datums=("A",),
         label="handle hub OD runout",
     )
@@ -281,7 +283,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=flat_end,
         frame_xy=(0.205, 0.135),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle flat-end perpendicularity"],
         datums=("A",),
         label="handle flat-end perpendicularity",
     )
@@ -294,7 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         frame_xy=(0.315, 0.155),
         characteristic="position",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle transverse-axis position"],
         datums=("A", "B"),
         diameter=True,
         quantity="BODY CROSS-HOLE AXIS BEFORE PRESSING",

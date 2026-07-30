@@ -110,3 +110,12 @@ DRAWING_NOTES = "\n".join(
         f"C-C {ATTACHMENT_SPACING:.5f}.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "datum-A seat flatness": "0.05",
+    "datum-B outside-diameter form": "0.05",
+    "journal-axis true position": "0.05",
+    "crank-bore true position": "0.10",
+}

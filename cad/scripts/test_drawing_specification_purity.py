@@ -163,6 +163,140 @@ add_surface_finish(
     assert drawing_specification_violations(imported_controls) == ()
 
 
+def test_detector_finds_drawing_owned_feature_control_frame_tolerances() -> None:
+    source = """
+from _drawing_common import add_feature_control_frame as fcf
+import _drawing_common as drawing
+
+LOCAL_TOLERANCE = "0.10"
+fcf(adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
+    tolerance="0.05", label="literal")
+drawing.add_feature_control_frame(
+    adapter, view, frame_xy=(0.1, 0.2), characteristic="perpendicularity",
+    tolerance=LOCAL_TOLERANCE, label="local alias")
+"""
+    violations = drawing_specification_violations(source)
+    assert [item.rule for item in violations] == [
+        "drawing-gdt-provenance",
+        "drawing-gdt-provenance",
+    ]
+    assert [item.evidence for item in violations] == [
+        "tolerance='0.05' is not part-spec-sourced",
+        "tolerance=LOCAL_TOLERANCE is not part-spec-sourced",
+    ]
+
+
+def test_detector_allows_feature_control_frame_values_from_part_contracts() -> None:
+    source = """
+from _drawing_common import add_feature_control_frame
+from pinion_lever_spec import GEOMETRIC_CONTROLS, HUB_RUNOUT_TOLERANCE
+import pinion_lever_spec as lever_spec
+
+FIRST_CONTROL = GEOMETRIC_CONTROLS[0]
+SELECTED_CONTROL = next(
+    control for control in GEOMETRIC_CONTROLS if control.key == "grip-flatness"
+)
+add_feature_control_frame(
+    adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
+    tolerance=HUB_RUNOUT_TOLERANCE, label="direct")
+add_feature_control_frame(
+    adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
+    tolerance=lever_spec.FLAT_END_TOLERANCE, label="module")
+add_feature_control_frame(
+    adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
+    tolerance=FIRST_CONTROL.tolerance, label="indexed control")
+add_feature_control_frame(
+    adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
+    tolerance=SELECTED_CONTROL.tolerance, label="selected control")
+"""
+    assert drawing_specification_violations(source) == ()
+
+
+def test_detector_does_not_let_spec_text_mask_a_local_fcf_number() -> None:
+    source = """
+from _drawing_common import add_feature_control_frame
+from pinion_lever_spec import LABEL
+
+add_feature_control_frame(
+    adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
+    tolerance=f"0.0{LABEL}", label="mixed provenance")
+"""
+    assert _rules(source) == ["drawing-gdt-provenance"]
+
+
+def test_detector_finds_bare_within_limits_only_in_attached_notes() -> None:
+    source = """
+from _drawing_common import add_attached_note as attached
+import _drawing_common as drawing
+from pinion_lever_spec import LABEL
+
+NOTE = "TIP FACE FLAT WITHIN 0.05\\nPERPENDICULAR TO AXIS WITHIN 0.10"
+LOCAL_LIMIT = 0.20
+attached(adapter, view, text=NOTE, note_xy=(0.1, 0.2), label="literal")
+drawing.add_attached_note(
+    adapter, view, text=f"PROFILE WITHIN {LOCAL_LIMIT:.2f}",
+    note_xy=(0.1, 0.2), label="local f-string")
+attached(
+    adapter, view, text=f"FLAT WITHIN 0.30 {LABEL}",
+    note_xy=(0.1, 0.2), label="unrelated spec interpolation")
+attached(
+    adapter, view, text="INSPECT WITHIN ",
+    note_xy=(0.1, 0.2), label="text-only fragment")
+
+PROSE = "complete within 0.30 seconds"
+unrelated(text="WITHIN 0.40")
+"""
+    violations = drawing_specification_violations(source)
+    assert [item.rule for item in violations] == [
+        "drawing-gdt-note",
+        "drawing-gdt-note",
+        "drawing-gdt-note",
+        "drawing-gdt-note",
+    ]
+    assert [item.evidence for item in violations] == [
+        "'WITHIN 0.05'",
+        "'WITHIN 0.10'",
+        "'WITHIN {...}'",
+        "'WITHIN 0.30'",
+    ]
+
+
+def test_detector_allows_attached_note_limits_from_part_contracts() -> None:
+    source = """
+from _drawing_common import add_attached_note
+from pinion_lever_spec import (
+    GEOMETRIC_TOLERANCES_MM,
+    GRIP_FLATNESS,
+    GRIP_REQUIREMENT_NOTE,
+)
+import pinion_lever_spec as lever_spec
+
+LOCAL_ALIAS = GRIP_FLATNESS
+add_attached_note(
+    adapter, view, text=f"TIP FACE FLAT WITHIN {LOCAL_ALIAS:.2f}",
+    note_xy=(0.1, 0.2), label="direct value")
+add_attached_note(
+    adapter, view, text=GRIP_REQUIREMENT_NOTE,
+    note_xy=(0.1, 0.2), label="direct note")
+add_attached_note(
+    adapter, view, text=lever_spec.GRIP_REQUIREMENT_NOTE,
+    note_xy=(0.1, 0.2), label="module note")
+add_attached_note(
+    adapter,
+    view,
+    text=(
+        "TIP FACE FLAT WITHIN "
+        f"{GEOMETRIC_TOLERANCES_MM['grip tip face flatness']}\\n"
+        "PERPENDICULAR TO GRIP AXIS\\n"
+        f"WITHIN {GEOMETRIC_TOLERANCES_MM['grip tip face perpendicularity']}"
+    ),
+    note_xy=(0.1, 0.2),
+    label="split text and spec values",
+)
+"""
+    assert drawing_specification_violations(source) == ()
+
+
 def test_detector_finds_direct_drawing_com_tolerance_mutation() -> None:
     source = """
 model_dimension.SetToleranceType(2)
@@ -185,7 +319,7 @@ def test_model_tolerance_analysis_includes_symmetric_angular_setter(
 ) -> None:
     source = tmp_path / "build_sample.py"
     source.write_text(
-        'set_dimension_symmetric_angular_tolerance('
+        "set_dimension_symmetric_angular_tolerance("
         'adapter, "Chamfer", "Angle", ANGULAR_TOLERANCE_MM)\n',
         encoding="utf-8",
     )

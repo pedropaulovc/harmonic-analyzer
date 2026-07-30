@@ -17,6 +17,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_cam_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -282,7 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bottom_boss_right,
         frame_xy=(0.285, 0.240),
         characteristic="position",
-        tolerance="0.03",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cam boss axis position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="BOSS OD AXIS",
@@ -294,7 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bottom_tap_right,
         frame_xy=(0.315, 0.215),
         characteristic="position",
-        tolerance="0.03",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cam tap pitch axis position"],
         datums=("D",),
         diameter=True,
         quantity="M2.5 TAP PITCH AXIS",

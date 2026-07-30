@@ -22,6 +22,8 @@ import argparse
 import sys
 from typing import Any
 
+from tube_frame_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -58,7 +60,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 5.0)   # 1:5 whole sheet (~990 mm column)
+SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (~990 mm column)
 END_VIEW_SCALE = 2.0
 
 # Sheet layout (meters).  The length view (tube vertical) hugs the far left,
@@ -155,7 +157,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(flank_x, LENGTH_CENTER[1]),
         frame_xy=(0.115, 0.205),
         characteristic="cylindricity",
-        tolerance="0.03",
+        tolerance=GEOMETRIC_TOLERANCES_MM['full-length OD cylindricity'],
         quantity="FULL OD LENGTH",
         label="full-length OD cylindricity",
         entity_type="SILHOUETTE",
@@ -181,7 +183,7 @@ async def build(adapter: Any) -> dict[str, str]:
             edge_xy=(LENGTH_CENTER[0], edge_y),
             frame_xy=(0.090, frame_y),
             characteristic="perpendicularity",
-            tolerance="0.10",
+            tolerance=GEOMETRIC_TOLERANCES_MM[label],
             datums=("A",),
             quantity=quantity,
             label=label,

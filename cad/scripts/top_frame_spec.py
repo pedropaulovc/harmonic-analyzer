@@ -60,3 +60,11 @@ INSPECTION_NOTES = "\n".join(
 )
 TOP_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:4"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "column-bore true position": "0.20",
+    "column-boss true position": "0.20",
+    "gooseneck-bore true position": "0.20",
+}

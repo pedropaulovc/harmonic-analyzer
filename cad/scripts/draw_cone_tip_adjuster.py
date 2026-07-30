@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from cone_tip_adjuster_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -86,9 +88,7 @@ DIMENSION_CALLOUTS = {
 }
 
 
-def _circular_edge(
-    view: Any, *, radius_mm: float, center_y_mm: float
-) -> Any:
+def _circular_edge(view: Any, *, radius_mm: float, center_y_mm: float) -> Any:
     """Return the visible circular model edge at the requested axis station."""
     candidates: list[tuple[float, float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="tip-adjuster edges"):
@@ -222,7 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
         cup,
         frame_xy=(CUP_CENTER[0] + 0.050, CUP_CENTER[1] + 0.032),
         characteristic="position",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cup axis position"],
         datums=("A",),
         diameter=True,
         label="cup axis position",
@@ -237,7 +237,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         frame_xy=(END_CENTER[0] + 0.065, END_CENTER[1] - 0.025),
         characteristic="position",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["driver-slot median-plane position"],
         datums=("A",),
         quantity="SLOT MEDIAN PLANE",
         label="driver-slot median-plane position",

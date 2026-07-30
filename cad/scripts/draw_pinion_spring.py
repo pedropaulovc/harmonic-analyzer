@@ -18,6 +18,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_spring_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -193,7 +195,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=top_face,
         frame_xy=(0.305, 0.122),
         characteristic="flatness",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["spring screw-down foot flatness"],
         quantity="FOOT BROAD FACE",
         label="spring screw-down foot flatness",
         entity_type="FACE",

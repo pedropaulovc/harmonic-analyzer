@@ -20,6 +20,8 @@ import argparse
 import sys
 from typing import Any
 
+from crank_handle_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -211,7 +213,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=collar_face,
         frame_xy=(0.020, 0.155),
         characteristic="perpendicularity",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["flat collar end perpendicularity"],
         datums=("A",),
         quantity="DATUM B FACE",
         label="flat collar end perpendicularity",
@@ -222,7 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bore_top,
         frame_xy=(0.350, 0.263),
         characteristic="total_runout",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["full-length bore total runout"],
         datums=("A",),
         quantity="FULL BORE LENGTH",
         label="full-length bore total runout",
@@ -233,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=profile_peak,
         frame_xy=(0.180, 0.263),
         characteristic="profile_surface",
-        tolerance="0.50",
+        tolerance=GEOMETRIC_TOLERANCES_MM["turned handle profile"],
         datums=("A", "B"),
         quantity="TURNED GRIP PROFILE - SEE NOTE",
         label="turned handle profile",

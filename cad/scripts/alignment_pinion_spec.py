@@ -13,17 +13,17 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
-TEETH = 42                        # cad/config/machine/alignment_pinion.yaml
-DIAMETRAL_PITCH = 49.82           # meshes the cylinder train (gear_train.yaml)
+TEETH = 42  # cad/config/machine/alignment_pinion.yaml
+DIAMETRAL_PITCH = 49.82  # meshes the cylinder train (gear_train.yaml)
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 
-BORE_DIA = 8.0                    # Ø8 arbor through-bore (build_pinion_arbor.py)
+BORE_DIA = 8.0  # Ø8 arbor through-bore (build_pinion_arbor.py)
 ARBOR_BORE_BAND = (-0.020, -0.040)  # light press; (upper, lower) deviations
-FACE_WIDTH = 143.2                # spans all 20 drum stations
+FACE_WIDTH = 143.2  # spans all 20 drum stations
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
@@ -63,3 +63,9 @@ DRAWING_NOTES = "\n".join(
         "  TABULATED BORE LIMITS ARE THE PRE-FIT TARGET.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "drum end squareness to bore": "0.05",
+}

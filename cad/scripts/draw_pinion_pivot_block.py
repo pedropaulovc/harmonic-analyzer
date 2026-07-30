@@ -19,6 +19,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_pivot_block_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -280,7 +282,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=lift_edge,
         frame_xy=(0.048, 0.172),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lift-bore parallelism"],
         datums=("B",),
         diameter=True,
         label="lift-bore parallelism",
@@ -304,7 +306,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=west_screw_edge,
         frame_xy=(0.052, 0.240),
         characteristic="position",
-        tolerance="0.25",
+        tolerance=GEOMETRIC_TOLERANCES_MM["hold-down hole position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="2X",

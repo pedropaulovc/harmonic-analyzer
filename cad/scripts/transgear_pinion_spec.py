@@ -25,9 +25,7 @@ BORE_DIA = 5.0  # rides the knob shaft's turned-down Ø5 seat
 FACE_WIDTH = 4.0
 BORE_DIA_BAND = (0.05, 0.03)
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-)
+SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
@@ -60,3 +58,9 @@ DRAWING_NOTES = "\n".join(
         "MESHES THE 120T REDUCTION DISC (MHA-070) FOR THE 1:10 PAPER FEED.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "pinion face squareness to bore": "0.05",
+}

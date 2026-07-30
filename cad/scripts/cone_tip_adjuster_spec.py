@@ -59,3 +59,10 @@ DRAWING_NOTES = "\n".join(
         f"PARENTHETICAL DIA {BODY_DIA:.2f} IS THE REFERENCE THREAD ROOT ENVELOPE.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "cup axis position": "0.05",
+    "driver-slot median-plane position": "0.10",
+}

@@ -47,3 +47,10 @@ END_VIEW_NOTE = "END VIEW SCALE 4:1"
 # 1:1, so without this the pictorial is silently half scale.  Mirrors
 # fulcrum-shaft / cylinder-gear-shaft, whose identical 1:2 iso carry the note.
 ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "pinion pivot cylindrical body": "0.01",
+    "pinion pivot crown profile": "0.05",
+}

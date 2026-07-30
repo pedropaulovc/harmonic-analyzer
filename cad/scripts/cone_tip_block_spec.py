@@ -64,3 +64,11 @@ DRAWING_NOTES = "\n".join(
         "POSITION TOLERANCE 0.10 TO B IS THE TOTAL MEDIAN-PLANE ZONE.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "adjuster common-axis true position": "0.05",
+    "slot median-plane position": "0.10",
+    "pinch common-axis true position": "0.05",
+}

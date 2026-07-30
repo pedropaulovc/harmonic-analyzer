@@ -54,7 +54,10 @@ def test_notes_and_native_gdt() -> None:
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 2
     assert 'characteristic="cylindricity"' in source
-    assert 'tolerance="0.03"' in source
+    assert (
+        tube_frame_spec.GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"] == "0.03"
+    )
+    assert "tolerance=GEOMETRIC_TOLERANCES_MM['full-length OD cylindricity']" in source
     assert '"BOTTOM END FACE"' in source
     assert '"TOP END FACE"' in source
     assert source.count('characteristic="perpendicularity"') == 1

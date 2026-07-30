@@ -50,6 +50,10 @@ _UNILATERAL_FRAGMENT = re.compile(
     rf"{_ZERO_FRAGMENT}\s*/\s*-\s*{_UNSIGNED_VALUE_FRAGMENT})",
     re.IGNORECASE,
 )
+_WITHIN_FRAGMENT = re.compile(
+    rf"\bWITHIN\s+{_VALUE_FRAGMENT}(?![\d.])",
+    re.IGNORECASE,
+)
 _PROPERTY_LINK = re.compile(r'\s*\$PRP(?:SHEET)?:"[^"]+"\s*', re.IGNORECASE)
 _FORMAT_SIGN_OPTION = re.compile(r"^(?:.[<>=^]|[<>=^])?([+\- ])")
 
@@ -167,6 +171,132 @@ def _part_spec_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
     return frozenset(direct), frozenset(modules)
 
 
+def _bound_names(target: ast.expr) -> frozenset[str]:
+    if isinstance(target, ast.Name):
+        return frozenset({target.id})
+    if isinstance(target, (ast.List, ast.Tuple)):
+        return frozenset(
+            name for element in target.elts for name in _bound_names(element)
+        )
+    return frozenset()
+
+
+def _part_spec_sourced(
+    expression: ast.expr,
+    *,
+    direct: frozenset[str],
+    modules: frozenset[str],
+    assignments: dict[str, ast.expr],
+    seen: frozenset[str] = frozenset(),
+    bound: frozenset[str] = frozenset(),
+) -> bool:
+    """Whether a value can be traced to a part-owned ``*_spec`` contract.
+
+    Attribute access and indexing only select data from an already-proven
+    contract.  The comprehension case covers the common, still inspectable
+    ``next(row for row in GEOMETRIC_CONTROLS if ...)`` selector without
+    treating arbitrary drawing-local helper calls as provenance.
+    """
+    if isinstance(expression, ast.Name):
+        if (
+            expression.id in direct
+            or expression.id in modules
+            or expression.id in bound
+        ):
+            return True
+        if expression.id in seen or expression.id not in assignments:
+            return False
+        return _part_spec_sourced(
+            assignments[expression.id],
+            direct=direct,
+            modules=modules,
+            assignments=assignments,
+            seen=seen | {expression.id},
+            bound=bound,
+        )
+    if isinstance(expression, ast.Attribute):
+        return _part_spec_sourced(
+            expression.value,
+            direct=direct,
+            modules=modules,
+            assignments=assignments,
+            seen=seen,
+            bound=bound,
+        )
+    if isinstance(expression, ast.Subscript):
+        return _part_spec_sourced(
+            expression.value,
+            direct=direct,
+            modules=modules,
+            assignments=assignments,
+            seen=seen,
+            bound=bound,
+        )
+    if isinstance(expression, ast.JoinedStr):
+        formatted = [
+            value.value
+            for value in expression.values
+            if isinstance(value, ast.FormattedValue)
+        ]
+        owns_numeric_text = any(
+            isinstance(value, ast.Constant)
+            and isinstance(value.value, str)
+            and any(character.isdigit() for character in value.value)
+            for value in expression.values
+        )
+        return (
+            bool(formatted)
+            and not owns_numeric_text
+            and all(
+                _part_spec_sourced(
+                    value,
+                    direct=direct,
+                    modules=modules,
+                    assignments=assignments,
+                    seen=seen,
+                    bound=bound,
+                )
+                for value in formatted
+            )
+        )
+    if isinstance(expression, (ast.GeneratorExp, ast.ListComp, ast.SetComp)):
+        comprehension_bound = set(bound)
+        for generator in expression.generators:
+            if not _part_spec_sourced(
+                generator.iter,
+                direct=direct,
+                modules=modules,
+                assignments=assignments,
+                seen=seen,
+                bound=frozenset(comprehension_bound),
+            ):
+                return False
+            comprehension_bound.update(_bound_names(generator.target))
+        return _part_spec_sourced(
+            expression.elt,
+            direct=direct,
+            modules=modules,
+            assignments=assignments,
+            seen=seen,
+            bound=frozenset(comprehension_bound),
+        )
+    if isinstance(expression, ast.Call):
+        return (
+            isinstance(expression.func, ast.Name)
+            and expression.func.id == "next"
+            and bool(expression.args)
+            and _part_spec_sourced(
+                expression.args[0],
+                direct=direct,
+                modules=modules,
+                assignments=assignments,
+                seen=seen,
+                bound=bound,
+            )
+        )
+    return False
+
+
 def _part_spec_surface_control(
     expression: ast.expr,
     *,
@@ -208,9 +338,17 @@ def _part_spec_surface_control(
         expression, "surface_finish_by_key", lookup_direct, lookup_modules
     ):
         return False
-    controls = expression.args[0] if expression.args else next(
-        (keyword.value for keyword in expression.keywords if keyword.arg == "controls"),
-        None,
+    controls = (
+        expression.args[0]
+        if expression.args
+        else next(
+            (
+                keyword.value
+                for keyword in expression.keywords
+                if keyword.arg == "controls"
+            ),
+            None,
+        )
     )
     return controls is not None and _part_spec_surface_control(
         controls,
@@ -324,6 +462,56 @@ def _joined_string(node: ast.JoinedStr) -> tuple[str, tuple[ast.expr, ...]]:
     return "".join(fragments), tuple(expressions)
 
 
+def _rendered_string_expression(
+    expression: ast.expr,
+    *,
+    assignments: dict[str, ast.expr],
+    seen: frozenset[str] = frozenset(),
+) -> tuple[str, tuple[tuple[int, ast.expr], ...]] | None:
+    """Render statically-known string pieces and locate f-string expressions."""
+    if isinstance(expression, ast.Constant) and isinstance(expression.value, str):
+        return expression.value, ()
+    if isinstance(expression, ast.Name):
+        if expression.id in seen or expression.id not in assignments:
+            return None
+        return _rendered_string_expression(
+            assignments[expression.id],
+            assignments=assignments,
+            seen=seen | {expression.id},
+        )
+    if isinstance(expression, ast.JoinedStr):
+        fragments: list[str] = []
+        formatted: list[tuple[int, ast.expr]] = []
+        rendered_length = 0
+        for value in expression.values:
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                fragments.append(value.value)
+                rendered_length += len(value.value)
+                continue
+            if not isinstance(value, ast.FormattedValue):
+                return None
+            placeholder = _formatted_placeholder(value)
+            formatted.append((rendered_length, value.value))
+            fragments.append(placeholder)
+            rendered_length += len(placeholder)
+        return "".join(fragments), tuple(formatted)
+    if isinstance(expression, ast.BinOp) and isinstance(expression.op, ast.Add):
+        left = _rendered_string_expression(
+            expression.left, assignments=assignments, seen=seen
+        )
+        right = _rendered_string_expression(
+            expression.right, assignments=assignments, seen=seen
+        )
+        if left is None or right is None:
+            return None
+        left_text, left_formatted = left
+        right_text, right_formatted = right
+        return left_text + right_text, left_formatted + tuple(
+            (position + len(left_text), value) for position, value in right_formatted
+        )
+    return None
+
+
 def _docstring_nodes(tree: ast.AST) -> frozenset[int]:
     found: set[int] = set()
     containers = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
@@ -408,6 +596,12 @@ def drawing_specification_violations(
     )
     surface_direct, surface_modules = _imported_functions(
         tree, "_drawing_common", frozenset({"add_surface_finish"})
+    )
+    gtol_direct, gtol_modules = _imported_functions(
+        tree, "_drawing_common", frozenset({"add_feature_control_frame"})
+    )
+    note_direct, note_modules = _imported_functions(
+        tree, "_drawing_common", frozenset({"add_attached_note"})
     )
     tolerance_names = _tolerance_names(tree)
     violations: list[DrawingSpecificationViolation] = []
@@ -498,6 +692,55 @@ def drawing_specification_violations(
                         "drawing-surface-finish-provenance",
                         f"control={ast.unparse(control)} is not part-spec-sourced",
                     )
+
+            if _call_is(node, "add_feature_control_frame", gtol_direct, gtol_modules):
+                tolerance = next(
+                    (kw.value for kw in node.keywords if kw.arg == "tolerance"),
+                    None,
+                )
+                if tolerance is not None and not _part_spec_sourced(
+                    tolerance,
+                    direct=part_spec_direct,
+                    modules=part_spec_modules,
+                    assignments=assignments,
+                ):
+                    add(
+                        tolerance,
+                        "drawing-gdt-provenance",
+                        f"tolerance={ast.unparse(tolerance)} is not part-spec-sourced",
+                    )
+
+            if _call_is(node, "add_attached_note", note_direct, note_modules):
+                text = next(
+                    (kw.value for kw in node.keywords if kw.arg == "text"), None
+                )
+                if text is not None:
+                    rendered_note = _rendered_string_expression(
+                        text, assignments=assignments
+                    )
+                    if rendered_note is not None:
+                        rendered_text, formatted_note = rendered_note
+                        for match in _WITHIN_FRAGMENT.finditer(rendered_text):
+                            values = tuple(
+                                expression
+                                for position, expression in formatted_note
+                                if match.start() <= position < match.end()
+                            )
+                            if values and all(
+                                _part_spec_sourced(
+                                    value,
+                                    direct=part_spec_direct,
+                                    modules=part_spec_modules,
+                                    assignments=assignments,
+                                )
+                                for value in values
+                            ):
+                                continue
+                            add(
+                                text,
+                                "drawing-gdt-note",
+                                repr(match.group(0).replace("\x00", "{...}")),
+                            )
 
             name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
             if name in _TOLERANCE_SETTERS:

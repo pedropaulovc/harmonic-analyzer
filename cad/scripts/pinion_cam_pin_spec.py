@@ -50,3 +50,10 @@ DRAWING_NOTES = "\n".join(
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 8:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "cam-pin seated-end flatness": "0.05",
+    "pinion cam-pin crown profile": "0.05",
+}

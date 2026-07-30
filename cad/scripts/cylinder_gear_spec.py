@@ -19,27 +19,27 @@ MM_PER_IN = 25.4
 
 # --- gear tooth system (build_cylinder_gear.py / gear_train.yaml) ------------
 TEETH = 120
-DIAMETRAL_PITCH = 49.82  # train DP (= 122*25.4/62.2), cad/config/machine/gear_train.yaml
+DIAMETRAL_PITCH = (
+    49.82  # train DP (= 122*25.4/62.2), cad/config/machine/gear_train.yaml
+)
 PRESSURE_ANGLE_DEG = 14.5
-MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH          # 0.510
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN   # 61.18
+MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH  # 0.510
+PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN  # 61.18
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN  # 62.20
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN       # 1.10
+WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN  # 1.10
 
 # --- machinable blank (build_cylinder_gear.py) ------------------------------
-BORE_DIA = 0.375 * MM_PER_IN   # 9.525 (3/8")
+BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8")
 BORE_DIA_BAND = (0.05, 0.03)  # (upper, lower) deviations
 FACE_WIDTH = 3.0
-CAM_DIA = 30.6                 # integral eccentric cam disc
+CAM_DIA = 30.6  # integral eccentric cam disc
 CAM_THICKNESS = 3.5
-ECCENTRICITY = 8.64            # cam axis offset from the bore axis
-NOTCH_WIDTH = 0.4             # alignment saw-kerf
+ECCENTRICITY = 8.64  # cam axis offset from the bore axis
+NOTCH_WIDTH = 0.4  # alignment saw-kerf
 NOTCH_DEPTH = 3.0
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "cylinder_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)
-    ),
+    SurfaceFinishControl("cylinder_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
 
 # Only the bore is a marked MODEL dimension (the single source of the critical
@@ -83,3 +83,9 @@ DRAWING_NOTES = "\n".join(
         "SET QC (20-GEAR ANALYZER SET): RANGE OF MEASURED CAM AXIS OFFSETS 0.025 MAX.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "gear face squareness to bore": "0.05",
+}

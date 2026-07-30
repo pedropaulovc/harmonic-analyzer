@@ -38,3 +38,10 @@ DRAWING_NOTES = "\n".join(
         "STUB.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "bushing OD runout": "0.05",
+    "bushing end-face parallelism": "0.03",
+}

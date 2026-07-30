@@ -24,16 +24,14 @@ BASE_DIA = PITCH_DIA * math.cos(math.radians(PRESSURE_ANGLE_DEG))
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
-HELIX_ANGLE_DEG = 12.0            # recentered crossed-axis accommodation
+HELIX_ANGLE_DEG = 12.0  # recentered crossed-axis accommodation
 BACKLASH_MM = 0.15
 
-BORE_DIA = 0.375 * MM_PER_IN       # 9.525 (3/8" cone-shaft journal)
+BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" cone-shaft journal)
 BORE_DIA_BAND = (0.050, 0.030)  # (upper, lower) deviations
 FACE_WIDTH = 8.0
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "crank_drive_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)
-    ),
+    SurfaceFinishControl("crank_drive_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
 TOTAL_TWIST_DEG = math.degrees(
     FACE_WIDTH * math.tan(math.radians(HELIX_ANGLE_DEG)) / (PITCH_DIA / 2.0)
@@ -41,17 +39,14 @@ TOTAL_TWIST_DEG = math.degrees(
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0 - BACKLASH_MM
 NORMAL_MODULE_MM = MODULE_MM * math.cos(math.radians(HELIX_ANGLE_DEG))
 NORMAL_PRESSURE_ANGLE_RAD = math.atan(
-    math.tan(math.radians(PRESSURE_ANGLE_DEG))
-    * math.cos(math.radians(HELIX_ANGLE_DEG))
+    math.tan(math.radians(PRESSURE_ANGLE_DEG)) * math.cos(math.radians(HELIX_ANGLE_DEG))
 )
 NORMAL_PRESSURE_ANGLE_DEG = math.degrees(NORMAL_PRESSURE_ANGLE_RAD)
 BASE_TANGENT_SPAN_TEETH = 6
-NORMAL_BASE_TANGENT_SPAN = NORMAL_MODULE_MM * math.cos(
-    NORMAL_PRESSURE_ANGLE_RAD
-) * (
+NORMAL_BASE_TANGENT_SPAN = NORMAL_MODULE_MM * math.cos(NORMAL_PRESSURE_ANGLE_RAD) * (
     math.pi * (BASE_TANGENT_SPAN_TEETH - 0.5)
-    + TEETH * (math.tan(math.radians(PRESSURE_ANGLE_DEG))
-               - math.radians(PRESSURE_ANGLE_DEG))
+    + TEETH
+    * (math.tan(math.radians(PRESSURE_ANGLE_DEG)) - math.radians(PRESSURE_ANGLE_DEG))
 ) - BACKLASH_MM * math.cos(math.radians(HELIX_ANGLE_DEG)) * math.cos(
     NORMAL_PRESSURE_ANGLE_RAD
 )
@@ -86,11 +81,15 @@ GEAR_DATA = gear_data_note(
         ("PROFILE / LEAD MODIFICATION", "NONE; THICKNESS PER CONTROLLED SPAN"),
         ("HELIX ANGLE", f"+{HELIX_ANGLE_DEG:.2f} +/-0.10 DEG"),
         ("HELIX TWIST (REF)", f"+{TOTAL_TWIST_DEG:.2f} DEG, -Z TO +Z"),
-        ("NORMAL BASE-TANGENT SPAN, EVERY 6 TEETH (mm)",
-         f"{NORMAL_BASE_TANGENT_SPAN:.3f} +0.000/-0.020"),
-        ("TRANSVERSE TOOTH THINNING FROM STANDARD (mm)",
-         f"{BACKLASH_MM:.3f} REF"),
-        ("TOOTH-FLANK ACCURACY", "ISO 1328-1:2013 GRADE 10; PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK"),
+        (
+            "NORMAL BASE-TANGENT SPAN, EVERY 6 TEETH (mm)",
+            f"{NORMAL_BASE_TANGENT_SPAN:.3f} +0.000/-0.020",
+        ),
+        ("TRANSVERSE TOOTH THINNING FROM STANDARD (mm)", f"{BACKLASH_MM:.3f} REF"),
+        (
+            "TOOTH-FLANK ACCURACY",
+            "ISO 1328-1:2013 GRADE 10; PROFILE/LEAD/PITCH, EVERY ACTIVE FLANK",
+        ),
         ("PAIR GEOMETRY", "CUSTOM NONCONJUGATE"),
         ("PAIR SHAFT ANGLE", "12.52 +/-0.10 DEG"),
         ("MID-FACE TRANSVERSE C2C (mm)", "39.735 +/-0.050"),
@@ -128,3 +127,10 @@ DRAWING_NOTES = "\n".join(
         "CORRECTED MAGNITUDE 0.10 N*m MAX; PEAK-TO-PEAK 0.05 N*m MAX; NO FILTERING.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "gear end-face squareness to bore": "0.05",
+    "gear tooth-tip circular runout": "0.05",
+}

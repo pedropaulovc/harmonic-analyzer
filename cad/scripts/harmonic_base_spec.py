@@ -20,7 +20,7 @@ BOTTOM_REAR_Z = FORMER_BOTTOM_WIDTH / 2.0
 BOTTOM_WIDTH = BOTTOM_REAR_Z - BOTTOM_FRONT_Z
 BOTTOM_CENTER_Z = (BOTTOM_FRONT_Z + BOTTOM_REAR_Z) / 2.0
 BOTTOM_THICKNESS = 0.5 * MM_PER_IN  # 12.7
-TOP_LENGTH = 17.5 * MM_PER_IN   # 444.5 (0.25 in reveal per side)
+TOP_LENGTH = 17.5 * MM_PER_IN  # 444.5 (0.25 in reveal per side)
 FORMER_TOP_WIDTH = 10.5 * MM_PER_IN  # 266.7
 TOP_FRONT_Z = -FORMER_TOP_WIDTH / 2.0
 TOP_REAR_Z = FORMER_TOP_WIDTH / 2.0
@@ -66,3 +66,13 @@ DRAWING_NOTES = "\n".join(
     )
 )
 SIDE_VIEW_NOTE = "FRONT VIEW 1:4"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "through-hole true position": "0.20",
+    "tapped-hole true position": "0.50",
+    "datum B perpendicularity to A": "0.10",
+    "datum C perpendicularity to A and B": "0.10",
+    "top-pad parallelism to A": "0.10",
+}

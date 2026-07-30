@@ -23,6 +23,8 @@ import argparse
 import sys
 from typing import Any
 
+from summing_lever_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -210,7 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
             anchor_bore_fcf_edge[1] + 0.026,
         ),
         characteristic="position",
-        tolerance="0.30",
+        tolerance=GEOMETRIC_TOLERANCES_MM["summation anchor position"],
         datums=("A",),
         diameter=True,
         label="summation anchor position",
@@ -294,7 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=seed_rim_left,
         frame_xy=(0.222, 0.088),
         characteristic="position",
-        tolerance="0.30",
+        tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
         diameter=True,
         quantity="20X",

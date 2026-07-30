@@ -20,6 +20,8 @@ import math
 import sys
 from typing import Any
 
+from crank_arm_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -314,7 +316,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=pin_edge,
         frame_xy=(0.100, 0.230),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cross-hole true position"],
         datums=("A", "B"),
         diameter=True,
         label="cross-hole true position",
@@ -410,7 +412,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=handle_edge,
         frame_xy=(0.222, 0.158),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle pivot position"],
         datums=("A", "B", "C"),
         diameter=True,
         label="handle pivot position",
@@ -448,7 +450,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(RIGHT_CENTER[0] + 0.008, RIGHT_CENTER[1]),
         frame_xy=(0.316, 0.118),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["crank broad-face parallelism"],
         datums=("A",),
         label="crank broad-face parallelism",
     )

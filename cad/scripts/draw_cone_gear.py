@@ -12,6 +12,8 @@ import argparse
 import sys
 from typing import Any
 
+from cone_gear_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -139,7 +141,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["gear face squareness to bore"],
         datums=("A",),
         label="gear face squareness to bore",
     )
