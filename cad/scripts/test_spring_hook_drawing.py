@@ -62,3 +62,23 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"] == "AISI 1018 steel wire, 1.4 dia, annealed (cold-formable)"
     assert spec["finish"] == "black oxide"
     assert int(spec["quantity"]) == 20
+
+
+def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
+    (control,) = spring_hook_spec.SURFACE_FINISHES
+    assert control.key == "shank_seating"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == spring_hook_spec.ROD_DIA
+    assert control.face.contains_y_mm == spring_hook_spec.SHANK_RISE / 2.0
+    assert (hook.ROD_DIA, hook.SHANK_RISE) == (
+        spring_hook_spec.ROD_DIA,
+        spring_hook_spec.SHANK_RISE,
+    )
+    part_source = "".join(Path(hook.__file__).read_text(encoding="utf-8").split())
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert (
+        'control=surface_finish_by_key(SURFACE_FINISHES,"shank_seating")'
+        in sheet_source
+    )
+    assert "roughness_ra=" not in sheet_source

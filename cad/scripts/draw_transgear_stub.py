@@ -24,7 +24,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from transgear_stub_spec import (
     BASE_DIA,
     BASE_LEN,
@@ -34,6 +34,7 @@ from transgear_stub_spec import (
     PART_DATUMS,
     SEAT_DIA,
     SEAT_LEN,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -204,7 +205,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(_fx(SEAT_DIA / 2.0), _fy(BASE_LEN + SEAT_LEN / 2.0)),
         symbol_xy=(_fx(SEAT_DIA / 2.0) + 0.008, _fy(BASE_LEN + SEAT_LEN / 2.0) + 0.004),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "gear_seat"),
         label="gear seat finish",
         entity_type="SILHOUETTE",
     )

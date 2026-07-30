@@ -8,6 +8,7 @@ import the part build implementation.
 from __future__ import annotations
 
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 OUTER_DIA = 10.0
@@ -36,6 +37,9 @@ GEOMETRIC_CONTROLS = (
         PlanarFace((0, 0, -1), LENGTH / 2.0),
         datums=("B",),
     ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

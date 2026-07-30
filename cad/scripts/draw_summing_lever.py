@@ -42,7 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from summing_lever_spec import (
     ANCHOR_BORE_R,
     ANCHOR_R,
@@ -53,6 +53,7 @@ from summing_lever_spec import (
     HOLE_Z_FIRST,
     PLATE_L,
     PLATE_W,
+    SURFACE_FINISHES,
     TIP_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -192,7 +193,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=knife_edge,
         symbol_xy=(knife_edge[0] + 0.015, knife_edge[1] + 0.015),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
     # Use a separate point on the bore rim so the position-frame leader does

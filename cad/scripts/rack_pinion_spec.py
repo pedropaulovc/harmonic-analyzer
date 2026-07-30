@@ -7,6 +7,9 @@ pinion. See the batch gear-drawing pattern in ``cylinder_gear_spec``.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
@@ -21,6 +24,10 @@ WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 BORE_DIA = 5.0  # shares the stud's Ø5 front seat
 FACE_WIDTH = 3.0
 BORE_DIA_BAND = (0.05, 0.03)
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},

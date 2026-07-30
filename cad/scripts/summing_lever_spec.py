@@ -11,6 +11,11 @@ build_summing_lever.py.
 
 from __future__ import annotations
 
+import math
+
+from _gtol_spec import PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 MM_PER_IN = 25.4
 
 # --- Nominal geometry (SummingLever.cs, inches -> mm; DIMENSIONS.md ch. 18). ---
@@ -26,6 +31,24 @@ ANCHOR_BORE_R = 1.5  # 3.0 dia counter-spring hook seat
 HEX_W = 8.653
 HEX_H = 10.268
 HEX_DEPTH = 21.717
+
+# Outward normal and plane offset of the upper-right sloping face of the
+# vertex-up hexagon. Its upper endpoint is the +Y knife-edge ridge.
+_KNIFE_FACE_SCALE = math.hypot(HEX_H / 4.0, HEX_W / 2.0)
+KNIFE_FACE_NORMAL = (
+    (HEX_H / 4.0) / _KNIFE_FACE_SCALE,
+    (HEX_W / 2.0) / _KNIFE_FACE_SCALE,
+    0.0,
+)
+KNIFE_FACE_OFFSET = KNIFE_FACE_NORMAL[1] * HEX_H / 2.0
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "knife_edge_ridge",
+        MACHINED_UM,
+        PlanarFace(KNIFE_FACE_NORMAL, KNIFE_FACE_OFFSET),
+    ),
+)
 
 # 20 channel-spring holes (#47 seed + linear pattern).
 HOLE_X = 39.85

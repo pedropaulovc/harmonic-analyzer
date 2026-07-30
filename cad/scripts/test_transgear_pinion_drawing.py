@@ -75,3 +75,16 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material_specification"] == "AISI 1018 cold-finished steel"
     assert config["finish"] == "gear teeth cut, oiled"
     assert int(config["quantity"]) == 1
+
+
+def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
+    (control,) = spec.SURFACE_FINISHES
+    assert control.key == "bore"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == spec.BORE_DIA
+    assert part.BORE_DIAMETER == spec.BORE_DIA
+    part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert 'control=surface_finish_by_key(SURFACE_FINISHES,"bore")' in sheet_source
+    assert "roughness_ra=" not in sheet_source

@@ -31,10 +31,11 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from spring_hook_spec import (
     ARM_HEIGHT,
     SHANK_RISE,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
@@ -199,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_entity=shank_edge,
         symbol_xy=(0.140, 0.120),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "shank_seating"),
         label="shank seating finish",
     )
 

@@ -95,12 +95,14 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from summing_lever_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
+from summing_lever_spec import SURFACE_FINISHES
 
 PART_NAME = "summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
@@ -761,6 +763,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

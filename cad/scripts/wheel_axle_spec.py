@@ -3,6 +3,7 @@ r"""Pure-data dimensional contract shared by the wheel axle and drawing."""
 from __future__ import annotations
 
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 FLANGE_DIA = 35.0
@@ -39,6 +40,9 @@ GEOMETRIC_CONTROLS = (
         CylinderFace(COLLAR_DIA),
         datums=("B",),
     ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl("stud_bearing", MACHINED_UM, CylinderFace(STUD_DIA)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

@@ -79,7 +79,7 @@ def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A", "B")
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter" in part_source
+    assert "author_part_pmi(" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
@@ -104,3 +104,18 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
+    (control,) = wheel_axle_spec.SURFACE_FINISHES
+    assert control.key == "stud_bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == wheel_axle_spec.STUD_DIA
+    part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert (
+        'control=surface_finish_by_key(SURFACE_FINISHES,"stud_bearing")'
+        in sheet_source
+    )
+    assert "roughness_ra=" not in sheet_source

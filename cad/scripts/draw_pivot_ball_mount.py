@@ -30,7 +30,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import GROUND, MACHINED
+from _surface_finish import surface_finish_by_key
 from pivot_ball_mount_spec import (
     BALL_CENTER_H,
     BALL_DIA,
@@ -38,6 +38,7 @@ from pivot_ball_mount_spec import (
     BASE_H,
     BORE_DIA,
     STEM_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -367,7 +368,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(0.152, _front_y(BALL_CENTER_H) - 0.026),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "cross_bore"),
         label="cross-bore finish",
         entity=bore_entity,
     )
@@ -376,7 +377,9 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=ball_outline,
         symbol_xy=(0.286, 0.178),
-        roughness_ra=GROUND,
+        control=surface_finish_by_key(
+            SURFACE_FINISHES, "turned_exterior_before_plate"
+        ),
         label="turned exterior finish before plate",
         entity_type="SILHOUETTE",
     )
