@@ -324,6 +324,75 @@ def _select_annotation_entity(
     return edge_entity
 
 
+def _surface_finish_entity_faces(
+    selected_entity: Any, *, entity_type: str, label: str
+) -> tuple[Any, ...]:
+    """Return the model face(s) qualified by one drawing annotation entity."""
+    entity_type = entity_type.upper()
+    if entity_type == "FACE":
+        return (selected_entity,)
+    if entity_type == "SILHOUETTE":
+        silhouette = _early_bound(selected_entity, "ISilhouetteEdge")
+        face = silhouette.GetFace()
+        return () if face is None else (face,)
+    if entity_type == "EDGE":
+        edge = _early_bound(selected_entity, "IEdge")
+        return tuple(
+            face for face in (edge.GetTwoAdjacentFaces2() or ()) if face is not None
+        )
+    raise ValueError(
+        f"{label}: cannot validate a surface finish on entity type {entity_type!r}; "
+        "expected EDGE, SILHOUETTE, or FACE"
+    )
+
+
+def _surface_finish_face_signatures(faces: Sequence[Any]) -> tuple[dict[str, Any], ...]:
+    """Read candidate face geometry once for validation and optional diagnostics."""
+    from _part_pmi import _face_geometry
+
+    signatures: list[dict[str, Any]] = []
+    for face in faces:
+        geometry = _face_geometry(face)
+        if geometry is None:
+            continue
+        signatures.append(
+            {
+                "geometry": geometry,
+                "identity": geometry.identity,
+                "parameters": tuple(round(value, 9) for value in geometry.parameters),
+                "normal": geometry.outward_normal,
+                "box": tuple(round(value, 9) for value in geometry.box),
+            }
+        )
+    return tuple(signatures)
+
+
+def _validate_surface_finish_control_face(
+    selected_entity: Any,
+    *,
+    entity_type: str,
+    control: SurfaceFinishControl,
+    label: str,
+) -> tuple[dict[str, Any], ...]:
+    """Fail unless a selected drawing entity belongs to the controlled face."""
+    from _part_pmi import _face_matches
+
+    faces = _surface_finish_entity_faces(
+        selected_entity, entity_type=entity_type, label=label
+    )
+    signatures = _surface_finish_face_signatures(faces)
+    if any(_face_matches(item["geometry"], control.face) for item in signatures):
+        return signatures
+    diagnostic = tuple(
+        {key: value for key, value in item.items() if key != "geometry"}
+        for item in signatures
+    )
+    raise RuntimeError(
+        f"{label}: selected {entity_type.lower()} does not touch controlled "
+        f"surface-finish face {control.face!r}; candidates={diagnostic!r}"
+    )
+
+
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
@@ -770,38 +839,27 @@ def add_surface_finish(
         entity_type=entity_type,
         label=label,
     )
+    signatures: tuple[dict[str, Any], ...] = ()
+    if control is not None:
+        signatures = _validate_surface_finish_control_face(
+            selected_entity,
+            entity_type=entity_type,
+            control=control,
+            label=label,
+        )
+    elif os.getenv("HARMONIC_SURFACE_AUDIT") == "1":
+        faces = _surface_finish_entity_faces(
+            selected_entity, entity_type=entity_type, label=label
+        )
+        signatures = _surface_finish_face_signatures(faces)
     if os.getenv("HARMONIC_SURFACE_AUDIT") == "1":
-        from _part_pmi import _face_geometry
-
-        faces: list[Any] = []
-        if entity_type == "FACE":
-            faces.append(selected_entity)
-        else:
-            edge = adapter._attempt(
-                lambda: _early_bound(selected_entity, "IEdge"), default=None
-            )
-            adjacent = adapter._attempt(
-                lambda: edge.GetTwoAdjacentFaces2() if edge is not None else None,
-                default=None,
-            )
-            if adjacent:
-                faces.extend(face for face in tuple(adjacent) if face is not None)
-        signatures = []
-        for face in faces:
-            geometry = _face_geometry(face)
-            if geometry is None:
-                continue
-            signatures.append(
-                {
-                    "identity": geometry.identity,
-                    "parameters": tuple(round(value, 9) for value in geometry.parameters),
-                    "normal": geometry.outward_normal,
-                    "box": tuple(round(value, 9) for value in geometry.box),
-                }
-            )
+        diagnostic = tuple(
+            {key: value for key, value in item.items() if key != "geometry"}
+            for item in signatures
+        )
         _telemetry.info(
             f"SURFACE_AUDIT {label}: entity_type={entity_type}, "
-            f"faces={signatures!r}"
+            f"faces={diagnostic!r}"
         )
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(

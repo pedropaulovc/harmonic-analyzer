@@ -10,6 +10,7 @@ import build_cone_swing_platform
 import build_cone_tip_adjuster
 import build_cone_tip_block
 import build_cone_tip_bushing
+import build_connecting_rod
 import build_crank_arm
 import build_crank_drive_gear
 import build_crank_handle
@@ -25,6 +26,7 @@ import cone_pivot_post_spec
 import cone_swing_platform_spec
 import cone_tip_block_spec
 import cone_tip_bushing_spec
+import connecting_rod_spec
 import crank_arm_spec
 import crank_drive_gear_spec
 import crank_pinion_spec
@@ -44,6 +46,7 @@ def test_direct_tolerance_values_are_named_in_part_specs() -> None:
     assert cone_tip_block_spec.BLOCK_HEIGHT_BAND == (0.05, 0.00)
     assert cone_tip_bushing_spec.BORE_DIA_BAND == (0.05, 0.00)
     assert cone_tip_bushing_spec.LENGTH_TOLERANCE_MM == 0.03
+    assert connecting_rod_spec.RING_BORE_DIA_BAND == (0.10, 0.00)
     assert crank_arm_spec.SHAFT_BORE_BAND == (0.05, 0.00)
     assert crank_drive_gear_spec.BORE_DIA_BAND == (0.050, 0.030)
     assert crank_pinion_spec.BORE_DIA_BAND == (0.050, 0.030)
@@ -81,6 +84,9 @@ def test_direct_tolerances_are_owned_by_named_model_dimensions() -> None:
             ("SlotProfile", "SlotWDim"): "GENERAL_TOL_MM",
             ("CupProfile", "CupDiaDim"): "*deviations(CUP_DIA_BAND)",
             ("Cup", "CupDepth"): "GENERAL_TOL_MM",
+        },
+        build_connecting_rod: {
+            ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)"
         },
         build_crank_arm: {
             ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(SHAFT_BORE_BAND)"

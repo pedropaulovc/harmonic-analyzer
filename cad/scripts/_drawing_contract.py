@@ -24,10 +24,16 @@ from pathlib import Path
 from typing import Any, Iterable
 
 _TOLERANCE_SETTERS = frozenset(
-    {"set_dimension_bilateral_tolerance", "set_dimension_symmetric_tolerance"}
+    {
+        "set_dimension_bilateral_tolerance",
+        "set_dimension_symmetric_angular_tolerance",
+        "set_dimension_symmetric_tolerance",
+    }
 )
 
+_UNSIGNED_VALUE_FRAGMENT = r"(?:\d+(?:\.\d*)?|\.\d+|\x00)"
 _VALUE_FRAGMENT = r"(?:[-+]?(?:\d+(?:\.\d*)?|\.\d+)|\x00)"
+_ZERO_FRAGMENT = r"(?:[-+]?\s*(?:0+(?:\.0*)?|\.0+))"
 _RA_FRAGMENT = re.compile(rf"\bRa\s*{_VALUE_FRAGMENT}", re.IGNORECASE)
 _LIMIT_FRAGMENT = re.compile(
     rf"(?:{_VALUE_FRAGMENT}\s*(?:MAX|MIN)\b|\b(?:MAX|MIN)\s*{_VALUE_FRAGMENT})",
@@ -36,6 +42,11 @@ _LIMIT_FRAGMENT = re.compile(
 _BILATERAL_FRAGMENT = re.compile(
     rf"(?:±|\+/-)\s*{_VALUE_FRAGMENT}|"
     rf"\+\s*{_VALUE_FRAGMENT}\s*/\s*-\s*{_VALUE_FRAGMENT}",
+    re.IGNORECASE,
+)
+_UNILATERAL_FRAGMENT = re.compile(
+    rf"(?:\+\s*{_UNSIGNED_VALUE_FRAGMENT}\s*/\s*{_ZERO_FRAGMENT}|"
+    rf"{_ZERO_FRAGMENT}\s*/\s*-\s*{_UNSIGNED_VALUE_FRAGMENT})",
     re.IGNORECASE,
 )
 _PROPERTY_LINK = re.compile(r'\s*\$PRP(?:SHEET)?:"[^"]+"\s*', re.IGNORECASE)
@@ -133,6 +144,81 @@ def _surface_finish_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[st
                 if _module_is(alias.name, "_surface_finish"):
                     modules.add(alias.asname or alias.name.split(".")[-1])
     return frozenset(direct), frozenset(modules)
+
+
+def _part_spec_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
+    """Return bindings whose value originates in a part-owned ``*_spec`` module."""
+
+    def is_part_spec(module: str | None) -> bool:
+        leaf = (module or "").rsplit(".", 1)[-1]
+        return leaf.endswith("_spec") and not leaf.startswith("_")
+
+    direct: set[str] = set()
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and is_part_spec(node.module):
+            direct.update(alias.asname or alias.name for alias in node.names)
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if is_part_spec(alias.name):
+                    modules.add(alias.asname or alias.name.split(".")[-1])
+    return frozenset(direct), frozenset(modules)
+
+
+def _part_spec_surface_control(
+    expression: ast.expr,
+    *,
+    direct: frozenset[str],
+    modules: frozenset[str],
+    lookup_direct: dict[str, str],
+    lookup_modules: frozenset[str],
+    assignments: dict[str, ast.expr],
+    seen: frozenset[str] = frozenset(),
+) -> bool:
+    """Whether a finish control is selected from a part-owned specification."""
+    if isinstance(expression, ast.Name):
+        if expression.id in direct:
+            return True
+        if expression.id in seen or expression.id not in assignments:
+            return False
+        return _part_spec_surface_control(
+            assignments[expression.id],
+            direct=direct,
+            modules=modules,
+            lookup_direct=lookup_direct,
+            lookup_modules=lookup_modules,
+            assignments=assignments,
+            seen=seen | {expression.id},
+        )
+    if isinstance(expression, ast.Attribute):
+        return isinstance(expression.value, ast.Name) and expression.value.id in modules
+    if isinstance(expression, ast.Subscript):
+        return _part_spec_surface_control(
+            expression.value,
+            direct=direct,
+            modules=modules,
+            lookup_direct=lookup_direct,
+            lookup_modules=lookup_modules,
+            assignments=assignments,
+            seen=seen,
+        )
+    if not isinstance(expression, ast.Call) or not _call_is(
+        expression, "surface_finish_by_key", lookup_direct, lookup_modules
+    ):
+        return False
+    controls = expression.args[0] if expression.args else next(
+        (keyword.value for keyword in expression.keywords if keyword.arg == "controls"),
+        None,
+    )
+    return controls is not None and _part_spec_surface_control(
+        controls,
+        direct=direct,
+        modules=modules,
+        lookup_direct=lookup_direct,
+        lookup_modules=lookup_modules,
+        assignments=assignments,
+        seen=seen,
+    )
 
 
 def _catalog_sourced(
@@ -286,6 +372,10 @@ def drawing_specification_violations(
     docstrings = _docstring_nodes(tree)
     assignments = _simple_assignments(tree)
     catalog_direct, catalog_modules = _surface_finish_imports(tree)
+    part_spec_direct, part_spec_modules = _part_spec_imports(tree)
+    finish_lookup_direct, finish_lookup_modules = _imported_functions(
+        tree, "_surface_finish", frozenset({"surface_finish_by_key"})
+    )
     fit_direct, fit_modules = _imported_functions(
         tree, "_fit_limits", frozenset({"fit_limits", "band_text"})
     )
@@ -322,6 +412,7 @@ def drawing_specification_violations(
             ra = _RA_FRAGMENT.search(rendered)
             limits = _LIMIT_FRAGMENT.search(rendered)
             bilateral = _BILATERAL_FRAGMENT.search(rendered)
+            unilateral = _UNILATERAL_FRAGMENT.search(rendered)
             catalog_ra = bool(ra and formatted) and all(
                 _catalog_sourced(
                     expression,
@@ -331,8 +422,8 @@ def drawing_specification_violations(
                 )
                 for expression in formatted
             )
-            if (ra and not catalog_ra) or limits or bilateral:
-                match = ra or limits or bilateral
+            if (ra and not catalog_ra) or limits or bilateral or unilateral:
+                match = ra or limits or bilateral or unilateral
                 assert match is not None
                 add(
                     node,
@@ -363,6 +454,22 @@ def drawing_specification_violations(
                         roughness,
                         "drawing-roughness-provenance",
                         f"roughness_ra={ast.unparse(roughness)} is not catalog-sourced",
+                    )
+                control = next(
+                    (kw.value for kw in node.keywords if kw.arg == "control"), None
+                )
+                if control is not None and not _part_spec_surface_control(
+                    control,
+                    direct=part_spec_direct,
+                    modules=part_spec_modules,
+                    lookup_direct=finish_lookup_direct,
+                    lookup_modules=finish_lookup_modules,
+                    assignments=assignments,
+                ):
+                    add(
+                        control,
+                        "drawing-surface-finish-provenance",
+                        f"control={ast.unparse(control)} is not part-spec-sourced",
                     )
 
             name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)

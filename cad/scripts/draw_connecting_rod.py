@@ -154,12 +154,9 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    # The strap bore is a machined fit over the 30.60 cam: the general ±0.51
-    # block would even allow interference, so the bore dimension carries its
-    # own +0.10/0 callout (the notes explain the running clearance).
-    set_dimension_callouts(
-        adapter, front_annotations, {"StrapBoreDia": "BORE +0.10/0"}
-    )
+    # The strap-bore tolerance imports with the named model dimension.  The
+    # drawing owns only this descriptive text beneath the native value/band.
+    set_dimension_callouts(adapter, front_annotations, {"StrapBoreDia": "BORE"})
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

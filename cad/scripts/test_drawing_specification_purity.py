@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from _drawing_contract import (
     drawing_fleet_specification_violations,
     drawing_specification_violations,
+    model_toleranced_dimensions,
 )
 
 
@@ -18,6 +20,10 @@ def _rules(source: str) -> list[str]:
     "value",
     (
         '"+0.00/-0.02"',
+        '"+0.10/0"',
+        '"+0.10/+0.00"',
+        '"0/-0.10"',
+        '"+0.00/-0.10"',
         '"±0.05"',
         '"Ra 1.6"',
         '"R0.10 MAX"',
@@ -86,19 +92,78 @@ add_surface_finish(
     assert drawing_specification_violations(source) == ()
 
 
+def test_detector_requires_surface_finish_controls_from_a_part_spec() -> None:
+    local_control = """
+from _drawing_common import add_surface_finish
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
+add_surface_finish(
+    adapter,
+    view,
+    symbol_xy=(0.1, 0.2),
+    control=SurfaceFinishControl(
+        "strap_bore", MACHINED_UM, CylinderFace(30.8)
+    ),
+    label="local control",
+)
+"""
+    assert _rules(local_control) == ["drawing-surface-finish-provenance"]
+
+    imported_controls = """
+from _drawing_common import add_surface_finish
+from _surface_finish import surface_finish_by_key
+from connecting_rod_spec import SURFACE_FINISHES
+import connecting_rod_spec as rod_spec
+import _surface_finish as finish_catalog
+
+CONTROL = surface_finish_by_key(SURFACE_FINISHES, "strap_bore")
+add_surface_finish(
+    adapter, view, symbol_xy=(0.1, 0.2), control=CONTROL, label="direct spec"
+)
+add_surface_finish(
+    adapter,
+    view,
+    symbol_xy=(0.2, 0.2),
+    control=finish_catalog.surface_finish_by_key(
+        rod_spec.SURFACE_FINISHES, "strap_bore"
+    ),
+    label="module spec",
+)
+"""
+    assert drawing_specification_violations(imported_controls) == ()
+
+
 def test_detector_finds_direct_drawing_com_tolerance_mutation() -> None:
     source = """
 model_dimension.SetToleranceType(2)
 tolerance = _early_bound(model_dimension.Tolerance, "IDimensionTolerance")
 tolerance.Type = 2
 tolerance.SetValues(-0.00005, 0.00005)
+set_dimension_symmetric_angular_tolerance(adapter, "Chamfer", "Angle", 0.5)
 series.SetValues(1.0, 2.0)
 """
     assert _rules(source) == [
         "drawing-tolerance-mutation",
         "drawing-tolerance-mutation",
         "drawing-tolerance-mutation",
+        "drawing-tolerance-mutation",
     ]
+
+
+def test_model_tolerance_analysis_includes_symmetric_angular_setter(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "build_sample.py"
+    source.write_text(
+        'set_dimension_symmetric_angular_tolerance('
+        'adapter, "Chamfer", "Angle", ANGULAR_TOLERANCE_MM)\n',
+        encoding="utf-8",
+    )
+    module = SimpleNamespace(__file__=source)
+    assert model_toleranced_dimensions(module) == {
+        ("Chamfer", "Angle"): "ANGULAR_TOLERANCE_MM"
+    }
 
 
 def test_detector_ignores_docstrings_property_links_placement_and_prose() -> None:

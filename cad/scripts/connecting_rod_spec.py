@@ -16,6 +16,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 # --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
 CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
 RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
+RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
 RING_WALL = 5.0  # radial strap wall
 RING_THICKNESS = 3.0
 SHANK_WIDTH = 8.0

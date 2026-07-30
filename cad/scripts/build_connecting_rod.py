@@ -62,7 +62,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from connecting_rod_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
@@ -74,6 +76,7 @@ from connecting_rod_spec import (
     HEAD_THICKNESS,
     HEAD_WIDTH,
     RING_BORE_DIA,
+    RING_BORE_DIA_BAND,
     RING_THICKNESS,
     RING_WALL,
     SHANK_THICKNESS,
@@ -390,6 +393,12 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(
         adapter, "driven connecting rod (equations neutral)", v_built, 0.001 * v_built
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "StrapBoreProfile",
+        "StrapBoreDia",
+        *deviations(RING_BORE_DIA_BAND),
     )
 
     await apply_material(adapter, MATERIAL)

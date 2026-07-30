@@ -146,6 +146,7 @@ def set_dimension_bilateral_tolerance(
     )
 
 
+@_telemetry.traced("dim.angular_tolerance", label_param="dimension_name")
 def set_dimension_symmetric_angular_tolerance(
     adapter: Any,
     feature_name: str,

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -80,3 +82,23 @@ def test_rejects_ambiguous_dimension_names_below_one_feature(
         _drawing_marks.mark_dimensions_for_drawing(
             object(), "PinchBore", {"PinchZ"}
         )
+
+
+def test_angular_tolerance_helper_has_an_operation_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans: list[tuple[str, dict[str, Any]]] = []
+
+    @contextmanager
+    def capture_span(name: str, **attributes: Any):
+        spans.append((name, attributes))
+        yield
+
+    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
+
+    with pytest.raises(ValueError, match="angular tolerance must be positive"):
+        _drawing_marks.set_dimension_symmetric_angular_tolerance(
+            object(), "RodProfile", "GripAngle", 0.0
+        )
+
+    assert spans == [("dim.angular_tolerance", {"label": "GripAngle"})]
