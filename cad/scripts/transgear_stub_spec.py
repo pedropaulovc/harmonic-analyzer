@@ -8,6 +8,7 @@ import the part build implementation.
 from __future__ import annotations
 
 from _fit_limits import SHAFT_H
+from _gtol_spec import CylinderFace, GeometricControl, PartDatum
 
 
 MM_PER_IN = 25.4
@@ -31,6 +32,23 @@ SEAT_DIA_BAND = SHAFT_H
 # BASE: slip into the transgear bracket bore and the latch hub.  Looser than any
 # _fit_limits class and specific to this stud, so it lives here beside BASE_DIA.
 BASE_DIA_BAND = (0.000, -0.050)
+
+# Geometric controls, authored on the model as plain annotations by the part build
+# (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
+# tolerance strings. The stud is one revolve, so each control's face resolves
+# by diameter alone.
+PART_DATUMS = (
+    # The stud base axis the seat runout is measured against.
+    PartDatum("A", CylinderFace(BASE_DIA)),
+)
+GEOMETRIC_CONTROLS = (
+    GeometricControl(
+        "seat_cylindricity", "cylindricity", "0.01", CylinderFace(SEAT_DIA)
+    ),
+    GeometricControl(
+        "seat_runout", "circular_runout", "0.03", CylinderFace(SEAT_DIA), datums=("A",)
+    ),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StubProfile": {

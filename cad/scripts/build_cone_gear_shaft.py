@@ -85,10 +85,13 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from _gear import volume_check
+from _part_pmi import author_part_pmi
 from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     SECTION_DIA_BAND,
     SECTIONS,
 )
@@ -198,6 +201,8 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
+    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -10,13 +10,13 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -26,7 +26,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
-from pivot_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA
+from pivot_bushing_spec import (
+    BORE_DIA,
+    GEOMETRIC_CONTROLS,
+    LENGTH,
+    OUTER_DIA,
+    PART_DATUMS,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -135,15 +141,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bushing axis centerline",
     )
 
-    # Spread the front-view attach points around the circles (bore top for the
-    # datum, OD 45-degree points for runout/finish) so the four leaders do not
-    # converge on one spot at the circle's right side.
-    outer_r = OUTER_DIA * SHEET_SCALE[0] / 2000.0
-    diag = 0.7071
-    outer_edge_upper = (
-        FRONT_CENTER[0] + outer_r * diag,
-        FRONT_CENTER[1] + outer_r * diag,
-    )
     bore_edge = (
         FRONT_CENTER[0] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
         FRONT_CENTER[1],
@@ -152,47 +149,47 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0],
         FRONT_CENTER[1] + BORE_DIA * SHEET_SCALE[0] / 2000.0,
     )
+    outer_radius = OUTER_DIA * SHEET_SCALE[0] / 2000.0
+    outer_edge_upper = (
+        FRONT_CENTER[0] + outer_radius * 0.7071,
+        FRONT_CENTER[1] + outer_radius * 0.7071,
+    )
     half_depth = LENGTH * SHEET_SCALE[0] / 2000.0
     left_end = (RIGHT_CENTER[0] - half_depth, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + half_depth, RIGHT_CENTER[1])
-    # Live readback normalizes this restricted axis tag by 4.478 um.  Bound
-    # only the annotation placement; part dimensions and GD&T remain unchanged.
-    add_datum_feature(
+    # GD&T is model PMI (pivot_bushing_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
+    # authored by build_pivot_bushing) — project it and place it where the
+    # hand-authored symbols used to sit. Which VIEW receives each annotation
+    # depends on its attachment (a datum tag only lands in a view aligned
+    # with its face), and the projection fails loud on any mismatch.
+    project_part_pmi(
         adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
-        datum="A",
-        label="bushing bore axis",
-        position_tolerance_m=0.000005,
-    )
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=left_end,
-        symbol_xy=(left_end[0] - 0.018, RIGHT_CENTER[1]),
-        datum="B",
-        label="bushing reference end",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=outer_edge_upper,
-        frame_xy=(0.115, 0.255),
-        characteristic="circular_runout",
-        tolerance="0.05",
-        datums=("A",),
-        label="bushing OD runout",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=right_end,
-        frame_xy=(right_end[0] + 0.014, 0.180),
-        characteristic="parallelism",
-        tolerance="0.03",
-        datums=("B",),
-        label="bushing end-face parallelism",
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=front,
+                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.037),
+                attachment_xy=bore_top,
+                position_tolerance_m=0.000005,
+            ),
+            "datum:B": PmiDrawingPlacement(
+                view=right,
+                position=(left_end[0] - 0.018, RIGHT_CENTER[1]),
+                attachment_xy=left_end,
+            ),
+            "od_runout": PmiDrawingPlacement(
+                view=front,
+                position=(0.115, 0.255),
+                attachment_xy=outer_edge_upper,
+            ),
+            "end_face_parallelism": PmiDrawingPlacement(
+                view=right,
+                position=(right_end[0] + 0.014, 0.180),
+                attachment_xy=right_end,
+            ),
+        },
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        label="pivot bushing PMI",
     )
     # Held close to the bore it controls: at (0.160, 0.225) the leader ran back
     # across the whole front view as a long shallow diagonal and converged on

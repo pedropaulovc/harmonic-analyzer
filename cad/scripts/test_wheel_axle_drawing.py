@@ -59,18 +59,27 @@ def test_stud_callout_keeps_wheel_bore_running_clearance() -> None:
 
 
 def test_native_gdt_controls_axle_orientation_coaxiality_and_finish() -> None:
+    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
+    from wheel_axle_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+
+    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
+    assert set(by_key) == {"stud_perpendicularity", "collar_runout"}
+    assert by_key["stud_perpendicularity"].characteristic == "perpendicularity"
+    assert by_key["stud_perpendicularity"].tolerance == "0.05"
+    assert by_key["stud_perpendicularity"].datums == ("A",)
+    assert by_key["stud_perpendicularity"].tolerance_zone == "diametral"
+    assert by_key["collar_runout"].characteristic == "circular_runout"
+    assert by_key["collar_runout"].tolerance == "0.05"
+    assert by_key["collar_runout"].datums == ("B",)
+    assert tuple(datum.letter for datum in PART_DATUMS) == ("A", "B")
+
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 2
-    assert (
-        '        datum="B",\n'
-        '        label="stud bearing axis",\n'
-        "        position_tolerance_m=0.00003,"
-        in source
-    )
-    assert source.count("position_tolerance_m=0.00003") == 1
-    assert source.count("characteristic=\"perpendicularity\"") == 1
-    assert source.count("characteristic=\"circular_runout\"") == 1
+    assert "project_part_pmi(" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
     assert source.count("add_surface_finish(") == 1
 
 

@@ -3,6 +3,7 @@ r"""Pure-data dimensional contract shared by the cone gear shaft and drawing."""
 from __future__ import annotations
 
 from _fit_limits import SHAFT_H
+from _gtol_spec import CylinderFace, GeometricControl, PartDatum
 
 from cone_pivot_post_installation import GEAR_AXIS_SHIFT
 
@@ -50,6 +51,28 @@ SHAFT_LENGTH = SECTION_ENDS[-1]
 # applied to the model dimension by build_cone_gear_shaft -- not five copies of
 # "+0.00/-0.02" typed as sheet callout text.
 SECTION_DIA_BAND = SHAFT_H
+
+# Geometric controls, authored on the model as plain annotations by the part build
+# (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
+# tolerance strings. The shaft is five distinct-diameter lands, so each
+# control's face resolves by diameter alone; the Ø0.79375 tip needs the
+# tightened match tolerance to stay unique against nothing else that small.
+PART_DATUMS = (
+    # The integral v2-post bearing journal the tip runout is measured against.
+    PartDatum("A", CylinderFace(JOURNAL_DIA)),
+)
+GEOMETRIC_CONTROLS = (
+    GeometricControl(
+        "journal_cylindricity", "cylindricity", "0.01", CylinderFace(JOURNAL_DIA)
+    ),
+    GeometricControl(
+        "tip_runout",
+        "circular_runout",
+        "0.05",
+        CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
+        datums=("A",),
+    ),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec0Profile": {"Sec0Dia"},

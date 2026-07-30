@@ -46,13 +46,26 @@ def test_linked_notes_define_remaining_turned_part_operations() -> None:
 
 
 def test_native_gdt_controls_bushing_functional_surfaces() -> None:
+    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
+    from lever_bushing_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+
+    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
+    assert set(by_key) == {"od_runout", "end_face_parallelism"}
+    assert by_key["od_runout"].characteristic == "circular_runout"
+    assert by_key["od_runout"].tolerance == "0.05"
+    assert by_key["od_runout"].datums == ("A",)
+    assert by_key["end_face_parallelism"].characteristic == "parallelism"
+    assert by_key["end_face_parallelism"].tolerance == "0.03"
+    assert by_key["end_face_parallelism"].datums == ("B",)
+    assert tuple(datum.letter for datum in PART_DATUMS) == ("A", "B")
+
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert "edge_xy=bore_top" in source
-    assert source.count("position_tolerance_m=0.0001") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert "characteristic=\"circular_runout\"" in source
-    assert "characteristic=\"parallelism\"" in source
+    assert "project_part_pmi(" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
     assert source.count("add_surface_finish(") == 1
 
 

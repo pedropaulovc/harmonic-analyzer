@@ -49,21 +49,29 @@ def test_linked_notes_define_remaining_arbor_operations() -> None:
 
 
 def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert (
-        "        edge_xy=end_top,\n"
-        "        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),\n"
-        '        datum="A",\n'
-        '        label="pinion arbor axis",\n'
-        "        position_tolerance_m=0.00002,"
-        in source
-    )
-    assert source.count("position_tolerance_m=0.00002") == 1
-    assert "characteristic=\"cylindricity\"" in source
+    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
+    from pinion_arbor_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+
+    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
+    assert set(by_key) == {"bearing_cylindricity", "flat_tip_perpendicularity"}
+    assert by_key["bearing_cylindricity"].characteristic == "cylindricity"
+    assert by_key["bearing_cylindricity"].tolerance == "0.01"
     # Only the flat front tip is squared to the axis -- the back end is the crown.
-    assert source.count("characteristic=\"perpendicularity\"") == 1
+    assert by_key["flat_tip_perpendicularity"].characteristic == "perpendicularity"
+    assert by_key["flat_tip_perpendicularity"].tolerance == "0.05"
+    assert by_key["flat_tip_perpendicularity"].datums == ("A",)
+    assert by_key["flat_tip_perpendicularity"].face.normal == (0, 0, -1)
+    assert by_key["flat_tip_perpendicularity"].face.offset_mm == 0.0
+    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
+    assert PART_DATUMS[0].face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
+
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter" in part_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "project_part_pmi(" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
     assert source.count("add_surface_finish(") == 1
 
 

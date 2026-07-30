@@ -10,12 +10,12 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -24,7 +24,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
-from pivot_shaft_spec import SHAFT_DIA, SHAFT_LENGTH
+from pivot_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS, SHAFT_DIA, SHAFT_LENGTH
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -58,8 +58,8 @@ RIGHT_CENTER = (
 ISO_CENTER = (0.320, 0.120)
 
 # The shaft's flank in the *Right view: a 6.35-dia cylinder at 1:1, so its top
-# silhouette runs ~3.2 mm above the view centre. The cylindrical callouts anchor
-# HERE rather than on the front view's end circle -- see the GD&T block below.
+# silhouette runs ~3.2 mm above the view centre. The bearing Ra anchors HERE
+# rather than on the front view's end circle -- see the finish block below.
 SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
@@ -145,69 +145,55 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    # Pick the end circle at 12 o'clock, because the symbol goes straight ABOVE
-    # it. Picked at 3 o'clock (the +r,0 point) with the symbol at 12, the tag
-    # fought SetPosition2's along-the-edge rule -- on a CIRCLE the permitted set
-    # IS the circumference, so the symbol collapsed to the nearest circle point
-    # and its Y went inert: the requested 17.6 mm standoff rendered as 1.05 mm,
-    # too little for the ~3 mm attachment triangle, which then overlapped the
-    # box and struck through the "A". Picking the clock position the symbol
-    # actually sits at lets the leader run radially out to it -- the same
-    # spelling draw_pivot_bushing.py and draw_cone_tip_bushing.py use. No gate
-    # sees this: a datum symbol exposes no GetExtent, so only the render shows it.
+    left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
+    right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     end_top = (
         FRONT_CENTER[0],
         FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
     )
-    left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
-    right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
-    # Live readback normalizes this restricted axis tag by 16.826 um.  Bound
-    # only annotation placement; part dimensions and GD&T remain unchanged.
-    add_datum_feature(
+    # GD&T is model PMI (pivot_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
+    # authored by build_pivot_shaft) — project it and place it where the
+    # hand-authored symbols used to sit (sheet-LEFT of the *Right view is the
+    # model +Z end, so the +Z squareness frame takes the left-end spot). Which
+    # VIEW receives each annotation depends on its attachment (a datum tag
+    # only lands in a view aligned with its face), and the projection fails
+    # loud on any mismatch.
+    project_part_pmi(
         adapter,
-        front,
-        edge_xy=end_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-        datum="A",
-        label="pivot shaft axis",
-        position_tolerance_m=0.00002,
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=front,
+                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
+                attachment_xy=end_top,
+                position_tolerance_m=0.00002,
+            ),
+            "bearing_cylindricity": PmiDrawingPlacement(
+                view=right,
+                position=(RIGHT_CENTER[0] - 0.045, 0.236),
+                attachment_xy=(RIGHT_CENTER[0] - 0.045, SHAFT_FLANK_Y),
+                attachment_type="SILHOUETTE",
+            ),
+            "plus_z_end_perpendicularity": PmiDrawingPlacement(
+                view=right,
+                position=(left_end[0] - 0.042, 0.180),
+                attachment_xy=left_end,
+            ),
+            "minus_z_end_perpendicularity": PmiDrawingPlacement(
+                view=right,
+                position=(right_end[0] + 0.014, 0.180),
+                attachment_xy=right_end,
+            ),
+        },
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        label="pivot shaft PMI",
     )
-    # Cylindricity and the bearing finish both control the shaft's CYLINDRICAL
-    # face, which the side view shows edge-on -- so both anchor to its flank
-    # there instead of to the front view's end circle. Anchored on the front
-    # circle they had to sit out at the side view's x to find free sheet, and
-    # the leader then ran the whole way back across the side view. Off the flank
-    # the leader is a short vertical drop into the empty band above the view. A
-    # cylinder carries no model edge along its side, so these picks are
-    # SILHOUETTE entities (as in draw_transgear_stub).
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] - 0.045, SHAFT_FLANK_Y),
-        frame_xy=(RIGHT_CENTER[0] - 0.045, 0.236),
-        characteristic="cylindricity",
-        tolerance="0.01",
-        label="pivot bearing cylindricity",
-        entity_type="SILHOUETTE",
-    )
-    # The frame extends ~0.027 m right of its anchor; 0.042 keeps the left
-    # frame's far edge clear of the Depth extension line at the shaft's end.
-    for edge, x, label in (
-        (left_end, left_end[0] - 0.042, "left end perpendicularity"),
-        (right_end, right_end[0] + 0.014, "right end perpendicularity"),
-    ):
-        add_feature_control_frame(
-            adapter,
-            right,
-            edge_xy=edge,
-            frame_xy=(x, 0.180),
-            characteristic="perpendicularity",
-            tolerance="0.05",
-            datums=("A",),
-            label=label,
-        )
-    # Sits right of the cylindricity frame, whose text ends near x=0.177; the
-    # Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
+    # The bearing finish controls the shaft's CYLINDRICAL face, which the side
+    # view shows edge-on -- so it anchors to the flank there instead of to the
+    # front view's end circle (from which the leader had to run the whole way
+    # back across the side view). A cylinder carries no model edge along its
+    # side, so the pick is a SILHOUETTE entity (as in draw_transgear_stub).
+    # The Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
     add_surface_finish(
         adapter,
         right,

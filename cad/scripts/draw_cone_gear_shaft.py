@@ -3,7 +3,6 @@ r"""Create the curated machinist drawing for the stepped cone gear shaft."""
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -11,13 +10,13 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
+    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -29,9 +28,11 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED
 from cone_gear_shaft_spec import (
+    GEOMETRIC_CONTROLS,
     JOURNAL_DIA,
     JOURNAL_END,
     SECTION_DIAS,
+    PART_DATUMS,
     SHAFT_LENGTH,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -95,24 +96,15 @@ def _outer_end_edge(adapter: Any, view: Any) -> Any:
     circles: list[tuple[float, Any]] = []
     for edge in visible_view_entities(view, 1, label="gear-shaft end edges"):
         edge = _early_bound(edge, "IEdge")
-        curve = edge.GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
         if not curve.IsCircle():
             continue
         params = curve.CircleParams
-        if params is None or len(params) < 7:
-            continue
-        circles.append((float(params[6]), edge))
+        if params is not None and len(params) >= 7:
+            circles.append((float(params[6]), edge))
     if not circles:
         raise RuntimeError("end view has no visible circular model edge")
-    circles.sort(key=lambda item: item[0])
-    _telemetry.info(
-        "end-view circular edge radii (mm): "
-        + ", ".join(f"{radius * 1000.0:.4f}" for radius, _edge in circles)
-    )
-    return circles[-1][1]
+    return max(circles, key=lambda item: item[0])[1]
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -213,55 +205,44 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    # Sheet geometry the GD&T picks attach to (meters). The end view shows the
-    # Ø12.2308 pivot journal as its outermost circle; the side view's tip
-    # journal silhouette hugs the axis line (half-height 0.79 mm x scale / 2).
-    pivot_circle = (
-        END_CENTER[0] + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
-        END_CENTER[1] + SECTION_DIAS[0] * END_VIEW_SCALE / (2000.0 * math.sqrt(2.0)),
-    )
     pivot_edge = _outer_end_edge(adapter, end)
+    # Leader anchor points for the surface-finish symbols (sheet meters).
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
     tip_top = (
         SIDE_CENTER[0] - SHAFT_LENGTH / 2000.0 + 0.016,
         SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
     )
-    add_datum_feature(
+    # GD&T is model PMI (cone_gear_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
+    # authored by build_cone_gear_shaft) — project it and place it where the
+    # hand-authored symbols used to sit. Which VIEW receives each annotation
+    # depends on its attachment (a datum tag only lands in a view aligned
+    # with its face), and the projection fails loud on any mismatch. The datum tag keeps its placement derived from
+    # the journal's actual small-end station, not a frozen sheet number.
+    project_part_pmi(
         adapter,
-        side,
-        # A datum feature symbol attached to a cylindrical face persists at
-        # the face boundary, not at an arbitrary leader shoulder.  Request the
-        # journal's actual small-end station so the authored and read-back
-        # positions are identical.
-        symbol_xy=(big_end_x - JOURNAL_END / 1000.0, 0.252),
-        datum="A",
-        label="pivot journal datum feature",
-        entity_type="FACE",
-        entity=pivot_face,
-    )
-    add_feature_control_frame(
-        adapter,
-        end,
-        frame_xy=(0.150, 0.142),
-        characteristic="cylindricity",
-        tolerance="0.01",
-        label="pivot journal cylindricity",
-        entity=pivot_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=tip_top,
-        frame_xy=(0.070, 0.245),
-        characteristic="circular_runout",
-        tolerance="0.05",
-        datums=("A",),
-        label="tip journal runout",
-        # Attach to the cylindrical outline itself.  A face attachment lets
-        # SolidWorks terminate the leader at the nearest end corner, which is
-        # visually ambiguous between radial runout and end-face runout.
-        entity_type="SILHOUETTE",
+        placements={
+            "datum:A": PmiDrawingPlacement(
+                view=side,
+                position=(big_end_x - JOURNAL_END / 1000.0, 0.252),
+                entity=pivot_face,
+                attachment_type="FACE",
+            ),
+            "journal_cylindricity": PmiDrawingPlacement(
+                view=end,
+                position=(0.150, 0.142),
+                edge_entity=pivot_edge,
+            ),
+            "tip_runout": PmiDrawingPlacement(
+                view=side,
+                position=(0.070, 0.245),
+                attachment_xy=tip_top,
+                attachment_type="SILHOUETTE",
+            ),
+        },
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        label="cone gear shaft PMI",
     )
     add_surface_finish(
         adapter,

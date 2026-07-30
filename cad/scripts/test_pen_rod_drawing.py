@@ -53,11 +53,31 @@ def test_linked_notes_define_remaining_square_rod_operations() -> None:
 
 
 def test_native_gdt_controls_slide_faces_and_ends() -> None:
+    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
+    from pen_rod_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+
+    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
+    assert set(by_key) == {"opposite_slide_face_parallelism", "bottom_end_squareness"}
+    assert by_key["opposite_slide_face_parallelism"].characteristic == "parallelism"
+    assert by_key["opposite_slide_face_parallelism"].tolerance == "0.03"
+    assert by_key["opposite_slide_face_parallelism"].datums == ("A",)
+    assert by_key["bottom_end_squareness"].characteristic == "perpendicularity"
+    assert by_key["bottom_end_squareness"].tolerance == "0.05"
+    assert by_key["bottom_end_squareness"].datums == ("A",)
+    # Datum A is the -X slide face; its +X opposite rides parallel to it.
+    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
+    assert PART_DATUMS[0].face.normal == (-1, 0, 0)
+    assert PART_DATUMS[0].face.offset_mm == pen_rod_spec.ROD_SECTION / 2.0
+    assert by_key["opposite_slide_face_parallelism"].face.normal == (1, 0, 0)
+    assert by_key["bottom_end_squareness"].face.normal == (0, -1, 0)
+
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert source.count('characteristic="parallelism"') == 1
-    assert source.count('characteristic="perpendicularity"') == 1
+    assert "project_part_pmi(" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
     assert source.count("add_surface_finish(") == 1
 
 

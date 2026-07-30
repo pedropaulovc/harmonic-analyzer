@@ -42,14 +42,15 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         part.COLLAR_DIA,
         part.COLLAR_LEN,
     ) == nominals
+    # BASE_DIA left this tuple with the hand-authored datum tag: the drawing
+    # no longer types anything from it (datum A comes from the model PMI spec).
     assert (
-        drawing.BASE_DIA,
         drawing.BASE_LEN,
         drawing.SEAT_DIA,
         drawing.SEAT_LEN,
         drawing.COLLAR_DIA,
         drawing.COLLAR_LEN,
-    ) == nominals
+    ) == nominals[1:]
     # The base is machine-standard 3/8" stock carried in mm.
     assert transgear_stub_spec.BASE_DIA == 0.375 * transgear_stub_spec.MM_PER_IN
 
@@ -102,13 +103,25 @@ def test_linked_notes() -> None:
 
 
 def test_native_gdt_controls_seat_form_runout_and_finish() -> None:
+    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
+    from transgear_stub_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+
+    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
+    assert set(by_key) == {"seat_cylindricity", "seat_runout"}
+    assert by_key["seat_cylindricity"].characteristic == "cylindricity"
+    assert by_key["seat_cylindricity"].tolerance == "0.01"
+    assert by_key["seat_runout"].characteristic == "circular_runout"
+    assert by_key["seat_runout"].tolerance == "0.03"
+    assert by_key["seat_runout"].datums == ("A",)
+    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
+
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("position_tolerance_m=0.003") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="cylindricity"' in source
-    assert 'characteristic="circular_runout"' in source
-    assert 'datums=("A",)' in source
+    assert "project_part_pmi(" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
     assert source.count("add_surface_finish(") == 1
 
 
