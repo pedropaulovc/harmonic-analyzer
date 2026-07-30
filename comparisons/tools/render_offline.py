@@ -86,8 +86,7 @@ def resolve_blender(override: str | None = None) -> str:
     which = shutil.which("blender")
     if which:
         version = _blender_version(which)
-        if version:
-            found.append((version, which))
+        found.append((version or (-1, -1), which))
     if found:
         return max(found)[1]
     raise SystemExit(f"{BLENDER_UNAVAILABLE} no Blender found; install Blender or set "
