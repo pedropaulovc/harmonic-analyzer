@@ -176,9 +176,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Datum A is the actual knife-edge pivot ridge, not the merged cylinder
-    # silhouette hidden by the ribs in the front view.  Use the -Z ridge for
-    # the datum and the opposite +Z ridge for Ra so their leaders stay distinct.
-    knife_edge_datum = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
+    # silhouette hidden by the ribs in the front view.  A SolidWorks Top view
+    # reverses model Z on the sheet: the positive sheet offset selects the -Z
+    # ridge, while the negative offset selects the part-owned +Z finish face.
+    # Keep datum and finish on opposite ridges so their leaders stay distinct.
+    knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
     add_datum_feature(
         adapter,
         top,
@@ -187,7 +189,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="knife-edge pivot axis",
     )
-    knife_edge = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
+    knife_edge = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
     add_surface_finish(
         adapter,
         top,

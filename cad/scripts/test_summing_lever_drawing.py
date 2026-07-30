@@ -79,8 +79,10 @@ def test_native_gdt_and_finish_present() -> None:
     assert "add_surface_finish(" in source
     assert source.count("add_native_hole_callout(") == 2
     assert "knife_edge_datum = _top_xy" in source
+    assert "knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)" in source
     assert 'label="knife-edge pivot axis"' in source
     assert "knife_edge = _top_xy" in source
+    assert "knife_edge = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))" in source
     assert 'label="knife-edge ridge finish"' in source
     assert "anchor_bore_fcf_edge = _top_xy(TIP_X - ANCHOR_BORE_R, 0.0)" in source
     assert 'edge_xy=anchor_bore_fcf_edge' in source
