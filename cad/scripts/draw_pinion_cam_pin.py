@@ -131,7 +131,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(8, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
+    right = place_view(adapter, str(SOURCE), "*Top", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -186,7 +186,7 @@ async def build(adapter: Any) -> dict[str, str]:
     seated_flat_face = model_point_in_view(
         adapter,
         right,
-        (0.0, PIN_DIA / 2000.0, 0.0),
+        (PIN_DIA / 2000.0, 0.0, 0.0),
         label="cam-pin seated flat end",
     )
     add_feature_control_frame(
@@ -206,8 +206,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         (
-            0.0,
             crown_radial / 1000.0,
+            0.0,
             (PIN_LEN + crown_axial) / 1000.0,
         ),
         label="pinion cam-pin outer crown face",

@@ -35,6 +35,12 @@ def test_sheet_runs_at_4_to_1_with_8_to_1_end_view() -> None:
     assert drawing.SHEET_SCALE == (4.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(8, 1)" in source  # the end-view override
+    # The crown radius belongs to a sketch on the Top plane.  The equivalent
+    # axisymmetric side elevation must face that plane to import CapR natively.
+    assert '"*Top", *RIGHT_CENTER' in source
+    assert '"*Right", *RIGHT_CENTER' not in source
+    assert "(PIN_DIA / 2000.0, 0.0, 0.0)" in source
+    assert "crown_radial / 1000.0,\n            0.0," in source
     # The isometric renders at the sheet scale, so no separate iso-scale note.
     assert 'add_property_linked_note(adapter, "End View Note"' in source
     assert pinion_cam_pin_spec.END_VIEW_NOTE == "END VIEW SCALE 8:1"
