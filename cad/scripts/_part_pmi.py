@@ -23,6 +23,7 @@ drawing or assembly module (``check:partiso``).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Sequence
 
@@ -30,12 +31,14 @@ import _telemetry
 from _common import _early_bound, _read_member
 from _gtol_spec import (
     GTOL_SYMBOLS,
+    ConeFace,
     CylinderFace,
     FaceSpec,
     GeometricControl,
     PartDatum,
     PlanarFace,
     SphereFace,
+    TorusFace,
     gtol_frame_signature,
     validate_part_pmi,
 )
@@ -45,7 +48,9 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 # swSurfaceTypes_e identities read via ISurface.Identity.
 _SURFACE_PLANE = 4001
 _SURFACE_CYLINDER = 4002
-_SURFACE_SPHERE = 4003
+_SURFACE_CONE = 4003
+_SURFACE_SPHERE = 4004
+_SURFACE_TORUS = 4005
 
 _GTOL_CURRENT_FORMAT = 2  # swGtolFormatType_e.GTOL_SW2022
 _SELECT_FACE = 2  # swSelectType_e.swSelFACES
@@ -83,6 +88,14 @@ def _face_geometry(face: Any) -> _FaceGeometry | None:
             outward_normal=None,
             box=tuple(face.GetBox() or ()),
         )
+    if identity == _SURFACE_CONE:
+        return _FaceGeometry(
+            face=face,
+            identity=identity,
+            parameters=tuple(_read_member(surface, "ConeParams2")),
+            outward_normal=None,
+            box=tuple(face.GetBox() or ()),
+        )
     if identity == _SURFACE_PLANE:
         parameters = tuple(_read_member(surface, "PlaneParams"))
         normal = _unit(parameters[0:3])
@@ -103,6 +116,14 @@ def _face_geometry(face: Any) -> _FaceGeometry | None:
             outward_normal=None,
             box=tuple(face.GetBox() or ()),
         )
+    if identity == _SURFACE_TORUS:
+        return _FaceGeometry(
+            face=face,
+            identity=identity,
+            parameters=tuple(_read_member(surface, "TorusParams")),
+            outward_normal=None,
+            box=tuple(face.GetBox() or ()),
+        )
     return _FaceGeometry(face, identity, (), None, ())
 
 
@@ -116,12 +137,34 @@ def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
         diameter_m = 2.0 * geometry.parameters[6]
         if abs(diameter_m - spec.diameter_mm / 1000.0) > tolerance_m:
             return False
-        if spec.contains_y_mm is None:
+        if spec.contains_x_mm is None and spec.contains_y_mm is None:
             return True
         if len(geometry.box) != 6:
             return False
-        y = spec.contains_y_mm / 1000.0
-        return geometry.box[1] - tolerance_m <= y <= geometry.box[4] + tolerance_m
+        if spec.contains_x_mm is not None:
+            x = spec.contains_x_mm / 1000.0
+            if not geometry.box[0] - tolerance_m <= x <= geometry.box[3] + tolerance_m:
+                return False
+        if spec.contains_y_mm is not None:
+            y = spec.contains_y_mm / 1000.0
+            if not geometry.box[1] - tolerance_m <= y <= geometry.box[4] + tolerance_m:
+                return False
+        return True
+    if isinstance(spec, ConeFace):
+        if geometry.identity != _SURFACE_CONE:
+            return False
+        # ConeParams2: origin xyz, axis xyz, reference radius, half-angle,
+        # reference direction xyz. The angle is radians.
+        if abs(math.degrees(geometry.parameters[7]) - spec.half_angle_degrees) > (
+            spec.tolerance_degrees
+        ):
+            return False
+        if spec.contains_x_mm is None:
+            return True
+        if len(geometry.box) != 6:
+            return False
+        x = spec.contains_x_mm / 1000.0
+        return geometry.box[0] - tolerance_m <= x <= geometry.box[3] + tolerance_m
     if isinstance(spec, PlanarFace):
         if geometry.identity != _SURFACE_PLANE or geometry.outward_normal is None:
             return False
@@ -139,6 +182,22 @@ def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
         center = geometry.parameters[0:3]
         radius = geometry.parameters[3]
         if abs(2.0 * radius - spec.diameter_mm / 1000.0) > tolerance_m:
+            return False
+        if spec.center_mm is None:
+            return True
+        return all(
+            abs(actual - expected / 1000.0) <= tolerance_m
+            for actual, expected in zip(center, spec.center_mm)
+        )
+    if isinstance(spec, TorusFace):
+        if geometry.identity != _SURFACE_TORUS:
+            return False
+        center = geometry.parameters[0:3]
+        major_radius = geometry.parameters[6]
+        minor_radius = geometry.parameters[7]
+        if abs(major_radius - spec.major_radius_mm / 1000.0) > tolerance_m:
+            return False
+        if abs(minor_radius - spec.minor_radius_mm / 1000.0) > tolerance_m:
             return False
         if spec.center_mm is None:
             return True

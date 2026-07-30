@@ -6,10 +6,13 @@ import pytest
 
 from _drawing_common import PmiDrawingPlacement
 from _gtol_spec import (
+    ConeFace,
     CylinderFace,
     GeometricControl,
     PartDatum,
     PlanarFace,
+    SphereFace,
+    TorusFace,
     gtol_frame_signature,
     validate_part_pmi,
 )
@@ -79,6 +82,77 @@ def test_cylinder_face_tolerance_is_diametral_not_radial() -> None:
 
     assert not _face_matches(geometry, CylinderFace(10.0, tolerance_mm=0.05))
     assert _face_matches(geometry, CylinderFace(10.0, tolerance_mm=0.1))
+
+
+def test_cylinder_face_can_disambiguate_by_x_and_y_stations() -> None:
+    geometry = _FaceGeometry(
+        face=SimpleNamespace(),
+        identity=4002,
+        parameters=(0.011, -0.04, 0.008, 0.0, 1.0, 0.0, 4e-3),
+        outward_normal=None,
+        box=(0.007, 0.008, 0.004, 0.015, 0.018, 0.012),
+    )
+
+    assert _face_matches(
+        geometry, CylinderFace(8.0, contains_x_mm=11.0, contains_y_mm=13.0)
+    )
+    assert not _face_matches(
+        geometry, CylinderFace(8.0, contains_x_mm=21.0, contains_y_mm=13.0)
+    )
+
+
+def test_cone_face_matches_live_coneparams2_contract() -> None:
+    geometry = _FaceGeometry(
+        face=SimpleNamespace(),
+        identity=4003,
+        parameters=(
+            0.045,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0025,
+            0.01041629,
+            0.0,
+            -1.0,
+            0.0,
+        ),
+        outward_normal=None,
+        box=(0.0, -0.003, -0.003, 0.045, 0.003, 0.003),
+    )
+
+    assert _face_matches(
+        geometry, ConeFace(0.596809, contains_x_mm=22.5, tolerance_degrees=0.001)
+    )
+    assert not _face_matches(geometry, ConeFace(1.0))
+
+
+def test_sphere_identity_is_not_cone_identity() -> None:
+    geometry = _FaceGeometry(
+        face=SimpleNamespace(),
+        identity=4004,
+        parameters=(0.0, 0.0252, 0.0, 0.0065),
+        outward_normal=None,
+        box=(),
+    )
+
+    assert _face_matches(geometry, SphereFace(13.0, center_mm=(0.0, 25.2, 0.0)))
+
+
+def test_torus_face_matches_generating_radii_and_center() -> None:
+    geometry = _FaceGeometry(
+        face=SimpleNamespace(),
+        identity=4005,
+        parameters=(0.0, 0.0085, 0.0, 0.0, 1.0, 0.0, 0.0015, 0.005),
+        outward_normal=None,
+        box=(),
+    )
+
+    assert _face_matches(
+        geometry, TorusFace(1.5, 5.0, center_mm=(0.0, 8.5, 0.0))
+    )
+    assert not _face_matches(geometry, TorusFace(2.0, 5.0))
 
 
 def test_imported_pmi_placement_requires_one_attachment() -> None:

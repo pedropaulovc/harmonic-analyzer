@@ -52,6 +52,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pen_v_block_spec import (
     BLOCK_DEPTH,
@@ -67,6 +68,7 @@ from pen_v_block_spec import (
     SCREW_HOLE_XY,
     SLIT_LENGTH,
     SLIT_Y,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "pen-v-block"
@@ -253,6 +255,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
     # The ch24 macro shows the cradle painted the machine green (manifest note

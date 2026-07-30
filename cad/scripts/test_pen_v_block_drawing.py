@@ -8,6 +8,7 @@ import build_pen_v_block as part
 import draw_pen_v_block as drawing
 import pen_v_block_spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_spec import CylinderFace
 
 
 def test_required_drawing_paths() -> None:
@@ -84,12 +85,21 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
     assert "characteristic=\"position\"" in source
     # Ra 1.6 on BOTH pen bores (the 2X functional pair), one symbol each.
     assert source.count("add_surface_finish(") == 2
+    assert all(
+        isinstance(control.face, CylinderFace)
+        for control in pen_v_block_spec.SURFACE_FINISHES
+    )
+    assert {control.face.contains_x_mm for control in pen_v_block_spec.SURFACE_FINISHES} == set(
+        pen_v_block_spec.BORE_X
+    )
+    assert source.count("surface_finish_by_key(SURFACE_FINISHES") == 2
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in source
     import _config
 
     spec = _config.parts("pen-v-block")

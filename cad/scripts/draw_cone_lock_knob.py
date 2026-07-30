@@ -24,7 +24,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from cone_lock_knob_spec import (
     BODY_DIA,
     BODY_TOP,
@@ -32,6 +32,7 @@ from cone_lock_knob_spec import (
     STUD_DIA,
     STUD_LEN,
     STUD_THREAD,
+    SURFACE_FINISHES,
     WASHER_DIA,
     WASHER_T,
 )
@@ -305,7 +306,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=crown_flat,
         symbol_xy=(crown_flat[0] + 0.024, crown_flat[1] + 0.012),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "dome_crown"),
         label="dome crown finish",
     )
 

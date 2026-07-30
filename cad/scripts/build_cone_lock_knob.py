@@ -56,6 +56,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_symmetric_tolerance,
 )
+from _part_pmi import author_part_pmi
 from cone_lock_knob_spec import (
     BODY_DIA,  # knob body -- ONE straight wall (t00411: no mid step)
     BODY_TOP,  # body top above the washer seat; height ~ diameter
@@ -65,6 +66,7 @@ from cone_lock_knob_spec import (
     DRAWING_NOTES,
     STUD_DIA,  # 1/4" clamp stud -- rides the platform's SLOT_W notch
     STUD_LEN,  # plate thickness exactly: stud ends FLUSH with the base
+    SURFACE_FINISHES,
     # top (thread engagement into the absent base unmodeled, see docstring)
     WASHER_DIA,  # clamp washer flange, seats on the plate top
     WASHER_T,
@@ -200,6 +202,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

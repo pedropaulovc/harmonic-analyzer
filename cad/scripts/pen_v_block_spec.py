@@ -24,6 +24,9 @@ run without SolidWorks in ~1 s.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 # --- Nominal geometry (DIMENSIONS.md "Chapter 24", all scaled from the p.65
 # close-up vs the ~5 mm square rod, low).  These drive the part's named
 # equation globals AND the drawing's coordinate math. ---
@@ -37,6 +40,20 @@ SLIT_LENGTH = 26.0  # stopped cut from x=0; hinge remains 26..32
 SLIT_Y = (4.0, 8.0)  # slit band
 SCREW_HOLE_DIA = 2.5  # front-face clamp/set screw hole
 SCREW_HOLE_XY = (29.0, 11.0)
+
+_UPPER_BORE_Y = (SLIT_Y[1] + BLOCK_HEIGHT) / 2.0
+SURFACE_FINISHES = tuple(
+    SurfaceFinishControl(
+        f"pen_bore_{index}",
+        MACHINED_UM,
+        CylinderFace(
+            BORE_DIA,
+            contains_x_mm=x,
+            contains_y_mm=_UPPER_BORE_Y,
+        ),
+    )
+    for index, x in enumerate(BORE_X)
+)
 
 # Derived spans (equations of the primitives above).
 SLIT_WIDTH = SLIT_Y[1] - SLIT_Y[0]  # 4.0

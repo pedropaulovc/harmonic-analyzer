@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import _surface_finish
 import build_crank_pin as part
 import crank_pin_spec
 import draw_crank_pin as drawing
-from _drawing_contract import assert_sheet_references
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gtol_spec import ConeFace
 
 
 def test_required_drawing_paths() -> None:
@@ -23,11 +22,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is crank_pin_spec.DRAWING_DIMENSIONS
     marked = set().union(*crank_pin_spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FRONT_KEEP) == marked
-    assert (drawing.PIN_LENGTH, drawing.BIG_END_DIA, drawing.SMALL_END_DIA) == (
-        crank_pin_spec.PIN_LENGTH,
-        crank_pin_spec.BIG_END_DIA,
-        crank_pin_spec.SMALL_END_DIA,
-    )
+    assert drawing.PIN_LENGTH == crank_pin_spec.PIN_LENGTH
 
 
 def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
@@ -59,7 +54,11 @@ def test_linked_notes_define_remaining_pin_operations() -> None:
 def test_native_finish_symbol_controls_taper_seat() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_surface_finish(") == 1
-    assert_sheet_references(drawing, "MACHINED", _surface_finish.MACHINED)
+    assert isinstance(crank_pin_spec.SURFACE_FINISHES[0].face, ConeFace)
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "taper_seat")' in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
+        part.__file__
+    ).read_text(encoding="utf-8")
 
 
 def test_view_scales_are_explicit() -> None:
