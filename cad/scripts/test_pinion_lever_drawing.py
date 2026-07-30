@@ -99,6 +99,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
         ("Wall", "EndWall"): "END_WALL_TOLERANCE_MM",
         ("RodProfile", "RodTipY"): "ROD_TIP_Y_TOLERANCE_MM",
         ("RodProfile", "RodTipDia"): "ROD_TIP_DIAMETER_TOLERANCE_MM",
+        ("RodProfile", "GripHalfAngle"): "GRIP_HALF_ANGLE_TOLERANCE_DEG",
         ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
     }
     part_source = Path(lever.__file__).read_text(encoding="utf-8")
