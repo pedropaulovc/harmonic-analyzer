@@ -9,6 +9,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import math
+import os
 import sys
 from collections import Counter
 from dataclasses import dataclass, replace
@@ -749,7 +750,7 @@ def add_surface_finish(
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
     """
-    _select_annotation_entity(
+    selected_entity = _select_annotation_entity(
         adapter,
         view,
         edge_xy=edge_xy,
@@ -758,6 +759,39 @@ def add_surface_finish(
         entity_type=entity_type,
         label=label,
     )
+    if os.getenv("HARMONIC_SURFACE_AUDIT") == "1":
+        from _part_pmi import _face_geometry
+
+        faces: list[Any] = []
+        if entity_type == "FACE":
+            faces.append(selected_entity)
+        else:
+            edge = adapter._attempt(
+                lambda: _early_bound(selected_entity, "IEdge"), default=None
+            )
+            adjacent = adapter._attempt(
+                lambda: edge.GetTwoAdjacentFaces2() if edge is not None else None,
+                default=None,
+            )
+            if adjacent:
+                faces.extend(face for face in tuple(adjacent) if face is not None)
+        signatures = []
+        for face in faces:
+            geometry = _face_geometry(face)
+            if geometry is None:
+                continue
+            signatures.append(
+                {
+                    "identity": geometry.identity,
+                    "parameters": tuple(round(value, 9) for value in geometry.parameters),
+                    "normal": geometry.outward_normal,
+                    "box": tuple(round(value, 9) for value in geometry.box),
+                }
+            )
+        _telemetry.info(
+            f"SURFACE_AUDIT {label}: entity_type={entity_type}, "
+            f"faces={signatures!r}"
+        )
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req

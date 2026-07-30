@@ -156,7 +156,24 @@ class PlanarFace:
             raise ValueError("plane match tolerance must be positive")
 
 
-FaceSpec = Union[CylinderFace, PlanarFace]
+@dataclass(frozen=True)
+class SphereFace:
+    """The unique spherical face of ``diameter_mm`` and optional centre."""
+
+    diameter_mm: float
+    center_mm: tuple[float, float, float] | None = None
+    tolerance_mm: float = 0.05
+
+    def __post_init__(self) -> None:
+        if self.diameter_mm <= 0.0:
+            raise ValueError("sphere diameter must be positive")
+        if self.center_mm is not None and len(self.center_mm) != 3:
+            raise ValueError("sphere center must be a 3-vector")
+        if self.tolerance_mm <= 0.0:
+            raise ValueError("sphere match tolerance must be positive")
+
+
+FaceSpec = Union[CylinderFace, PlanarFace, SphereFace]
 
 
 @dataclass(frozen=True)
