@@ -23,13 +23,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
+from _surface_finish import surface_finish_by_key  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
+from transgear_stub_spec import SURFACE_FINISHES  # noqa: E402
 
 SOURCE = CAD_ROOT / "out" / "sldprt" / "transgear-stub.SLDPRT"
 SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "transgear-stub-surface-pmi.SLDPRT"
 SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "transgear-stub-surface-pmi.SLDDRW"
-ANNOTATION_NAME = "PMI:SURFACE:gear-seat"
-ROUGHNESS = "Ra 1.6"
+CONTROL = surface_finish_by_key(SURFACE_FINISHES, "gear_seat")
+ANNOTATION_NAME = CONTROL.annotation_name
+ROUGHNESS = f"Ra {CONTROL.roughness_um:g}"
 SHEET_TARGET = (0.19, 0.19)
 
 _SFS_ANNOTATION = 7
