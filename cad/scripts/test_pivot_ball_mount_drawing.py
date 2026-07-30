@@ -8,7 +8,7 @@ import _surface_finish
 import build_pivot_ball_mount as part
 import draw_pivot_ball_mount as drawing
 import pivot_ball_mount_spec
-from _drawing_contract import assert_sheet_references
+from _drawing_contract import assert_sheet_references, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -17,8 +17,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.PDF.as_posix().endswith("/pdf/pivot-ball-mount.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pivot-ball-mount_drawing.png")
     assert (
-        DRAWINGS_BY_NAME["pivot_ball_mount"].script
-        == Path(drawing.__file__).resolve()
+        DRAWINGS_BY_NAME["pivot_ball_mount"].script == Path(drawing.__file__).resolve()
     )
 
 
@@ -29,6 +28,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert kept == marked
     assert marked == {
         "BallRise",
+        "BaseHeight",
         "ShaftBoreDia",
     }
 
@@ -48,8 +48,15 @@ def test_part_uses_shared_geometry_constants() -> None:
 
 
 def test_callouts_clarify_bore_and_center_height() -> None:
-    assert drawing.DIMENSION_CALLOUTS["ShaftBoreDia"] == "+0.00/-0.05 THRU"
+    assert drawing.DIMENSION_CALLOUTS["ShaftBoreDia"] == "THRU"
     assert "BallRise" not in drawing.DIMENSION_CALLOUTS
+    assert model_toleranced_dimensions(part) == {
+        ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(SHAFT_BORE_DIA_BAND)",
+        ("BallMountProfile", "BaseHeight"): "BASE_HEIGHT_TOLERANCE_MM",
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "HEIGHT PER NATIVE DIMENSION" in source
+    assert "{BASE_DIA:.2f} +/-0.05 PAD" in source
 
 
 def test_notes_specify_ball_bore_and_shaft_without_title_block_duplicates() -> None:

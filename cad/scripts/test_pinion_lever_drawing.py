@@ -8,6 +8,7 @@ import pinion_lever_spec
 import draw_pinion_lever as drawing
 import build_pinion_lever as lever
 import _drawing_common
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -15,9 +16,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-lever.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-lever.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pinion-lever_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["pinion_lever"].script == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["pinion_lever"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -81,19 +80,25 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
         "        symbol_xy=(bore_left[0] - 0.022, bore_left[1] + 0.018),\n"
         '        datum="A",\n'
         '        label="lever final bore axis",\n'
-        "        position_tolerance_m=0.005,"
-        in source
+        "        position_tolerance_m=0.005," in source
     )
     assert source.count("position_tolerance_m=0.005") == 1
     assert source.count('entity_type="SILHOUETTE"') == 5
     assert source.count('entity_type="FACE"') == 0
     assert 'characteristic="circular_runout"' in source
     assert "add_surface_finish(" not in source
-    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["HubBore"]
-    assert "Ra 1.6" in drawing.DIMENSION_CALLOUTS["HubBore"]
-    assert "+0.10/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDepth"]
+    assert model_toleranced_dimensions(lever) == {
+        ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",
+        ("Barrel", "BoreDepth"): "*deviations(BORE_DEPTH_BAND)",
+        ("Wall", "EndWall"): "END_WALL_TOLERANCE_MM",
+        ("RodProfile", "RodTipY"): "ROD_TIP_Y_TOLERANCE_MM",
+        ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
+    }
+    assert drawing.DIMENSION_CALLOUTS["HubBore"] == "FINAL REAM"
+    assert "+0.10/-0.00" not in drawing.DIMENSION_CALLOUTS["BoreDepth"]
     assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
-    assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall"}
+    assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall", "CapR"}
+    assert "SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10" not in source
     assert "<MOD-DIAM>{ROD_TIP_DIA:.2f}" in source
     assert "GRIP_HALF_ANGLE_DEG" in source
     assert "{HUB_LEN:.2f} REF" in source
@@ -104,7 +109,10 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "ModelToViewTransform" in common_source
     assert "(0.0, HUB_OD / 2000.0, HUB_LEN / 2000.0)" in source
     assert "section_hub_y" not in source
-    assert 'sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")' in common_source
+    assert (
+        'sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")'
+        in common_source
+    )
     assert "segment = sketch_manager.CreateLine(" in common_source
     assert "segment = ddoc.CreateLine2(" not in common_source
 

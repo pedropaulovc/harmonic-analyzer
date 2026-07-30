@@ -39,9 +39,16 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
-from transgear_pinion_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, GEAR_DATA
+from transgear_pinion_spec import (
+    BORE_DIA_BAND,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    GEAR_DATA,
+)
 
 PART_NAME = "transgear-pinion"
 MATERIAL = "Plain Carbon Steel"  # ch. 23 photos: steel (unlike the brass wheels)
@@ -75,7 +82,12 @@ async def build(adapter) -> dict[str, str]:
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, BORE_DIAMETER / 2.0, "bore", dims=bore,
+        adapter,
+        0.0,
+        0.0,
+        BORE_DIAMETER / 2.0,
+        "bore",
+        dims=bore,
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
@@ -98,7 +110,10 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven transgear pinion (equations neutral)", volume - v_bore, 0.01 * v_bore
+        adapter,
+        "driven transgear pinion (equations neutral)",
+        volume - v_bore,
+        0.01 * v_bore,
     )
 
     await apply_material(adapter, MATERIAL)
@@ -106,6 +121,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Mark the bore as the single manufacturing model dimension and stamp the
     # title-block + gear-data properties the curated drawing reads.
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

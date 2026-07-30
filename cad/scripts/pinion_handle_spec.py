@@ -10,6 +10,7 @@ drawing keeps in lockstep (``test_pinion_handle_drawing.py``).
 
 from __future__ import annotations
 
+from _fit_limits import REAM_SLIDE
 from pinion_handle_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -33,6 +34,10 @@ from pinion_handle_geometry import (
 # text stale (codex #359).
 ROD_PRESS_BAND = (0.0025, -0.0025)  # turned cross-rod OD tolerance
 ROD_HOLE_REAM_BAND = (0.005, -0.005)  # body cross-hole ream tolerance
+TUBE_ID_BAND = REAM_SLIDE
+GRIP_LENGTH_TOLERANCE_MM = 0.10
+TUBE_LENGTH_BAND = (0.10, 0.00)
+ROD_SPAN_TOLERANCE_MM = 0.10
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripProfile": {"GripDia"},
@@ -41,6 +46,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Tube": {"TubeLen"},
     "RodProfile": {"RodDia"},
     "Rod": {"RodSpan"},
+    "RodHoleProfile": {"RodHoleDia"},
 }
 
 DRAWING_NOTES = "\n".join(

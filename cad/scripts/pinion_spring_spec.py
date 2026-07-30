@@ -29,6 +29,10 @@ from pinion_spring_geometry import (
     WIDTH as WIDTH,
 )
 
+FOOT_LENGTH_TOLERANCE_MM = 0.10
+BEND_RADIUS_TOLERANCE_MM = 0.10
+KINK_RADIUS_TOLERANCE_MM = 0.10
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {"FootLen", "BendR", "KinkR"},
 }

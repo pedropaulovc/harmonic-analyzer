@@ -46,7 +46,10 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_shaft_spec import (
     CAP_SAG,
@@ -55,7 +58,9 @@ from pinion_pivot_shaft_spec import (
     END_VIEW_NOTE,
     ISO_VIEW_NOTE,
     SHAFT_DIA,
+    SHAFT_DIA_BAND,
     SHAFT_LEN,
+    SHAFT_LENGTH_TOLERANCE_MM,
 )
 
 PART_NAME = "pinion-pivot-shaft"
@@ -97,7 +102,12 @@ async def build(adapter) -> dict[str, str]:
     shaft = SketchDims()
     check("create_sketch shaft", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, SHAFT_R, "shaft", dims=shaft,
+        adapter,
+        0.0,
+        0.0,
+        SHAFT_R,
+        "shaft",
+        dims=shaft,
         names=("ShaftCx", "ShaftCz", "ShaftDia"),
         drives=(None, None, '"ShaftDia"'),
     )
@@ -143,8 +153,11 @@ async def build(adapter) -> dict[str, str]:
         )
         # add_arc sweeps CCW p1 -> p2: the minor (outward-bulge) lobe is
         # rim -> apex at the front end, apex -> rim at the back end.
-        p1, p2 = (((0.0, v_apex), (SHAFT_R, v_base)) if sign > 0
-                  else ((SHAFT_R, v_base), (0.0, v_apex)))
+        p1, p2 = (
+            ((0.0, v_apex), (SHAFT_R, v_base))
+            if sign > 0
+            else ((SHAFT_R, v_base), (0.0, v_apex))
+        )
         arc = check(
             f"cap {tag} arc",
             await adapter.add_arc(0.0, v_centre, p1[0], p1[1], p2[0], p2[1]),
@@ -214,9 +227,7 @@ async def build(adapter) -> dict[str, str]:
             await adapter.create_revolve(RevolveParameters(angle=360.0)),
         )
         name_last_feature(adapter, f"Cap{tag.capitalize()}")
-        volume = await volume_check(
-            adapter, f"cap {tag}", volume + V_CAP, 0.03 * V_CAP
-        )
+        volume = await volume_check(adapter, f"cap {tag}", volume + V_CAP, 0.03 * V_CAP)
 
     # Named central axis (Axis1) for the assembly swing revolute: the pinion
     # swing group pivots on this shaft (p2 engage DOF, build_drive_train).
@@ -228,10 +239,18 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven shaft (equations neutral)", volume, 0.005 * V_SHAFT)
+    await volume_check(
+        adapter, "driven shaft (equations neutral)", volume, 0.005 * V_SHAFT
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Shaft", "Depth", SHAFT_LENGTH_TOLERANCE_MM
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

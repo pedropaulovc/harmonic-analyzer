@@ -7,6 +7,7 @@ from pathlib import Path
 import pinion_handle_spec
 import draw_pinion_handle as drawing
 import build_pinion_handle as handle
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -14,9 +15,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-handle.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-handle.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pinion-handle_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["pinion_handle"].script == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["pinion_handle"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -30,13 +29,11 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         drawing.ROD_UP,
         drawing.ROD_DOWN,
         drawing.ROD_DIA,
-        drawing.ROD_HOLE_DIA,
     ) == (
         pinion_handle_spec.TUBE_ID,
         pinion_handle_spec.ROD_UP,
         pinion_handle_spec.ROD_DOWN,
         pinion_handle_spec.ROD_DIA,
-        pinion_handle_spec.ROD_HOLE_DIA,
     )
 
 
@@ -66,8 +63,8 @@ def test_handle_interfaces_are_fully_released_for_manufacture() -> None:
     assert "AT ASSEMBLY" not in notes
     assert "DOWEL" not in notes
     assert "PRESSED CROSS ROD" in notes
-    assert "6.010 MAX / 6.000 MIN" in drawing.DIMENSION_CALLOUTS["RodDia"]
-    assert "6.020 MAX / 6.015 MIN" in drawing.DIMENSION_CALLOUTS["RodDia"]
+    assert drawing.DIMENSION_CALLOUTS["RodDia"] == "PRESS ROD"
+    assert drawing.DIMENSION_CALLOUTS["RodHoleDia"] == "BODY HOLE; REAM THRU"
     assert 6.015 <= pinion_handle_spec.ROD_DIA <= 6.020
     assert 6.000 <= pinion_handle_spec.ROD_HOLE_DIA <= 6.010
     source = Path(handle.__file__).read_text(encoding="utf-8")
@@ -87,18 +84,25 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
     assert source.count("add_datum_feature(") == 2
     assert source.count("add_feature_control_frame(") == 4
     assert (
-        'label="handle final bore axis",\n        position_tolerance_m=0.0001'
-        in source
+        'label="handle final bore axis",\n        position_tolerance_m=0.0001' in source
     )
     assert source.count("position_tolerance_m=0.0001") == 1
     assert "add_surface_finish(" not in source
     assert {"GripLen", "TubeLen", "RodSpan"} <= set().union(
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()
     )
-    assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["TubeId"]
+    assert model_toleranced_dimensions(handle) == {
+        ("TubeProfile", "TubeId"): "*deviations(TUBE_ID_BAND)",
+        ("Grip", "GripLen"): "GRIP_LENGTH_TOLERANCE_MM",
+        ("Tube", "TubeLen"): "*deviations(TUBE_LENGTH_BAND)",
+        ("RodProfile", "RodDia"): "*deviations(ROD_PRESS_BAND)",
+        ("Rod", "RodSpan"): "ROD_SPAN_TOLERANCE_MM",
+        ("RodHoleProfile", "RodHoleDia"): "*deviations(ROD_HOLE_REAM_BAND)",
+    }
+    assert drawing.DIMENSION_CALLOUTS["TubeId"] == "FINAL REAM"
     assert "CYL. LENGTH" in drawing.DIMENSION_CALLOUTS["GripLen"]
-    assert drawing.DIMENSION_CALLOUTS["TubeLen"] == "+0.10/-0.00 BORE DEPTH"
-    assert drawing.DIMENSION_CALLOUTS["RodSpan"] == "+/-0.10 OAL"
+    assert drawing.DIMENSION_CALLOUTS["TubeLen"] == "BORE DEPTH"
+    assert drawing.DIMENSION_CALLOUTS["RodSpan"] == "OAL"
     assert "HUB PROJECTION: DATUM B TO GRIP FACE 12.00 +0.10/-0.00" in (
         pinion_handle_spec.DRAWING_NOTES
     )

@@ -7,6 +7,7 @@ from pathlib import Path
 import build_pinion_lift_rod as part
 import draw_pinion_lift_rod as drawing
 import pinion_lift_rod_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -33,10 +34,14 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_linked_notes_define_remaining_bearing_rod_operations() -> None:
     notes = pinion_lift_rod_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["RodDia"] == "+0.00/-0.02"
+    assert drawing.DIMENSION_CALLOUTS == {}
     # The length tolerance rides the 202.00 dimension, not a detached UOS note
     # (codex machinist review finding).
-    assert drawing.RIGHT_CALLOUTS["Depth"] == "+/-0.25"
+    assert drawing.RIGHT_CALLOUTS == {}
+    assert model_toleranced_dimensions(part) == {
+        ("RodProfile", "RodDia"): "*deviations(ROD_DIA_BAND)",
+        ("Rod", "Depth"): "ROD_LENGTH_TOLERANCE_MM",
+    }
     assert "LENGTH +/-" not in notes
     # The crown is conveyed as a note (its sketch dims live on the Top plane,
     # outside every placed view): spherical radius consistent with the

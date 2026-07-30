@@ -38,11 +38,9 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import fit_limits
 from _surface_finish import MACHINED
 from pinion_cam_spec import (
     BORE,
-    BORE_BAND,
     BOSS_DIA,
     BOSS_PROUD,
     BOSS_Z,
@@ -74,9 +72,7 @@ SHEET_SCALE = (3.0, 1.0)
 
 # Front view (XY): the collar circle is centred ECC BELOW the origin, the bore
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
-FRONT_BBOX_CY = (
-    (CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))
-) / 2.0
+FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
 FRONT_CENTER = (0.105, 0.150)
 TOP_CENTER = (0.100, 0.232)
 ISO_CENTER = (0.230, 0.185)
@@ -105,13 +101,9 @@ TOP_KEEP = {
     "BossCz": (0.155, 0.200),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"FINAL REAM LIMITS\n{fit_limits(BORE, BORE_BAND)} THRU",
-    "CollarOd": "+/-0.05",
-    "CollarCy": "+/-0.05 BOTH END FACES",
-    "Depth": "+/-0.05",
-    "BossDia": (
-        f"+/-0.05\nPROJECTION {BOSS_PROUD:.2f}+/-0.05\nBEYOND DIA {CAM_OD:.2f} OD"
-    ),
+    "BoreDia": "FINAL REAM; THRU",
+    "CollarCy": "BOTH END FACES",
+    "BossDia": (f"PROJECTION {BOSS_PROUD:.2f}+/-0.05\nBEYOND DIA {CAM_OD:.2f} OD"),
     "BossCz": "A TO BOSS / TAP AXIS",
 }
 
@@ -186,9 +178,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
-    bottom = place_view(
-        adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1)
-    )
+    bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", 0.350, 0.185, scale=(2, 1))
     set_hidden_lines_removed(adapter, iso)
     for view in (front, top, bottom):
@@ -210,9 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if boss_station_display is None:
         raise RuntimeError("BossCz has no display dimension to box")
-    set_basic_dimension(
-        adapter, boss_station_display, label="boss/tap axial station"
-    )
+    set_basic_dimension(adapter, boss_station_display, label="boss/tap axial station")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
@@ -222,7 +210,6 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_bottom = (bore_center[0], bore_center[1] - BORE_R_SHEET)
     bore_right = (bore_center[0] + BORE_R_SHEET, bore_center[1])
     front_face_x = TOP_CENTER[0] - CAM_LEN * SHEET_SCALE[0] / 2000.0
-    front_face = (front_face_x, TOP_CENTER[1])
     bottom_boss_center = (
         BOTTOM_CENTER[0],
         BOTTOM_CENTER[1] + (BOSS_Z - CAM_LEN / 2.0) * 2.0 / 1000.0,

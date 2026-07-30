@@ -9,6 +9,7 @@ import pinion_cam_spec
 import draw_pinion_cam as drawing
 import build_pinion_cam as cam
 from _buildgraph import module_deps_of
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -67,7 +68,13 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "SLIDING FIT" not in notes
-    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert model_toleranced_dimensions(cam) == {
+        ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
+        ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
+        ("CollarProfile", "CollarCy"): "COLLAR_AXIS_TOLERANCE_MM",
+        ("Collar", "Depth"): "COLLAR_DEPTH_TOLERANCE_MM",
+        ("BossProfile", "BossDia"): "BOSS_DIA_TOLERANCE_MM",
+    }
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
     assert "X.XX" not in notes
@@ -95,22 +102,19 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert (
         'symbol_xy=(0.085, 0.105),\n        datum="B",\n'
         '        label="cam final bore axis",\n'
-        "        position_tolerance_m=0.003,"
-        in source
+        "        position_tolerance_m=0.003," in source
     )
     assert source.count("position_tolerance_m=0.003") == 1
     assert (
         'symbol_xy=(0.155, 0.105),\n        datum="C",\n'
         '        label="cam OD datum axis",\n'
-        "        position_tolerance_m=0.019,"
-        in source
+        "        position_tolerance_m=0.019," in source
     )
     assert source.count("position_tolerance_m=0.019") == 1
     assert (
         'symbol_xy=(0.192, 0.170),\n        datum="D",\n'
         '        label="cam boss OD axis",\n'
-        "        position_tolerance_m=0.0041,"
-        in source
+        "        position_tolerance_m=0.0041," in source
     )
     assert source.count("position_tolerance_m=0.0041") == 1
     assert "set_basic_dimension(" in source
@@ -121,12 +125,13 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert "COMMON ZONE" not in pinion_cam_spec.DRAWING_NOTES
     assert "POSITION TAP PITCH AXIS TO DATUM D" in pinion_cam_spec.DRAWING_NOTES
     assert "add_surface_finish(" in source
-    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].count("\n") == 1
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "FINAL REAM; THRU"
     assert "*Bottom" in source
     assert "BOSS END VIEW SCALE 2:1" in source
     assert "A TO BOSS / TAP AXIS" in drawing.DIMENSION_CALLOUTS["BossCz"]
-    assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "BOTH END FACES"
+    assert "PROJECTION" in drawing.DIMENSION_CALLOUTS["BossDia"]
+    assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["BossDia"]
     assert "{CAM_OD:.2f} OD" in source
 
 

@@ -53,6 +53,7 @@ BLOCK_BOTTOM_Y = -BORE_UP  # -12.0: the base seat
 FRONT_BBOX_CY = (BLOCK_TOP_Y + BLOCK_BOTTOM_Y) / 2.0  # -4.0: front-view centre
 BORE_SPACING = 2.0 * BORE_HALF_SPACING  # 15.0
 SCREW_SPACING = 2.0 * SCREW_HALF_SPACING  # 27.0
+BORE_DIA_BAND = (0.05, 0.00)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pinion_pivot_block`` marks exactly these;

@@ -17,9 +17,11 @@ BASE_H = 4.0  # seat pad height
 STEM_DIA = 8.0  # pillar between the pad and the ball
 BORE_DIA = 6.5  # shaft cross-bore
 SHAFT_DIA = 6.35  # the mating Ø6.35 pivot shaft
+SHAFT_BORE_DIA_BAND = (0.00, -0.05)
+BASE_HEIGHT_TOLERANCE_MM = 0.05
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BallMountProfile": {"BallRise"},
+    "BallMountProfile": {"BallRise", "BaseHeight"},
     "ShaftBoreProfile": {"ShaftBoreDia"},
 }
 

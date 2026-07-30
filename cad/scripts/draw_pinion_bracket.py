@@ -36,13 +36,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import REAM_H7, REAM_SLIDE, fit_limits
 from pinion_bracket_spec import (
     ARBOR_BORE,
     C2C as C2C,
     OVERALL_LENGTH,
-    PIN_BORE,
-    PIN_SEAT,
     PIVOT_BORE,
     R_END,
     THICKNESS,
@@ -107,26 +104,21 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (0.190, 0.068),
     "PinSeatDia": (0.282, 0.132),
+    "PinSeatDepth": (0.282, 0.110),
     # Locates the pin seat through the thickness (mid-plane) in the section view.
     "PinSeatCz": (0.245, 0.190),
 }
 DIMENSION_CALLOUTS = {
-    "ArborBoreCz": "+/-0.10",
-    "PivotBoreDia": (
-        f"PIVOT BORE; NOMINAL REF\nTHRU - REAM\n{fit_limits(PIVOT_BORE, REAM_SLIDE)}\nRa 1.6"
-    ),
-    "ArborBoreDia": (
-        f"ARBOR BORE; NOMINAL REF\nTHRU - REAM\n{fit_limits(ARBOR_BORE, REAM_SLIDE)}\nRa 1.6"
-    ),
-    "PinSeatCy": "PIN-SEAT AXIS\n+/-0.05 BELOW\nPIVOT-BORE AXIS",
-    "Depth": "+/-0.05 ONE STRAP THICKNESS",
+    "PivotBoreDia": "PIVOT BORE; THRU - REAM",
+    "ArborBoreDia": "ARBOR BORE; THRU - REAM",
+    "PinSeatCy": "PIN-SEAT AXIS BELOW PIVOT-BORE AXIS",
+    "Depth": "ONE STRAP THICKNESS",
     "PinSeatDia": (
-        f"NOMINAL REF\nH7: {fit_limits(PIN_BORE, REAM_H7)}\nBLIND; FLAT BOTTOM\n"
-        f"{PIN_SEAT:.2f} +0.10/-0.00 FULL-DIAMETER DEPTH\n"
-        "ALONG HOLE AXIS TO FLAT BOTTOM\nENTRY ON THE STRAIGHT EDGE FACE\n"
+        "H7; BLIND; FLAT BOTTOM\nENTRY ON THE STRAIGHT EDGE FACE\n"
         "NEAREST THE PIVOT BORE"
     ),
-    "PinSeatCz": "+/-0.05 FROM DATUM C",
+    "PinSeatCz": "FROM DATUM C",
+    "PinSeatDepth": "FULL-DIAMETER DEPTH\nALONG HOLE AXIS TO FLAT BOTTOM",
 }
 
 

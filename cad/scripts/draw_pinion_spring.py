@@ -71,9 +71,7 @@ SHEET_SCALE = (2.0, 1.0)
 
 # Front view (XY): the checkmark profile -- the foot runs along the bottom, the
 # blade rises to the upper right.  Centre it on the profile's y midspan.
-FRONT_BBOX_CX = (
-    FOOT_END[0] + max(BEND_EXIT[0], KINK_START[0], FLAT_TIP[0])
-) / 2.0
+FRONT_BBOX_CX = (FOOT_END[0] + max(BEND_EXIT[0], KINK_START[0], FLAT_TIP[0])) / 2.0
 FRONT_BBOX_CY = (FOOT_Y + FLAT_TIP[1]) / 2.0
 FRONT_CENTER = (0.130, 0.150)
 # Put the narrow top view in the open right-hand field, above the title block
@@ -98,9 +96,9 @@ FRONT_KEEP = {
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS: dict[str, str] = {
-    "FootLen": "+/-0.10 TRUE LENGTH\nFREE END TO BEND TANGENCY",
-    "BendR": "+/-0.10 INSIDE RADIUS",
-    "KinkR": "+/-0.10 INSIDE RADIUS",
+    "FootLen": "TRUE LENGTH\nFREE END TO BEND TANGENCY",
+    "BendR": "INSIDE RADIUS",
+    "KinkR": "INSIDE RADIUS",
 }
 
 
@@ -202,12 +200,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if add_note(adapter, "FORMED PROFILE - FRONT VIEW SCALE 2:1", 0.085, 0.078) is None:
         raise RuntimeError("failed to label spring front view")
-    if add_note(
-        adapter,
-        "TOP VIEW - LOOKING AT SCREW-DOWN FOOT BROAD FACE - SCALE 2:1",
-        0.245,
-        0.078,
-    ) is None:
+    if (
+        add_note(
+            adapter,
+            "TOP VIEW - LOOKING AT SCREW-DOWN FOOT BROAD FACE - SCALE 2:1",
+            0.245,
+            0.078,
+        )
+        is None
+    ):
         raise RuntimeError("failed to label spring top view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)

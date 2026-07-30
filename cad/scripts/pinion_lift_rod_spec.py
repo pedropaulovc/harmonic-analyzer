@@ -2,11 +2,14 @@ r"""Pure-data dimensional contract shared by the pinion lift rod and drawing."""
 
 from __future__ import annotations
 
+from _fit_limits import SHAFT_H
 
 ROD_DIA = 6.35
 ROD_LEN = 202.0
 CAP_SAG = 1.2
 CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
+ROD_DIA_BAND = SHAFT_H
+ROD_LENGTH_TOLERANCE_MM = 0.25
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"RodDia"},

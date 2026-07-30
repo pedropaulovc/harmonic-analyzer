@@ -26,12 +26,17 @@ from pinion_lever_geometry import (
 # Symmetric ream band about the 6.3675 mid nominal: 6.375 MAX / 6.360 MIN
 # (running fit on the Ø6.35 pivot shaft).
 BORE_BAND = (0.0075, -0.0075)
+BORE_DEPTH_BAND = (0.10, 0.00)
+END_WALL_TOLERANCE_MM = 0.05
+ROD_TIP_Y_TOLERANCE_MM = 0.25
+CAP_RADIUS_TOLERANCE_MM = 0.10
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
     "Wall": {"EndWall"},
     "RodProfile": {"RodTipY"},
+    "CapProfile": {"CapR"},
 }
 
 DRAWING_NOTES = "\n".join(

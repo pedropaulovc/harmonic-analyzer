@@ -34,7 +34,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import SHAFT_H, fit_limits
 from _surface_finish import MACHINED
 from pinion_pivot_shaft_spec import (
     CAP_RADIUS,
@@ -80,11 +79,8 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
 DIMENSION_CALLOUTS = {
-    "ShaftDia": (
-        "NOMINAL REF ONLY\nFINAL LIMITS\n"
-        + fit_limits(SHAFT_DIA, SHAFT_H, diameter=True)
-    ),
-    "Depth": "+/-0.25 CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
+    "ShaftDia": "FINAL SIZE",
+    "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
 }
 
 
@@ -177,9 +173,7 @@ async def build(adapter: Any) -> dict[str, str]:
         position_tolerance_m=0.0001,
     )
     crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(
-        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
-    )
+    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
     right_crown_face = (
         RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + crown_axial) / 1000.0,
         RIGHT_CENTER[1] + crown_radial / 2000.0,

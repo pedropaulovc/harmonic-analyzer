@@ -37,10 +37,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import fit_limits
 from pinion_lever_spec import (
     BORE,
-    BORE_BAND,
     CAP_RADIUS,
     CAP_SAG,
     HUB_LEN,
@@ -102,12 +100,14 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "BoreDepth": (0.245, 0.105),
     "EndWall": (0.235, 0.190),
+    "CapR": (0.300, 0.240),
 }
 DIMENSION_CALLOUTS = {
-    "HubBore": f"NOMINAL REF\n{fit_limits(BORE, BORE_BAND)}\nRa 1.6",
-    "BoreDepth": "+0.10/-0.00 FULL-DIA DEPTH FROM B; FLAT BOTTOM",
-    "EndWall": "+/-0.05 END WALL TO CROWN ROOT PLANE",
-    "RodTipY": "+/-0.25 FROM HUB AXIS",
+    "HubBore": "FINAL REAM",
+    "BoreDepth": "FULL-DIA DEPTH FROM B; FLAT BOTTOM",
+    "EndWall": "END WALL TO CROWN ROOT PLANE",
+    "RodTipY": "FROM HUB AXIS",
+    "CapR": "SPHERICAL CROWN",
 }
 
 
@@ -246,9 +246,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
     crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(
-        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
-    )
+    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
     crown_face = model_point_in_view(
         adapter,
         side,
@@ -263,8 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         side,
         text=(
-            f"SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10\n"
-            f"{HUB_LEN:.2f} REF B TO CROWN ROOT PLANE\n"
+            f"SPHERICAL CROWN\n{HUB_LEN:.2f} REF B TO CROWN ROOT PLANE\n"
             f"({CAP_SAG:.2f}) REF AXIAL HEIGHT ROOT TO APEX"
         ),
         entity_xy=crown_face,

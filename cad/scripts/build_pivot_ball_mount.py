@@ -50,15 +50,20 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from pivot_ball_mount_spec import (
     BALL_CENTER_H,
     BALL_DIA,
     BASE_DIA,
     BASE_H,
+    BASE_HEIGHT_TOLERANCE_MM,
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    SHAFT_BORE_DIA_BAND,
     STEM_DIA,
 )
 
@@ -166,9 +171,7 @@ async def build(adapter) -> dict[str, str]:
     profile.record("BallRadius", '"BallDia" / 2')
     check(
         "base radius",
-        await adapter.add_sketch_dimension(
-            base_bottom, None, "linear", BASE_DIA / 2.0
-        ),
+        await adapter.add_sketch_dimension(base_bottom, None, "linear", BASE_DIA / 2.0),
     )
     profile.record("BaseRadius", '"BaseDia" / 2')
     check(
@@ -203,7 +206,12 @@ async def build(adapter) -> dict[str, str]:
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, BALL_CENTER_H, BORE_DIA / 2.0, "shaft bore", dims=bore,
+        adapter,
+        0.0,
+        BALL_CENTER_H,
+        BORE_DIA / 2.0,
+        "shaft bore",
+        dims=bore,
         names=("BoreCx", "BoreCz", "ShaftBoreDia"),
         drives=(None, '"BallCenterH"', '"BoreDia"'),
     )
@@ -236,6 +244,18 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ShaftBoreProfile",
+        "ShaftBoreDia",
+        *deviations(SHAFT_BORE_DIA_BAND),
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "BallMountProfile",
+        "BaseHeight",
+        BASE_HEIGHT_TOLERANCE_MM,
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

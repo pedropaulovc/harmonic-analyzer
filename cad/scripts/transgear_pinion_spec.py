@@ -11,15 +11,16 @@ from __future__ import annotations
 MM_PER_IN = 25.4
 
 TEETH = 12
-DIAMETRAL_PITCH = 38.0            # meshes the 120T disc at its DP (build_transgear_pinion.py)
+DIAMETRAL_PITCH = 38.0  # meshes the 120T disc at its DP (build_transgear_pinion.py)
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 
-BORE_DIA = 5.0                    # rides the knob shaft's turned-down Ø5 seat
+BORE_DIA = 5.0  # rides the knob shaft's turned-down Ø5 seat
 FACE_WIDTH = 4.0
+BORE_DIA_BAND = (0.05, 0.03)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},

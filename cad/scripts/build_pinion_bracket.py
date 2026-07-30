@@ -57,7 +57,10 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pinion_bracket_geometry import (
@@ -75,9 +78,17 @@ from pinion_bracket_geometry import (
     WIDTH,
 )
 from pinion_bracket_spec import (
+    ARBOR_BORE_BAND,
+    ARBOR_BORE_CZ_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
+    PIN_SEAT_AXIS_TOLERANCE_MM,
+    PIN_SEAT_CZ_TOLERANCE_MM,
+    PIN_SEAT_DEPTH_BAND,
+    PIN_SEAT_DIA_BAND,
+    PIVOT_BORE_BAND,
+    THICKNESS_TOLERANCE_MM,
 )
 
 import _telemetry
@@ -128,9 +139,7 @@ def _cam_relief_intervals(y: float, centers) -> list[tuple[float, float]]:
     elif y <= C2C:
         strap_half = R_END
     else:
-        strap_half = math.sqrt(
-            max(R_END * R_END - (y - C2C) * (y - C2C), 0.0)
-        )
+        strap_half = math.sqrt(max(R_END * R_END - (y - C2C) * (y - C2C), 0.0))
     intervals: list[tuple[float, float]] = []
     for cx, cy in centers:
         dy = y - cy
@@ -165,10 +174,15 @@ def _cam_relief_area(centers) -> float:
     span = C2C + 2.0 * R_END
     h = span / n
     values = [_cam_relief_width(-R_END + i * h, centers) for i in range(n + 1)]
-    return h / 3.0 * (
-        values[0] + values[-1]
-        + 4.0 * sum(values[1:-1:2])
-        + 2.0 * sum(values[2:-1:2])
+    return (
+        h
+        / 3.0
+        * (
+            values[0]
+            + values[-1]
+            + 4.0 * sum(values[1:-1:2])
+            + 2.0 * sum(values[2:-1:2])
+        )
     )
 
 
@@ -222,12 +236,22 @@ async def build(adapter) -> dict[str, str]:
     # Pivot bore on the origin (only its diameter recorded); arbor bore on the +Y
     # axis (x 0): one centre dim (the rise, driven by the positive C2C) + diameter.
     await define_circle(
-        adapter, 0.0, 0.0, PIVOT_BORE / 2.0, "pivot bore", dims=strap,
+        adapter,
+        0.0,
+        0.0,
+        PIVOT_BORE / 2.0,
+        "pivot bore",
+        dims=strap,
         names=("PivotBoreCx", "PivotBoreCz", "PivotBoreDia"),
         drives=(None, None, '"PivotBore"'),
     )
     arbor_bore = await define_circle(
-        adapter, 0.0, C2C, ARBOR_BORE / 2.0, "arbor bore", dims=strap,
+        adapter,
+        0.0,
+        C2C,
+        ARBOR_BORE / 2.0,
+        "arbor bore",
+        dims=strap,
         names=("ArborBoreCx", "ArborBoreCz", "ArborBoreDia"),
         drives=(None, '"C2C"', '"ArborBore"'),
     )
@@ -312,8 +336,12 @@ async def build(adapter) -> dict[str, str]:
         relief = SketchDims()
         check(f"create_sketch cam relief {label}", await adapter.create_sketch("Front"))
         await define_circle(
-            adapter, centre[0], centre[1], CAM_RELIEF_RADIUS,
-            f"cam relief {label}", dims=relief,
+            adapter,
+            centre[0],
+            centre[1],
+            CAM_RELIEF_RADIUS,
+            f"cam relief {label}",
+            dims=relief,
             names=(f"CamRelief{label}X", f"CamRelief{label}Y", f"CamRelief{label}Dia"),
             drives=(None, None, '"CamReliefDia"'),
         )
@@ -323,9 +351,12 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs += relief.apply(adapter, f"CamRelief{label}Profile")
         check(
             f"cut cam relief {label}",
-            await adapter.create_cut_extrude(ExtrusionParameters(
-                depth=2.0 * (THICKNESS + 1.0), both_directions=True,
-            )),
+            await adapter.create_cut_extrude(
+                ExtrusionParameters(
+                    depth=2.0 * (THICKNESS + 1.0),
+                    both_directions=True,
+                )
+            ),
         )
         name_last_feature(adapter, f"CamRelief{label}")
         union_area = _cam_relief_area(centers)
@@ -360,16 +391,25 @@ async def build(adapter) -> dict[str, str]:
     com_before_x = com_before[0] * 1000.0 if com_before is not None else None
     check(
         f"create_plane PinSeatPlane (Right, {-R_END:+g})",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Right Plane", offset=-R_END,
-        )),
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Right Plane",
+                offset=-R_END,
+            )
+        ),
     )
     name_last_feature(adapter, "PinSeatPlane")
     seat = SketchDims()
     u_mid = -THICKNESS / 2.0
     check("create_sketch pin seat", await adapter.create_sketch("PinSeatPlane"))
     await define_circle(
-        adapter, u_mid, -PIN_DROP, PIN_BORE / 2.0, "pin seat", dims=seat,
+        adapter,
+        u_mid,
+        -PIN_DROP,
+        PIN_BORE / 2.0,
+        "pin seat",
+        dims=seat,
         names=("PinSeatCz", "PinSeatCy", "PinSeatDia"),
         drives=('"StrapThickness" / 2', '"PinDrop"', '"PinBore"'),
     )
@@ -425,11 +465,35 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven strap (equations neutral)", expected, 0.005 * expected)
+    await volume_check(
+        adapter, "driven strap (equations neutral)", expected, 0.005 * expected
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
     # and stamp the make-critical title-block properties.
+    set_dimension_symmetric_tolerance(
+        adapter, "StrapProfile", "ArborBoreCz", ARBOR_BORE_CZ_TOLERANCE_MM
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "StrapProfile", "PivotBoreDia", *deviations(PIVOT_BORE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "StrapProfile", "ArborBoreDia", *deviations(ARBOR_BORE_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Strap", "Depth", THICKNESS_TOLERANCE_MM)
+    set_dimension_symmetric_tolerance(
+        adapter, "PinSeatProfile", "PinSeatCy", PIN_SEAT_AXIS_TOLERANCE_MM
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "PinSeatProfile", "PinSeatDia", *deviations(PIN_SEAT_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "PinSeatProfile", "PinSeatCz", PIN_SEAT_CZ_TOLERANCE_MM
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "PinSeat", "PinSeatDepth", *deviations(PIN_SEAT_DEPTH_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

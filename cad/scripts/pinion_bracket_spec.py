@@ -21,6 +21,7 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
+from _fit_limits import REAM_H7, REAM_SLIDE
 from pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
@@ -35,6 +36,15 @@ from pinion_bracket_geometry import (
     THICKNESS as THICKNESS,
     WIDTH as WIDTH,
 )
+
+ARBOR_BORE_CZ_TOLERANCE_MM = 0.10
+PIVOT_BORE_BAND = REAM_SLIDE
+ARBOR_BORE_BAND = REAM_SLIDE
+PIN_SEAT_AXIS_TOLERANCE_MM = 0.05
+THICKNESS_TOLERANCE_MM = 0.05
+PIN_SEAT_DIA_BAND = REAM_H7
+PIN_SEAT_DEPTH_BAND = (0.10, 0.00)
+PIN_SEAT_CZ_TOLERANCE_MM = 0.05
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pinion_bracket`` marks exactly these; ``draw_pinion_bracket``
@@ -51,6 +61,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # PinSeatCz locates the blind pin seat THROUGH the 5 mm thickness (mid-
     # thickness), so the seat is fully located, not just drawn centred.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
+    "PinSeat": {"PinSeatDepth"},
 }
 
 # True free-text instructions only. Geometry, datum structure, form/orientation

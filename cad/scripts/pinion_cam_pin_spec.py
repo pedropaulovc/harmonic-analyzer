@@ -22,10 +22,14 @@ from pinion_cam_pin_geometry import (
 # 4.012 MIN press band); the drawing callout derives its limits from these
 # two constants so a retuned press fit can never ship stale limit text.
 PIN_DIA_TOL = 0.004
+PIN_DIA_BAND = (PIN_DIA_TOL, -PIN_DIA_TOL)
+PIN_LENGTH_TOLERANCE_MM = 0.05
+CAP_RADIUS_TOLERANCE_MM = 0.05
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"PinDia"},
     "Pin": {"Depth"},
+    "CapProfile": {"CapR"},
 }
 
 DRAWING_NOTES = "\n".join(

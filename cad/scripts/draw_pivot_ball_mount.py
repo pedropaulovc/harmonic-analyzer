@@ -80,11 +80,12 @@ def _front_y(model_y: float) -> float:
 FRONT_KEEP = {
     "BallRise": (FRONT_CENTER[0] - 0.050, _front_y(BALL_CENTER_H / 2.0)),
     "ShaftBoreDia": (FRONT_CENTER[0] + 0.052, _front_y(BALL_CENTER_H)),
+    "BaseHeight": (FRONT_CENTER[0] + 0.050, _front_y(BASE_H)),
 }
 # No second orthographic view carries dimensions; keep the test contract honest.
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "+0.00/-0.05 THRU",
+    "ShaftBoreDia": "THRU",
 }
 STEM_DIM_TEXT = (0.180, _front_y(12.0))
 
@@ -92,17 +93,13 @@ STEM_DIM_TEXT = (0.180, _front_y(12.0))
 @_telemetry.traced("drawing.stem_dimension_format")
 def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
     """Render the drawing-native stem width as a toleranced diameter."""
-    display = _early_bound(
-        dimension,
-        "IDisplayDimension")
+    display = _early_bound(dimension, "IDisplayDimension")
     prefix = "<MOD-DIAM>"
     display.SetText(1, prefix)  # swDimensionTextPrefix
     if str(display.GetText(1) or "") != prefix:
         raise RuntimeError("stem diameter glyph did not persist")
     model_dimension = _early_bound(display.GetDimension(), "IDimension")
-    tolerance = _early_bound(
-        model_dimension.Tolerance,
-        "IDimensionTolerance")
+    tolerance = _early_bound(model_dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = 2  # swTolType_e.swTolBILAT
     limit_m = 0.05 / 1000.0
     if not tolerance.SetValues(-limit_m, limit_m):
@@ -138,8 +135,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
         raise RuntimeError("no circular edge matches the seat face")
     radius, height, bore_edge = min(
         circles,
-        key=lambda item: abs(item[0] - BORE_DIA / 2.0)
-        + abs(item[1] - BALL_CENTER_H),
+        key=lambda item: abs(item[0] - BORE_DIA / 2.0) + abs(item[1] - BALL_CENTER_H),
     )
     if abs(radius - BORE_DIA / 2.0) > 0.01 or abs(height - BALL_CENTER_H) > 0.01:
         raise RuntimeError(
@@ -278,7 +274,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         front,
-        text=f"<MOD-DIAM>{BASE_DIA:.2f} +/-0.05 X {BASE_H:.2f} +/-0.05 PAD",
+        text=(f"<MOD-DIAM>{BASE_DIA:.2f} +/-0.05 PAD\nHEIGHT PER NATIVE DIMENSION"),
         entity_xy=(FRONT_CENTER[0] + BASE_DIA / 2.0 * _S, _front_y(BASE_H / 2.0)),
         note_xy=(0.168, 0.094),
         label="seat pad size",
@@ -288,7 +284,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum A is the seat face. Datum B is derived from the cylindrical stem,
     # making the sphere, pad, and cross-bore controls inspectable from one DRF.
     _bore_r = BORE_DIA / 2.0 * _S
-    seat_edge = (FRONT_CENTER[0] + 0.008, _front_y(0.0))
     seat_entity, bore_entity = _front_entities(adapter, front)
     add_datum_feature(
         adapter,

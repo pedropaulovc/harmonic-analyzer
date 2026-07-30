@@ -26,6 +26,10 @@ from pinion_cam_geometry import (
 # on the Ø6.35 lift rod). Asymmetric because BORE is the model's as-cut
 # nominal, not the band midpoint.
 BORE_BAND = (0.005, -0.010)
+COLLAR_OD_TOLERANCE_MM = 0.05
+COLLAR_AXIS_TOLERANCE_MM = 0.05
+COLLAR_DEPTH_TOLERANCE_MM = 0.05
+BOSS_DIA_TOLERANCE_MM = 0.05
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},

@@ -54,7 +54,10 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pinion_cam_geometry import (
@@ -68,6 +71,11 @@ from pinion_cam_geometry import (
     TAP_DRILL_DIA,
 )
 from pinion_cam_spec import (
+    BORE_BAND,
+    BOSS_DIA_TOLERANCE_MM,
+    COLLAR_AXIS_TOLERANCE_MM,
+    COLLAR_DEPTH_TOLERANCE_MM,
+    COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
@@ -157,7 +165,12 @@ async def build(adapter) -> dict[str, str]:
     collar = SketchDims()
     check("create_sketch collar", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, -ECC, CAM_R, "collar", dims=collar,
+        adapter,
+        0.0,
+        -ECC,
+        CAM_R,
+        "collar",
+        dims=collar,
         names=("CollarCx", "CollarCy", "CollarOd"),
         drives=(None, '"Ecc"', '"CamOd"'),
     )
@@ -180,7 +193,12 @@ async def build(adapter) -> dict[str, str]:
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, BORE_R, "bore", dims=bore,
+        adapter,
+        0.0,
+        0.0,
+        BORE_R,
+        "bore",
+        dims=bore,
         names=("BoreCx", "BoreCy", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
     )
@@ -203,7 +221,12 @@ async def build(adapter) -> dict[str, str]:
     boss = SketchDims()
     check("create_sketch boss", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, -BOSS_Z, BOSS_R, "set-pin boss", dims=boss,
+        adapter,
+        0.0,
+        -BOSS_Z,
+        BOSS_R,
+        "set-pin boss",
+        dims=boss,
         names=("BossCx", "BossCz", "BossDia"),
         drives=(None, None, '"BossDia"'),
     )
@@ -235,7 +258,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_sketch(tap_plane_name),
     )
     await define_circle(
-        adapter, 0.0, -BOSS_Z, TAP_DRILL_DIA / 2.0, "tap drill", dims=tap,
+        adapter,
+        0.0,
+        -BOSS_Z,
+        TAP_DRILL_DIA / 2.0,
+        "tap drill",
+        dims=tap,
         names=("TapCx", "TapCz", "TapDrillDia"),
         drives=(None, None, '"TapDrillDia"'),
     )
@@ -266,10 +294,27 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven cam (equations neutral)", volume, 0.01 * V_COLLAR)
+    await volume_check(
+        adapter, "driven cam (equations neutral)", volume, 0.01 * V_COLLAR
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "CollarProfile", "CollarOd", COLLAR_OD_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "CollarProfile", "CollarCy", COLLAR_AXIS_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Collar", "Depth", COLLAR_DEPTH_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BossProfile", "BossDia", BOSS_DIA_TOLERANCE_MM
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

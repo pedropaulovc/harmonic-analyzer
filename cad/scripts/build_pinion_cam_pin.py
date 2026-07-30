@@ -51,15 +51,21 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_cam_pin_spec import (
+    CAP_RADIUS_TOLERANCE_MM,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
     PIN_DIA,
+    PIN_DIA_BAND,
     PIN_LEN,
+    PIN_LENGTH_TOLERANCE_MM,
 )
 
 PART_NAME = "pinion-cam-pin"
@@ -96,7 +102,12 @@ async def build(adapter) -> dict[str, str]:
     pin = SketchDims()
     check("create_sketch pin", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, PIN_R, "pin", dims=pin,
+        adapter,
+        0.0,
+        0.0,
+        PIN_R,
+        "pin",
+        dims=pin,
         names=("PinCx", "PinCz", "PinDia"),
         drives=(None, None, '"PinDia"'),
     )
@@ -128,8 +139,14 @@ async def build(adapter) -> dict[str, str]:
     )
     close = check("cap close", await adapter.add_line(0.0, v_apex, 0.0, v_base))
     set_sketch_direct_db(adapter, False)
-    check("cap base horizontal", await adapter.add_sketch_constraint(base, None, "horizontal"))
-    check("cap close vertical", await adapter.add_sketch_constraint(close, None, "vertical"))
+    check(
+        "cap base horizontal",
+        await adapter.add_sketch_constraint(base, None, "horizontal"),
+    )
+    check(
+        "cap close vertical",
+        await adapter.add_sketch_constraint(close, None, "vertical"),
+    )
     check(
         "cap rim reach",
         await adapter.add_sketch_dimension(
@@ -146,7 +163,9 @@ async def build(adapter) -> dict[str, str]:
     cap.record("CapSagDim", '"CapSag"')
     check(
         "cap on axis",
-        await adapter.add_sketch_constraint(f"{base}.start", "origin", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{base}.start", "origin", "vertical_points"
+        ),
     )
     check(
         "cap station",
@@ -185,6 +204,13 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "PinProfile", "PinDia", *deviations(PIN_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Pin", "Depth", PIN_LENGTH_TOLERANCE_MM)
+    set_dimension_symmetric_tolerance(
+        adapter, "CapProfile", "CapR", CAP_RADIUS_TOLERANCE_MM
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

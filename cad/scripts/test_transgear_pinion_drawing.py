@@ -7,6 +7,7 @@ from pathlib import Path
 import build_transgear_pinion as part
 import draw_transgear_pinion as drawing
 import transgear_pinion_spec as spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -14,7 +15,9 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/transgear-pinion.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/transgear-pinion.pdf")
     assert drawing.PNG.as_posix().endswith("/png/transgear-pinion_drawing.png")
-    assert DRAWINGS_BY_NAME["transgear_pinion"].script == Path(drawing.__file__).resolve()
+    assert (
+        DRAWINGS_BY_NAME["transgear_pinion"].script == Path(drawing.__file__).resolve()
+    )
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -26,9 +29,16 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_gear_data_block_specifies_the_tooth_system() -> None:
     data = spec.GEAR_DATA
     for field in (
-        "GEAR DATA", "NUMBER OF TEETH", "DIAMETRAL PITCH", "MODULE (mm",
-        "PRESSURE ANGLE", "PITCH DIAMETER (mm", "OUTSIDE DIAMETER (mm)",
-        "WHOLE DEPTH (mm)", "FACE WIDTH (mm)", "TOOTH FORM",
+        "GEAR DATA",
+        "NUMBER OF TEETH",
+        "DIAMETRAL PITCH",
+        "MODULE (mm",
+        "PRESSURE ANGLE",
+        "PITCH DIAMETER (mm",
+        "OUTSIDE DIAMETER (mm)",
+        "WHOLE DEPTH (mm)",
+        "FACE WIDTH (mm)",
+        "TOOTH FORM",
     ):
         assert field in data, field
     assert "12" in data
@@ -49,6 +59,10 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert source.count("add_surface_finish(") == 1
+    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "THRU - REAM"}
+    assert model_toleranced_dimensions(part) == {
+        ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)"
+    }
 
 
 def test_part_stamps_make_critical_properties() -> None:

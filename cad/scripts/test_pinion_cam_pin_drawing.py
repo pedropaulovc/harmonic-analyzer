@@ -7,6 +7,7 @@ from pathlib import Path
 import pinion_cam_pin_spec
 import draw_pinion_cam_pin as drawing
 import build_pinion_cam_pin as pin
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -14,10 +15,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-cam-pin.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-cam-pin.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pinion-cam-pin_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["pinion_cam_pin"].script
-        == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["pinion_cam_pin"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -61,12 +59,16 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
         "        symbol_xy=(0.105, 0.228),\n"
         '        datum="A",\n'
         '        label="cam-pin cylindrical-shank datum axis",\n'
-        "        position_tolerance_m=0.0065,"
-        in source
+        "        position_tolerance_m=0.0065," in source
     )
     assert source.count("position_tolerance_m=0.0065") == 1
     assert "add_surface_finish(" not in source
-    assert "4.020 MAX / 4.012 MIN" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert model_toleranced_dimensions(pin) == {
+        ("PinProfile", "PinDia"): "*deviations(PIN_DIA_BAND)",
+        ("Pin", "Depth"): "PIN_LENGTH_TOLERANCE_MM",
+        ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
+    }
+    assert drawing.DIMENSION_CALLOUTS["PinDia"] == "FINAL SIZE"
     assert "NOMINAL REF ONLY" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "set_reference_dimension(" in source
     assert 'characteristic="flatness"' in source
@@ -74,6 +76,8 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert "NO CHAMFER" in pinion_cam_pin_spec.DRAWING_NOTES
     assert "ISO 286-2" not in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "SEATED FLAT END TO CROWN ROOT" in drawing.DIMENSION_CALLOUTS["Depth"]
+    assert "CapR" in drawing.RIGHT_KEEP
+    assert "SR{CAP_RADIUS:.2f}+/-0.05" not in source
     assert "ONE SPHERICAL CROWN" in pinion_cam_pin_spec.DRAWING_NOTES
     assert "BOTH SPHERICAL CROWNS" not in pinion_cam_pin_spec.DRAWING_NOTES
     assert "EXEMPT FROM TITLE-BLOCK EDGE-BREAK" in pinion_cam_pin_spec.DRAWING_NOTES

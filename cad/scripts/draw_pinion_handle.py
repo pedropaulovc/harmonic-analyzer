@@ -40,16 +40,12 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import REAM_SLIDE, fit_limits
 from pinion_handle_spec import (
     CAP_SAG,
     GRIP_DIA,
     GRIP_LEN,
     ROD_DIA,
     ROD_DOWN,
-    ROD_HOLE_DIA,
-    ROD_HOLE_REAM_BAND,
-    ROD_PRESS_BAND,
     ROD_UP,
     TUBE_ID,
     TUBE_LEN,
@@ -111,21 +107,15 @@ RIGHT_KEEP = {
 }
 TOP_KEEP = {
     "RodDia": (0.300, 0.092),
+    "RodHoleDia": (0.300, 0.112),
 }
 DIMENSION_CALLOUTS = {
-    "TubeId": (
-        f"NOMINAL REF ONLY\nFINAL REAM LIMITS\n{fit_limits(TUBE_ID, REAM_SLIDE)}\nRa 1.6"
-    ),
-    "GripLen": "+/-0.10 CYL. LENGTH",
-    "TubeLen": (
-        "+0.10/-0.00 BORE DEPTH"
-    ),
-    "RodSpan": "+/-0.10 OAL",
-    "RodDia": (
-        "PRESS ROD NOMINAL REFERENCE\n"
-        f"FINAL ROD LIMITS {fit_limits(ROD_DIA, ROD_PRESS_BAND)}\n"
-        f"REAM BODY HOLE {fit_limits(ROD_HOLE_DIA, ROD_HOLE_REAM_BAND)} THRU"
-    ),
+    "TubeId": "FINAL REAM",
+    "GripLen": "CYL. LENGTH",
+    "TubeLen": "BORE DEPTH",
+    "RodSpan": "OAL",
+    "RodDia": "PRESS ROD",
+    "RodHoleDia": "BODY HOLE; REAM THRU",
 }
 
 
@@ -245,9 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(
         adapter, cross_hole_station, label="datum B to body cross-hole axis"
     )
-    top_rod_center_y = (
-        TOP_CENTER[1] - (0.0 - z_center) * SHEET_SCALE[0] / 1000.0
-    )
+    top_rod_center_y = TOP_CENTER[1] - (0.0 - z_center) * SHEET_SCALE[0] / 1000.0
     flat_end_x = RIGHT_CENTER[0] - (z_max - z_center) * SHEET_SCALE[0] / 1000.0
     flat_end = (flat_end_x, bore_center[1])
     flat_end_face = (
@@ -318,12 +306,15 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="BODY CROSS-HOLE AXIS BEFORE PRESSING",
         label="handle transverse-axis position",
     )
-    if add_note(
-        adapter,
-        "BODY CROSS-HOLE VIEW - LOOKING ALONG HOLE AXIS - SCALE 2:1",
-        0.235,
-        0.070,
-    ) is None:
+    if (
+        add_note(
+            adapter,
+            "BODY CROSS-HOLE VIEW - LOOKING ALONG HOLE AXIS - SCALE 2:1",
+            0.235,
+            0.070,
+        )
+        is None
+    ):
         raise RuntimeError("failed to label handle body cross-hole view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)

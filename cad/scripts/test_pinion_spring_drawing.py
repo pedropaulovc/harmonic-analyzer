@@ -7,6 +7,7 @@ from pathlib import Path
 import pinion_spring_spec
 import draw_pinion_spring as drawing
 import build_pinion_spring as spring
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -14,9 +15,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-spring.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-spring.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pinion-spring_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["pinion_spring"].script == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["pinion_spring"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -79,7 +78,7 @@ def test_feature_requirements_use_inspectable_datum_controls() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_datum_feature(" not in source
     assert source.count("add_feature_control_frame(") == 1
-    assert "characteristic=\"flatness\"" in source
+    assert 'characteristic="flatness"' in source
     assert "parallelism" not in source
     assert "add_surface_finish(" not in source
     assert source.count('entity_type="FACE"') == 1
@@ -94,6 +93,12 @@ def test_feature_requirements_use_inspectable_datum_controls() -> None:
     assert abs(spring._BLADE_LEN - pinion_spring_spec.BLADE_STRAIGHT_LEN) < 1e-9
     assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["BendR"]
     assert "INSIDE RADIUS" in drawing.DIMENSION_CALLOUTS["KinkR"]
+    assert model_toleranced_dimensions(spring) == {
+        ("SpringProfile", "FootLen"): "FOOT_LENGTH_TOLERANCE_MM",
+        ("SpringProfile", "BendR"): "BEND_RADIUS_TOLERANCE_MM",
+        ("SpringProfile", "KinkR"): "KINK_RADIUS_TOLERANCE_MM",
+    }
+    assert "+/-" not in "\n".join(drawing.DIMENSION_CALLOUTS.values())
     assert "R2.00 AND R1.50" not in pinion_spring_spec.DRAWING_NOTES
 
 

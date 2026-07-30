@@ -74,10 +74,10 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"RodDia": "+0.00/-0.02"}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 # The length tolerance rides its own dimension (codex machinist review: a
 # detached "LENGTH +/-0.25" UOS note is ambiguous about which length it bounds).
-RIGHT_CALLOUTS = {"Depth": "+/-0.25"}
+RIGHT_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:

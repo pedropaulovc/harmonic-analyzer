@@ -39,12 +39,10 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import fit_limits
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
     PIN_DIA as PIN_DIA,
-    PIN_DIA_TOL,
     PIN_LEN,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -79,12 +77,12 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
+    "CapR": (RIGHT_CENTER[0] + 0.035, RIGHT_CENTER[1] + 0.040),
 }
 DIMENSION_CALLOUTS = {
-    "PinDia": (
-        f"FINAL LIMITS\n{fit_limits(PIN_DIA, (PIN_DIA_TOL, -PIN_DIA_TOL))}\nRa 0.8"
-    ),
-    "Depth": "+/-0.05\nSEATED FLAT END TO CROWN ROOT",
+    "PinDia": "FINAL SIZE",
+    "Depth": "SEATED FLAT END TO CROWN ROOT",
+    "CapR": "OUTER CROWN",
 }
 
 
@@ -192,9 +190,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
     crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(
-        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
-    )
+    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
     outer_crown_face = model_point_in_view(
         adapter,
         right,
@@ -221,9 +217,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         text=(
-            f"OUTER CROWN SR{CAP_RADIUS:.2f}+/-0.05\n"
-            f"({CAP_SAG:.2f}) REF AXIAL HEIGHT\n"
-            "CROWN ROOT PLANE TO APEX"
+            f"OUTER CROWN\n({CAP_SAG:.2f}) REF AXIAL HEIGHT\nCROWN ROOT PLANE TO APEX"
         ),
         entity_xy=outer_crown_face,
         note_xy=(0.250, 0.175),
