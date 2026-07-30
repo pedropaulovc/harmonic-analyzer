@@ -171,6 +171,7 @@ class PlanarFace:
 
     normal: tuple[float, float, float]
     offset_mm: float
+    contains_z_mm: float | None = None
     tolerance_mm: float = 0.05
 
     def __post_init__(self) -> None:

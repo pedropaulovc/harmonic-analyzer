@@ -128,6 +128,33 @@ def test_cone_face_matches_live_coneparams2_contract() -> None:
     assert not _face_matches(geometry, ConeFace(1.0))
 
 
+def test_planar_face_can_disambiguate_coplanar_trunnions_by_z_station() -> None:
+    geometry = _FaceGeometry(
+        face=SimpleNamespace(),
+        identity=4001,
+        parameters=(-0.510265461, -0.860016953, 0.0, 0.0043265, 0.002567, 0.097917),
+        outward_normal=(0.510265461, 0.860016953, 0.0),
+        box=(0.0, 0.002567, 0.0762, 0.0043265, 0.005134, 0.097917),
+    )
+
+    assert _face_matches(
+        geometry,
+        PlanarFace(
+            (0.510265461, 0.860016953, 0.0),
+            4.415327,
+            contains_z_mm=87.0585,
+        ),
+    )
+    assert not _face_matches(
+        geometry,
+        PlanarFace(
+            (0.510265461, 0.860016953, 0.0),
+            4.415327,
+            contains_z_mm=-87.0585,
+        ),
+    )
+
+
 def test_sphere_identity_is_not_cone_identity() -> None:
     geometry = _FaceGeometry(
         face=SimpleNamespace(),

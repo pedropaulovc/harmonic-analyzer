@@ -46,7 +46,11 @@ SURFACE_FINISHES = (
     SurfaceFinishControl(
         "knife_edge_ridge",
         MACHINED_UM,
-        PlanarFace(KNIFE_FACE_NORMAL, KNIFE_FACE_OFFSET),
+        PlanarFace(
+            KNIFE_FACE_NORMAL,
+            KNIFE_FACE_OFFSET,
+            contains_z_mm=(PLATE_L + HEX_DEPTH) / 2.0,
+        ),
     ),
 )
 

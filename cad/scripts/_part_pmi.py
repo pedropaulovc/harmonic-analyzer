@@ -106,7 +106,7 @@ def _face_geometry(face: Any) -> _FaceGeometry | None:
             identity=identity,
             parameters=parameters,
             outward_normal=normal,
-            box=(),
+            box=tuple(face.GetBox() or ()),
         )
     if identity == _SURFACE_SPHERE:
         return _FaceGeometry(
@@ -175,7 +175,14 @@ def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
             point * normal
             for point, normal in zip(geometry.parameters[3:6], geometry.outward_normal)
         )
-        return abs(offset - spec.offset_mm / 1000.0) <= tolerance_m
+        if abs(offset - spec.offset_mm / 1000.0) > tolerance_m:
+            return False
+        if spec.contains_z_mm is None:
+            return True
+        if len(geometry.box) != 6:
+            return False
+        z = spec.contains_z_mm / 1000.0
+        return geometry.box[2] - tolerance_m <= z <= geometry.box[5] + tolerance_m
     if isinstance(spec, SphereFace):
         if geometry.identity != _SURFACE_SPHERE:
             return False
