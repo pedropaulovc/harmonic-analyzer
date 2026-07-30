@@ -38,7 +38,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pinion_cam_spec import (
     BORE,
     BOSS_DIA,
@@ -48,6 +48,7 @@ from pinion_cam_spec import (
     CAM_OD,
     ECC,
     TAP_DRILL_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -303,7 +304,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=bore_right,
         symbol_xy=(0.155, 0.175),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="cam bore finish",
     )
 

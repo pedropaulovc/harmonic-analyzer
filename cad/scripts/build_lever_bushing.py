@@ -57,6 +57,7 @@ from lever_bushing_spec import (
     LENGTH_TOLERANCE_MM,
     OUTER_DIA,
     PART_DATUMS,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "lever-bushing"
@@ -136,7 +137,12 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
+    author_part_pmi(
+        adapter,
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        surface_finishes=SURFACE_FINISHES,
+    )
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
 

@@ -3,6 +3,7 @@ r"""Pure-data dimensional contract shared by the pen rod and drawing."""
 from __future__ import annotations
 
 from _gtol_spec import GeometricControl, PartDatum, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 ROD_SECTION = 5.0  # DIMENSIONS.md ch24: square section (low)
@@ -35,6 +36,11 @@ GEOMETRIC_CONTROLS = (
         "0.05",
         PlanarFace((0, -1, 0), 0.0),
         datums=("A",),
+    ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "slide_face", MACHINED_UM, PlanarFace((-1, 0, 0), ROD_SECTION / 2.0)
     ),
 )
 

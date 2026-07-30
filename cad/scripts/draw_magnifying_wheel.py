@@ -37,13 +37,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from magnifying_wheel_spec import (
     BORE_DIA,
     HUB_AXIAL,
     HUB_DIA,
     RIM_AXIAL,
     RIM_OUTER_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -204,7 +205,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0] + HUB_DIA * SHEET_SCALE[0] / 2000.0, FRONT_CENTER[1]),
         # up-right of the hub, clear of the Ø20 leader (round 1: crossed it)
         symbol_xy=(FRONT_CENTER[0] + _HUB_R + 0.024, FRONT_CENTER[1] + 0.024),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "hub_drum"),
         label="hub drum finish",
     )
 

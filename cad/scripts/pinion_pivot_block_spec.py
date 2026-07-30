@@ -23,6 +23,9 @@ part marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 # --- Nominal geometry (cad/DIMENSIONS.md "Chapter 25", photo-scaled low).
 # These drive the part's named equation globals AND the drawing's coordinate
 # math. Layout: block centred on the origin midway between the bores, both
@@ -54,6 +57,17 @@ FRONT_BBOX_CY = (BLOCK_TOP_Y + BLOCK_BOTTOM_Y) / 2.0  # -4.0: front-view centre
 BORE_SPACING = 2.0 * BORE_HALF_SPACING  # 15.0
 SCREW_SPACING = 2.0 * SCREW_HALF_SPACING  # 27.0
 BORE_DIA_BAND = (0.05, 0.00)
+
+# The two reamed bores share a diameter.  The harvested pivot-bore cylinder
+# spans y=-BORE_DIA/2..+BORE_DIA/2, while the raised lift bore does not reach
+# the pivot bore's lower generator; that point makes this selector exact.
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "pivot_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA, contains_y_mm=-BORE_DIA / 2.0),
+    ),
+)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pinion_pivot_block`` marks exactly these;

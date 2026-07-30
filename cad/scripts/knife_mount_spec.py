@@ -19,6 +19,9 @@ out in the notes.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import GROUND_UM, SurfaceFinishControl
+
 # --- fixed geometry for the drawing's view math (mirrors build_knife_mount) ----
 R_BORE = 12.7  # Ø25.4 knife-bearing bore
 BLK_HALF_X = 17.0  # block half-width (34 across)
@@ -26,6 +29,10 @@ SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
 BLK_TOP = 14.62  # local block top (abuts the top-crossbar lower face)
 BLK_BOT = -29.15  # local block bottom
 BORE_CY = -12.45  # bore centre below the ridge origin (TopClear - R_BORE)
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl("knife_bore", GROUND_UM, CylinderFace(2.0 * R_BORE)),
+)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The block depth (14) is added on the sheet across the right-view

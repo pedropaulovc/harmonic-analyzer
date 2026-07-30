@@ -26,11 +26,12 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pen_rod_spec import (
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
     ROD_LENGTH,
+    SURFACE_FINISHES,
     WIRE_HOLE_DIA,
     WIRE_HOLE_Y,
 )
@@ -229,7 +230,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(front_side[0], FRONT_CENTER[1] - 0.050),
         symbol_xy=(0.170, 0.068),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "slide_face"),
         label="pen-rod slide face finish",
     )
 

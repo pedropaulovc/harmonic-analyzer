@@ -12,6 +12,19 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _holes import NUMBER_DRILL_MM
 
 
+def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = pen_rod_spec.SURFACE_FINISHES
+    assert control.key == "slide_face"
+    assert control.roughness_um == 1.6
+    assert control.face.normal == (-1, 0, 0)
+    assert control.face.offset_mm == pen_rod_spec.ROD_SECTION / 2.0
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "slide_face")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pen-rod.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pen-rod.pdf")

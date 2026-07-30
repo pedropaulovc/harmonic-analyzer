@@ -54,6 +54,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from _part_pmi import author_part_pmi
 from magnifying_wheel_geom import (
     BORE_DIA,
     HUB_AXIAL,
@@ -72,6 +73,7 @@ from magnifying_wheel_spec import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
     SECTION_VIEW_NOTE,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "magnifying-wheel"
@@ -329,6 +331,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -11,6 +11,18 @@ from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = pinion_pivot_shaft_spec.SURFACE_FINISHES
+    assert control.key == "bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pinion_pivot_shaft_spec.SHAFT_DIA
+    part_source = Path(shaft.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-pivot-shaft.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-pivot-shaft.pdf")

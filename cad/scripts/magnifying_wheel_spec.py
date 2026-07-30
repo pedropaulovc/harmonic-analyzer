@@ -11,6 +11,8 @@ lockstep test, which asserts the part marks and the drawing keeps EXACTLY
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_DIA,
     HUB_AXIAL,
@@ -21,6 +23,10 @@ from magnifying_wheel_geom import (  # noqa: F401 (re-export)
     SPOKE_AXIAL,
     SPOKE_COUNT,
     SPOKE_WIDTH,
+)
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl("hub_drum", MACHINED_UM, CylinderFace(HUB_DIA)),
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

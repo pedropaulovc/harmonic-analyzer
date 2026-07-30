@@ -11,6 +11,18 @@ import pen_marker_spec
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = pen_marker_spec.SURFACE_FINISHES
+    assert control.key == "barrel"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pen_marker_spec.BARREL_DIA
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "barrel")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pen-marker.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pen-marker.pdf")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 SHAFT_DIA = 8.0
@@ -32,6 +33,9 @@ GEOMETRIC_CONTROLS = (
         PlanarFace((0, 0, -1), 0.0),
         datums=("A",),
     ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

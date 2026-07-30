@@ -52,6 +52,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from pinion_lift_rod_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
@@ -61,6 +62,7 @@ from pinion_lift_rod_spec import (
     ROD_DIA_BAND,
     ROD_LEN,
     ROD_LENGTH_TOLERANCE_MM,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "pinion-lift-rod"
@@ -231,6 +233,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

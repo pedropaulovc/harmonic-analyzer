@@ -53,6 +53,7 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_block_spec import (
     BLOCK_DEPTH,
@@ -67,6 +68,7 @@ from pinion_pivot_block_spec import (
     ISOMETRIC_VIEW_NOTE,
     LIFT_BORE_RISE,
     SCREW_HALF_SPACING,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "pinion-pivot-block"
@@ -241,6 +243,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

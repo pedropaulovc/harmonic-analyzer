@@ -40,7 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pinion_pivot_block_spec import (
     BLOCK_BOTTOM_Y,
     BLOCK_DEPTH,
@@ -51,6 +51,7 @@ from pinion_pivot_block_spec import (
     LIFT_BORE_RISE,
     SCREW_HALF_SPACING,
     SCREW_HOLE_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -330,7 +331,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=pivot_right_edge,
         symbol_xy=(0.200, 0.163),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
 

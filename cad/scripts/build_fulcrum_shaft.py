@@ -57,6 +57,7 @@ from fulcrum_shaft_spec import (
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LENGTH,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "fulcrum-shaft"
@@ -123,7 +124,12 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
+    author_part_pmi(
+        adapter,
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        surface_finishes=SURFACE_FINISHES,
+    )
     apply_drawing_properties(
         adapter,
         PART_NAME,

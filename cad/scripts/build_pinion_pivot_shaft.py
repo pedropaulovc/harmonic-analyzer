@@ -50,6 +50,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_shaft_spec import (
     CAP_SAG,
@@ -61,6 +62,7 @@ from pinion_pivot_shaft_spec import (
     SHAFT_DIA_BAND,
     SHAFT_LEN,
     SHAFT_LENGTH_TOLERANCE_MM,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "pinion-pivot-shaft"
@@ -258,6 +260,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

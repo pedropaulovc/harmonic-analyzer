@@ -11,6 +11,8 @@ test, which asserts the part marks and the drawing keeps EXACTLY
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from magnifying_clamp_geom import (  # noqa: F401 (re-export)
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -19,6 +21,14 @@ from magnifying_clamp_geom import (  # noqa: F401 (re-export)
     LEVER_BORE_Y,
     ROD_BORE_DIA,
     ROD_BORE_X,
+)
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "lever_bore",
+        MACHINED_UM,
+        CylinderFace(LEVER_BORE_DIA, contains_y_mm=LEVER_BORE_Y),
+    ),
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

@@ -10,6 +10,18 @@ import knife_mount_spec
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+def test_ground_bore_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = knife_mount_spec.SURFACE_FINISHES
+    assert control.key == "knife_bore"
+    assert control.roughness_um == knife_mount_spec.GROUND_UM == 0.8
+    assert control.face.diameter_mm == 2.0 * knife_mount_spec.R_BORE
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "knife_bore")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/knife-mount.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/knife-mount.pdf")

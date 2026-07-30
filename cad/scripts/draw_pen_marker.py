@@ -31,8 +31,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
-from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H
+from _surface_finish import surface_finish_by_key
+from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H, SURFACE_FINISHES
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -293,7 +293,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(FRONT_CENTER[0] - 0.024, FRONT_CENTER[1] + _HALF_DIA),
         symbol_xy=(FRONT_CENTER[0] - 0.016, 0.196),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "barrel"),
         label="barrel bearing finish",
         entity_type="SILHOUETTE",
     )
