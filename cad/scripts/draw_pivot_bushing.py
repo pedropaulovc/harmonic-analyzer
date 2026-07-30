@@ -72,10 +72,9 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
 }
-DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU - REAM\n+0.03/-0.00",
-    "Depth": "+/-0.03",
-}
+# Bore and length tolerances live on the source model; the linked note carries
+# the drill-under/ream-through manufacturing instruction.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:

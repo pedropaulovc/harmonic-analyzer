@@ -7,6 +7,7 @@ from _gtol_spec import GeometricControl, PartDatum, PlanarFace
 
 ROD_SECTION = 5.0  # DIMENSIONS.md ch24: square section (low)
 ROD_LENGTH = 120.0  # DIMENSIONS.md ch24: p.64 inset (low)
+SECTION_BAND = (0.00, -0.05)
 WIRE_HOLE_Y = 115.0  # wire tie-off near the top (build_pen_assembly imports this)
 WIRE_HOLE_DRILL = "#47"  # number drill (see _holes.NUMBER_DRILL_MM)
 WIRE_HOLE_DIA = 1.994

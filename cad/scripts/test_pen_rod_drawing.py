@@ -7,6 +7,7 @@ from pathlib import Path
 import build_pen_rod as part
 import draw_pen_rod as drawing
 import pen_rod_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _holes import NUMBER_DRILL_MM
 
@@ -43,7 +44,13 @@ def test_wire_hole_matches_the_number_drill_standard() -> None:
 
 def test_linked_notes_define_remaining_square_rod_operations() -> None:
     notes = pen_rod_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["Section"] == "+0.00/-0.05"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert drawing.TOP_DIMENSION_CALLOUTS == {}
+    assert pen_rod_spec.SECTION_BAND == (0.00, -0.05)
+    assert model_toleranced_dimensions(part) == {
+        ("RodProfile", "Section"): "*deviations(SECTION_BAND)",
+        ("Rod", "Depth"): "*deviations(SECTION_BAND)",
+    }
     assert "V-BLOCK" in notes
     assert "#47" in notes
     assert "X.XX" not in notes

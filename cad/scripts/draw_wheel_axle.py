@@ -103,9 +103,8 @@ END_KEEP = {
         END_CENTER[1] - 0.028,
     ),
 }
-# The magnifying wheel's O5 bore rides the stud: unilateral-minus keeps a
-# 0.02..0.05 running clearance against the nominal-on-nominal bore.
-DIMENSION_CALLOUTS = {"StudDia": "-0.02/-0.05"}
+# The stud's unilateral-minus running-fit band lives on its source-model dimension.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 # Datum B's projected-symbol offset from the end-view centre. Placed off-axis at
 # ~-54 deg so the tag's leader runs radially out of the stud circle clear of the

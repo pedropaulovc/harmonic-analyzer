@@ -45,7 +45,10 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from cylinder_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
@@ -53,8 +56,10 @@ from cylinder_gear_shaft_spec import (
     END_VIEW_NOTE,
     GEOMETRIC_CONTROLS,
     ISO_VIEW_NOTE,
+    LENGTH_TOLERANCE_MM,
     PART_DATUMS,
     SHAFT_DIA,
+    SHAFT_DIA_BAND,
     SHAFT_LENGTH,
 )
 
@@ -82,7 +87,12 @@ async def build(adapter) -> dict[str, str]:
     shaft = SketchDims()
     check("create_sketch shaft", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, SHAFT_RADIUS, "shaft circle", dims=shaft,
+        adapter,
+        0.0,
+        0.0,
+        SHAFT_RADIUS,
+        "shaft circle",
+        dims=shaft,
         names=("ShaftCx", "ShaftCz", "ShaftDia"),
         drives=(None, None, '"ShaftDia"'),
     )
@@ -107,7 +117,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven shaft (equations neutral)", v_shaft, 0.005 * v_shaft)
+    await volume_check(
+        adapter, "driven shaft (equations neutral)", v_shaft, 0.005 * v_shaft
+    )
 
     # Named central axis (arbor axis along +Y through the origin) so the
     # cylinder gears ride it coincident axis-to-axis in the assembly.
@@ -115,6 +127,10 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Shaft", "Depth", LENGTH_TOLERANCE_MM)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

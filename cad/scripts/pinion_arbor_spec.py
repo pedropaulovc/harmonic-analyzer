@@ -2,11 +2,13 @@ r"""Pure-data dimensional contract shared by the pinion arbor and drawing."""
 
 from __future__ import annotations
 
+from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
 
 
 SHAFT_DIA = 8.0
 SHAFT_LEN = 226.25
+SHAFT_DIA_BAND = SHAFT_H
 CAP_SAG = 1.2
 CAP_R = (SHAFT_DIA / 2.0) ** 2 / (2.0 * CAP_SAG) + CAP_SAG / 2.0  # 7.27
 

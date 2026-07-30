@@ -80,7 +80,8 @@ END_KEEP = {
 PROFILE_KEEP = {
     "Depth": (PROFILE_CENTER[0], PROFILE_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02", "Depth": "+/-0.25"}
+# Size tolerances live on the source-model dimensions; the sheet renders them natively.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 # 3/8 in = 9.525 exactly; the sheet default of 2 decimals would print 9.53,
 # a false contradiction of the exact inch conversion the arbor's bore mates
 # are built on.

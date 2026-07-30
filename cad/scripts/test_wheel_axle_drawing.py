@@ -8,6 +8,7 @@ import build_magnifying_wheel
 import build_wheel_axle as part
 import draw_wheel_axle as drawing
 import wheel_axle_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -42,9 +43,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_stud_callout_keeps_wheel_bore_running_clearance() -> None:
     # The magnifying wheel's bore is nominal-on-nominal with the stud, so the
-    # running clearance comes entirely from the stud's unilateral-minus callout.
+    # running clearance comes entirely from the stud's model-owned band.
     assert build_magnifying_wheel.BORE_DIA == wheel_axle_spec.STUD_DIA
-    assert drawing.DIMENSION_CALLOUTS["StudDia"] == "-0.02/-0.05"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert wheel_axle_spec.STUD_DIA_BAND == (-0.02, -0.05)
+    assert model_toleranced_dimensions(part) == {
+        ("StudProfile", "StudDia"): "*deviations(STUD_DIA_BAND)"
+    }
     clearance_min = build_magnifying_wheel.BORE_DIA - (wheel_axle_spec.STUD_DIA - 0.02)
     clearance_max = build_magnifying_wheel.BORE_DIA - (wheel_axle_spec.STUD_DIA - 0.05)
     assert round(clearance_min, 2) == 0.02

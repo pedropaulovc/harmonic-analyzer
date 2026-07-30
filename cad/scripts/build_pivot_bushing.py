@@ -50,14 +50,19 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from pivot_bushing_spec import (
     BORE_DIA,
+    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     GEOMETRIC_CONTROLS,
     LENGTH,
+    LENGTH_TOLERANCE_MM,
     OUTER_DIA,
     PART_DATUMS,
 )
@@ -86,12 +91,24 @@ async def build(adapter) -> dict[str, str]:
     annulus = SketchDims()
     check("create_sketch annulus", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, OUTER_DIA / 2.0, "outer", dims=annulus,
-        names=(None, None, "OuterDia"), drives=(None, None, '"OuterDia"'),
+        adapter,
+        0.0,
+        0.0,
+        OUTER_DIA / 2.0,
+        "outer",
+        dims=annulus,
+        names=(None, None, "OuterDia"),
+        drives=(None, None, '"OuterDia"'),
     )
     await define_circle(
-        adapter, 0.0, 0.0, BORE_DIA / 2.0, "bore", dims=annulus,
-        names=(None, None, "BoreDia"), drives=(None, None, '"BoreDia"'),
+        adapter,
+        0.0,
+        0.0,
+        BORE_DIA / 2.0,
+        "bore",
+        dims=annulus,
+        names=(None, None, "BoreDia"),
+        drives=(None, None, '"BoreDia"'),
     )
     await ensure_fully_defined(adapter, "annulus sketch")
     check("exit_sketch annulus", await adapter.exit_sketch())
@@ -119,14 +136,16 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "AnnulusProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Bushing", "Depth", LENGTH_TOLERANCE_MM)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # GD&T lives on the MODEL as plain annotations; the drawing imports it.
     author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
-    apply_drawing_properties(
-        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
-    )
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
 
 

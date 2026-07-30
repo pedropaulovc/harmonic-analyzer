@@ -89,7 +89,9 @@ RIGHT_KEEP = {
         RIGHT_CENTER[1] + 0.022,
     ),
 }
-DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
+# The shaft fit lives on the source-model dimension. The crown descriptor is
+# still a sheet layout annotation, not a tolerance override.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 CAP_CALLOUTS = {"CapSagDim": f"SR{CAP_R:.2f} CROWN"}
 
 

@@ -7,6 +7,8 @@ from pathlib import Path
 import build_pivot_shaft as part
 import draw_pivot_shaft as drawing
 import pivot_shaft_spec
+import _fit_limits
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -30,9 +32,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_linked_notes_define_remaining_bearing_shaft_operations() -> None:
     notes = pivot_shaft_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "+0.00/-0.02"
-    # The length tolerance rides the dimension, not the general note.
-    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.25"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert pivot_shaft_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+    assert pivot_shaft_spec.LENGTH_TOLERANCE_MM == 0.25
+    assert model_toleranced_dimensions(part) == {
+        ("SectionProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("Shaft", "Depth"): "LENGTH_TOLERANCE_MM",
+    }
     assert "LENGTH +/-" not in notes
     clearance_min = 6.50 - pivot_shaft_spec.SHAFT_DIA
     clearance_max = clearance_min + 0.02 + 0.03

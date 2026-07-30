@@ -2,6 +2,7 @@ r"""Pure-data dimensional contract shared by the fulcrum shaft and drawing."""
 
 from __future__ import annotations
 
+from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
 
 
@@ -9,6 +10,7 @@ MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_LENGTH = 182.0
+SHAFT_DIA_BAND = SHAFT_H
 
 # Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no

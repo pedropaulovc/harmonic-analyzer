@@ -13,6 +13,8 @@ from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
 OUTER_DIA = 12.0
 BORE_DIA = 6.5
 LENGTH = 4.0565
+BORE_DIA_BAND = (0.03, 0.00)
+LENGTH_TOLERANCE_MM = 0.03
 
 # Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no

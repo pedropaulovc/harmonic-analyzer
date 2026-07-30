@@ -73,7 +73,8 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
+# The shaft fit lives on the source-model dimension.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:

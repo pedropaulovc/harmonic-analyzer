@@ -72,7 +72,8 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02", "Depth": "+/-0.25"}
+# Size tolerances live on the source-model dimensions; the sheet renders them natively.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:

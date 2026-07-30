@@ -7,6 +7,7 @@ from pathlib import Path
 import build_lever_bushing as part
 import draw_lever_bushing as drawing
 import lever_bushing_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -33,8 +34,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_linked_notes_define_remaining_turned_part_operations() -> None:
     notes = lever_bushing_spec.DRAWING_NOTES
     assert "REAM BORE THRU" in notes
-    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.03"
-    assert "+0.03/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert lever_bushing_spec.BORE_DIA_BAND == (0.03, 0.00)
+    assert lever_bushing_spec.LENGTH_TOLERANCE_MM == 0.03
+    assert model_toleranced_dimensions(part) == {
+        ("AnnulusProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
+        ("Bushing", "Depth"): "LENGTH_TOLERANCE_MM",
+    }
     clearance_min = lever_bushing_spec.BORE_DIA - 6.35
     clearance_max = clearance_min + 0.03 + 0.02
     assert round(clearance_min, 2) == 0.15

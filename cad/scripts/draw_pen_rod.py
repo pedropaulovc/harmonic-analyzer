@@ -78,11 +78,9 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "Depth": (TOP_CENTER[0] - 0.034, TOP_CENTER[1]),
 }
-# No-oversize on BOTH functional slide faces: Section (front, X width) and Depth
-# (top, Z width) are the two 5 mm faces the rod rides on in the v-block, so each
-# is controlled +0.00/-0.05 rather than leaning on the general SECTION +/-0.05.
-DIMENSION_CALLOUTS = {"Section": "+0.00/-0.05"}
-TOP_DIMENSION_CALLOUTS = {"Depth": "+0.00/-0.05"}
+# No-oversize bands on both functional slide dimensions live on the source model.
+DIMENSION_CALLOUTS: dict[str, str] = {}
+TOP_DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:

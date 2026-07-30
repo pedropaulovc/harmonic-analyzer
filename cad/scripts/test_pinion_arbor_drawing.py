@@ -7,6 +7,8 @@ from pathlib import Path
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
 import pinion_arbor_spec
+import _fit_limits
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -40,7 +42,11 @@ def test_crown_is_dimensioned_and_annotated() -> None:
 
 def test_linked_notes_define_remaining_arbor_operations() -> None:
     notes = pinion_arbor_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "+0.00/-0.02"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert pinion_arbor_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+    assert model_toleranced_dimensions(part) == {
+        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)"
+    }
     assert "CENTRE MARKS" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")

@@ -42,7 +42,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
@@ -53,6 +55,7 @@ from pen_rod_spec import (
     PART_DATUMS,
     ROD_LENGTH,
     ROD_SECTION,
+    SECTION_BAND,
     TOP_VIEW_NOTE,
     WIRE_HOLE_Y,
 )
@@ -94,7 +97,11 @@ async def build(adapter) -> dict[str, str]:
     ]
     lines = await add_line_chain(adapter, section_rect)
     await define_rectilinear_chain(
-        adapter, lines, section_rect, label="rod", dims=section,
+        adapter,
+        lines,
+        section_rect,
+        label="rod",
+        dims=section,
         names=["Section", "Length", "CornerX"],
         drives=['"RodSection"', '"RodLength"', '"RodSection" / 2'],
     )
@@ -139,18 +146,31 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven pen rod (equations neutral)", v_final, 0.005 * v_rod)
+    await volume_check(
+        adapter, "driven pen rod (equations neutral)", v_final, 0.005 * v_rod
+    )
 
     # Named slide axis (local Y through the origin = Front Plane ∩ Right Plane,
     # the square rod's long axis) so the pen rod runs as a prismatic joint along
     # the v-block guide in the M6 mated-DOF assembly (vertical pen travel).
     slide_axis = await name_bore_axis(
-        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "slide axis",
+        adapter,
+        "Front Plane",
+        0.0,
+        "Right Plane",
+        0.0,
+        "slide axis",
     )
     _blank_ref_axis(adapter, slide_axis)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "RodProfile", "Section", *deviations(SECTION_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Rod", "Depth", *deviations(SECTION_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -168,8 +188,12 @@ async def build(adapter) -> dict[str, str]:
     require_saved_drawing_properties(
         adapter,
         (
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Top View Note",
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Top View Note",
         ),
     )
     return artefacts
@@ -182,7 +206,15 @@ def _blank_ref_axis(adapter, name: str) -> None:
     model = adapter.currentModel
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
-        name, "AXIS", 0, 0, 0, False, 0, null_callout(), 0,
+        name,
+        "AXIS",
+        0,
+        0,
+        0,
+        False,
+        0,
+        null_callout(),
+        0,
     ):
         raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
     model.BlankRefGeom()

@@ -49,7 +49,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from pinion_arbor_spec import (
     CAP_SAG,
@@ -59,6 +61,7 @@ from pinion_arbor_spec import (
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
     SHAFT_DIA,
+    SHAFT_DIA_BAND,
     SHAFT_LEN,
 )
 
@@ -97,7 +100,12 @@ async def build(adapter) -> dict[str, str]:
     shaft = SketchDims()
     check("create_sketch shaft", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, SHAFT_R, "shaft", dims=shaft,
+        adapter,
+        0.0,
+        0.0,
+        SHAFT_R,
+        "shaft",
+        dims=shaft,
         names=("ShaftCx", "ShaftCz", "ShaftDia"),
         drives=(None, None, '"ShaftDia"'),
     )
@@ -129,8 +137,14 @@ async def build(adapter) -> dict[str, str]:
     )
     close = check("back cap close", await adapter.add_line(0.0, v_apex, 0.0, v_base))
     set_sketch_direct_db(adapter, False)
-    check("back cap base horizontal", await adapter.add_sketch_constraint(base, None, "horizontal"))
-    check("back cap close vertical", await adapter.add_sketch_constraint(close, None, "vertical"))
+    check(
+        "back cap base horizontal",
+        await adapter.add_sketch_constraint(base, None, "horizontal"),
+    )
+    check(
+        "back cap close vertical",
+        await adapter.add_sketch_constraint(close, None, "vertical"),
+    )
     check(
         "back cap rim reach",
         await adapter.add_sketch_dimension(
@@ -147,7 +161,9 @@ async def build(adapter) -> dict[str, str]:
     cap.record("CapSagDim", '"CapSag"')
     check(
         "back cap on axis",
-        await adapter.add_sketch_constraint(f"{base}.start", "origin", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{base}.start", "origin", "vertical_points"
+        ),
     )
     check(
         "back cap station",
@@ -168,7 +184,9 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch back cap", await adapter.exit_sketch())
     name_last_feature(adapter, "BackCapProfile")
     drive_jobs += cap.apply(adapter, "BackCapProfile")
-    check("revolve back cap", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check(
+        "revolve back cap", await adapter.create_revolve(RevolveParameters(angle=360.0))
+    )
     name_last_feature(adapter, "BackCap")
     volume = await volume_check(adapter, "back cap", volume + V_CAP, 0.03 * V_CAP)
 
@@ -182,11 +200,16 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven arbor (equations neutral)", volume, 0.005 * V_SHAFT)
+    await volume_check(
+        adapter, "driven arbor (equations neutral)", volume, 0.005 * V_SHAFT
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
