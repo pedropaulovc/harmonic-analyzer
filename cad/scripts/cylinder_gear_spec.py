@@ -11,6 +11,9 @@ cleanly.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
@@ -32,6 +35,12 @@ CAM_THICKNESS = 3.5
 ECCENTRICITY = 8.64            # cam axis offset from the bore axis
 NOTCH_WIDTH = 0.4             # alignment saw-kerf
 NOTCH_DEPTH = 3.0
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "cylinder_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)
+    ),
+)
 
 # Only the bore is a marked MODEL dimension (the single source of the critical
 # mounting fit). OD / pitch dia / tooth system are carried by the GEAR DATA

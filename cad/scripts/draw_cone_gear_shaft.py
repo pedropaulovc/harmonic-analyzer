@@ -26,7 +26,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_spec import (
     GEOMETRIC_CONTROLS,
     JOURNAL_DIA,
@@ -34,6 +34,7 @@ from cone_gear_shaft_spec import (
     SECTION_DIAS,
     PART_DATUMS,
     SHAFT_LENGTH,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -248,7 +249,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         side,
         symbol_xy=(0.255, 0.242),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
         entity_type="FACE",
         entity=pivot_face,
@@ -258,7 +259,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         side,
         symbol_xy=(0.102, 0.240),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "tip_journal"),
         label="tip journal finish",
         entity_type="FACE",
         entity=tip_face,

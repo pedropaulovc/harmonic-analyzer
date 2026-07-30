@@ -25,6 +25,9 @@ without SolidWorks in ~1 s.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 # inch -> mm. Mirrors ``_common.IN`` but kept local so the spec pulls in NO COM
 # module (importing ``_common`` would drag the SolidWorks adapter back into the
 # drawing's recipe closure -- the very coupling this split removes).
@@ -47,6 +50,12 @@ PIN_HOLE_DIA = 4.623  # ANSI #14 drill table value used by Hole Wizard
 DIMPLE_DIA = 8.0  # fiducial indentation (low)
 DIMPLE_DEPTH = 0.5  # fiducial indentation (low)
 DIMPLE_X = 30.0  # on the arm near the boss (low)
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "shaft_bore", MACHINED_UM, CylinderFace(SHAFT_BORE_DIA)
+    ),
+)
 
 # Derived spans (equations of the primitives above).
 ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG  # 76.0: square end past the shaft-bore origin

@@ -54,6 +54,7 @@ from _holes import (
     cross_hole_volume_mm3,
     wizard_hole_on_cylinder,
 )
+from _part_pmi import author_part_pmi
 from crankshaft_spec import (
     CRANK_END_NOTE,
     DRAWING_DIMENSIONS,
@@ -67,6 +68,7 @@ from crankshaft_spec import (
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LENGTH,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "crankshaft"
@@ -279,6 +281,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

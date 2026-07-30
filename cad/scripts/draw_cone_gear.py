@@ -30,8 +30,8 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _surface_finish import MACHINED
-from cone_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
+from _surface_finish import surface_finish_by_key
+from cone_gear_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -147,7 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] + 0.015, FRONT_CENTER[1] - 0.052),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "cone_gear_bore"),
         label="cone gear bore finish",
         entity=bore_edge,
     )

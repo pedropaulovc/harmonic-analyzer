@@ -43,6 +43,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from cone_tip_bushing_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
@@ -51,6 +52,7 @@ from cone_tip_bushing_spec import (
     LENGTH,
     LENGTH_TOLERANCE_MM,
     OUTER_DIA,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "cone-tip-bushing"
@@ -121,6 +123,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
     )

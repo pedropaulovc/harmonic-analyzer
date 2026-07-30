@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import math
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
@@ -25,6 +28,11 @@ ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN
 BORE_DIA = 0.375 * MM_PER_IN       # 9.525 (3/8" crankshaft)
 BORE_DIA_BAND = (0.050, 0.030)  # (upper, lower) deviations
 FACE_WIDTH = 10.8
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "crank_pinion_bore", MACHINED_UM, CylinderFace(BORE_DIA)
+    ),
+)
 NORMAL_MODULE_MM = MODULE_MM
 NORMAL_PRESSURE_ANGLE_DEG = PRESSURE_ANGLE_DEG
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0

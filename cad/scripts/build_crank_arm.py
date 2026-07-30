@@ -56,6 +56,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from crank_arm_spec import (
     ARM_C2C,
     ARM_END_X,
@@ -71,6 +72,7 @@ from crank_arm_spec import (
     SHAFT_BORE_DIA,
     SHAFT_BORE_BAND,
     SQUARE_END_OVERHANG,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "crank-arm"
@@ -313,6 +315,7 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -10,6 +10,9 @@ is the drift alarm the offline test enforces.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 # --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
 CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
 RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
@@ -27,6 +30,12 @@ PIN_HOLE_DIA = 1.994  # rocker pin hole = #47 number drill
 RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
 HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # crown top (150.07)
 RING_BOTTOM_Y = -RING_OUTER_RADIUS  # -20.4
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "strap_bore", MACHINED_UM, CylinderFace(RING_BORE_DIA)
+    ),
+)
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the

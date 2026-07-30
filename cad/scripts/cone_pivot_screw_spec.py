@@ -9,7 +9,9 @@ overall under-head length, and shoulder diameter.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
+from _gtol_spec import CylinderFace
 from _holes import TAP_DRILL_MM, THREAD_MAJOR_MM
+from _surface_finish import GROUND_UM, SurfaceFinishControl
 
 
 _SPEC = fastener("cone-pivot-screw")
@@ -38,6 +40,14 @@ MIN_FULL_FORM = 6.00
 THREAD_MAJOR_DIA = THREAD_MAJOR_MM[THREAD]
 THREAD_TAP_DRILL_DIA = TAP_DRILL_MM[THREAD]
 THREAD_SOLID_DIA = THREAD_TAP_DRILL_DIA
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "ground_shoulder",
+        GROUND_UM,
+        CylinderFace(SHOULDER_DIA, contains_y_mm=-SHOULDER_LEN / 2.0),
+    ),
+)
 
 if THREAD_TAIL_LEN < THREAD_MAJOR_DIA:
     raise ValueError(

@@ -44,7 +44,7 @@ from _drawing_common import (
     add_view_centerline,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from crankshaft_spec import (
     JOURNAL_DIA,
     JOURNAL_LENGTH,
@@ -53,6 +53,7 @@ from crankshaft_spec import (
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
     SHAFT_LENGTH,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -419,10 +420,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         symbol_xy=(0.205, 0.145),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bearing_journal"),
         label="crankshaft bearing-journal finish",
         edge_entity=journal_silhouette,
-        production_method="BEARING JOURNAL",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)
     # Identify the enlarged circular projection without relying on its position.

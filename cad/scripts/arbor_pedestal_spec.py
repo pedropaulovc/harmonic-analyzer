@@ -6,6 +6,9 @@ SLDDRW recipes from one source (see build_arbor_pedestal.py for the geometry).
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
@@ -54,6 +57,14 @@ SCREW_THREAD = "#4"  # flange hold-down clearance hole
 # `test_arbor_pedestal_drawing.test_screw_clearance_tracks_the_hole_resolver`,
 # so the duplicate cannot drift again without a gate going red.
 SCREW_CLEARANCE_DIA = 3.264
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "arbor_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
+    ),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},

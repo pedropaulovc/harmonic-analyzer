@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -47,6 +48,13 @@ GEOMETRIC_CONTROLS = (
         "0.05",
         PlanarFace((0, 1, 0), SHAFT_LENGTH),
         datums=("A",),
+    ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "arbor_bearing",
+        MACHINED_UM,
+        CylinderFace(SHAFT_DIA, contains_y_mm=SHAFT_LENGTH / 2.0),
     ),
 )
 

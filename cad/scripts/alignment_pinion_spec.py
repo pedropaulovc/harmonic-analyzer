@@ -7,6 +7,9 @@ pattern in ``cylinder_gear_spec``.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
@@ -21,6 +24,10 @@ WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 BORE_DIA = 8.0                    # Ø8 arbor through-bore (build_pinion_arbor.py)
 ARBOR_BORE_BAND = (-0.020, -0.040)  # light press; (upper, lower) deviations
 FACE_WIDTH = 143.2                # spans all 20 drum stations
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArborBoreProfile": {"ArborBoreDia"},

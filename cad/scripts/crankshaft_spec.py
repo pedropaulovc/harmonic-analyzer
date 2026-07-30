@@ -2,6 +2,9 @@ r"""Pure-data dimensional contract shared by the crankshaft and its drawing."""
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
@@ -23,6 +26,17 @@ JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
 JOURNAL_START = 32.755105572
 JOURNAL_END = 104.789505572
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "bearing_journal",
+        MACHINED_UM,
+        CylinderFace(
+            JOURNAL_DIA,
+            contains_y_mm=JOURNAL_START + JOURNAL_LENGTH / 2.0,
+        ),
+        production_method="BEARING JOURNAL",
+    ),
+)
 # Tapered-pin cross-hole: a native Hole Wizard #9 number drill radially through
 # the crank seat (axis along Z). The diameter comes from the wizard drill table
 # (_holes.NUMBER_DRILL_MM["#9"]); the value is mirrored here so the drawing's

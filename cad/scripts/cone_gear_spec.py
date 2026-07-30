@@ -8,6 +8,8 @@ family note. See the batch gear-drawing pattern in ``cylinder_gear_spec``.
 from __future__ import annotations
 
 import _config
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -35,6 +37,10 @@ FAMILY_BORES_MM = {
     18: 0.25 * MM_PER_IN,
     24: 0.375 * MM_PER_IN,
 }
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl("cone_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreCutDia"},

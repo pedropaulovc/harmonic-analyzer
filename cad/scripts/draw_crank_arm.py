@@ -44,7 +44,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from crank_arm_spec import (
     ARM_C2C,
     ARM_END_X,
@@ -54,6 +54,7 @@ from crank_arm_spec import (
     HALF_WIDTH,
     PIN_HOLE_DIA,
     SHAFT_BORE_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -493,7 +494,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=shaft_edge_lower,
         symbol_xy=(0.022, 0.125),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "shaft_bore"),
         label="shaft bore finish",
     )
 

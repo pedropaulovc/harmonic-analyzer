@@ -25,12 +25,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from cylinder_gear_shaft_spec import (
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
     SHAFT_DIA,
     SHAFT_LENGTH,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -243,7 +244,7 @@ async def build(adapter: Any) -> dict[str, str]:
         end,
         edge_xy=end_circle,
         symbol_xy=(0.078, 0.222),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bearing"),
         label="arbor bearing finish",
     )
 

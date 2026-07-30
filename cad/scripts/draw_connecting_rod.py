@@ -40,13 +40,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from connecting_rod_spec import (
     CENTER_DISTANCE,
     HEAD_TOP_Y,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -230,7 +231,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=BORE_FINISH_EDGE,
         symbol_xy=BORE_FINISH_SYMBOL,
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
         label="strap bore finish",
     )
     # The hole callout owns the 9-o'clock rim and routes down-right to its

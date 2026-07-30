@@ -49,7 +49,14 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
-from crank_pinion_spec import BORE_DIA_BAND, DRAWING_DIMENSIONS, DRAWING_NOTES, GEAR_DATA
+from _part_pmi import author_part_pmi
+from crank_pinion_spec import (
+    BORE_DIA_BAND,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    GEAR_DATA,
+    SURFACE_FINISHES,
+)
 
 PART_NAME = "crank-pinion"
 MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
@@ -139,6 +146,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

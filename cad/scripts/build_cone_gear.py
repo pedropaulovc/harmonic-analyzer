@@ -78,7 +78,13 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _grouped_bom_properties import apply_grouped_bom_properties
-from cone_gear_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, GEAR_DATA
+from _part_pmi import author_part_pmi
+from cone_gear_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    GEAR_DATA,
+    SURFACE_FINISHES,
+)
 from _common import (
     OUT_PNG,
     SketchDims,
@@ -826,6 +832,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

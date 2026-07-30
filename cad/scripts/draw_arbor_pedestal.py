@@ -28,7 +28,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from arbor_pedestal_spec import (
     BORE_DIA,
     BORE_HEIGHT,
@@ -37,6 +37,7 @@ from arbor_pedestal_spec import (
     FOOT_WIDTH,
     SCREW_CLEARANCE_DIA,
     STRAP_T,
+    SURFACE_FINISHES,
     TOP_RADIUS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -431,7 +432,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(0.155, 0.225),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
         entity=bore_entity,
         leader_attach_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),
