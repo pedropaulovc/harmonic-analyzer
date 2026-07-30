@@ -2521,10 +2521,30 @@ async def build(adapter) -> dict[str, str]:
         # already sit on the seed's side. The end-state validation below (pose
         # + status + mate count) is the tripwire if any copy landed wrong.
         model = adapter.currentModel
-        if not bool(adapter._attempt(lambda: model.EditRebuild3(),
-                                     default=False)):
+        rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
+        if rebuilt is False or rebuilt is None:
+            faults = whats_wrong(adapter, model)
+            hard_faults = [
+                f"{name} [code={code}]"
+                for name, code, warning in faults
+                if not warning
+            ]
+            warnings = [
+                f"{name} [code={code}]"
+                for name, code, warning in faults
+                if warning
+            ]
+            _telemetry.error(
+                "cone-gear replication rebuild rejected",
+                rebuild_result=repr(rebuilt),
+                hard_faults=hard_faults,
+                warnings=warnings,
+            )
             raise RuntimeError(
-                "closing EditRebuild3 after cone-gear replication failed")
+                "EditRebuild3 after cone-gear replication returned "
+                f"{rebuilt!r}; hard faults: {hard_faults or ['none reported']}; "
+                f"warnings: {warnings or ['none reported']}"
+            )
     # Validate the production way (CopyWithMates2's return LIES): pose on the
     # seed's transform translated one seat pitch per station, full mate set,
     # fully-defined status, the configuration actually taken; then re-anchor

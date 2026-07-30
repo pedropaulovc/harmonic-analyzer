@@ -412,7 +412,10 @@ def author_part_pmi(
         for control in surface_finishes:
             label = f"surface:{control.key}"
             face = resolved_faces[label]
-            _select_face(model, face, label=label)
+            if control.native_attachment == "face":
+                _select_face(model, face, label=label)
+            else:
+                model.ClearSelection2(True)
             box = tuple(face.GetBox() or ())
             position = (
                 (box[3] + 0.01, box[4] + 0.01, box[5] + 0.01)
@@ -421,7 +424,8 @@ def author_part_pmi(
             )
             symbol = model.Extension.InsertSurfaceFinishSymbol3(
                 1,  # installed R2026x swSFMachining_Req
-                1,  # swLeaderStyle_e.swSTRAIGHT
+                1 if control.native_attachment == "face" else 0,
+                # swLeaderStyle_e.swSTRAIGHT / swNO_LEADER
                 *position,
                 0,  # swSFLaySym_e.swSFNone
                 1,  # swArrowStyle_e.swCLOSED_ARROWHEAD
@@ -456,18 +460,29 @@ def author_part_pmi(
                 name=control.annotation_name,
                 label=label,
             )
-            _verify_attachment(annotation, control.face, label=label)
-            if not bool(symbol.IsAttached()) or int(symbol.GetLeaderCount()) != 1:
-                raise RuntimeError(
-                    f"{label}: leader attachment mismatch: "
-                    f"attached={bool(symbol.IsAttached())}, "
-                    f"leaders={symbol.GetLeaderCount()}"
-                )
+            if control.native_attachment == "face":
+                _verify_attachment(annotation, control.face, label=label)
+                if not bool(symbol.IsAttached()) or int(symbol.GetLeaderCount()) != 1:
+                    raise RuntimeError(
+                        f"{label}: leader attachment mismatch: "
+                        f"attached={bool(symbol.IsAttached())}, "
+                        f"leaders={symbol.GetLeaderCount()}"
+                    )
+            else:
+                attached = tuple(annotation.GetAttachedEntities3() or ())
+                leader_style = int(annotation.GetLeaderStyle())
+                if attached or bool(symbol.IsAttached()) or leader_style != 0:
+                    raise RuntimeError(
+                        f"{label}: model-owned symbol unexpectedly attached: "
+                        f"entities={len(attached)}, attached={bool(symbol.IsAttached())}, "
+                        f"leader_style={leader_style}, leaders={symbol.GetLeaderCount()}"
+                    )
             _telemetry.event(
                 "pmi.surface_finish",
                 key=control.key,
                 roughness_um=control.roughness_um,
                 production_method=control.production_method,
+                native_attachment=control.native_attachment,
             )
         model.ClearSelection2(True)
         _telemetry.success(

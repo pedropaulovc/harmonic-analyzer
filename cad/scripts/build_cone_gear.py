@@ -722,12 +722,23 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
 
+    # Author before the existing 20-configuration regeneration sweep.  This is
+    # the live regression gate for the model-owned symbol: a face-attached
+    # symbol created in the 120T geometry makes every other configuration's
+    # component feature rebuild with swFeatureErrorUnknown.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+
     png_dir = OUT_PNG / PART_NAME
     png_dir.mkdir(parents=True, exist_ok=True)
     artefacts: dict[str, str] = {}
     volumes: dict[str, float] = {}
     for name, teeth in CONFIGS:
-        check(f"activate {name}", await adapter.set_active_configuration(name))
+        activation = await adapter.set_active_configuration(name)
+        check(f"activate {name}", activation)
+        if not bool(activation.data.get("rebuilt")):
+            raise RuntimeError(
+                f"{name}: configuration activation did not rebuild cleanly"
+            )
         # Config switches regenerate LAZILY: get_mass_properties can otherwise
         # sample a half-regenerated solid. Seen once in a from-empty build_all run
         # (T006 read 182.7 vs 108.3 -- a partially re-patterned state -- while
@@ -832,7 +843,6 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

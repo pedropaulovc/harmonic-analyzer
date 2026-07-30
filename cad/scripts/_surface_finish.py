@@ -32,6 +32,7 @@ vocabulary.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from _gtol_spec import FaceSpec, pmi_annotation_name
 
@@ -67,17 +68,32 @@ MACHINED = ra(MACHINED_UM)
 
 @dataclass(frozen=True)
 class SurfaceFinishControl:
-    """Part-owned surface requirement attached to one exact model face."""
+    """Part-owned surface requirement qualified by one exact model face.
+
+    ``native_attachment`` controls only how the native symbol is stored in the
+    ``.SLDPRT``.  Most parts attach it directly to the qualified face.  A
+    configuration-driven part whose topology changes between configurations
+    uses ``"model"`` so one configuration's transient face identity cannot
+    make every other configuration rebuild with a dangling annotation.  The
+    typed ``face`` remains mandatory and is still resolved live by the part
+    build and used to place the drawing leader.
+    """
 
     key: str
     roughness_um: float
     face: FaceSpec
     production_method: str = ""
+    native_attachment: Literal["face", "model"] = "face"
 
     def __post_init__(self) -> None:
         if not self.key:
             raise ValueError("surface-finish key cannot be blank")
         ra(self.roughness_um)
+        if self.native_attachment not in {"face", "model"}:
+            raise ValueError(
+                "surface-finish native_attachment must be 'face' or 'model', "
+                f"got {self.native_attachment!r}"
+            )
 
     @property
     def roughness_ra(self) -> str:

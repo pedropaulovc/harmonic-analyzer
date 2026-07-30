@@ -39,7 +39,12 @@ FAMILY_BORES_MM = {
 }
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl("cone_gear_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+    SurfaceFinishControl(
+        "cone_gear_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA),
+        native_attachment="model",
+    ),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

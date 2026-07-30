@@ -82,6 +82,7 @@ CASES = (
                 "cone_gear_bore",
                 MACHINED_UM,
                 CylinderFace(cone_gear_spec.BORE_DIA),
+                native_attachment="model",
             ),
         ),
     ),
