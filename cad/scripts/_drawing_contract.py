@@ -51,6 +51,7 @@ _UNILATERAL_FRAGMENT = re.compile(
     re.IGNORECASE,
 )
 _PROPERTY_LINK = re.compile(r'\s*\$PRP(?:SHEET)?:"[^"]+"\s*', re.IGNORECASE)
+_FORMAT_SIGN_OPTION = re.compile(r"^(?:.[<>=^]|[<>=^])?([+\- ])")
 
 _DIRECT_TOLERANCE_METHODS = frozenset(
     {
@@ -286,6 +287,31 @@ def _catalog_sourced(
     return False
 
 
+def _static_format_spec(node: ast.FormattedValue) -> str | None:
+    format_spec = node.format_spec
+    if format_spec is None:
+        return ""
+    if not isinstance(format_spec, ast.JoinedStr):
+        return None
+    if not all(
+        isinstance(value, ast.Constant) and isinstance(value.value, str)
+        for value in format_spec.values
+    ):
+        return None
+    return "".join(value.value for value in format_spec.values)
+
+
+def _formatted_placeholder(node: ast.FormattedValue) -> str:
+    """Represent a formatted value without discarding a static sign option."""
+    format_spec = _static_format_spec(node)
+    if format_spec is None:
+        return "\x00"
+    sign = _FORMAT_SIGN_OPTION.match(format_spec)
+    if sign is not None:
+        return f"{sign.group(1)}\x00"
+    return "\x00"
+
+
 def _joined_string(node: ast.JoinedStr) -> tuple[str, tuple[ast.expr, ...]]:
     fragments: list[str] = []
     expressions: list[ast.expr] = []
@@ -293,7 +319,7 @@ def _joined_string(node: ast.JoinedStr) -> tuple[str, tuple[ast.expr, ...]]:
         if isinstance(value, ast.Constant) and isinstance(value.value, str):
             fragments.append(value.value)
         elif isinstance(value, ast.FormattedValue):
-            fragments.append("\x00")
+            fragments.append(_formatted_placeholder(value))
             expressions.append(value.value)
     return "".join(fragments), tuple(expressions)
 

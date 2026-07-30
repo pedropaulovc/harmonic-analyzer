@@ -71,6 +71,43 @@ def _named_dimension(
     return matches[0]
 
 
+def _tolerance_precision_mm(*deviations_mm: float) -> int:
+    """Return the fewest decimals that preserve every millimetre deviation.
+
+    SOLIDWORKS stores tolerance values in metres but renders them in the
+    document's display units.  The drawing template defaults tolerance values
+    to two decimal places, which would turn a real 0.004 mm deviation into
+    0.00.  Derive the override from the source values rather than maintaining a
+    second per-drawing precision table.
+    """
+    for digits in range(9):
+        if all(
+            math.isclose(value, round(value, digits), rel_tol=0.0, abs_tol=1e-12)
+            for value in deviations_mm
+        ):
+            return digits
+    raise ValueError(
+        f"dimension tolerance needs more than 8 decimal places: {deviations_mm!r}"
+    )
+
+
+def _set_tolerance_precision(
+    display: Any, deviations_mm: tuple[float, ...], *, label: str
+) -> int:
+    """Set and verify a model display dimension's primary tolerance precision."""
+    display = _early_bound(display, "IDisplayDimension")
+    digits = _tolerance_precision_mm(*deviations_mm)
+    do_not_change = -1  # swDimensionPrecisionSettings_e
+    display.SetPrecision3(do_not_change, do_not_change, digits, do_not_change)
+    applied = int(display.GetPrimaryTolPrecision2())
+    if applied != digits:
+        raise RuntimeError(
+            f"{label}: tolerance precision did not persist: "
+            f"requested {digits} decimals, dimension reports {applied}"
+        )
+    return digits
+
+
 def set_dimension_symmetric_tolerance(
     adapter: Any,
     feature_name: str,
@@ -80,7 +117,7 @@ def set_dimension_symmetric_tolerance(
     """Tolerance one named source-model dimension and verify the stored values."""
     if tolerance_mm <= 0.0:
         raise ValueError("symmetric dimension tolerance must be positive")
-    _, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display, dimension = _named_dimension(adapter, feature_name, dimension_name)
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
     tolerance_m = tolerance_mm / 1000.0
@@ -102,8 +139,12 @@ def set_dimension_symmetric_tolerance(
             f"{dimension_name}@{feature_name}: tolerance readback "
             f"{minimum:g}/{maximum:g} m != +/-{tolerance_m:g} m"
         )
+    precision = _set_tolerance_precision(
+        display, (-tolerance_mm, tolerance_mm), label=f"{dimension_name}@{feature_name}"
+    )
     _telemetry.success(
-        f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_mm:.2f} mm"
+        f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_mm:g} mm "
+        f"({precision} decimals)"
     )
 
 
@@ -119,7 +160,7 @@ def set_dimension_bilateral_tolerance(
         raise ValueError("lower dimension deviation must not exceed upper deviation")
     if lower_deviation_mm == upper_deviation_mm:
         raise ValueError("bilateral dimension tolerance must have a nonzero range")
-    _, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display, dimension = _named_dimension(adapter, feature_name, dimension_name)
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = 2  # swTolType_e.swTolBILAT
     lower_m = lower_deviation_mm / 1000.0
@@ -140,9 +181,15 @@ def set_dimension_bilateral_tolerance(
             f"{dimension_name}@{feature_name}: tolerance readback "
             f"{minimum:g}/{maximum:g} m != {lower_m:g}/{upper_m:g} m"
         )
+    precision = _set_tolerance_precision(
+        display,
+        (lower_deviation_mm, upper_deviation_mm),
+        label=f"{dimension_name}@{feature_name}",
+    )
     _telemetry.success(
         f"toleranced {dimension_name}@{feature_name}: "
-        f"{lower_deviation_mm:+.2f}/{upper_deviation_mm:+.2f} mm"
+        f"{lower_deviation_mm:+g}/{upper_deviation_mm:+g} mm "
+        f"({precision} decimals)"
     )
 
 

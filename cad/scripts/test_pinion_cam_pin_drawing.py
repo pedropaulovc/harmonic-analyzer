@@ -82,7 +82,7 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     }
     assert drawing.DIMENSION_CALLOUTS["PinDia"] == "FINAL SIZE"
     assert "NOMINAL REF ONLY" not in drawing.DIMENSION_CALLOUTS["PinDia"]
-    assert "set_reference_dimension(" in source
+    assert "set_reference_dimension(" not in source
     assert 'characteristic="flatness"' in source
     assert "datums=()," in source  # crown profile is FORM ONLY (machinist round 1)
     assert "NO CHAMFER" in pinion_cam_pin_spec.DRAWING_NOTES

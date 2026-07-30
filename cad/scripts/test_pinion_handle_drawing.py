@@ -127,7 +127,7 @@ def test_transverse_axis_uses_basic_location_and_position_control() -> None:
     assert "diameter=True" in source
     assert "add_edge_dimension(" in source
     assert "set_basic_dimension(" in source
-    assert "set_reference_dimension(" in source
+    assert "set_reference_dimension(" not in source
     assert drawing.FRONT_KEEP["RodSpan"] == (0.115, 0.245)
     assert drawing.FRONT_KEEP["TubeId"][0] >= 0.075
     assert "frame_xy=(0.315, 0.155)" in source

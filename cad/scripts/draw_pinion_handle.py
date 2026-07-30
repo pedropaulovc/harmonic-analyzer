@@ -28,7 +28,6 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     model_point_in_view,
@@ -37,7 +36,6 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_basic_dimension,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -185,13 +183,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         [*front_annotations, *right_annotations, *top_annotations],
         DIMENSION_CALLOUTS,
-    )
-    top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
-    set_reference_dimension(
-        adapter,
-        top_by_name["RodDia"],
-        label="handle press-rod nominal diameter",
-        diameter=True,
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

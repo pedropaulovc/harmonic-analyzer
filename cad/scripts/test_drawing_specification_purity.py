@@ -34,11 +34,36 @@ def _rules(source: str) -> list[str]:
         '"3.00 MIN"',
         '"6.375 MAX / 6.360 MIN"',
         'f"{upper:.3f} MAX / {lower:.3f} MIN"',
+        'f"{upper:+.2f}/{lower:+.2f}"',
+        'f"{upper:>+.3f} / {lower:*>+8.3f}"',
+        'f"{upper:-.2f}/{lower:-.2f}"',
         'f"Ra {local_grade}"',
     ),
 )
 def test_detector_finds_frozen_manufacturing_string_fragments(value: str) -> None:
     assert "drawing-spec-string" in _rules(f"CALLOUT = {value}\n")
+
+
+def test_detector_preserves_f_string_signs_in_violation_evidence() -> None:
+    violations = drawing_specification_violations(
+        'CALLOUT = f"{upper:+.2f}/{lower:+.2f}"\n'
+    )
+    assert len(violations) == 1
+    assert violations[0].rule == "drawing-spec-string"
+    assert violations[0].evidence == "'+{...}/+{...}'"
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        'f"{numerator:.2f}/{denominator:.2f}"',
+        'f"{month:02d}/{day:02d}"',
+        'f"{value:+.2f}"',
+        'f"{width:+.2f} BY {height:+.2f}"',
+    ),
+)
+def test_detector_does_not_treat_unbanded_f_strings_as_tolerances(value: str) -> None:
+    assert drawing_specification_violations(f"LABEL = {value}\n") == ()
 
 
 def test_detector_finds_fit_renderers_through_import_aliases() -> None:
