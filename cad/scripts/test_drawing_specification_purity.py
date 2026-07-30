@@ -22,6 +22,10 @@ def _rules(source: str) -> list[str]:
         '"+0.00/-0.02"',
         '"+0.10/0"',
         '"+0.10/+0.00"',
+        '"-0.02/-0.04"',
+        '"+0.04/+0.02"',
+        '"-0.02/+0.04"',
+        '"+ 0.04 / + 0.02"',
         '"0/-0.10"',
         '"+0.00/-0.10"',
         '"±0.05"',
@@ -174,6 +178,8 @@ VIEW_XY = (0.130, 0.170)
 SCALE = (2, 1)
 PROPERTY = '$PRPSHEET:"ToleranceCallout"'
 NOTE = "KEEP MAX-MIN RESULTS WITH THE INSPECTION REPORT"
+RATIO = "12/24"
+THREAD = "1/4-20 UNC"
 '''
     assert drawing_specification_violations(source) == ()
 

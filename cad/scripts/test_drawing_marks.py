@@ -102,3 +102,37 @@ def test_angular_tolerance_helper_has_an_operation_span(
         )
 
     assert spans == [("dim.angular_tolerance", {"label": "GripAngle"})]
+
+
+def test_dimension_prefix_helper_has_an_operation_span(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans: list[tuple[str, dict[str, Any]]] = []
+
+    @contextmanager
+    def capture_span(name: str, **attributes: Any):
+        spans.append((name, attributes))
+        yield
+
+    class PrefixDisplay:
+        def __init__(self) -> None:
+            self.prefix = ""
+
+        def SetText(self, _part: int, prefix: str) -> bool:
+            self.prefix = prefix
+            return True
+
+        def GetText(self, _part: int) -> str:
+            return self.prefix
+
+    display = PrefixDisplay()
+    monkeypatch.setattr(_drawing_marks._telemetry, "span", capture_span)
+    monkeypatch.setattr(
+        _drawing_marks, "_named_dimension", lambda *_args: (display, object())
+    )
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+
+    _drawing_marks.set_dimension_prefix(object(), "GripAngleDim", "GripAngle", "REF ")
+
+    assert display.prefix == "REF "
+    assert spans == [("dim.prefix", {"label": "GripAngle"})]

@@ -39,6 +39,7 @@ _SFS_ANNOTATION = 7
 _INSERT_SURFACE_FINISH = 0x80
 
 
+@_telemetry.traced("diagnostic.surface_finish_pmi.walk_part_annotations")
 def _surface_annotations(model):
     found = {}
     raw = model.GetFirstAnnotation2()
@@ -50,6 +51,7 @@ def _surface_annotations(model):
     return found
 
 
+@_telemetry.traced("diagnostic.surface_finish_pmi.walk_drawing_annotations")
 def _drawing_surface_annotations(model):
     drawing = _early_bound(model, "IDrawingDoc")
     view = _early_bound(drawing.GetFirstView(), "IView")
@@ -65,6 +67,7 @@ def _drawing_surface_annotations(model):
                 found[f"{view.GetName2()}/{annotation.GetName() or ''}"] = annotation
 
 
+@_telemetry.traced("diagnostic.surface_finish_pmi.assert_symbol", label_param="stage")
 def _assert_symbol(annotation, *, stage: str) -> None:
     symbol = _early_bound(annotation.GetSpecificAnnotation(), "ISFSymbol")
     if str(symbol.GetText(8) or "").strip() != ROUGHNESS:
@@ -75,7 +78,9 @@ def _assert_symbol(annotation, *, stage: str) -> None:
         raise RuntimeError(f"{stage}: surface-finish symbol is not attached")
     entities = tuple(annotation.GetAttachedEntities3() or ())
     if len(entities) != 1 or entities[0] is None:
-        raise RuntimeError(f"{stage}: expected one attached entity, got {len(entities)}")
+        raise RuntimeError(
+            f"{stage}: expected one attached entity, got {len(entities)}"
+        )
 
 
 @_telemetry.traced("diagnostic.surface_finish_pmi")
@@ -89,113 +94,128 @@ async def main() -> int:
         shutil.copy2(SOURCE, SCRATCH_PRT)
         SCRATCH_DRW.unlink(missing_ok=True)
 
-        result = await adapter.open_model(str(SCRATCH_PRT))
-        if not result.is_success:
-            raise RuntimeError(f"part open failed: {result.error}")
-        model = adapter.currentModel
-        face_spec = GEOMETRIC_CONTROLS[0].face
-        face = _resolve_faces(model, {"gear-seat": face_spec})["gear-seat"]
-        _select_face(model, face, label="gear-seat surface finish")
-        symbol = model.Extension.InsertSurfaceFinishSymbol3(
-            1,
-            2,
-            0.018,
-            0.016,
-            0.008,
-            0,
-            10,
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-        )
-        if symbol is None:
-            raise RuntimeError("part InsertSurfaceFinishSymbol3 returned None")
-        symbol = _early_bound(symbol, "ISFSymbol")
-        if not symbol.SetText(8, ROUGHNESS):
-            raise RuntimeError("part SetText(roughness) failed")
-        annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
-        if not annotation.SetName(ANNOTATION_NAME):
-            raise RuntimeError("part surface-finish SetName failed")
-        _assert_symbol(annotation, stage="part authored")
-        model.ClearSelection2(True)
-        model.SaveAs3(os.path.abspath(SCRATCH_PRT), 0, 0)
-        adapter.swApp.CloseAllDocuments(True)
+        with _telemetry.span("diagnostic.surface_finish_pmi.part_authoring"):
+            result = await adapter.open_model(str(SCRATCH_PRT))
+            if not result.is_success:
+                raise RuntimeError(f"part open failed: {result.error}")
+            model = adapter.currentModel
+            face_spec = GEOMETRIC_CONTROLS[0].face
+            face = _resolve_faces(model, {"gear-seat": face_spec})["gear-seat"]
+            _select_face(model, face, label="gear-seat surface finish")
+            symbol = model.Extension.InsertSurfaceFinishSymbol3(
+                1,
+                2,
+                0.018,
+                0.016,
+                0.008,
+                0,
+                10,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            )
+            if symbol is None:
+                raise RuntimeError("part InsertSurfaceFinishSymbol3 returned None")
+            symbol = _early_bound(symbol, "ISFSymbol")
+            if not symbol.SetText(8, ROUGHNESS):
+                raise RuntimeError("part SetText(roughness) failed")
+            annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
+            if not annotation.SetName(ANNOTATION_NAME):
+                raise RuntimeError("part surface-finish SetName failed")
+            _assert_symbol(annotation, stage="part authored")
 
-        result = await adapter.open_model(str(SCRATCH_PRT))
-        if not result.is_success:
-            raise RuntimeError(f"part reopen failed: {result.error}")
-        reopened = _surface_annotations(adapter.currentModel)
-        if ANNOTATION_NAME not in reopened:
-            raise RuntimeError("named part surface-finish annotation did not persist")
-        _assert_symbol(reopened[ANNOTATION_NAME], stage="part reopened")
-        adapter.swApp.CloseAllDocuments(True)
+        with _telemetry.span("diagnostic.surface_finish_pmi.part_save_reopen"):
+            model.ClearSelection2(True)
+            model.SaveAs3(os.path.abspath(SCRATCH_PRT), 0, 0)
+            adapter.swApp.CloseAllDocuments(True)
+
+            result = await adapter.open_model(str(SCRATCH_PRT))
+            if not result.is_success:
+                raise RuntimeError(f"part reopen failed: {result.error}")
+            reopened = _surface_annotations(adapter.currentModel)
+            if ANNOTATION_NAME not in reopened:
+                raise RuntimeError(
+                    "named part surface-finish annotation did not persist"
+                )
+            _assert_symbol(reopened[ANNOTATION_NAME], stage="part reopened")
+            adapter.swApp.CloseAllDocuments(True)
 
         from solidworks_mcp.adapters.solidworks.drawing import new_drawing, place_view
 
-        new_drawing(adapter)
-        draw = adapter.currentModel
-        drawing = _early_bound(draw, "IDrawingDoc")
-        _early_bound(
-            place_view(
-                adapter,
-                str(SCRATCH_PRT),
-                "*Front",
-                0.11,
-                0.15,
-                scale=(4.0, 1.0),
-            ),
-            "IView",
-        )
-        inserted = tuple(
-            drawing.InsertModelAnnotations3(
-                0, _INSERT_SURFACE_FINISH, True, True, False, False
+        with _telemetry.span("diagnostic.surface_finish_pmi.drawing_import"):
+            new_drawing(adapter)
+            draw = adapter.currentModel
+            drawing = _early_bound(draw, "IDrawingDoc")
+            _early_bound(
+                place_view(
+                    adapter,
+                    str(SCRATCH_PRT),
+                    "*Front",
+                    0.11,
+                    0.15,
+                    scale=(4.0, 1.0),
+                ),
+                "IView",
             )
-            or ()
-        )
-        imported = [
-            _early_bound(item, "IAnnotation")
-            for item in inserted
-            if int(_early_bound(item, "IAnnotation").GetType()) == _SFS_ANNOTATION
-        ]
-        _telemetry.info(f"InsertModelAnnotations3(surface finishes) -> {len(imported)}")
-        if len(imported) != 1:
-            raise RuntimeError(f"expected one imported surface finish, got {len(imported)}")
-        _assert_symbol(imported[0], stage="drawing imported")
-        if str(imported[0].GetName() or "") != ANNOTATION_NAME:
-            raise RuntimeError(
-                "drawing import lost annotation name: "
-                f"{imported[0].GetName()!r} != {ANNOTATION_NAME!r}"
+            inserted = tuple(
+                drawing.InsertModelAnnotations3(
+                    0, _INSERT_SURFACE_FINISH, True, True, False, False
+                )
+                or ()
             )
-        if not imported[0].SetPosition2(*SHEET_TARGET, 0.0):
-            raise RuntimeError("failed to position imported surface finish")
-        draw.SaveAs3(os.path.abspath(SCRATCH_DRW), 0, 0)
-        adapter.swApp.CloseAllDocuments(True)
+            imported = [
+                _early_bound(item, "IAnnotation")
+                for item in inserted
+                if int(_early_bound(item, "IAnnotation").GetType()) == _SFS_ANNOTATION
+            ]
+            _telemetry.info(
+                f"InsertModelAnnotations3(surface finishes) -> {len(imported)}"
+            )
+            if len(imported) != 1:
+                raise RuntimeError(
+                    f"expected one imported surface finish, got {len(imported)}"
+                )
+            _assert_symbol(imported[0], stage="drawing imported")
+            if str(imported[0].GetName() or "") != ANNOTATION_NAME:
+                raise RuntimeError(
+                    "drawing import lost annotation name: "
+                    f"{imported[0].GetName()!r} != {ANNOTATION_NAME!r}"
+                )
+            if not imported[0].SetPosition2(*SHEET_TARGET, 0.0):
+                raise RuntimeError("failed to position imported surface finish")
+            draw.SaveAs3(os.path.abspath(SCRATCH_DRW), 0, 0)
+            adapter.swApp.CloseAllDocuments(True)
 
-        result = await adapter.open_model(str(SCRATCH_DRW))
-        if not result.is_success:
-            raise RuntimeError(f"drawing reopen failed: {result.error}")
-        final = _drawing_surface_annotations(adapter.currentModel)
-        _telemetry.info(f"drawing reopen surface-finish names: {tuple(final)}")
-        if len(final) != 1:
-            raise RuntimeError(
-                f"expected one reopened drawing surface finish, got {len(final)}"
-            )
-        reopened_annotation = next(iter(final.values()))
-        _assert_symbol(reopened_annotation, stage="drawing reopened")
-        position = tuple(reopened_annotation.GetPosition() or ())
-        if len(position) < 2 or max(
-            abs(position[0] - SHEET_TARGET[0]),
-            abs(position[1] - SHEET_TARGET[1]),
-        ) > 0.0005:
-            raise RuntimeError(
-                "imported surface-finish position did not persist: "
-                f"{position!r} != {SHEET_TARGET!r}"
-            )
-        adapter.swApp.QuitDoc(str(_read_member(adapter.currentModel, "GetTitle")))
+        with _telemetry.span("diagnostic.surface_finish_pmi.drawing_final_reopen"):
+            result = await adapter.open_model(str(SCRATCH_DRW))
+            if not result.is_success:
+                raise RuntimeError(f"drawing reopen failed: {result.error}")
+            final = _drawing_surface_annotations(adapter.currentModel)
+            _telemetry.info(f"drawing reopen surface-finish names: {tuple(final)}")
+            if len(final) != 1:
+                raise RuntimeError(
+                    f"expected one reopened drawing surface finish, got {len(final)}"
+                )
+            reopened_annotation = next(iter(final.values()))
+            _assert_symbol(reopened_annotation, stage="drawing reopened")
+            position = tuple(reopened_annotation.GetPosition() or ())
+            if (
+                len(position) < 2
+                or max(
+                    abs(position[0] - SHEET_TARGET[0]),
+                    abs(position[1] - SHEET_TARGET[1]),
+                )
+                > 0.0005
+            ):
+                raise RuntimeError(
+                    "imported surface-finish position did not persist: "
+                    f"{position!r} != {SHEET_TARGET!r}"
+                )
+            adapter.swApp.QuitDoc(str(_read_member(adapter.currentModel, "GetTitle")))
         _telemetry.success("surface-finish PMI positive control passed")
         return 0
     finally:

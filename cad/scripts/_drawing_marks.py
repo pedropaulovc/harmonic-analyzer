@@ -183,6 +183,7 @@ def set_dimension_symmetric_angular_tolerance(
     )
 
 
+@_telemetry.traced("dim.prefix", label_param="dimension_name")
 def set_dimension_prefix(
     adapter: Any, feature_name: str, dimension_name: str, prefix: str
 ) -> None:

@@ -32,6 +32,7 @@ _TOLERANCE_SETTERS = frozenset(
 )
 
 _UNSIGNED_VALUE_FRAGMENT = r"(?:\d+(?:\.\d*)?|\.\d+|\x00)"
+_SIGNED_VALUE_FRAGMENT = rf"(?:[-+]\s*{_UNSIGNED_VALUE_FRAGMENT})"
 _VALUE_FRAGMENT = r"(?:[-+]?(?:\d+(?:\.\d*)?|\.\d+)|\x00)"
 _ZERO_FRAGMENT = r"(?:[-+]?\s*(?:0+(?:\.0*)?|\.0+))"
 _RA_FRAGMENT = re.compile(rf"\bRa\s*{_VALUE_FRAGMENT}", re.IGNORECASE)
@@ -41,7 +42,7 @@ _LIMIT_FRAGMENT = re.compile(
 )
 _BILATERAL_FRAGMENT = re.compile(
     rf"(?:±|\+/-)\s*{_VALUE_FRAGMENT}|"
-    rf"\+\s*{_VALUE_FRAGMENT}\s*/\s*-\s*{_VALUE_FRAGMENT}",
+    rf"{_SIGNED_VALUE_FRAGMENT}\s*/\s*{_SIGNED_VALUE_FRAGMENT}",
     re.IGNORECASE,
 )
 _UNILATERAL_FRAGMENT = re.compile(
