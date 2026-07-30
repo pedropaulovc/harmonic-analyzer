@@ -23,7 +23,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
     CAP_R,
     CAP_SAG,
@@ -31,6 +31,7 @@ from pinion_arbor_spec import (
     PART_DATUMS,
     SHAFT_DIA,
     SHAFT_LEN,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -89,7 +90,9 @@ RIGHT_KEEP = {
         RIGHT_CENTER[1] + 0.022,
     ),
 }
-DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
+# The shaft fit lives on the source-model dimension. The crown descriptor is
+# still a sheet layout annotation, not a tolerance override.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 CAP_CALLOUTS = {"CapSagDim": f"SR{CAP_R:.2f} CROWN"}
 
 
@@ -199,7 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=(RIGHT_CENTER[0] + 0.050, SHAFT_FLANK_Y),
         symbol_xy=(RIGHT_CENTER[0] + 0.050, 0.222),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",
         entity_type="SILHOUETTE",
     )

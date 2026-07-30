@@ -19,6 +19,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_pivot_block_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -40,7 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pinion_pivot_block_spec import (
     BLOCK_BOTTOM_Y,
     BLOCK_DEPTH,
@@ -51,6 +53,7 @@ from pinion_pivot_block_spec import (
     LIFT_BORE_RISE,
     SCREW_HALF_SPACING,
     SCREW_HOLE_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -116,8 +119,8 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"Depth": (0.280, 0.168)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "THRU - REAM 1/4 IN\n+0.05/-0.00",
-    "LiftBoreDia": "THRU - REAM 1/4 IN\n+0.05/-0.00",
+    "PivotBoreDia": "THRU - REAM 1/4 IN",
+    "LiftBoreDia": "THRU - REAM 1/4 IN",
 }
 
 
@@ -279,7 +282,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=lift_edge,
         frame_xy=(0.048, 0.172),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lift-bore parallelism"],
         datums=("B",),
         diameter=True,
         label="lift-bore parallelism",
@@ -303,7 +306,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=west_screw_edge,
         frame_xy=(0.052, 0.240),
         characteristic="position",
-        tolerance="0.25",
+        tolerance=GEOMETRIC_TOLERANCES_MM["hold-down hole position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="2X",
@@ -330,7 +333,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=pivot_right_edge,
         symbol_xy=(0.200, 0.163),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
 

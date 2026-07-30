@@ -8,11 +8,14 @@ import the part build implementation.
 from __future__ import annotations
 
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 OUTER_DIA = 10.0
 BORE_DIA = 6.5
 LENGTH = 4.5565
+BORE_DIA_BAND = (0.03, 0.00)
+LENGTH_TOLERANCE_MM = 0.03
 
 # Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
@@ -34,6 +37,9 @@ GEOMETRIC_CONTROLS = (
         PlanarFace((0, 0, -1), LENGTH / 2.0),
         datums=("B",),
     ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

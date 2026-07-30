@@ -13,6 +13,7 @@ MM_PER_IN = 25.4
 BLOCK_X = 14.0  # plan width across the shaft
 BLOCK_Z = 12.0  # plan depth along the shaft
 BLOCK_HEIGHT = 40.718  # v2 post cascade: preserve the 1.000-mm crown above slit
+BLOCK_HEIGHT_BAND = (0.05, 0.00)  # (upper, lower) deviations
 ADJUSTER_AXIS_HEIGHT = 33.368  # coaxial with cone-pivot-post-v2 journal
 ADJUSTER_THREAD = "5/16-18"  # blind tapped hole from the far (north) face
 ADJUSTER_DEPTH = 8.0
@@ -63,3 +64,11 @@ DRAWING_NOTES = "\n".join(
         "POSITION TOLERANCE 0.10 TO B IS THE TOTAL MEDIAN-PLANE ZONE.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "adjuster common-axis true position": "0.05",
+    "slot median-plane position": "0.10",
+    "pinch common-axis true position": "0.05",
+}

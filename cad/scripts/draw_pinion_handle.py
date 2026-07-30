@@ -18,6 +18,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_handle_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -26,8 +28,8 @@ from _drawing_common import (
     add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     model_point_in_view,
@@ -36,21 +38,18 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_basic_dimension,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import REAM_SLIDE, fit_limits
+from _surface_finish import surface_finish_by_key
 from pinion_handle_spec import (
     CAP_SAG,
     GRIP_DIA,
     GRIP_LEN,
     ROD_DIA,
     ROD_DOWN,
-    ROD_HOLE_DIA,
-    ROD_HOLE_REAM_BAND,
-    ROD_PRESS_BAND,
     ROD_UP,
+    SURFACE_FINISHES,
     TUBE_ID,
     TUBE_LEN,
     TUBE_OD,
@@ -111,21 +110,15 @@ RIGHT_KEEP = {
 }
 TOP_KEEP = {
     "RodDia": (0.300, 0.092),
+    "RodHoleDia": (0.300, 0.112),
 }
 DIMENSION_CALLOUTS = {
-    "TubeId": (
-        f"NOMINAL REF ONLY\nFINAL REAM LIMITS\n{fit_limits(TUBE_ID, REAM_SLIDE)}\nRa 1.6"
-    ),
-    "GripLen": "+/-0.10 CYL. LENGTH",
-    "TubeLen": (
-        "+0.10/-0.00 BORE DEPTH"
-    ),
-    "RodSpan": "+/-0.10 OAL",
-    "RodDia": (
-        "PRESS ROD NOMINAL REFERENCE\n"
-        f"FINAL ROD LIMITS {fit_limits(ROD_DIA, ROD_PRESS_BAND)}\n"
-        f"REAM BODY HOLE {fit_limits(ROD_HOLE_DIA, ROD_HOLE_REAM_BAND)} THRU"
-    ),
+    "TubeId": "FINAL REAM",
+    "GripLen": "CYL. LENGTH",
+    "TubeLen": "BORE DEPTH",
+    "RodSpan": "OAL",
+    "RodDia": "PRESS ROD",
+    "RodHoleDia": "BODY HOLE; REAM THRU",
 }
 
 
@@ -193,13 +186,6 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *right_annotations, *top_annotations],
         DIMENSION_CALLOUTS,
     )
-    top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
-    set_reference_dimension(
-        adapter,
-        top_by_name["RodDia"],
-        label="handle press-rod nominal diameter",
-        diameter=True,
-    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
@@ -245,9 +231,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(
         adapter, cross_hole_station, label="datum B to body cross-hole axis"
     )
-    top_rod_center_y = (
-        TOP_CENTER[1] - (0.0 - z_center) * SHEET_SCALE[0] / 1000.0
-    )
+    top_rod_center_y = TOP_CENTER[1] - (0.0 - z_center) * SHEET_SCALE[0] / 1000.0
     flat_end_x = RIGHT_CENTER[0] - (z_max - z_center) * SHEET_SCALE[0] / 1000.0
     flat_end = (flat_end_x, bore_center[1])
     flat_end_face = (
@@ -279,7 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=grip_right,
         frame_xy=(0.105, 0.205),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle grip OD runout"],
         datums=("A",),
         label="handle grip OD runout",
     )
@@ -289,7 +273,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=hub_right,
         frame_xy=(0.112, 0.120),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle hub OD runout"],
         datums=("A",),
         label="handle hub OD runout",
     )
@@ -299,7 +283,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=flat_end,
         frame_xy=(0.205, 0.135),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle flat-end perpendicularity"],
         datums=("A",),
         label="handle flat-end perpendicularity",
     )
@@ -312,18 +296,29 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         frame_xy=(0.315, 0.155),
         characteristic="position",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle transverse-axis position"],
         datums=("A", "B"),
         diameter=True,
         quantity="BODY CROSS-HOLE AXIS BEFORE PRESSING",
         label="handle transverse-axis position",
     )
-    if add_note(
+    add_surface_finish(
         adapter,
-        "BODY CROSS-HOLE VIEW - LOOKING ALONG HOLE AXIS - SCALE 2:1",
-        0.235,
-        0.070,
-    ) is None:
+        front,
+        edge_xy=bore_top,
+        symbol_xy=(0.110, 0.090),
+        control=surface_finish_by_key(SURFACE_FINISHES, "final_bore"),
+        label="handle final bore finish",
+    )
+    if (
+        add_note(
+            adapter,
+            "BODY CROSS-HOLE VIEW - LOOKING ALONG HOLE AXIS - SCALE 2:1",
+            0.235,
+            0.070,
+        )
+        is None
+    ):
         raise RuntimeError("failed to label handle body cross-hole view")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)

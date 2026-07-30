@@ -8,6 +8,7 @@ import connecting_rod_notes
 import connecting_rod_spec
 import draw_connecting_rod as drawing
 import build_connecting_rod as rod
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -32,6 +33,7 @@ def test_draw_view_math_matches_the_spec() -> None:
     )
     assert connecting_rod_spec.CENTER_DISTANCE == rod.CENTER_DISTANCE
     assert connecting_rod_spec.RING_BORE_DIA == rod.RING_BORE_DIA
+    assert connecting_rod_spec.RING_BORE_DIA_BAND == rod.RING_BORE_DIA_BAND
     assert connecting_rod_spec.SHANK_WIDTH == rod.SHANK_WIDTH
     assert connecting_rod_spec.RING_THICKNESS == rod.RING_THICKNESS
     assert connecting_rod_spec.SHANK_THICKNESS == rod.SHANK_THICKNESS
@@ -54,7 +56,7 @@ def test_sheet_runs_at_1_to_1_with_1_to_2_isometric() -> None:
 def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     notes = connecting_rod_notes.DRAWING_NOTES
     # The pin hole rides its native Ø1.99 THRU ALL callout and the bore its
-    # +0.10/0 dimension callout; notes never repeat a sheet dimension.
+    # imported model tolerance; notes never repeat a sheet dimension.
     assert "#47" not in notes
     assert "1X" in notes
     assert "RING 3.00 THICK, STEP AT THE RING OD" in notes
@@ -79,19 +81,27 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
 def test_native_gdt_and_finish_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     # A = strap bore axis, B = shank left flank (clocking); the pin-hole
-    # position frame references both and the bore carries a fit callout.
+    # position frame references both and the bore imports its model-owned fit.
     assert source.count("add_datum_feature(") == 2
     assert 'label="strap bore axis",\n        position_tolerance_m=0.000005' in source
     assert source.count("add_feature_control_frame(") == 1
     assert 'datums=("A", "B")' in source
     assert 'characteristic="position"' in source
-    assert '"StrapBoreDia": "BORE +0.10/0"' in source
+    assert '"StrapBoreDia": "BORE"' in source
+    assert "+0.10/0" not in source
     assert "add_surface_finish(" in source
     assert "add_native_hole_callout(" in source
     # The callout owns the 9-o'clock rim; the position FCF anchors the
     # opposite 3-o'clock rim so the two leaders cannot cross.
     assert source.count("edge_xy=pin_rim") == 1
     assert source.count("edge_xy=pin_fcf_rim") == 1
+
+
+def test_strap_bore_tolerance_is_owned_by_the_named_model_dimension() -> None:
+    assert connecting_rod_spec.RING_BORE_DIA_BAND == (0.10, 0.00)
+    assert model_toleranced_dimensions(rod) == {
+        ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)"
+    }
 
 
 def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:

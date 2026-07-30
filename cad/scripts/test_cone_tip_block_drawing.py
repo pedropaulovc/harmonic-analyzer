@@ -49,7 +49,7 @@ def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
     assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == (
         "THRU - CLEARANCE PASSAGE"
     )
-    assert drawing.DIMENSION_CALLOUTS["BlockHt"] == "+0.05/-0.00"
+    assert "BlockHt" not in drawing.DIMENSION_CALLOUTS
     assert "A SHAFT-BEARING SURFACE" in cone_tip_block_spec.DRAWING_NOTES
 
 

@@ -74,9 +74,7 @@ def test_manufacturing_notes_cover_cam_and_teeth() -> None:
 
 
 def test_running_bore_limits_match_the_shaft_fit_policy() -> None:
-    assert drawing.DIMENSION_CALLOUTS == {
-        "BoreDia": "THRU - REAM\n+0.05/+0.03"
-    }
+    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "THRU - REAM"}
     assert drawing.DIMENSION_PRECISION == {"BoreDia": 3}
 
 

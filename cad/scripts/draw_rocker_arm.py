@@ -22,6 +22,8 @@ import math
 import sys
 from typing import Any
 
+from rocker_arm_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -42,13 +44,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from rocker_arm_spec import (
     ARM_THICKNESS,
     PIVOT_HOLE_DIA,
     R_TOP,
     ROD_HOLE_X,
     ROD_HOLE_Y,
+    SURFACE_FINISHES,
     TIP_FACE,
     TOP_ARC_LEN,
     TOP_END_X,
@@ -219,10 +222,8 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=pivot_datum_rim,
         symbol_xy=(
-            pivot_datum_rim[0]
-            + pivot_datum_standoff * math.cos(pivot_datum_angle),
-            pivot_datum_rim[1]
-            + pivot_datum_standoff * math.sin(pivot_datum_angle),
+            pivot_datum_rim[0] + pivot_datum_standoff * math.cos(pivot_datum_angle),
+            pivot_datum_rim[1] + pivot_datum_standoff * math.sin(pivot_datum_angle),
         ),
         datum="A",
         label="pivot bore cylindrical datum feature",
@@ -241,7 +242,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=pivot_bottom,
         symbol_xy=(pivot_bottom[0] + 0.010, pivot_bottom[1] - 0.020),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
     # Datum B (broad face, on the end view) orients the hole axes; datum C
@@ -271,7 +272,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=rod_rim,
         frame_xy=(0.300, 0.195),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["rod-pin hole position"],
         datums=("A", "B", "C"),
         diameter=True,
         label="rod-pin hole position",

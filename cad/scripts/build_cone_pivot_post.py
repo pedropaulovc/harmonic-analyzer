@@ -51,6 +51,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from _holes import HoleSpec, wizard_holes
 from cone_pivot_post_spec import (
@@ -67,6 +68,7 @@ from cone_pivot_post_spec import (
     CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
+    CRANK_BORE_TOLERANCE_MM,
     CRANK_BOSS_DIA,
     CRANK_BOSS_LENGTH,
     CRANK_BOSS_START_Z,
@@ -77,6 +79,7 @@ from cone_pivot_post_spec import (
     HEAD_DIA,
     HEAD_HEIGHT,
     INCLINE_DEG,
+    TURNED_DIAMETER_TOLERANCE_MM,
 )
 
 PART_NAME = "cone-pivot-post"
@@ -379,6 +382,30 @@ async def build(adapter: Any) -> dict[str, str]:
         "v2 harvested final",
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "MainBodyProfile",
+        "MainBodyDia",
+        TURNED_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "HeadProfile",
+        "HeadDia",
+        TURNED_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "CrankBossProfile",
+        "CrankBossDia",
+        TURNED_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "CrankBoreProfile",
+        "CrankBoreDia",
+        CRANK_BORE_TOLERANCE_MM,
     )
 
     # Semantic, name-selected assembly references.  The journal axis is taken

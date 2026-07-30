@@ -89,7 +89,7 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
 
 def test_linked_notes_define_remaining_operations() -> None:
     notes = crankshaft_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShaftDiaDim"] == "+0.00/-0.02"
+    assert drawing.DIMENSION_CALLOUTS == {}
     assert "AISI" not in notes
     assert "ZINC" not in notes
     assert "UOS" not in notes
@@ -115,7 +115,10 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert re.search(r"GetVisibleEntities2\(\s*c,\s*4\s*\)", source)
     assert "journal_silhouette = _visible_journal_silhouette(adapter, right)" in source
     assert "edge_entity=journal_silhouette" in source
-    assert 'production_method="BEARING JOURNAL"' in source
+    assert 'entity_type="SILHOUETTE"' in source
+    assert 'production_method="BEARING JOURNAL"' not in source
+    assert crankshaft_spec.SURFACE_FINISHES[0].production_method == "BEARING JOURNAL"
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing_journal")' in source
     assert 'dimension_name(adapter, annotation) == "ShaftDiaDim"' in source
     assert drawing.DATUM_A_RIGHT == (
         drawing.FRONT_CENTER[0] + drawing.JOURNAL_DIA * drawing.END_VIEW_SCALE / 2000.0,

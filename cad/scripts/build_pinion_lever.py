@@ -54,23 +54,39 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_angular_reference_dimension,
+    add_diametric_linear_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_angular_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_lever_spec import (
     BORE,
+    BORE_BAND,
+    BORE_DEPTH_BAND,
+    CAP_RADIUS_TOLERANCE_MM,
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    END_WALL_TOLERANCE_MM,
+    GRIP_HALF_ANGLE_DEG,
+    GRIP_HALF_ANGLE_TOLERANCE_DEG,
     HUB_LEN,
     HUB_OD,
     ISOMETRIC_VIEW_NOTE,
     ROD_LEN,
     ROD_ROOT_DIA,
     ROD_TIP_DIA,
+    ROD_TIP_DIAMETER_TOLERANCE_MM,
+    ROD_TIP_Y_TOLERANCE_MM,
     ROD_Y0,
+    SURFACE_FINISHES,
     WALL_T,
 )
 
@@ -95,10 +111,7 @@ V_ANNULUS = math.pi * (HUB_R**2 - BORE_R**2) * (HUB_LEN - WALL_T)
 V_WALL = math.pi * HUB_R**2 * WALL_T
 V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 101.3
 _H = ROD_LEN - ROD_Y0
-V_FRUSTUM = (
-    math.pi / 3.0 * _H
-    * (ROD_ROOT_R**2 + ROD_ROOT_R * ROD_TIP_R + ROD_TIP_R**2)
-)
+V_FRUSTUM = math.pi / 3.0 * _H * (ROD_ROOT_R**2 + ROD_ROOT_R * ROD_TIP_R + ROD_TIP_R**2)
 
 
 def _rod_r(y: float) -> float:
@@ -153,12 +166,22 @@ async def build(adapter) -> dict[str, str]:
     barrel = SketchDims()
     check("create_sketch barrel", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, HUB_R, "hub OD", dims=barrel,
+        adapter,
+        0.0,
+        0.0,
+        HUB_R,
+        "hub OD",
+        dims=barrel,
         names=("HubOdCx", "HubOdCz", "HubOd"),
         drives=(None, None, '"HubOd"'),
     )
     await define_circle(
-        adapter, 0.0, 0.0, BORE_R, "hub bore", dims=barrel,
+        adapter,
+        0.0,
+        0.0,
+        BORE_R,
+        "hub bore",
+        dims=barrel,
         names=("HubBoreCx", "HubBoreCz", "HubBore"),
         drives=(None, None, '"Bore"'),
     )
@@ -181,7 +204,12 @@ async def build(adapter) -> dict[str, str]:
     wall = SketchDims()
     check("create_sketch wall", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, HUB_R, "wall", dims=wall,
+        adapter,
+        0.0,
+        0.0,
+        HUB_R,
+        "wall",
+        dims=wall,
         names=("WallCx", "WallCz", "WallDia"),
         drives=(None, None, '"HubOd"'),
     )
@@ -191,9 +219,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += wall.apply(adapter, "WallProfile")
     extrude_at_offset(adapter, WALL_T, -HUB_LEN / 2.0)
     name_last_feature(adapter, "Wall")
-    drive_jobs += [
-        (name_dimensions(adapter, "Wall", ["EndWall"])[0], '"WallT"')
-    ]
+    drive_jobs += [(name_dimensions(adapter, "Wall", ["EndWall"])[0], '"WallT"')]
     expected += V_WALL
     await volume_check(adapter, "wall", expected, 0.005 * V_WALL)
 
@@ -214,8 +240,14 @@ async def build(adapter) -> dict[str, str]:
     )
     close = check("cap close", await adapter.add_line(0.0, v_apex, 0.0, v_base))
     set_sketch_direct_db(adapter, False)
-    check("cap base horizontal", await adapter.add_sketch_constraint(base, None, "horizontal"))
-    check("cap close vertical", await adapter.add_sketch_constraint(close, None, "vertical"))
+    check(
+        "cap base horizontal",
+        await adapter.add_sketch_constraint(base, None, "horizontal"),
+    )
+    check(
+        "cap close vertical",
+        await adapter.add_sketch_constraint(close, None, "vertical"),
+    )
     check(
         "cap rim reach",
         await adapter.add_sketch_dimension(
@@ -232,7 +264,9 @@ async def build(adapter) -> dict[str, str]:
     cap.record("CapSagDim", '"CapSag"')
     check(
         "cap on axis",
-        await adapter.add_sketch_constraint(f"{base}.start", "origin", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{base}.start", "origin", "vertical_points"
+        ),
     )
     check(
         "cap station",
@@ -263,7 +297,7 @@ async def build(adapter) -> dict[str, str]:
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    check(
+    centerline = check(
         "rod centerline",
         await adapter.add_centerline(0.0, ROD_Y0, 0.0, ROD_LEN),
     )
@@ -277,12 +311,23 @@ async def build(adapter) -> dict[str, str]:
     lines = await add_line_chain(adapter, pts, close=False)
     set_sketch_direct_db(adapter, False)
     r_base, flank, r_top, axis_edge = lines
-    check("rod base horizontal", await adapter.add_sketch_constraint(r_base, None, "horizontal"))
-    check("rod top horizontal", await adapter.add_sketch_constraint(r_top, None, "horizontal"))
-    check("rod axis vertical", await adapter.add_sketch_constraint(axis_edge, None, "vertical"))
+    check(
+        "rod base horizontal",
+        await adapter.add_sketch_constraint(r_base, None, "horizontal"),
+    )
+    check(
+        "rod top horizontal",
+        await adapter.add_sketch_constraint(r_top, None, "horizontal"),
+    )
+    check(
+        "rod axis vertical",
+        await adapter.add_sketch_constraint(axis_edge, None, "vertical"),
+    )
     check(
         "rod base on axis",
-        await adapter.add_sketch_constraint(f"{r_base}.start", "origin", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{r_base}.start", "origin", "vertical_points"
+        ),
     )
     check(
         "rod base height",
@@ -296,11 +341,14 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(r_base, None, "linear", ROD_ROOT_R),
     )
     rod.record("RodRootR", '"RodRootDia" / 2')
-    check(
-        "rod tip radius",
-        await adapter.add_sketch_dimension(r_top, None, "linear", ROD_TIP_R),
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        f"{r_top}.start",
+        (8.0, ROD_LEN - 5.0),
+        "rod tip diameter",
     )
-    rod.record("RodTipR", '"RodTipDia" / 2')
+    rod.record("RodTipDia", '"RodTipDia"')
     check(
         "rod length",
         await adapter.add_sketch_dimension(
@@ -308,6 +356,15 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     rod.record("RodTipY", '"RodLen"')
+    await add_angular_reference_dimension(
+        adapter,
+        centerline,
+        flank,
+        (10.0, (ROD_Y0 + ROD_LEN) / 2.0),
+        "grip half-angle",
+        expected_degrees=GRIP_HALF_ANGLE_DEG,
+    )
+    rod.record("GripHalfAngle")
     await ensure_fully_defined(adapter, "rod sketch")
     check("exit_sketch rod", await adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
@@ -326,13 +383,42 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven lever (equations neutral)", V_TOTAL, 0.01 * V_FRUSTUM)
+    await volume_check(
+        adapter, "driven lever (equations neutral)", V_TOTAL, 0.01 * V_FRUSTUM
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "BarrelProfile", "HubBore", *deviations(BORE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Barrel", "BoreDepth", *deviations(BORE_DEPTH_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Wall", "EndWall", END_WALL_TOLERANCE_MM)
+    set_dimension_symmetric_tolerance(
+        adapter, "RodProfile", "RodTipY", ROD_TIP_Y_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "RodProfile",
+        "RodTipDia",
+        ROD_TIP_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter,
+        "RodProfile",
+        "GripHalfAngle",
+        GRIP_HALF_ANGLE_TOLERANCE_DEG,
+        require_driven=True,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "CapProfile", "CapR", CAP_RADIUS_TOLERANCE_MM
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

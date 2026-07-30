@@ -10,9 +10,13 @@ is the drift alarm the offline test enforces.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 # --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
 CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
 RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
+RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
 RING_WALL = 5.0  # radial strap wall
 RING_THICKNESS = 3.0
 SHANK_WIDTH = 8.0
@@ -28,6 +32,10 @@ RING_OUTER_RADIUS = RING_BORE_DIA / 2.0 + RING_WALL  # 20.4
 HEAD_TOP_Y = CENTER_DISTANCE + HEAD_CROWN_ABOVE_PIN  # crown top (150.07)
 RING_BOTTOM_Y = -RING_OUTER_RADIUS  # -20.4
 
+SURFACE_FINISHES = (
+    SurfaceFinishControl("strap_bore", MACHINED_UM, CylinderFace(RING_BORE_DIA)),
+)
+
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_connecting_rod marks exactly these; draw_connecting_rod
@@ -39,3 +47,9 @@ RING_BOTTOM_Y = -RING_OUTER_RADIUS  # -20.4
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # connecting_rod_notes.py so assemblies importing this spec never inherit a
 # notes edit into their rebuild closure (codex #354).
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "rocker pin hole position": "0.20",
+}

@@ -19,6 +19,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_bracket_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -26,6 +28,7 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -36,15 +39,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import REAM_H7, REAM_SLIDE, fit_limits
+from _surface_finish import surface_finish_by_key
 from pinion_bracket_spec import (
     ARBOR_BORE,
     C2C as C2C,
     OVERALL_LENGTH,
-    PIN_BORE,
-    PIN_SEAT,
     PIVOT_BORE,
     R_END,
+    SURFACE_FINISHES,
     THICKNESS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -75,7 +77,7 @@ SHEET_SCALE = (2.0, 1.0)
 # so it would render as an empty box.
 FRONT_BBOX_CY = (OVERALL_LENGTH / 2.0) - R_END  # 21.5: (52 + -9) / 2
 FRONT_CENTER = (0.110, 0.150)
-RIGHT_CENTER = (0.200, 0.150)
+RIGHT_CENTER = (0.225, 0.150)
 ISO_CENTER = (0.330, 0.205)
 
 
@@ -103,6 +105,7 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.162, 0.130),
     "BottomCapRadius": (0.098, 0.076),
     "PinSeatCy": (0.058, 0.128),
+    "PinSeatDepth": (0.170, 0.105),
 }
 RIGHT_KEEP = {
     "Depth": (0.190, 0.068),
@@ -111,22 +114,16 @@ RIGHT_KEEP = {
     "PinSeatCz": (0.245, 0.190),
 }
 DIMENSION_CALLOUTS = {
-    "ArborBoreCz": "+/-0.10",
-    "PivotBoreDia": (
-        f"PIVOT BORE; NOMINAL REF\nTHRU - REAM\n{fit_limits(PIVOT_BORE, REAM_SLIDE)}\nRa 1.6"
-    ),
-    "ArborBoreDia": (
-        f"ARBOR BORE; NOMINAL REF\nTHRU - REAM\n{fit_limits(ARBOR_BORE, REAM_SLIDE)}\nRa 1.6"
-    ),
-    "PinSeatCy": "PIN-SEAT AXIS\n+/-0.05 BELOW\nPIVOT-BORE AXIS",
-    "Depth": "+/-0.05 ONE STRAP THICKNESS",
+    "PivotBoreDia": "PIVOT BORE; THRU - REAM",
+    "ArborBoreDia": "ARBOR BORE; THRU - REAM",
+    "PinSeatCy": "PIN-SEAT AXIS BELOW PIVOT-BORE AXIS",
+    "Depth": "ONE STRAP THICKNESS",
     "PinSeatDia": (
-        f"NOMINAL REF\nH7: {fit_limits(PIN_BORE, REAM_H7)}\nBLIND; FLAT BOTTOM\n"
-        f"{PIN_SEAT:.2f} +0.10/-0.00 FULL-DIAMETER DEPTH\n"
-        "ALONG HOLE AXIS TO FLAT BOTTOM\nENTRY ON THE STRAIGHT EDGE FACE\n"
+        "H7; BLIND; FLAT BOTTOM\nENTRY ON THE STRAIGHT EDGE FACE\n"
         "NEAREST THE PIVOT BORE"
     ),
-    "PinSeatCz": "+/-0.05 FROM DATUM C",
+    "PinSeatCz": "FROM DATUM C",
+    "PinSeatDepth": "FULL-DIAMETER DEPTH",
 }
 
 
@@ -223,6 +220,25 @@ async def build(adapter: Any) -> dict[str, str]:
         label="arbor bore axis",
         position_tolerance_m=0.006,
     )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=pivot_bore_edge,
+        # Keep the lower-bore finish below the pin-seat-axis callout.  The
+        # former Y=0.110 placement let SolidWorks' symbol text collide with
+        # the imported PinSeatCy dimension text in the rendered print.
+        symbol_xy=(0.040, 0.087),
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
+        label="pivot bore finish",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=arbor_bore_edge,
+        symbol_xy=(0.040, 0.195),
+        control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
+        label="arbor bore finish",
+    )
     add_datum_feature(
         adapter,
         right,
@@ -237,7 +253,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(_front_x(0.0), _front_y(-R_END)),
         frame_xy=(0.048, 0.082),
         characteristic="profile_surface",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lower end-arc profile"],
         datums=("A",),
         quantity=f"LOWER R{R_END:.2f} ARC",
         label="lower end-arc profile",
@@ -248,7 +264,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(_front_x(0.0), _front_y(C2C + R_END)),
         frame_xy=(0.060, 0.224),
         characteristic="profile_surface",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["upper end-arc profile"],
         datums=("B",),
         quantity=f"UPPER R{R_END:.2f} ARC",
         label="upper end-arc profile",

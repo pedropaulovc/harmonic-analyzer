@@ -20,6 +20,8 @@ import math
 import sys
 from typing import Any
 
+from crank_arm_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -44,7 +46,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from crank_arm_spec import (
     ARM_C2C,
     ARM_END_X,
@@ -54,6 +56,7 @@ from crank_arm_spec import (
     HALF_WIDTH,
     PIN_HOLE_DIA,
     SHAFT_BORE_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -117,7 +120,7 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "THRU - REAM 3/8 IN\n+0.05/-0.00",
+    "ShaftBoreDia": "THRU - REAM 3/8 IN",
     "DimpleDia": "0.5 DEEP",
 }
 
@@ -313,7 +316,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=pin_edge,
         frame_xy=(0.100, 0.230),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cross-hole true position"],
         datums=("A", "B"),
         diameter=True,
         label="cross-hole true position",
@@ -409,7 +412,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=handle_edge,
         frame_xy=(0.222, 0.158),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["handle pivot position"],
         datums=("A", "B", "C"),
         diameter=True,
         label="handle pivot position",
@@ -447,7 +450,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(RIGHT_CENTER[0] + 0.008, RIGHT_CENTER[1]),
         frame_xy=(0.316, 0.118),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["crank broad-face parallelism"],
         datums=("A",),
         label="crank broad-face parallelism",
     )
@@ -493,7 +496,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=shaft_edge_lower,
         symbol_xy=(0.022, 0.125),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "shaft_bore"),
         label="shaft bore finish",
     )
 

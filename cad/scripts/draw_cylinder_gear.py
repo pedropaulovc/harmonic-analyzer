@@ -14,6 +14,8 @@ import math
 import sys
 from typing import Any
 
+from cylinder_gear_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -33,8 +35,8 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _surface_finish import MACHINED
-from cylinder_gear_spec import BORE_DIA, OUTSIDE_DIA
+from _surface_finish import surface_finish_by_key
+from cylinder_gear_spec import BORE_DIA, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -73,7 +75,7 @@ DIMENSION_CALLOUTS = {
     # The 9.525 +0.03/+0.05 reamed bore against the arbor's
     # 9.525 +0.00/-0.02 journal guarantees 0.03..0.07 diametral clearance,
     # inside the project's 0.025..0.075 shaft-in-bushing policy.
-    "BoreDia": "THRU - REAM\n+0.05/+0.03",
+    "BoreDia": "THRU - REAM",
 }
 DIMENSION_PRECISION = {"BoreDia": 3}
 
@@ -83,9 +85,12 @@ def _largest_visible_planar_face(adapter: Any, view: Any) -> Any:
     candidates: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        faces = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 3), default=()
-        ) or ()
+        faces = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 3), default=()
+            )
+            or ()
+        )
         for face in faces:
             face = _early_bound(face, "IFace2")
             surface = _early_bound(face.GetSurface(), "ISurface")
@@ -184,7 +189,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.175, RIGHT_CENTER[1] + half_od + 0.010),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["gear face squareness to bore"],
         datums=("A",),
         label="gear face squareness to bore",
         entity_type="FACE",
@@ -202,7 +207,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] - 0.0038, FRONT_CENTER[1] + 0.035),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "cylinder_gear_bore"),
         label="cylinder gear bore finish",
         entity=bore_edge,
     )

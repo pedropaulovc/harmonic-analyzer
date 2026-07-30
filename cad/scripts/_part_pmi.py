@@ -23,6 +23,7 @@ drawing or assembly module (``check:partiso``).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Sequence
 
@@ -30,19 +31,26 @@ import _telemetry
 from _common import _early_bound, _read_member
 from _gtol_spec import (
     GTOL_SYMBOLS,
+    ConeFace,
     CylinderFace,
     FaceSpec,
     GeometricControl,
     PartDatum,
     PlanarFace,
+    SphereFace,
+    TorusFace,
     gtol_frame_signature,
     validate_part_pmi,
 )
+from _surface_finish import SurfaceFinishControl
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
 # swSurfaceTypes_e identities read via ISurface.Identity.
 _SURFACE_PLANE = 4001
 _SURFACE_CYLINDER = 4002
+_SURFACE_CONE = 4003
+_SURFACE_SPHERE = 4004
+_SURFACE_TORUS = 4005
 
 _GTOL_CURRENT_FORMAT = 2  # swGtolFormatType_e.GTOL_SW2022
 _SELECT_FACE = 2  # swSelectType_e.swSelFACES
@@ -80,6 +88,14 @@ def _face_geometry(face: Any) -> _FaceGeometry | None:
             outward_normal=None,
             box=tuple(face.GetBox() or ()),
         )
+    if identity == _SURFACE_CONE:
+        return _FaceGeometry(
+            face=face,
+            identity=identity,
+            parameters=tuple(_read_member(surface, "ConeParams2")),
+            outward_normal=None,
+            box=tuple(face.GetBox() or ()),
+        )
     if identity == _SURFACE_PLANE:
         parameters = tuple(_read_member(surface, "PlaneParams"))
         normal = _unit(parameters[0:3])
@@ -90,7 +106,23 @@ def _face_geometry(face: Any) -> _FaceGeometry | None:
             identity=identity,
             parameters=parameters,
             outward_normal=normal,
-            box=(),
+            box=tuple(face.GetBox() or ()),
+        )
+    if identity == _SURFACE_SPHERE:
+        return _FaceGeometry(
+            face=face,
+            identity=identity,
+            parameters=tuple(_read_member(surface, "SphereParams")),
+            outward_normal=None,
+            box=tuple(face.GetBox() or ()),
+        )
+    if identity == _SURFACE_TORUS:
+        return _FaceGeometry(
+            face=face,
+            identity=identity,
+            parameters=tuple(_read_member(surface, "TorusParams")),
+            outward_normal=None,
+            box=tuple(face.GetBox() or ()),
         )
     return _FaceGeometry(face, identity, (), None, ())
 
@@ -105,12 +137,34 @@ def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
         diameter_m = 2.0 * geometry.parameters[6]
         if abs(diameter_m - spec.diameter_mm / 1000.0) > tolerance_m:
             return False
-        if spec.contains_y_mm is None:
+        if spec.contains_x_mm is None and spec.contains_y_mm is None:
             return True
         if len(geometry.box) != 6:
             return False
-        y = spec.contains_y_mm / 1000.0
-        return geometry.box[1] - tolerance_m <= y <= geometry.box[4] + tolerance_m
+        if spec.contains_x_mm is not None:
+            x = spec.contains_x_mm / 1000.0
+            if not geometry.box[0] - tolerance_m <= x <= geometry.box[3] + tolerance_m:
+                return False
+        if spec.contains_y_mm is not None:
+            y = spec.contains_y_mm / 1000.0
+            if not geometry.box[1] - tolerance_m <= y <= geometry.box[4] + tolerance_m:
+                return False
+        return True
+    if isinstance(spec, ConeFace):
+        if geometry.identity != _SURFACE_CONE:
+            return False
+        # ConeParams2: origin xyz, axis xyz, reference radius, half-angle,
+        # reference direction xyz. The angle is radians.
+        if abs(math.degrees(geometry.parameters[7]) - spec.half_angle_degrees) > (
+            spec.tolerance_degrees
+        ):
+            return False
+        if spec.contains_x_mm is None:
+            return True
+        if len(geometry.box) != 6:
+            return False
+        x = spec.contains_x_mm / 1000.0
+        return geometry.box[0] - tolerance_m <= x <= geometry.box[3] + tolerance_m
     if isinstance(spec, PlanarFace):
         if geometry.identity != _SURFACE_PLANE or geometry.outward_normal is None:
             return False
@@ -121,7 +175,43 @@ def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
             point * normal
             for point, normal in zip(geometry.parameters[3:6], geometry.outward_normal)
         )
-        return abs(offset - spec.offset_mm / 1000.0) <= tolerance_m
+        if abs(offset - spec.offset_mm / 1000.0) > tolerance_m:
+            return False
+        if spec.contains_z_mm is None:
+            return True
+        if len(geometry.box) != 6:
+            return False
+        z = spec.contains_z_mm / 1000.0
+        return geometry.box[2] - tolerance_m <= z <= geometry.box[5] + tolerance_m
+    if isinstance(spec, SphereFace):
+        if geometry.identity != _SURFACE_SPHERE:
+            return False
+        center = geometry.parameters[0:3]
+        radius = geometry.parameters[3]
+        if abs(2.0 * radius - spec.diameter_mm / 1000.0) > tolerance_m:
+            return False
+        if spec.center_mm is None:
+            return True
+        return all(
+            abs(actual - expected / 1000.0) <= tolerance_m
+            for actual, expected in zip(center, spec.center_mm)
+        )
+    if isinstance(spec, TorusFace):
+        if geometry.identity != _SURFACE_TORUS:
+            return False
+        center = geometry.parameters[0:3]
+        major_radius = geometry.parameters[6]
+        minor_radius = geometry.parameters[7]
+        if abs(major_radius - spec.major_radius_mm / 1000.0) > tolerance_m:
+            return False
+        if abs(minor_radius - spec.minor_radius_mm / 1000.0) > tolerance_m:
+            return False
+        if spec.center_mm is None:
+            return True
+        return all(
+            abs(actual - expected / 1000.0) <= tolerance_m
+            for actual, expected in zip(center, spec.center_mm)
+        )
     raise TypeError(f"unsupported face spec: {spec!r}")
 
 
@@ -193,15 +283,27 @@ def author_part_pmi(
     *,
     datums: Sequence[PartDatum] = (),
     controls: Sequence[GeometricControl] = (),
+    surface_finishes: Sequence[SurfaceFinishControl] = (),
 ) -> None:
     """Author ``datums`` then ``controls`` as plain model annotations."""
-    if not datums and not controls:
+    if not datums and not controls and not surface_finishes:
         return
     validate_part_pmi(datums, controls)
+    surface_keys = [control.key for control in surface_finishes]
+    if len(surface_keys) != len(set(surface_keys)):
+        raise ValueError("surface-finish keys must be unique within one part")
     model = adapter.currentModel
     requests = {datum.key: datum.face for datum in datums}
     requests.update({control.key: control.face for control in controls})
-    with _telemetry.span("part.pmi", datums=len(datums), controls=len(controls)):
+    requests.update(
+        {f"surface:{control.key}": control.face for control in surface_finishes}
+    )
+    with _telemetry.span(
+        "part.pmi",
+        datums=len(datums),
+        controls=len(controls),
+        surface_finishes=len(surface_finishes),
+    ):
         resolved_faces = _resolve_faces(model, requests)
         for datum in datums:
             face = resolved_faces[datum.key]
@@ -306,7 +408,84 @@ def author_part_pmi(
                 characteristic=control.characteristic,
                 tolerance=control.tolerance,
             )
+
+        for control in surface_finishes:
+            label = f"surface:{control.key}"
+            face = resolved_faces[label]
+            if control.native_attachment == "face":
+                _select_face(model, face, label=label)
+            else:
+                model.ClearSelection2(True)
+            box = tuple(face.GetBox() or ())
+            position = (
+                (box[3] + 0.01, box[4] + 0.01, box[5] + 0.01)
+                if len(box) == 6
+                else (0.01, 0.01, 0.01)
+            )
+            symbol = model.Extension.InsertSurfaceFinishSymbol3(
+                1,  # installed R2026x swSFMachining_Req
+                1 if control.native_attachment == "face" else 0,
+                # swLeaderStyle_e.swSTRAIGHT / swNO_LEADER
+                *position,
+                0,  # swSFLaySym_e.swSFNone
+                1,  # swArrowStyle_e.swCLOSED_ARROWHEAD
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            )
+            if symbol is None:
+                raise RuntimeError(f"{label}: InsertSurfaceFinishSymbol3 failed")
+            symbol = _early_bound(symbol, "ISFSymbol")
+            roughness = f"Ra {control.roughness_ra}"
+            if not symbol.SetText(8, roughness):
+                raise RuntimeError(f"{label}: failed to set roughness")
+            if control.production_method and not symbol.SetText(
+                2, control.production_method
+            ):
+                raise RuntimeError(f"{label}: failed to set production method")
+            if int(symbol.GetSymbol()) != 1:
+                raise RuntimeError(f"{label}: machining-required symbol did not persist")
+            if str(symbol.GetText(8) or "").strip() != roughness:
+                raise RuntimeError(f"{label}: roughness did not persist")
+            if control.production_method and str(symbol.GetText(2) or "").strip() != (
+                control.production_method
+            ):
+                raise RuntimeError(f"{label}: production method did not persist")
+            annotation = _name_annotation(
+                symbol.GetAnnotation(),
+                name=control.annotation_name,
+                label=label,
+            )
+            if control.native_attachment == "face":
+                _verify_attachment(annotation, control.face, label=label)
+                if not bool(symbol.IsAttached()) or int(symbol.GetLeaderCount()) != 1:
+                    raise RuntimeError(
+                        f"{label}: leader attachment mismatch: "
+                        f"attached={bool(symbol.IsAttached())}, "
+                        f"leaders={symbol.GetLeaderCount()}"
+                    )
+            else:
+                attached = tuple(annotation.GetAttachedEntities3() or ())
+                leader_style = int(annotation.GetLeaderStyle())
+                if attached or bool(symbol.IsAttached()) or leader_style != 0:
+                    raise RuntimeError(
+                        f"{label}: model-owned symbol unexpectedly attached: "
+                        f"entities={len(attached)}, attached={bool(symbol.IsAttached())}, "
+                        f"leader_style={leader_style}, leaders={symbol.GetLeaderCount()}"
+                    )
+            _telemetry.event(
+                "pmi.surface_finish",
+                key=control.key,
+                roughness_um=control.roughness_um,
+                production_method=control.production_method,
+                native_attachment=control.native_attachment,
+            )
         model.ClearSelection2(True)
         _telemetry.success(
-            f"part PMI authored: {len(datums)} datums, {len(controls)} controls"
+            f"part PMI authored: {len(datums)} datums, {len(controls)} controls, "
+            f"{len(surface_finishes)} surface finishes"
         )

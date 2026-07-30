@@ -9,6 +9,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import math
+import os
 import sys
 from collections import Counter
 from dataclasses import dataclass, replace
@@ -21,6 +22,7 @@ import _telemetry
 from _common import _early_bound
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
+from _surface_finish import SurfaceFinishControl
 from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
@@ -320,6 +322,75 @@ def _select_annotation_entity(
     if not selected:
         raise RuntimeError(f"failed to select {label} entity in drawing view")
     return edge_entity
+
+
+def _surface_finish_entity_faces(
+    selected_entity: Any, *, entity_type: str, label: str
+) -> tuple[Any, ...]:
+    """Return the model face(s) qualified by one drawing annotation entity."""
+    entity_type = entity_type.upper()
+    if entity_type == "FACE":
+        return (selected_entity,)
+    if entity_type == "SILHOUETTE":
+        silhouette = _early_bound(selected_entity, "ISilhouetteEdge")
+        face = silhouette.GetFace()
+        return () if face is None else (face,)
+    if entity_type == "EDGE":
+        edge = _early_bound(selected_entity, "IEdge")
+        return tuple(
+            face for face in (edge.GetTwoAdjacentFaces2() or ()) if face is not None
+        )
+    raise ValueError(
+        f"{label}: cannot validate a surface finish on entity type {entity_type!r}; "
+        "expected EDGE, SILHOUETTE, or FACE"
+    )
+
+
+def _surface_finish_face_signatures(faces: Sequence[Any]) -> tuple[dict[str, Any], ...]:
+    """Read candidate face geometry once for validation and optional diagnostics."""
+    from _part_pmi import _face_geometry
+
+    signatures: list[dict[str, Any]] = []
+    for face in faces:
+        geometry = _face_geometry(face)
+        if geometry is None:
+            continue
+        signatures.append(
+            {
+                "geometry": geometry,
+                "identity": geometry.identity,
+                "parameters": tuple(round(value, 9) for value in geometry.parameters),
+                "normal": geometry.outward_normal,
+                "box": tuple(round(value, 9) for value in geometry.box),
+            }
+        )
+    return tuple(signatures)
+
+
+def _validate_surface_finish_control_face(
+    selected_entity: Any,
+    *,
+    entity_type: str,
+    control: SurfaceFinishControl,
+    label: str,
+) -> tuple[dict[str, Any], ...]:
+    """Fail unless a selected drawing entity belongs to the controlled face."""
+    from _part_pmi import _face_matches
+
+    faces = _surface_finish_entity_faces(
+        selected_entity, entity_type=entity_type, label=label
+    )
+    signatures = _surface_finish_face_signatures(faces)
+    if any(_face_matches(item["geometry"], control.face) for item in signatures):
+        return signatures
+    diagnostic = tuple(
+        {key: value for key, value in item.items() if key != "geometry"}
+        for item in signatures
+    )
+    raise RuntimeError(
+        f"{label}: selected {entity_type.lower()} does not touch controlled "
+        f"surface-finish face {control.face!r}; candidates={diagnostic!r}"
+    )
 
 
 @_telemetry.traced("drawing.datum_feature", label_param="label")
@@ -735,7 +806,8 @@ def add_surface_finish(
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
     symbol_xy: tuple[float, float],
-    roughness_ra: str,
+    roughness_ra: str | None = None,
+    control: SurfaceFinishControl | None = None,
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
@@ -749,7 +821,16 @@ def add_surface_finish(
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
     """
-    _select_annotation_entity(
+    if control is not None:
+        if roughness_ra is not None or production_method:
+            raise ValueError(
+                f"{label}: pass a part-owned control or drawing-owned values, not both"
+            )
+        roughness_ra = control.roughness_ra
+        production_method = control.production_method
+    if roughness_ra is None:
+        raise ValueError(f"{label}: surface finish requires a part-owned control")
+    selected_entity = _select_annotation_entity(
         adapter,
         view,
         edge_xy=edge_xy,
@@ -758,6 +839,28 @@ def add_surface_finish(
         entity_type=entity_type,
         label=label,
     )
+    signatures: tuple[dict[str, Any], ...] = ()
+    if control is not None:
+        signatures = _validate_surface_finish_control_face(
+            selected_entity,
+            entity_type=entity_type,
+            control=control,
+            label=label,
+        )
+    elif os.getenv("HARMONIC_SURFACE_AUDIT") == "1":
+        faces = _surface_finish_entity_faces(
+            selected_entity, entity_type=entity_type, label=label
+        )
+        signatures = _surface_finish_face_signatures(faces)
+    if os.getenv("HARMONIC_SURFACE_AUDIT") == "1":
+        diagnostic = tuple(
+            {key: value for key, value in item.items() if key != "geometry"}
+            for item in signatures
+        )
+        _telemetry.info(
+            f"SURFACE_AUDIT {label}: entity_type={entity_type}, "
+            f"faces={diagnostic!r}"
+        )
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req

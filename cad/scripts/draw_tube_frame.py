@@ -22,6 +22,8 @@ import argparse
 import sys
 from typing import Any
 
+from tube_frame_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -33,7 +35,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -59,7 +60,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 5.0)   # 1:5 whole sheet (~990 mm column)
+SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (~990 mm column)
 END_VIEW_SCALE = 2.0
 
 # Sheet layout (meters).  The length view (tube vertical) hugs the far left,
@@ -132,12 +133,8 @@ async def build(adapter: Any) -> dict[str, str]:
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"
     )
-    length_annotations = curate_view_dimensions(
-        adapter, length, keep=LENGTH_KEEP, view_label="length"
-    )
+    curate_view_dimensions(adapter, length, keep=LENGTH_KEEP, view_label="length")
     set_dimension_precision(adapter, end_annotations, {"OuterDia": 2})
-    set_dimension_callouts(adapter, end_annotations, {"OuterDia": "+0/-0.05"})
-    set_dimension_callouts(adapter, length_annotations, {"Depth": "+/-0.25"})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
@@ -160,7 +157,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(flank_x, LENGTH_CENTER[1]),
         frame_xy=(0.115, 0.205),
         characteristic="cylindricity",
-        tolerance="0.03",
+        tolerance=GEOMETRIC_TOLERANCES_MM['full-length OD cylindricity'],
         quantity="FULL OD LENGTH",
         label="full-length OD cylindricity",
         entity_type="SILHOUETTE",
@@ -186,7 +183,7 @@ async def build(adapter: Any) -> dict[str, str]:
             edge_xy=(LENGTH_CENTER[0], edge_y),
             frame_xy=(0.090, frame_y),
             characteristic="perpendicularity",
-            tolerance="0.10",
+            tolerance=GEOMETRIC_TOLERANCES_MM[label],
             datums=("A",),
             quantity=quantity,
             label=label,

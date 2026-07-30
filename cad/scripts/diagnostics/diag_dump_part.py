@@ -406,12 +406,12 @@ def _surface(surf):
     s = _early_bound(surf, "ISurface")
     for flag, kind, params in (("IsPlane", "plane", "PlaneParams"),
                                ("IsCylinder", "cylinder", "CylinderParams"),
-                               ("IsCone", "cone", "ConeParams"),
+                               ("IsCone", "cone", "ConeParams2"),
                                ("IsSphere", "sphere", "SphereParams"),
                                ("IsTorus", "torus", "TorusParams")):
         if not _g(s, flag):
             continue
-        out = {"surface": kind}
+        out = {"surface": kind, "identity": int(_g(s, "Identity"))}
         p = _g(s, params)
         if p is None:
             return out

@@ -8,6 +8,8 @@ family note. See the batch gear-drawing pattern in ``cylinder_gear_spec``.
 from __future__ import annotations
 
 import _config
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -19,15 +21,15 @@ _MFG = _config.parts("cone-gear")
 BODY_MATERIAL_SPEC = str(_MFG["material_specification"])
 TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
-TEETH = 120                       # drawn (fundamental) configuration
-DIAMETRAL_PITCH = 49.82           # cad/config/machine/gear_train.yaml
+TEETH = 120  # drawn (fundamental) configuration
+DIAMETRAL_PITCH = 49.82  # cad/config/machine/gear_train.yaml
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 
-BORE_DIA = 0.375 * MM_PER_IN      # 9.525 (3/8") at T120; smaller on the tip gears
+BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 FACE_WIDTH = 6.5
 FAMILY_BORES_MM = {
     6: 0.03125 * MM_PER_IN,
@@ -35,6 +37,15 @@ FAMILY_BORES_MM = {
     18: 0.25 * MM_PER_IN,
     24: 0.375 * MM_PER_IN,
 }
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "cone_gear_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA),
+        native_attachment="model",
+    ),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreCutDia"},
@@ -78,3 +89,9 @@ DRAWING_NOTES = "\n".join(
         "  WHERE FULL DEPTH WOULD UNDERCUT.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "gear face squareness to bore": "0.05",
+}

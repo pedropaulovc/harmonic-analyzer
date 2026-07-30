@@ -7,19 +7,25 @@ long face bridges back to mesh the rack. See the batch gear-drawing pattern in
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
 TEETH = 12
-DIAMETRAL_PITCH = 30.0            # meshes the DP30 rack (build_transgear_feed_pinion.py)
+DIAMETRAL_PITCH = 30.0  # meshes the DP30 rack (build_transgear_feed_pinion.py)
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 
-BORE_DIA = 5.0                    # rides the stud's turned-down Ø5 front seat
+BORE_DIA = 5.0  # rides the stud's turned-down Ø5 front seat
 FACE_WIDTH = 9.5
+BORE_DIA_BAND = (0.05, 0.03)
+
+SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
@@ -53,3 +59,9 @@ DRAWING_NOTES = "\n".join(
         "LOCKED COAXIAL TO THE 120T REDUCTION DISC (MHA-070) ON THE STUD.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "pinion face squareness to bore": "0.05",
+}

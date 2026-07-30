@@ -116,3 +116,19 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"] == "AISI 1018 cold-rolled steel strap"
     assert spec["finish"] == "matte black oxide"
     assert int(spec["quantity"]) == 20
+
+
+def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
+    (control,) = rocker_arm_spec.SURFACE_FINISHES
+    assert control.key == "pivot_bore"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == rocker_arm_spec.PIVOT_HOLE_DIA
+    assert arm.PIVOT_HOLE_DIA == rocker_arm_spec.PIVOT_HOLE_DIA
+    part_source = "".join(Path(arm.__file__).read_text(encoding="utf-8").split())
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert (
+        'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bore")'
+        in sheet_source
+    )
+    assert "roughness_ra=" not in sheet_source

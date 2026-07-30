@@ -71,6 +71,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 from _visibility import blank_reference_geometry
@@ -80,6 +81,7 @@ from cone_swing_platform_spec import (
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PLATE_THICKNESS,
+    PLATE_LENGTH_TOLERANCE_MM,
     PLAN_VIEW_NOTE,
     POST_MOUNT_THREAD,
 )
@@ -521,6 +523,12 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "PlateProfile",
+        "PlateLenDim",
+        PLATE_LENGTH_TOLERANCE_MM,
+    )
     await volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole
     )

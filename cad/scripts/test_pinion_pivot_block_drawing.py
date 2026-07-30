@@ -7,7 +7,21 @@ from pathlib import Path
 import pinion_pivot_block_spec
 import draw_pinion_pivot_block as drawing
 import build_pinion_pivot_block as block
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = pinion_pivot_block_spec.SURFACE_FINISHES
+    assert control.key == "pivot_bore"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pinion_pivot_block_spec.BORE_DIA
+    assert control.face.contains_y_mm == -pinion_pivot_block_spec.BORE_DIA / 2.0
+    part_source = Path(block.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "pivot_bore")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -27,9 +41,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # a rename in one script that isn't mirrored in the other fails here, offline.
     assert block.DRAWING_DIMENSIONS is pinion_pivot_block_spec.DRAWING_DIMENSIONS
     marked = set().union(*pinion_pivot_block_spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
-    )
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
@@ -45,9 +57,7 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(2, 1)" in source  # the isometric override
-    assert (
-        pinion_pivot_block_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
-    )
+    assert pinion_pivot_block_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
@@ -73,6 +83,11 @@ def test_hole_states_are_annotated() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["PivotBoreDia"].startswith("THRU")
     assert callouts["LiftBoreDia"].startswith("THRU")
+    assert "+0.05/-0.00" not in "\n".join(callouts.values())
+    assert model_toleranced_dimensions(block) == {
+        ("BlockProfile", "PivotBoreDia"): "*deviations(BORE_DIA_BAND)",
+        ("BlockProfile", "LiftBoreDia"): "*deviations(BORE_DIA_BAND)",
+    }
 
 
 def test_native_gdt_replaces_form_orientation_notes() -> None:
@@ -84,12 +99,11 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
         "        symbol_xy=(_front_x(BORE_HALF_SPACING) + 0.0145, _front_y(0.0) - 0.026),\n"
         '        datum="B",\n'
         '        label="pivot bore axis",\n'
-        "        position_tolerance_m=0.003,"
-        in source
+        "        position_tolerance_m=0.003," in source
     )
     assert source.count("position_tolerance_m=0.003") == 1
-    assert "characteristic=\"parallelism\"" in source
-    assert "characteristic=\"position\"" in source
+    assert 'characteristic="parallelism"' in source
+    assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
     assert "set_basic_dimension(" in source  # the 27 hold-down spacing
 

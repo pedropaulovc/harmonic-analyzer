@@ -65,9 +65,18 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
-from crank_drive_gear_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, GEAR_DATA
+from _part_pmi import author_part_pmi
+from crank_drive_gear_spec import (
+    BORE_DIA_BAND,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    GEAR_DATA,
+    SURFACE_FINISHES,
+)
 
 PART_NAME = "crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
@@ -148,6 +157,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+    )
     await volume_check(adapter, "driven crank-drive gear (equations neutral)", expected, 0.01 * v_bore)
 
     await apply_material(adapter, MATERIAL)
@@ -158,6 +170,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

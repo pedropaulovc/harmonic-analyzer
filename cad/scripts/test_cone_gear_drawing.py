@@ -73,12 +73,14 @@ def test_native_gdt_controls_bore_datum_and_finish() -> None:
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert source.count("add_surface_finish(") == 1
+    assert spec.SURFACE_FINISHES[0].native_attachment == "model"
 
 
 def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
+    assert 'if not bool(activation.data.get("rebuilt")):' in source
     import _config
 
     config = _config.parts("cone-gear")

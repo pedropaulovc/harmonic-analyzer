@@ -7,6 +7,7 @@ from pathlib import Path
 import build_pivot_bushing as part
 import draw_pivot_bushing as drawing
 import pivot_bushing_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -33,8 +34,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_linked_notes_define_remaining_turned_part_operations() -> None:
     notes = pivot_bushing_spec.DRAWING_NOTES
     assert "REAM BORE THRU" in notes
-    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.03"
-    assert "+0.03/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert pivot_bushing_spec.BORE_DIA_BAND == (0.03, 0.00)
+    assert pivot_bushing_spec.LENGTH_TOLERANCE_MM == 0.03
+    assert model_toleranced_dimensions(part) == {
+        ("AnnulusProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
+        ("Bushing", "Depth"): "LENGTH_TOLERANCE_MM",
+    }
     clearance_min = pivot_bushing_spec.BORE_DIA - 6.35
     clearance_max = clearance_min + 0.03 + 0.02
     assert round(clearance_min, 2) == 0.15
@@ -60,7 +66,7 @@ def test_native_gdt_controls_bushing_functional_surfaces() -> None:
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A", "B")
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter" in part_source
+    assert "author_part_pmi(" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
@@ -86,3 +92,15 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "brass" in str(config["material_specification"]).lower()
     assert config["finish"]
     assert int(config["quantity"]) == 19
+
+
+def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
+    (control,) = pivot_bushing_spec.SURFACE_FINISHES
+    assert control.key == "bore"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pivot_bushing_spec.BORE_DIA
+    part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert 'control=surface_finish_by_key(SURFACE_FINISHES,"bore")' in sheet_source
+    assert "roughness_ra=" not in sheet_source

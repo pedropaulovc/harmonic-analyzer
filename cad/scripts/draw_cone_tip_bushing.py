@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from cone_tip_bushing_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -26,8 +28,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
-from cone_tip_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA
+from _surface_finish import surface_finish_by_key
+from cone_tip_bushing_spec import BORE_DIA, LENGTH, OUTER_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -69,8 +71,7 @@ SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0] + 0.036, SIDE_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDiaDim": "1/32 IN THRU\n+0.05/-0.00",
-    "Depth": "+/-0.03",
+    "BoreDiaDim": "1/32 IN THRU",
 }
 # The bore is an exact inch conversion (1/32 in = 0.794); the sheet default of
 # 2 decimals (0.79) would contradict the note, so this one dim displays 3.
@@ -242,7 +243,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=outer_upper_left,
         frame_xy=(0.072, 0.254),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["bushing OD runout"],
         datums=("A",),
         label="bushing OD runout",
     )
@@ -252,7 +253,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=top_end,
         frame_xy=(SIDE_CENTER[0] + 0.016, top_end[1] + 0.024),
         characteristic="parallelism",
-        tolerance="0.03",
+        tolerance=GEOMETRIC_TOLERANCES_MM["bushing end-face parallelism"],
         datums=("B",),
         label="bushing end-face parallelism",
     )
@@ -268,7 +269,7 @@ async def build(adapter: Any) -> dict[str, str]:
         end,
         edge_xy=bore_edge,
         symbol_xy=(0.115, 0.200),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bushing_bore"),
         label="bushing bore finish",
     )
 

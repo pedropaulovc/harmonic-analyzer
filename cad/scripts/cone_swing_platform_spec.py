@@ -13,6 +13,7 @@ from crank_drive_gear_spec import OUTSIDE_DIA as CRANK_GEAR_OUTSIDE_DIA
 
 
 PLATE_THICKNESS = 6.35
+PLATE_LENGTH_TOLERANCE_MM = 0.25
 
 # The recentered DP25.731 gear is smaller than the intermediate DP24.74 gear;
 # its complete swept OD now clears the platform top, so the obsolete scallop is

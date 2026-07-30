@@ -2,13 +2,17 @@ r"""Pure-data dimensional contract shared by the pivot shaft and drawing."""
 
 from __future__ import annotations
 
+from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.25 * MM_PER_IN
 SHAFT_LENGTH = 203.2
+SHAFT_DIA_BAND = SHAFT_H
+LENGTH_TOLERANCE_MM = 0.25
 
 # Geometric controls, authored on the model as plain annotations by the part build
 # (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
@@ -37,6 +41,9 @@ GEOMETRIC_CONTROLS = (
         PlanarFace((0, 0, -1), SHAFT_LENGTH / 2.0),
         datums=("A",),
     ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl("pivot_bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

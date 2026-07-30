@@ -55,21 +55,32 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_handle_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     GRIP_DIA,
+    GRIP_LENGTH_TOLERANCE_MM,
     GRIP_LEN,
     ISOMETRIC_VIEW_NOTE,
     ROD_DIA,
     ROD_DOWN,
+    ROD_HOLE_REAM_BAND,
     ROD_HOLE_DIA,
+    ROD_PRESS_BAND,
+    ROD_SPAN_TOLERANCE_MM,
     ROD_UP,
+    SURFACE_FINISHES,
     TUBE_ID,
+    TUBE_ID_BAND,
     TUBE_LEN,
+    TUBE_LENGTH_BAND,
     TUBE_OD,
     WALL_T,
 )
@@ -147,7 +158,12 @@ async def build(adapter) -> dict[str, str]:
     grip = SketchDims()
     check("create_sketch grip", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, GRIP_R, "grip", dims=grip,
+        adapter,
+        0.0,
+        0.0,
+        GRIP_R,
+        "grip",
+        dims=grip,
         names=("GripCx", "GripCz", "GripDia"),
         drives=(None, None, '"GripDia"'),
     )
@@ -178,8 +194,14 @@ async def build(adapter) -> dict[str, str]:
     )
     close = check("cap close", await adapter.add_line(0.0, v_apex, 0.0, v_base))
     set_sketch_direct_db(adapter, False)
-    check("cap base horizontal", await adapter.add_sketch_constraint(base, None, "horizontal"))
-    check("cap close vertical", await adapter.add_sketch_constraint(close, None, "vertical"))
+    check(
+        "cap base horizontal",
+        await adapter.add_sketch_constraint(base, None, "horizontal"),
+    )
+    check(
+        "cap close vertical",
+        await adapter.add_sketch_constraint(close, None, "vertical"),
+    )
     check(
         "cap rim reach",
         await adapter.add_sketch_dimension(
@@ -196,7 +218,9 @@ async def build(adapter) -> dict[str, str]:
     cap.record("CapSagDim", '"CapSag"')
     check(
         "cap on axis",
-        await adapter.add_sketch_constraint(f"{base}.start", "origin", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{base}.start", "origin", "vertical_points"
+        ),
     )
     check(
         "cap station",
@@ -227,7 +251,12 @@ async def build(adapter) -> dict[str, str]:
     wall = SketchDims()
     check("create_sketch wall", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, TUBE_OD / 2.0, "wall", dims=wall,
+        adapter,
+        0.0,
+        0.0,
+        TUBE_OD / 2.0,
+        "wall",
+        dims=wall,
         names=("WallCx", "WallCz", "WallDia"),
         drives=(None, None, '"TubeOd"'),
     )
@@ -243,12 +272,22 @@ async def build(adapter) -> dict[str, str]:
     tube = SketchDims()
     check("create_sketch tube", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, TUBE_OD / 2.0, "tube OD", dims=tube,
+        adapter,
+        0.0,
+        0.0,
+        TUBE_OD / 2.0,
+        "tube OD",
+        dims=tube,
         names=("TubeOdCx", "TubeOdCz", "TubeOd"),
         drives=(None, None, '"TubeOd"'),
     )
     await define_circle(
-        adapter, 0.0, 0.0, TUBE_ID / 2.0, "tube ID", dims=tube,
+        adapter,
+        0.0,
+        0.0,
+        TUBE_ID / 2.0,
+        "tube ID",
+        dims=tube,
         names=("TubeIdCx", "TubeIdCz", "TubeId"),
         drives=(None, None, '"TubeId"'),
     )
@@ -268,7 +307,12 @@ async def build(adapter) -> dict[str, str]:
     hole = SketchDims()
     check("create_sketch rod hole", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, ROD_HOLE_R, "rod hole", dims=hole,
+        adapter,
+        0.0,
+        0.0,
+        ROD_HOLE_R,
+        "rod hole",
+        dims=hole,
         names=("RodHoleCx", "RodHoleCz", "RodHoleDia"),
         drives=(None, None, '"RodHoleDia"'),
     )
@@ -291,7 +335,12 @@ async def build(adapter) -> dict[str, str]:
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, ROD_R, "rod", dims=rod,
+        adapter,
+        0.0,
+        0.0,
+        ROD_R,
+        "rod",
+        dims=rod,
         names=("RodCx", "RodCz", "RodDia"),
         drives=(None, None, '"RodDia"'),
     )
@@ -317,13 +366,32 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven handle (equations neutral)", V_TOTAL, 0.01 * V_ROD)
+    await volume_check(
+        adapter, "driven handle (equations neutral)", V_TOTAL, 0.01 * V_ROD
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "TubeProfile", "TubeId", *deviations(TUBE_ID_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Grip", "GripLen", GRIP_LENGTH_TOLERANCE_MM
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "Tube", "TubeLen", *deviations(TUBE_LENGTH_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "RodProfile", "RodDia", *deviations(ROD_PRESS_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Rod", "RodSpan", ROD_SPAN_TOLERANCE_MM)
+    set_dimension_bilateral_tolerance(
+        adapter, "RodHoleProfile", "RodHoleDia", *deviations(ROD_HOLE_REAM_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

@@ -12,6 +12,8 @@ import argparse
 import sys
 from typing import Any
 
+from alignment_pinion_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -31,8 +33,8 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _surface_finish import MACHINED
-from alignment_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
+from _surface_finish import surface_finish_by_key
+from alignment_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -53,8 +55,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-FRONT_CENTER = (0.150, 0.185)   # toothed end view
-RIGHT_CENTER = (0.285, 0.185)   # long drum profile (143 mm face)
+FRONT_CENTER = (0.150, 0.185)  # toothed end view
+RIGHT_CENTER = (0.285, 0.185)  # long drum profile (143 mm face)
 
 BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
@@ -69,8 +71,8 @@ DIMENSION_CALLOUTS = {
     # Light press under the MHA-102 arbor's Ø8.00 +0.00/-0.02 journal: bore
     # 7.96..7.98 vs shaft 7.98..8.00 guarantees 0.00..0.04 interference. Also
     # settles which tolerance-block row governs (neither .XX +/-0.51 nor
-    # DRILLED +0.10/0 -- the callout's own limits do).
-    "ArborBoreDia": "THRU - REAM\n-0.02/-0.04 (PRESS)",
+    # DRILLED +0.10/0 -- the model dimension's own limits do).
+    "ArborBoreDia": "THRU - REAM\nPRESS FIT",
 }
 DIMENSION_PRECISION = {"ArborBoreDia": 2}
 
@@ -153,7 +155,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(LEFT_END_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
         frame_xy=(LEFT_END_X - 0.030, RIGHT_CENTER[1] + HALF_OD + 0.014),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["drum end squareness to bore"],
         datums=("A",),
         label="drum end squareness to bore",
     )
@@ -161,7 +163,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.050),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "drum_bore"),
         label="drum bore finish",
         entity=bore_edge,
     )

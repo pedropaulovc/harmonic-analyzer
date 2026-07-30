@@ -10,10 +10,20 @@ keeps in lockstep (``test_pinion_pivot_shaft_drawing.py``).
 
 from __future__ import annotations
 
+from _fit_limits import SHAFT_H
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 SHAFT_LEN = 192.0  # ends flush with the pivot blocks' outer faces
 CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
+SHAFT_DIA_BAND = SHAFT_H
+SHAFT_LENGTH_TOLERANCE_MM = 0.25
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDia"},
@@ -37,3 +47,10 @@ END_VIEW_NOTE = "END VIEW SCALE 4:1"
 # 1:1, so without this the pictorial is silently half scale.  Mirrors
 # fulcrum-shaft / cylinder-gear-shaft, whose identical 1:2 iso carry the note.
 ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "pinion pivot cylindrical body": "0.01",
+    "pinion pivot crown profile": "0.05",
+}

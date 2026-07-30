@@ -7,7 +7,21 @@ from pathlib import Path
 import build_fulcrum_shaft as part
 import draw_fulcrum_shaft as drawing
 import fulcrum_shaft_spec
+import _fit_limits
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = fulcrum_shaft_spec.SURFACE_FINISHES
+    assert control.key == "bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == fulcrum_shaft_spec.SHAFT_DIA
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -30,7 +44,11 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_linked_notes_define_remaining_bearing_shaft_operations() -> None:
     notes = fulcrum_shaft_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "+0.00/-0.02"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert fulcrum_shaft_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+    assert model_toleranced_dimensions(part) == {
+        ("SectionProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)"
+    }
     clearance_min = 6.50 - fulcrum_shaft_spec.SHAFT_DIA
     clearance_max = clearance_min + 0.02 + 0.03
     assert round(clearance_min, 2) == 0.15
@@ -61,7 +79,7 @@ def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter" in part_source
+    assert "author_part_pmi(" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source

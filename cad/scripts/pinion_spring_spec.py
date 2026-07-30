@@ -29,6 +29,10 @@ from pinion_spring_geometry import (
     WIDTH as WIDTH,
 )
 
+FOOT_LENGTH_TOLERANCE_MM = 0.10
+BEND_RADIUS_TOLERANCE_MM = 0.10
+KINK_RADIUS_TOLERANCE_MM = 0.10
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {"FootLen", "BendR", "KinkR"},
 }
@@ -54,3 +58,9 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "spring screw-down foot flatness": "0.10",
+}

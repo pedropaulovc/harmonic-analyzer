@@ -17,6 +17,8 @@ import math
 import sys
 from typing import Any
 
+from pinion_cam_pin_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -25,9 +27,9 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -35,17 +37,16 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import fit_limits
+from _surface_finish import surface_finish_by_key
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
     PIN_DIA as PIN_DIA,
-    PIN_DIA_TOL,
     PIN_LEN,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -79,12 +80,12 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
+    "CapR": (RIGHT_CENTER[0] + 0.035, RIGHT_CENTER[1] + 0.040),
 }
 DIMENSION_CALLOUTS = {
-    "PinDia": (
-        f"FINAL LIMITS\n{fit_limits(PIN_DIA, (PIN_DIA_TOL, -PIN_DIA_TOL))}\nRa 0.8"
-    ),
-    "Depth": "+/-0.05\nSEATED FLAT END TO CROWN ROOT",
+    "PinDia": "FINAL SIZE",
+    "Depth": "SEATED FLAT END TO CROWN ROOT",
+    "CapR": "OUTER CROWN",
 }
 
 
@@ -130,7 +131,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(8, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(4, 1))
+    right = place_view(adapter, str(SOURCE), "*Top", *RIGHT_CENTER, scale=(4, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -145,13 +146,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
     set_dimension_precision(adapter, front_annotations, {"PinDia": 3})
-    front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
-    set_reference_dimension(
-        adapter,
-        front_by_name["PinDia"],
-        label="cam-pin nominal diameter",
-        diameter=True,
-    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
@@ -174,10 +168,18 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cam-pin cylindrical-shank datum axis",
         position_tolerance_m=0.0065,
     )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),
+        symbol_xy=(0.115, 0.180),
+        control=surface_finish_by_key(SURFACE_FINISHES, "finished_shank"),
+        label="cam-pin finished shank",
+    )
     seated_flat_face = model_point_in_view(
         adapter,
         right,
-        (0.0, PIN_DIA / 2000.0, 0.0),
+        (PIN_DIA / 2000.0, 0.0, 0.0),
         label="cam-pin seated flat end",
     )
     add_feature_control_frame(
@@ -186,21 +188,19 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=seated_flat_face,
         frame_xy=(0.220, 0.210),
         characteristic="flatness",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cam-pin seated-end flatness"],
         quantity="SEATED END",
         label="cam-pin seated-end flatness",
         entity_type="SILHOUETTE",
     )
     crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(
-        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
-    )
+    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
     outer_crown_face = model_point_in_view(
         adapter,
         right,
         (
-            0.0,
             crown_radial / 1000.0,
+            0.0,
             (PIN_LEN + crown_axial) / 1000.0,
         ),
         label="pinion cam-pin outer crown face",
@@ -211,7 +211,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=outer_crown_face,
         frame_xy=(0.245, 0.235),
         characteristic="profile_surface",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion cam-pin crown profile"],
         datums=(),
         quantity="OUTER CROWN",
         label="pinion cam-pin crown profile",
@@ -221,9 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         text=(
-            f"OUTER CROWN SR{CAP_RADIUS:.2f}+/-0.05\n"
-            f"({CAP_SAG:.2f}) REF AXIAL HEIGHT\n"
-            "CROWN ROOT PLANE TO APEX"
+            f"OUTER CROWN\n({CAP_SAG:.2f}) REF AXIAL HEIGHT\nCROWN ROOT PLANE TO APEX"
         ),
         entity_xy=outer_crown_face,
         note_xy=(0.250, 0.175),

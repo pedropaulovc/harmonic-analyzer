@@ -15,6 +15,8 @@ from __future__ import annotations
 import math
 
 from cone_pivot_post_installation import MECHANISM_X_SHIFT
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 14"). These MUST match the
 # constants in build_rocker_arm.py (the test cross-checks the load-bearing
@@ -28,6 +30,10 @@ TIP_FACE = 5.588  # 0.22" tip face, perpendicular to the top edge
 PIVOT_HOLE_DIA = 6.5  # rides the 6.35 pivot shaft
 ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
 ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the level-pose pin Y after X shift
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl("pivot_bore", MACHINED_UM, CylinderFace(PIVOT_HOLE_DIA)),
+)
 
 # --- Derived spans (equations of the primitives; mirror build_rocker_arm). ---
 R_TOP = CURVE_RADIUS
@@ -45,7 +51,9 @@ _RAD_X = TOP_END_X / R_TOP
 ROD_TIP_X = TOP_END_X + TIP_FACE * _RAD_X  # widest half-span (~146.25)
 
 # Rod-pin hole Y (low in the strap, ch14 fan photo).
-ROD_HOLE_Y = (CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_HOLE_X * ROD_HOLE_X)) + ROD_HOLE_ABOVE_BOTTOM
+ROD_HOLE_Y = (
+    CENTER_Y - math.sqrt(R_BOTTOM**2 - ROD_HOLE_X * ROD_HOLE_X)
+) + ROD_HOLE_ABOVE_BOTTOM
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -62,3 +70,9 @@ PIVOT_MID_Y = ARM_DEPTH / 2.0  # 8.0
 
 # Drawing prose (DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) lives in
 # rocker_arm_notes.py -- see connecting_rod_notes for the rationale.
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "rod-pin hole position": "0.20",
+}

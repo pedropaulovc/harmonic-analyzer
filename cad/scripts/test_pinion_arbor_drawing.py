@@ -7,7 +7,21 @@ from pathlib import Path
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
 import pinion_arbor_spec
+import _fit_limits
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = pinion_arbor_spec.SURFACE_FINISHES
+    assert control.key == "bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -40,7 +54,11 @@ def test_crown_is_dimensioned_and_annotated() -> None:
 
 def test_linked_notes_define_remaining_arbor_operations() -> None:
     notes = pinion_arbor_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "+0.00/-0.02"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert pinion_arbor_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+    assert model_toleranced_dimensions(part) == {
+        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)"
+    }
     assert "CENTRE MARKS" in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -66,7 +84,7 @@ def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
     assert PART_DATUMS[0].face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter" in part_source
+    assert "author_part_pmi(" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source

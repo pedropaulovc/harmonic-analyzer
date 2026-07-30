@@ -15,6 +15,8 @@ import math
 import sys
 from typing import Any
 
+from pen_marker_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -31,8 +33,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
-from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H
+from _surface_finish import surface_finish_by_key
+from pen_marker_spec import BARREL_DIA, BARREL_TOP_Y, CONE_H, SURFACE_FINISHES
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -103,7 +105,9 @@ def _add_picked_dimension(
     apex is a VERTEX, so the overall length needs a mixed-type pick.
     """
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
@@ -140,7 +144,9 @@ def _display_as_diameter(adapter: Any, dimension: Any, *, label: str) -> None:
 def _add_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
     """Insert the turned-part axis centerline between the barrel silhouettes."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")  # IDrawingDoc view for drawing-only methods (same dispatch)
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
@@ -272,7 +278,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=CONE_FLANK,
         frame_xy=(APEX[0] - 0.032, FRONT_CENTER[1] + 0.032),
         characteristic="circular_runout",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["marker tip runout"],
         datums=("A",),
         label="marker tip runout",
         entity_type="SILHOUETTE",
@@ -293,7 +299,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(FRONT_CENTER[0] - 0.024, FRONT_CENTER[1] + _HALF_DIA),
         symbol_xy=(FRONT_CENTER[0] - 0.016, 0.196),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "barrel"),
         label="barrel bearing finish",
         entity_type="SILHOUETTE",
     )

@@ -20,6 +20,8 @@ import argparse
 import sys
 from typing import Any
 
+from guide_lock_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -244,7 +246,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # the #4 screws' Ø2.845 majors leaves ~Ø0.20 of position TOTAL across
         # the plate + rail pair, so this plate's share is Ø0.10 -- Ø0.20 here
         # would consume the whole stack alone.
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["screw-hole position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="2X",
@@ -262,7 +264,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(DATUM_FACE_X, RIGHT_CENTER[1] - 0.006),
         frame_xy=(0.248, 0.124),
         characteristic="flatness",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["rail-mating face flatness"],
         label="rail-mating face flatness",
     )
     # The bent leader elbows at the text's LEFT end, so the text must start just

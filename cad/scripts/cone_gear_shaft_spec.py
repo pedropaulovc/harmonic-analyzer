@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from cone_pivot_post_installation import GEAR_AXIS_SHIFT
 
@@ -71,6 +72,16 @@ GEOMETRIC_CONTROLS = (
         "0.05",
         CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
         datums=("A",),
+    ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA)
+    ),
+    SurfaceFinishControl(
+        "tip_journal",
+        MACHINED_UM,
+        CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
     ),
 )
 

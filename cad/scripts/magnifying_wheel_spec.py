@@ -11,6 +11,8 @@ lockstep test, which asserts the part marks and the drawing keeps EXACTLY
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_DIA,
     HUB_AXIAL,
@@ -21,6 +23,10 @@ from magnifying_wheel_geom import (  # noqa: F401 (re-export)
     SPOKE_AXIAL,
     SPOKE_COUNT,
     SPOKE_WIDTH,
+)
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl("hub_drum", MACHINED_UM, CylinderFace(HUB_DIA)),
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -53,3 +59,9 @@ DRAWING_NOTES = "\n".join(
 # does not carry (a true rim/spoke/hub section is a deferred enrichment).
 SECTION_VIEW_NOTE = "SIDE VIEW SCALE 1:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "rim runout to the bore": "0.10",
+}

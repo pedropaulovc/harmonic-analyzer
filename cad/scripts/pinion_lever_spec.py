@@ -10,6 +10,10 @@ map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
+import math
+
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_lever_geometry import (
     BORE as BORE,
     CAP_RADIUS as CAP_RADIUS,
@@ -26,13 +30,31 @@ from pinion_lever_geometry import (
 # Symmetric ream band about the 6.3675 mid nominal: 6.375 MAX / 6.360 MIN
 # (running fit on the Ø6.35 pivot shaft).
 BORE_BAND = (0.0075, -0.0075)
+BORE_DEPTH_BAND = (0.10, 0.00)
+END_WALL_TOLERANCE_MM = 0.05
+ROD_TIP_Y_TOLERANCE_MM = 0.25
+ROD_TIP_DIAMETER_TOLERANCE_MM = 0.05
+GRIP_HALF_ANGLE_TOLERANCE_DEG = 0.05
+CAP_RADIUS_TOLERANCE_MM = 0.10
+GRIP_HALF_ANGLE_DEG = math.degrees(
+    math.atan((ROD_TIP_DIA - ROD_ROOT_DIA) / (2.0 * (ROD_LEN - ROD_Y0)))
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
     "Wall": {"EndWall"},
-    "RodProfile": {"RodTipY"},
+    "RodProfile": {"RodTipY", "RodTipDia", "GripHalfAngle"},
+    "CapProfile": {"CapR"},
 }
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        key="hub_bore",
+        roughness_um=MACHINED_UM,
+        face=CylinderFace(diameter_mm=BORE),
+    ),
+)
 
 DRAWING_NOTES = "\n".join(
     (
@@ -51,3 +73,13 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "lever hub OD runout": "0.05",
+    "lever flat-face perpendicularity": "0.05",
+    "lever crown profile": "0.05",
+    "grip tip face flatness": "0.05",
+    "grip tip face perpendicularity": "0.10",
+}

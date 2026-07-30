@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from cone_tip_adjuster_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -30,9 +32,7 @@ from cone_tip_adjuster_spec import (
     BODY_DIA,
     BODY_LEN,
     CHAMFER as CHAMFER,
-    CUP_DEPTH,
     CUP_DIA,
-    GENERAL_TOL_MM,
     SLOT_W,
     THREAD,
 )
@@ -67,6 +67,7 @@ ISO_CENTER = (0.300, 0.160)
 FRONT_KEEP = {
     "BodyLenDim": (FRONT_CENTER[0] - 0.045, FRONT_CENTER[1]),
     "BodyDiaDim": (FRONT_CENTER[0] + 0.060, FRONT_CENTER[1] + 0.010),
+    "CupDepth": (FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.020),
 }
 END_KEEP = {
     "SlotWDim": (END_CENTER[0] + 0.055, END_CENTER[1] - 0.015),
@@ -80,19 +81,14 @@ CUP_KEEP = {
 #
 # The two entries that remain are sheet annotation, not specification:
 #   BodyDiaDim - the thread designation, already derived from the spec's THREAD.
-#   CupDiaDim  - the cup DEPTH, which is not a marked model dimension on this
-#                part (the blind bore's depth has no drawing dim to tolerance),
-#                so it stays a callout. Its band rides GENERAL_TOL_MM rather
-#                than a typed "+/-0.10" so the two cannot drift apart.
+#   CupDepth   - the machining instruction for the marked blind-hole depth.
 DIMENSION_CALLOUTS = {
     "BodyDiaDim": f"{THREAD} UNC-2A",
-    "CupDiaDim": f"X {CUP_DEPTH:.2f} +/-{GENERAL_TOL_MM:.2f} DEEP",
+    "CupDepth": "DEEP",
 }
 
 
-def _circular_edge(
-    view: Any, *, radius_mm: float, center_y_mm: float
-) -> Any:
+def _circular_edge(view: Any, *, radius_mm: float, center_y_mm: float) -> Any:
     """Return the visible circular model edge at the requested axis station."""
     candidates: list[tuple[float, float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label="tip-adjuster edges"):
@@ -226,7 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
         cup,
         frame_xy=(CUP_CENTER[0] + 0.050, CUP_CENTER[1] + 0.032),
         characteristic="position",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cup axis position"],
         datums=("A",),
         diameter=True,
         label="cup axis position",
@@ -241,7 +237,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         frame_xy=(END_CENTER[0] + 0.065, END_CENTER[1] - 0.025),
         characteristic="position",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["driver-slot median-plane position"],
         datums=("A",),
         quantity="SLOT MEDIAN PLANE",
         label="driver-slot median-plane position",

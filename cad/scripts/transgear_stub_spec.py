@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -48,6 +49,9 @@ GEOMETRIC_CONTROLS = (
     GeometricControl(
         "seat_runout", "circular_runout", "0.03", CylinderFace(SEAT_DIA), datums=("A",)
     ),
+)
+SURFACE_FINISHES = (
+    SurfaceFinishControl("gear_seat", MACHINED_UM, CylinderFace(SEAT_DIA)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

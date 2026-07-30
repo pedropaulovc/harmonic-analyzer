@@ -31,6 +31,11 @@ vocabulary.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Literal
+
+from _gtol_spec import FaceSpec, pmi_annotation_name
+
 # Roughness average (Ra) in MICROMETRES.
 #
 # GROUND — a ground or lapped bearing/register surface: a pivot-screw shoulder
@@ -59,3 +64,53 @@ def ra(grade_um: float) -> str:
 # the printed callout with it.
 GROUND = ra(GROUND_UM)
 MACHINED = ra(MACHINED_UM)
+
+
+@dataclass(frozen=True)
+class SurfaceFinishControl:
+    """Part-owned surface requirement qualified by one exact model face.
+
+    ``native_attachment`` controls only how the native symbol is stored in the
+    ``.SLDPRT``.  Most parts attach it directly to the qualified face.  A
+    configuration-driven part whose topology changes between configurations
+    uses ``"model"`` so one configuration's transient face identity cannot
+    make every other configuration rebuild with a dangling annotation.  The
+    typed ``face`` remains mandatory and is still resolved live by the part
+    build and used to place the drawing leader.
+    """
+
+    key: str
+    roughness_um: float
+    face: FaceSpec
+    production_method: str = ""
+    native_attachment: Literal["face", "model"] = "face"
+
+    def __post_init__(self) -> None:
+        if not self.key:
+            raise ValueError("surface-finish key cannot be blank")
+        ra(self.roughness_um)
+        if self.native_attachment not in {"face", "model"}:
+            raise ValueError(
+                "surface-finish native_attachment must be 'face' or 'model', "
+                f"got {self.native_attachment!r}"
+            )
+
+    @property
+    def roughness_ra(self) -> str:
+        return ra(self.roughness_um)
+
+    @property
+    def annotation_name(self) -> str:
+        return pmi_annotation_name(f"surface:{self.key}")
+
+
+def surface_finish_by_key(
+    controls: tuple[SurfaceFinishControl, ...], key: str
+) -> SurfaceFinishControl:
+    """Resolve one stable surface-finish row by semantic key."""
+    matches = [control for control in controls if control.key == key]
+    if len(matches) != 1:
+        raise ValueError(
+            f"surface-finish key {key!r} resolved {len(matches)} controls"
+        )
+    return matches[0]

@@ -130,6 +130,7 @@ class CylinderFace:
     by a point its axis span must contain, in part coordinates, mm)."""
 
     diameter_mm: float
+    contains_x_mm: float | None = None
     contains_y_mm: float | None = None
     tolerance_mm: float = 0.05
 
@@ -141,12 +142,36 @@ class CylinderFace:
 
 
 @dataclass(frozen=True)
+class ConeFace:
+    """The unique conical face with the specified half-angle.
+
+    ``contains_x_mm`` optionally requires the face bounding box to cross a
+    part-coordinate X station. This distinguishes coaxial conical patches
+    without depending on volatile face enumeration order.
+    """
+
+    half_angle_degrees: float
+    contains_x_mm: float | None = None
+    tolerance_degrees: float = 0.01
+    tolerance_mm: float = 0.05
+
+    def __post_init__(self) -> None:
+        if not 0.0 < self.half_angle_degrees < 90.0:
+            raise ValueError("cone half-angle must be between 0 and 90 degrees")
+        if self.tolerance_degrees <= 0.0:
+            raise ValueError("cone angle tolerance must be positive")
+        if self.tolerance_mm <= 0.0:
+            raise ValueError("cone match tolerance must be positive")
+
+
+@dataclass(frozen=True)
 class PlanarFace:
     """The unique planar face whose outward normal ≈ ``normal`` and whose plane
     sits at ``offset_mm`` along that normal (part coordinates, mm)."""
 
     normal: tuple[float, float, float]
     offset_mm: float
+    contains_z_mm: float | None = None
     tolerance_mm: float = 0.05
 
     def __post_init__(self) -> None:
@@ -156,7 +181,44 @@ class PlanarFace:
             raise ValueError("plane match tolerance must be positive")
 
 
-FaceSpec = Union[CylinderFace, PlanarFace]
+@dataclass(frozen=True)
+class SphereFace:
+    """The unique spherical face of ``diameter_mm`` and optional centre."""
+
+    diameter_mm: float
+    center_mm: tuple[float, float, float] | None = None
+    tolerance_mm: float = 0.05
+
+    def __post_init__(self) -> None:
+        if self.diameter_mm <= 0.0:
+            raise ValueError("sphere diameter must be positive")
+        if self.center_mm is not None and len(self.center_mm) != 3:
+            raise ValueError("sphere center must be a 3-vector")
+        if self.tolerance_mm <= 0.0:
+            raise ValueError("sphere match tolerance must be positive")
+
+
+@dataclass(frozen=True)
+class TorusFace:
+    """The unique toroidal face with the specified generating radii."""
+
+    major_radius_mm: float
+    minor_radius_mm: float
+    center_mm: tuple[float, float, float] | None = None
+    tolerance_mm: float = 0.05
+
+    def __post_init__(self) -> None:
+        # SolidWorks permits negative major radii for lemon tori, so only the
+        # physically positive minor radius is constrained here.
+        if self.minor_radius_mm <= 0.0:
+            raise ValueError("torus minor radius must be positive")
+        if self.center_mm is not None and len(self.center_mm) != 3:
+            raise ValueError("torus center must be a 3-vector")
+        if self.tolerance_mm <= 0.0:
+            raise ValueError("torus match tolerance must be positive")
+
+
+FaceSpec = Union[CylinderFace, ConeFace, PlanarFace, SphereFace, TorusFace]
 
 
 @dataclass(frozen=True)

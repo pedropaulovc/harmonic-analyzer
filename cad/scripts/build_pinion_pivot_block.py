@@ -49,14 +49,18 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BLOCK_WIDTH,
     BORE_DIA,
+    BORE_DIA_BAND,
     BORE_HALF_SPACING,
     BORE_UP,
     DRAWING_DIMENSIONS,
@@ -64,6 +68,7 @@ from pinion_pivot_block_spec import (
     ISOMETRIC_VIEW_NOTE,
     LIFT_BORE_RISE,
     SCREW_HALF_SPACING,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "pinion-pivot-block"
@@ -125,12 +130,21 @@ async def build(adapter) -> dict[str, str]:
     # diameter. The v2 linkage closure raises the lift bore, adding its own
     # unsigned y dim.
     await define_circle(
-        adapter, BORE_HALF_SPACING, 0.0, BORE_DIA / 2.0, "pivot bore", dims=block,
+        adapter,
+        BORE_HALF_SPACING,
+        0.0,
+        BORE_DIA / 2.0,
+        "pivot bore",
+        dims=block,
         names=("PivotBoreX", "PivotBoreCz", "PivotBoreDia"),
         drives=('"BoreHalfSpacing"', None, '"Bore"'),
     )
     await define_circle(
-        adapter, -BORE_HALF_SPACING, LIFT_BORE_RISE, BORE_DIA / 2.0, "lift bore",
+        adapter,
+        -BORE_HALF_SPACING,
+        LIFT_BORE_RISE,
+        BORE_DIA / 2.0,
+        "lift bore",
         dims=block,
         names=("LiftBoreX", "LiftBoreCz", "LiftBoreDia"),
         drives=('"BoreHalfSpacing"', '"LiftBoreRise"', '"Bore"'),
@@ -139,7 +153,11 @@ async def build(adapter) -> dict[str, str]:
     # span) and height (Y span) segment dims, then the two anchor dims (absolute
     # distances to the origin, so AnchorX = BLOCK_WIDTH/2 and AnchorZ = BORE_UP).
     await define_rectilinear_chain(
-        adapter, entities, block_rect, label="block", dims=block,
+        adapter,
+        entities,
+        block_rect,
+        label="block",
+        dims=block,
         names=["BlockWidth", "BlockHeight", "AnchorX", "AnchorZ"],
         drives=['"BlockWidth"', '"BlockHeight"', '"BlockWidth" / 2', '"BoreUp"'],
     )
@@ -166,15 +184,18 @@ async def build(adapter) -> dict[str, str]:
     # -BLOCK_DEPTH/2 is model z = +BLOCK_DEPTH/2 -- the mid-depth line.
     screw_dia = NUMBER_DRILL_MM[SCREW_HOLE_SPEC.size]
     screw_cut = wizard_holes(
-        adapter, SCREW_HOLE_SPEC,
-        [[SCREW_HALF_SPACING, -BORE_UP, BLOCK_DEPTH / 2.0],
-         [-SCREW_HALF_SPACING, -BORE_UP, BLOCK_DEPTH / 2.0]],
-        (0.0, -1.0, 0.0), "hold-down screw holes (#19)", name="ScrewHoles",
+        adapter,
+        SCREW_HOLE_SPEC,
+        [
+            [SCREW_HALF_SPACING, -BORE_UP, BLOCK_DEPTH / 2.0],
+            [-SCREW_HALF_SPACING, -BORE_UP, BLOCK_DEPTH / 2.0],
+        ],
+        (0.0, -1.0, 0.0),
+        "hold-down screw holes (#19)",
+        name="ScrewHoles",
         placement_dims=[
-            (("ScrewEastX", '"ScrewHalfSpacing"'),
-             ("ScrewEastZ", '"BlockDepth" / 2')),
-            (("ScrewWestX", '"ScrewHalfSpacing"'),
-             ("ScrewWestZ", '"BlockDepth" / 2')),
+            (("ScrewEastX", '"ScrewHalfSpacing"'), ("ScrewEastZ", '"BlockDepth" / 2')),
+            (("ScrewWestX", '"ScrewHalfSpacing"'), ("ScrewWestZ", '"BlockDepth" / 2')),
         ],
     )
     drive_jobs += screw_cut.placement_drive_jobs
@@ -185,7 +206,11 @@ async def build(adapter) -> dict[str, str]:
     # Named lift-bore axis (Axis1): the lift rod's revolute mates coaxial to
     # this in the assembly (PR8 -- the rod spins to drive the cams).
     lift_axis = await name_bore_axis(
-        adapter, "Right Plane", -BORE_HALF_SPACING, "Top Plane", LIFT_BORE_RISE,
+        adapter,
+        "Right Plane",
+        -BORE_HALF_SPACING,
+        "Top Plane",
+        LIFT_BORE_RISE,
         "lift bore",
     )
     _blank_ref_geometry(adapter, "Plane1", "PLANE")
@@ -198,11 +223,19 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven block (equations neutral)", expected, 0.005 * expected)
+    await volume_check(
+        adapter, "driven block (equations neutral)", expected, 0.005 * expected
+    )
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
     # and stamp the make-critical title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "BlockProfile", "PivotBoreDia", *deviations(BORE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BlockProfile", "LiftBoreDia", *deviations(BORE_DIA_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
@@ -210,6 +243,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -230,7 +264,15 @@ def _blank_ref_geometry(adapter, name: str, kind: str) -> None:
     model = adapter.currentModel
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
-        name, kind, 0, 0, 0, False, 0, null_callout(), 0,
+        name,
+        kind,
+        0,
+        0,
+        0,
+        False,
+        0,
+        null_callout(),
+        0,
     ):
         raise RuntimeError(f"cannot select {name!r} to hide reference geometry")
     model.BlankRefGeom()

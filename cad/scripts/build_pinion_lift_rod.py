@@ -48,14 +48,21 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from pinion_lift_rod_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
     ROD_DIA,
+    ROD_DIA_BAND,
     ROD_LEN,
+    ROD_LENGTH_TOLERANCE_MM,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "pinion-lift-rod"
@@ -96,7 +103,12 @@ async def build(adapter) -> dict[str, str]:
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, ROD_R, "rod", dims=rod,
+        adapter,
+        0.0,
+        0.0,
+        ROD_R,
+        "rod",
+        dims=rod,
         names=("RodCx", "RodCz", "RodDia"),
         drives=(None, None, '"RodDia"'),
     )
@@ -166,7 +178,9 @@ async def build(adapter) -> dict[str, str]:
     cap.record("CapSagDim", '"CapSag"')
     check(
         "back cap on axis",
-        await adapter.add_sketch_constraint(f"{base}.start", "origin", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{base}.start", "origin", "vertical_points"
+        ),
     )
     check(
         "back cap station",
@@ -212,9 +226,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "RodProfile", "RodDia", *deviations(ROD_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Rod", "Depth", ROD_LENGTH_TOLERANCE_MM)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from arbor_pedestal_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -28,7 +30,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from arbor_pedestal_spec import (
     BORE_DIA,
     BORE_HEIGHT,
@@ -37,6 +39,7 @@ from arbor_pedestal_spec import (
     FOOT_WIDTH,
     SCREW_CLEARANCE_DIA,
     STRAP_T,
+    SURFACE_FINISHES,
     TOP_RADIUS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -65,7 +68,9 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # The casting spans model y 0 (foot seat) .. 64 (dome top); centre the front
 # elevation on that midpoint. Third-angle: the 24x16 foot plan sits ABOVE the
 # elevation, the isometric off to the right.
-_PART_MID_Y = (BORE_HEIGHT + TOP_RADIUS) / 2.0  # foot 0 .. dome top (bore + dome radius)
+_PART_MID_Y = (
+    BORE_HEIGHT + TOP_RADIUS
+) / 2.0  # foot 0 .. dome top (bore + dome radius)
 FRONT_CENTER = (0.100, 0.150)
 TOP_CENTER = (0.100, 0.245)
 ISO_CENTER = (0.335, 0.150)
@@ -88,7 +93,7 @@ TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "+0.055/+0.025 THRU",
+    "BoreDia": "THRU",
 }
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
 # 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).
@@ -126,9 +131,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
         ):
             side_candidates.append((abs(p1[1] - p0[1]), edge))
         flank_rise = BORE_HEIGHT - FOOT_HEIGHT
-        flank_run = (
-            (FOOT_WIDTH / 2.0 - TOP_RADIUS) * flank_rise / BORE_HEIGHT
-        )
+        flank_run = (FOOT_WIDTH / 2.0 - TOP_RADIUS) * flank_rise / BORE_HEIGHT
         if (
             min(p0[0], p1[0]) > 0.0
             and abs(abs(p1[1] - p0[1]) - flank_rise) <= 0.01
@@ -154,8 +157,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
         raise RuntimeError("front view has no circular model edges")
     radius, height, bore_edge = min(
         bore_candidates,
-        key=lambda item: abs(item[0] - BORE_DIA / 2.0)
-        + abs(item[1] - BORE_HEIGHT),
+        key=lambda item: abs(item[0] - BORE_DIA / 2.0) + abs(item[1] - BORE_HEIGHT),
     )
     if abs(radius - BORE_DIA / 2.0) > 0.01 or abs(height - BORE_HEIGHT) > 0.01:
         raise RuntimeError(
@@ -163,8 +165,7 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
         )
     dome_radius, dome_height, dome_edge = min(
         bore_candidates,
-        key=lambda item: abs(item[0] - TOP_RADIUS)
-        + abs(item[1] - BORE_HEIGHT),
+        key=lambda item: abs(item[0] - TOP_RADIUS) + abs(item[1] - BORE_HEIGHT),
     )
     if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
         raise RuntimeError("front view has no circular dome edge")
@@ -184,10 +185,7 @@ def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
         end = _early_bound(end, "IVertex")
         p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
         p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
-        if (
-            abs(p0[2] - z_mm) <= 0.01
-            and abs(p1[2] - z_mm) <= 0.01
-        ):
+        if abs(p0[2] - z_mm) <= 0.01 and abs(p1[2] - z_mm) <= 0.01:
             candidates.append((abs(p1[0] - p0[0]), edge))
     if not candidates:
         raise RuntimeError(f"plan view has no {label} edge at z={z_mm:.3f} mm")
@@ -343,9 +341,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # measure from). The arbor bore is toleranced parallel to it and carries the
     # clamp-fit finish.
     _bore_r = BORE_DIA / 2.0 * _S
-    foot_edge = (FRONT_CENTER[0] + 0.006, _front_y(0.0))
-    foot_entity, side_entity, flank_entity, bore_entity, dome_entity = (
-        _front_entities(adapter, front)
+    foot_entity, side_entity, flank_entity, bore_entity, dome_entity = _front_entities(
+        adapter, front
     )
     _add_circle_basic(
         adapter,
@@ -388,7 +385,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.185, 0.080),
         characteristic="flatness",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["datum-A seat flatness"],
         label="datum-A seat flatness",
         entity=foot_entity,
     )
@@ -397,7 +394,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.020, 0.105),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["datum-B side perpendicularity"],
         datums=("A",),
         quantity="DATUM B SIDE",
         label="datum-B side perpendicularity",
@@ -410,7 +407,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.020, _front_y(BORE_HEIGHT) + 0.006),
         characteristic="position",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["arbor bore true position"],
         datums=("A", "B"),
         diameter=True,
         label="arbor bore true position",
@@ -421,7 +418,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.245, _front_y(BORE_HEIGHT) + 0.014),
         characteristic="profile_surface",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["controlled exterior surface profile"],
         datums=("A", "B"),
         quantity="CROWN + 2 FLANKS + FOOT TOP + RIGHT SIDE",
         label="controlled exterior surface profile",
@@ -431,7 +428,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(0.155, 0.225),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
         entity=bore_entity,
         leader_attach_xy=(FRONT_CENTER[0] + _bore_r, _front_y(BORE_HEIGHT)),
@@ -481,7 +478,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.020, 0.235),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["datum-D face perpendicularity"],
         datums=("A", "B"),
         quantity="DATUM D FACE",
         label="datum-D face perpendicularity",
@@ -500,7 +497,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.300, 0.250),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["flange-hole true position"],
         datums=("A", "B", "D"),
         diameter=True,
         label="flange-hole true position",
@@ -511,7 +508,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.245, 0.242),
         characteristic="profile_surface",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["strap near-face profile"],
         datums=("A", "B", "D"),
         quantity=f"STRAP NEAR FACE @ BASIC {FOOT_DEPTH - STRAP_T:.2f}",
         label="strap near-face profile",
@@ -522,7 +519,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.300, 0.220),
         characteristic="profile_surface",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["coplanar far-face profile"],
         datums=("A", "B", "D"),
         quantity=f"FOOT + STRAP FAR FACES @ BASIC {FOOT_DEPTH:.2f}",
         label="coplanar far-face profile",

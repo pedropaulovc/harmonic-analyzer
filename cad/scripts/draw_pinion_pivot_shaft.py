@@ -17,6 +17,8 @@ import math
 import sys
 from typing import Any
 
+from pinion_pivot_shaft_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -34,13 +36,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import SHAFT_H, fit_limits
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pinion_pivot_shaft_spec import (
     CAP_RADIUS,
     CAP_SAG,
     SHAFT_DIA as SHAFT_DIA,
     SHAFT_LEN,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -80,11 +82,8 @@ RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
 DIMENSION_CALLOUTS = {
-    "ShaftDia": (
-        "NOMINAL REF ONLY\nFINAL LIMITS\n"
-        + fit_limits(SHAFT_DIA, SHAFT_H, diameter=True)
-    ),
-    "Depth": "+/-0.25 CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
+    "ShaftDia": "FINAL SIZE",
+    "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
 }
 
 
@@ -164,7 +163,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=end_upper,
         frame_xy=(0.065, 0.232),
         characteristic="cylindricity",
-        tolerance="0.01",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot cylindrical body"],
         label="pinion pivot cylindrical body",
     )
     add_datum_feature(
@@ -177,9 +176,7 @@ async def build(adapter: Any) -> dict[str, str]:
         position_tolerance_m=0.0001,
     )
     crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(
-        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
-    )
+    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
     right_crown_face = (
         RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + crown_axial) / 1000.0,
         RIGHT_CENTER[1] + crown_radial / 2000.0,
@@ -194,7 +191,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=right_crown_face,
         frame_xy=(0.245, 0.228),
         characteristic="profile_surface",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot crown profile"],
         datums=(),
         quantity="BOTH CROWNS",
         label="pinion pivot crown profile",
@@ -205,7 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=body_face,
         symbol_xy=(0.155, 0.205),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="pinion pivot bearing finish",
         entity_type="FACE",
     )

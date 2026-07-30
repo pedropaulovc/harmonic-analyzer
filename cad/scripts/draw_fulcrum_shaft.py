@@ -24,8 +24,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
-from fulcrum_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS, SHAFT_DIA, SHAFT_LENGTH
+from _surface_finish import surface_finish_by_key
+from fulcrum_shaft_spec import (
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
+    SHAFT_DIA,
+    SHAFT_LENGTH,
+    SURFACE_FINISHES,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -73,7 +79,8 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"ShaftDia": "+0.00/-0.02"}
+# The shaft fit lives on the source-model dimension.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -205,7 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=end_circle,
         symbol_xy=(0.075, 0.222),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="fulcrum bearing finish",
     )
 

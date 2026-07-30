@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_lift_rod_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -23,8 +25,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
-from pinion_lift_rod_spec import CAP_SAG, ROD_DIA, ROD_LEN
+from _surface_finish import surface_finish_by_key
+from pinion_lift_rod_spec import CAP_SAG, ROD_DIA, ROD_LEN, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -74,10 +76,10 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
 }
-DIMENSION_CALLOUTS = {"RodDia": "+0.00/-0.02"}
+DIMENSION_CALLOUTS: dict[str, str] = {}
 # The length tolerance rides its own dimension (codex machinist review: a
 # detached "LENGTH +/-0.25" UOS note is ambiguous about which length it bounds).
-RIGHT_CALLOUTS = {"Depth": "+/-0.25"}
+RIGHT_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -184,7 +186,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(RIGHT_CENTER[0] - 0.045, ROD_FLANK_Y),
         frame_xy=(RIGHT_CENTER[0] - 0.045, 0.236),
         characteristic="cylindricity",
-        tolerance="0.01",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lift rod bearing cylindricity"],
         label="lift rod bearing cylindricity",
         entity_type="SILHOUETTE",
     )
@@ -198,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=flat_end,
         frame_xy=(flat_end[0] + 0.018, 0.228),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["front end perpendicularity"],
         datums=("A",),
         label="front end perpendicularity",
     )
@@ -209,7 +211,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=(RIGHT_CENTER[0] + 0.045, ROD_FLANK_Y),
         symbol_xy=(RIGHT_CENTER[0] + 0.045, 0.222),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="lift rod bearing finish",
         entity_type="SILHOUETTE",
     )

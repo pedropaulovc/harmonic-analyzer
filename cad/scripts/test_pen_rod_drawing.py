@@ -7,8 +7,22 @@ from pathlib import Path
 import build_pen_rod as part
 import draw_pen_rod as drawing
 import pen_rod_spec
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _holes import NUMBER_DRILL_MM
+
+
+def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = pen_rod_spec.SURFACE_FINISHES
+    assert control.key == "slide_face"
+    assert control.roughness_um == 1.6
+    assert control.face.normal == (-1, 0, 0)
+    assert control.face.offset_mm == pen_rod_spec.ROD_SECTION / 2.0
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "slide_face")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -43,7 +57,13 @@ def test_wire_hole_matches_the_number_drill_standard() -> None:
 
 def test_linked_notes_define_remaining_square_rod_operations() -> None:
     notes = pen_rod_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["Section"] == "+0.00/-0.05"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert drawing.TOP_DIMENSION_CALLOUTS == {}
+    assert pen_rod_spec.SECTION_BAND == (0.00, -0.05)
+    assert model_toleranced_dimensions(part) == {
+        ("RodProfile", "Section"): "*deviations(SECTION_BAND)",
+        ("Rod", "Depth"): "*deviations(SECTION_BAND)",
+    }
     assert "V-BLOCK" in notes
     assert "#47" in notes
     assert "X.XX" not in notes
@@ -72,7 +92,7 @@ def test_native_gdt_controls_slide_faces_and_ends() -> None:
     assert by_key["bottom_end_squareness"].face.normal == (0, -1, 0)
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter" in part_source
+    assert "author_part_pmi(" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source

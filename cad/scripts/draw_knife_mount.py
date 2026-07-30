@@ -17,6 +17,8 @@ import argparse
 import sys
 from typing import Any
 
+from knife_mount_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -36,8 +38,15 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import GROUND
-from knife_mount_spec import BLK_BOT, BLK_TOP, BORE_CY, R_BORE, SUPPORT_Z_THICK
+from _surface_finish import surface_finish_by_key
+from knife_mount_spec import (
+    BLK_BOT,
+    BLK_TOP,
+    BORE_CY,
+    R_BORE,
+    SUPPORT_Z_THICK,
+    SURFACE_FINISHES,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -169,7 +178,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0),
         frame_xy=(FRONT_CENTER[0] + 0.032, _front_y(BORE_CY) + 0.040),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["knife-bore position"],
         datums=("A",),
         diameter=True,
         label="knife-bore position",
@@ -179,7 +188,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=(FRONT_CENTER[0] + R_BORE * SHEET_SCALE[0] / 1000.0, _front_y(BORE_CY)),
         symbol_xy=(FRONT_CENTER[0] + 0.052, _front_y(BORE_CY) - 0.020),
-        roughness_ra=GROUND,
+        control=surface_finish_by_key(SURFACE_FINISHES, "knife_bore"),
         label="knife bore finish",
     )
 

@@ -15,6 +15,8 @@ import argparse
 import sys
 from typing import Any
 
+from platen_guide_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -185,8 +187,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         datum_xy=(FRONT_LEFT_X_M, FRONT_BOTTOM_Y_M),
         hole_points=tuple(
-            (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M)
-            for station in stations
+            (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M) for station in stations
         ),
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         label="platen-guide",
@@ -271,7 +272,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # y=0.110 while staying under the front view's lower edge (y=0.104).
         frame_xy=(0.312, 0.092),
         characteristic="flatness",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["platen-mating face flatness"],
         label="platen-mating face flatness",
     )
     add_feature_control_frame(
@@ -290,7 +291,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # (0.385, 0.110).
         frame_xy=(0.390, 0.086),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["guide opposite-face parallelism"],
         datums=("A",),
         label="guide opposite-face parallelism",
     )
@@ -300,7 +301,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_LEFT_X_M + BLIND_X[0] / 1000.0, FRONT_HOLE_Y_M),
         frame_xy=(0.105, 0.155),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="9X",

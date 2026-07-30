@@ -6,6 +6,8 @@ import argparse
 import sys
 from typing import Any
 
+from top_crossbar_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -89,14 +91,13 @@ def _stud_hole_edge(adapter: Any, view: Any) -> Any:
         candidates.append((params[6], edge))
     if not candidates:
         raise RuntimeError("top view has no circular stud-hole model edge")
-    radius, edge = min(
-        candidates, key=lambda item: abs(item[0] - STUD_HOLE_DIA / 2.0)
-    )
+    radius, edge = min(candidates, key=lambda item: abs(item[0] - STUD_HOLE_DIA / 2.0))
     if abs(radius - STUD_HOLE_DIA / 2.0) > 0.01:
         raise RuntimeError(
             f"no top-view circle matches stud-hole radius {STUD_HOLE_DIA / 2.0:.3f} mm"
         )
     return edge
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -221,7 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_entity=hole_edge,
         frame_xy=(0.020, 0.235),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["crossbar stud-hole position"],
         datums=("A", "B", "C"),
         diameter=True,
         label="crossbar stud-hole position",
@@ -232,7 +233,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=lower_end,
         frame_xy=(0.115, 0.175),
         characteristic="perpendicularity",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["crossbar reference-end squareness"],
         datums=("A", "B"),
         label="crossbar reference-end squareness",
     )
@@ -242,7 +243,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=upper_end,
         frame_xy=(0.115, 0.255),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["crossbar end-seat parallelism"],
         datums=("C",),
         label="crossbar end-seat parallelism",
     )

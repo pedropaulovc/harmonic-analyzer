@@ -17,6 +17,8 @@ import argparse
 import sys
 from typing import Any
 
+from magnifying_clamp_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -36,7 +38,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from magnifying_clamp_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -44,6 +46,7 @@ from magnifying_clamp_spec import (
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
     ROD_BORE_X,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -88,7 +91,10 @@ FRONT_KEEP = {
     # perpendicularity frame sits right at +0.052, so a centred dim clears.
     "Width": (FRONT_CENTER[0], _front_y(BLOCK_HEIGHT) + 0.014),
     "Height": (FRONT_CENTER[0] - BLOCK_WIDTH * 2.0 / 1000.0 - 0.022, FRONT_CENTER[1]),
-    "LeverBoreYDim": (FRONT_CENTER[0] + BLOCK_WIDTH * 2.0 / 1000.0 + 0.020, _front_y(LEVER_BORE_Y / 2.0)),
+    "LeverBoreYDim": (
+        FRONT_CENTER[0] + BLOCK_WIDTH * 2.0 / 1000.0 + 0.020,
+        _front_y(LEVER_BORE_Y / 2.0),
+    ),
     "LeverBoreDiaDim": (FRONT_CENTER[0] - 0.045, _front_y(LEVER_BORE_Y) + 0.030),
 }
 TOP_KEEP = {
@@ -210,7 +216,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0] + 0.038, _front_y(BLOCK_HEIGHT)),
         frame_xy=(FRONT_CENTER[0] + 0.052, _front_y(BLOCK_HEIGHT) + 0.016),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["block top-face parallelism"],
         datums=("A",),
         label="block top-face parallelism",
     )
@@ -222,7 +228,7 @@ async def build(adapter: Any) -> dict[str, str]:
             _front_y(LEVER_BORE_Y),
         ),
         symbol_xy=(FRONT_CENTER[0] + 0.030, _front_y(LEVER_BORE_Y) + 0.008),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "lever_bore"),
         label="lever bore finish",
     )
 

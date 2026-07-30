@@ -19,6 +19,8 @@ import argparse
 import sys
 from typing import Any
 
+from pen_v_block_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -40,7 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pen_v_block_spec import (
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
@@ -50,6 +52,7 @@ from pen_v_block_spec import (
     SCREW_HOLE_XY,
     SLIT_LENGTH,
     SLIT_Y,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -100,7 +103,10 @@ FRONT_KEEP = {
     "SlitLength": (_sheet_x(SLIT_LENGTH / 2.0), 0.070),
     "SlitY0": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[0] / 2.0)),
     "SlitWidth": (_sheet_x(0.0) - 0.022, _front_y(SLIT_Y[1] + 2.0)),
-    "Chamfer2dx": (_sheet_x(BLOCK_LENGTH - CHAMFER / 2.0), _front_y(BLOCK_HEIGHT) + 0.012),
+    "Chamfer2dx": (
+        _sheet_x(BLOCK_LENGTH - CHAMFER / 2.0),
+        _front_y(BLOCK_HEIGHT) + 0.012,
+    ),
     "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] - 5.0), _front_y(BLOCK_HEIGHT) + 0.026),
     # +0.012 keeps this vertical dimension's line (drawn at the text's x, from the
     # block bottom up to the hole centre) out of datum C's box in the crowded
@@ -206,9 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
         display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
         if display is None:
             raise RuntimeError(f"{station} station has no display dimension to box")
-        set_basic_dimension(
-            adapter, display, label=f"{station} basic bore station"
-        )
+        set_basic_dimension(adapter, display, label=f"{station} basic bore station")
     # Block height (18): dimension the right view's flat top/bottom silhouette
     # edges.  At 4:1 the 16 x 18 section spans +/-0.032 (Z) x +/-0.036 (Y)
     # around the view center.
@@ -271,7 +275,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bore0_edge,
         frame_xy=(0.198, 0.196),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pen bore position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="2X",
@@ -283,7 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + RIGHT_HALF_Y),
         frame_xy=(0.300, 0.165),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["block top-face parallelism"],
         datums=("A",),
         label="block top-face parallelism",
     )
@@ -312,7 +316,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=(_sheet_x(BORE_X[0]), TOP_CENTER[1] + 0.016),  # bore 0, top edge
         symbol_xy=(0.205, 0.244),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_0"),
         label="pen bore finish (bore 0)",
     )
     bore1_edge = (_sheet_x(BORE_X[1]) + 0.016, TOP_CENTER[1])
@@ -321,7 +325,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_xy=bore1_edge,
         symbol_xy=(0.205, 0.220),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_1"),
         label="pen bore finish (bore 1)",
     )
 

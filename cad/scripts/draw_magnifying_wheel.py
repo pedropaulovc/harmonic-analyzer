@@ -18,6 +18,8 @@ import argparse
 import sys
 from typing import Any
 
+from magnifying_wheel_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -37,13 +39,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from magnifying_wheel_spec import (
     BORE_DIA,
     HUB_AXIAL,
     HUB_DIA,
     RIM_AXIAL,
     RIM_OUTER_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -72,7 +75,10 @@ _RIM_R = RIM_OUTER_DIA * SHEET_SCALE[0] / 2000.0
 _HUB_R = HUB_DIA * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    "RimOuterDiaDim": (FRONT_CENTER[0] - _RIM_R - 0.028, FRONT_CENTER[1] + _RIM_R + 0.006),
+    "RimOuterDiaDim": (
+        FRONT_CENTER[0] - _RIM_R - 0.028,
+        FRONT_CENTER[1] + _RIM_R + 0.006,
+    ),
     "HubDiaDim": (FRONT_CENTER[0] + _HUB_R + 0.030, FRONT_CENTER[1] - 0.006),
     "BoreDiaDim": (FRONT_CENTER[0] - _HUB_R - 0.030, FRONT_CENTER[1] + 0.004),
     "SpokeWidthDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + _HUB_R + 0.020),
@@ -194,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0] + _RIM_R * 0.5, FRONT_CENTER[1] + _RIM_R * 0.866),
         frame_xy=(FRONT_CENTER[0] + 0.035, FRONT_CENTER[1] + _RIM_R + 0.012),
         characteristic="circular_runout",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["rim runout to the bore"],
         datums=("A",),
         label="rim runout to the bore",
     )
@@ -204,12 +210,14 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_CENTER[0] + HUB_DIA * SHEET_SCALE[0] / 2000.0, FRONT_CENTER[1]),
         # up-right of the hub, clear of the Ø20 leader (round 1: crossed it)
         symbol_xy=(FRONT_CENTER[0] + _HUB_R + 0.024, FRONT_CENTER[1] + 0.024),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "hub_drum"),
         label="hub drum finish",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Section View Note", RIGHT_CENTER[0] - 0.022, 0.075)
+    add_property_linked_note(
+        adapter, "Section View Note", RIGHT_CENTER[0] - 0.022, 0.075
+    )
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.085)
 
     return await finalize_drawing(

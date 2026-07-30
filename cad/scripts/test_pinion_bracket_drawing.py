@@ -9,6 +9,7 @@ import pinion_bracket_geometry
 import draw_pinion_bracket as drawing
 import build_pinion_bracket as bracket
 from _buildgraph import module_deps_of
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -16,10 +17,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-bracket.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-bracket.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pinion-bracket_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["pinion_bracket"].script
-        == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["pinion_bracket"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -28,11 +26,17 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # spec), and the drawing keeps exactly its union across the per-view keep-maps --
     # a rename in one script that isn't mirrored in the other fails here, offline.
     assert bracket.DRAWING_DIMENSIONS is pinion_bracket_spec.DRAWING_DIMENSIONS
+    assert bracket.SURFACE_FINISHES is pinion_bracket_spec.SURFACE_FINISHES
+    assert drawing.SURFACE_FINISHES is pinion_bracket_spec.SURFACE_FINISHES
     marked = set().union(*pinion_bracket_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    # The blind-depth model dimension follows the seat's cut direction and is
+    # importable in the face view; the section carries its diameter/location.
+    assert "PinSeatDepth" in drawing.FRONT_KEEP
+    assert "PinSeatDepth" not in drawing.RIGHT_KEEP
     # The drawing's view math reads the spec's nominal spans, not a divergent copy.
     assert (drawing.C2C, drawing.OVERALL_LENGTH, drawing.R_END) == (
         pinion_bracket_spec.C2C,
@@ -54,9 +58,7 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(1, 1)" in source  # the isometric override
-    assert (
-        pinion_bracket_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    )
+    assert pinion_bracket_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
@@ -67,12 +69,19 @@ def test_linked_notes_and_callouts_fully_define_functional_limits() -> None:
     assert "CLAMPED FACE-TO-FACE" in notes
     assert "2X OPEN R6.90 SCALLOPS" in notes
     assert "SILVER-BRAZE" in notes
-    assert "6.375 MAX / 6.360 MIN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
-    assert "8.025 MAX / 8.010 MIN" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
-    assert "4.012 MAX / 4.000 MIN" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
+    assert model_toleranced_dimensions(bracket) == {
+        ("StrapProfile", "ArborBoreCz"): "ARBOR_BORE_CZ_TOLERANCE_MM",
+        ("StrapProfile", "PivotBoreDia"): "*deviations(PIVOT_BORE_BAND)",
+        ("StrapProfile", "ArborBoreDia"): "*deviations(ARBOR_BORE_BAND)",
+        ("Strap", "Depth"): "THICKNESS_TOLERANCE_MM",
+        ("PinSeatProfile", "PinSeatCy"): "PIN_SEAT_AXIS_TOLERANCE_MM",
+        ("PinSeatProfile", "PinSeatDia"): "*deviations(PIN_SEAT_DIA_BAND)",
+        ("PinSeatProfile", "PinSeatCz"): "PIN_SEAT_CZ_TOLERANCE_MM",
+        ("PinSeat", "PinSeatDepth"): "*deviations(PIN_SEAT_DEPTH_BAND)",
+    }
     assert "1/4 IN" not in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     assert "5/16" not in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
-    assert drawing.DIMENSION_CALLOUTS["PinSeatCy"].count("\n") == 2
+    assert "+/-" not in "\n".join(drawing.DIMENSION_CALLOUTS.values())
     assert "THRU - REAM" in drawing.DIMENSION_CALLOUTS["ArborBoreDia"]
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
@@ -92,10 +101,10 @@ def test_hole_states_are_annotated() -> None:
     assert "THRU - REAM" in callouts["PivotBoreDia"]
     assert "THRU" in callouts["ArborBoreDia"]
     assert "FLAT BOTTOM" in callouts["PinSeatDia"]
-    assert "4.00 +0.10/-0.00 FULL-DIAMETER DEPTH" in callouts["PinSeatDia"]
+    assert callouts["PinSeatDepth"] == "FULL-DIAMETER DEPTH"
     assert "ENTRY ON THE STRAIGHT EDGE FACE" in callouts["PinSeatDia"]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "{PIN_SEAT:.2f} +0.10/-0.00 FULL-DIAMETER DEPTH" in source
+    assert '"PinSeatDepth"' in source
 
 
 def test_blind_seat_depth_uses_the_marked_drawing_name() -> None:
@@ -120,8 +129,7 @@ def test_datum_scheme_fully_defines_functional_relationships() -> None:
         "        symbol_xy=(pivot_bore_edge[0] + 0.026, pivot_bore_edge[1] - 0.009),\n"
         '        datum="A",\n'
         '        label="pivot bore axis",\n'
-        "        position_tolerance_m=0.013,"
-        in source
+        "        position_tolerance_m=0.013," in source
     )
     assert source.count("position_tolerance_m=0.013") == 1
     assert (
@@ -129,16 +137,20 @@ def test_datum_scheme_fully_defines_functional_relationships() -> None:
         "        symbol_xy=(arbor_bore_edge[0] + 0.020, arbor_bore_edge[1] + 0.017),\n"
         '        datum="B",\n'
         '        label="arbor bore axis",\n'
-        "        position_tolerance_m=0.006,"
-        in source
+        "        position_tolerance_m=0.006," in source
     )
     assert source.count("position_tolerance_m=0.006") == 1
     assert source.count('characteristic="profile_surface"') == 2
     assert 'datums=("A",)' in source
     assert 'datums=("B",)' in source
-    assert "add_surface_finish(" not in source
-    assert drawing.DIMENSION_CALLOUTS["ArborBoreCz"] == "+/-0.10"
-    assert drawing.DIMENSION_CALLOUTS["PinSeatCz"] == "+/-0.05 FROM DATUM C"
+    assert source.count("add_surface_finish(") == 2
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "pivot_bore")' in source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
+        bracket.__file__
+    ).read_text(encoding="utf-8")
+    assert "ArborBoreCz" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS["PinSeatCz"] == "FROM DATUM C"
     assert "CONCENTRIC" not in pinion_bracket_spec.DRAWING_NOTES
     assert "TIR" not in pinion_bracket_spec.DRAWING_NOTES
 

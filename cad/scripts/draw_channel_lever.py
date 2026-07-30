@@ -20,6 +20,8 @@ import argparse
 import sys
 from typing import Any
 
+from channel_lever_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -322,7 +324,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=outer_profile,
         frame_xy=(0.105, 0.210),
         characteristic="profile_surface",
-        tolerance="0.50",
+        tolerance=GEOMETRIC_TOLERANCES_MM["outer perimeter profile"],
         datums=("A", "B", "C"),
         all_around=True,
         label="outer perimeter profile",
@@ -334,7 +336,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=fulcrum_bottom,
         frame_xy=(0.065, 0.200),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["fulcrum bore perpendicularity"],
         datums=("A",),
         diameter=True,
         label="fulcrum bore perpendicularity",
@@ -349,7 +351,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=opposite_broad_face,
         frame_xy=(0.225, 0.205),
         characteristic="parallelism",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["opposite broad face parallelism"],
         datums=("A",),
         label="opposite broad face parallelism",
     )
@@ -362,7 +364,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # the old above-left position crossed the bar-pin callout leader.
         frame_xy=(bar_pin_edge[0] - 0.045, 0.174),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["bar-pin hole position"],
         datums=("A", "B", "C"),
         diameter=True,
         label="bar-pin hole position",
@@ -376,7 +378,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=spring_fcf_edge,
         frame_xy=(spring_fcf_edge[0] + 0.020, 0.174),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["spring-eye hole position"],
         datums=("A", "B", "C"),
         diameter=True,
         label="spring-eye hole position",

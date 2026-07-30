@@ -47,7 +47,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from wheel_axle_spec import (
     COLLAR_DIA,
@@ -59,7 +61,9 @@ from wheel_axle_spec import (
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
     STUD_DIA,
+    STUD_DIA_BAND,
     STUD_LEN,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "wheel-axle"
@@ -118,7 +122,12 @@ async def build(adapter) -> dict[str, str]:
     flange = SketchDims()
     check("create_sketch flange", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, FLANGE_DIA / 2.0, "flange section", dims=flange,
+        adapter,
+        0.0,
+        0.0,
+        FLANGE_DIA / 2.0,
+        "flange section",
+        dims=flange,
         names=(None, None, "FlangeDia"),
         drives=(None, None, '"FlangeDia"'),
     )
@@ -143,7 +152,12 @@ async def build(adapter) -> dict[str, str]:
     stud = SketchDims()
     check("create_sketch stud", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, STUD_DIA / 2.0, "stud section", dims=stud,
+        adapter,
+        0.0,
+        0.0,
+        STUD_DIA / 2.0,
+        "stud section",
+        dims=stud,
         names=(None, None, "StudDia"),
         drives=(None, None, '"StudDia"'),
     )
@@ -156,9 +170,7 @@ async def build(adapter) -> dict[str, str]:
     # dim[0] = blind depth (StudLen); dim[1] = start offset (flange face).
     stud_dims = name_dimensions(adapter, "Stud", ["StudLength", "StudStart"])
     drive_jobs += [(stud_dims[0], '"StudLen"'), (stud_dims[1], '"FlangeLen"')]
-    await volume_check(
-        adapter, "flange+stud", _V_FLANGE + _V_STUD, 0.005 * _V_STUD
-    )
+    await volume_check(adapter, "flange+stud", _V_FLANGE + _V_STUD, 0.005 * _V_STUD)
 
     # Collar: O9 retainer around the stud tip (y 13..17). Its start offset is a
     # NAMED dim driven from the length globals ("FlangeLen" + "StudLen" -
@@ -167,7 +179,12 @@ async def build(adapter) -> dict[str, str]:
     collar = SketchDims()
     check("create_sketch collar", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, COLLAR_DIA / 2.0, "collar section", dims=collar,
+        adapter,
+        0.0,
+        0.0,
+        COLLAR_DIA / 2.0,
+        "collar section",
+        dims=collar,
         names=(None, None, "CollarDia"),
         drives=(None, None, '"CollarDia"'),
     )
@@ -203,11 +220,19 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "StudProfile", "StudDia", *deviations(STUD_DIA_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
+    author_part_pmi(
+        adapter,
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        surface_finishes=SURFACE_FINISHES,
+    )
     apply_drawing_properties(
         adapter,
         PART_NAME,

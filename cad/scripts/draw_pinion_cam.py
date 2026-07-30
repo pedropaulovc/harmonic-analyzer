@@ -17,6 +17,8 @@ import argparse
 import sys
 from typing import Any
 
+from pinion_cam_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -38,11 +40,9 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import fit_limits
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pinion_cam_spec import (
     BORE,
-    BORE_BAND,
     BOSS_DIA,
     BOSS_PROUD,
     BOSS_Z,
@@ -50,6 +50,7 @@ from pinion_cam_spec import (
     CAM_OD,
     ECC,
     TAP_DRILL_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -74,9 +75,7 @@ SHEET_SCALE = (3.0, 1.0)
 
 # Front view (XY): the collar circle is centred ECC BELOW the origin, the bore
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
-FRONT_BBOX_CY = (
-    (CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))
-) / 2.0
+FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
 FRONT_CENTER = (0.105, 0.150)
 TOP_CENTER = (0.100, 0.232)
 ISO_CENTER = (0.230, 0.185)
@@ -96,6 +95,7 @@ CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
     "BoreDia": (0.045, 0.165),
+    "BossProjection": (0.190, 0.120),
     "CollarOd": (0.025, 0.120),
     "CollarCy": (0.170, 0.135),
 }
@@ -105,13 +105,9 @@ TOP_KEEP = {
     "BossCz": (0.155, 0.200),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"FINAL REAM LIMITS\n{fit_limits(BORE, BORE_BAND)} THRU",
-    "CollarOd": "+/-0.05",
-    "CollarCy": "+/-0.05 BOTH END FACES",
-    "Depth": "+/-0.05",
-    "BossDia": (
-        f"+/-0.05\nPROJECTION {BOSS_PROUD:.2f}+/-0.05\nBEYOND DIA {CAM_OD:.2f} OD"
-    ),
+    "BoreDia": "FINAL REAM; THRU",
+    "CollarCy": "BOTH END FACES",
+    "BossProjection": f"BEYOND DIA {CAM_OD:.2f} OD",
     "BossCz": "A TO BOSS / TAP AXIS",
 }
 
@@ -186,9 +182,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
-    bottom = place_view(
-        adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1)
-    )
+    bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", 0.350, 0.185, scale=(2, 1))
     set_hidden_lines_removed(adapter, iso)
     for view in (front, top, bottom):
@@ -210,9 +204,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if boss_station_display is None:
         raise RuntimeError("BossCz has no display dimension to box")
-    set_basic_dimension(
-        adapter, boss_station_display, label="boss/tap axial station"
-    )
+    set_basic_dimension(adapter, boss_station_display, label="boss/tap axial station")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
@@ -222,7 +214,6 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_bottom = (bore_center[0], bore_center[1] - BORE_R_SHEET)
     bore_right = (bore_center[0] + BORE_R_SHEET, bore_center[1])
     front_face_x = TOP_CENTER[0] - CAM_LEN * SHEET_SCALE[0] / 2000.0
-    front_face = (front_face_x, TOP_CENTER[1])
     bottom_boss_center = (
         BOTTOM_CENTER[0],
         BOTTOM_CENTER[1] + (BOSS_Z - CAM_LEN / 2.0) * 2.0 / 1000.0,
@@ -293,7 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bottom_boss_right,
         frame_xy=(0.285, 0.240),
         characteristic="position",
-        tolerance="0.03",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cam boss axis position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="BOSS OD AXIS",
@@ -305,7 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bottom_tap_right,
         frame_xy=(0.315, 0.215),
         characteristic="position",
-        tolerance="0.03",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cam tap pitch axis position"],
         datums=("D",),
         diameter=True,
         quantity="M2.5 TAP PITCH AXIS",
@@ -316,7 +307,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=bore_right,
         symbol_xy=(0.155, 0.175),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="cam bore finish",
     )
 

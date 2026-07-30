@@ -27,7 +27,17 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*cone_tip_adjuster_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.END_KEEP) | set(drawing.CUP_KEEP)
     assert kept == marked
-    assert marked == {"BodyDiaDim", "BodyLenDim", "CupDiaDim", "SlotWDim"}
+    assert marked == {
+        "BodyDiaDim",
+        "BodyLenDim",
+        "CupDiaDim",
+        "CupDepth",
+        "SlotWDim",
+    }
+    # Blind depth is parallel to the screw axis, so its native model dimension
+    # is visible in the elevation and cannot be imported into the axial end view.
+    assert "CupDepth" in drawing.FRONT_KEEP
+    assert "CupDepth" not in drawing.CUP_KEEP
 
 
 def test_thread_callout_is_the_catalog_thread() -> None:
@@ -119,12 +129,10 @@ def test_machining_bands_are_toleranced_on_the_model_not_the_sheet() -> None:
         ("Body", "BodyLenDim"): "GENERAL_TOL_MM",
         ("SlotProfile", "SlotWDim"): "GENERAL_TOL_MM",
         ("CupProfile", "CupDiaDim"): "*deviations(CUP_DIA_BAND)",
+        ("Cup", "CupDepth"): "GENERAL_TOL_MM",
     }
     # What remains on the sheet is annotation, not specification: a thread
-    # designation and a depth with no model dimension to carry it. Both are
-    # derived from the spec, so neither can drift from the part.
-    assert set(drawing.DIMENSION_CALLOUTS) == {"BodyDiaDim", "CupDiaDim"}
+    # designation and the blind-depth machining instruction.
+    assert set(drawing.DIMENSION_CALLOUTS) == {"BodyDiaDim", "CupDepth"}
     assert cone_tip_adjuster_spec.THREAD in drawing.DIMENSION_CALLOUTS["BodyDiaDim"]
-    depth = drawing.DIMENSION_CALLOUTS["CupDiaDim"]
-    assert f"{cone_tip_adjuster_spec.CUP_DEPTH:.2f}" in depth
-    assert f"{cone_tip_adjuster_spec.GENERAL_TOL_MM:.2f}" in depth
+    assert drawing.DIMENSION_CALLOUTS["CupDepth"] == "DEEP"

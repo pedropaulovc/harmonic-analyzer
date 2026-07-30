@@ -44,16 +44,22 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from pivot_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
     GEOMETRIC_CONTROLS,
+    LENGTH_TOLERANCE_MM,
     PART_DATUMS,
     SHAFT_DIA,
+    SHAFT_DIA_BAND,
     SHAFT_LENGTH,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "pivot-shaft"
@@ -78,7 +84,12 @@ async def build(adapter) -> dict[str, str]:
     section = SketchDims()
     check("create_sketch section", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, SHAFT_DIA / 2.0, "shaft section", dims=section,
+        adapter,
+        0.0,
+        0.0,
+        SHAFT_DIA / 2.0,
+        "shaft section",
+        dims=section,
         names=("SectionCx", "SectionCz", "ShaftDia"),
         drives=(None, None, '"ShaftDia"'),
     )
@@ -108,11 +119,20 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "SectionProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Shaft", "Depth", LENGTH_TOLERANCE_MM)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
+    author_part_pmi(
+        adapter,
+        datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS,
+        surface_finishes=SURFACE_FINISHES,
+    )
     apply_drawing_properties(
         adapter,
         PART_NAME,

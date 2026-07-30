@@ -2,6 +2,10 @@ r"""Pure-data dimensional contract shared by the crank pin and drawing."""
 
 from __future__ import annotations
 
+import math
+
+from _gtol_spec import ConeFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 PIN_LENGTH = 45.0
 # CUSTOM 1:48 self-holding taper (0.9375 on diameter over the 45 mm length),
@@ -13,6 +17,17 @@ PIN_LENGTH = 45.0
 # the same 1:48 to suit this pin at assembly.
 SMALL_END_DIA = 5.0
 BIG_END_DIA = SMALL_END_DIA + PIN_LENGTH / 48.0  # 5.9375
+TAPER_HALF_ANGLE_DEGREES = math.degrees(
+    math.atan((BIG_END_DIA - SMALL_END_DIA) / (2.0 * PIN_LENGTH))
+)
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "taper_seat",
+        MACHINED_UM,
+        ConeFace(TAPER_HALF_ANGLE_DEGREES, contains_x_mm=PIN_LENGTH / 2.0),
+    ),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"Length"},

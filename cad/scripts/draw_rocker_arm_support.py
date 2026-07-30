@@ -21,6 +21,8 @@ import argparse
 import sys
 from typing import Any
 
+from rocker_arm_support_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -77,8 +79,8 @@ ISO_CENTER = (0.360, 0.201)
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).
 FRONT_KEEP = {
-    "Depth": (0.075, 0.252),      # 177.8 overall width (extrude span), above
-    "WinWidth": (0.075, 0.235),   # 165.1 window square, inside the opening
+    "Depth": (0.075, 0.252),  # 177.8 overall width (extrude span), above
+    "WinWidth": (0.075, 0.235),  # 165.1 window square, inside the opening
     # Both window dims INSIDE the opening: outside the view a 165.1 vertical
     # reads as an overall height and contradicts the 177.8 wall height.
     #
@@ -89,13 +91,13 @@ FRONT_KEEP = {
     # through it -- leaving a ~19 mm gap between them; their dimension lines stay
     # clear of the two horizontal dims' texts, which are centred on x=0.075.
     "WinHeight": (0.058, 0.200),
-    "CavWidth": (0.075, 0.172),   # 127 cavity square, seen through the window
+    "CavWidth": (0.075, 0.172),  # 127 cavity square, seen through the window
     "CavDepth": (0.092, 0.200),
 }
 RIGHT_KEEP = {
     "WallHeight": (0.182, 0.200),  # 177.8 wall height, right of the taper
-    "FootSpan": (0.155, 0.147),    # 63.5 foot section, below the view
-    "TopSpan": (0.155, 0.252),     # 16.93 top section, above the view
+    "FootSpan": (0.155, 0.147),  # 63.5 foot section, below the view
+    "TopSpan": (0.155, 0.252),  # 16.93 top section, above the view
 }
 
 # Top-left anchor (meters); the table grows down and RIGHT. It is ~145 mm wide,
@@ -254,7 +256,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=datum_a_edge,
         frame_xy=(0.205, 0.175),
         characteristic="flatness",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["support mounting-seat flatness"],
         label="support mounting-seat flatness",
     )
     add_feature_control_frame(
@@ -263,7 +265,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=_bottom_sheet_xy(HOLES[0]),
         frame_xy=(0.120, 0.090),
         characteristic="position",
-        tolerance="0.40",
+        tolerance=GEOMETRIC_TOLERANCES_MM["support hole-pattern position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="4X",

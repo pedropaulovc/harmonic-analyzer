@@ -11,6 +11,8 @@ in lockstep (``test_pinion_cam_drawing.py``).
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_cam_geometry import (
     BORE as BORE,
     BOSS_DIA as BOSS_DIA,
@@ -26,12 +28,20 @@ from pinion_cam_geometry import (
 # on the Ø6.35 lift rod). Asymmetric because BORE is the model's as-cut
 # nominal, not the band midpoint.
 BORE_BAND = (0.005, -0.010)
+COLLAR_OD_TOLERANCE_MM = 0.05
+COLLAR_AXIS_TOLERANCE_MM = 0.05
+COLLAR_DEPTH_TOLERANCE_MM = 0.05
+BOSS_DIA_TOLERANCE_MM = 0.05
+BOSS_PROJECTION_TOLERANCE_MM = 0.05
+
+SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE)),)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},
     "BoreProfile": {"BoreDia"},
     "Collar": {"Depth"},
     "BossProfile": {"BossDia", "BossCz"},
+    "SetPinBossProjection": {"BossProjection"},
 }
 
 DRAWING_NOTES = "\n".join(
@@ -50,3 +60,10 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1\n(SET-SCREW BOSS HIDDEN AT REAR)"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "cam boss axis position": "0.03",
+    "cam tap pitch axis position": "0.03",
+}

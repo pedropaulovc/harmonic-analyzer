@@ -10,6 +10,8 @@ import argparse
 import sys
 from typing import Any
 
+from crank_pinion_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -29,8 +31,8 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge, visible_tooth_tip_silhouette
-from _surface_finish import MACHINED
-from crank_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
+from _surface_finish import surface_finish_by_key
+from crank_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -66,8 +68,8 @@ DIMENSION_CALLOUTS = {
     # arbor journals): min 0.03 diametral clearance, inside the project's
     # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
     # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # callout's own limits do).
-    "BoreDia": "THRU - REAM\n+0.050/+0.030",
+    # model dimension's own limits do).
+    "BoreDia": "THRU - REAM",
 }
 DIMENSION_PRECISION = {"BoreDia": 3}
 
@@ -145,7 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion end-face squareness to bore"],
         datums=("A",),
         quantity="2X AXIAL END FACES",
         label="pinion end-face squareness to bore",
@@ -156,7 +158,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=tooth_tip_silhouette,
         frame_xy=(0.330, 0.220),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion tooth-tip circular runout"],
         datums=("A",),
         quantity="TOOTH TIPS",
         label="pinion tooth-tip circular runout",
@@ -166,7 +168,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] + 0.017, FRONT_CENTER[1] - 0.060),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
         label="crank pinion bore finish",
         entity=bore_edge,
         leader_attach_xy=(
@@ -175,9 +177,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
 
-    add_property_linked_note(
-        adapter, "Gear Data", 0.018, 0.262, char_height=0.0025
-    )
+    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262, char_height=0.0025)
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.018, 0.102, char_height=0.0025
     )

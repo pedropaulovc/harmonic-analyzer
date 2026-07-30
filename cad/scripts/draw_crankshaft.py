@@ -21,6 +21,8 @@ import argparse
 import sys
 from typing import Any
 
+from crankshaft_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -44,7 +46,7 @@ from _drawing_common import (
     add_view_centerline,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from crankshaft_spec import (
     JOURNAL_DIA,
     JOURNAL_LENGTH,
@@ -53,6 +55,7 @@ from crankshaft_spec import (
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
     SHAFT_LENGTH,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -113,10 +116,7 @@ RIGHT_KEEP = {
         _SIDE_BOTTOM + (JOURNAL_START + JOURNAL_LENGTH / 2.0) / 1000.0,
     ),
 }
-DIMENSION_CALLOUTS = {
-    "ShaftDiaDim": "+0.00/-0.02",
-    "JournalDiaDim": "+0.00/-0.02",
-}
+DIMENSION_CALLOUTS = {}
 
 
 def _visible_cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
@@ -376,7 +376,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         frame_xy=(0.185, 0.235),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["end-face perpendicularity"],
         datums=("A",),
         quantity="2X END FACES",
         label="end-face perpendicularity",
@@ -410,7 +410,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         frame_xy=(0.100, 0.055),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["cross-hole true position"],
         datums=("A", "B"),
         diameter=True,
         label="cross-hole true position",
@@ -422,10 +422,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         symbol_xy=(0.205, 0.145),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bearing_journal"),
         label="crankshaft bearing-journal finish",
         edge_entity=journal_silhouette,
-        production_method="BEARING JOURNAL",
+        entity_type="SILHOUETTE",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)
     # Identify the enlarged circular projection without relying on its position.

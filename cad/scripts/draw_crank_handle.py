@@ -20,6 +20,8 @@ import argparse
 import sys
 from typing import Any
 
+from crank_handle_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -40,13 +42,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import fit_limits
 from crank_handle_spec import (
     COLLAR_DIA,
     HANDLE_LENGTH,
     HANDLE_MAX_DIA,
     PEAK_X,
-    PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -98,15 +98,10 @@ RIGHT_KEEP = {
     "PivotBoreDia": (0.360, 0.220),
 }
 # The HandleLength band moved onto the model dimension in build_crank_handle
-# (crank_handle_spec.HANDLE_LENGTH_BAND). PivotBoreDia keeps a callout because
-# it states the FINAL REAMED limits, which differ from the modelled nominal --
-# and it already renders them through _fit_limits.fit_limits rather than typing
-# them, so the released limits track the spec band.
+# (crank_handle_spec.HANDLE_LENGTH_BAND). The pivot-bore tolerance now also
+# renders from its model dimension; the callout retains only process intent.
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": (
-        "NOMINAL REF ONLY\n"
-        f"FINAL LIMITS {fit_limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND, decimals=2)} THRU"
-    ),
+    "PivotBoreDia": "THRU - REAM",
 }
 
 
@@ -218,7 +213,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=collar_face,
         frame_xy=(0.020, 0.155),
         characteristic="perpendicularity",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["flat collar end perpendicularity"],
         datums=("A",),
         quantity="DATUM B FACE",
         label="flat collar end perpendicularity",
@@ -229,7 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bore_top,
         frame_xy=(0.350, 0.263),
         characteristic="total_runout",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["full-length bore total runout"],
         datums=("A",),
         quantity="FULL BORE LENGTH",
         label="full-length bore total runout",
@@ -240,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=profile_peak,
         frame_xy=(0.180, 0.263),
         characteristic="profile_surface",
-        tolerance="0.50",
+        tolerance=GEOMETRIC_TOLERANCES_MM["turned handle profile"],
         datums=("A", "B"),
         quantity="TURNED GRIP PROFILE - SEE NOTE",
         label="turned handle profile",

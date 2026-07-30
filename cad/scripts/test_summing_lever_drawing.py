@@ -79,8 +79,10 @@ def test_native_gdt_and_finish_present() -> None:
     assert "add_surface_finish(" in source
     assert source.count("add_native_hole_callout(") == 2
     assert "knife_edge_datum = _top_xy" in source
+    assert "knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)" in source
     assert 'label="knife-edge pivot axis"' in source
     assert "knife_edge = _top_xy" in source
+    assert "knife_edge = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))" in source
     assert 'label="knife-edge ridge finish"' in source
     assert "anchor_bore_fcf_edge = _top_xy(TIP_X - ANCHOR_BORE_R, 0.0)" in source
     assert 'edge_xy=anchor_bore_fcf_edge' in source
@@ -116,3 +118,23 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"] == "ASTM A48 Class 30 gray cast iron"
     assert spec["finish"] == "green enamel; knife edges + anchor bore machined"
     assert int(spec["quantity"]) == 1
+
+
+def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
+    (control,) = summing_lever_spec.SURFACE_FINISHES
+    assert control.key == "knife_edge_ridge"
+    assert control.roughness_um == 1.6
+    assert control.face.normal == summing_lever_spec.KNIFE_FACE_NORMAL
+    assert control.face.offset_mm == summing_lever_spec.KNIFE_FACE_OFFSET
+    assert (lever.HEX_W, lever.HEX_H) == (
+        summing_lever_spec.HEX_W,
+        summing_lever_spec.HEX_H,
+    )
+    part_source = "".join(Path(lever.__file__).read_text(encoding="utf-8").split())
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert (
+        'control=surface_finish_by_key(SURFACE_FINISHES,"knife_edge_ridge")'
+        in sheet_source
+    )
+    assert "roughness_ra=" not in sheet_source

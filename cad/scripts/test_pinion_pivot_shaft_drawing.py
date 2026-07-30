@@ -7,7 +7,20 @@ from pathlib import Path
 import pinion_pivot_shaft_spec
 import draw_pinion_pivot_shaft as drawing
 import build_pinion_pivot_shaft as shaft
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+
+
+def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    (control,) = pinion_pivot_shaft_spec.SURFACE_FINISHES
+    assert control.key == "bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pinion_pivot_shaft_spec.SHAFT_DIA
+    part_source = Path(shaft.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -49,10 +62,11 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "(1.20) REF AXIAL HEIGHT" in notes
     assert "1.20+/-0.05" not in notes
     assert "194.40 OVERALL" not in notes
-    assert (
-        "<MOD-DIAM>6.350 MAX / <MOD-DIAM>6.330 MIN"
-        in drawing.DIMENSION_CALLOUTS["ShaftDia"]
-    )
+    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "FINAL SIZE"
+    assert model_toleranced_dimensions(shaft) == {
+        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("Shaft", "Depth"): "SHAFT_LENGTH_TOLERANCE_MM",
+    }
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert " BA " not in f" {notes} "

@@ -8,6 +8,8 @@ from pathlib import Path
 import build_cylinder_gear_shaft as part
 import cylinder_gear_shaft_spec
 import draw_cylinder_gear_shaft as drawing
+import _fit_limits
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -34,8 +36,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_linked_notes_define_remaining_arbor_operations() -> None:
     notes = cylinder_gear_shaft_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "+0.00/-0.02"
-    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.25"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert cylinder_gear_shaft_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+    assert cylinder_gear_shaft_spec.LENGTH_TOLERANCE_MM == 0.25
+    assert model_toleranced_dimensions(part) == {
+        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("Shaft", "Depth"): "LENGTH_TOLERANCE_MM",
+    }
     # M6.2 keyway refutation: the 20 gears spin at different speeds and run
     # FREE on the fixed arbor, so the print must forbid the legacy keyseat.
     assert "KEYSEAT" in notes
@@ -80,7 +87,7 @@ def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter" in part_source
+    assert "author_part_pmi(" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source

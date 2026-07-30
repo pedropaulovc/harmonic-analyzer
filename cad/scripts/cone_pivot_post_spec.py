@@ -31,6 +31,8 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # initial derivation.
 CRANK_BOSS_DIA = 21.93
 CRANK_BORE_DIA = 11.438
+TURNED_DIAMETER_TOLERANCE_MM = 0.05
+CRANK_BORE_TOLERANCE_MM = 0.025
 CRANK_BORE_HEIGHT = 72.7
 CRANK_BORE_OFFSET = 0.0
 CRANK_BOSS_START_Z = -HEAD_DIA / 2.0
@@ -108,3 +110,12 @@ DRAWING_NOTES = "\n".join(
         f"C-C {ATTACHMENT_SPACING:.5f}.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "datum-A seat flatness": "0.05",
+    "datum-B outside-diameter form": "0.05",
+    "journal-axis true position": "0.05",
+    "crank-bore true position": "0.10",
+}

@@ -19,6 +19,8 @@ import argparse
 import sys
 from typing import Any
 
+from connecting_rod_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -40,13 +42,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from connecting_rod_spec import (
     CENTER_DISTANCE,
     HEAD_TOP_Y,
     PIN_HOLE_DIA,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -153,12 +156,9 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    # The strap bore is a machined fit over the 30.60 cam: the general ±0.51
-    # block would even allow interference, so the bore dimension carries its
-    # own +0.10/0 callout (the notes explain the running clearance).
-    set_dimension_callouts(
-        adapter, front_annotations, {"StrapBoreDia": "BORE +0.10/0"}
-    )
+    # The strap-bore tolerance imports with the named model dimension.  The
+    # drawing owns only this descriptive text beneath the native value/band.
+    set_dimension_callouts(adapter, front_annotations, {"StrapBoreDia": "BORE"})
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -230,7 +230,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=BORE_FINISH_EDGE,
         symbol_xy=BORE_FINISH_SYMBOL,
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
         label="strap bore finish",
     )
     # The hole callout owns the 9-o'clock rim and routes down-right to its
@@ -244,7 +244,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=pin_fcf_rim,
         frame_xy=(0.222, 0.222),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["rocker pin hole position"],
         datums=("A", "B"),
         diameter=True,
         label="rocker pin hole position",

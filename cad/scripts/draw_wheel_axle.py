@@ -26,7 +26,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from wheel_axle_spec import (
     COLLAR_DIA as COLLAR_DIA,
     COLLAR_LEN,
@@ -36,6 +36,7 @@ from wheel_axle_spec import (
     PART_DATUMS,
     STUD_DIA,
     STUD_LEN,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -103,9 +104,8 @@ END_KEEP = {
         END_CENTER[1] - 0.028,
     ),
 }
-# The magnifying wheel's O5 bore rides the stud: unilateral-minus keeps a
-# 0.02..0.05 running clearance against the nominal-on-nominal bore.
-DIMENSION_CALLOUTS = {"StudDia": "-0.02/-0.05"}
+# The stud's unilateral-minus running-fit band lives on its source-model dimension.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 # Datum B's projected-symbol offset from the end-view centre. Placed off-axis at
 # ~-54 deg so the tag's leader runs radially out of the stud circle clear of the
@@ -309,7 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Text lands at x~0.058..0.084: clear of the stud flank (x=0.0975) and
         # of the O9 collar (x>=0.0915), which starts a further 9 mm up.
         symbol_xy=fpt(0.045, stud_flank_y),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "stud_bearing"),
         label="stud bearing finish",
         entity_type="SILHOUETTE",
     )

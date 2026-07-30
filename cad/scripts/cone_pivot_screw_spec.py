@@ -9,7 +9,9 @@ overall under-head length, and shoulder diameter.
 from __future__ import annotations
 
 from _fastener_catalog import fastener
+from _gtol_spec import CylinderFace
 from _holes import TAP_DRILL_MM, THREAD_MAJOR_MM
+from _surface_finish import GROUND_UM, SurfaceFinishControl
 
 
 _SPEC = fastener("cone-pivot-screw")
@@ -39,6 +41,14 @@ THREAD_MAJOR_DIA = THREAD_MAJOR_MM[THREAD]
 THREAD_TAP_DRILL_DIA = TAP_DRILL_MM[THREAD]
 THREAD_SOLID_DIA = THREAD_TAP_DRILL_DIA
 
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "ground_shoulder",
+        GROUND_UM,
+        CylinderFace(SHOULDER_DIA, contains_y_mm=-SHOULDER_LEN / 2.0),
+    ),
+)
+
 if THREAD_TAIL_LEN < THREAD_MAJOR_DIA:
     raise ValueError(
         "cone pivot thread engagement must be at least one nominal diameter"
@@ -46,7 +56,9 @@ if THREAD_TAIL_LEN < THREAD_MAJOR_DIA:
 if THREAD_MAJOR_DIA >= SHOULDER_DIA:
     raise ValueError("cone pivot thread must leave a positive annular shoulder seat")
 if THREAD_SOLID_DIA >= THREAD_MAJOR_DIA:
-    raise ValueError("cone pivot solid thread envelope must remain below major diameter")
+    raise ValueError(
+        "cone pivot solid thread envelope must remain below major diameter"
+    )
 if (
     THREAD_TAIL_LEN
     - THREAD_LENGTH_TOL
@@ -83,3 +95,13 @@ END_VIEW_NOTE = (
     f"THREAD-END VIEW: INNER CIRCLE = {THREAD} EXTERNAL THREAD\n"
     "MIDDLE CIRCLE = GROUND SHOULDER OD"
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "head bearing face perpendicularity": "0.05",
+    "shoulder end perpendicularity": "0.05",
+    "slot median-plane position": "0.10",
+    "shoulder total runout": "0.05",
+    "head total runout": "0.05",
+}

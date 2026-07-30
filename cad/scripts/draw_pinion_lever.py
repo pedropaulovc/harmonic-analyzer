@@ -17,6 +17,8 @@ import math
 import sys
 from typing import Any
 
+from pinion_lever_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -25,6 +27,7 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
@@ -37,18 +40,16 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import fit_limits
+from _surface_finish import surface_finish_by_key
 from pinion_lever_spec import (
     BORE,
-    BORE_BAND,
     CAP_RADIUS,
     CAP_SAG,
     HUB_LEN,
     HUB_OD,
     ROD_LEN,
     ROD_ROOT_DIA,
-    ROD_TIP_DIA,
-    ROD_Y0,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -77,7 +78,8 @@ FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
 # without crowding the orthographic views.
 FRONT_CENTER = (0.078, 0.170)
 SECTION_CENTER = (0.190, 0.185)
-ISO_CENTER = (0.330, 0.135)
+TOP_CENTER = (0.290, 0.135)
+ISO_CENTER = (0.340, 0.105)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -90,24 +92,26 @@ def _front_y(model_y_mm: float) -> float:
 
 HUB_R_SHEET = HUB_OD * SHEET_SCALE[0] / 2000.0
 BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
-GRIP_HALF_ANGLE_DEG = math.degrees(
-    math.atan((ROD_TIP_DIA - ROD_ROOT_DIA) / (2.0 * (ROD_LEN - ROD_Y0)))
-)
-
 FRONT_KEEP = {
     "HubOd": (0.025, 0.102),
     "HubBore": (0.115, 0.085),
     "RodTipY": (0.044, 0.170),
+    "RodTipDia": (0.125, 0.250),
+    "GripHalfAngle": (0.135, 0.205),
 }
 RIGHT_KEEP = {
     "BoreDepth": (0.245, 0.105),
     "EndWall": (0.235, 0.190),
 }
+TOP_KEEP = {"CapR": (0.290, 0.165)}
 DIMENSION_CALLOUTS = {
-    "HubBore": f"NOMINAL REF\n{fit_limits(BORE, BORE_BAND)}\nRa 1.6",
-    "BoreDepth": "+0.10/-0.00 FULL-DIA DEPTH FROM B; FLAT BOTTOM",
-    "EndWall": "+/-0.05 END WALL TO CROWN ROOT PLANE",
-    "RodTipY": "+/-0.25 FROM HUB AXIS",
+    "HubBore": "FINAL REAM",
+    "BoreDepth": "FULL-DIA DEPTH FROM B; FLAT BOTTOM",
+    "EndWall": "END WALL TO CROWN ROOT PLANE",
+    "RodTipY": "FROM HUB AXIS",
+    "RodTipDia": "AT TIP",
+    "GripHalfAngle": "GRIP HALF-ANGLE TO AXIS",
+    "CapR": "SPHERICAL CROWN",
 }
 
 
@@ -152,6 +156,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_visible(adapter, front)
@@ -165,8 +170,13 @@ async def build(adapter: Any) -> dict[str, str]:
     right_annotations = curate_view_dimensions(
         adapter, side, keep=RIGHT_KEEP, view_label="side"
     )
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
+    )
     set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        DIMENSION_CALLOUTS,
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -192,6 +202,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lever final bore axis",
         position_tolerance_m=0.005,
     )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=bore_left,
+        symbol_xy=(0.155, 0.115),
+        control=surface_finish_by_key(SURFACE_FINISHES, "hub_bore"),
+        label="lever hub bore finish",
+    )
     add_datum_feature(
         adapter,
         side,
@@ -207,7 +225,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=hub_right,
         frame_xy=(0.145, 0.120),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lever hub OD runout"],
         datums=("A",),
         label="lever hub OD runout",
     )
@@ -217,7 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=flat_face,
         frame_xy=(0.145, 0.165),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lever flat-face perpendicularity"],
         datums=("A",),
         label="lever flat-face perpendicularity",
         entity_type="SILHOUETTE",
@@ -233,12 +251,10 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         text=(
             "STRAIGHT CONICAL GRIP\n"
-            f"HALF-ANGLE {GRIP_HALF_ANGLE_DEG:.3f}+/-0.05 DEG\n"
-            "TO GRIP AXIS\n"
-            f"<MOD-DIAM>{ROD_TIP_DIA:.2f}+/-0.05 AT TIP\n"
-            "TIP FACE FLAT WITHIN 0.05\n"
+            "TIP FACE FLAT WITHIN "
+            f"{GEOMETRIC_TOLERANCES_MM['grip tip face flatness']}\n"
             "PERPENDICULAR TO GRIP AXIS\n"
-            "WITHIN 0.10"
+            f"WITHIN {GEOMETRIC_TOLERANCES_MM['grip tip face perpendicularity']}"
         ),
         entity_xy=grip_edge,
         note_xy=(0.105, 0.235),
@@ -246,9 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
     crown_axial = CAP_SAG / 2.0
-    crown_radial = math.sqrt(
-        CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2
-    )
+    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
     crown_face = model_point_in_view(
         adapter,
         side,
@@ -263,8 +277,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         side,
         text=(
-            f"SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10\n"
-            f"{HUB_LEN:.2f} REF B TO CROWN ROOT PLANE\n"
+            f"SPHERICAL CROWN\n{HUB_LEN:.2f} REF B TO CROWN ROOT PLANE\n"
             f"({CAP_SAG:.2f}) REF AXIAL HEIGHT ROOT TO APEX"
         ),
         entity_xy=crown_face,
@@ -278,7 +291,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=crown_face,
         frame_xy=(0.315, 0.205),
         characteristic="circular_runout",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["lever crown profile"],
         datums=("A",),
         quantity="CROWN",
         label="lever crown profile",
@@ -286,7 +299,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.085)
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.065)
 
     return await finalize_drawing(
         adapter,

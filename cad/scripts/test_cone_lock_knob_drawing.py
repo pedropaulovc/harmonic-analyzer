@@ -9,6 +9,7 @@ import cone_lock_knob_spec
 import draw_cone_lock_knob as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
+from _gtol_spec import TorusFace
 
 
 def test_required_drawing_paths() -> None:
@@ -74,6 +75,8 @@ def test_native_gdt_ties_seat_and_flange_to_the_turned_axis() -> None:
     assert source.count('characteristic="perpendicularity"') == 1
     assert source.count('characteristic="circular_runout"') == 1
     assert source.count("add_surface_finish(") == 1
+    assert isinstance(cone_lock_knob_spec.SURFACE_FINISHES[0].face, TorusFace)
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "dome_crown")' in source
     assert (
         'symbol_xy=(0.128, 0.255),\n        datum="A",\n'
         '        label="knob body axis",\n'
@@ -93,6 +96,7 @@ def test_part_stamps_make_critical_properties() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_properties" in source
     assert "clear_dimensions_for_drawing" in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in source
     import _config
 
     config = _config.parts("cone-lock-knob")

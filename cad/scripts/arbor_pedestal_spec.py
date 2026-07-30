@@ -6,6 +6,9 @@ SLDDRW recipes from one source (see build_arbor_pedestal.py for the geometry).
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
@@ -20,6 +23,7 @@ STRAP_T = 10.0  # strap depth; far face is coplanar with the foot far face
 TOP_RADIUS = 10.0  # dome radius = strap half-width at the top
 DOME_DIA = 2.0 * TOP_RADIUS  # 20.0: the round head around the clamp bore
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525: the 3/8 in cylinder-arbor journal
+BORE_DIA_BAND = (0.055, 0.025)  # running bore; (upper, lower) deviations
 BORE_HEIGHT = 39.718  # v2 post journal axis: 6.35 platform + 33.368 boss height
 SCREW_THREAD = "#4"  # flange hold-down clearance hole
 # The #4 NORMAL clearance the wizard ACTUALLY cuts on this seat.
@@ -54,6 +58,14 @@ SCREW_THREAD = "#4"  # flange hold-down clearance hole
 # so the duplicate cannot drift again without a gate going red.
 SCREW_CLEARANCE_DIA = 3.264
 
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "arbor_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
+    ),
+)
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},
     "Foot": {"FootHt"},
@@ -82,3 +94,16 @@ DRAWING_NOTES = "\n".join(
         "HOLE, FOOT SEAT A, LEFT SIDE B, AND PROFILE-CONTROLLED SURFACES.",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "datum-A seat flatness": "0.05",
+    "datum-B side perpendicularity": "0.05",
+    "arbor bore true position": "0.10",
+    "controlled exterior surface profile": "0.10",
+    "datum-D face perpendicularity": "0.05",
+    "flange-hole true position": "0.20",
+    "strap near-face profile": "0.10",
+    "coplanar far-face profile": "0.10",
+}

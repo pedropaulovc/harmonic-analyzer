@@ -21,6 +21,8 @@ import argparse
 import sys
 from typing import Any
 
+from harmonic_base_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -75,7 +77,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 2.0)          # 1:2 whole sheet (457 mm plate)
+SHEET_SCALE = (1.0, 2.0)  # 1:2 whole sheet (457 mm plate)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-mm
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
@@ -97,7 +99,10 @@ TOP_KEEP = {
         + max(abs(BOTTOM_FRONT_Z), abs(BOTTOM_REAR_Z)) * VIEW_SCALE / 1000.0
         + 0.008,
     ),
-    "BottomWid": (TOP_CENTER[0] + BOTTOM_LENGTH * VIEW_SCALE / 2000.0 + 0.017, TOP_CENTER[1]),
+    "BottomWid": (
+        TOP_CENTER[0] + BOTTOM_LENGTH * VIEW_SCALE / 2000.0 + 0.017,
+        TOP_CENTER[1],
+    ),
 }
 
 # Hole-table origin corner (the plate's lower-left plan corner) + the four
@@ -142,19 +147,27 @@ def _visible_hole_table_entities(
     lines: list[tuple[tuple[float, ...], Any]] = []
 
     for component in components:
-        visible_vertices = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 2),  # swViewEntityType_Vertex
-            default=(),
-        ) or ()
+        visible_vertices = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 2),  # swViewEntityType_Vertex
+                default=(),
+            )
+            or ()
+        )
         for vertex in visible_vertices:
             vertex = _early_bound(vertex, "IVertex")
             point = tuple(float(value) for value in vertex.GetPoint())
             vertices.append((point, vertex))
 
-        visible_edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1),  # swViewEntityType_Edge
-            default=(),
-        ) or ()
+        visible_edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(
+                    c, 1
+                ),  # swViewEntityType_Edge
+                default=(),
+            )
+            or ()
+        )
         for edge in visible_edges:
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -209,9 +222,7 @@ def _visible_hole_table_entities(
         )
         candidates = sorted(
             (
-                abs(x - expected[0])
-                + abs(z - expected[1])
-                + abs(radius - expected[2]),
+                abs(x - expected[0]) + abs(z - expected[1]) + abs(radius - expected[2]),
                 index,
                 edge,
             )
@@ -259,10 +270,13 @@ def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     candidates: list[tuple[float, Any]] = []
     for component in components:
-        edges = adapter._attempt(
-            lambda c=component: view.GetVisibleEntities2(c, 1),
-            default=(),
-        ) or ()
+        edges = (
+            adapter._attempt(
+                lambda c=component: view.GetVisibleEntities2(c, 1),
+                default=(),
+            )
+            or ()
+        )
         for edge in edges:
             edge = _early_bound(edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -274,11 +288,7 @@ def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
             candidates.append((parameters[1], edge))
 
     def _at_height(height_m: float, label: str) -> Any:
-        matching = [
-            edge
-            for y, edge in candidates
-            if abs(y - height_m) <= 2e-6
-        ]
+        matching = [edge for y, edge in candidates if abs(y - height_m) <= 2e-6]
         if not matching:
             raise RuntimeError(
                 f"harmonic-base side view has no visible {label} edge at "
@@ -396,7 +406,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.165, 0.125),
         characteristic="position",
-        tolerance="0.20",
+        tolerance=GEOMETRIC_TOLERANCES_MM["through-hole true position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="E1-E4 DIA 13 THRU",
@@ -408,7 +418,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.085, 0.147),
         characteristic="position",
-        tolerance="0.50",
+        tolerance=GEOMETRIC_TOLERANCES_MM["tapped-hole true position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="A1, B1, C1-C3, D1-D4",
@@ -420,7 +430,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.075, 0.105),
         characteristic="perpendicularity",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["datum B perpendicularity to A"],
         datums=("A",),
         quantity="DATUM B LONG SIDE",
         label="datum B perpendicularity to A",
@@ -431,7 +441,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         frame_xy=(0.022, 0.135),
         characteristic="perpendicularity",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["datum C perpendicularity to A and B"],
         datums=("A", "B"),
         quantity="DATUM C LEFT END",
         label="datum C perpendicularity to A and B",
@@ -442,7 +452,7 @@ async def build(adapter: Any) -> dict[str, str]:
         side,
         frame_xy=(0.365, 0.093),
         characteristic="parallelism",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["top-pad parallelism to A"],
         datums=("A",),
         label="top-pad parallelism to A",
         entity=top_pad_edge,

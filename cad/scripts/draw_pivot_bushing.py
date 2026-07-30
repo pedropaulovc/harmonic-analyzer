@@ -25,13 +25,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from pivot_bushing_spec import (
     BORE_DIA,
     GEOMETRIC_CONTROLS,
     LENGTH,
     OUTER_DIA,
     PART_DATUMS,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -72,10 +73,9 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.040),
 }
-DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU - REAM\n+0.03/-0.00",
-    "Depth": "+/-0.03",
-}
+# Bore and length tolerances live on the source model; the linked note carries
+# the drill-under/ream-through manufacturing instruction.
+DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -204,7 +204,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=bore_edge,
         symbol_xy=(0.118, 0.210),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="bushing bore finish",
     )
 

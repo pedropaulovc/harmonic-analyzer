@@ -7,6 +7,8 @@ from pathlib import Path
 import build_pivot_shaft as part
 import draw_pivot_shaft as drawing
 import pivot_shaft_spec
+import _fit_limits
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -30,9 +32,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 def test_linked_notes_define_remaining_bearing_shaft_operations() -> None:
     notes = pivot_shaft_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "+0.00/-0.02"
-    # The length tolerance rides the dimension, not the general note.
-    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.25"
+    assert drawing.DIMENSION_CALLOUTS == {}
+    assert pivot_shaft_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+    assert pivot_shaft_spec.LENGTH_TOLERANCE_MM == 0.25
+    assert model_toleranced_dimensions(part) == {
+        ("SectionProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("Shaft", "Depth"): "LENGTH_TOLERANCE_MM",
+    }
     assert "LENGTH +/-" not in notes
     clearance_min = 6.50 - pivot_shaft_spec.SHAFT_DIA
     clearance_max = clearance_min + 0.02 + 0.03
@@ -64,7 +70,7 @@ def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter" in part_source
+    assert "author_part_pmi(" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source
@@ -92,3 +98,18 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_surface_finish_is_part_owned_authored_and_consumed() -> None:
+    (control,) = pivot_shaft_spec.SURFACE_FINISHES
+    assert control.key == "pivot_bearing"
+    assert control.roughness_um == 1.6
+    assert control.face.diameter_mm == pivot_shaft_spec.SHAFT_DIA
+    part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert (
+        'control=surface_finish_by_key(SURFACE_FINISHES,"pivot_bearing")'
+        in sheet_source
+    )
+    assert "roughness_ra=" not in sheet_source

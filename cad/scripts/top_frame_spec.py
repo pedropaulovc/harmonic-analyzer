@@ -9,6 +9,9 @@ bore diameters) from ``build_top_frame`` for its view math.
 from __future__ import annotations
 
 
+OUTER_PROFILE_TOLERANCE_MM = 0.25
+
+
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The rail outside profile (OuterProfile Width/Depth) is marked;
 # limits and the datum-controlled bore pattern stay together in the notes rather
@@ -57,3 +60,11 @@ INSPECTION_NOTES = "\n".join(
 )
 TOP_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
 FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:4"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "column-bore true position": "0.20",
+    "column-boss true position": "0.20",
+    "gooseneck-bore true position": "0.20",
+}

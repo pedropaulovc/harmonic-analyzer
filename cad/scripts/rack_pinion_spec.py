@@ -7,19 +7,25 @@ pinion. See the batch gear-drawing pattern in ``cylinder_gear_spec``.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
 TEETH = 120
-DIAMETRAL_PITCH = 38.0            # disc OD ~82 at 120T (build_rack_pinion.py)
+DIAMETRAL_PITCH = 38.0  # disc OD ~82 at 120T (build_rack_pinion.py)
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 
-BORE_DIA = 5.0                    # shares the stud's Ø5 front seat
+BORE_DIA = 5.0  # shares the stud's Ø5 front seat
 FACE_WIDTH = 3.0
+BORE_DIA_BAND = (0.05, 0.03)
+
+SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
@@ -53,3 +59,9 @@ DRAWING_NOTES = "\n".join(
         "LOCKED COAXIAL TO THE 12T FEED PINION (MHA-110).",
     )
 )
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "disc face squareness to bore": "0.05",
+}

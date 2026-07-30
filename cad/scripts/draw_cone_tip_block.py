@@ -6,12 +6,13 @@ import argparse
 import sys
 from typing import Any
 
+from cone_tip_block_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
@@ -94,7 +95,6 @@ TOP_KEEP = {
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "BlockHt": "+0.05/-0.00",
     "PassageDiaDim": "THRU - CLEARANCE PASSAGE",
 }
 DIMENSION_PRECISION = {"PassageZ": 2}
@@ -124,8 +124,7 @@ def _circle_entity(
         raise RuntimeError(f"{label} view has no visible circular model edges")
     radius, center_y, edge = min(
         candidates,
-        key=lambda item: abs(item[0] - radius_mm)
-        + abs(item[1] - center_y_mm),
+        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - center_y_mm),
     )
     if abs(radius - radius_mm) > 0.01 or abs(center_y - center_y_mm) > 0.01:
         raise RuntimeError(
@@ -250,7 +249,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # pinch-axis heights measure from).
     # Attach datum A to the RIGHT of the foot-bottom edge so its symbol clears
     # the centred 14.00 Width dimension (which sits at x=FRONT_CENTER[0]).
-    foot_edge = (FRONT_CENTER[0] + 0.005, _front_y(0.0))
     foot_entity = _foot_edge(adapter, front)
     add_datum_feature(
         adapter,
@@ -314,7 +312,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         frame_xy=(0.245, _front_y(ADJUSTER_AXIS_HEIGHT) - 0.058),
         characteristic="position",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["adjuster common-axis true position"],
         datums=("A", "B", "C"),
         diameter=True,
         quantity="2 COAXIAL FEATURES; SIM REQT",
@@ -332,7 +330,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # crosses the datum-D tag leader east of the plan-view depth text.
         frame_xy=(0.170, 0.239),
         characteristic="position",
-        tolerance="0.10",
+        tolerance=GEOMETRIC_TOLERANCES_MM["slot median-plane position"],
         datums=("B",),
         quantity="SLOT MEDIAN PLANE; BASIC 0 TO B",
         label="slot median-plane position",
@@ -374,7 +372,7 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         frame_xy=(0.245, _front_y(PINCH_HEIGHT) - 0.030),
         characteristic="position",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinch common-axis true position"],
         datums=("A", "D", "E"),
         diameter=True,
         quantity="2 COAXIAL FEATURES; SIM REQT",

@@ -8,7 +8,7 @@ import _surface_finish
 import build_pivot_ball_mount as part
 import draw_pivot_ball_mount as drawing
 import pivot_ball_mount_spec
-from _drawing_contract import assert_sheet_references
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -17,8 +17,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.PDF.as_posix().endswith("/pdf/pivot-ball-mount.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pivot-ball-mount_drawing.png")
     assert (
-        DRAWINGS_BY_NAME["pivot_ball_mount"].script
-        == Path(drawing.__file__).resolve()
+        DRAWINGS_BY_NAME["pivot_ball_mount"].script == Path(drawing.__file__).resolve()
     )
 
 
@@ -28,8 +27,12 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert marked == {
+        "BallDia",
         "BallRise",
+        "BaseDia",
+        "BaseHeight",
         "ShaftBoreDia",
+        "StemDia",
     }
 
 
@@ -48,8 +51,18 @@ def test_part_uses_shared_geometry_constants() -> None:
 
 
 def test_callouts_clarify_bore_and_center_height() -> None:
-    assert drawing.DIMENSION_CALLOUTS["ShaftBoreDia"] == "+0.00/-0.05 THRU"
+    assert drawing.DIMENSION_CALLOUTS["ShaftBoreDia"] == "THRU"
     assert "BallRise" not in drawing.DIMENSION_CALLOUTS
+    assert model_toleranced_dimensions(part) == {
+        ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(SHAFT_BORE_DIA_BAND)",
+        ("BallMountProfile", "BaseHeight"): "BASE_HEIGHT_TOLERANCE_MM",
+        ("BallMountProfile", "BallDia"): "BALL_DIAMETER_TOLERANCE_MM",
+        ("BallMountProfile", "BaseDia"): "BASE_DIAMETER_TOLERANCE_MM",
+        ("BallMountProfile", "StemDia"): "STEM_DIAMETER_TOLERANCE_MM",
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "HEIGHT PER NATIVE DIMENSION" not in source
+    assert "+/-0.05" not in source
 
 
 def test_notes_specify_ball_bore_and_shaft_without_title_block_duplicates() -> None:
@@ -87,18 +100,16 @@ def test_datum_and_geometric_controls_are_present() -> None:
         "leader_attach_xy=(STEM_DIM_TEXT[0] - 0.004, STEM_DIM_TEXT[1] - 0.0045)"
         in source
     )
-    assert 'label="stem diameter"' in source
+    assert "StemDia" in drawing.FRONT_KEEP
     assert 'entity_type="SILHOUETTE"' in source
     assert source.count('entity_type="DIMENSION"') == 1
     assert "symbol_xy=(0.150, _front_y(12.0))" in source
     assert "position_tolerance_m=0.020" in source
     assert "set_basic_dimension(" in source
     assert "add_view_centerline(" in source
-    assert_sheet_references(drawing, "MACHINED", _surface_finish.MACHINED)
-    assert_sheet_references(drawing, "GROUND", _surface_finish.GROUND)
     assert "INTERSECT DATUM B WITHIN" not in pivot_ball_mount_spec.DRAWING_NOTES
     assert 'quantity="PAD OD"' in source
-    assert source.count("add_attached_note(") == 2
+    assert "add_attached_note(" not in source
 
 
 def test_view_scales_are_explicit() -> None:
@@ -121,3 +132,26 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "SC1" in str(config["finish"])
     assert "after plate" in str(config["finish"])
     assert int(config["quantity"]) == 4
+
+
+def test_surface_finishes_are_part_owned_authored_and_consumed() -> None:
+    by_key = {control.key: control for control in pivot_ball_mount_spec.SURFACE_FINISHES}
+    assert set(by_key) == {"cross_bore", "turned_exterior_before_plate"}
+    bore = by_key["cross_bore"]
+    assert bore.roughness_um == _surface_finish.MACHINED_UM
+    assert bore.face.diameter_mm == pivot_ball_mount_spec.BORE_DIA
+    assert bore.face.contains_y_mm == pivot_ball_mount_spec.BALL_CENTER_H
+    exterior = by_key["turned_exterior_before_plate"]
+    assert exterior.roughness_um == _surface_finish.GROUND_UM
+    assert exterior.face.diameter_mm == pivot_ball_mount_spec.BALL_DIA
+    assert exterior.face.center_mm == (0.0, pivot_ball_mount_spec.BALL_CENTER_H, 0.0)
+
+    part_source = "".join(Path(part.__file__).read_text(encoding="utf-8").split())
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    sheet_source = "".join(Path(drawing.__file__).read_text(encoding="utf-8").split())
+    assert 'surface_finish_by_key(SURFACE_FINISHES,"cross_bore")' in sheet_source
+    assert (
+        'surface_finish_by_key(SURFACE_FINISHES,"turned_exterior_before_plate")'
+        in sheet_source
+    )
+    assert "roughness_ra=" not in sheet_source

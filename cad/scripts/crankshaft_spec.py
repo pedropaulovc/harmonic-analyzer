@@ -2,10 +2,14 @@ r"""Pure-data dimensional contract shared by the crankshaft and its drawing."""
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.375 * MM_PER_IN  # 9.525: ch11 legacy ShaftDiameter, uncontradicted
+SHAFT_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
 SHAFT_LENGTH = 150.0  # re-anchored v2 post: reaches the rear-shifted 16T seat
 
 # The installed v2 pivot post is turned end-for-end and remains fixed at its
@@ -18,9 +22,21 @@ SHAFT_LENGTH = 150.0  # re-anchored v2 post: reaches the rear-shifted 16T seat
 JOURNAL_BORE_DIA = 11.438
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
+JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
 JOURNAL_START = 32.755105572
 JOURNAL_END = 104.789505572
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "bearing_journal",
+        MACHINED_UM,
+        CylinderFace(
+            JOURNAL_DIA,
+            contains_y_mm=JOURNAL_START + JOURNAL_LENGTH / 2.0,
+        ),
+        production_method="BEARING JOURNAL",
+    ),
+)
 # Tapered-pin cross-hole: a native Hole Wizard #9 number drill radially through
 # the crank seat (axis along Z). The diameter comes from the wizard drill table
 # (_holes.NUMBER_DRILL_MM["#9"]); the value is mirrored here so the drawing's
@@ -54,3 +70,10 @@ DRAWING_NOTES = "\n".join(
 )
 END_VIEW_NOTE = "CRANK-END VIEW SCALE 2:1"
 CRANK_END_NOTE = "CRANK / OUTBOARD END = LOWER END OF LENGTH VIEW"
+
+
+# Manufacturing GD&T limits consumed by the part's drawing projection.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "end-face perpendicularity": "0.05",
+    "cross-hole true position": "0.20",
+}

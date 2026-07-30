@@ -23,6 +23,8 @@ import argparse
 import sys
 from typing import Any
 
+from summing_lever_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -42,7 +44,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED
+from _surface_finish import surface_finish_by_key
 from summing_lever_spec import (
     ANCHOR_BORE_R,
     ANCHOR_R,
@@ -53,6 +55,7 @@ from summing_lever_spec import (
     HOLE_Z_FIRST,
     PLATE_L,
     PLATE_W,
+    SURFACE_FINISHES,
     TIP_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -175,9 +178,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Datum A is the actual knife-edge pivot ridge, not the merged cylinder
-    # silhouette hidden by the ribs in the front view.  Use the -Z ridge for
-    # the datum and the opposite +Z ridge for Ra so their leaders stay distinct.
-    knife_edge_datum = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
+    # silhouette hidden by the ribs in the front view.  A SolidWorks Top view
+    # reverses model Z on the sheet: the positive sheet offset selects the -Z
+    # ridge, while the negative offset selects the part-owned +Z finish face.
+    # Keep datum and finish on opposite ridges so their leaders stay distinct.
+    knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
     add_datum_feature(
         adapter,
         top,
@@ -186,13 +191,13 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="knife-edge pivot axis",
     )
-    knife_edge = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
+    knife_edge = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
     add_surface_finish(
         adapter,
         top,
         edge_xy=knife_edge,
         symbol_xy=(knife_edge[0] + 0.015, knife_edge[1] + 0.015),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
     # Use a separate point on the bore rim so the position-frame leader does
@@ -207,7 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
             anchor_bore_fcf_edge[1] + 0.026,
         ),
         characteristic="position",
-        tolerance="0.30",
+        tolerance=GEOMETRIC_TOLERANCES_MM["summation anchor position"],
         datums=("A",),
         diameter=True,
         label="summation anchor position",
@@ -291,7 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=seed_rim_left,
         frame_xy=(0.222, 0.088),
         characteristic="position",
-        tolerance="0.30",
+        tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
         diameter=True,
         quantity="20X",

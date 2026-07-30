@@ -10,6 +10,8 @@ import argparse
 import sys
 from typing import Any
 
+from transgear_feed_pinion_spec import GEOMETRIC_TOLERANCES_MM
+
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -29,8 +31,13 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
-from _surface_finish import MACHINED
-from transgear_feed_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
+from _surface_finish import surface_finish_by_key
+from transgear_feed_pinion_spec import (
+    BORE_DIA,
+    FACE_WIDTH,
+    OUTSIDE_DIA,
+    SURFACE_FINISHES,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -68,7 +75,7 @@ DIMENSION_CALLOUTS = {
     # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
     # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
     # callout's own limits do).
-    "BoreDia": "THRU - REAM\n+0.05/+0.03",
+    "BoreDia": "THRU - REAM",
 }
 DIMENSION_PRECISION = {"BoreDia": 2}
 
@@ -146,7 +153,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
         frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
         characteristic="perpendicularity",
-        tolerance="0.05",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion face squareness to bore"],
         datums=("A",),
         label="pinion face squareness to bore",
     )
@@ -154,7 +161,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] + 0.016, FRONT_CENTER[1] - 0.058),
-        roughness_ra=MACHINED,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="feed pinion bore finish",
         entity=bore_edge,
     )

@@ -65,16 +65,20 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_spring_spec import (
+    BEND_RADIUS_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FLAT_LEN,
     FOOT_LEN,
+    FOOT_LENGTH_TOLERANCE_MM,
     ISOMETRIC_VIEW_NOTE,
     R_BEND,
     R_KINK,
+    KINK_RADIUS_TOLERANCE_MM,
     THICK,
     WIDTH,
 )
@@ -115,6 +119,7 @@ _SAVED_DRAWING_PROPERTIES = (
     "Isometric View Note",
 )
 
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -150,12 +155,19 @@ async def build(adapter) -> dict[str, str]:
     )
     blade = check(
         "add blade line",
-        await adapter.add_line(BEND_EXIT[0], BEND_EXIT[1], KINK_START[0], KINK_START[1]),
+        await adapter.add_line(
+            BEND_EXIT[0], BEND_EXIT[1], KINK_START[0], KINK_START[1]
+        ),
     )
     kink = check(
         "add kink arc",
         await adapter.add_arc(
-            KINK_C[0], KINK_C[1], KINK_START[0], KINK_START[1], KINK_EXIT[0], KINK_EXIT[1]
+            KINK_C[0],
+            KINK_C[1],
+            KINK_START[0],
+            KINK_START[1],
+            KINK_EXIT[0],
+            KINK_EXIT[1],
         ),
     )
     flat = check(
@@ -168,11 +180,23 @@ async def build(adapter) -> dict[str, str]:
     # line at the merged endpoint. Position: foot free end anchored to the
     # origin, foot length, both radii, blade top anchored (the two literal
     # tilt-dependent dims), and the flat tip's x fixing the kink sweep side.
-    check("foot horizontal", await adapter.add_sketch_constraint(foot, None, "horizontal"))
-    check("bend tangent foot", await adapter.add_sketch_constraint(bend, foot, "tangent"))
-    check("bend tangent blade", await adapter.add_sketch_constraint(bend, blade, "tangent"))
-    check("kink tangent blade", await adapter.add_sketch_constraint(kink, blade, "tangent"))
-    check("kink tangent flat", await adapter.add_sketch_constraint(kink, flat, "tangent"))
+    check(
+        "foot horizontal", await adapter.add_sketch_constraint(foot, None, "horizontal")
+    )
+    check(
+        "bend tangent foot", await adapter.add_sketch_constraint(bend, foot, "tangent")
+    )
+    check(
+        "bend tangent blade",
+        await adapter.add_sketch_constraint(bend, blade, "tangent"),
+    )
+    check(
+        "kink tangent blade",
+        await adapter.add_sketch_constraint(kink, blade, "tangent"),
+    )
+    check(
+        "kink tangent flat", await adapter.add_sketch_constraint(kink, flat, "tangent")
+    )
 
     await anchor_point_to_origin(adapter, f"{foot}.start", *FOOT_END, "foot end")
     spring.record("FootEndX")
@@ -200,7 +224,12 @@ async def build(adapter) -> dict[str, str]:
     )
     spring.record("FlatLen", '"FlatLength"')
     await dimension_between(
-        adapter, f"{flat}.end", "origin", "horizontal_distance", abs(FLAT_TIP[0]), "flat tip"
+        adapter,
+        f"{flat}.end",
+        "origin",
+        "horizontal_distance",
+        abs(FLAT_TIP[0]),
+        "flat tip",
     )
     spring.record("FlatTipX")
 
@@ -234,9 +263,12 @@ async def build(adapter) -> dict[str, str]:
     # thin-wall side ever defeats face resolution it fails LOUD, not silently.)
     screw_dia = blind_cut_dia_mm(HOLE_SPEC)
     wizard_holes(
-        adapter, HOLE_SPEC,
+        adapter,
+        HOLE_SPEC,
         [[FOOT_END[0] + HOLE_FROM_END, FOOT_Y, 0.0]],
-        (0.0, -1.0, 0.0), "foot screw hole (#4 clearance)", name="FootHole",
+        (0.0, -1.0, 0.0),
+        "foot screw hole (#4 clearance)",
+        name="FootHole",
     )
     v_hole = math.pi * (screw_dia / 2.0) ** 2 * THICK
     volume -= v_hole
@@ -254,6 +286,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
+    set_dimension_symmetric_tolerance(
+        adapter, "SpringProfile", "FootLen", FOOT_LENGTH_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "SpringProfile", "BendR", BEND_RADIUS_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "SpringProfile", "KinkR", KINK_RADIUS_TOLERANCE_MM
+    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

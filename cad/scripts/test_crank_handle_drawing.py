@@ -93,10 +93,7 @@ def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     assert "ACTUAL BUTT TRIM FACE" in notes
     assert "GENERAL Ra 3.2" not in notes
     assert "PROFILE 0.50 | A | B APPLIES" in notes
-    assert "NOMINAL REF ONLY" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
-    assert "6.15 MAX / 6.10 MIN THRU" in drawing.DIMENSION_CALLOUTS[
-        "PivotBoreDia"
-    ]
+    assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == "THRU - REAM"
 
 
 def test_feature_requirements_use_datum_based_full_length_controls() -> None:
