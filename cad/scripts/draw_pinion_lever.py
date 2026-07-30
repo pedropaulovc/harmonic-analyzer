@@ -47,8 +47,6 @@ from pinion_lever_spec import (
     HUB_OD,
     ROD_LEN,
     ROD_ROOT_DIA,
-    ROD_TIP_DIA,
-    ROD_Y0,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -78,7 +76,8 @@ FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
 # without crowding the orthographic views.
 FRONT_CENTER = (0.078, 0.170)
 SECTION_CENTER = (0.190, 0.185)
-ISO_CENTER = (0.330, 0.135)
+TOP_CENTER = (0.290, 0.135)
+ISO_CENTER = (0.340, 0.105)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -91,25 +90,25 @@ def _front_y(model_y_mm: float) -> float:
 
 HUB_R_SHEET = HUB_OD * SHEET_SCALE[0] / 2000.0
 BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
-GRIP_HALF_ANGLE_DEG = math.degrees(
-    math.atan((ROD_TIP_DIA - ROD_ROOT_DIA) / (2.0 * (ROD_LEN - ROD_Y0)))
-)
-
 FRONT_KEEP = {
     "HubOd": (0.025, 0.102),
     "HubBore": (0.115, 0.085),
     "RodTipY": (0.044, 0.170),
+    "RodTipDia": (0.125, 0.250),
+    "GripHalfAngle": (0.135, 0.205),
 }
 RIGHT_KEEP = {
     "BoreDepth": (0.245, 0.105),
     "EndWall": (0.235, 0.190),
-    "CapR": (0.300, 0.240),
 }
+TOP_KEEP = {"CapR": (0.290, 0.165)}
 DIMENSION_CALLOUTS = {
     "HubBore": "FINAL REAM",
     "BoreDepth": "FULL-DIA DEPTH FROM B; FLAT BOTTOM",
     "EndWall": "END WALL TO CROWN ROOT PLANE",
     "RodTipY": "FROM HUB AXIS",
+    "RodTipDia": "AT TIP",
+    "GripHalfAngle": "GRIP HALF-ANGLE TO AXIS",
     "CapR": "SPHERICAL CROWN",
 }
 
@@ -155,6 +154,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
     set_hidden_lines_visible(adapter, front)
@@ -168,8 +168,13 @@ async def build(adapter: Any) -> dict[str, str]:
     right_annotations = curate_view_dimensions(
         adapter, side, keep=RIGHT_KEEP, view_label="side"
     )
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
+    )
     set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+        adapter,
+        [*front_annotations, *right_annotations, *top_annotations],
+        DIMENSION_CALLOUTS,
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -199,7 +204,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=bore_left,
-        symbol_xy=(0.115, 0.070),
+        symbol_xy=(0.155, 0.115),
         control=surface_finish_by_key(SURFACE_FINISHES, "hub_bore"),
         label="lever hub bore finish",
     )
@@ -244,9 +249,6 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         text=(
             "STRAIGHT CONICAL GRIP\n"
-            f"HALF-ANGLE {GRIP_HALF_ANGLE_DEG:.3f}+/-0.05 DEG\n"
-            "TO GRIP AXIS\n"
-            f"<MOD-DIAM>{ROD_TIP_DIA:.2f}+/-0.05 AT TIP\n"
             "TIP FACE FLAT WITHIN 0.05\n"
             "PERPENDICULAR TO GRIP AXIS\n"
             "WITHIN 0.10"
@@ -294,7 +296,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.085)
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.065)
 
     return await finalize_drawing(
         adapter,

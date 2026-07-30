@@ -10,6 +10,8 @@ map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
+import math
+
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_lever_geometry import (
@@ -31,13 +33,18 @@ BORE_BAND = (0.0075, -0.0075)
 BORE_DEPTH_BAND = (0.10, 0.00)
 END_WALL_TOLERANCE_MM = 0.05
 ROD_TIP_Y_TOLERANCE_MM = 0.25
+ROD_TIP_DIAMETER_TOLERANCE_MM = 0.05
+GRIP_HALF_ANGLE_TOLERANCE_DEG = 0.05
 CAP_RADIUS_TOLERANCE_MM = 0.10
+GRIP_HALF_ANGLE_DEG = math.degrees(
+    math.atan((ROD_TIP_DIA - ROD_ROOT_DIA) / (2.0 * (ROD_LEN - ROD_Y0)))
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
     "Wall": {"EndWall"},
-    "RodProfile": {"RodTipY"},
+    "RodProfile": {"RodTipY", "RodTipDia", "GripHalfAngle"},
     "CapProfile": {"CapR"},
 }
 

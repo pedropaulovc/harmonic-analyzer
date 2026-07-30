@@ -54,10 +54,13 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_angular_reference_dimension,
+    add_diametric_linear_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
@@ -72,12 +75,15 @@ from pinion_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_WALL_TOLERANCE_MM,
+    GRIP_HALF_ANGLE_DEG,
+    GRIP_HALF_ANGLE_TOLERANCE_DEG,
     HUB_LEN,
     HUB_OD,
     ISOMETRIC_VIEW_NOTE,
     ROD_LEN,
     ROD_ROOT_DIA,
     ROD_TIP_DIA,
+    ROD_TIP_DIAMETER_TOLERANCE_MM,
     ROD_TIP_Y_TOLERANCE_MM,
     ROD_Y0,
     SURFACE_FINISHES,
@@ -291,7 +297,7 @@ async def build(adapter) -> dict[str, str]:
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    check(
+    centerline = check(
         "rod centerline",
         await adapter.add_centerline(0.0, ROD_Y0, 0.0, ROD_LEN),
     )
@@ -335,11 +341,14 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(r_base, None, "linear", ROD_ROOT_R),
     )
     rod.record("RodRootR", '"RodRootDia" / 2')
-    check(
-        "rod tip radius",
-        await adapter.add_sketch_dimension(r_top, None, "linear", ROD_TIP_R),
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        f"{r_top}.start",
+        (8.0, ROD_LEN - 5.0),
+        "rod tip diameter",
     )
-    rod.record("RodTipR", '"RodTipDia" / 2')
+    rod.record("RodTipDia", '"RodTipDia"')
     check(
         "rod length",
         await adapter.add_sketch_dimension(
@@ -347,6 +356,15 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     rod.record("RodTipY", '"RodLen"')
+    await add_angular_reference_dimension(
+        adapter,
+        centerline,
+        flank,
+        (10.0, (ROD_Y0 + ROD_LEN) / 2.0),
+        "grip half-angle",
+        expected_degrees=GRIP_HALF_ANGLE_DEG,
+    )
+    rod.record("GripHalfAngle")
     await ensure_fully_defined(adapter, "rod sketch")
     check("exit_sketch rod", await adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
@@ -380,6 +398,19 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(adapter, "Wall", "EndWall", END_WALL_TOLERANCE_MM)
     set_dimension_symmetric_tolerance(
         adapter, "RodProfile", "RodTipY", ROD_TIP_Y_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "RodProfile",
+        "RodTipDia",
+        ROD_TIP_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter,
+        "RodProfile",
+        "GripHalfAngle",
+        GRIP_HALF_ANGLE_TOLERANCE_DEG,
+        require_driven=True,
     )
     set_dimension_symmetric_tolerance(
         adapter, "CapProfile", "CapR", CAP_RADIUS_TOLERANCE_MM

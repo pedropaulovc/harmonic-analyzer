@@ -24,7 +24,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert lever.SURFACE_FINISHES is pinion_lever_spec.SURFACE_FINISHES
     assert drawing.SURFACE_FINISHES is pinion_lever_spec.SURFACE_FINISHES
     marked = set().union(*pinion_lever_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert (drawing.HUB_OD, drawing.ROD_LEN, drawing.BORE) == (
@@ -98,15 +98,21 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
         ("Barrel", "BoreDepth"): "*deviations(BORE_DEPTH_BAND)",
         ("Wall", "EndWall"): "END_WALL_TOLERANCE_MM",
         ("RodProfile", "RodTipY"): "ROD_TIP_Y_TOLERANCE_MM",
+        ("RodProfile", "RodTipDia"): "ROD_TIP_DIAMETER_TOLERANCE_MM",
         ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
     }
+    part_source = Path(lever.__file__).read_text(encoding="utf-8")
+    assert "await add_diametric_linear_dimension(" in part_source
+    assert "await add_angular_reference_dimension(" in part_source
+    assert "set_dimension_symmetric_angular_tolerance(" in part_source
     assert drawing.DIMENSION_CALLOUTS["HubBore"] == "FINAL REAM"
     assert "+0.10/-0.00" not in drawing.DIMENSION_CALLOUTS["BoreDepth"]
     assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
-    assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall", "CapR"}
+    assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall"}
+    assert set(drawing.TOP_KEEP) == {"CapR"}
     assert "SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10" not in source
-    assert "<MOD-DIAM>{ROD_TIP_DIA:.2f}" in source
-    assert "GRIP_HALF_ANGLE_DEG" in source
+    assert "<MOD-DIAM>{ROD_TIP_DIA:.2f}" not in source
+    assert "GRIP_HALF_ANGLE_DEG" not in source
     assert "{HUB_LEN:.2f} REF" in source
     assert "({CAP_SAG:.2f}) REF AXIAL HEIGHT" in source
     assert "create_section_view(" not in source
