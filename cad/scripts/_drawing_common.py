@@ -22,6 +22,7 @@ import _telemetry
 from _common import _early_bound
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
+from _surface_finish import SurfaceFinishControl
 from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
@@ -736,7 +737,8 @@ def add_surface_finish(
     edge_xy: tuple[float, float] | None = None,
     edge_entity: Any | None = None,
     symbol_xy: tuple[float, float],
-    roughness_ra: str,
+    roughness_ra: str | None = None,
+    control: SurfaceFinishControl | None = None,
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
@@ -750,6 +752,15 @@ def add_surface_finish(
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
     """
+    if control is not None:
+        if roughness_ra is not None or production_method:
+            raise ValueError(
+                f"{label}: pass a part-owned control or drawing-owned values, not both"
+            )
+        roughness_ra = control.roughness_ra
+        production_method = control.production_method
+    if roughness_ra is None:
+        raise ValueError(f"{label}: surface finish requires a part-owned control")
     selected_entity = _select_annotation_entity(
         adapter,
         view,

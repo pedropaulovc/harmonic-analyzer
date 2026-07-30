@@ -86,3 +86,15 @@ class SurfaceFinishControl:
     @property
     def annotation_name(self) -> str:
         return pmi_annotation_name(f"surface:{self.key}")
+
+
+def surface_finish_by_key(
+    controls: tuple[SurfaceFinishControl, ...], key: str
+) -> SurfaceFinishControl:
+    """Resolve one stable surface-finish row by semantic key."""
+    matches = [control for control in controls if control.key == key]
+    if len(matches) != 1:
+        raise ValueError(
+            f"surface-finish key {key!r} resolved {len(matches)} controls"
+        )
+    return matches[0]
