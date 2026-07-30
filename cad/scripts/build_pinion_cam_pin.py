@@ -55,6 +55,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
+from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_cam_pin_spec import (
     CAP_RADIUS_TOLERANCE_MM,
@@ -66,6 +67,7 @@ from pinion_cam_pin_spec import (
     PIN_DIA_BAND,
     PIN_LEN,
     PIN_LENGTH_TOLERANCE_MM,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "pinion-cam-pin"
@@ -214,6 +216,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

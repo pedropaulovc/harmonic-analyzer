@@ -25,6 +25,7 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
     finalize_drawing,
@@ -37,6 +38,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from pinion_lever_spec import (
     BORE,
     CAP_RADIUS,
@@ -47,6 +49,7 @@ from pinion_lever_spec import (
     ROD_ROOT_DIA,
     ROD_TIP_DIA,
     ROD_Y0,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -191,6 +194,14 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="lever final bore axis",
         position_tolerance_m=0.005,
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=bore_left,
+        symbol_xy=(0.115, 0.070),
+        control=surface_finish_by_key(SURFACE_FINISHES, "hub_bore"),
+        label="lever hub bore finish",
     )
     add_datum_feature(
         adapter,

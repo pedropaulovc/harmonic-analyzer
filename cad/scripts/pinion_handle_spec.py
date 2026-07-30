@@ -11,6 +11,8 @@ drawing keeps in lockstep (``test_pinion_handle_drawing.py``).
 from __future__ import annotations
 
 from _fit_limits import REAM_SLIDE
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_handle_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -48,6 +50,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Rod": {"RodSpan"},
     "RodHoleProfile": {"RodHoleDia"},
 }
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        key="final_bore",
+        roughness_um=MACHINED_UM,
+        face=CylinderFace(diameter_mm=TUBE_ID),
+    ),
+)
 
 DRAWING_NOTES = "\n".join(
     (

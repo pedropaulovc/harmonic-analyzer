@@ -26,6 +26,7 @@ from _drawing_common import (
     add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -40,6 +41,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from pinion_handle_spec import (
     CAP_SAG,
     GRIP_DIA,
@@ -47,6 +49,7 @@ from pinion_handle_spec import (
     ROD_DIA,
     ROD_DOWN,
     ROD_UP,
+    SURFACE_FINISHES,
     TUBE_ID,
     TUBE_LEN,
     TUBE_OD,
@@ -305,6 +308,14 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         quantity="BODY CROSS-HOLE AXIS BEFORE PRESSING",
         label="handle transverse-axis position",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=bore_top,
+        symbol_xy=(0.110, 0.090),
+        control=surface_finish_by_key(SURFACE_FINISHES, "final_bore"),
+        label="handle final bore finish",
     )
     if (
         add_note(

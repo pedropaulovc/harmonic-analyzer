@@ -22,6 +22,8 @@ marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 from __future__ import annotations
 
 from _fit_limits import REAM_H7, REAM_SLIDE
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
@@ -63,6 +65,19 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
     "PinSeat": {"PinSeatDepth"},
 }
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        key="pivot_bore",
+        roughness_um=MACHINED_UM,
+        face=CylinderFace(diameter_mm=PIVOT_BORE),
+    ),
+    SurfaceFinishControl(
+        key="arbor_bore",
+        roughness_um=MACHINED_UM,
+        face=CylinderFace(diameter_mm=ARBOR_BORE),
+    ),
+)
 
 # True free-text instructions only. Geometry, datum structure, form/orientation
 # live in native dimensions / datum tags / FCFs / surface symbols. The part

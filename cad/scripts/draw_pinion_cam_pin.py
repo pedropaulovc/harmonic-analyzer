@@ -25,6 +25,7 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
     dimension_name,
@@ -39,11 +40,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
     CAP_SAG,
     PIN_DIA as PIN_DIA,
     PIN_LEN,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -171,6 +174,14 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="cam-pin cylindrical-shank datum axis",
         position_tolerance_m=0.0065,
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),
+        symbol_xy=(0.115, 0.180),
+        control=surface_finish_by_key(SURFACE_FINISHES, "finished_shank"),
+        label="cam-pin finished shank",
     )
     seated_flat_face = model_point_in_view(
         adapter,

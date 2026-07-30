@@ -10,6 +10,8 @@ map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_lever_geometry import (
     BORE as BORE,
     CAP_RADIUS as CAP_RADIUS,
@@ -38,6 +40,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"RodTipY"},
     "CapProfile": {"CapR"},
 }
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        key="hub_bore",
+        roughness_um=MACHINED_UM,
+        face=CylinderFace(diameter_mm=BORE),
+    ),
+)
 
 DRAWING_NOTES = "\n".join(
     (

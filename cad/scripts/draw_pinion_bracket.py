@@ -26,6 +26,7 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -36,12 +37,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from pinion_bracket_spec import (
     ARBOR_BORE,
     C2C as C2C,
     OVERALL_LENGTH,
     PIVOT_BORE,
     R_END,
+    SURFACE_FINISHES,
     THICKNESS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -214,6 +217,22 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="arbor bore axis",
         position_tolerance_m=0.006,
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=pivot_bore_edge,
+        symbol_xy=(0.040, 0.110),
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
+        label="pivot bore finish",
+    )
+    add_surface_finish(
+        adapter,
+        front,
+        edge_xy=arbor_bore_edge,
+        symbol_xy=(0.040, 0.195),
+        control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
+        label="arbor bore finish",
     )
     add_datum_feature(
         adapter,

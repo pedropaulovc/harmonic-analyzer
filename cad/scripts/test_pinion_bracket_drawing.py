@@ -26,6 +26,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # spec), and the drawing keeps exactly its union across the per-view keep-maps --
     # a rename in one script that isn't mirrored in the other fails here, offline.
     assert bracket.DRAWING_DIMENSIONS is pinion_bracket_spec.DRAWING_DIMENSIONS
+    assert bracket.SURFACE_FINISHES is pinion_bracket_spec.SURFACE_FINISHES
+    assert drawing.SURFACE_FINISHES is pinion_bracket_spec.SURFACE_FINISHES
     marked = set().union(*pinion_bracket_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
@@ -137,7 +139,12 @@ def test_datum_scheme_fully_defines_functional_relationships() -> None:
     assert source.count('characteristic="profile_surface"') == 2
     assert 'datums=("A",)' in source
     assert 'datums=("B",)' in source
-    assert "add_surface_finish(" not in source
+    assert source.count("add_surface_finish(") == 2
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "pivot_bore")' in source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
+        bracket.__file__
+    ).read_text(encoding="utf-8")
     assert "ArborBoreCz" not in drawing.DIMENSION_CALLOUTS
     assert drawing.DIMENSION_CALLOUTS["PinSeatCz"] == "FROM DATUM C"
     assert "CONCENTRIC" not in pinion_bracket_spec.DRAWING_NOTES

@@ -10,6 +10,8 @@ marked-dimension map keeps the part marks and drawing keeps in lockstep
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace
+from _surface_finish import GROUND_UM, SurfaceFinishControl
 from pinion_cam_pin_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -31,6 +33,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Pin": {"Depth"},
     "CapProfile": {"CapR"},
 }
+
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        key="finished_shank",
+        roughness_um=GROUND_UM,
+        face=CylinderFace(diameter_mm=PIN_DIA),
+    ),
+)
 
 DRAWING_NOTES = "\n".join(
     (

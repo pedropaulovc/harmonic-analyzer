@@ -21,6 +21,8 @@ def test_required_drawing_paths() -> None:
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert lever.DRAWING_DIMENSIONS is pinion_lever_spec.DRAWING_DIMENSIONS
+    assert lever.SURFACE_FINISHES is pinion_lever_spec.SURFACE_FINISHES
+    assert drawing.SURFACE_FINISHES is pinion_lever_spec.SURFACE_FINISHES
     marked = set().union(*pinion_lever_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
@@ -86,7 +88,11 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
     assert source.count('entity_type="SILHOUETTE"') == 5
     assert source.count('entity_type="FACE"') == 0
     assert 'characteristic="circular_runout"' in source
-    assert "add_surface_finish(" not in source
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "hub_bore")' in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
+        lever.__file__
+    ).read_text(encoding="utf-8")
     assert model_toleranced_dimensions(lever) == {
         ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",
         ("Barrel", "BoreDepth"): "*deviations(BORE_DEPTH_BAND)",

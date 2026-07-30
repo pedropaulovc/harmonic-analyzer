@@ -20,6 +20,8 @@ def test_required_drawing_paths() -> None:
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert handle.DRAWING_DIMENSIONS is pinion_handle_spec.DRAWING_DIMENSIONS
+    assert handle.SURFACE_FINISHES is pinion_handle_spec.SURFACE_FINISHES
+    assert drawing.SURFACE_FINISHES is pinion_handle_spec.SURFACE_FINISHES
     marked = set().union(*pinion_handle_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
@@ -87,7 +89,11 @@ def test_unique_feature_dimensions_and_direct_bore_limits() -> None:
         'label="handle final bore axis",\n        position_tolerance_m=0.0001' in source
     )
     assert source.count("position_tolerance_m=0.0001") == 1
-    assert "add_surface_finish(" not in source
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "final_bore")' in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
+        handle.__file__
+    ).read_text(encoding="utf-8")
     assert {"GripLen", "TubeLen", "RodSpan"} <= set().union(
         *pinion_handle_spec.DRAWING_DIMENSIONS.values()
     )

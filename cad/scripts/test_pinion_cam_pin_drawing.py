@@ -20,6 +20,8 @@ def test_required_drawing_paths() -> None:
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert pin.DRAWING_DIMENSIONS is pinion_cam_pin_spec.DRAWING_DIMENSIONS
+    assert pin.SURFACE_FINISHES is pinion_cam_pin_spec.SURFACE_FINISHES
+    assert drawing.SURFACE_FINISHES is pinion_cam_pin_spec.SURFACE_FINISHES
     marked = set().union(*pinion_cam_pin_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
@@ -62,7 +64,11 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
         "        position_tolerance_m=0.0065," in source
     )
     assert source.count("position_tolerance_m=0.0065") == 1
-    assert "add_surface_finish(" not in source
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "finished_shank")' in source
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
+        pin.__file__
+    ).read_text(encoding="utf-8")
     assert model_toleranced_dimensions(pin) == {
         ("PinProfile", "PinDia"): "*deviations(PIN_DIA_BAND)",
         ("Pin", "Depth"): "PIN_LENGTH_TOLERANCE_MM",
