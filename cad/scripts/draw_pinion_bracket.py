@@ -222,7 +222,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=pivot_bore_edge,
-        symbol_xy=(0.040, 0.110),
+        # Keep the lower-bore finish below the pin-seat-axis callout.  The
+        # former Y=0.110 placement let SolidWorks' symbol text collide with
+        # the imported PinSeatCy dimension text in the rendered print.
+        symbol_xy=(0.040, 0.087),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
