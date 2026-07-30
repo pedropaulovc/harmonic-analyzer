@@ -199,6 +199,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_entity=shank_edge,
+        entity_type="SILHOUETTE",
         symbol_xy=(0.140, 0.120),
         control=surface_finish_by_key(SURFACE_FINISHES, "shank_seating"),
         label="shank seating finish",

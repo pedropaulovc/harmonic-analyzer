@@ -50,6 +50,7 @@ def test_linked_notes_describe_the_form() -> None:
     assert "add_surface_finish(" in source
     assert "_shank_silhouette(adapter, front)" in source
     assert "edge_entity=shank_edge" in source
+    assert 'entity_type="SILHOUETTE"' in source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

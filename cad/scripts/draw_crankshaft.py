@@ -423,6 +423,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing_journal"),
         label="crankshaft bearing-journal finish",
         edge_entity=journal_silhouette,
+        entity_type="SILHOUETTE",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)
     # Identify the enlarged circular projection without relying on its position.
