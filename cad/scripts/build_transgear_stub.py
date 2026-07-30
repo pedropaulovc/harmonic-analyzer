@@ -28,9 +28,7 @@ from __future__ import annotations
 
 import math
 import sys
-from typing import Any
 
-import _telemetry
 from _common import (
     SketchDims,
     add_line_chain,
@@ -50,6 +48,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -74,31 +73,6 @@ from transgear_stub_spec import (
 
 PART_NAME = "transgear-stub"
 MATERIAL = "Plain Carbon Steel"
-
-
-@_telemetry.traced("dim.diametric", label_param="label")
-async def _diametric_dim(
-    adapter: Any, centerline: str, line: str, text_xy: tuple[float, float], label: str
-) -> None:
-    """Driving doubled (diameter) dim between the revolve centerline and one
-    outline line (``swDiametricLinearDimension``). ``text_xy`` in sketch mm."""
-    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
-
-    model = adapter.currentModel
-    model.ClearSelection2(True)
-    _select_sketch_entities(adapter, [centerline, line], 0)
-    ext = _sw_type_info.early_bound_or_flag(
-        model.Extension, "IModelDocExtension", "AddSpecificDimension"
-    )
-    # Early-bound out param: returns (IDisplayDimension, swAddSpecificDimension_e).
-    display, status = ext.AddSpecificDimension(
-        text_xy[0] / 1000.0, text_xy[1] / 1000.0, 0.0, 15, 0
-    )  # 15 = swDimensionType_e.swDiametricLinearDimension
-    model.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError(f"{label}: AddSpecificDimension(diametric) failed ({status})")
-    _telemetry.success(f"diametric dim {label}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -145,7 +119,7 @@ async def build(adapter) -> dict[str, str]:
     # the on-axis closing segment plus closure supply the rest.
     n = len(profile_lines)
     for i, line in enumerate(profile_lines):
-        (x1, y1), (x2, y2) = profile_pts[i], profile_pts[(i + 1) % n]
+        (_, y1), (_, y2) = profile_pts[i], profile_pts[(i + 1) % n]
         direction = "horizontal" if y1 == y2 else "vertical"
         check(
             f"stub {direction} {line}",
@@ -168,7 +142,9 @@ async def build(adapter) -> dict[str, str]:
         (profile_lines[3], "SeatDia", '"SeatDia"', BASE_LEN + SEAT_LEN / 2.0),
         (profile_lines[5], "CollarDia", '"CollarDia"', y_seat + COLLAR_LEN / 2.0),
     ):
-        await _diametric_dim(adapter, axis, line, (-8.0, text_y), name)
+        await add_diametric_linear_dimension(
+            adapter, axis, line, (-8.0, text_y), name
+        )
         profile.record(name, drive)
     await anchor_point_to_origin(
         adapter, f"{profile_lines[0]}.start", 0.0, 0.0, "stub anchor"

@@ -60,7 +60,7 @@ def test_lands_carry_true_diametric_dimensions() -> None:
     centerline (diameter) dims plus the three land lengths -- never the
     radius/step chain a rectilinear-chain recipe would emit."""
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("await _diametric_dim(") == 1  # the one loop chokepoint
+    assert source.count("await add_diametric_linear_dimension(") == 1
     assert "swDiametricLinearDimension" in source
     imports = source.split("PART_NAME =", 1)[0]
     assert "define_rectilinear_chain" not in imports  # not even imported

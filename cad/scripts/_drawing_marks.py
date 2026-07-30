@@ -12,6 +12,7 @@ the single source of every manufacturing dimension.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
 
 import _config
@@ -47,6 +48,29 @@ def _feature_tree(feature: Any) -> Any:
         stack.extend(reversed(children))
 
 
+def _named_dimension(
+    adapter: Any, feature_name: str, dimension_name: str
+) -> tuple[Any, Any]:
+    """Resolve exactly one named display/source dimension on ``feature_name``."""
+    feature = _feature_by_name(adapter, feature_name)
+    matches: list[tuple[Any, Any]] = []
+    display = _read_member(feature, "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if not display:
+            break
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        name = str(_read_member(dimension, "Name"))
+        if _dim_owner_feature(dimension) == feature_name and name == dimension_name:
+            matches.append((display, dimension))
+        display = feature.GetNextDisplayDimension(display)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: expected exactly one dimension, "
+            f"found {len(matches)}"
+        )
+    return matches[0]
+
+
 def set_dimension_symmetric_tolerance(
     adapter: Any,
     feature_name: str,
@@ -56,23 +80,8 @@ def set_dimension_symmetric_tolerance(
     """Tolerance one named source-model dimension and verify the stored values."""
     if tolerance_mm <= 0.0:
         raise ValueError("symmetric dimension tolerance must be positive")
-    feature = _feature_by_name(adapter, feature_name)
-    matches: list[Any] = []
-    display = _read_member(feature, "GetFirstDisplayDimension")
-    for _ in range(1000):
-        if not display:
-            break
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        name = str(_read_member(dimension, "Name"))
-        if _dim_owner_feature(dimension) == feature_name and name == dimension_name:
-            matches.append(dimension)
-        display = feature.GetNextDisplayDimension(display)
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"{dimension_name}@{feature_name}: expected exactly one dimension, "
-            f"found {len(matches)}"
-        )
-    tolerance = _early_bound(matches[0].Tolerance, "IDimensionTolerance")
+    _, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
     tolerance_m = tolerance_mm / 1000.0
     # SOLIDWORKS 2026 rejects SetValues2 for this extrusion-depth dimension in
@@ -110,23 +119,8 @@ def set_dimension_bilateral_tolerance(
         raise ValueError("lower dimension deviation must not exceed upper deviation")
     if lower_deviation_mm == upper_deviation_mm:
         raise ValueError("bilateral dimension tolerance must have a nonzero range")
-    feature = _feature_by_name(adapter, feature_name)
-    matches: list[Any] = []
-    display = _read_member(feature, "GetFirstDisplayDimension")
-    for _ in range(1000):
-        if not display:
-            break
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        name = str(_read_member(dimension, "Name"))
-        if _dim_owner_feature(dimension) == feature_name and name == dimension_name:
-            matches.append(dimension)
-        display = feature.GetNextDisplayDimension(display)
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"{dimension_name}@{feature_name}: expected exactly one dimension, "
-            f"found {len(matches)}"
-        )
-    tolerance = _early_bound(matches[0].Tolerance, "IDimensionTolerance")
+    _, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = 2  # swTolType_e.swTolBILAT
     lower_m = lower_deviation_mm / 1000.0
     upper_m = upper_deviation_mm / 1000.0
@@ -150,6 +144,93 @@ def set_dimension_bilateral_tolerance(
         f"toleranced {dimension_name}@{feature_name}: "
         f"{lower_deviation_mm:+.2f}/{upper_deviation_mm:+.2f} mm"
     )
+
+
+def set_dimension_symmetric_angular_tolerance(
+    adapter: Any,
+    feature_name: str,
+    dimension_name: str,
+    tolerance_degrees: float,
+    *,
+    require_driven: bool = False,
+) -> None:
+    """Tolerance one angular model dimension; SolidWorks stores radians."""
+    if tolerance_degrees <= 0.0:
+        raise ValueError("symmetric angular tolerance must be positive")
+    _, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    if require_driven and int(_read_member(dimension, "DrivenState")) != 1:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: expected a driven reference dimension"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
+    tolerance_rad = math.radians(tolerance_degrees)
+    if not tolerance.SetValues(-tolerance_rad, tolerance_rad):
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: SetValues rejected "
+            f"+/-{tolerance_degrees} deg"
+        )
+    minimum = float(tolerance.GetMinValue())
+    maximum = float(tolerance.GetMaxValue())
+    if abs(minimum + tolerance_rad) > 1e-12 or abs(maximum - tolerance_rad) > 1e-12:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: angular tolerance readback "
+            f"{minimum:g}/{maximum:g} rad != +/-{tolerance_rad:g} rad"
+        )
+    _telemetry.success(
+        f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_degrees:.2f} deg"
+    )
+
+
+def set_dimension_prefix(
+    adapter: Any, feature_name: str, dimension_name: str, prefix: str
+) -> None:
+    """Set and verify a model display dimension's native prefix text."""
+    display, _ = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    if not display.SetText(1, prefix):  # swDimensionTextParts_e.swDimensionTextPrefix
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: failed to set prefix {prefix!r}"
+        )
+    if str(display.GetText(1) or "") != prefix:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: prefix did not persist as {prefix!r}"
+        )
+
+
+@_telemetry.traced("dim.diametric", label_param="label")
+async def add_diametric_linear_dimension(
+    adapter: Any,
+    centerline: str,
+    line: str,
+    text_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Create a doubled centerline-to-outline diameter dimension."""
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [centerline, line], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        text_xy[0] / 1000.0,
+        text_xy[1] / 1000.0,
+        0.0,
+        15,  # swDimensionType_e.swDiametricLinearDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: AddSpecificDimension(diametric) failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    if not bool(_read_member(display, "Diametric")):
+        raise RuntimeError(f"{label}: new dimension is not diametric")
+    _telemetry.success(f"diametric dim {label}")
+    return display
 
 
 def mark_dimensions_for_drawing(
