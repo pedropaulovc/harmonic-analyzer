@@ -32,6 +32,7 @@ COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
 COLLAR_DEPTH_TOLERANCE_MM = 0.05
 BOSS_DIA_TOLERANCE_MM = 0.05
+BOSS_PROJECTION_TOLERANCE_MM = 0.05
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE)),
@@ -42,6 +43,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
     "Collar": {"Depth"},
     "BossProfile": {"BossDia", "BossCz"},
+    "SetPinBossProjection": {"BossProjection"},
 }
 
 DRAWING_NOTES = "\n".join(

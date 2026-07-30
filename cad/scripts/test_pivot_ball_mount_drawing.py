@@ -27,9 +27,12 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert marked == {
+        "BallDia",
         "BallRise",
+        "BaseDia",
         "BaseHeight",
         "ShaftBoreDia",
+        "StemDia",
     }
 
 
@@ -53,10 +56,13 @@ def test_callouts_clarify_bore_and_center_height() -> None:
     assert model_toleranced_dimensions(part) == {
         ("ShaftBoreProfile", "ShaftBoreDia"): "*deviations(SHAFT_BORE_DIA_BAND)",
         ("BallMountProfile", "BaseHeight"): "BASE_HEIGHT_TOLERANCE_MM",
+        ("BallMountProfile", "BallDia"): "BALL_DIAMETER_TOLERANCE_MM",
+        ("BallMountProfile", "BaseDia"): "BASE_DIAMETER_TOLERANCE_MM",
+        ("BallMountProfile", "StemDia"): "STEM_DIAMETER_TOLERANCE_MM",
     }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "HEIGHT PER NATIVE DIMENSION" in source
-    assert "{BASE_DIA:.2f} +/-0.05 PAD" in source
+    assert "HEIGHT PER NATIVE DIMENSION" not in source
+    assert "+/-0.05" not in source
 
 
 def test_notes_specify_ball_bore_and_shaft_without_title_block_duplicates() -> None:
@@ -94,7 +100,7 @@ def test_datum_and_geometric_controls_are_present() -> None:
         "leader_attach_xy=(STEM_DIM_TEXT[0] - 0.004, STEM_DIM_TEXT[1] - 0.0045)"
         in source
     )
-    assert 'label="stem diameter"' in source
+    assert "StemDia" in drawing.FRONT_KEEP
     assert 'entity_type="SILHOUETTE"' in source
     assert source.count('entity_type="DIMENSION"') == 1
     assert "symbol_xy=(0.150, _front_y(12.0))" in source
@@ -103,7 +109,7 @@ def test_datum_and_geometric_controls_are_present() -> None:
     assert "add_view_centerline(" in source
     assert "INTERSECT DATUM B WITHIN" not in pivot_ball_mount_spec.DRAWING_NOTES
     assert 'quantity="PAD OD"' in source
-    assert source.count("add_attached_note(") == 2
+    assert "add_attached_note(" not in source
 
 
 def test_view_scales_are_explicit() -> None:

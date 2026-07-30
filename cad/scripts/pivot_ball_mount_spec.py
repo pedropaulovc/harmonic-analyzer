@@ -22,6 +22,9 @@ BORE_DIA = 6.5  # shaft cross-bore
 SHAFT_DIA = 6.35  # the mating Ø6.35 pivot shaft
 SHAFT_BORE_DIA_BAND = (0.00, -0.05)
 BASE_HEIGHT_TOLERANCE_MM = 0.05
+BALL_DIAMETER_TOLERANCE_MM = 0.05
+BASE_DIAMETER_TOLERANCE_MM = 0.05
+STEM_DIAMETER_TOLERANCE_MM = 0.05
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -37,7 +40,13 @@ SURFACE_FINISHES = (
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BallMountProfile": {"BallRise", "BaseHeight"},
+    "BallMountProfile": {
+        "BallDia",
+        "BallRise",
+        "BaseDia",
+        "BaseHeight",
+        "StemDia",
+    },
     "ShaftBoreProfile": {"ShaftBoreDia"},
 }
 

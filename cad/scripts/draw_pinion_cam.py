@@ -93,6 +93,7 @@ CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
     "BoreDia": (0.045, 0.165),
+    "BossProjection": (0.190, 0.120),
     "CollarOd": (0.025, 0.120),
     "CollarCy": (0.170, 0.135),
 }
@@ -104,7 +105,7 @@ TOP_KEEP = {
 DIMENSION_CALLOUTS = {
     "BoreDia": "FINAL REAM; THRU",
     "CollarCy": "BOTH END FACES",
-    "BossDia": (f"PROJECTION {BOSS_PROUD:.2f}+/-0.05\nBEYOND DIA {CAM_OD:.2f} OD"),
+    "BossProjection": f"BEYOND DIA {CAM_OD:.2f} OD",
     "BossCz": "A TO BOSS / TAP AXIS",
 }
 

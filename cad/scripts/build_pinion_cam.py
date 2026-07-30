@@ -74,6 +74,7 @@ from pinion_cam_geometry import (
 from pinion_cam_spec import (
     BORE_BAND,
     BOSS_DIA_TOLERANCE_MM,
+    BOSS_PROJECTION_TOLERANCE_MM,
     COLLAR_AXIS_TOLERANCE_MM,
     COLLAR_DEPTH_TOLERANCE_MM,
     COLLAR_OD_TOLERANCE_MM,
@@ -159,6 +160,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "Ecc", f"{ECC}mm")
     await set_global(adapter, "BoreDia", f"{BORE}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    await set_global(adapter, "BossProjection", f"{BOSS_PROUD}mm")
     await set_global(adapter, "TapDrillDia", f"{TAP_DRILL_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -236,8 +238,35 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch boss", await adapter.exit_sketch())
     name_last_feature(adapter, "BossProfile")
     drive_jobs += boss.apply(adapter, "BossProfile")
-    extrude_at_offset(adapter, _BOSS_TOP_Y - _BOSS_TIP_Y, _BOSS_TIP_Y)
-    name_last_feature(adapter, "SetPinBoss")
+    boss_root_y = -(ECC + CAM_R)
+    extrude_at_offset(adapter, _BOSS_TOP_Y - boss_root_y, boss_root_y)
+    name_last_feature(adapter, "SetPinBossRoot")
+
+    # A second, coaxial extrusion carries only the projection beyond the OD's
+    # lowest tangent plane. Its depth is therefore the actual make-critical
+    # projection, not prose derived from the full embedded boss length.
+    projection = SketchDims()
+    check("create_sketch boss projection", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter,
+        0.0,
+        -BOSS_Z,
+        BOSS_R,
+        "set-pin boss projection",
+        dims=projection,
+        names=("ProjectionCx", "ProjectionCz", "ProjectionDia"),
+        drives=(None, None, '"BossDia"'),
+    )
+    await ensure_fully_defined(adapter, "boss projection sketch")
+    check("exit_sketch boss projection", await adapter.exit_sketch())
+    name_last_feature(adapter, "BossProjectionProfile")
+    drive_jobs += projection.apply(adapter, "BossProjectionProfile")
+    extrude_at_offset(adapter, BOSS_PROUD, _BOSS_TIP_Y)
+    name_last_feature(adapter, "SetPinBossProjection")
+    projection_dim = name_dimensions(
+        adapter, "SetPinBossProjection", ["BossProjection"]
+    )
+    drive_jobs += [(projection_dim[0], '"BossProjection"')]
     volume = await volume_check(adapter, "set-pin boss", volume + V_BOSS, 0.1 * V_BOSS)
 
     # M2.5 x 0.45 tap drill, cut from the boss tip into the existing rod bore.
@@ -316,6 +345,12 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "BossProfile", "BossDia", BOSS_DIA_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "SetPinBossProjection",
+        "BossProjection",
+        BOSS_PROJECTION_TOLERANCE_MM,
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

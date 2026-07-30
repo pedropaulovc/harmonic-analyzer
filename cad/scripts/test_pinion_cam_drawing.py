@@ -86,6 +86,10 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
         ("CollarProfile", "CollarCy"): "COLLAR_AXIS_TOLERANCE_MM",
         ("Collar", "Depth"): "COLLAR_DEPTH_TOLERANCE_MM",
         ("BossProfile", "BossDia"): "BOSS_DIA_TOLERANCE_MM",
+        (
+            "SetPinBossProjection",
+            "BossProjection",
+        ): "BOSS_PROJECTION_TOLERANCE_MM",
     }
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
@@ -142,8 +146,9 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert "BOSS END VIEW SCALE 2:1" in source
     assert "A TO BOSS / TAP AXIS" in drawing.DIMENSION_CALLOUTS["BossCz"]
     assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "BOTH END FACES"
-    assert "PROJECTION" in drawing.DIMENSION_CALLOUTS["BossDia"]
-    assert "+/-0.05" in drawing.DIMENSION_CALLOUTS["BossDia"]
+    assert "BossProjection" in drawing.FRONT_KEEP
+    assert "+/-0.05" not in Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "BEYOND" in drawing.DIMENSION_CALLOUTS["BossProjection"]
     assert "{CAM_OD:.2f} OD" in source
 
 

@@ -11,9 +11,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
     add_datum_feature,
-    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
@@ -78,41 +76,20 @@ def _front_y(model_y: float) -> float:
 # The elevation carries the shared sphere/bore center height and bore diameter.
 # The turned diameters use explicit leadered feature callouts below rather than
 # displaying radial sketch dimensions as ambiguous pseudo-diameters.
+STEM_DIM_TEXT = (0.180, _front_y(12.0))
 FRONT_KEEP = {
+    "BallDia": (0.170, 0.202),
     "BallRise": (FRONT_CENTER[0] - 0.050, _front_y(BALL_CENTER_H / 2.0)),
+    "BaseDia": (0.168, 0.094),
     "ShaftBoreDia": (FRONT_CENTER[0] + 0.052, _front_y(BALL_CENTER_H)),
     "BaseHeight": (FRONT_CENTER[0] + 0.050, _front_y(BASE_H)),
+    "StemDia": STEM_DIM_TEXT,
 }
 # No second orthographic view carries dimensions; keep the test contract honest.
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "THRU",
 }
-STEM_DIM_TEXT = (0.180, _front_y(12.0))
-
-
-@_telemetry.traced("drawing.stem_dimension_format")
-def _set_stem_dimension_format(adapter: Any, dimension: Any) -> None:
-    """Render the drawing-native stem width as a toleranced diameter."""
-    display = _early_bound(dimension, "IDisplayDimension")
-    prefix = "<MOD-DIAM>"
-    display.SetText(1, prefix)  # swDimensionTextPrefix
-    if str(display.GetText(1) or "") != prefix:
-        raise RuntimeError("stem diameter glyph did not persist")
-    model_dimension = _early_bound(display.GetDimension(), "IDimension")
-    tolerance = _early_bound(model_dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = 2  # swTolType_e.swTolBILAT
-    limit_m = 0.05 / 1000.0
-    if not tolerance.SetValues(-limit_m, limit_m):
-        raise RuntimeError("stem diameter bilateral tolerance was rejected")
-    if (
-        abs(float(tolerance.GetMinValue()) + limit_m) > 1e-9
-        or abs(float(tolerance.GetMaxValue()) - limit_m) > 1e-9
-    ):
-        raise RuntimeError("stem diameter bilateral tolerance did not persist")
-    adapter.currentModel.EditRebuild3()
-
-
 def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any]:
     """Return real seat and cross-bore edges from the front view."""
     circles: list[tuple[float, float, Any]] = []
@@ -250,37 +227,10 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=stem_face,
     )
 
-    # Explicit arrowed feature callouts avoid the old R6.50 / DIA13 duplicate
-    # and identify exactly which turned surface each size controls.
+    # The imported BallDia/BaseDia/StemDia dimensions carry the model-owned
+    # nominals and tolerances. The silhouette remains useful for attaching the
+    # sphere profile and finish controls below.
     ball_outline = _ball_silhouette_xy(30.0)
-    add_attached_note(
-        adapter,
-        front,
-        text=f"S<MOD-DIAM>{BALL_DIA:.2f} +/-0.05 BALL",
-        entity_xy=ball_outline,
-        note_xy=(0.170, 0.202),
-        label="spherical ball size",
-        entity_type="SILHOUETTE",
-    )
-    stem_dimension = add_edge_dimension(
-        adapter,
-        front,
-        p0=(FRONT_CENTER[0] - STEM_DIA / 2.0 * _S, _front_y(12.0)),
-        p1=(FRONT_CENTER[0] + STEM_DIA / 2.0 * _S, _front_y(12.0)),
-        text_xy=STEM_DIM_TEXT,
-        label="stem diameter",
-        entity_type="SILHOUETTE",
-    )
-    _set_stem_dimension_format(adapter, stem_dimension)
-    add_attached_note(
-        adapter,
-        front,
-        text=(f"<MOD-DIAM>{BASE_DIA:.2f} +/-0.05 PAD\nHEIGHT PER NATIVE DIMENSION"),
-        entity_xy=(FRONT_CENTER[0] + BASE_DIA / 2.0 * _S, _front_y(BASE_H / 2.0)),
-        note_xy=(0.168, 0.094),
-        label="seat pad size",
-        entity_type="SILHOUETTE",
-    )
 
     # Datum A is the seat face. Datum B is derived from the cylindrical stem,
     # making the sphere, pad, and cross-bore controls inspectable from one DRF.

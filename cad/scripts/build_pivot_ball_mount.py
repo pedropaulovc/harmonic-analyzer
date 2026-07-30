@@ -47,6 +47,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -58,7 +59,9 @@ from _part_pmi import author_part_pmi
 from pivot_ball_mount_spec import (
     BALL_CENTER_H,
     BALL_DIA,
+    BALL_DIAMETER_TOLERANCE_MM,
     BASE_DIA,
+    BASE_DIAMETER_TOLERANCE_MM,
     BASE_H,
     BASE_HEIGHT_TOLERANCE_MM,
     BORE_DIA,
@@ -66,6 +69,7 @@ from pivot_ball_mount_spec import (
     DRAWING_NOTES,
     SHAFT_BORE_DIA_BAND,
     STEM_DIA,
+    STEM_DIAMETER_TOLERANCE_MM,
     SURFACE_FINISHES,
 )
 
@@ -106,7 +110,7 @@ async def build(adapter) -> dict[str, str]:
     profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    check(
+    centerline = check(
         "add_centerline axis",
         await adapter.add_centerline(0.0, 0.0, 0.0, BALL_TOP_Y),
     )
@@ -160,34 +164,38 @@ async def build(adapter) -> dict[str, str]:
     # Record each display dim into SketchDims in CREATION order. The ball-centre
     # anchor is on the Y axis (x=0, y!=0), so anchor_point_to_origin emits ONE
     # dim (the vertical rise) -- an UNSIGNED distance from the origin, driven by
-    # the positive global. Then the four manual dims follow: ball radius, base
-    # radius, base height, shoulder run. Five display dims total.
+    # the positive global. The three turned sizes are authored as native
+    # diameter dimensions rather than drawing-side text.
     await anchor_point_to_origin(
         adapter, f"{arc}.center", 0.0, BALL_CENTER_H, "ball centre"
     )
     profile.record("BallRise", '"BallCenterH"')
     check(
-        "ball radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", BALL_R),
+        "ball diameter",
+        await adapter.add_sketch_dimension(arc, None, "diameter", BALL_DIA),
     )
-    profile.record("BallRadius", '"BallDia" / 2')
-    check(
-        "base radius",
-        await adapter.add_sketch_dimension(base_bottom, None, "linear", BASE_DIA / 2.0),
+    profile.record("BallDia", '"BallDia"')
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        f"{base_bottom}.end",
+        (BASE_DIA / 2.0 + 4.0, 1.0),
+        "base diameter",
     )
-    profile.record("BaseRadius", '"BaseDia" / 2')
+    profile.record("BaseDia", '"BaseDia"')
     check(
         "base height",
         await adapter.add_sketch_dimension(base_wall, None, "linear", BASE_H),
     )
     profile.record("BaseHeight", '"BaseH"')
-    check(
-        "shoulder run",
-        await adapter.add_sketch_dimension(
-            shoulder, None, "linear", (BASE_DIA - STEM_DIA) / 2.0
-        ),
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        stem_wall,
+        (STEM_DIA / 2.0 + 3.0, BASE_H + 3.0),
+        "stem diameter",
     )
-    profile.record("ShoulderRun", '("BaseDia" - "StemDia") / 2')
+    profile.record("StemDia", '"StemDia"')
     await ensure_fully_defined(adapter, "ball mount profile")
     check("exit_sketch profile", await adapter.exit_sketch())
     name_last_feature(adapter, "BallMountProfile")
@@ -199,8 +207,8 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "BallMount")
     res = await adapter.get_mass_properties()
     _telemetry.info(f"volume after revolve: {res.data.volume:.1f} mm^3")
-    # expected: disc 804.2 + stem 632.5 + sphere cap above the chord 3568.6
-    #           = ~5,005 mm^3
+    # expected: disc 530.9 + stem 808.1 + sphere cap above the chord 1114.4
+    #           = 2453.4 mm^3
 
     # Shaft cross-bore through the ball centre, along Z. On-axis in X (x=0,
     # y=BALL_CENTER_H!=0): define_circle records only the Z centre (an unsigned
@@ -257,6 +265,24 @@ async def build(adapter) -> dict[str, str]:
         "BallMountProfile",
         "BaseHeight",
         BASE_HEIGHT_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "BallMountProfile",
+        "BallDia",
+        BALL_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "BallMountProfile",
+        "BaseDia",
+        BASE_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "BallMountProfile",
+        "StemDia",
+        STEM_DIAMETER_TOLERANCE_MM,
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
