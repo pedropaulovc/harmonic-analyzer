@@ -66,8 +66,8 @@ DIMENSION_CALLOUTS = {
     # arbor journals): min 0.03 diametral clearance, inside the project's
     # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
     # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # callout's own limits do).
-    "BoreDia": "THRU - REAM\n+0.050/+0.030",
+    # model dimension's own limits do).
+    "BoreDia": "THRU - REAM",
 }
 DIMENSION_PRECISION = {"BoreDia": 3}
 

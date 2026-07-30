@@ -82,11 +82,11 @@ FRONT_KEEP = {
     # 1.5 mm thick, so at 3:1 its two extension lines are just 4.5 mm apart
     # (measured 2026-07-16 at x=0.115, clear of the text: y=0.1437 and y=0.1392).
     # `_front_y(WASHER_T / 2.0)` put the text INSIDE that 4.5 mm gap, and the text
-    # is a two-line block ~9.4 mm tall ("1.50" over the "+/-0.10" callout) -- it
+    # is a two-line block ~9.4 mm tall ("1.50" over its native tolerance) -- it
     # cannot fit, so the dimension printed through itself: at x=0.1305 the upper
     # extension line reappears at y=0.1437..0.1439, dead through the middle of
     # "1.50" (glyphs y=0.1417..0.1451), the lower line at y=0.1392 clips the top of
-    # "+/-0.10", and the vertical dim line at x=0.130 crosses both.  SolidWorks has
+    # tolerance text, and the vertical dim line at x=0.130 crosses both. SolidWorks has
     # already flipped the arrows outside the gap (y=0.1472 / 0.1357); only the text
     # was left behind.
     #
@@ -127,7 +127,6 @@ TOP_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "StudDia": f"{STUD_THREAD} UNC-2A",
-    "WasherT": "+/-0.10",
 }
 
 

@@ -45,7 +45,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _holes import (
     NUMBER_DRILL_MM,
     HoleSpec,
@@ -56,12 +58,14 @@ from crankshaft_spec import (
     CRANK_END_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    JOURNAL_DIA_BAND,
     END_VIEW_NOTE,
     JOURNAL_DIA,
     JOURNAL_LENGTH,
     JOURNAL_START,
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
+    SHAFT_DIA_BAND,
     SHAFT_LENGTH,
 )
 
@@ -231,6 +235,15 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "ShaftProfile", "ShaftDiaDim", *deviations(SHAFT_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "JournalProfile",
+        "JournalDiaDim",
+        *deviations(JOURNAL_DIA_BAND),
+    )
     await volume_check(adapter, "driven crankshaft (equations neutral)", v_final, 50.0)
 
     # Named central axis (shaft axis = local +Y through the origin) so the

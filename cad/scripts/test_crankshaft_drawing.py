@@ -89,7 +89,7 @@ def test_cross_hole_matches_the_wizard_drill_and_build_station() -> None:
 
 def test_linked_notes_define_remaining_operations() -> None:
     notes = crankshaft_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS["ShaftDiaDim"] == "+0.00/-0.02"
+    assert drawing.DIMENSION_CALLOUTS == {}
     assert "AISI" not in notes
     assert "ZINC" not in notes
     assert "UOS" not in notes

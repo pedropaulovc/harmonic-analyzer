@@ -39,12 +39,17 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from cone_tip_bushing_spec import (
     BORE_DIA,
+    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     LENGTH,
+    LENGTH_TOLERANCE_MM,
     OUTER_DIA,
 )
 
@@ -103,6 +108,12 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven bushing (equations neutral)", volume,
                        0.05 * v_bore)
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDiaDim", *deviations(BORE_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Body", "Depth", LENGTH_TOLERANCE_MM
+    )
 
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "bore axis")
     await apply_material(adapter, MATERIAL)  # Brass appearance = the gears' gold

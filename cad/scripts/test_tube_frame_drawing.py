@@ -58,8 +58,7 @@ def test_notes_and_native_gdt() -> None:
     assert '"BOTTOM END FACE"' in source
     assert '"TOP END FACE"' in source
     assert source.count('characteristic="perpendicularity"') == 1
-    assert '{"OuterDia": "+0/-0.05"}' in source
-    assert '{"Depth": "+/-0.25"}' in source
+    assert "set_dimension_callouts" not in source
     assert source.count("add_surface_finish(") == 0
 
 

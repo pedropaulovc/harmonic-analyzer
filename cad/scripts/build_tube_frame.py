@@ -68,15 +68,20 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from tube_frame_spec import (
     COLUMN_LENGTH,
+    COLUMN_LENGTH_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
     INNER_DIA,
     LENGTH_VIEW_NOTE,
     OUTER_DIA,
+    OUTER_DIA_BAND,
     WALL_THICKNESS,
 )
 
@@ -145,6 +150,12 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "AnnulusProfile", "OuterDia", *deviations(OUTER_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Column", "Depth", COLUMN_LENGTH_TOLERANCE_MM
+    )
     await volume_check(adapter, "driven annulus column (equations neutral)", v_annulus, 0.001 * v_annulus)
 
     await apply_material(adapter, MATERIAL)

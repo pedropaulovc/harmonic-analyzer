@@ -36,8 +36,8 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_linked_notes_define_remaining_turned_part_operations() -> None:
     notes = cone_tip_bushing_spec.DRAWING_NOTES
     assert "DRILL 1/32 IN (0.794) BORE THRU" in notes
-    assert drawing.DIMENSION_CALLOUTS["Depth"] == "+/-0.03"
-    assert "+0.05/-0.00" in drawing.DIMENSION_CALLOUTS["BoreDiaDim"]
+    assert "Depth" not in drawing.DIMENSION_CALLOUTS
+    assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == "1/32 IN THRU"
     # The bore rides the cone shaft's 1/32 in tip stub line-to-line at nominal;
     # the +0.05/-0.00 drilled callout keeps it a slip fit, never an interference.
     assert cone_tip_bushing_spec.BORE_DIA == 0.03125 * 25.4

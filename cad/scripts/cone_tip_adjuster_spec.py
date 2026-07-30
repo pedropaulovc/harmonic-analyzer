@@ -39,6 +39,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BodyProfile": {"BodyDiaDim"},
     "Body": {"BodyLenDim"},
     "CupProfile": {"CupDiaDim"},
+    "Cup": {"CupDepth"},
     "SlotProfile": {"SlotWDim"},
 }
 

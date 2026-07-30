@@ -6,6 +6,7 @@ from __future__ import annotations
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.375 * MM_PER_IN  # 9.525: ch11 legacy ShaftDiameter, uncontradicted
+SHAFT_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
 SHAFT_LENGTH = 150.0  # re-anchored v2 post: reaches the rear-shifted 16T seat
 
 # The installed v2 pivot post is turned end-for-end and remains fixed at its
@@ -18,6 +19,7 @@ SHAFT_LENGTH = 150.0  # re-anchored v2 post: reaches the rear-shifted 16T seat
 JOURNAL_BORE_DIA = 11.438
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
+JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
 JOURNAL_START = 32.755105572
 JOURNAL_END = 104.789505572
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START

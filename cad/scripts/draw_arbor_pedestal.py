@@ -88,7 +88,7 @@ TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + 0.040, TOP_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": "+0.055/+0.025 THRU",
+    "BoreDia": "THRU",
 }
 # 3/8 in = 9.525 exactly; show 3 places so the view matches the note (else the
 # 2-decimal sheet default prints 9.53 against the DIA 9.525 the note cites).

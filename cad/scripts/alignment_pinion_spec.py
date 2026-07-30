@@ -19,6 +19,7 @@ OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 
 BORE_DIA = 8.0                    # Ø8 arbor through-bore (build_pinion_arbor.py)
+ARBOR_BORE_BAND = (-0.020, -0.040)  # light press; (upper, lower) deviations
 FACE_WIDTH = 143.2                # spans all 20 drum stations
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

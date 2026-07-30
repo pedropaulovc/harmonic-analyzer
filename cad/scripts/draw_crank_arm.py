@@ -117,7 +117,7 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "THRU - REAM 3/8 IN\n+0.05/-0.00",
+    "ShaftBoreDia": "THRU - REAM 3/8 IN",
     "DimpleDia": "0.5 DEEP",
 }
 

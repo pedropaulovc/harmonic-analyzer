@@ -15,9 +15,11 @@ MM_PER_IN = 25.4
 # wall, capped flush with the top-frame ring. OD rederived from the ch30 eight
 # views (Ø23.8 +/-1.0 -> 1 in stock); wall + length as in build_tube_frame. ---
 OUTER_DIA = 1.0 * MM_PER_IN       # 25.4
+OUTER_DIA_BAND = (0.00, -0.05)  # (upper, lower) deviations
 WALL_THICKNESS = 0.12 * MM_PER_IN  # 3.048
 INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS  # 19.304
 COLUMN_LENGTH = 989.9  # top flush with the top-frame ring top face
+COLUMN_LENGTH_TOLERANCE_MM = 0.25
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_tube_frame`` marks exactly these; ``draw_tube_frame`` keeps

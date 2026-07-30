@@ -80,6 +80,7 @@ from crank_handle_spec import (  # noqa: E402
     ISOMETRIC_VIEW_NOTE,
     NECK_R,
     PEAK_X,
+    PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
     REAR_PROFILE_R,
 )
@@ -338,6 +339,12 @@ async def build(adapter) -> dict[str, str]:
     # "+0.00/-0.25 OVERALL" as frozen callout text beside a live numeral.
     set_dimension_bilateral_tolerance(
         adapter, "HandleProfile", "HandleLength", *deviations(HANDLE_LENGTH_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "PivotBoreProfile",
+        "PivotBoreDia",
+        *deviations(PIVOT_BORE_BAND),
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -54,6 +54,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from cone_lock_knob_spec import (
     BODY_DIA,  # knob body -- ONE straight wall (t00411: no mid step)
@@ -67,6 +68,7 @@ from cone_lock_knob_spec import (
     # top (thread engagement into the absent base unmodeled, see docstring)
     WASHER_DIA,  # clamp washer flange, seats on the plate top
     WASHER_T,
+    WASHER_THICKNESS_TOLERANCE_MM,
 )
 
 PART_NAME = "cone-lock-knob"
@@ -184,6 +186,9 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(
         adapter, "driven knob (equations neutral)", v_expect, 0.005 * v_expect
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Washer", "WasherT", WASHER_THICKNESS_TOLERANCE_MM
     )
 
     # Vertical clamp axis for the assembly (locates by datums today; the axis

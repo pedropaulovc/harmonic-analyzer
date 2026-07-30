@@ -85,7 +85,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "add_feature_control_frame" not in source
     assert "datum=" not in source
     assert "characteristic=" not in source
-    assert '{"PlateLenDim": "+/-0.25"}' in source
+    assert "set_dimension_callouts" not in source
 
 
 def test_v2_post_foot_and_mount_pattern_cascade() -> None:

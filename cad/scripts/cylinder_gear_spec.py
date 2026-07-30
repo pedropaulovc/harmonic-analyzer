@@ -25,6 +25,7 @@ WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN       # 1.10
 
 # --- machinable blank (build_cylinder_gear.py) ------------------------------
 BORE_DIA = 0.375 * MM_PER_IN   # 9.525 (3/8")
+BORE_DIA_BAND = (0.05, 0.03)  # (upper, lower) deviations
 FACE_WIDTH = 3.0
 CAM_DIA = 30.6                 # integral eccentric cam disc
 CAM_THICKNESS = 3.5

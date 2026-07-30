@@ -51,12 +51,15 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_DEPTH,
     ADJUSTER_THREAD,
     BLOCK_HEIGHT,
+    BLOCK_HEIGHT_BAND,
     BLOCK_X,
     BLOCK_Z,
     DRAWING_DIMENSIONS,
@@ -350,6 +353,9 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
+    set_dimension_bilateral_tolerance(
+        adapter, "Block", "BlockHt", *deviations(BLOCK_HEIGHT_BAND)
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)

@@ -96,10 +96,7 @@ TOP_KEEP = {
     "HeadDia": (TOP_CENTER[0] + 0.045, TOP_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
-    "MainBodyDia": "+/-0.05",
-    "HeadDia": "+/-0.05",
-    "CrankBossDia": "+/-0.05",
-    "CrankBoreDia": "+/-0.025 THRU",
+    "CrankBoreDia": "THRU",
 }
 DIMENSION_PRECISION = {
     "MainBodyDia": 3,

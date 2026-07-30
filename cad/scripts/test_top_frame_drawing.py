@@ -86,7 +86,7 @@ def test_notes_carry_the_pitch_rail_and_boss() -> None:
     assert 'allow_coincident=True' in source
     assert "FRONT_COLUMN_Z" in source
     assert 'quantity="GOOSENECK BORE"' in source
-    assert '{"Width": "+/-0.25", "Depth": "+/-0.25"}' in source
+    assert "set_dimension_callouts" not in source
 
 
 def test_asymmetric_rear_column_and_ring_envelope_are_single_sourced() -> None:

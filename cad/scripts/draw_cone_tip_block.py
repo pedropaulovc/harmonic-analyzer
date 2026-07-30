@@ -94,7 +94,6 @@ TOP_KEEP = {
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "BlockHt": "+0.05/-0.00",
     "PassageDiaDim": "THRU - CLEARANCE PASSAGE",
 }
 DIMENSION_PRECISION = {"PassageZ": 2}

@@ -63,12 +63,14 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FRONT_VIEW_NOTE,
     INSPECTION_NOTES,
+    OUTER_PROFILE_TOLERANCE_MM,
     TOP_VIEW_NOTE,
 )
 from cone_pivot_post_installation import (
@@ -387,6 +389,18 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "OuterProfile",
+        "Width",
+        OUTER_PROFILE_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "OuterProfile",
+        "Depth",
+        OUTER_PROFILE_TOLERANCE_MM,
+    )
     await volume_check(adapter, "driven ring (equations neutral)", v_final, 0.005 * v_boss_extra + 50.0)
 
     await apply_material(adapter, MATERIAL)

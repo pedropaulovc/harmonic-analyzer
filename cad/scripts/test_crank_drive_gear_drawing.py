@@ -26,7 +26,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FRONT_KEEP) == marked == {"BoreDia"}
     assert drawing.DIMENSION_PRECISION["BoreDia"] == 3
-    assert "+0.050/+0.030" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "THRU - REAM"
 
 
 def test_bore_volume_formula_dependency_is_available() -> None:

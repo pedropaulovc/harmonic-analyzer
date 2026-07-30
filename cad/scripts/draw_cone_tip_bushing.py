@@ -69,8 +69,7 @@ SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0] + 0.036, SIDE_CENTER[1]),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDiaDim": "1/32 IN THRU\n+0.05/-0.00",
-    "Depth": "+/-0.03",
+    "BoreDiaDim": "1/32 IN THRU",
 }
 # The bore is an exact inch conversion (1/32 in = 0.794); the sheet default of
 # 2 decimals (0.79) would contradict the note, so this one dim displays 3.

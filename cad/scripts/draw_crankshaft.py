@@ -113,10 +113,7 @@ RIGHT_KEEP = {
         _SIDE_BOTTOM + (JOURNAL_START + JOURNAL_LENGTH / 2.0) / 1000.0,
     ),
 }
-DIMENSION_CALLOUTS = {
-    "ShaftDiaDim": "+0.00/-0.02",
-    "JournalDiaDim": "+0.00/-0.02",
-}
+DIMENSION_CALLOUTS = {}
 
 
 def _visible_cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:

@@ -15,6 +15,7 @@ _STUD = fastener("cone-lock-knob")
 
 WASHER_DIA = 18.0  # clamp washer flange, seats on the plate top
 WASHER_T = 1.5
+WASHER_THICKNESS_TOLERANCE_MM = 0.10
 BODY_DIA = 13.0  # knob body -- ONE straight wall (t00411: no mid step)
 BODY_TOP = 13.5  # body top above the washer seat; height ~ diameter
 DOME_R = 5.0  # top-edge fillet radius: the domed crown

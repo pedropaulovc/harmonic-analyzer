@@ -73,7 +73,7 @@ DIMENSION_CALLOUTS = {
     # The 9.525 +0.03/+0.05 reamed bore against the arbor's
     # 9.525 +0.00/-0.02 journal guarantees 0.03..0.07 diametral clearance,
     # inside the project's 0.025..0.075 shaft-in-bushing policy.
-    "BoreDia": "THRU - REAM\n+0.05/+0.03",
+    "BoreDia": "THRU - REAM",
 }
 DIMENSION_PRECISION = {"BoreDia": 3}
 

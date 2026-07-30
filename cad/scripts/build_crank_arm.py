@@ -53,7 +53,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from crank_arm_spec import (
     ARM_C2C,
     ARM_END_X,
@@ -67,6 +69,7 @@ from crank_arm_spec import (
     HALF_WIDTH,
     ISOMETRIC_VIEW_NOTE,
     SHAFT_BORE_DIA,
+    SHAFT_BORE_BAND,
     SQUARE_END_OVERHANG,
 )
 
@@ -277,6 +280,12 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ShaftBoreProfile",
+        "ShaftBoreDia",
+        *deviations(SHAFT_BORE_BAND),
+    )
     await volume_check(adapter, "driven crank arm (equations neutral)", vol, 0.001 * vol)
 
     # HandleSeat datum: the plate face OPPOSITE the origin plane (z =

@@ -187,6 +187,8 @@ async def build(adapter) -> dict[str, str]:
     check("cut cup", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=CUP_DEPTH)))
     name_last_feature(adapter, "Cup")
+    cup_depth_dim = name_dimensions(adapter, "Cup", ["CupDepth"])
+    drive_jobs += [(cup_depth_dim[0], '"CupDepth"')]
     v_cup = math.pi * (CUP_DIA / 2.0) ** 2 * CUP_DEPTH
     volume = await volume_check(adapter, "cup", volume - v_cup, 0.02 * v_cup)
 
@@ -265,6 +267,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "CupProfile", "CupDiaDim", *deviations(CUP_DIA_BAND)
     )
+    set_dimension_symmetric_tolerance(adapter, "Cup", "CupDepth", GENERAL_TOL_MM)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

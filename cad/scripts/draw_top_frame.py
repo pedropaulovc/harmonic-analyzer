@@ -28,7 +28,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
-    set_dimension_callouts,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -235,11 +234,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
-    )
-    set_dimension_callouts(
-        adapter,
-        top_annotations,
-        {"Width": "+/-0.25", "Depth": "+/-0.25"},
     )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the ring bores")

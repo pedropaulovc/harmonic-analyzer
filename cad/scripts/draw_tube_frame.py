@@ -33,7 +33,6 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -136,8 +135,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, length, keep=LENGTH_KEEP, view_label="length"
     )
     set_dimension_precision(adapter, end_annotations, {"OuterDia": 2})
-    set_dimension_callouts(adapter, end_annotations, {"OuterDia": "+0/-0.05"})
-    set_dimension_callouts(adapter, length_annotations, {"Depth": "+/-0.25"})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 

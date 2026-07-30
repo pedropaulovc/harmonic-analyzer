@@ -52,9 +52,16 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _gear import build_fixed_gear
-from alignment_pinion_spec import DRAWING_DIMENSIONS, DRAWING_NOTES, GEAR_DATA
+from alignment_pinion_spec import (
+    ARBOR_BORE_BAND,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    GEAR_DATA,
+)
 from build_cone_gear import DP  # DP = train diametral_pitch (machine.yaml)
 
 PART_NAME = "alignment-pinion"
@@ -127,6 +134,12 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(
         adapter, "driven alignment pinion (equations neutral)", expected, 0.02 * v_bore
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ArborBoreProfile",
+        "ArborBoreDia",
+        *deviations(ARBOR_BORE_BAND),
     )
 
     await apply_material(adapter, MATERIAL)

@@ -10,7 +10,9 @@ from __future__ import annotations
 
 OUTER_DIA = 6.0
 BORE_DIA = 0.03125 * 25.4  # 0.79375: the cone shaft's 1/32 in tip stub
+BORE_DIA_BAND = (0.05, 0.00)  # (upper, lower) deviations
 LENGTH = 4.0
+LENGTH_TOLERANCE_MM = 0.03
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BodyProfile": {"ODDim"},

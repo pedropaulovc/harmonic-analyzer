@@ -9,6 +9,9 @@ bore diameters) from ``build_top_frame`` for its view math.
 from __future__ import annotations
 
 
+OUTER_PROFILE_TOLERANCE_MM = 0.25
+
+
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The rail outside profile (OuterProfile Width/Depth) is marked;
 # limits and the datum-controlled bore pattern stay together in the notes rather

@@ -30,9 +30,7 @@ from cone_tip_adjuster_spec import (
     BODY_DIA,
     BODY_LEN,
     CHAMFER as CHAMFER,
-    CUP_DEPTH,
     CUP_DIA,
-    GENERAL_TOL_MM,
     SLOT_W,
     THREAD,
 )
@@ -73,6 +71,7 @@ END_KEEP = {
 }
 CUP_KEEP = {
     "CupDiaDim": (CUP_CENTER[0] + 0.050, CUP_CENTER[1]),
+    "CupDepth": (CUP_CENTER[0] + 0.050, CUP_CENTER[1] - 0.025),
 }
 # Only NON-tolerance annotation survives here. Every band moved onto the model
 # dimension in build_cone_tip_adjuster (cone_tip_adjuster_spec.GENERAL_TOL_MM /
@@ -80,13 +79,10 @@ CUP_KEEP = {
 #
 # The two entries that remain are sheet annotation, not specification:
 #   BodyDiaDim - the thread designation, already derived from the spec's THREAD.
-#   CupDiaDim  - the cup DEPTH, which is not a marked model dimension on this
-#                part (the blind bore's depth has no drawing dim to tolerance),
-#                so it stays a callout. Its band rides GENERAL_TOL_MM rather
-#                than a typed "+/-0.10" so the two cannot drift apart.
+#   CupDepth   - the machining instruction for the marked blind-hole depth.
 DIMENSION_CALLOUTS = {
     "BodyDiaDim": f"{THREAD} UNC-2A",
-    "CupDiaDim": f"X {CUP_DEPTH:.2f} +/-{GENERAL_TOL_MM:.2f} DEEP",
+    "CupDepth": "DEEP",
 }
 
 

@@ -59,9 +59,12 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from arbor_pedestal_spec import (
     BORE_DIA,
+    BORE_DIA_BAND,
     BORE_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -295,6 +298,9 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven pedestal (equations neutral)", v_final, 0.01 * v_bore)
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
