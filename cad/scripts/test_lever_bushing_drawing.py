@@ -78,7 +78,7 @@ def test_native_gdt_controls_bushing_functional_surfaces() -> None:
     assert tuple(datum.letter for datum in PART_DATUMS) == ("A", "B")
 
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter" in part_source
+    assert "author_part_pmi(" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "project_part_pmi(" in source
     assert "controls=GEOMETRIC_CONTROLS" in source

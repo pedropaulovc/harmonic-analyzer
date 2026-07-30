@@ -232,9 +232,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, front):
         set_hidden_lines_removed(adapter, view)
 
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
-    )
+    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the ring bores")
 

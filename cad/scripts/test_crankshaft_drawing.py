@@ -115,7 +115,9 @@ def test_native_finish_and_notes_control_the_turned_shaft() -> None:
     assert re.search(r"GetVisibleEntities2\(\s*c,\s*4\s*\)", source)
     assert "journal_silhouette = _visible_journal_silhouette(adapter, right)" in source
     assert "edge_entity=journal_silhouette" in source
-    assert 'production_method="BEARING JOURNAL"' in source
+    assert 'production_method="BEARING JOURNAL"' not in source
+    assert crankshaft_spec.SURFACE_FINISHES[0].production_method == "BEARING JOURNAL"
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing_journal")' in source
     assert 'dimension_name(adapter, annotation) == "ShaftDiaDim"' in source
     assert drawing.DATUM_A_RIGHT == (
         drawing.FRONT_CENTER[0] + drawing.JOURNAL_DIA * drawing.END_VIEW_SCALE / 2000.0,

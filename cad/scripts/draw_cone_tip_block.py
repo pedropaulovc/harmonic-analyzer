@@ -11,7 +11,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
     add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
@@ -249,7 +248,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # pinch-axis heights measure from).
     # Attach datum A to the RIGHT of the foot-bottom edge so its symbol clears
     # the centred 14.00 Width dimension (which sits at x=FRONT_CENTER[0]).
-    foot_edge = (FRONT_CENTER[0] + 0.005, _front_y(0.0))
     foot_entity = _foot_edge(adapter, front)
     add_datum_feature(
         adapter,

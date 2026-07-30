@@ -131,9 +131,7 @@ async def build(adapter: Any) -> dict[str, str]:
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"
     )
-    length_annotations = curate_view_dimensions(
-        adapter, length, keep=LENGTH_KEEP, view_label="length"
-    )
+    curate_view_dimensions(adapter, length, keep=LENGTH_KEEP, view_label="length")
     set_dimension_precision(adapter, end_annotations, {"OuterDia": 2})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")

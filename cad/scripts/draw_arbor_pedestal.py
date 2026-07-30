@@ -344,7 +344,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # measure from). The arbor bore is toleranced parallel to it and carries the
     # clamp-fit finish.
     _bore_r = BORE_DIA / 2.0 * _S
-    foot_edge = (FRONT_CENTER[0] + 0.006, _front_y(0.0))
     foot_entity, side_entity, flank_entity, bore_entity, dome_entity = (
         _front_entities(adapter, front)
     )

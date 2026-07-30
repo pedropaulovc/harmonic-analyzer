@@ -45,6 +45,7 @@ from crank_handle_spec import (
     HANDLE_LENGTH,
     HANDLE_MAX_DIA,
     PEAK_X,
+    PIVOT_BORE_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,

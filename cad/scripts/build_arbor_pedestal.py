@@ -33,7 +33,6 @@ import math
 import sys
 
 from _common import (
-    IN,
     PANEL_BLACK,
     SketchDims,
     anchor_point_to_origin,

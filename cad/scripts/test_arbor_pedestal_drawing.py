@@ -9,7 +9,6 @@ import _surface_finish
 import arbor_pedestal_spec
 import build_arbor_pedestal as part
 import draw_arbor_pedestal as drawing
-from _drawing_contract import assert_sheet_references
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -166,7 +165,9 @@ def test_bore_dome_and_mounting_hole_have_inspectable_gdt() -> None:
     assert 'orientation="vertical"' in source
     assert "set_arc_endpoints_to_center(" in source
     assert 'label="flange-hole true position"' in source
-    assert_sheet_references(drawing, "MACHINED", _surface_finish.MACHINED)
+    assert drawing.SURFACE_FINISHES is arbor_pedestal_spec.SURFACE_FINISHES
+    assert drawing.SURFACE_FINISHES[0].roughness_ra == _surface_finish.MACHINED
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "arbor_bore")' in source
     assert 'for name in ("Width", "FootHt"):' in source
     assert 'label="far-face depth coordinate"' in source
     assert 'label="strap near-face profile"' in source
