@@ -33,6 +33,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    # The blind-depth model dimension follows the seat's cut direction and is
+    # importable in the face view; the section carries its diameter/location.
+    assert "PinSeatDepth" in drawing.FRONT_KEEP
+    assert "PinSeatDepth" not in drawing.RIGHT_KEEP
     # The drawing's view math reads the spec's nominal spans, not a divergent copy.
     assert (drawing.C2C, drawing.OVERALL_LENGTH, drawing.R_END) == (
         pinion_bracket_spec.C2C,
@@ -97,7 +101,7 @@ def test_hole_states_are_annotated() -> None:
     assert "THRU - REAM" in callouts["PivotBoreDia"]
     assert "THRU" in callouts["ArborBoreDia"]
     assert "FLAT BOTTOM" in callouts["PinSeatDia"]
-    assert "FULL-DIAMETER DEPTH" in callouts["PinSeatDepth"]
+    assert callouts["PinSeatDepth"] == "FULL-DIAMETER DEPTH"
     assert "ENTRY ON THE STRAIGHT EDGE FACE" in callouts["PinSeatDia"]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"PinSeatDepth"' in source

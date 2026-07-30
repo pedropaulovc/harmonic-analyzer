@@ -75,7 +75,7 @@ SHEET_SCALE = (2.0, 1.0)
 # so it would render as an empty box.
 FRONT_BBOX_CY = (OVERALL_LENGTH / 2.0) - R_END  # 21.5: (52 + -9) / 2
 FRONT_CENTER = (0.110, 0.150)
-RIGHT_CENTER = (0.200, 0.150)
+RIGHT_CENTER = (0.225, 0.150)
 ISO_CENTER = (0.330, 0.205)
 
 
@@ -103,11 +103,11 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.162, 0.130),
     "BottomCapRadius": (0.098, 0.076),
     "PinSeatCy": (0.058, 0.128),
+    "PinSeatDepth": (0.170, 0.105),
 }
 RIGHT_KEEP = {
     "Depth": (0.190, 0.068),
     "PinSeatDia": (0.282, 0.132),
-    "PinSeatDepth": (0.282, 0.110),
     # Locates the pin seat through the thickness (mid-plane) in the section view.
     "PinSeatCz": (0.245, 0.190),
 }
@@ -121,7 +121,7 @@ DIMENSION_CALLOUTS = {
         "NEAREST THE PIVOT BORE"
     ),
     "PinSeatCz": "FROM DATUM C",
-    "PinSeatDepth": "FULL-DIAMETER DEPTH\nALONG HOLE AXIS TO FLAT BOTTOM",
+    "PinSeatDepth": "FULL-DIAMETER DEPTH",
 }
 
 
