@@ -65,13 +65,13 @@ ISO_CENTER = (0.300, 0.160)
 FRONT_KEEP = {
     "BodyLenDim": (FRONT_CENTER[0] - 0.045, FRONT_CENTER[1]),
     "BodyDiaDim": (FRONT_CENTER[0] + 0.060, FRONT_CENTER[1] + 0.010),
+    "CupDepth": (FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.020),
 }
 END_KEEP = {
     "SlotWDim": (END_CENTER[0] + 0.055, END_CENTER[1] - 0.015),
 }
 CUP_KEEP = {
     "CupDiaDim": (CUP_CENTER[0] + 0.050, CUP_CENTER[1]),
-    "CupDepth": (CUP_CENTER[0] + 0.050, CUP_CENTER[1] - 0.025),
 }
 # Only NON-tolerance annotation survives here. Every band moved onto the model
 # dimension in build_cone_tip_adjuster (cone_tip_adjuster_spec.GENERAL_TOL_MM /

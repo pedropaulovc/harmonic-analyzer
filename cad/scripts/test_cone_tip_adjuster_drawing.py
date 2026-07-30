@@ -34,6 +34,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "CupDepth",
         "SlotWDim",
     }
+    # Blind depth is parallel to the screw axis, so its native model dimension
+    # is visible in the elevation and cannot be imported into the axial end view.
+    assert "CupDepth" in drawing.FRONT_KEEP
+    assert "CupDepth" not in drawing.CUP_KEEP
 
 
 def test_thread_callout_is_the_catalog_thread() -> None:
