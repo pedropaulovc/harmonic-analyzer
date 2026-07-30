@@ -2,9 +2,8 @@ r"""Positive control for part-owned surface-finish PMI.
 
 The production migration must not assume that a surface-finish symbol authored
 on a ``.SLDPRT`` survives save/reopen or imports into a drawing.  This probe
-uses the already-built transgear stud, attaches a named Ra 1.6 symbol to its
-uniquely identifiable gear-seat cylinder, then proves both behaviors on a
-scratch copy without modifying released artefacts.
+copies the already-built transgear stud, verifies its production-authored named
+Ra 1.6 symbol, then proves both behaviors without modifying released artefacts.
 
 Run with a 3DEXPERIENCE-launched SolidWorks session already open::
 
@@ -24,9 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import _telemetry  # noqa: E402
 import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
-from _part_pmi import _resolve_faces, _select_face  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
-from transgear_stub_spec import GEOMETRIC_CONTROLS  # noqa: E402
 
 SOURCE = CAD_ROOT / "out" / "sldprt" / "transgear-stub.SLDPRT"
 SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "transgear-stub-surface-pmi.SLDPRT"
@@ -99,34 +96,13 @@ async def main() -> int:
             if not result.is_success:
                 raise RuntimeError(f"part open failed: {result.error}")
             model = adapter.currentModel
-            face_spec = GEOMETRIC_CONTROLS[0].face
-            face = _resolve_faces(model, {"gear-seat": face_spec})["gear-seat"]
-            _select_face(model, face, label="gear-seat surface finish")
-            symbol = model.Extension.InsertSurfaceFinishSymbol3(
-                1,
-                2,
-                0.018,
-                0.016,
-                0.008,
-                0,
-                10,
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-                "",
-            )
-            if symbol is None:
-                raise RuntimeError("part InsertSurfaceFinishSymbol3 returned None")
-            symbol = _early_bound(symbol, "ISFSymbol")
-            if not symbol.SetText(8, ROUGHNESS):
-                raise RuntimeError("part SetText(roughness) failed")
-            annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
-            if not annotation.SetName(ANNOTATION_NAME):
-                raise RuntimeError("part surface-finish SetName failed")
-            _assert_symbol(annotation, stage="part authored")
+            authored = _surface_annotations(model)
+            if tuple(authored) != (ANNOTATION_NAME,):
+                raise RuntimeError(
+                    "expected exactly the production-authored surface finish "
+                    f"{ANNOTATION_NAME!r}, got {tuple(authored)!r}"
+                )
+            _assert_symbol(authored[ANNOTATION_NAME], stage="part authored")
 
         with _telemetry.span("diagnostic.surface_finish_pmi.part_save_reopen"):
             model.ClearSelection2(True)
