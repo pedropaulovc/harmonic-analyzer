@@ -193,7 +193,7 @@ This project is built using:
 
 ## 🔓 License
 
-All original documentation, code, and CAD files are released under the [MIT License](./LICENSE). Reuse of book content or video transcripts must respect original copyright.
+All original documentation, code, and CAD files are released under the [Creative Commons Attribution-ShareAlike 4.0 International License](./LICENSE). Reuse of book content or video transcripts must respect original copyright.
 
 ---
 
@@ -293,7 +293,7 @@ This project is built using:
 
 ## 🔓 License
 
-All original documentation, code, and CAD files are released under the [MIT License](./LICENSE). Reuse of book content or video transcripts must respect original copyright.
+All original documentation, code, and CAD files are released under the [Creative Commons Attribution-ShareAlike 4.0 International License](./LICENSE). Reuse of book content or video transcripts must respect original copyright.
 ```
 
 ---
