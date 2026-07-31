@@ -402,7 +402,9 @@ async def _add_mate(
     entities: list[Any],
     *,
     distance: float = 0.0,
+    distance_limits: Iterable[float] | None = None,
     angle: float = 0.0,
+    angle_limits: Iterable[float] | None = None,
     alignment: str = "closest",
     lock_rotation: bool = False,
     gear_ratio: Iterable[float] | None = None,
@@ -419,7 +421,9 @@ async def _add_mate(
             alignment=alignment,
             flip=flip,
             distance=abs(distance),
+            distance_limits=list(distance_limits) if distance_limits else [],
             angle=angle,
+            angle_limits=list(angle_limits) if angle_limits else [],
             lock_rotation=lock_rotation,
             gear_ratio=list(gear_ratio) if gear_ratio else [],
             pinion_pitch_diameter=pinion_pitch_diameter,
@@ -909,6 +913,43 @@ async def angle_driver(
         witness=witness,
         angle=angle,
     )
+
+
+async def limit_distance_mate(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    limits: tuple[float, float],
+    *,
+    initial: float,
+    alignment: str = "closest",
+    flip: bool = False,
+    label: str = "limit distance",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Constrain a distance to a finite range without pinning its live DOF.
+
+    The range and ``initial`` value are in millimetres.  This is an advanced
+    SolidWorks distance mate: unlike :func:`distance_driver`, it stays free
+    inside the interval and reacts only at an endpoint.  Use it to give a
+    physical rocker/slider a travel stop, not to replace an operational
+    free-DOF manifest drive.
+    """
+    lo, hi = limits
+    if lo > hi:
+        raise ValueError(f"{label}: invalid distance limits {limits!r}")
+    return await _mate(
+        adapter,
+        label,
+        "distance",
+        [ref_a, ref_b],
+        alignment=alignment,
+        flip=flip,
+        verify=verify,
+        distance=initial,
+        distance_limits=(lo, hi),
+    )
+
 
 async def spin_driver(
     adapter: Any,

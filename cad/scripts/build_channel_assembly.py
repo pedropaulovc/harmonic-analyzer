@@ -85,7 +85,7 @@ component fixed, fully defined or coupled-free, zero interference
 Only the SEED channels are authored mate-by-mate: channel 0 (the global
 Z anchor) plus the first channel >= 1 of each distinct amplitude value.
 Every other channel is ONE CopyWithMates2 of its seed's 4-part slice
-(rocker + rod + bar + lever, 9 mates -- see _cwm.py for the pinned
+(rocker + rod + bar + lever, 10 mates -- see _cwm.py for the pinned
 native-call contract). The J1a axial dim is re-pointed to THIS channel's
 OWN gap bushing (Repeat=false + NewEntityToMateTo) at the local PITCH/2
 seat -- the SAME per-gap neighbour idiom the authored channels use --
@@ -143,6 +143,7 @@ from _assembly import (
     concentric_mate,
     delete_assembly_feature,
     distance_driver,
+    limit_distance_mate,
     named_ref,
     parallel_mate,
     place_component,
@@ -453,7 +454,7 @@ BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (swing pivot)
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~806 mm arm)
 
 # --- CopyWithMates2 slice replication (PR #220 probes -> production) ---------
-# A channel's 4 moving parts + their 9 mates are one repeatable SLICE: author
+# A channel's 4 moving parts + their 10 mates are one repeatable SLICE: author
 # it once per amplitude value (the seed), then replicate every same-amplitude
 # channel with ONE native CopyWithMates2 call (~1-2 s) instead of re-authoring
 # (~12-20 s of per-mate solves). Contract + pinned rules live in _cwm.py.
@@ -514,12 +515,13 @@ def _copied_chain_instances(adapter: Any, j: int) -> dict[str, str]:
 
 
 # The free-build slice: J1 radial+axial, J2 coaxial+axial, J4 radial+axial,
-# J3 radial+axial, J5 = 9 mates, of which 3 are EXTERNAL (J1 radial on the
+# J3 radial+axial, J5 radius+travel-stop = 10 mates, of which 4 are EXTERNAL (J1 radial on the
 # pivot-shaft, J1a axial dim to the gap bushing -- the ONLY external dim --
-# and J4 radial on the fulcrum-shaft). A mate-scheme change moves these:
+# J4 radial on the fulcrum-shaft, and the J5 travel limit to the root plane).
+# A mate-scheme change moves these:
 # update them consciously, the slot audit below fails loud.
-SLICE_MATES = 9
-SLICE_EXTERNAL = 3
+SLICE_MATES = 10
+SLICE_EXTERNAL = 4
 # Debug instrumentation for the copy path: per-part pose readbacks around the
 # pose landing + PNG snapshots of the model state (screenshot-first debugging).
 _CWM_DEBUG = bool(os.environ.get("HARMONIC_CWM_DEBUG"))
@@ -1204,7 +1206,7 @@ async def build(adapter) -> dict[str, str]:
 
     async def _author_channel(j: int, st: dict[str, float]) -> dict[str, str]:
         """Author one channel's chain from scratch: place the 4 moving parts
-        on-solution and join them with the 9-mate slice (J1/J2/J4/J3/J5).
+        on-solution and join them with the 10-mate slice (J1/J2/J4/J3/J5).
 
         The SEED path: run for channel 0 (the single global Z anchor) and once
         per distinct amplitude value; every other channel is replicated from
@@ -1389,6 +1391,27 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Axis2@{bar}", "AXIS"), named_ref(f"Axis3@{rocker}", "AXIS"),
             foot_r,
             label=f"J5 bar-foot on rocker arc ch{j:02d} r={foot_r:.2f}",
+            verify=(bar, bar_tgt),
+        )
+        # The radius mate has one free angular branch.  Without a physical
+        # travel stop it permits the bar to roll all the way around the R800
+        # circle after an opposite-side manual drag, past the finite rocker
+        # arc.  Bound the foot's existing amplitude-control coordinate: its
+        # distance from the assembly Right plane.  This is the exact coordinate
+        # an operator drag (and the transient kinematic driver) changes.  A
+        # limit mate preserves that free motion inside the envelope while
+        # stopping the bar before it can roll around the whole R800 circle.
+        max_station = float(_config.machine("amplitude", "max_travel_mm"))
+        await limit_distance_mate(
+            adapter,
+            named_ref(f"Axis2@{bar}", "AXIS"),
+            named_ref("Right Plane", "PLANE"),
+            # Distance mates are unsigned.  The physical travel spans the
+            # neutral foot coordinate +/- its configured amplitude range.
+            (0.0, abs(PIVOT[0]) + max_station),
+            initial=abs(PIVOT[0]),
+            label=(f"J5 bar travel limits ch{j:02d} "
+                   f"0..{abs(PIVOT[0]) + max_station:.1f} mm"),
             verify=(bar, bar_tgt),
         )
         return {"rocker-arm": rocker, "connecting-rod": rod,
