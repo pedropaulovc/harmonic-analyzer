@@ -434,8 +434,8 @@ setup motion, formerly park-driven at the engaged pose) **and lift-rod/cam spin*
 (PR8: the eccentric-cam engage path; 4 DOF total for drive-train), plus channel's
 **3 DOF per active channel** (rocker swing +
 connecting-rod follow + amplitude-bar slide; 2026-07-07 the **channel lever is
-COUPLED**, not separately freed: the J5 foot-on-arc mate — the amplitude bar's
-foot axis held at its as-solved radius from the rocker's arc-centre axis
+COUPLED**, not separately freed: the J5 roof-on-arc mate — the amplitude bar's
+bottom plane held tangent to the rocker about its arc-centre axis
 `Axis3@rocker` — closes the rocker → bar → lever chain, so dragging the rocker
 articulates the whole channel and the lever reads under-constrained WITH it;
 the old J4 hard spin pin is gone), plus magnifier's **lever

@@ -82,6 +82,7 @@ from _common import (
 from _assembly import (
     _ALLOWED_FREE_STEMS,
     _export_assembly_images,
+    angle_driver,
     assert_components_fully_defined,
     assert_free_dof_necessity,
     assert_model_healthy,
@@ -90,6 +91,7 @@ from _assembly import (
     component_names,
     component_transform,
     delete_assembly_feature,
+    named_ref,
     repair_dangling_mates,
     save_assembly_in_place,
     whats_wrong,
@@ -615,7 +617,7 @@ _REQUIRED_FREE_STEMS = {
     "drive-train": ("crankshaft", "cone-swing-platform",
                     "pinion-bracket", "pinion-lift-rod"),
     # Rocker swing + rod follow + bar amplitude, plus the channel lever which
-    # must read under-constrained WITH the chain (closed by the J5 foot-on-arc
+    # must read under-constrained WITH the chain (closed by the J5 roof-on-arc
     # coupling off the rocker -- a frozen lever means the coupling died).
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
@@ -1244,30 +1246,23 @@ _CHAIN_HOOK_TOL_MM = 0.02  # ball joint residual
 _CHAIN_MIN_WHEEL_SPAN_DEG = 5.0  # coupling-alive floor over the 0..1 deg sweep
 _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
 
-# Channel amplitude contact sweep.  This reproduces the operator sequence that
-# exposed the bad mate: first place the bar at the end of the rocker, then lower
-# the rocker.  The bottom-notch roof must remain on the rocker top arc throughout
-# that sequence; a constraint that holds only the bar's foot-axis circle permits
-# the physical roof to roll through the rocker.
-_CHANNEL_END_STATION_MM = float(_config.machine("amplitude", "max_travel_mm"))
-_CHANNEL_ROCKER_DRIVE_DELTA_MM = 25.0
-_CHANNEL_MIN_ARC_DROP_MM = 5.0
+# Channel amplitude contact sweep.  Exercise BOTH signed travel directions from
+# a fresh open: the former unsigned distance stop covered only one and admitted
+# a reflected endpoint in the other.  Then lower the rocker with the amplitude
+# setting held and prove the exact roof tangent follows it.
 _CHANNEL_CONTACT_TOL_MM = 0.10
-_CHANNEL_STATION_TOL_DEG = 0.5
+_CHANNEL_MIN_UPRIGHT_DOT = 0.25
+_CHANNEL_MAX_STEP_DEG = 30.0
+_CHANNEL_ROCKER_TEST_ANGLE_DEG = 85.0
 
 
 async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) -> None:
-    """Drive a channel bar to its end station, lower its rocker, and prove contact.
-
-    The saved channel model intentionally leaves the bar-amplitude and rocker
-    freedoms open.  This gate authors only those two manifest drives transiently,
-    recreating the interactive sequence without modifying the shipped assembly.
-    It measures the *physical notch roof*, not the bar's foot datum axis: a
-    centre-axis radius can remain satisfied while the roof rolls past the rocker.
-    """
+    """Drive both bar endpoints and the rocker stroke without branch inversion."""
     from build_channel_assembly import (
+        AMPLITUDE_ANGLE_LIMITS,
         ARM_ARC_CENTER_LOCAL_Y,
         ARM_TOP_RADIUS,
+        BAR_TANGENT_DISTANCE,
         BAR_CONTACT_GAP,
         BAR_FOOT_LOCAL,
         BAR_FOOT_NOTCH,
@@ -1282,141 +1277,163 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
     if not _assert_fresh(name, report):
         return
 
-    keys = ("bar_amplitude_00", "rocker_angle_00")
-    manifest = {spec.get("key"): spec for spec in load_dof_manifest(name)}
-    missing = [key for key in keys if key not in manifest]
-    if missing:
-        report.failed.append((
-            f"chain:{name}:dof-manifest",
-            f"missing channel drive spec(s) {missing} -- rebuild channel",
-        ))
-        return
-
-    async def _exercise() -> None:
+    async def _exercise_endpoint(endpoint: float) -> None:
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
         check(f"open {name}", await adapter.open_model(str(sldasm)))
         try:
-            # Replay the authored physical branch to its end station.  The
-            # station-limit mate deliberately rejects the opposite, unbounded
-            # radius-circle branch that previously let a manual drag roll past
-            # the rocker; the test must therefore drive the finite branch an
-            # operator can actually use, then release it before lowering.
-            bar_spec = dict(manifest[keys[0]])
-            bar_spec["verify"] = None
-            (bar_mate,) = await author_dof_drives(adapter, [bar_spec])
             model = adapter.currentModel
+            rocker, bar = "rocker-arm-1", "amplitude-bar-1"
+
+            def _unit(v: tuple[float, float]) -> tuple[float, float]:
+                mag = math.hypot(*v)
+                if mag <= 1e-9:
+                    raise RuntimeError("zero-length channel orientation witness")
+                return (v[0] / mag, v[1] / mag)
+
+            def _vectors() -> tuple[tuple[float, float], tuple[float, float]]:
+                pivot = world_point(adapter, rocker, [0.0, 8.0, 0.0])
+                arc = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
+                bar0 = world_point(adapter, bar, [0.0, 0.0, 0.0])
+                bar1 = world_point(adapter, bar, [0.0, 1.0, 0.0])
+                return (
+                    _unit((arc[0] - pivot[0], arc[1] - pivot[1])),
+                    _unit((bar1[0] - bar0[0], bar1[1] - bar0[1])),
+                )
+
+            rest_rocker, rest_bar = _vectors()
+
+            def _contact_state() -> tuple[float, float, float, float, float]:
+                pivot = world_point(adapter, rocker, [0.0, 8.0, 0.0])
+                arc = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
+                foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+                roof = world_point(
+                    adapter, bar,
+                    [BAR_FOOT_LOCAL[0], BAR_FOOT_NOTCH, BAR_FOOT_LOCAL[2]],
+                )
+                rocker_u, bar_u = _vectors()
+                plane_distance = abs(
+                    (arc[0] - foot[0]) * bar_u[0]
+                    + (arc[1] - foot[1]) * bar_u[1]
+                )
+                roof_distance = abs(
+                    (arc[0] - roof[0]) * bar_u[0]
+                    + (arc[1] - roof[1]) * bar_u[1]
+                )
+                plane_error = abs(plane_distance - BAR_TANGENT_DISTANCE)
+                roof_error = abs(
+                    roof_distance - (ARM_TOP_RADIUS - BAR_CONTACT_GAP)
+                )
+                rocker_dot = sum(a * b for a, b in zip(rocker_u, rest_rocker))
+                bar_dot = sum(a * b for a, b in zip(bar_u, rest_bar))
+                rocker_angle = math.degrees(math.atan2(
+                    arc[1] - pivot[1], arc[0] - pivot[0]
+                ))
+                return plane_error, roof_error, rocker_dot, bar_dot, rocker_angle
+
+            # An angle driver between the rocker and bar is the signed amplitude
+            # coordinate.  Starting at the 90-degree neutral and ramping through
+            # intermediate values reproduces a slider drag while making a branch
+            # jump visible at the step where it occurs.
+            bar_result = await angle_driver(
+                adapter,
+                named_ref(f"Right Plane@{rocker}", "PLANE"),
+                named_ref(f"Top Plane@{bar}", "PLANE"),
+                90.0,
+                label=f"VERIFY channel amplitude toward {endpoint:.3f} deg",
+            )
+            bar_mate = bar_result["name"]
             bar_param = adapter._attempt(
                 lambda: model.Parameter(f"D1@{bar_mate}"), default=None
             )
             if bar_param is None:
                 raise RuntimeError(
-                    f"cannot read transient channel amplitude drive {bar_mate!r}"
+                    f"cannot read transient channel angle drive {bar_mate!r}"
                 )
-
-            # Parameter system units are metres.  The manifest distance is the
-            # foot station at rest, so extending it by the configured maximum
-            # puts the bar on the physical amplitude travel stop.
-            bar_param.SystemValue = float(_read_member(bar_param, "SystemValue")) + (
-                _CHANNEL_END_STATION_MM / 1000.0
-            )
-            _rebuild(adapter)
-
-            # Match an interactive drag: use a transient driver solely to move
-            # the free amplitude coordinate to its end station, then remove it
-            # before lowering the rocker.  Leaving this mate active would pin
-            # the bar to the assembly datum and conceal the bad free-motion path.
-            delete_assembly_feature(adapter, bar_mate)
-            (rocker_mate,) = await author_dof_drives(adapter, [manifest[keys[1]]])
-            rocker_param = adapter._attempt(
-                lambda: model.Parameter(f"D1@{rocker_mate}"), default=None
-            )
-            if rocker_param is None:
-                raise RuntimeError(
-                    f"cannot read transient channel rocker drive {rocker_mate!r}"
-                )
-
-            rocker, bar = "rocker-arm-1", "amplitude-bar-1"
-
-            def _contact_state() -> tuple[float, float, float, float, float, float]:
-                pivot = world_point(adapter, rocker, [0.0, 8.0, 0.0])
-                arc = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
-                roof = world_point(
-                    adapter, bar,
-                    [BAR_FOOT_LOCAL[0], BAR_FOOT_NOTCH, BAR_FOOT_LOCAL[2]],
-                )
-                radius = math.dist(roof[:2], arc[:2])
-                station = math.degrees(math.atan2(roof[1] - arc[1], roof[0] - arc[0]))
-                rocker_angle = math.degrees(math.atan2(
-                    arc[1] - pivot[1], arc[0] - pivot[0]
-                ))
-                bar_y0 = world_point(adapter, bar, [0.0, 0.0, 0.0])
-                bar_y1 = world_point(adapter, bar, [0.0, 1.0, 0.0])
-                bar_normal = (bar_y1[0] - bar_y0[0], bar_y1[1] - bar_y0[1])
-                radial = (roof[0] - arc[0], roof[1] - arc[1])
-                dot = (bar_normal[0] * radial[0] + bar_normal[1] * radial[1])
-                tangent_error = math.degrees(math.acos(min(1.0, abs(dot) / (
-                    math.hypot(*bar_normal) * math.hypot(*radial)
-                ))))
-                return (arc[1], roof[1],
-                        abs(radius - (ARM_TOP_RADIUS + BAR_CONTACT_GAP)), station,
-                        rocker_angle, tangent_error)
-
-            arc0, roof0, end_error, station0, rocker0, tangent0 = _contact_state()
-
-            # The rocker drive is a coordinate distance.  Either sense can be
-            # "down" depending on which plane spin_driver selected, so exercise
-            # both and retain the pose that lowers the arm *under the bar*.
-            rest = float(_read_member(rocker_param, "SystemValue"))
-            trials: list[tuple[float, float, float, float, float, float, float]] = []
-            for value in (rest + _CHANNEL_ROCKER_DRIVE_DELTA_MM / 1000.0,
-                          max(1e-6, rest - _CHANNEL_ROCKER_DRIVE_DELTA_MM / 1000.0)):
-                rocker_param.SystemValue = value
+            previous_rocker_angle: float | None = None
+            endpoint_state: tuple[float, float, float, float, float] | None = None
+            for step in range(9):
+                requested = 90.0 + (endpoint - 90.0) * step / 8.0
+                bar_param.SystemValue = math.radians(requested)
                 _rebuild(adapter)
-                arc_y, roof_y, error, station, rocker_angle, tangent = _contact_state()
-                trials.append((arc_y, roof_y, error, station, rocker_angle, tangent, value))
-            arc1, roof1, moved_error, station1, rocker1, tangent1, chosen = min(
-                trials, key=lambda row: row[1]
-            )
-            rocker_param.SystemValue = chosen
-            _rebuild(adapter)
-            local_station0 = math.remainder(station0 - rocker0, 360.0)
-            local_station1 = math.remainder(station1 - rocker1, 360.0)
-            station_drift = abs(math.remainder(local_station1 - local_station0, 360.0))
-            _telemetry.info(
-                f"channel sweep: arc {arc0:.3f}->{arc1:.3f} mm; "
-                f"roof {roof0:.3f}->{roof1:.3f} mm; "
-                f"station {station0:.3f}->{station1:.3f} deg, rocker "
-                f"{rocker0:.3f}->{rocker1:.3f} deg, local station "
-                f"{local_station0:.3f}->{local_station1:.3f} deg; "
-                f"contact err {end_error:.4f}/{moved_error:.4f} mm; roof-normal "
-                f"error {tangent0:.3f}/{tangent1:.3f} deg"
-            )
+                state = _contact_state()
+                plane_error, roof_error, rocker_dot, bar_dot, rocker_angle = state
+                if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
+                    raise RuntimeError(
+                        f"amplitude {requested:.3f} deg left the exact rocker "
+                        f"tangent: plane error {plane_error:.3f} mm, roof error "
+                        f"{roof_error:.3f} mm"
+                    )
+                if min(rocker_dot, bar_dot) < _CHANNEL_MIN_UPRIGHT_DOT:
+                    raise RuntimeError(
+                        f"amplitude {requested:.3f} deg inverted a component: "
+                        f"rocker dot {rocker_dot:.3f}, bar dot {bar_dot:.3f}"
+                    )
+                if previous_rocker_angle is not None:
+                    jump = abs(math.remainder(
+                        rocker_angle - previous_rocker_angle, 360.0
+                    ))
+                    if jump > _CHANNEL_MAX_STEP_DEG:
+                        raise RuntimeError(
+                            f"amplitude {requested:.3f} deg caused a {jump:.1f} "
+                            "degree rocker branch jump"
+                        )
+                previous_rocker_angle = rocker_angle
+                endpoint_state = state
 
-            if arc0 - arc1 < _CHANNEL_MIN_ARC_DROP_MM:
+            # Hold the chosen amplitude and lower the rocker through its working
+            # stroke.  The exact plane-axis mate must carry the roof with it.
+            rocker_result = await angle_driver(
+                adapter,
+                named_ref(f"Right Plane@{rocker}", "PLANE"),
+                named_ref("Top Plane", "PLANE"),
+                _CHANNEL_ROCKER_TEST_ANGLE_DEG,
+                label=(f"VERIFY channel rocker at amplitude "
+                       f"{endpoint:.3f} deg"),
+            )
+            rocker_mate = rocker_result["name"]
+            _rebuild(adapter)
+            moved_state = _contact_state()
+            plane_error, roof_error, rocker_dot, bar_dot, rocker_angle = moved_state
+            if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
                 raise RuntimeError(
-                    f"rocker drive moved its arc centre only {arc0 - arc1:.3f} mm "
-                    f"(< {_CHANNEL_MIN_ARC_DROP_MM:g} mm); cannot exercise lowering"
+                    f"rocker stroke at amplitude {endpoint:.3f} deg left the "
+                    f"tangent: plane error {plane_error:.3f} mm, roof error "
+                    f"{roof_error:.3f} mm"
                 )
-            if roof0 - roof1 < _CHANNEL_MIN_ARC_DROP_MM:
+            if min(rocker_dot, bar_dot) < _CHANNEL_MIN_UPRIGHT_DOT:
                 raise RuntimeError(
-                    f"amplitude-bar roof dropped only {roof0 - roof1:.3f} mm while "
-                    f"the rocker dropped {arc0 - arc1:.3f} mm -- not moving in tandem"
+                    f"rocker stroke inverted a component at amplitude "
+                    f"{endpoint:.3f} deg: rocker dot {rocker_dot:.3f}, "
+                    f"bar dot {bar_dot:.3f}"
                 )
-            worst = max(end_error, moved_error)
-            if worst > _CHANNEL_CONTACT_TOL_MM:
+            if endpoint_state is None:
+                raise RuntimeError("channel amplitude ramp produced no samples")
+            endpoint_rocker_angle = endpoint_state[-1]
+            rocker_motion = abs(math.remainder(
+                rocker_angle - endpoint_rocker_angle, 360.0
+            ))
+            if rocker_motion < 2.0:
                 raise RuntimeError(
-                    f"amplitude-bar notch roof left the rocker arc by {worst:.3f} mm "
-                    f"at the end/lowered sweep (> {_CHANNEL_CONTACT_TOL_MM:g} mm)"
+                    f"rocker moved only {rocker_motion:.2f} deg during the "
+                    "lowering proof"
                 )
-            if station_drift > _CHANNEL_STATION_TOL_DEG:
-                raise RuntimeError(
-                    f"amplitude-bar roof rolled {station_drift:.2f} deg along the rocker "
-                    f"while lowering (> {_CHANNEL_STATION_TOL_DEG:g} deg)"
-                )
+            _telemetry.info(
+                f"channel amplitude endpoint {endpoint:.3f} deg: tangent errors "
+                f"{plane_error:.4f}/{roof_error:.4f} mm, upright dots "
+                f"{rocker_dot:.3f}/{bar_dot:.3f}, rocker motion "
+                f"{rocker_motion:.3f} deg"
+            )
+            delete_assembly_feature(adapter, rocker_mate)
+            delete_assembly_feature(adapter, bar_mate)
         finally:
             discard_open_documents(adapter)
 
-    await report.agate(f"chain:{name}:bar-roof-stays-on-rocker", _exercise)
+    for endpoint in AMPLITUDE_ANGLE_LIMITS:
+        direction = "left" if endpoint < 90.0 else "right"
+        await report.agate(
+            f"chain:{name}:bar-roof-{direction}-endpoint",
+            lambda endpoint=endpoint: _exercise_endpoint(endpoint),
+        )
 
 
 async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:

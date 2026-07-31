@@ -951,6 +951,44 @@ async def limit_distance_mate(
     )
 
 
+async def limit_angle_mate(
+    adapter: Any,
+    ref_a: Any,
+    ref_b: Any,
+    limits: tuple[float, float],
+    *,
+    initial: float,
+    alignment: str = "closest",
+    flip: bool = False,
+    label: str = "limit angle",
+    verify: tuple[str, list[float]] | None = None,
+) -> Any:
+    """Constrain a relative angle to a finite range without pinning its DOF.
+
+    Values are degrees.  Bias branch-sensitive mechanisms around 90 degrees;
+    a range around zero folds the two angular senses and cannot reject the
+    reflected assembly branch.
+    """
+    lo, hi = limits
+    if lo > hi:
+        raise ValueError(f"{label}: invalid angle limits {limits!r}")
+    if not lo <= initial <= hi:
+        raise ValueError(
+            f"{label}: initial angle {initial:g} outside limits {limits!r}"
+        )
+    return await _mate(
+        adapter,
+        label,
+        "angle",
+        [ref_a, ref_b],
+        alignment=alignment,
+        flip=flip,
+        verify=verify,
+        angle=initial,
+        angle_limits=(lo, hi),
+    )
+
+
 async def spin_driver(
     adapter: Any,
     off_axis_ref: Any,

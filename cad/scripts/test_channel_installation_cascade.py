@@ -37,6 +37,43 @@ def test_rocker_and_rod_reclose_the_level_plumb_neutral_pose() -> None:
     assert abs(channel._ARC["rod_tilt"]) < 0.02
 
 
+def test_both_amplitude_endpoints_close_on_the_upright_tangent_branch() -> None:
+    """The signed +/- travel states must satisfy contact and lever closure."""
+    max_travel = float(_config.machine("amplitude", "max_travel_mm"))
+    endpoint_angles: list[float] = []
+
+    for amplitude in (-max_travel, max_travel):
+        state = channel.solve_state(amplitude)
+        beta = -math.radians(state["bar_tilt"])
+        bar_u = (math.sin(beta), math.cos(beta))
+        foot = (channel.PIVOT[0] + amplitude, state["bar_bottom"])
+        arc = (channel._ARC["acx"], channel._ARC["acy"])
+        tangent_distance = sum(
+            (arc[i] - foot[i]) * bar_u[i] for i in range(2)
+        )
+        assert math.isclose(
+            tangent_distance, channel.BAR_TANGENT_DISTANCE, abs_tol=1e-6
+        )
+
+        pin = (
+            foot[0] + channel.BAR_TOP_TO_FOOT * bar_u[0],
+            foot[1] + channel.BAR_TOP_TO_FOOT * bar_u[1],
+        )
+        assert math.isclose(
+            math.dist(pin, channel.FULCRUM),
+            channel.LEVER_BAR_PIN_X,
+            abs_tol=1e-6,
+        )
+        endpoint_angles.append(
+            90.0 - (state["bar_tilt"] - state["arm_tilt"])
+        )
+
+    assert channel.AMPLITUDE_ANGLE_LIMITS == pytest.approx(
+        (min(endpoint_angles), max(endpoint_angles)), abs=1e-9
+    )
+    assert channel.ROCKER_ANGLE_LIMITS[0] < 90.0 < channel.ROCKER_ANGLE_LIMITS[1]
+
+
 def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     assert channel.CHANNEL_BANK_REAR_SHIFT == MECHANISM_Z_SHIFT
 

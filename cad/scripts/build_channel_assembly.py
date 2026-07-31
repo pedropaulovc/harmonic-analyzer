@@ -73,8 +73,8 @@ FREE (rocker swing + rod follow + bar amplitude -- 3 live DOF per
 channel); each freed DOF's drive spec is recorded into the assembly's
 DOF manifest (`.channel.dof.json`) for the transient verify:kinematics
 replays, never authored. The channel LEVER carries no pin of its own:
-the J5 foot-on-arc coupling (the bar's foot axis held at its as-solved
-radius from the rocker's arc-centre axis) closes the rocker -> bar ->
+the J5 roof-on-arc coupling (the bar's bottom plane held tangent to the
+rocker's arc about its centre axis) closes the rocker -> bar ->
 lever chain, so dragging the rocker articulates the whole channel and
 the lever reads under-constrained WITH it (coupled, magnifier-wheel
 style, not separately freed). Far-side mate flips are caught by
@@ -85,7 +85,7 @@ component fixed, fully defined or coupled-free, zero interference
 Only the SEED channels are authored mate-by-mate: channel 0 (the global
 Z anchor) plus the first channel >= 1 of each distinct amplitude value.
 Every other channel is ONE CopyWithMates2 of its seed's 4-part slice
-(rocker + rod + bar + lever, 10 mates -- see _cwm.py for the pinned
+(rocker + rod + bar + lever, 11 mates -- see _cwm.py for the pinned
 native-call contract). The J1a axial dim is re-pointed to THIS channel's
 OWN gap bushing (Repeat=false + NewEntityToMateTo) at the local PITCH/2
 seat -- the SAME per-gap neighbour idiom the authored channels use --
@@ -143,7 +143,7 @@ from _assembly import (
     concentric_mate,
     delete_assembly_feature,
     distance_driver,
-    limit_distance_mate,
+    limit_angle_mate,
     named_ref,
     parallel_mate,
     place_component,
@@ -454,7 +454,7 @@ BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (swing pivot)
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~806 mm arm)
 
 # --- CopyWithMates2 slice replication (PR #220 probes -> production) ---------
-# A channel's 4 moving parts + their 10 mates are one repeatable SLICE: author
+# A channel's 4 moving parts + their 11 mates are one repeatable SLICE: author
 # it once per amplitude value (the seed), then replicate every same-amplitude
 # channel with ONE native CopyWithMates2 call (~1-2 s) instead of re-authoring
 # (~12-20 s of per-mate solves). Contract + pinned rules live in _cwm.py.
@@ -515,12 +515,12 @@ def _copied_chain_instances(adapter: Any, j: int) -> dict[str, str]:
 
 
 # The free-build slice: J1 radial+axial, J2 coaxial+axial, J4 radial+axial,
-# J3 radial+axial, J5 radius+travel-stop = 10 mates, of which 4 are EXTERNAL (J1 radial on the
+# J3 radial+axial, J5 tangent+amplitude-stop+rocker-stop = 11 mates, of which 4 are EXTERNAL (J1 radial on the
 # pivot-shaft, J1a axial dim to the gap bushing -- the ONLY external dim --
-# J4 radial on the fulcrum-shaft, and the J5 travel limit to the root plane).
+# J4 radial on the fulcrum-shaft, and the rocker ROM limit to the root plane).
 # A mate-scheme change moves these:
 # update them consciously, the slot audit below fails loud.
-SLICE_MATES = 10
+SLICE_MATES = 11
 SLICE_EXTERNAL = 4
 # Debug instrumentation for the copy path: per-part pose readbacks around the
 # pose landing + PNG snapshots of the model state (screenshot-first debugging).
@@ -628,14 +628,19 @@ async def _seat_bushing_on_shaft(
 # Top-pin-to-foot span of the rigid bar (Axis1 local y - Axis2 local y); the
 # amplitude swing pivots the bar about its top pin over this lever arm.
 BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 806.45
-# Foot-axis -> notch-roof contact offset in the bar's UNtilted (vertical) XY
-# frame: the roof sits at the bar's +X edge (+BAR_WIDTH/2) and BAR_FOOT_NOTCH up,
-# lifted BAR_CONTACT_GAP off the arc. (Machine frame: the amplitude foot slides
-# +X off the pivot, so the roof rides the +X edge -- the mirror of the pre-#151
-# -X edge.) Rotating this by the bar tilt keeps the contact-on-arc constraint
-# exact as the bar swings.
-_CONTACT_OFF_X = BAR_WIDTH / 2.0
-_CONTACT_OFF_Y = BAR_FOOT_NOTCH - BAR_CONTACT_GAP
+# Exact distance from the rocker's arc-centre axis to the bar's bottom datum
+# plane.  The physical notch roof is BAR_FOOT_NOTCH above that plane and sits
+# BAR_CONTACT_GAP inside the R800 tangent radius, so its signed distance from
+# the arc centre is exactly ARM_TOP_RADIUS - BAR_CONTACT_GAP.
+BAR_TANGENT_DISTANCE = ARM_TOP_RADIUS + BAR_FOOT_NOTCH - BAR_CONTACT_GAP
+
+# Both travel stops are biased around 90 degrees so SolidWorks cannot fold the
+# two senses together as it does for an unsigned distance or a zero-centred
+# angle.  The amplitude endpoint is the exact plane/axis tangent solve at
+# +/-max_travel_mm.  The rocker window covers its physical cam-driven
+# -7.43..0 degree stroke with margin while rejecting the inverted branch.
+_AMPLITUDE_MAX_TRAVEL_MM = float(_config.machine("amplitude", "max_travel_mm"))
+ROCKER_ANGLE_LIMITS = (82.0, 90.5)
 
 
 def _arc_geometry() -> dict[str, float]:
@@ -716,12 +721,9 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
 
     def foot_y(beta: float) -> float:
         s, c = math.sin(beta), math.cos(beta)
-        cx_c = fx + _CONTACT_OFF_X * c - _CONTACT_OFF_Y * s
-        ky = _CONTACT_OFF_X * s + _CONTACT_OFF_Y * c
-        disc = ARM_TOP_RADIUS**2 - (cx_c - acx) ** 2
-        if disc <= 0.0:
-            raise RuntimeError(f"foot station {amplitude:.1f} mm runs off the R800 arc")
-        return acy - ky - math.sqrt(disc)
+        if abs(c) <= 1e-9:
+            raise RuntimeError(f"foot station {amplitude:.1f} mm reaches a tangent singularity")
+        return acy - (BAR_TANGENT_DISTANCE - (acx - fx) * s) / c
 
     def residual(beta: float) -> float:
         fy = foot_y(beta)
@@ -729,11 +731,19 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
         ty = fy + BAR_TOP_TO_FOOT * math.cos(beta)
         return math.hypot(tx - FULCRUM[0], ty - FULCRUM[1]) - LEVER_BAR_PIN_X
 
-    beta = _bisect(residual, -0.30, 0.20)
+    # The exact tangent equation has a second, folded lever-loop solution.
+    # Bracket the upright branch by the amplitude sign instead of spanning both
+    # roots (whose equal-sign outer residuals make an undirected bisection fail).
+    if abs(amplitude) <= 1e-9:
+        beta = 0.0
+    elif amplitude > 0.0:
+        beta = _bisect(residual, -0.30, 0.0)
+    else:
+        beta = _bisect(residual, 0.0, 0.30)
     fy = foot_y(beta)
     tx = fx + BAR_TOP_TO_FOOT * math.sin(beta)
     ty = fy + BAR_TOP_TO_FOOT * math.cos(beta)
-    contact_y = fy + _CONTACT_OFF_X * math.sin(beta) + _CONTACT_OFF_Y * math.cos(beta)
+    contact_y = fy + BAR_FOOT_NOTCH * math.cos(beta)
     return {
         "arm_tilt": _ARC["arm_tilt"],
         "rod_tilt": _ARC["rod_tilt"],
@@ -766,6 +776,22 @@ def _bisect(f, lo: float, hi: float, tol: float = 1e-10, iters: int = 80) -> flo
         else:
             lo, flo = mid, fmid
     return 0.5 * (lo + hi)
+
+
+# Derive the endpoint angles from the complete tangent + lever-closure solve,
+# not the small-angle approximation asin(travel/R).  The sign-bracketed solver
+# above deliberately selects the upright root at both extremes.
+_AMPLITUDE_ENDPOINT_ANGLES = tuple(
+    90.0 - (state["bar_tilt"] - state["arm_tilt"])
+    for state in (
+        solve_state(-_AMPLITUDE_MAX_TRAVEL_MM),
+        solve_state(_AMPLITUDE_MAX_TRAVEL_MM),
+    )
+)
+AMPLITUDE_ANGLE_LIMITS = (
+    min(_AMPLITUDE_ENDPOINT_ANGLES),
+    max(_AMPLITUDE_ENDPOINT_ANGLES),
+)
 
 
 async def _revolute(
@@ -806,7 +832,7 @@ async def _revolute(
     swing): recorded into the DOF manifest, not authored. ``None`` keeps it a
     hard pin. ``pin_spin=False`` skips the spin driver entirely -- the caller
     couples the residual spin through another mate (the channel lever's spin is
-    closed by the J5 foot-on-arc coupling, not a pin). Returns the spin mate
+    closed by the J5 roof-on-arc coupling, not a pin). Returns the spin mate
     dict, or ``None`` when the spin was skipped.
     """
     tgt = _org(adapter, comp)
@@ -1206,7 +1232,7 @@ async def build(adapter) -> dict[str, str]:
 
     async def _author_channel(j: int, st: dict[str, float]) -> dict[str, str]:
         """Author one channel's chain from scratch: place the 4 moving parts
-        on-solution and join them with the 10-mate slice (J1/J2/J4/J3/J5).
+        on-solution and join them with the 11-mate slice (J1/J2/J4/J3/J5).
 
         The SEED path: run for channel 0 (the single global Z anchor) and once
         per distinct amplitude value; every other channel is replicated from
@@ -1247,6 +1273,7 @@ async def build(adapter) -> dict[str, str]:
             euler_from_rows(lever_rows), lever_rows,
             ground=False, label=f"channel-lever ch{j:02d}",
         )
+        rocker_tgt = _org(adapter, rocker)
 
         # J1 rocker revolute (shaft OD ↔ pivot bore). Axial Z chains off the
         # neighbour pivot-bushing in the gap below (distance = PITCH/2), except
@@ -1300,7 +1327,7 @@ async def build(adapter) -> dict[str, str]:
         # channel mid-plane with the rocker (both mid-plane extruded, both at
         # z_mid), so its axial seat is a COINCIDENT mid-plane mate to the
         # rocker's Front plane -- not a bare distance to the datum. NO spin pin
-        # (pin_spin=False): the lever's rotation is CLOSED by the J5 foot-on-arc
+        # (pin_spin=False): the lever's rotation is CLOSED by the J5 roof-on-arc
         # coupling below (like the magnifier wheel's yoke -- coupled, not
         # separately freed): swing the rocker and the bar + lever follow.
         await _revolute(
@@ -1361,58 +1388,56 @@ async def build(adapter) -> dict[str, str]:
             free_dof_key=f"bar_amplitude_{j:02d}",
         )
         free_dof_keys.append(f"bar_amplitude_{j:02d}")
-        # J5 foot-on-arc COUPLING: the bar's foot axis (Axis2@bar) is held at
-        # its as-solved radius from the rocker's R800 arc-centre axis
-        # (Axis3@rocker) -- two Z-parallel axes, ONE unambiguous distance (the
-        # lever-wire stand-off idiom, no far-side flip). This is the slot
-        # contact that closes the rocker -> bar -> lever chain: swinging the
-        # rocker moves the arc centre, the foot follows at its radius, and the
-        # top-pin hinge turns the lever -- so the lever is COUPLED (magnifier-
-        # wheel style), not separately freed, and the free count stays 3 per
-        # channel. The radius is the design pose's own measure (per channel:
-        # the foot-notch contact offset rotates with the amplitude tilt), so
-        # the mate authors residual-free; it tracks the true roof-on-arc
-        # contact to first order (offset ~5 mm over R800 -- sub-visible).
-        # Analytic radius, all in the machine frame: the foot X is the +X-side
-        # station PIVOT[0] + a_j (matching solve_state's fx), the arc centre and
-        # bar_bottom come straight from the machine-frame solver (#151: was a
-        # pre-mirror PIVOT[0] - a_j mixed against the post-mirror foot readback).
-        arc_c = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
-        foot_r = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
-        want_r = math.hypot(
-            (PIVOT[0] + amplitudes[j]) - _ARC["acx"], st["bar_bottom"] - _ARC["acy"])
-        if abs(foot_r - want_r) > 1e-3:
-            raise RuntimeError(
-                f"ch{j:02d}: measured foot->arc-centre radius {foot_r:.4f} != "
-                f"analytic {want_r:.4f} -- the placed pose drifted off solve_state"
-            )
+        # J5 roof-on-arc COUPLING: the amplitude bar's Top plane is its bottom
+        # datum plane.  Holding that plane BAR_TANGENT_DISTANCE from the
+        # rocker's arc-centre axis makes the physical notch roof tangent to the
+        # R800 rocker at BAR_CONTACT_GAP.  Unlike the old foot-axis radius,
+        # this is the exact contact equation at every amplitude and rocker
+        # angle; it cannot let the roof roll through the arm while its datum
+        # axis remains on an approximate circle.
         await distance_driver(
             adapter,
-            named_ref(f"Axis2@{bar}", "AXIS"), named_ref(f"Axis3@{rocker}", "AXIS"),
-            foot_r,
-            label=f"J5 bar-foot on rocker arc ch{j:02d} r={foot_r:.2f}",
+            named_ref(f"Top Plane@{bar}", "PLANE"),
+            named_ref(f"Axis3@{rocker}", "AXIS"),
+            BAR_TANGENT_DISTANCE,
+            label=(f"J5 bar-roof tangent to rocker arc ch{j:02d} "
+                   f"d={BAR_TANGENT_DISTANCE:.3f}"),
             verify=(bar, bar_tgt),
         )
-        # The radius mate has one free angular branch.  Without a physical
-        # travel stop it permits the bar to roll all the way around the R800
-        # circle after an opposite-side manual drag, past the finite rocker
-        # arc.  Bound the foot's existing amplitude-control coordinate: its
-        # distance from the assembly Right plane.  This is the exact coordinate
-        # an operator drag (and the transient kinematic driver) changes.  A
-        # limit mate preserves that free motion inside the envelope while
-        # stopping the bar before it can roll around the whole R800 circle.
-        max_station = float(_config.machine("amplitude", "max_travel_mm"))
-        await limit_distance_mate(
+
+        # Bound the bar station by its relative angle to the rocker.  The old
+        # root-plane distance was unsigned: a +160.9 mm stop also admitted
+        # -160.9 mm, which is exactly the reflected branch that turned the
+        # rocker upside down.  A 90-degree-centred interval preserves the two
+        # signed travel directions and rejects that reflection.
+        amplitude_initial = 90.0 - (st["bar_tilt"] - st["arm_tilt"])
+        await limit_angle_mate(
             adapter,
-            named_ref(f"Axis2@{bar}", "AXIS"),
-            named_ref("Right Plane", "PLANE"),
-            # Distance mates are unsigned.  The physical travel spans the
-            # neutral foot coordinate +/- its configured amplitude range.
-            (0.0, abs(PIVOT[0]) + max_station),
-            initial=abs(PIVOT[0]),
-            label=(f"J5 bar travel limits ch{j:02d} "
-                   f"0..{abs(PIVOT[0]) + max_station:.1f} mm"),
+            named_ref(f"Right Plane@{rocker}", "PLANE"),
+            named_ref(f"Top Plane@{bar}", "PLANE"),
+            AMPLITUDE_ANGLE_LIMITS,
+            initial=amplitude_initial,
+            label=(f"J5 amplitude limits ch{j:02d} "
+                   f"{AMPLITUDE_ANGLE_LIMITS[0]:.3f}.."
+                   f"{AMPLITUDE_ANGLE_LIMITS[1]:.3f} deg"),
             verify=(bar, bar_tgt),
+        )
+
+        # The rocker remains the channel's live cam-following DOF, but it must
+        # stay on its physical upright stroke.  This independent range prevents
+        # continued bar dragging at an amplitude stop from transferring motion
+        # into a 180-degree rocker inversion.
+        rocker_initial = 90.0 + st["arm_tilt"]
+        await limit_angle_mate(
+            adapter,
+            named_ref(f"Right Plane@{rocker}", "PLANE"),
+            named_ref("Top Plane", "PLANE"),
+            ROCKER_ANGLE_LIMITS,
+            initial=rocker_initial,
+            label=(f"J5 rocker upright limits ch{j:02d} "
+                   f"{ROCKER_ANGLE_LIMITS[0]:.1f}.."
+                   f"{ROCKER_ANGLE_LIMITS[1]:.1f} deg"),
+            verify=(rocker, rocker_tgt),
         )
         return {"rocker-arm": rocker, "connecting-rod": rod,
                 "amplitude-bar": bar, "channel-lever": lever}

@@ -1832,6 +1832,11 @@ def task_verify():
         "kinematics": [
             _sldasm("pen"),
             _assembly_execution_token("pen"),
+            # The bidirectional channel amplitude proof opens channel.SLDASM,
+            # drives both signed bar endpoints, and exercises the rocker stroke.
+            # Its stamp must therefore invalidate on channel rebuild/restore.
+            _sldasm("channel"),
+            _assembly_execution_token("channel"),
             # The magnifier live-chain sweep (verify._verify_live_chain_one)
             # opens magnifier.SLDASM and authors its recorded lever drive spec
             # transiently; without this dep a magnifier rebuild would leave a

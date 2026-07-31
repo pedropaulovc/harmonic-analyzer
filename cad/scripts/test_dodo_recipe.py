@@ -169,7 +169,7 @@ def test_verify_gates_depend_on_exact_assembly_identities():
         assert dodo._assembly_execution_token(stem) in soundness[stem]["file_dep"]
 
     kinematics = next(task for task in dodo.task_verify() if task["name"] == "kinematics")
-    for stem in ("pen", "magnifier", "paper_drive"):
+    for stem in ("pen", "channel", "magnifier", "paper_drive"):
         assert dodo._assembly_execution_token(stem) in kinematics["file_dep"]
 
 
