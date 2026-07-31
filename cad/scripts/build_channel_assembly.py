@@ -73,14 +73,14 @@ FREE (rocker swing + rod follow + bar amplitude -- 3 live DOF per
 channel); each freed DOF's drive spec is recorded into the assembly's
 DOF manifest (`.channel.dof.json`) for the transient verify:kinematics
 replays, never authored. The channel LEVER carries no pin of its own:
-the J5 foot-on-arc coupling (the bar's foot axis held at its as-solved
-radius from the rocker's arc-centre axis) closes the rocker -> bar ->
-lever chain, so dragging the rocker articulates the whole channel and
-the lever reads under-constrained WITH it (coupled, magnifier-wheel
-style, not separately freed). Far-side mate flips are caught by
-reading back the origin and re-adding flipped. Saved state: every
-component fixed, fully defined or coupled-free, zero interference
-(face-flush and tangent contacts allowed).
+the J5 tangent contact between the bar's bottom-notch roof and the
+rocker's R800 top face closes the rocker -> bar -> lever chain while
+leaving the bar free to slide along the contact, so dragging the rocker
+articulates the whole channel and the lever reads under-constrained WITH
+it (coupled, magnifier-wheel style, not separately freed). Far-side mate
+flips are caught by reading back the origin and re-adding flipped. Saved
+state: every component fixed, fully defined or coupled-free, zero
+interference (face-flush and tangent contacts allowed).
 
 Only the SEED channels are authored mate-by-mate: channel 0 (the global
 Z anchor) plus the first channel >= 1 of each distinct amplitude value.
@@ -151,6 +151,7 @@ from _assembly import (
     reset_dof_manifest,
     save_assembly_and_images,
     spin_driver,
+    tangent_mate,
     world_point,
     write_dof_manifest,
 )
@@ -274,6 +275,13 @@ BAR_TOP_PIN_DROP = 6.35
 # spring eye, and the plate-threading loop margin (~0.11 mm) bounds it -- 0.02
 # keeps that margin clear, 0.1 broke it.
 BAR_CONTACT_GAP = _config.fit("cam_follower_contact", "contact_gap_mm")  # cad/config/tolerances.yaml
+
+# J5 is a real sliding contact: the rocker arc carries the contact normal and
+# the bar remains free to slide along that arc when its amplitude station is
+# adjusted.  A distance from the foot axis to the arc centre preserves only the
+# radius; it does not carry the contact with a moving rocker.
+J5_MATE_KIND = "tangent"
+J5_CONTACT_DOF = "rocker_coupled_with_amplitude_slide"
 
 # --- lever bank -------------------------------------------------------------
 FULCRUM = (199.9, 1065.9)  # lever fulcrum shaft axis (x, y); machine frame
@@ -634,6 +642,37 @@ BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 806.45
 # exact as the bar swings.
 _CONTACT_OFF_X = BAR_WIDTH / 2.0
 _CONTACT_OFF_Y = BAR_FOOT_NOTCH - BAR_CONTACT_GAP
+
+
+def _rocker_arc_y_local(station_mm: float) -> float:
+    """Return the R800 top-edge ordinate at a local amplitude station."""
+    if abs(station_mm) >= ARM_TOP_RADIUS:
+        raise ValueError(
+            f"amplitude station {station_mm:g} mm is outside the rocker R800 arc"
+        )
+    return ARM_ARC_CENTER_LOCAL_Y - math.sqrt(
+        ARM_TOP_RADIUS**2 - station_mm**2
+    )
+
+
+def rocker_contact_world(
+    station_mm: float, *, rocker_angle_deg: float = 0.0
+) -> tuple[float, float]:
+    """Return a rocker-material contact point in machine XY coordinates.
+
+    ``station_mm`` is measured from the rocker pivot along its local X axis.
+    The point rotates with the rocker, which is the kinematic relation the J5
+    tangent contact must preserve when the user lowers the rocker after moving
+    the amplitude bar along it.
+    """
+    local_x = station_mm
+    local_y = _rocker_arc_y_local(station_mm) - ARM_PIVOT_LOCAL_Y
+    theta = math.radians(rocker_angle_deg)
+    c, s = math.cos(theta), math.sin(theta)
+    return (
+        PIVOT[0] + c * local_x - s * local_y,
+        PIVOT[1] + s * local_x + c * local_y,
+    )
 
 
 def _arc_geometry() -> dict[str, float]:
@@ -1359,22 +1398,24 @@ async def build(adapter) -> dict[str, str]:
             free_dof_key=f"bar_amplitude_{j:02d}",
         )
         free_dof_keys.append(f"bar_amplitude_{j:02d}")
-        # J5 foot-on-arc COUPLING: the bar's foot axis (Axis2@bar) is held at
-        # its as-solved radius from the rocker's R800 arc-centre axis
-        # (Axis3@rocker) -- two Z-parallel axes, ONE unambiguous distance (the
-        # lever-wire stand-off idiom, no far-side flip). This is the slot
-        # contact that closes the rocker -> bar -> lever chain: swinging the
-        # rocker moves the arc centre, the foot follows at its radius, and the
-        # top-pin hinge turns the lever -- so the lever is COUPLED (magnifier-
-        # wheel style), not separately freed, and the free count stays 3 per
-        # channel. The radius is the design pose's own measure (per channel:
-        # the foot-notch contact offset rotates with the amplitude tilt), so
-        # the mate authors residual-free; it tracks the true roof-on-arc
-        # contact to first order (offset ~5 mm over R800 -- sub-visible).
-        # Analytic radius, all in the machine frame: the foot X is the +X-side
-        # station PIVOT[0] + a_j (matching solve_state's fx), the arc centre and
-        # bar_bottom come straight from the machine-frame solver (#151: was a
-        # pre-mirror PIVOT[0] - a_j mixed against the post-mirror foot readback).
+        # J5 foot-on-arc COUPLING: the bar's bottom-notch roof is TANGENT to
+        # the rocker's R800 top face.  The old single distance from Axis2@bar
+        # to Axis3@rocker constrained only the foot radius; it left the contact
+        # normal free, so lowering the rocker let the bar rotate past it instead
+        # of carrying the bar down.  A face tangent mate supplies the missing
+        # contact-normal constraint while leaving the bar's tangential slide
+        # (the amplitude DOF) free.
+        #
+        # Select the two persistent faces by points in the placed channel model:
+        # the rocker point is the chosen amplitude station on its R800 arc, and
+        # the bar point is the centre of the bottom-notch roof.  The 0.02 mm
+        # build gap is a selection/initial-pose margin; the tangent mate closes
+        # the physical contact in the solved model without relying on a fragile
+        # named FaceN identity.
+        #
+        # Keep the analytic radius check as a placement guard.  It catches a
+        # wrong handedness/station before SolidWorks authors the tangent and is
+        # independent of the face-pick implementation.
         arc_c = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
         foot_r = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
         want_r = math.hypot(
@@ -1384,11 +1425,22 @@ async def build(adapter) -> dict[str, str]:
                 f"ch{j:02d}: measured foot->arc-centre radius {foot_r:.4f} != "
                 f"analytic {want_r:.4f} -- the placed pose drifted off solve_state"
             )
-        await distance_driver(
+        rocker_face_point = world_point(
             adapter,
-            named_ref(f"Axis2@{bar}", "AXIS"), named_ref(f"Axis3@{rocker}", "AXIS"),
-            foot_r,
-            label=f"J5 bar-foot on rocker arc ch{j:02d} r={foot_r:.2f}",
+            rocker,
+            [amplitudes[j], _rocker_arc_y_local(amplitudes[j]), 0.0],
+        )
+        bar_face_point = world_point(
+            adapter,
+            bar,
+            [BAR_WIDTH / 2.0, BAR_FOOT_NOTCH, BAR_WIDTH / 2.0],
+        )
+        await tangent_mate(
+            adapter,
+            bore_axis_ref(rocker_face_point, "FACE"),
+            bore_axis_ref(bar_face_point, "FACE"),
+            label=(f"J5 bar-notch tangent to rocker arc ch{j:02d} "
+                   f"station={amplitudes[j]:+.2f} r={foot_r:.2f}"),
             verify=(bar, bar_tgt),
         )
         return {"rocker-arm": rocker, "connecting-rod": rod,
