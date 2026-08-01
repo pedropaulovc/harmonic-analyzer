@@ -76,7 +76,7 @@ def _patch_mate_walk(monkeypatch):
         "_mate_group_subfeatures",
         lambda adapter: list(adapter.features),
     )
-    monkeypatch.setattr(_assembly, "_flag_only", lambda *_args: None)
+    monkeypatch.setattr(_assembly, "_early_bound", lambda obj, _iface: obj)
 
 
 def test_range_stop_probe_restores_only_active_limit_mates():

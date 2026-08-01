@@ -26,7 +26,6 @@ from _common import (
     _MATE_TOL_MM,
     _git_sha,
     _early_bound,
-    _flag_only,
     _read_member,
     active_configuration_name,
     check,
@@ -2187,13 +2186,13 @@ def _range_stops_suppressed(adapter: Any):
     )
 
     model = adapter.currentModel
+    model_h = _early_bound(model, "IModelDoc2")
     candidates = []
     for feature in _mate_group_subfeatures(adapter):
         if str(_read_member(feature, "GetTypeName2")) not in _RANGE_STOP_MATE_TYPES:
             continue
         if bool(_read_member(feature, "IsSuppressed")):
             continue
-        _flag_only(feature, "Select2")
         candidates.append(feature)
 
     changed: list[Any] = []
@@ -2202,7 +2201,7 @@ def _range_stops_suppressed(adapter: Any):
     ) as span:
         try:
             if candidates:
-                model.ClearSelection2(True)
+                model_h.ClearSelection2(True)
                 for feature in candidates:
                     if not adapter._attempt(
                         lambda f=feature: f.Select2(True, 0), default=False
@@ -2211,8 +2210,7 @@ def _range_stops_suppressed(adapter: Any):
                         raise RuntimeError(
                             f"failed to select range stop {name!r} for DOF probe"
                         )
-                _flag_only(model, "EditSuppress2", "EditUnsuppress2")
-                ok = adapter._attempt(lambda: model.EditSuppress2(), default=False)
+                ok = adapter._attempt(lambda: model_h.EditSuppress2(), default=False)
                 changed = [
                     feature
                     for feature in candidates
@@ -2230,13 +2228,13 @@ def _range_stops_suppressed(adapter: Any):
         finally:
             restore_errors = []
             if changed:
-                model.ClearSelection2(True)
+                model_h.ClearSelection2(True)
                 for feature in changed:
                     if not adapter._attempt(
                         lambda f=feature: f.Select2(True, 0), default=False
                     ):
                         restore_errors.append(str(_read_member(feature, "Name")))
-                ok = adapter._attempt(lambda: model.EditUnsuppress2(), default=False)
+                ok = adapter._attempt(lambda: model_h.EditUnsuppress2(), default=False)
                 if not ok:
                     restore_errors.append("<batch unsuppress>")
                 restore_errors.extend(
@@ -2244,7 +2242,8 @@ def _range_stops_suppressed(adapter: Any):
                     for feature in changed
                     if bool(_read_member(feature, "IsSuppressed"))
                 )
-            model.ClearSelection2(True)
+            if candidates:
+                model_h.ClearSelection2(True)
             span.set_attribute("range_stops_restored", len(changed))
             if restore_errors:
                 raise RuntimeError(
