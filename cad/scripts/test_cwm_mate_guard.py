@@ -34,6 +34,47 @@ class FakeFeature:
         return self._code
 
 
+class FakeAngleData:
+    Angle = 1.5707963267948966
+    MinimumAngle = 1.4311699866353502
+    MaximumAngle = 1.5795229730548683
+    FlipDimension = False
+
+
+class FakeOwner:
+    def __init__(self, name):
+        self.Name2 = name
+
+
+class FakeMateEntity:
+    def __init__(self, owner):
+        self.ReferenceComponent = FakeOwner(owner)
+
+
+class FakeMate:
+    def __init__(self, owners):
+        self._entities = [FakeMateEntity(owner) for owner in owners]
+
+    def MateEntity(self, index):
+        return self._entities[index]
+
+
+class FakeLimitAngleFeature(FakeFeature):
+    def __init__(self):
+        super().__init__("LimitAngle1")
+        self._data = FakeAngleData()
+        self._mate = FakeMate(("rocker-arm-1", "Assem1"))
+
+    def GetTypeName2(self):
+        return "MateLimitPlanarAngleDim"
+
+    def GetDefinition(self):
+        return self._data
+
+    def GetSpecificFeature2(self):
+        return self._mate
+
+
 class FakeExtension:
     """`GetWhatsWrong` in its EARLY-BOUND form: outs ride the return tuple.
 
@@ -112,6 +153,18 @@ def test_clean_scan_reports_nothing():
     adapter = FakeAdapter(_chain(("Coincident1", (0, False)),
                                  ("Distance1", (0, False))))
     assert _cwm.new_mate_errors(adapter) == {}
+
+
+def test_limit_angle_row_carries_seed_radians_and_bounds():
+    """CopyWithMates2.Values needs the seed angle in radians, not zero."""
+    row = _cwm.mates_with_owners(
+        FakeAdapter([FakeLimitAngleFeature()]), {"rocker-arm"})[0]
+    assert row["type"] == "MateLimitPlanarAngleDim"
+    assert row["owners"] == frozenset({"ROOT", "rocker-arm"})
+    assert row["angle_rad"] == FakeAngleData.Angle
+    assert row["angle_min_rad"] == FakeAngleData.MinimumAngle
+    assert row["angle_max_rad"] == FakeAngleData.MaximumAngle
+    assert row["flip"] is False
 
 
 def test_hard_error_is_reported():

@@ -62,8 +62,9 @@ from _common import _early_bound, _flag_only
 
 def mates_with_owners(adapter: Any, known_prefixes: set[str]) -> list[dict]:
     """EVERY top-level mate in tree order: name, type, owner part prefixes,
-    owning instance names; for distance dims also D1 (mm) and the mate's own
-    FlipDimension state (its side of the reference).
+    owning instance names; for distance dims also D1 (mm), and for angle dims
+    the seed angle plus advanced-mate bounds (radians). Dimensional mates also
+    carry their own FlipDimension state (their side of the reference).
 
     ``known_prefixes`` classifies each mate entity's owning component by its
     part stem (instance suffix stripped); anything else -- including a root
@@ -80,7 +81,7 @@ def mates_with_owners(adapter: Any, known_prefixes: set[str]) -> list[dict]:
     for feat in _mate_group_subfeatures(adapter):
         tname = str(_read_member(feat, "GetTypeName2"))
         name = str(_read_member(feat, "Name"))
-        mm = flip = None
+        mm = flip = angle_rad = angle_min_rad = angle_max_rad = None
         if tname == "MateDistanceDim":
             param = adapter._attempt(
                 lambda n=name: model.Parameter(f"D1@{n}"), default=None)
@@ -88,6 +89,14 @@ def mates_with_owners(adapter: Any, known_prefixes: set[str]) -> list[dict]:
             mm = (val or 0.0) * 1000.0
             data = _read_member(feat, "GetDefinition")
             flip = bool(_read_member(data, "FlipDimension")) if data else None
+        if tname in {"MatePlanarAngleDim", "MateLimitPlanarAngleDim"}:
+            data = _read_member(feat, "GetDefinition")
+            if data is not None:
+                angle_rad = float(_read_member(data, "Angle"))
+                flip = bool(_read_member(data, "FlipDimension"))
+            if data is not None and tname == "MateLimitPlanarAngleDim":
+                angle_min_rad = float(_read_member(data, "MinimumAngle"))
+                angle_max_rad = float(_read_member(data, "MaximumAngle"))
         mate = _read_member(feat, "GetSpecificFeature2")
         owners: set[str] = set()
         instances: set[str] = set()
@@ -103,6 +112,9 @@ def mates_with_owners(adapter: Any, known_prefixes: set[str]) -> list[dict]:
             else:
                 owners.add("ROOT")
         out.append({"name": name, "type": tname, "mm": mm,
+                    "angle_rad": angle_rad,
+                    "angle_min_rad": angle_min_rad,
+                    "angle_max_rad": angle_max_rad,
                     "owners": frozenset(owners), "instances": instances,
                     "flip": flip})
     return out

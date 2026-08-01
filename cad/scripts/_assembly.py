@@ -26,6 +26,7 @@ from _common import (
     _MATE_TOL_MM,
     _git_sha,
     _early_bound,
+    _flag_only,
     _read_member,
     active_configuration_name,
     check,
@@ -2164,6 +2165,94 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     return under
 
 
+_RANGE_STOP_MATE_TYPES = frozenset(
+    {"MateLimitPlanarAngleDim", "MateLimitDistanceDim"}
+)
+
+
+@contextmanager
+def _range_stops_suppressed(adapter: Any):
+    """Temporarily suppress finite-range stops for the scalar-free DOF probe.
+
+    SolidWorks reports every component touched by an active limit angle/distance
+    mate as fully constrained even while that advanced mate permits motion inside
+    its interval.  ``GetConstrainedStatus`` therefore cannot measure the
+    underlying operational freedom until those stops are suppressed.  This
+    context changes only currently-active top-level range mates, re-solves before
+    the status walk, and restores + re-solves in ``finally``; the saved assembly
+    always retains its physical stops.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import (
+        _mate_group_subfeatures,
+    )
+
+    model = adapter.currentModel
+    candidates = []
+    for feature in _mate_group_subfeatures(adapter):
+        if str(_read_member(feature, "GetTypeName2")) not in _RANGE_STOP_MATE_TYPES:
+            continue
+        if bool(_read_member(feature, "IsSuppressed")):
+            continue
+        _flag_only(feature, "Select2")
+        candidates.append(feature)
+
+    changed: list[Any] = []
+    with _telemetry.span(
+        "gate.dof_free_range_stop_probe", range_stops=len(candidates)
+    ) as span:
+        try:
+            if candidates:
+                model.ClearSelection2(True)
+                for feature in candidates:
+                    if not adapter._attempt(
+                        lambda f=feature: f.Select2(True, 0), default=False
+                    ):
+                        name = str(_read_member(feature, "Name"))
+                        raise RuntimeError(
+                            f"failed to select range stop {name!r} for DOF probe"
+                        )
+                _flag_only(model, "EditSuppress2", "EditUnsuppress2")
+                ok = adapter._attempt(lambda: model.EditSuppress2(), default=False)
+                changed = [
+                    feature
+                    for feature in candidates
+                    if bool(_read_member(feature, "IsSuppressed"))
+                ]
+                if not ok or len(changed) != len(candidates):
+                    names = [str(_read_member(f, "Name")) for f in changed]
+                    raise RuntimeError(
+                        "failed to batch-suppress every range stop for DOF probe: "
+                        f"{len(changed)}/{len(candidates)} changed ({names})"
+                    )
+            if changed:
+                _telemetry.event("dof.range_stops_suppressed", count=len(changed))
+            yield len(changed)
+        finally:
+            restore_errors = []
+            if changed:
+                model.ClearSelection2(True)
+                for feature in changed:
+                    if not adapter._attempt(
+                        lambda f=feature: f.Select2(True, 0), default=False
+                    ):
+                        restore_errors.append(str(_read_member(feature, "Name")))
+                ok = adapter._attempt(lambda: model.EditUnsuppress2(), default=False)
+                if not ok:
+                    restore_errors.append("<batch unsuppress>")
+                restore_errors.extend(
+                    str(_read_member(feature, "Name"))
+                    for feature in changed
+                    if bool(_read_member(feature, "IsSuppressed"))
+                )
+            model.ClearSelection2(True)
+            span.set_attribute("range_stops_restored", len(changed))
+            if restore_errors:
+                raise RuntimeError(
+                    "failed to restore range stops after DOF probe: "
+                    f"{restore_errors}"
+                )
+
+
 def assert_free_dof_necessity(
     adapter: Any,
     expected_count: int,
@@ -2177,7 +2266,10 @@ def assert_free_dof_necessity(
 
     The freed DOF have no driver mates in the saved model (see the Kinematic
     DOF manifest section), so the gate reads the component constrained-status
-    walk and proves the free SET from both directions:
+    walk and proves the free SET from both directions. Finite-range stops are
+    suppressed only during that walk because SolidWorks counts an active limit
+    mate as fully constrained despite permitting motion inside its interval;
+    they are restored before this function returns:
 
     * NECESSITY: at least ``expected_count`` top-level components read
       under-constrained, i.e. the operational DOF genuinely ARE free (a mate
@@ -2211,7 +2303,11 @@ def assert_free_dof_necessity(
         assert_components_fully_defined(adapter, resolve=resolve)
         return
     with _telemetry.span("gate.dof_free_necessity") as gsp:
-        under = _under_constrained_components(adapter, resolve=resolve)
+        with _range_stops_suppressed(adapter) as range_stops:
+            under = _under_constrained_components(
+                adapter, resolve=resolve and not range_stops
+            )
+        gsp.set_attribute("range_stops_ignored", range_stops)
         gsp.set_attribute("expected_free_dof", expected_count)
         gsp.set_attribute("free_under_constrained", len(under))
         if len(under) < expected_count:

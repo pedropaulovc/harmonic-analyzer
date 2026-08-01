@@ -120,7 +120,6 @@ from typing import Any
 import _config
 import _telemetry
 from _common import (
-    UNDER_CONSTRAINED,
     _early_bound,
     apply_custom_properties,
     apply_summary_info,
@@ -1444,9 +1443,10 @@ async def build(adapter) -> dict[str, str]:
 
     def _slice_slots(seed_comps: dict[str, str]) -> dict[str, Any]:
         """Measure the seed slice's CopyWithMates2 slot layout: the array
-        length, the J1a dim's Values slot index, the seed parts' as-authored
-        transform arrays (the pose targets every copy is landed on) and their
-        per-part mate counts (the copy-completeness reference).
+        length, the J1a distance and rocker-stop angle Values slots, the seed
+        parts' as-authored transform arrays (the pose targets every copy is
+        landed on) and their per-part mate counts (the copy-completeness
+        reference).
 
         One mates_with_owners read serves both the slice-mate count tripwire
         and the external slot mapping. Every expectation is asserted LOUD: a
@@ -1481,6 +1481,36 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(
                 f"J1a seed value {dim['mm']:.3f} mm != PITCH/2"
                 f" {PITCH / 2.0:.3f} -- the axial anchor moved")
+        angles = [(i, r) for i, r in enumerate(ext)
+                  if r["type"] == "MateLimitPlanarAngleDim"]
+        if len(angles) != 1:
+            raise RuntimeError(
+                "seed slice must expose exactly ONE external limit angle"
+                f" (the rocker upright stop); got"
+                f" {[(i, r['name']) for i, r in angles]}")
+        angle_slot, angle = angles[0]
+        if angle["owners"] != frozenset({"ROOT", "rocker-arm"}):
+            raise RuntimeError(
+                f"external limit angle {angle['name']!r} is not the"
+                " rocker->root upright stop"
+                f" (owners {sorted(angle['owners'])})")
+        angle_values = (
+            angle["angle_min_rad"], angle["angle_rad"], angle["angle_max_rad"])
+        if any(value is None for value in angle_values):
+            raise RuntimeError(
+                f"external limit angle {angle['name']!r} did not expose its"
+                f" min/start/max radians: {angle_values!r}")
+        expected_bounds = tuple(math.radians(v) for v in ROCKER_ANGLE_LIMITS)
+        if any(abs(got - expected) > 1e-6 for got, expected in zip(
+                (angle["angle_min_rad"], angle["angle_max_rad"]),
+                expected_bounds, strict=True)):
+            got_deg = (
+                math.degrees(angle["angle_min_rad"]),
+                math.degrees(angle["angle_max_rad"]),
+            )
+            raise RuntimeError(
+                f"rocker upright seed bounds {got_deg!r} deg !="
+                f" {ROCKER_ANGLE_LIMITS!r} deg")
         # The seed's J1a side is CARRIED to each copy (flips[dim_slot]) via the
         # Repeat=false + own-bushing idiom, so any seed side is honoured; the
         # authored neighbour idiom (#110) produces flip=False. No always-positive
@@ -1489,10 +1519,13 @@ async def build(adapter) -> dict[str, str]:
                   for p, n in seed_comps.items()}
         mate_counts = {p: component_mate_count(adapter, n)
                        for p, n in seed_comps.items()}
+        statuses = {p: component_constrained_status(adapter, n)
+                    for p, n in seed_comps.items()}
         # The seed's drive targets (all Z-independent), for the transient
         # drivers that land each copy on the design pose.
         return {
             "n": len(rows), "dim_slot": slot, "dim_flip": bool(dim["flip"]),
+            "angle_slot": angle_slot, "angle_rad": angle["angle_rad"],
             "rod_axial_flip": component_distance_mate_flip(
                 adapter,
                 seed_comps["connecting-rod"],
@@ -1500,6 +1533,7 @@ async def build(adapter) -> dict[str, str]:
             ),
             "arrays": arrays,
             "mate_counts": mate_counts,
+            "statuses": statuses,
             "rocker_off": world_point(
                 adapter, seed_comps["rocker-arm"], ROCKER_ROD_BORE_LOCAL),
             "rod_ring": world_point(
@@ -1521,7 +1555,7 @@ async def build(adapter) -> dict[str, str]:
     # + (CHANNELS-2) copies; a restored square preset degrades gracefully (each
     # distinct a_j authors once).
     seed_by_amp: dict[float, tuple[int, dict[str, str]]] = {}
-    slots_by_seed: dict[int, tuple[int, int, dict[str, list[float]]]] = {}
+    slots_by_seed: dict[int, dict[str, Any]] = {}
     copied: list[dict[str, Any]] = []
     for j in range(CHANNELS):
         st = solve_state(amplitudes[j])  # this channel's bar/lever pose
@@ -1537,17 +1571,21 @@ async def build(adapter) -> dict[str, str]:
             slots_by_seed[seed_j] = _slice_slots(seed_comps)
         slice_info = slots_by_seed[seed_j]
         n_slice, dim_slot = slice_info["n"], slice_info["dim_slot"]
+        angle_slot = slice_info["angle_slot"]
         seed_arrays = slice_info["arrays"]
         # Re-point ONLY the J1a slot to THIS channel's OWN gap bushing
         # (Repeat=false + NewEntityToMateTo) at the LOCAL PITCH/2 seat -- exactly
         # the authored #110 neighbour idiom -- honouring the seed's side via
-        # flips[dim_slot]. The other two external slots (J1 radial on the shared
-        # pivot-shaft) keep the seed's references (Repeat=true), the measured
-        # mixed-array idiom. This drops the old cumulative always-positive ladder
-        # off the seed's bushing (see _cwm.py module doc).
+        # flips[dim_slot]. The other external slots keep the seed's references
+        # (Repeat=true), including the rocker upright limit angle. CopyWithMates2
+        # still RE-VALUES repeated dimensional mates, so that angle's exact seed
+        # radians must be carried instead of the 0.0 used for dimensionless slots.
+        # This drops the old cumulative always-positive ladder off the seed's
+        # bushing (see _cwm.py module doc).
         own_bushing = pivot_bushing_by_gap[j]
         values = [0.0] * n_slice
         values[dim_slot] = (PITCH / 2.0) / 1000.0
+        values[angle_slot] = slice_info["angle_rad"]
         repeat = [True] * n_slice
         repeat[dim_slot] = False
         new_ents: list = [None] * n_slice
@@ -1681,9 +1719,12 @@ async def build(adapter) -> dict[str, str]:
     # prove each copy from the model (the CopyWithMates2 return value LIES):
     # pose = the seed's pose translated down-spine; per-part mate count = the
     # seed's (a native-typing slip silently DROPS mates); per-part
-    # constrained status = under-constrained like the seed's (an unsolvable
-    # copied mate drives its components to over/no-solution WITHOUT moving
-    # anything, so a pose read alone misses it). All three read the model via
+    # constrained status = exactly the seed's. Advanced limit mates make their
+    # components report fully constrained despite finite travel, so hard-coding
+    # UNDER_CONSTRAINED would reject healthy copies; the later free-DOF gate
+    # suppresses only those stops while it proves the underlying mobility. An
+    # unsolvable copied mate still changes the status away from the seed without
+    # moving anything, so a pose read alone misses it. All three read the model via
     # per-component calls -- never the MateGroup tree walk, which measured
     # ~20 s per pass here. Then record each copy's freed-DOF drive specs and
     # re-anchor the pose ledger to the validated solved poses (the copies
@@ -1704,6 +1745,7 @@ async def build(adapter) -> dict[str, str]:
                         f"{component_mate_dump(adapter, rec['comps'][part])}")
         for rec in copied:
             seed_counts = slots_by_seed[rec["seed_j"]]["mate_counts"]
+            seed_statuses = slots_by_seed[rec["seed_j"]]["statuses"]
             for part in CHAIN_PARTS:
                 name = rec["comps"][part]
                 a = rec["targets"][part]
@@ -1718,12 +1760,11 @@ async def build(adapter) -> dict[str, str]:
                         f"ch{rec['j']:02d} {name}: {got} mates, seed has"
                         f" {seed_counts[part]} -- the copy dropped mates")
                 status = component_constrained_status(adapter, name)
-                if status != UNDER_CONSTRAINED:
+                if status != seed_statuses[part]:
                     raise RuntimeError(
                         f"ch{rec['j']:02d} {name}: constrained status"
-                        f" {status}, expected under-constrained"
-                        f" ({UNDER_CONSTRAINED}) -- a copied mate is"
-                        " unsolvable or over-defining")
+                        f" {status}, seed has {seed_statuses[part]} -- a copied"
+                        " mate is unsolvable or over-defining")
         for rec in copied:
             j = rec["j"]
             rocker = rec["comps"]["rocker-arm"]
