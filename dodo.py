@@ -1850,9 +1850,10 @@ def task_verify():
             # SKIP the crank->feed gate (codex #189).
             _sldasm("paper-drive"),
             _assembly_execution_token("paper_drive"),
-            # The pen sweep + magnifier chain sweep read these manifests
-            # directly (the transient drive specs). Same rationale as
-            # soundness's paper-drive manifest dep above (codex #221).
+            # The channel endpoint, pen sweep, and magnifier chain gates read
+            # these manifests directly (the transient drive specs). Same
+            # rationale as soundness's paper-drive manifest dep above (#221).
+            _dof_json("channel"),
             _dof_json("pen"),
             _dof_json("magnifier"),
             str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
