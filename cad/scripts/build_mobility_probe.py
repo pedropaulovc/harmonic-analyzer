@@ -26,8 +26,10 @@ operating DOF); drop a setup driver (p0 amplitude / p1 cone swing / p2 pinion
 swing) and just that quasi-static freedom opens. The probe NEVER saves.
 
 Drive mates land as TOP-LEVEL mates of each standalone subassembly (drive-train
-carries crank + p1 + p2; channel carries the 20 p0 amplitude slides), so they are
-suppressible by name without the flexible-sub indirection the motion study needs.
+carries crank + p1 + p2; channel replays its rocker/rod drives, while the 20 p0
+amplitude stations are the PRODUCTION J6 rocker<->bar angle mates -- driven, not
+freed, PR #458), so they are suppressible by name without the flexible-sub
+indirection the motion study needs.
 
 Run (SolidWorks already open)::
 
@@ -119,6 +121,14 @@ def _drivers_by_family(adapter: Any, model: Any, root: str) -> dict[str, list[st
         reals = _real_parts(parts, root)
         if len(reals) == 1:
             out.setdefault(_family(reals[0]), []).append(name)
+            continue
+        # The p0 amplitude station is DRIVEN part<->part (the J6 rocker<->bar
+        # angle mate, PR #458), not a single-real root-plane dim -- classify
+        # it under the bar family it pins.
+        if (mtype == ANGLE
+                and sorted(_family(r) for r in reals)
+                == ["amplitude-bar", "rocker-arm"]):
+            out.setdefault("amplitude-bar", []).append(name)
     return out
 
 

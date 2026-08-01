@@ -2435,6 +2435,23 @@ def drag_rotate_component(
     return accepted
 
 
+def rename_assembly_feature(adapter: Any, name: str, new_name: str) -> None:
+    """Rename an assembly feature (e.g. a mate) to a STABLE semantic name.
+
+    Auto-generated mate names (``Angle5``) shift with authoring order, so a
+    gate that must drive a specific production mate's dimension
+    (``D1@J6-station-ch00``) needs the build to pin the name. Fails loud on a
+    missing feature or a readback mismatch."""
+    model = adapter.currentModel
+    asm_h = _early_bound(model, "IAssemblyDoc")
+    feat = adapter._attempt(lambda: asm_h.FeatureByName(name), default=None)
+    if feat is None:
+        raise RuntimeError(f"feature to rename not found: {name!r}")
+    feat.Name = new_name
+    if adapter._attempt(lambda: asm_h.FeatureByName(new_name), default=None) is None:
+        raise RuntimeError(f"feature rename {name!r} -> {new_name!r} did not stick")
+
+
 def delete_assembly_feature(adapter: Any, name: str) -> None:
     """Delete an assembly feature by name (Select2 + DeleteSelection2).
 

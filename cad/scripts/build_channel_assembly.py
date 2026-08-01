@@ -68,16 +68,22 @@ share a channel slice:
   * free-space structure with no in-subassembly contact partner (fulcrum-
     shaft, ball mounts, springs, spring-hooks) is datum-located by three
     orthogonal plane distances (the #110 frame-column idiom).
-Each of the rocker/rod/bar joints keeps its operational DOF genuinely
-FREE (rocker swing + rod follow + bar amplitude -- 3 live DOF per
-channel); each freed DOF's drive spec is recorded into the assembly's
-DOF manifest (`.channel.dof.json`) for the transient verify:kinematics
-replays, never authored. The channel LEVER carries no pin of its own:
-the J5 roof-on-arc coupling (the bar's bottom plane held tangent to the
-rocker's arc about its centre axis) closes the rocker -> bar ->
-lever chain, so dragging the rocker articulates the whole channel and
-the lever reads under-constrained WITH it (coupled, magnifier-wheel
-style, not separately freed). Far-side mate flips are caught by
+The rocker/rod joints keep their operational DOF genuinely FREE (rocker
+swing + rod follow -- 2 live DOF per channel); each freed DOF's drive
+spec is recorded into the assembly's DOF manifest (`.channel.dof.json`)
+for the transient verify:kinematics replays, never authored. The bar
+STATION (the amplitude, config a_j) is a SETUP parameter, not an
+operational DOF: the physical bar is friction-held in its rocker seat,
+so it is DRIVEN by the J6 rocker<->bar angle mate
+(`J6-station-chNN`) -- dragging the rocker carries the bar in exact
+tandem (PR #458), and repositioning = editing that mate's dimension (or
+suppressing it, the deliberate 'lift against friction' act). The
+channel LEVER carries no pin of its own: the J5 roof-on-arc coupling
+(the bar's bottom plane held tangent to the rocker's arc about its
+centre axis) closes the rocker -> bar -> lever chain, so dragging the
+rocker articulates the whole channel and the bar + lever read
+under-constrained WITH it (coupled, magnifier-wheel style, not
+separately freed). Far-side mate flips are caught by
 reading back the origin and re-adding flipped. Saved state: every
 component fixed, fully defined or coupled-free, zero interference
 (face-flush and tangent contacts allowed).
@@ -137,6 +143,7 @@ from _assembly import (
     coincident_mate,
     collected_dof_specs,
     component_named_ref,
+    angle_driver,
     component_names,
     component_transform,
     concentric_mate,
@@ -148,6 +155,7 @@ from _assembly import (
     place_component,
     place_components_batch,
     reledger_to_solved,
+    rename_assembly_feature,
     reset_dof_manifest,
     save_assembly_and_images,
     spin_driver,
@@ -514,9 +522,12 @@ def _copied_chain_instances(adapter: Any, j: int) -> dict[str, str]:
 
 
 # The free-build slice: J1 radial+axial, J2 coaxial+axial, J4 radial+axial,
-# J3 radial+axial, J5 tangent+amplitude-stop+rocker-stop = 11 mates, of which 4 are EXTERNAL (J1 radial on the
-# pivot-shaft, J1a axial dim to the gap bushing -- the ONLY external dim --
-# J4 radial on the fulcrum-shaft, and the rocker ROM limit to the root plane).
+# J3 radial+axial, J5 tangent, J6 station angle, rocker-stop = 11 mates, of
+# which 4 are EXTERNAL (J1 radial on the pivot-shaft, J1a axial dim to the gap
+# bushing -- the ONLY external dim -- J4 radial on the fulcrum-shaft, and the
+# rocker ROM limit to the root plane). J6 is INTERNAL (rocker<->bar), so a
+# copy inherits the seed's station value verbatim -- correct, because copies
+# are same-amplitude by construction.
 # A mate-scheme change moves these:
 # update them consciously, the slot audit below fails loud.
 SLICE_MATES = 11
@@ -1342,19 +1353,10 @@ async def build(adapter) -> dict[str, str]:
         # (Axis2@lever). The bar length equals the rocker's R800 arc radius, so
         # the top pin rides the arc CENTRE while the foot rides the R800 arc
         # itself (build_rocker_arm docstring): swinging the bar about the top pin
-        # slides the foot ALONG the arc, and that swing IS the amplitude DOF
-        # (±88 mm seesaw, ch.15). The swing is a freed DOF whose drive spec —
-        # a distance from the foot axis (Axis2@bar) to the assembly Right
-        # Plane, i.e. the foot's X = the amplitude position — is recorded into
-        # the DOF manifest at today's solved contact, so a transient replay
-        # reproduces `rest` bit-exact. The spec MUST stay a part↔root-plane
-        # distance (NOT part↔part): the motion study's driver classifier only
-        # recognises dims that reference one real part + the sub root. This is
-        # the explicit form of the generic foot-X spin_driver the other
-        # revolutes use.
+        # slides the foot ALONG the arc, and that swing IS the amplitude
+        # station (±88 mm seesaw, ch.15) — DRIVEN by the J6 angle mate below,
+        # not freed.
         bar_tgt = _org(adapter, bar)
-        foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
-        amplitude = foot[0] - pivot_w[0]  # foot X relative to the rocker pivot
         await coincident_mate(
             adapter,
             named_ref(f"Axis2@{lever}", "AXIS"), named_ref(f"Axis1@{bar}", "AXIS"),
@@ -1370,23 +1372,6 @@ async def build(adapter) -> dict[str, str]:
             label=f"J3 bar ch{j:02d} axial coincident mid-plane <- {rocker}",
             verify=(bar, bar_tgt),
         )
-        # The foot-X driver is a freed operational DOF (``free_dof_key``): the
-        # bar swings about its top pin = slides the foot along the rocker arc,
-        # the amplitude DOF (request #1). It stays a part<->root-plane distance
-        # (the motion study's driver classifier only recognises one real part +
-        # the sub root), so it is NOT chained off a neighbour like the rocker
-        # axial.
-        await distance_driver(
-            adapter,
-            named_ref(f"Axis2@{bar}", "AXIS"), named_ref("Right Plane", "PLANE"),
-            foot[0],  # SIGNED: distance_driver abs()es the mate value but needs
-            # the sign to seed the seat side (which side of Right Plane the foot
-            # is on) so the recorded spec carries the correct flip for replay
-            label=f"J3 bar ch{j:02d} AMPLITUDE drive foot-X={foot[0]:.2f} (amp {amplitude:+.1f})",
-            verify=(bar, bar_tgt),
-            free_dof_key=f"bar_amplitude_{j:02d}",
-        )
-        free_dof_keys.append(f"bar_amplitude_{j:02d}")
         # J5 roof-on-arc COUPLING: the amplitude bar's Top plane is its bottom
         # datum plane.  Holding that plane BAR_TANGENT_DISTANCE from the
         # rocker's arc-centre axis makes the physical notch roof tangent to the
@@ -1404,28 +1389,41 @@ async def build(adapter) -> dict[str, str]:
             verify=(bar, bar_tgt),
         )
 
-        # Bound the bar station by its relative angle to the rocker.  The old
-        # root-plane distance was unsigned: a +160.9 mm stop also admitted
-        # -160.9 mm, which is exactly the reflected branch that turned the
-        # rocker upside down.  A 90-degree-centred interval preserves the two
-        # signed travel directions and rejects that reflection.
+        # J6 STATION: a DRIVEN rocker<->bar angle mate at this channel's
+        # solved station (the Fourier coefficient a_j, channels.yaml
+        # amplitude_mm). The station is a SETUP parameter of the machine, not
+        # an operational DOF: the physical bar is friction-held in its seat
+        # (book ch.15 -- repositioning takes a deliberate shove, "a satisfying
+        # metallic squeak"), so during operation the bar moves ONLY with the
+        # rocker. No SolidWorks contact mate can express that friction: the
+        # shipped J5 tangent, main's foot-on-circle and a face tangent (the
+        # cam-follower family; the cam mate itself is not COM-authorable on
+        # this non-tangent-continuous profile) all leave the station a free
+        # DOF, and the Move Components drag solver provably spends it -- the
+        # bar hangs in the air while the arm tips away under it (PR #458,
+        # live-probed 1:1 slide in every DragMode). Driving the station makes
+        # a rocker drag carry the whole channel in exact tandem; repositioning
+        # = edit this mate's dimension (the gates do) or suppress it -- the
+        # deliberate 'lift against friction' act. The angle is 90-deg-centred
+        # (branch-safe, like the retired limit stop it replaces: an interval
+        # around zero folds the two angular senses).
         amplitude_initial = 90.0 - (st["bar_tilt"] - st["arm_tilt"])
-        await limit_angle_mate(
+        station_mate = await angle_driver(
             adapter,
             named_ref(f"Right Plane@{rocker}", "PLANE"),
             named_ref(f"Top Plane@{bar}", "PLANE"),
-            AMPLITUDE_ANGLE_LIMITS,
-            initial=amplitude_initial,
-            label=(f"J5 amplitude limits ch{j:02d} "
-                   f"{AMPLITUDE_ANGLE_LIMITS[0]:.3f}.."
-                   f"{AMPLITUDE_ANGLE_LIMITS[1]:.3f} deg"),
+            amplitude_initial,
+            label=(f"J6 bar STATION ch{j:02d} a={amplitudes[j]:.2f} "
+                   f"angle={amplitude_initial:.3f} deg"),
             verify=(bar, bar_tgt),
         )
+        rename_assembly_feature(
+            adapter, station_mate["name"], f"J6-station-ch{j:02d}")
 
         # The rocker remains the channel's live cam-following DOF, but it must
-        # stay on its physical upright stroke.  This independent range prevents
-        # continued bar dragging at an amplitude stop from transferring motion
-        # into a 180-degree rocker inversion.
+        # stay on its physical upright stroke.  With the station driven (J6)
+        # a bar drag now back-drives the rocker, so this range is what stops
+        # that drag at the physical stroke instead of a 180-degree inversion.
         rocker_initial = 90.0 + st["arm_tilt"]
         await limit_angle_mate(
             adapter,
@@ -1769,13 +1767,16 @@ async def build(adapter) -> dict[str, str]:
             j = rec["j"]
             rocker = rec["comps"]["rocker-arm"]
             rod = rec["comps"]["connecting-rod"]
-            bar = rec["comps"]["amplitude-bar"]
             for name in rec["comps"].values():
                 reledger_to_solved(adapter, name)
-            # Record the copy's 3 freed-DOF drive specs -- pure recording
+            # Record the copy's 2 freed-DOF drive specs -- pure recording
             # (free_dof_key never authors) + cheap COM transform reads on the
             # validated copies. Labels mirror the authored path VERBATIM so
-            # the flip ledger (_flip_sig) resolves the same signatures.
+            # the flip ledger (_flip_sig) resolves the same signatures. The
+            # bar STATION is NOT recorded: the copy inherits the seed's J6
+            # rocker<->bar angle mate (internal to the slice), so it is
+            # DRIVEN, not freed (PR #458) -- a recorded spec would replay a
+            # second driver onto an already-driven coordinate.
             tgt = _org(adapter, rocker)
             off = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
             await spin_driver(
@@ -1793,18 +1794,6 @@ async def build(adapter) -> dict[str, str]:
                 label=f"J2 rod ch{j:02d} swing -> ring {ring[0]:.1f},{ring[1]:.1f}",
                 verify=(rod, tgt), free_dof_key=f"rod_swing_{j:02d}")
             free_dof_keys.append(f"rod_swing_{j:02d}")
-            tgt = _org(adapter, bar)
-            foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
-            amplitude = foot[0] - pivot_w[0]
-            await distance_driver(
-                adapter,
-                component_named_ref(bar, "Axis2"),
-                named_ref("Right Plane", "PLANE"),
-                foot[0],
-                label=(f"J3 bar ch{j:02d} AMPLITUDE drive foot-X={foot[0]:.2f}"
-                       f" (amp {amplitude:+.1f})"),
-                verify=(bar, tgt), free_dof_key=f"bar_amplitude_{j:02d}")
-            free_dof_keys.append(f"bar_amplitude_{j:02d}")
 
     for j in range(CHANNELS):
         z_mid = z_station(j) + ARM_MID_DZ
@@ -1886,12 +1875,13 @@ async def build(adapter) -> dict[str, str]:
         _verify_pattern_z(adapter, "lever-bushing", z_gap_planes, "lever-bushing bank")
 
     # Free kinematic model: the per-channel operational DOF (rocker swing +
-    # rod follow + bar amplitude) are FREE -- their drivers were recorded into
-    # the DOF manifest, never authored. Necessity gate: the freed DOF are
+    # rod follow) are FREE -- their drivers were recorded into the DOF
+    # manifest, never authored. The bar station is DRIVEN (J6), so the bar and
+    # lever are COUPLED, not freed. Necessity gate: the freed DOF are
     # genuinely free, one family per DOF (the aggregate count alone cannot
-    # tell a pinned family from a free one, codex 2026-07-04); the channel
-    # lever must read under-constrained WITH the chain (the J5 coupling closes
-    # it off the rocker; a frozen lever means the coupling died).
+    # tell a pinned family from a free one, codex 2026-07-04); the bar and
+    # lever must read under-constrained WITH the chain (J5+J6 close them off
+    # the rocker; a frozen bar or lever means a coupling died).
     n_recorded = len(collected_dof_specs())
     if n_recorded != len(free_dof_keys):
         raise RuntimeError(

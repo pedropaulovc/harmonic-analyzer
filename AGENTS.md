@@ -432,13 +432,18 @@ the crank rig on the merged column — swings on its pivot screw), **pinion enga
 swing** (PR8: the strap+pinion rigid group swings on the torque shaft — the p2
 setup motion, formerly park-driven at the engaged pose) **and lift-rod/cam spin**
 (PR8: the eccentric-cam engage path; 4 DOF total for drive-train), plus channel's
-**3 DOF per active channel** (rocker swing +
-connecting-rod follow + amplitude-bar slide; 2026-07-07 the **channel lever is
-COUPLED**, not separately freed: the J5 roof-on-arc mate — the amplitude bar's
-bottom plane held tangent to the rocker about its arc-centre axis
-`Axis3@rocker` — closes the rocker → bar → lever chain, so dragging the rocker
-articulates the whole channel and the lever reads under-constrained WITH it;
-the old J4 hard spin pin is gone), plus magnifier's **lever
+**2 DOF per active channel** (rocker swing + connecting-rod follow;
+2026-08-01/PR #458 the **amplitude-bar station is DRIVEN, not freed**: the
+physical bar is friction-held in its rocker seat, no contact mate can express
+that friction, and the Move Components drag solver provably slides a free
+station 1:1 under a rocker drag — so each channel carries a hard rocker↔bar
+angle mate `J6-station-chNN` at its config a_j station; repositioning = edit
+that dimension (the verify sweeps do) or suppress it. The **bar and channel
+lever are COUPLED**, not separately freed: J6 plus the J5 roof-on-arc mate —
+the bar's bottom plane held tangent to the rocker about its arc-centre axis
+`Axis3@rocker` — close the rocker → bar → lever chain, so dragging the rocker
+articulates the whole channel in exact tandem and the bar + lever read
+under-constrained WITH it; the old J4 hard spin pin is gone), plus magnifier's **lever
 knife-rock + lever-wire swing/spin** (3 DOF, 2026-07-04: the lever pivots about
 the summing bar's knife-edge ridge — engineerguy video 2/4+4/4, ~6 mm tip arc —
 carrying the clamp/vertical-rod/fixture group AND the magnifying-bracket

@@ -246,16 +246,32 @@ async def _drive_p2(adapter: Any) -> dict[str, str]:
 
 async def _drive_p0(adapter: Any) -> dict[str, str]:
     """p0: an amplitude bar swings about its top pin (the channel's amplitude
-    coefficient). ONE bar's amplitude DOF is already free (its drive spec is
-    recorded, never authored -- the other 19 bars stay pinned by their own
-    recorded specs), then motor it about its top-pin bore (Axis1)."""
+    coefficient). The station is DRIVEN in the shipped model (the J6
+    rocker<->bar angle mate, PR #458 -- the physical bar is friction-held),
+    so the setup act is modelled faithfully: SUPPRESS this bar's J6 (the
+    'lift against friction'), then motor it about its top-pin bore (Axis1).
+    The other 19 bars stay pinned by their own J6 mates. The doc is discarded
+    unsaved, so the suppression is transient."""
     path = str(OUT_SLDASM / "channel.SLDASM")
     check("open channel", await adapter.open_model(path))
     bar, bar_name = _find_one(adapter, "amplitude-bar")
     if bar is None:
         raise RuntimeError("p0: amplitude-bar not found")
-    _assert_dof_already_free(
-        _part_driver_names(adapter, "channel", bar_name), f"p0 amplitude ({bar_name})")
+    # THIS bar's J6: the one ANGLE mate joining exactly {a rocker, this bar}.
+    station = [
+        name for _f, _m, name, mtype, parts, _v in _iter_mates(
+            adapter, adapter.currentModel, read_values=False, progress_every=40)
+        if mtype == ANGLE
+        and sorted(_family(p) for p in _real_parts(parts, "channel"))
+        == ["amplitude-bar", "rocker-arm"]
+        and bar_name in _real_parts(parts, "channel")
+    ]
+    if len(station) != 1:
+        raise RuntimeError(
+            f"p0: expected exactly one rocker<->{bar_name} station angle mate "
+            f"(J6), found {station!r} -- rebuild the assembly"
+        )
+    await _suppress(adapter, station, f"p0 station mate ({bar_name})")
     motor_axis = _entity_ref(bar_name, "Axis1", "AXIS")
     return await _run_swing_study(
         adapter, motor_axis, bar_name,

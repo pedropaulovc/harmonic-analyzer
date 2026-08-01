@@ -82,7 +82,6 @@ from _common import (
 from _assembly import (
     _ALLOWED_FREE_STEMS,
     _export_assembly_images,
-    angle_driver,
     assert_components_fully_defined,
     assert_free_dof_necessity,
     assert_model_healthy,
@@ -92,7 +91,6 @@ from _assembly import (
     component_transform,
     delete_assembly_feature,
     drag_rotate_component,
-    named_ref,
     repair_dangling_mates,
     save_assembly_in_place,
     whats_wrong,
@@ -583,15 +581,16 @@ def _expected_free_dof(name: str) -> int:
     """Free operational DOF expected in ``name``'s AS-SAVED model.
 
     drive-train frees the crank spin, the cone-platform swing, the pinion
-    engage swing and the lift-rod/cam spin (4 DOF, PR8); channel frees 3 DOF
-    per active channel (rocker swing + connecting-rod follow + amplitude-bar
-    slide). Each freed DOF's drive spec is recorded in the assembly's DOF
-    manifest, never authored. Every other assembly stays fully defined (0).
+    engage swing and the lift-rod/cam spin (4 DOF, PR8); channel frees 2 DOF
+    per active channel (rocker swing + connecting-rod follow; the amplitude
+    station is DRIVEN by the J6 rocker<->bar angle mate, PR #458). Each freed
+    DOF's drive spec is recorded in the assembly's DOF manifest, never
+    authored. Every other assembly stays fully defined (0).
     """
     if name == "drive-train":
         return 4
     if name == "channel":
-        return 3 * _config.active_count()
+        return 2 * _config.active_count()
     if name == "magnifier":
         # The freed lever knife-rock + the articulated lever-wire's swing/spin;
         # the wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
@@ -617,9 +616,11 @@ def _expected_free_dof(name: str) -> int:
 _REQUIRED_FREE_STEMS = {
     "drive-train": ("crankshaft", "cone-swing-platform",
                     "pinion-bracket", "pinion-lift-rod"),
-    # Rocker swing + rod follow + bar amplitude, plus the channel lever which
-    # must read under-constrained WITH the chain (closed by the J5 roof-on-arc
-    # coupling off the rocker -- a frozen lever means the coupling died).
+    # Rocker swing + rod follow (the two freed DOF), plus the amplitude bar and
+    # channel lever which must read under-constrained WITH the chain (the bar
+    # station is DRIVEN by the J6 rocker<->bar angle mate and the J5
+    # roof-on-arc tangent closes the lever, both off the free rocker -- a
+    # frozen bar or lever means a coupling died, PR #458).
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
     # wheel must read under-constrained WITH them, else the coupling died --
@@ -1248,10 +1249,11 @@ _CHAIN_MIN_WHEEL_SPAN_DEG = 5.0  # coupling-alive floor over the 0..1 deg sweep
 _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
 
 # Channel amplitude contact sweep.  Exercise BOTH signed travel directions from
-# a fresh open: the former unsigned distance stop covered only one and admitted
-# a reflected endpoint in the other.  Then release the amplitude driver, lower
-# the rocker, and prove the free slide stays inside its shipped range while the
-# exact roof tangent follows it.
+# a fresh open by driving the production J6 station mate (the setup coordinate;
+# repositioning IS editing this dimension), then stroke the rocker with the
+# manifest drive and prove the seated station rides it in exact tandem while
+# the roof tangent holds.
+_CHANNEL_STATION_MATE = "J6-station-ch00"  # build_channel_assembly's pinned name
 _CHANNEL_CONTACT_TOL_MM = 0.10
 _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG = 0.05
 _CHANNEL_MIN_UPRIGHT_DOT = 0.25
@@ -1362,24 +1364,19 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                     amplitude_angle,
                 )
 
-            # An angle driver between the rocker and bar is the signed amplitude
-            # coordinate.  Starting at the 90-degree neutral and ramping through
-            # intermediate values reproduces a slider drag while making a branch
-            # jump visible at the step where it occurs.
-            bar_result = await angle_driver(
-                adapter,
-                named_ref(f"Right Plane@{rocker}", "PLANE"),
-                named_ref(f"Top Plane@{bar}", "PLANE"),
-                90.0,
-                label=f"VERIFY channel amplitude toward {endpoint:.3f} deg",
-            )
-            bar_mate = bar_result["name"]
+            # The production J6 station mate IS the signed amplitude
+            # coordinate (build_channel_assembly names ch00's
+            # ``J6-station-ch00``); repositioning = editing its dimension.
+            # Starting at the 90-degree neutral and ramping through
+            # intermediate values reproduces the setup slide while making a
+            # branch jump visible at the step where it occurs.
             bar_param = adapter._attempt(
-                lambda: model.Parameter(f"D1@{bar_mate}"), default=None
+                lambda: model.Parameter(f"D1@{_CHANNEL_STATION_MATE}"),
+                default=None,
             )
             if bar_param is None:
                 raise RuntimeError(
-                    f"cannot read transient channel angle drive {bar_mate!r}"
+                    f"cannot read channel station mate D1@{_CHANNEL_STATION_MATE}"
                 )
             previous_rocker_angle: float | None = None
             endpoint_state: tuple[
@@ -1459,7 +1456,6 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 raise RuntimeError(
                     f"cannot read transient channel rocker drive {rocker_mate!r}"
                 )
-            delete_assembly_feature(adapter, bar_mate)
 
             # Lower the rocker five degrees about its real pivot.  Distance mate
             # system values are metres even though manifest distances are mm.
@@ -1478,18 +1474,17 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 rocker_angle,
                 actual_amplitude_angle,
             ) = moved_state
+            # TANDEM: the driven station must ride the rocker stroke exactly
+            # (PR #458 -- the physical bar is friction-held in its seat, so
+            # lowering the rocker lowers the bar WITH it, station unchanged).
             angle_error = abs(math.remainder(
                 actual_amplitude_angle - endpoint, 360.0
             ))
-            lower, upper = AMPLITUDE_ANGLE_LIMITS
-            if not (
-                lower - _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG
-                <= actual_amplitude_angle
-                <= upper + _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG
-            ):
+            if angle_error > _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG:
                 raise RuntimeError(
-                    f"released amplitude moved outside {lower:.3f}..{upper:.3f} "
-                    f"deg during rocker stroke: {actual_amplitude_angle:.3f} deg"
+                    f"bar station slid {angle_error:.3f} deg off the "
+                    f"{endpoint:.3f} deg seat during the rocker stroke -- the "
+                    "bar did not lower in tandem"
                 )
             if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
                 raise RuntimeError(
@@ -1518,8 +1513,8 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 f"channel amplitude endpoint {endpoint:.3f} deg: tangent errors "
                 f"{plane_error:.4f}/{roof_error:.4f} mm, upright dots "
                 f"{rocker_dot:.3f}/{bar_dot:.3f}, rocker motion "
-                f"{rocker_motion:.3f} deg, released amplitude "
-                f"{actual_amplitude_angle:.3f} deg (shift {angle_error:.3f} deg)"
+                f"{rocker_motion:.3f} deg, seated station "
+                f"{actual_amplitude_angle:.3f} deg (drift {angle_error:.3f} deg)"
             )
             delete_assembly_feature(adapter, rocker_mate)
         finally:
@@ -1540,12 +1535,18 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
 # 0.06 deg while every IDragOperator mode slides it 1:1 with the rocker -- the
 # bar visibly hangs in the air as the arm tips away under it.  The physical
 # machine holds station by notch friction (book ch.15), so the model must keep
-# it through a rocker drag.  Modes pinned: 0 (maximum/rigid move) and
-# 2 (relaxation); mode 1 (minimum move) is exercised but only sanity-bounded --
-# live it overshoots erratically (-7.7 deg on a -3 deg stroke).
+# it through a rocker drag.  Every mode must hold the station; full-stroke
+# draggability is proven by mode 0 (see _CHANNEL_DRAG_MIN_MOTION_DEG).
 _CHANNEL_DRAG_STROKE_DEG = 3.0
 _CHANNEL_DRAG_STEPS = 6
-_CHANNEL_DRAG_MIN_MOTION_DEG = 2.0  # the drag must actually move the rocker
+# Minimum rocker motion per stroke, by DragMode. Mode 0 (maximum/rigid move)
+# carries the coupled rocker+rod+bar+lever chain through the full stroke and
+# proves draggability. The iterative solvers (1 min-move, 2 relaxation)
+# advance the coupled chain only fractionally per request (measured ~0.29 deg
+# of a 3 deg stroke, INVARIANT to step size -- 6x0.5 and 60x0.05 both stall
+# there), so they carry only a frozen-DOF floor; an interactive drag's
+# continuous stream of updates does not stall this way.
+_CHANNEL_DRAG_MIN_MOTION_DEG = {0: 2.0, 1: 0.1, 2: 0.1}
 _CHANNEL_DRAG_STATION_TOL_DEG = 0.25  # station drift allowed over one stroke
 
 
@@ -1601,36 +1602,30 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                 return 90.0 + _rot(rocker_u, rest_rocker) - _rot(bar_u, rest_bar)
 
             async def _seat_station(target: float) -> None:
-                """Ramp a transient rocker<->bar angle drive to *target*, then
-                release it -- the manual 'slide the bar to a station' setup.
-                The drive is authored AT the current station (authoring it at
-                the target would jump the mechanism in one solve, the branch
-                hazard the contact sweep ramps to avoid)."""
-                start = station()
-                result = await angle_driver(
-                    adapter,
-                    named_ref(f"Right Plane@{rocker}", "PLANE"),
-                    named_ref(f"Top Plane@{bar}", "PLANE"),
-                    start,
-                    label=f"VERIFY drag-seat station {target:.3f} deg",
-                )
+                """Ramp the PRODUCTION J6 station dimension to *target* -- the
+                manual 'slide the bar to a station' setup act (repositioning
+                IS editing this dimension). Ramped in steps from the current
+                value: a one-solve jump is the branch hazard the contact
+                sweep ramps to avoid."""
                 param = adapter._attempt(
-                    lambda: model.Parameter(f"D1@{result['name']}"), default=None
+                    lambda: model.Parameter(f"D1@{_CHANNEL_STATION_MATE}"),
+                    default=None,
                 )
                 if param is None:
-                    raise RuntimeError("cannot read transient station drive")
+                    raise RuntimeError(
+                        f"cannot read station mate D1@{_CHANNEL_STATION_MATE}"
+                    )
+                start = station()
                 for step in range(1, 9):
                     param.SystemValue = math.radians(
                         start + (target - start) * step / 8.0
                     )
                     _rebuild(adapter)
-                delete_assembly_feature(adapter, result["name"])
-                _rebuild(adapter)
                 seated = station()
                 if abs(math.remainder(seated - target, 360.0)) > 0.5:
                     raise RuntimeError(
                         f"station seat missed: asked {target:.3f} deg, "
-                        f"released at {seated:.3f} deg"
+                        f"seated at {seated:.3f} deg"
                     )
 
             def _drag_stroke(mode: int, stroke_deg: float) -> None:
@@ -1648,23 +1643,12 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                     f"drag mode={mode} stroke={stroke_deg:+.1f} deg: rocker "
                     f"moved {motion:+.3f} deg, station drift {drift:+.3f} deg"
                 )
-                if abs(motion) < _CHANNEL_DRAG_MIN_MOTION_DEG:
+                if abs(motion) < _CHANNEL_DRAG_MIN_MOTION_DEG[mode]:
                     raise RuntimeError(
                         f"drag mode {mode} stroke {stroke_deg:+.1f} deg moved "
                         f"the rocker only {motion:+.3f} deg -- the operational "
                         "DOF no longer drags"
                     )
-                if mode == 1:
-                    # Minimum-move is erratic live; bound it to the shipped
-                    # range instead of the tight station pin.
-                    lower, upper = AMPLITUDE_ANGLE_LIMITS
-                    now = station()
-                    if not (lower - 0.5 <= now <= upper + 0.5):
-                        raise RuntimeError(
-                            f"drag mode 1 pushed the station outside "
-                            f"{lower:.3f}..{upper:.3f} deg: {now:.3f} deg"
-                        )
-                    return
                 if abs(drift) > _CHANNEL_DRAG_STATION_TOL_DEG:
                     raise RuntimeError(
                         f"drag mode {mode} stroke {stroke_deg:+.1f} deg slid "
