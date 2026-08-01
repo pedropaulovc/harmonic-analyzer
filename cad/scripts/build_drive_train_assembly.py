@@ -19,7 +19,10 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   arbor along Z at (-60.394, 90.518), carried by pedestals at both ends. The
   complete arbor/support bank follows the fixed-post mechanism recenter;
   each asymmetric gear/cam sandwich is turned end-for-end while its local +Y
-  cosine phase remains up (pp. 66-67).
+  cam lobe holds the authored CAM_PHASE_DEG (cam_phase_spec 88.5: the
+  SINE-setup "middle position" -- notches side, ring at mid-throw, rocker
+  arms level; the cos setup of pp. 66-67 is the same train re-clocked
+  notch-up).
 * crankshaft along Z in the merged green column (cone-pivot-post: big-end
   journal + crank pedestal, ONE casting riding the swing plate), ABOVE the
   64T (ch30 GT:
@@ -102,7 +105,9 @@ Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
 supports". Tooth phasing: every gear script seeds a TOOTH centred on
 local +X; the cone gears keep phase 0 (even tooth counts put a tooth
 at azimuth 180, the contact azimuth) and the drum gears are
-pre-rotated +1.5 deg (half a 3 deg pitch) to receive it tooth-in-gap;
+pre-rotated CAM_PHASE_DEG = 88.5 (the tooth-in-gap half-pitch 1.5 plus
+29 whole 3-deg pitches, parking the integral cams at the sine home --
+whole-pitch offsets preserve the gap at the contact azimuth);
 the crank pinion seeds PINION_SEED_DEG -- the generalization of the old
 +11.25 half-pitch to the tilted line of centres (it reduces to 11.25 at
 the horizontal mesh; see the derivation at the constant).
@@ -120,7 +125,7 @@ crankshaft and the 64T + 20 cone gears keyed to the cone shaft (lock
 mates); a 16T:64T gear mate drives the cone cluster from the crank, and
 each cylinder gear meshes its cone gear k at ratio [120-6k : 120]. The
 gear mate is each cylinder gear's sole rotational constraint, so it
-holds the cosine-setup phase without nudging the gear. The whole train
+holds the sine-setup phase without nudging the gear. The whole train
 is left with exactly ONE operational DOF -- the crank angle.
 
 The saved model is a WORKING kinematic model: the operational DOF (crank
@@ -162,6 +167,8 @@ from _common import (
 )
 from _drawing_marks import DRAWN_BY
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
+from cam_phase_spec import CAM_PHASE_DEG  # authored cam phase: the shared
+# drive-interface contract with build_channel_assembly (see the module)
 from cone_pivot_post_installation import (
     CHANNEL_Z0,
     DRUM_X,
@@ -2053,7 +2060,11 @@ async def build(adapter) -> dict[str, str]:
     # diameter.  Local +Z becomes machine -Z while local +Y (the cam-lobe
     # phase) is unchanged.  Translating the origin from face centre -1.5 to
     # face centre +1.5 keeps the 3-mm toothed slab centred on station z_j.
-    cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-1.5))
+    # The seed phase is the shared drive-interface contract CAM_PHASE_DEG
+    # (cam_phase_spec, 88.5 = sine home): channel.SLDASM authors its floating
+    # rod rings on this phased cam centre with NO top-level mate, so the two
+    # assemblies must agree here or the rings sit ~8 mm off the lobes.
+    cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-CAM_PHASE_DEG))
     cyl_gears: list[str] = [await place_component(
         adapter, "cylinder-gear",
         [X_DRUM, Y_DRIVE, Z_DRUM0 + DRUM_FACE / 2.0],

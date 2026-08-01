@@ -21,14 +21,22 @@ whole cam→rocker→rod chain re-authored around it.
   **2026-08-01 clarification (PR #458 user catch): the photographed tips are
   the ROD-SIDE arm ends** — each bright tip sits directly atop its
   matte-black connecting rod in the end views, and the 139.5 tip lever is
-  just past the 132.76 rod hole (nowhere near the ~130 tail). So the chain
-  reads: lobe UP ⇒ ring at TOP ⇒ ROD SIDE at its highest (= the level rest)
-  at cos home, and the working stroke dips the ROD SIDE below level (the
-  measured rocker plane angle INCREASES 90→~97.4). The rocker-stop window
-  shipped as (82.0, 90.5) — allowing only the mirror-image rod-side-UP swing
-  — was this direction INVERTED; a manual UI drag of the rod end downward
-  (the real stroke) hit the 0.5° margin instantly. Fixed to (89.5, 98.0)
-  with the drag gate now proving both the working swing and the up-side stop.
+  just past the 132.76 rod hole (nowhere near the ~130 tail).
+  **2026-08-01 SECOND user catch — the swing is SYMMETRIC about level.** The
+  "flat level row at cos home" proves equal *phases*, not level *arms* (a
+  uniform +3.72° tilt is invisible in tip heights, and the GT x-triangulation
+  moves only ~0.3 mm under it — neither ever had the resolution to pin the
+  tilt). Level = MID-throw: sine home is the "middle position" (engineerguy
+  4/4), and a Fourier channel must contribute zero at its cosine's zero
+  crossings, which only holds if the level (bar-neutral) pose is mid-stroke —
+  the level-at-ring-TOP closure biased every channel one-sided. Re-derived
+  (PR #458): authored rest = sine home, `CAM_PHASE_DEG = 88.5` in the shared
+  `cam_phase_spec` (1.5 tooth-in-gap + 29 whole 3° pitches), rod C2C
+  163.101 → **171.718** (plumb at cos home, ~2.8° oblique at rest), rocker
+  window derived from the closure's full-cycle sweep: (85.78, 94.22) —
+  symmetric ±~3.72° + 0.5 margin. The interim windows (82.0, 90.5)
+  (direction-inverted) and (89.5, 98.0) (one-sided rod-side-down) are both
+  superseded; the drag gate now proves BOTH stops.
 - **The rest pose is LEVEL and *authored*, not incidental**: `ROD_HOLE_X`
   127.49 → **127.3738**, `ROD_C2C`/`CENTER_DISTANCE` 144.75 → **147.6655**,
   `RING_CENTER` = (54.474, 113.437) are co-solved so arm tilt = rod tilt = 0

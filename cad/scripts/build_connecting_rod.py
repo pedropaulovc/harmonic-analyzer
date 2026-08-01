@@ -5,12 +5,14 @@ arm's see-saw: a full ring (strap) riding the Ø30.6 eccentric cam (cast
 integral with each cylinder gear), a thin flat shank, and a rounded
 TOMBSTONE head (the Y-shaped upper end of the ch14 fan photo) pinned (Ø2)
 to the rocker arm's rod-pin hole near the arm's rod-side tip. Centre
-distance 163.10103: the rod hangs PLUMB with the arm LEVEL after the fixed-post
-photos show every rod dropping vertically from the arm tip onto its cam,
-the ch14 end views show the 0-crank tip row dead level (cos-mode home =
-top of stroke, cam lobe UP), so the pin (127.37 out from the mid-seesaw
-pivot) sits directly above the phased lobe centre at machine
-(-54.474, 99.155) and the rod length closes that vertical link. The head
+distance 171.71801 (connecting_rod_spec): the SINE-home closure (PR #458)
+-- the arm is LEVEL with the ring at MID-throw (cam_phase_spec 88.5), so
+the rocker swings symmetrically +-~3.72 deg about level. The rod hangs
+PLUMB at the cos-mode home (ch30 photos: every rod dropping vertically
+from the arm tip onto its cam at the ring's TOP; the ch14 0-crank flat
+tip row is that pose, all channels at +max together) and ~2.8 deg oblique
+at the authored sine rest; the two-circle closure in
+build_channel_assembly solves the length against ring(88.5). The head
 is SHORTER than the 16 mm arm depth (10.5 crown-to-shoulder), 10 wide,
 crown 2.4 above the pin, angled shoulders narrowing into the 8 shank --
 proportions read off the ch14 fan photo against the 16 mm arm-depth

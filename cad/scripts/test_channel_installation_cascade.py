@@ -31,10 +31,30 @@ def test_machine_config_and_channel_interface_share_one_installation_contract() 
     )
 
 
-def test_rocker_and_rod_reclose_the_level_plumb_neutral_pose() -> None:
+def test_rocker_and_rod_reclose_the_level_neutral_pose() -> None:
+    """Sine-home closure (PR #458): arm LEVEL at rest, rod plumb at cos home.
+
+    The authored rest is the mid-throw sine home, so the rod hangs ~2.8 deg
+    oblique there (the ring sits CAM_ECC*sin(phase) off the pin's vertical);
+    the plumb pose the ch30 photos show is the COS home (ring at top).
+    """
     assert connecting_rod_spec.CENTER_DISTANCE == channel.ROD_C2C
     assert abs(channel._ARC["arm_tilt"]) < 0.02
-    assert abs(channel._ARC["rod_tilt"]) < 0.02
+    assert abs(channel._ARC["rod_tilt"]) < 3.5
+
+    cos_home = channel._arc_geometry(ring=(
+        channel.X_DRUM + channel.CAM_ECC * math.sin(math.radians(1.5)),
+        channel.Y_DRIVE + channel.CAM_ECC * math.cos(math.radians(1.5)),
+    ))
+    assert abs(cos_home["rod_tilt"]) < 0.5
+
+
+def test_rocker_swing_is_symmetric_about_level() -> None:
+    """The eccentric drive must swing the level arm equally both ways."""
+    lo, hi = channel._SWING_LO, channel._SWING_HI
+    assert lo < 0.0 < hi
+    assert abs(hi + lo) < 0.01  # symmetric to within the tooth quantization
+    assert 3.5 < hi < 4.0 and 3.5 < -lo < 4.0  # ~asin(ecc/lever) less obliquity
 
 
 def test_both_amplitude_endpoints_close_on_the_upright_tangent_branch() -> None:

@@ -14,7 +14,13 @@ from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 13 - Connecting rods"). ---
-CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
+CENTER_DISTANCE = 171.71800779906664  # sine-home closure (PR #458): level arm
+# with the cam ring at MID-throw (cam_phase_spec.CAM_PHASE_DEG 88.5), so the
+# rocker swings symmetrically +-~3.72 deg about level.  |pin_level - ring(88.5)|
+# solved by build_channel_assembly's two-circle closure; the rod hangs plumb at
+# the cos-mode home (ring top) and ~2.8 deg oblique at the authored sine rest.
+# (Supersedes 163.1010 -- the fixed-post recenter paired level with ring TOP,
+# a one-sided rod-side-down stroke.)
 RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
 RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
 RING_WALL = 5.0  # radial strap wall

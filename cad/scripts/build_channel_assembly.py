@@ -177,6 +177,8 @@ from _cwm import (
     resolve_entity,
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
+from cam_phase_spec import CAM_PHASE_DEG  # authored cam phase: the shared
+# drive-interface contract with build_drive_train_assembly (see the module)
 from cone_pivot_post_installation import (
     CHANNEL_Z0,
     DRUM_X,
@@ -194,8 +196,8 @@ from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 from connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
 # rocker pin (imported, NOT copied -- the part and the assembly must agree on
 # the link length or the J2 revolute drags the ring off the cam). Solved for
-# the LEVEL rest pose: plumb rod from the level arm's pin down to the lobe-up
-# phased cam centre.  Imported from the PURE-DATA spec, not the part builder:
+# the LEVEL rest pose at the SINE-home (mid-throw) phased cam centre, so the
+# swing is symmetric.  Imported from the PURE-DATA spec, not the part builder:
 # the builder's closure carries drawing prose, and pulling it here made every
 # notes edit full-rebuild this assembly (codex #354).
 from rocker_arm_spec import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
@@ -244,14 +246,16 @@ ARM_ARC_CENTER_LOCAL_Y = 816.0  # arm local arc centre above the bottom edge
 ARM_TOP_RADIUS = 800.0
 
 # --- drive interface (default state) ----------------------------------------
-GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
-# half the T120 tooth pitch, so a TOOTH faces the cone mesh (see
-# build_drive_train_assembly.py). The integral cam (local (0, +CAM_ECC) -- lobe
-# UP at notch-up, the cos-mode top of stroke per the ch14 end views) swings
-# with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
-# centre, not a point straight north of the arbor. The end-for-end gear flip
-# reverses local Z only; local +Y and therefore this phased XY centre stay put.
-# CAM_ECC is imported above.
+GEAR_PHASE_DEG = CAM_PHASE_DEG  # 88.5: drive-train seeds each cylinder gear at
+# Rz(+CAM_PHASE_DEG) -- the shared drive-interface contract (cam_phase_spec;
+# the top level pairs the floating rod rings with the cam lobes POSITIONALLY,
+# no mate, so both assemblies must read the one constant). 88.5 = the +1.5
+# tooth-in-gap half-pitch plus 29 whole 3-deg T120 pitches: the SINE-mode home
+# ("middle position", engineerguy 4/4 -- notches to the SIDE), which parks the
+# integral cam (local (0, +CAM_ECC), lobe toward the notch) with the ring at
+# MID-throw. The rod ring rides the PHASED cam centre, not a point straight
+# north of the arbor; the end-for-end gear flip reverses local Z only, so the
+# phased XY centre stays put. CAM_ECC is imported above.
 X_DRUM = DRUM_X
 Y_DRIVE = 90.518
 RING_CENTER = (
@@ -260,14 +264,18 @@ RING_CENTER = (
 )  # The drum sits at machine X_DRUM (crank side -X); y is the ch30 GT drive
 # height 90.518, fixed by cone-pivot-post-v2. MUST stay in sync with
 # build_drive_train_assembly.Y_DRIVE.
-# ROD_C2C (imported from connecting_rod_spec.CENTER_DISTANCE, 163.1010):
-# VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
-# its cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits
-# directly above the phased cam centre WITH THE ARM LEVEL (arm tilt 0: the ch14
-# end views show the 0-crank tip row flat, and the GT rocker-corner
-# triangulation lands the arm's rod-side end at machine x -60 -- the level-pose
-# bottom-arc end predicts -59.9). Supersedes the 144.75 lobe-down closure at
-# rest tilt -7.8158 deg, and the oblique 163.18/180.83 era before it.
+# ROD_C2C (imported from connecting_rod_spec.CENTER_DISTANCE, 171.71801):
+# the SINE-home closure (PR #458): the arm is LEVEL with the ring at MID-throw,
+# so the working swing is SYMMETRIC (level +-~3.72 deg) and each channel's
+# Fourier contribution is unbiased about neutral -- a_j * cos must read ZERO at
+# the crossings, which only holds if the level (bar-neutral, lever-neutral)
+# pose is the MID of the stroke. The rod hangs PLUMB at the cos-mode home
+# (ring TOP; ch30 photos + GT rocker-corner triangulation land the arm's
+# rod-side end at machine x -60 there) and ~2.8 deg oblique at the authored
+# rest. Supersedes the 163.1010 level-at-ring-TOP closure (its one-sided
+# rod-side-down stroke was the user-caught PR #458 symmetry bug), the 144.75
+# lobe-down closure at rest tilt -7.8158 deg, and the oblique 163.18/180.83
+# era before both.
 
 # --- amplitude bars ---------------------------------------------------------
 BAR_WIDTH = 6.35
@@ -650,31 +658,33 @@ BAR_TANGENT_DISTANCE = ARM_TOP_RADIUS + BAR_FOOT_NOTCH - BAR_CONTACT_GAP
 # two senses together as it does for an unsigned distance or a zero-centred
 # angle.  The amplitude endpoint is the exact plane/axis tangent solve at
 # +/-max_travel_mm.  The rocker window covers its physical cam-driven stroke
-# with margin while rejecting the inverted branch.  DIRECTION (PR #458, user
-# catch): the level rest pose is the TOP of the stroke -- the ch14 end views
-# show the rod-side arm tips (the bright tips sitting atop the matte-black
-# rods; tip lever 139.5 vs rod hole 132.76) in a flat level row at 0 cranks
-# and only ever BELOW it at 6/14/40 cranks, and the eccentric strap agrees
-# (lobe +Y at home = ring at top = rod side at its highest).  So the working
-# swing is ROD SIDE DOWN from level, which the plane-angle limit measures as
-# 90 deg INCREASING toward ~97.4; the window is 0.5 deg of margin above the
-# stroke top and the full throw + margin below it.  (The pre-#458 window
-# (82.0, 90.5) had this direction INVERTED -- it allowed only the unphysical
-# rod-side-up swing and stopped the real stroke 0.5 deg below level.)
+# with margin while rejecting the fold: SYMMETRIC about level (PR #458, user
+# requirement).  The level rest is the MID of the stroke -- sine home,
+# "middle position" (engineerguy 4/4) -- and the eccentric drives the arm
+# +-~3.72 deg about it (obliquity trims the naive asin(ecc/lever) = 3.88).
+# The measured plane angle reads 90 deg at level, INCREASING rod-side-down;
+# ROCKER_ANGLE_LIMITS below is DERIVED from the closure's full-cam-cycle
+# swing extents + margin, so it tracks any cam/lever/closure re-derive.
+# (History: the pre-#458 window (82.0, 90.5) was direction-inverted; the
+# first #458 fix (89.5, 98.0) matched the then-authored level-at-ring-TOP
+# closure, whose one-sided rod-side-down stroke the user then caught as the
+# real bug -- both superseded by the symmetric sine-home closure.)
 _AMPLITUDE_MAX_TRAVEL_MM = float(_config.machine("amplitude", "max_travel_mm"))
-ROCKER_ANGLE_LIMITS = (89.5, 98.0)
+_ROCKER_STOP_MARGIN_DEG = 0.5
 
 
-def _arc_geometry() -> dict[str, float]:
+def _arc_geometry(ring: tuple[float, float] | None = None) -> dict[str, float]:
     """Amplitude-independent rocker/rod kinematics + the top-edge arc centre.
 
     Rod-pin point P: |P - pivot| = ARM_ROD_LEVER (127.583) and
     |P - ring centre| = ROD_C2C, +X branch (rod side). The R800 arc the bar
     foot rides has its centre 808 mm out along the tilted arm's +Y, about the
-    pivot hole at local (0, 8).
+    pivot hole at local (0, 8).  ``ring`` overrides the authored RING_CENTER
+    to solve the same closure at another cam phase (the swing-extent sweep
+    below); default = the authored rest.
     """
     ox, oy = PIVOT
-    cx, cy = RING_CENTER
+    cx, cy = ring if ring is not None else RING_CENTER
     dx, dy = cx - ox, cy - oy
     d = math.hypot(dx, dy)
     a = (ARM_ROD_LEVER**2 - ROD_C2C**2 + d * d) / (2.0 * d)
@@ -707,15 +717,49 @@ def _arc_geometry() -> dict[str, float]:
 
 _ARC = _arc_geometry()
 # LEVEL rest pose is authored, not incidental: ROD_HOLE_X / ROD_C2C /
-# RING_CENTER are co-solved so the neutral arm sits flat (ch14 end views,
-# 0-crank tip row). Any drift here means one of those constants moved without
-# re-solving the closure -- fail before SolidWorks bakes the wrong pose in.
-if abs(_ARC["arm_tilt"]) > 0.02 or abs(_ARC["rod_tilt"]) > 0.02:
+# RING_CENTER are co-solved so the neutral arm sits flat at the SINE-home
+# (mid-throw) cam phase. Any drift here means one of those constants moved
+# without re-solving the closure -- fail before SolidWorks bakes the wrong
+# pose in.  The rod is NOT plumb at this rest (that is the cos-home pose):
+# the mid-throw ring sits CAM_ECC*sin(phase) off the pin's vertical, so the
+# authored rod tilt is ~2.8 deg -- band-checked, not zeroed.
+if abs(_ARC["arm_tilt"]) > 0.02 or abs(_ARC["rod_tilt"]) > 3.5:
     raise RuntimeError(
         "neutral pose no longer level: arm_tilt=%.4f deg, rod_tilt=%.4f deg "
         "-- re-solve ROD_HOLE_X (build_rocker_arm) and CENTER_DISTANCE "
         "(build_connecting_rod) against RING_CENTER" % (_ARC["arm_tilt"], _ARC["rod_tilt"])
     )
+
+
+def _rocker_swing_extents() -> tuple[float, float]:
+    """Arm-tilt extremes (deg, signed; + = rod side UP) over a full cam cycle.
+
+    Sweeps the ring around its eccentric orbit through the same two-circle
+    closure the rest pose uses; 0.5-deg steps resolve the extremes to well
+    under the stop margin.  With the sine-home closure the result is
+    ~(-3.72, +3.72): symmetric about level to within the obliquity of the
+    rod (the residual ~0.003 deg asymmetry is the 88.5-vs-90 tooth
+    quantization of the sine setup, a property of the real machine's 3-deg
+    re-clocking granularity).
+    """
+    lo = hi = 0.0
+    for k in range(720):
+        r = math.radians(k * 0.5)
+        tilt = _arc_geometry(ring=(
+            X_DRUM + CAM_ECC * math.sin(r),
+            Y_DRIVE + CAM_ECC * math.cos(r),
+        ))["arm_tilt"]
+        lo = min(lo, tilt)
+        hi = max(hi, tilt)
+    return lo, hi
+
+
+_SWING_LO, _SWING_HI = _rocker_swing_extents()
+# Measured plane angle = 90 - arm_tilt (rod-side-UP tilts read BELOW 90).
+ROCKER_ANGLE_LIMITS = (
+    round(90.0 - _SWING_HI - _ROCKER_STOP_MARGIN_DEG, 4),
+    round(90.0 - _SWING_LO + _ROCKER_STOP_MARGIN_DEG, 4),
+)
 
 
 def solve_state(amplitude: float = 0.0) -> dict[str, float]:

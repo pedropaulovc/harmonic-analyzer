@@ -626,9 +626,9 @@ sections:
       - confidence
       rows:
       - - Centre distance (cam ring → rocker pin)
-        - 163.1010 mm
-        - '5.81'
-        - 'fixed-post recenter closure: the phased cam centre moves to (−60.167, 99.155); the longer rocker lever puts its level pin at y 262.256, hence 163.101 = 262.256 − 99.155. The rod remains plumb and the arm level by construction.'
+        - 171.7180 mm
+        - '6.76'
+        - 'sine-home closure (PR #458): the arm is LEVEL with the ring at MID-throw (cam phase 88.5° = tooth-in-gap 1.5° + 29 whole 3° pitches), cam centre (−51.757, 90.744); |level pin (−60.167, 262.256) − ring| = 171.718, so the rocker swings symmetrically ±~3.72° about level. The rod hangs plumb at the cos home (ring top) and ~2.8° oblique at the authored rest.'
         - derived
         - high
       - - Cam ring bore
@@ -718,7 +718,7 @@ sections:
       - - Rod-pin hole
         - Ø2 at +127.37 from the pivot, rod side, LOW in the strap (5.3 above the bottom arc; 5.3 inboard of the bottom-arc end)
         - '5.01'
-        - 'ch30 GT closure + ch14 ROM re-derive with the post fixed: the rods hang PLUMB onto the cam centre at machine x −60.167 from drum axis −60.394. The rocker support stays at its old location; the part-local rod hole moves to x 133.067 / y 16.456 so the arm remains level and the 163.101-mm rod remains plumb.'
+        - 'ch30 GT closure + ch14 ROM re-derive with the post fixed: at the COS home the rods hang PLUMB onto the ring-top cam centre at machine x −60.167 from drum axis −60.394. The rocker support stays at its old location; the part-local rod hole moves to x 133.067 / y 16.456 so the arm sits level at mid-throw and the 171.718-mm rod is plumb at the ring''s top (sine-home closure, PR #458).'
         - derived
         - high
       - - Pivot pin hole
@@ -1048,8 +1048,8 @@ sections:
         - ch. 17/18 + assembly solve (level rest pose)
         - med
       - - Default mechanism state
-        - 'gear notches near +Y with the drive-train''s preserved +1.5° local-Y tooth phase → cam centres at (−60.167, 99.155) = drum (−60.394, 90.518) + 8.64·(sin 1.5°, cos 1.5°). The asymmetric cylinder bodies are Ry180 end-for-end, putting each cam plane at z_j −3.25; 163.101 rods reach the level-arm pins. 0 cranks = cos mode reading +1 on every channel.'
-        - ch. 13/14 end views + ch. 25 + assembly solve (ch14 ROM re-derive 2026-07-02)
+        - 'gear notches to the SIDE (sine home, "middle position") at cam phase 88.5° = tooth-in-gap 1.5° + 29 whole 3° pitches → cam centres at (−51.757, 90.744) = drum (−60.394, 90.518) + 8.64·(sin 88.5°, cos 88.5°). The asymmetric cylinder bodies are Ry180 end-for-end, putting each cam plane at z_j −3.25; 171.718 rods reach the level-arm pins (arm level = MID of the ±~3.72° swing). Re-clock every gear 29 pitches back for the cos setup (notches up, every channel at +1).'
+        - ch. 13/14 end views + engineerguy 4/4 mode setups + ch. 25 + assembly solve (PR #458 symmetric-swing re-derive 2026-08-01)
         - derived
   - prose: |2
 

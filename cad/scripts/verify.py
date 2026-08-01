@@ -1261,10 +1261,12 @@ _CHANNEL_CHORD_TOL_MM = 0.05  # per-step driven-dimension geometric readback
 _CHANNEL_STROKE_SLIDE_TOL_MM = 0.5  # foot slide along the edge over a stroke
 _CHANNEL_MIN_UPRIGHT_DOT = 0.25
 _CHANNEL_MAX_STEP_DEG = 30.0
-# The physical working stroke dips the ROD SIDE below the level rest pose
-# (ch14 end views: the rod-side tips sit level at the TOP of the stroke at
-# 0 cranks), which the measured plane angle reads as 90 deg INCREASING.
-_CHANNEL_ROCKER_TEST_ANGLE_DEG = 95.0
+# The physical working stroke is SYMMETRIC about the level rest (sine-home
+# closure, PR #458): the eccentric swings the arm +-~3.72 deg about level,
+# which the measured plane angle reads as 90 -+ tilt (rod-side-down reads
+# ABOVE 90).  Stroke the tandem proof to BOTH sides, inside the stops
+# (ROCKER_ANGLE_LIMITS ~(85.78, 94.22)).
+_CHANNEL_ROCKER_TEST_ANGLES_DEG = (86.5, 93.5)
 
 
 async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) -> None:
@@ -1524,76 +1526,85 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                     f"cannot read transient channel rocker drive {rocker_mate!r}"
                 )
 
-            # Lower the rocker five degrees about its real pivot.  Distance mate
-            # system values are metres even though manifest distances are mm.
-            theta = math.radians(_CHANNEL_ROCKER_TEST_ANGLE_DEG - 90.0)
+            # Stroke the rocker BOTH ways about its real pivot (symmetric
+            # swing, PR #458).  Distance mate system values are metres even
+            # though manifest distances are mm.
             dx = rod_bore[0] - pivot_point[0]
             dy = rod_bore[1] - pivot_point[1]
-            target_y = pivot_point[1] + dx * math.sin(theta) + dy * math.cos(theta)
-            rocker_param.SystemValue = target_y / 1000.0
-            _rebuild(adapter)
-            moved_state = _contact_state()
-            (
-                plane_error,
-                roof_error,
-                rocker_dot,
-                bar_dot,
-                rocker_angle,
-                _moved_amplitude_angle,
-            ) = moved_state
-            # TANDEM: friction means the foot never slides along the edge --
-            # its position IN THE ROCKER'S FRAME (the material point) is
-            # pinned while the stroke carries it (PR #458).  The bar's
-            # ORIENTATION is allowed to stay with its hang from the lever;
-            # asserting the rocker<->bar relative angle constant here would
-            # re-demand the retired angle-mate physics that broke the
-            # zero-amplitude station.
-            rf_moved = _foot_in_rocker_frame()
-            slide = math.hypot(
-                rf_moved[0] - rf_seated[0], rf_moved[1] - rf_seated[1]
-            )
-            if slide > _CHANNEL_STROKE_SLIDE_TOL_MM:
-                raise RuntimeError(
-                    f"rocker stroke slid the foot {slide:.3f} mm along the "
-                    f"edge at travel {travel:+.1f} mm (tol "
-                    f"{_CHANNEL_STROKE_SLIDE_TOL_MM}) -- the bar did not ride "
-                    "its material point in tandem"
+            for test_angle in _CHANNEL_ROCKER_TEST_ANGLES_DEG:
+                theta = math.radians(test_angle - 90.0)
+                target_y = (
+                    pivot_point[1] + dx * math.sin(theta) + dy * math.cos(theta)
                 )
-            if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
-                raise RuntimeError(
-                    f"rocker stroke at travel {travel:+.1f} mm left the arc: "
-                    f"foot radial error {plane_error:.3f} mm, roof radial "
-                    f"error {roof_error:.3f} mm"
+                rocker_param.SystemValue = target_y / 1000.0
+                _rebuild(adapter)
+                moved_state = _contact_state()
+                (
+                    plane_error,
+                    roof_error,
+                    rocker_dot,
+                    bar_dot,
+                    rocker_angle,
+                    _moved_amplitude_angle,
+                ) = moved_state
+                # TANDEM: friction means the foot never slides along the edge
+                # -- its position IN THE ROCKER'S FRAME (the material point)
+                # is pinned while the stroke carries it (PR #458).  The bar's
+                # ORIENTATION is allowed to stay with its hang from the lever;
+                # asserting the rocker<->bar relative angle constant here
+                # would re-demand the retired angle-mate physics that broke
+                # the zero-amplitude station.
+                rf_moved = _foot_in_rocker_frame()
+                slide = math.hypot(
+                    rf_moved[0] - rf_seated[0], rf_moved[1] - rf_seated[1]
                 )
-            if min(rocker_dot, bar_dot) < _CHANNEL_MIN_UPRIGHT_DOT:
-                raise RuntimeError(
-                    f"rocker stroke inverted a component at travel "
-                    f"{travel:+.1f} mm: rocker dot {rocker_dot:.3f}, "
-                    f"bar dot {bar_dot:.3f}"
+                if slide > _CHANNEL_STROKE_SLIDE_TOL_MM:
+                    raise RuntimeError(
+                        f"rocker stroke to {test_angle:.1f} deg slid the foot "
+                        f"{slide:.3f} mm along the edge at travel "
+                        f"{travel:+.1f} mm (tol "
+                        f"{_CHANNEL_STROKE_SLIDE_TOL_MM}) -- the bar did not "
+                        "ride its material point in tandem"
+                    )
+                if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
+                    raise RuntimeError(
+                        f"rocker stroke to {test_angle:.1f} deg at travel "
+                        f"{travel:+.1f} mm left the arc: foot radial error "
+                        f"{plane_error:.3f} mm, roof radial error "
+                        f"{roof_error:.3f} mm"
+                    )
+                if min(rocker_dot, bar_dot) < _CHANNEL_MIN_UPRIGHT_DOT:
+                    raise RuntimeError(
+                        f"rocker stroke to {test_angle:.1f} deg inverted a "
+                        f"component at travel {travel:+.1f} mm: rocker dot "
+                        f"{rocker_dot:.3f}, bar dot {bar_dot:.3f}"
+                    )
+                rocker_motion = abs(math.remainder(
+                    rocker_angle - pre_stroke[4], 360.0
+                ))
+                if rocker_motion < 2.0:
+                    raise RuntimeError(
+                        f"rocker moved only {rocker_motion:.2f} deg during "
+                        f"the {test_angle:.1f} deg stroke proof"
+                    )
+                foot_moved = world_point(adapter, bar, BAR_FOOT_LOCAL)
+                ride = math.hypot(
+                    foot_moved[0] - foot_seated[0],
+                    foot_moved[1] - foot_seated[1],
                 )
-            rocker_motion = abs(math.remainder(
-                rocker_angle - pre_stroke[4], 360.0
-            ))
-            if rocker_motion < 2.0:
-                raise RuntimeError(
-                    f"rocker moved only {rocker_motion:.2f} deg during the "
-                    "lowering proof"
+                bar_tilt_change = abs(
+                    _rotation_from_rest(_vectors()[1], rest_bar)
+                    - bar_tilt_seated
                 )
-            foot_moved = world_point(adapter, bar, BAR_FOOT_LOCAL)
-            ride = math.hypot(
-                foot_moved[0] - foot_seated[0], foot_moved[1] - foot_seated[1]
-            )
-            bar_tilt_change = abs(
-                _rotation_from_rest(_vectors()[1], rest_bar) - bar_tilt_seated
-            )
-            _telemetry.info(
-                f"channel travel {travel:+.1f} mm: radial errors "
-                f"{plane_error:.4f}/{roof_error:.4f} mm, upright dots "
-                f"{rocker_dot:.3f}/{bar_dot:.3f}, rocker motion "
-                f"{rocker_motion:.3f} deg rode the foot {ride:.3f} mm "
-                f"(edge slide {slide:.4f} mm, bar tilt change "
-                f"{bar_tilt_change:.3f} deg)"
-            )
+                _telemetry.info(
+                    f"channel travel {travel:+.1f} mm stroke to "
+                    f"{test_angle:.1f} deg: radial errors "
+                    f"{plane_error:.4f}/{roof_error:.4f} mm, upright dots "
+                    f"{rocker_dot:.3f}/{bar_dot:.3f}, rocker motion "
+                    f"{rocker_motion:.3f} deg rode the foot {ride:.3f} mm "
+                    f"(edge slide {slide:.4f} mm, bar tilt change "
+                    f"{bar_tilt_change:.3f} deg)"
+                )
             delete_assembly_feature(adapter, rocker_mate)
         finally:
             discard_open_documents(adapter)
@@ -1628,10 +1639,12 @@ _CHANNEL_DRAG_STEPS = 6
 # regardless of step size -- a regression back to that sluggishness should
 # fail here, not pass under a token floor.)
 _CHANNEL_DRAG_MIN_MOTION_DEG = {0: 2.0, 1: 2.0, 2: 2.0}
-# Rod-side-UP from the level rest is the physical STOP side (the eccentric
-# strap tops out at home): a drag that way must be swallowed by the
-# rocker-stop within its margin + solver overshoot, never swing through.
-_CHANNEL_DRAG_UP_STOP_MAX_DEG = 1.2
+# BOTH rocker stops are physical (symmetric window, PR #458): the eccentric
+# swings the arm +-~3.72 deg about level and the stops sit a margin beyond.
+# A stop-limited stroke's measured motion must land within this band of the
+# expectation -- the window's remaining room on an approach, ~zero on a press
+# from the stop itself -- covering stop margin + drag-solver overshoot.
+_CHANNEL_DRAG_STOP_TOL_DEG = 1.2
 _CHANNEL_DRAG_STATION_TOL_MM = 0.5  # foot slide along the edge per stroke
 
 
@@ -1642,6 +1655,7 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
         ARM_ARC_CENTER_LOCAL_Y,
         BAR_FOOT_LOCAL,
         PIVOT,
+        ROCKER_ANGLE_LIMITS,
         ROCKER_ROD_BORE_LOCAL,
         solve_state,
     )
@@ -1736,7 +1750,7 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                     )
 
             def _drag_stroke(
-                mode: int, stroke_deg: float, *, expect_stop: bool = False
+                mode: int, stroke_deg: float, *, stop_expect: float | None = None
             ) -> float:
                 pivot = world_point(adapter, rocker, pivot_local)
                 before_rocker, _ = _vectors()
@@ -1753,17 +1767,18 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                 )
                 _telemetry.info(
                     f"drag mode={mode} stroke={stroke_deg:+.1f} deg"
-                    f"{' (stop side)' if expect_stop else ''}: rocker "
-                    f"moved {motion:+.3f} deg, foot edge-slide {drift:.3f} mm"
+                    f"{' (stop side)' if stop_expect is not None else ''}: "
+                    f"rocker moved {motion:+.3f} deg, foot edge-slide "
+                    f"{drift:.3f} mm"
                 )
-                if expect_stop:
-                    if abs(motion) > _CHANNEL_DRAG_UP_STOP_MAX_DEG:
+                if stop_expect is not None:
+                    if abs(motion - stop_expect) > _CHANNEL_DRAG_STOP_TOL_DEG:
                         raise RuntimeError(
                             f"drag mode {mode} stroke {stroke_deg:+.1f} deg "
-                            f"swung the rocker {motion:+.3f} deg through the "
-                            f"rod-side-up STOP (max "
-                            f"{_CHANNEL_DRAG_UP_STOP_MAX_DEG}) -- the "
-                            "rocker-stop window is inverted or gone"
+                            f"moved the rocker {motion:+.3f} deg where the "
+                            f"stop allows {stop_expect:+.3f} deg (tol "
+                            f"{_CHANNEL_DRAG_STOP_TOL_DEG}) -- the "
+                            "rocker-stop window is off, inverted or gone"
                         )
                     # Pressing INTO the limit leaves the drag solver's
                     # unresolved residual in the raw pose (measured 0.77 mm
@@ -1802,26 +1817,36 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                 return motion
 
             # The user's repro station: the arc end.  Then the neutral rest,
-            # where a slide has the most room in both directions.  Positive
-            # stroke = rod side down = INTO the physical window; the working
-            # pair goes down-and-back, then the rod-side-up stop is proven
-            # (drag INTO the stop, expect it swallowed, and drag back down
-            # by however far it actually crept so the next station seats
-            # from the rest pose).
+            # where a slide has the most room in both directions.  The working
+            # +-3 deg pairs fit inside the symmetric window (~4.2 deg of room
+            # each side from level); then BOTH stops are proven: approach each
+            # edge with a stroke that overshoots the window (the drag must be
+            # swallowed AT the stop -- motion ~= the room left), press again
+            # from the stop (motion ~= 0), and drag back to level by the
+            # measured total so the next station seats from the rest pose.
             for target_travel in (_AMPLITUDE_MAX_TRAVEL_MM, 0.0):
                 await _seat_station(target_travel)
                 for mode in (0, 2, 1):
                     _drag_stroke(mode, +_CHANNEL_DRAG_STROKE_DEG)
                     _drag_stroke(mode, -_CHANNEL_DRAG_STROKE_DEG)
-                crept = _drag_stroke(
-                    0, -_CHANNEL_DRAG_STROKE_DEG, expect_stop=True
-                )
-                if abs(crept) > 0.01:
-                    drag_rotate_component(
-                        adapter, rocker,
-                        world_point(adapter, rocker, pivot_local),
-                        -crept, steps=2, mode=0,
+                for sign, edge in (
+                    (+1.0, ROCKER_ANGLE_LIMITS[1]),
+                    (-1.0, ROCKER_ANGLE_LIMITS[0]),
+                ):
+                    room = abs(edge - 90.0)
+                    reached = _drag_stroke(
+                        0, sign * (room + 1.5), stop_expect=sign * room
                     )
+                    crept = _drag_stroke(
+                        0, sign * _CHANNEL_DRAG_STROKE_DEG, stop_expect=0.0
+                    )
+                    total = reached + crept
+                    if abs(total) > 0.01:
+                        drag_rotate_component(
+                            adapter, rocker,
+                            world_point(adapter, rocker, pivot_local),
+                            -total, steps=_CHANNEL_DRAG_STEPS, mode=0,
+                        )
         finally:
             discard_open_documents(adapter)
 
@@ -1832,15 +1857,16 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
 # The Fourier a_j = 0 station is the point of the amplitude mechanism: with
 # the bar seated at NEUTRAL, rocking the rocker must contribute NOTHING to
 # the channel output.  Geometrically the neutral contact point sits ~16 mm
-# above the rocker pivot, so a 5-degree stroke shuffles it ~1.4 mm
-# horizontally and lifts it ~0.06 mm -- the bar "stays put".  The friction
+# above the rocker pivot, so a 3.5-degree stroke shuffles it ~1.0 mm
+# horizontally and lifts it ~0.03 mm -- the bar "stays put".  The friction
 # the station models pins the notch to that MATERIAL POINT of the rocker
 # edge; the bar's own orientation stays governed by its hang from the lever,
 # NOT by the rocker's tilt.  A scheme that instead pins the rocker<->bar
 # RELATIVE angle transmits the full rocker rotation into the bar at every
 # station -- at neutral the bar visibly tilts and walks (the user repro this
-# gate encodes).
-_CHANNEL_NEUTRAL_SWEEP_DEG = 5.0
+# gate encodes).  The sweep runs BOTH ways (symmetric swing, PR #458),
+# staying inside the ~(85.78, 94.22) stop window.
+_CHANNEL_NEUTRAL_SWEEP_DEG = 3.5
 _CHANNEL_NEUTRAL_STEPS = 5
 _CHANNEL_NEUTRAL_ROCKER_TRACK_TOL_DEG = 0.3  # drive must actually move rocker
 _CHANNEL_NEUTRAL_BAR_TILT_TOL_DEG = 0.5
@@ -1942,20 +1968,21 @@ async def _verify_channel_bar_neutral_isolation_one(
             dx = rod_bore[0] - pivot_point[0]
             dy = rod_bore[1] - pivot_point[1]
 
-            # Down through the working stroke and back to rest, asserting at
-            # every step: the rocker actually tracked the request, and the
-            # bar stayed put -- orientation, foot AND lever end.
-            # Positive = the physical working direction (rod side dips below
-            # the level rest; the measured plane angle increases).
+            # Through the working stroke BOTH ways and back to rest,
+            # asserting at every step: the rocker actually tracked the
+            # request, and the bar stayed put -- orientation, foot AND lever
+            # end.  Positive = rod side dips below the level rest (measured
+            # plane angle increases); the symmetric swing makes the negative
+            # half just as physical, so the sweep covers it too.
             steps = list(range(1, _CHANNEL_NEUTRAL_STEPS + 1))
-            sweep = [
+            half = [
                 _CHANNEL_NEUTRAL_SWEEP_DEG * s / _CHANNEL_NEUTRAL_STEPS
                 for s in steps
-            ] + [
-                _CHANNEL_NEUTRAL_SWEEP_DEG
-                * (_CHANNEL_NEUTRAL_STEPS - s) / _CHANNEL_NEUTRAL_STEPS
-                for s in steps
             ]
+            back = [x for x in reversed(half[:-1])] + [0.0]
+            sweep = (
+                half + back + [-x for x in half] + [-x for x in back]
+            )
             worst = {"tilt": 0.0, "foot": 0.0, "top": 0.0}
             for requested in sweep:
                 theta = math.radians(requested)
@@ -2003,9 +2030,10 @@ async def _verify_channel_bar_neutral_isolation_one(
                         "must feed no output"
                     )
             _telemetry.info(
-                f"neutral isolation over ±{_CHANNEL_NEUTRAL_SWEEP_DEG:.0f} deg "
-                f"stroke: worst bar tilt {worst['tilt']:.3f} deg, foot walk "
-                f"{worst['foot']:.3f} mm, lever-end walk {worst['top']:.3f} mm"
+                f"neutral isolation over ±{_CHANNEL_NEUTRAL_SWEEP_DEG:.1f} deg "
+                f"(both ways): worst bar tilt {worst['tilt']:.3f} deg, foot "
+                f"walk {worst['foot']:.3f} mm, lever-end walk "
+                f"{worst['top']:.3f} mm"
             )
             delete_assembly_feature(adapter, rocker_mate)
         finally:

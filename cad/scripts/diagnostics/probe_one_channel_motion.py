@@ -52,7 +52,7 @@ from _assembly import (
 # drive-train cam (build_drive_train_assembly / build_cylinder_gear)
 X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = DRUM_X, 90.518, CHANNEL_Z0, 7.0568
 DRUM_FACE = 3.0
-GEAR_PHASE_DEG = 1.5
+from cam_phase_spec import CAM_PHASE_DEG as GEAR_PHASE_DEG  # noqa: E402
 CAM_R = 25.4  # cam lobe OD radius (Ø50.8)
 
 CAM_RPM = 30.0
