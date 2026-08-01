@@ -18,6 +18,17 @@ whole cam→rocker→rod chain re-authored around it.
 - **Lobe points +Y (toward the notch) — the old model was 180° off.** At 0
   cranks (notch up = cos mode) the end views show all 20 tips in a flat LEVEL
   row at the TOP of the stroke: cos reads +1 at home, so the lobe is UP.
+  **2026-08-01 clarification (PR #458 user catch): the photographed tips are
+  the ROD-SIDE arm ends** — each bright tip sits directly atop its
+  matte-black connecting rod in the end views, and the 139.5 tip lever is
+  just past the 132.76 rod hole (nowhere near the ~130 tail). So the chain
+  reads: lobe UP ⇒ ring at TOP ⇒ ROD SIDE at its highest (= the level rest)
+  at cos home, and the working stroke dips the ROD SIDE below level (the
+  measured rocker plane angle INCREASES 90→~97.4). The rocker-stop window
+  shipped as (82.0, 90.5) — allowing only the mirror-image rod-side-UP swing
+  — was this direction INVERTED; a manual UI drag of the rod end downward
+  (the real stroke) hit the 0.5° margin instantly. Fixed to (89.5, 98.0)
+  with the drag gate now proving both the working swing and the up-side stop.
 - **The rest pose is LEVEL and *authored*, not incidental**: `ROD_HOLE_X`
   127.49 → **127.3738**, `ROD_C2C`/`CENTER_DISTANCE` 144.75 → **147.6655**,
   `RING_CENTER` = (54.474, 113.437) are co-solved so arm tilt = rod tilt = 0

@@ -1261,7 +1261,10 @@ _CHANNEL_CHORD_TOL_MM = 0.05  # per-step driven-dimension geometric readback
 _CHANNEL_STROKE_SLIDE_TOL_MM = 0.5  # foot slide along the edge over a stroke
 _CHANNEL_MIN_UPRIGHT_DOT = 0.25
 _CHANNEL_MAX_STEP_DEG = 30.0
-_CHANNEL_ROCKER_TEST_ANGLE_DEG = 85.0
+# The physical working stroke dips the ROD SIDE below the level rest pose
+# (ch14 end views: the rod-side tips sit level at the TOP of the stroke at
+# 0 cranks), which the measured plane angle reads as 90 deg INCREASING.
+_CHANNEL_ROCKER_TEST_ANGLE_DEG = 95.0
 
 
 async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) -> None:
@@ -1625,6 +1628,10 @@ _CHANNEL_DRAG_STEPS = 6
 # regardless of step size -- a regression back to that sluggishness should
 # fail here, not pass under a token floor.)
 _CHANNEL_DRAG_MIN_MOTION_DEG = {0: 2.0, 1: 2.0, 2: 2.0}
+# Rod-side-UP from the level rest is the physical STOP side (the eccentric
+# strap tops out at home): a drag that way must be swallowed by the
+# rocker-stop within its margin + solver overshoot, never swing through.
+_CHANNEL_DRAG_UP_STOP_MAX_DEG = 1.2
 _CHANNEL_DRAG_STATION_TOL_MM = 0.5  # foot slide along the edge per stroke
 
 
@@ -1728,7 +1735,9 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                         f"seated at {seated:.3f} mm"
                     )
 
-            def _drag_stroke(mode: int, stroke_deg: float) -> None:
+            def _drag_stroke(
+                mode: int, stroke_deg: float, *, expect_stop: bool = False
+            ) -> float:
                 pivot = world_point(adapter, rocker, pivot_local)
                 before_rocker, _ = _vectors()
                 before_rf = _foot_in_rocker_frame()
@@ -1743,10 +1752,41 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                     after_rf[0] - before_rf[0], after_rf[1] - before_rf[1]
                 )
                 _telemetry.info(
-                    f"drag mode={mode} stroke={stroke_deg:+.1f} deg: rocker "
+                    f"drag mode={mode} stroke={stroke_deg:+.1f} deg"
+                    f"{' (stop side)' if expect_stop else ''}: rocker "
                     f"moved {motion:+.3f} deg, foot edge-slide {drift:.3f} mm"
                 )
-                if abs(motion) < _CHANNEL_DRAG_MIN_MOTION_DEG[mode]:
+                if expect_stop:
+                    if abs(motion) > _CHANNEL_DRAG_UP_STOP_MAX_DEG:
+                        raise RuntimeError(
+                            f"drag mode {mode} stroke {stroke_deg:+.1f} deg "
+                            f"swung the rocker {motion:+.3f} deg through the "
+                            f"rod-side-up STOP (max "
+                            f"{_CHANNEL_DRAG_UP_STOP_MAX_DEG}) -- the "
+                            "rocker-stop window is inverted or gone"
+                        )
+                    # Pressing INTO the limit leaves the drag solver's
+                    # unresolved residual in the raw pose (measured 0.77 mm
+                    # in relaxation mode); the station contract at the stop
+                    # is no PERSISTENT slide once the solve settles.
+                    _rebuild(adapter)
+                    settled_rf = _foot_in_rocker_frame()
+                    settled = math.hypot(
+                        settled_rf[0] - before_rf[0],
+                        settled_rf[1] - before_rf[1],
+                    )
+                    _telemetry.info(
+                        f"  stop-side settled edge-slide {settled:.3f} mm "
+                        f"(raw {drift:.3f} mm)"
+                    )
+                    if settled > _CHANNEL_DRAG_STATION_TOL_MM:
+                        raise RuntimeError(
+                            f"stop-side drag left the foot {settled:.3f} mm "
+                            f"off its station after re-solve (tol "
+                            f"{_CHANNEL_DRAG_STATION_TOL_MM})"
+                        )
+                    return motion
+                elif abs(motion) < _CHANNEL_DRAG_MIN_MOTION_DEG[mode]:
                     raise RuntimeError(
                         f"drag mode {mode} stroke {stroke_deg:+.1f} deg moved "
                         f"the rocker only {motion:+.3f} deg -- the operational "
@@ -1759,14 +1799,29 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                         f"{_CHANNEL_DRAG_STATION_TOL_MM}) -- the bar does not "
                         "follow the rocker under manual manipulation"
                     )
+                return motion
 
             # The user's repro station: the arc end.  Then the neutral rest,
-            # where a slide has the most room in both directions.
+            # where a slide has the most room in both directions.  Positive
+            # stroke = rod side down = INTO the physical window; the working
+            # pair goes down-and-back, then the rod-side-up stop is proven
+            # (drag INTO the stop, expect it swallowed, and drag back down
+            # by however far it actually crept so the next station seats
+            # from the rest pose).
             for target_travel in (_AMPLITUDE_MAX_TRAVEL_MM, 0.0):
                 await _seat_station(target_travel)
                 for mode in (0, 2, 1):
-                    _drag_stroke(mode, -_CHANNEL_DRAG_STROKE_DEG)
                     _drag_stroke(mode, +_CHANNEL_DRAG_STROKE_DEG)
+                    _drag_stroke(mode, -_CHANNEL_DRAG_STROKE_DEG)
+                crept = _drag_stroke(
+                    0, -_CHANNEL_DRAG_STROKE_DEG, expect_stop=True
+                )
+                if abs(crept) > 0.01:
+                    drag_rotate_component(
+                        adapter, rocker,
+                        world_point(adapter, rocker, pivot_local),
+                        -crept, steps=2, mode=0,
+                    )
         finally:
             discard_open_documents(adapter)
 
@@ -1890,12 +1945,14 @@ async def _verify_channel_bar_neutral_isolation_one(
             # Down through the working stroke and back to rest, asserting at
             # every step: the rocker actually tracked the request, and the
             # bar stayed put -- orientation, foot AND lever end.
+            # Positive = the physical working direction (rod side dips below
+            # the level rest; the measured plane angle increases).
             steps = list(range(1, _CHANNEL_NEUTRAL_STEPS + 1))
             sweep = [
-                -_CHANNEL_NEUTRAL_SWEEP_DEG * s / _CHANNEL_NEUTRAL_STEPS
+                _CHANNEL_NEUTRAL_SWEEP_DEG * s / _CHANNEL_NEUTRAL_STEPS
                 for s in steps
             ] + [
-                -_CHANNEL_NEUTRAL_SWEEP_DEG
+                _CHANNEL_NEUTRAL_SWEEP_DEG
                 * (_CHANNEL_NEUTRAL_STEPS - s) / _CHANNEL_NEUTRAL_STEPS
                 for s in steps
             ]

@@ -649,10 +649,20 @@ BAR_TANGENT_DISTANCE = ARM_TOP_RADIUS + BAR_FOOT_NOTCH - BAR_CONTACT_GAP
 # Both travel stops are biased around 90 degrees so SolidWorks cannot fold the
 # two senses together as it does for an unsigned distance or a zero-centred
 # angle.  The amplitude endpoint is the exact plane/axis tangent solve at
-# +/-max_travel_mm.  The rocker window covers its physical cam-driven
-# -7.43..0 degree stroke with margin while rejecting the inverted branch.
+# +/-max_travel_mm.  The rocker window covers its physical cam-driven stroke
+# with margin while rejecting the inverted branch.  DIRECTION (PR #458, user
+# catch): the level rest pose is the TOP of the stroke -- the ch14 end views
+# show the rod-side arm tips (the bright tips sitting atop the matte-black
+# rods; tip lever 139.5 vs rod hole 132.76) in a flat level row at 0 cranks
+# and only ever BELOW it at 6/14/40 cranks, and the eccentric strap agrees
+# (lobe +Y at home = ring at top = rod side at its highest).  So the working
+# swing is ROD SIDE DOWN from level, which the plane-angle limit measures as
+# 90 deg INCREASING toward ~97.4; the window is 0.5 deg of margin above the
+# stroke top and the full throw + margin below it.  (The pre-#458 window
+# (82.0, 90.5) had this direction INVERTED -- it allowed only the unphysical
+# rod-side-up swing and stopped the real stroke 0.5 deg below level.)
 _AMPLITUDE_MAX_TRAVEL_MM = float(_config.machine("amplitude", "max_travel_mm"))
-ROCKER_ANGLE_LIMITS = (82.0, 90.5)
+ROCKER_ANGLE_LIMITS = (89.5, 98.0)
 
 
 def _arc_geometry() -> dict[str, float]:
