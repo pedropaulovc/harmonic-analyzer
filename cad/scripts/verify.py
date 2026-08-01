@@ -91,6 +91,7 @@ from _assembly import (
     component_names,
     component_transform,
     delete_assembly_feature,
+    drag_rotate_component,
     named_ref,
     repair_dangling_mates,
     save_assembly_in_place,
@@ -1532,6 +1533,159 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
         )
 
 
+# Manual-manipulation station hold (PR #458).  The transient-drive stroke above
+# uses the MATE solver; the user lowers the rocker with Move Components, whose
+# DRAG solver spends free DOF by its own move-minimisation.  Live-probed on the
+# shipped scheme: the mate re-solve holds the bar's rocker-relative station to
+# 0.06 deg while every IDragOperator mode slides it 1:1 with the rocker -- the
+# bar visibly hangs in the air as the arm tips away under it.  The physical
+# machine holds station by notch friction (book ch.15), so the model must keep
+# it through a rocker drag.  Modes pinned: 0 (maximum/rigid move) and
+# 2 (relaxation); mode 1 (minimum move) is exercised but only sanity-bounded --
+# live it overshoots erratically (-7.7 deg on a -3 deg stroke).
+_CHANNEL_DRAG_STROKE_DEG = 3.0
+_CHANNEL_DRAG_STEPS = 6
+_CHANNEL_DRAG_MIN_MOTION_DEG = 2.0  # the drag must actually move the rocker
+_CHANNEL_DRAG_STATION_TOL_DEG = 0.25  # station drift allowed over one stroke
+
+
+async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
+    """Drag the rocker (Move Components path) and pin the bar station."""
+    from build_channel_assembly import (
+        AMPLITUDE_ANGLE_LIMITS,
+        ARM_ARC_CENTER_LOCAL_Y,
+    )
+
+    name = CHANNEL_OWNER
+    sldasm = OUT_SLDASM / f"{name}.SLDASM"
+    if not sldasm.exists():
+        report.failed.append((f"chain:{name}:open", f"not built: {sldasm}"))
+        _telemetry.error(f"{sldasm.name} not built -- run doit")
+        return
+    if not _assert_fresh(name, report):
+        return
+
+    async def _exercise_drag() -> None:
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        check(f"open {name}", await adapter.open_model(str(sldasm)))
+        model = adapter.currentModel
+        try:
+            rocker, bar = "rocker-arm-1", "amplitude-bar-1"
+            pivot_local = [0.0, 8.0, 0.0]
+
+            def _unit(v: tuple[float, float]) -> tuple[float, float]:
+                mag = math.hypot(*v)
+                if mag <= 1e-9:
+                    raise RuntimeError("zero-length channel orientation witness")
+                return (v[0] / mag, v[1] / mag)
+
+            def _vectors() -> tuple[tuple[float, float], tuple[float, float]]:
+                pivot = world_point(adapter, rocker, pivot_local)
+                arc = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
+                bar0 = world_point(adapter, bar, [0.0, 0.0, 0.0])
+                bar1 = world_point(adapter, bar, [0.0, 1.0, 0.0])
+                return (
+                    _unit((arc[0] - pivot[0], arc[1] - pivot[1])),
+                    _unit((bar1[0] - bar0[0], bar1[1] - bar0[1])),
+                )
+
+            rest_rocker, rest_bar = _vectors()
+
+            def _rot(cur: tuple[float, float], rest: tuple[float, float]) -> float:
+                cross = rest[0] * cur[1] - rest[1] * cur[0]
+                dot = rest[0] * cur[0] + rest[1] * cur[1]
+                return math.degrees(math.atan2(cross, dot))
+
+            def station() -> float:
+                rocker_u, bar_u = _vectors()
+                return 90.0 + _rot(rocker_u, rest_rocker) - _rot(bar_u, rest_bar)
+
+            async def _seat_station(target: float) -> None:
+                """Ramp a transient rocker<->bar angle drive to *target*, then
+                release it -- the manual 'slide the bar to a station' setup.
+                The drive is authored AT the current station (authoring it at
+                the target would jump the mechanism in one solve, the branch
+                hazard the contact sweep ramps to avoid)."""
+                start = station()
+                result = await angle_driver(
+                    adapter,
+                    named_ref(f"Right Plane@{rocker}", "PLANE"),
+                    named_ref(f"Top Plane@{bar}", "PLANE"),
+                    start,
+                    label=f"VERIFY drag-seat station {target:.3f} deg",
+                )
+                param = adapter._attempt(
+                    lambda: model.Parameter(f"D1@{result['name']}"), default=None
+                )
+                if param is None:
+                    raise RuntimeError("cannot read transient station drive")
+                for step in range(1, 9):
+                    param.SystemValue = math.radians(
+                        start + (target - start) * step / 8.0
+                    )
+                    _rebuild(adapter)
+                delete_assembly_feature(adapter, result["name"])
+                _rebuild(adapter)
+                seated = station()
+                if abs(math.remainder(seated - target, 360.0)) > 0.5:
+                    raise RuntimeError(
+                        f"station seat missed: asked {target:.3f} deg, "
+                        f"released at {seated:.3f} deg"
+                    )
+
+            def _drag_stroke(mode: int, stroke_deg: float) -> None:
+                pivot = world_point(adapter, rocker, pivot_local)
+                before_rocker, _ = _vectors()
+                before_station = station()
+                drag_rotate_component(
+                    adapter, rocker, pivot, stroke_deg,
+                    steps=_CHANNEL_DRAG_STEPS, mode=mode,
+                )
+                after_rocker, _ = _vectors()
+                motion = _rot(after_rocker, before_rocker)
+                drift = station() - before_station
+                _telemetry.info(
+                    f"drag mode={mode} stroke={stroke_deg:+.1f} deg: rocker "
+                    f"moved {motion:+.3f} deg, station drift {drift:+.3f} deg"
+                )
+                if abs(motion) < _CHANNEL_DRAG_MIN_MOTION_DEG:
+                    raise RuntimeError(
+                        f"drag mode {mode} stroke {stroke_deg:+.1f} deg moved "
+                        f"the rocker only {motion:+.3f} deg -- the operational "
+                        "DOF no longer drags"
+                    )
+                if mode == 1:
+                    # Minimum-move is erratic live; bound it to the shipped
+                    # range instead of the tight station pin.
+                    lower, upper = AMPLITUDE_ANGLE_LIMITS
+                    now = station()
+                    if not (lower - 0.5 <= now <= upper + 0.5):
+                        raise RuntimeError(
+                            f"drag mode 1 pushed the station outside "
+                            f"{lower:.3f}..{upper:.3f} deg: {now:.3f} deg"
+                        )
+                    return
+                if abs(drift) > _CHANNEL_DRAG_STATION_TOL_DEG:
+                    raise RuntimeError(
+                        f"drag mode {mode} stroke {stroke_deg:+.1f} deg slid "
+                        f"the bar station {drift:+.3f} deg (tol "
+                        f"{_CHANNEL_DRAG_STATION_TOL_DEG}) -- the bar does not "
+                        "follow the rocker under manual manipulation"
+                    )
+
+            # The user's repro station: the arc end.  Then the neutral rest,
+            # where a slide has the most room in both directions.
+            for target in (max(AMPLITUDE_ANGLE_LIMITS), 90.0):
+                await _seat_station(target)
+                for mode in (0, 2, 1):
+                    _drag_stroke(mode, -_CHANNEL_DRAG_STROKE_DEG)
+                    _drag_stroke(mode, +_CHANNEL_DRAG_STROKE_DEG)
+        finally:
+            discard_open_documents(adapter)
+
+    await report.agate(f"chain:{name}:bar-station-drag", _exercise_drag)
+
+
 async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     """Kinematic proof that the crank drives the WHOLE paper feed (codex #189).
 
@@ -2215,6 +2369,7 @@ async def build(adapter: Any) -> dict[str, str]:
         await _verify_motion_one(adapter, report)
         await _verify_live_chain_one(adapter, report)
         await _verify_channel_amplitude_contact_one(adapter, report)
+        await _verify_channel_bar_drag_one(adapter, report)
         await _verify_paper_feed_one(adapter, report)
     if suite == "math":
         verify_truth(report)

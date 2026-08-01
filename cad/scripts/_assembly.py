@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
@@ -2367,6 +2368,71 @@ def component_names(adapter: Any) -> list[str]:
         # No flag: Name2 is a property read (issue #87).
         names.append(str(_read_member(component, "Name2")))
     return names
+
+
+def drag_rotate_component(
+    adapter: Any,
+    name: str,
+    pivot_mm: list[float],
+    total_deg: float,
+    *,
+    steps: int = 6,
+    mode: int = 0,
+) -> int:
+    """Rotate a component about a world +Z axis through ``pivot_mm`` with the
+    Move Components solver (``IDragOperator``) -- the interactive drag path,
+    NOT a mate re-solve.
+
+    A mate dimension edit + rebuild and a UI drag answer the same question
+    ("where can the mechanism go?") with DIFFERENT solvers: the drag solver
+    spends free DOF by its own move-minimisation, so a kinematic property that
+    holds under transient drives can still break under manual manipulation
+    (PR #458: the channel bar station). Gates proving drag behaviour must use
+    this path.
+
+    ``mode`` is ``IDragOperator.DragMode``: 0 = maximum (rigid) move,
+    1 = minimum move, 2 = relaxation. Returns the number of accepted drag
+    steps (a step returning False typically means a limit/collision stop).
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import _create_math_transform
+
+    model = adapter.currentModel
+    asm_h = _early_bound(model, "IAssemblyDoc")
+    component = adapter._attempt(lambda: asm_h.GetComponentByName(name), default=None)
+    if component is None:
+        raise RuntimeError(f"component to drag not found: {name!r}")
+    a = math.radians(total_deg / steps)
+    c, s = math.cos(a), math.sin(a)
+    px, py = pivot_mm[0] / 1000.0, pivot_mm[1] / 1000.0
+    # World-space per-step delta, Transform2 row-vector convention:
+    # w' = w.R + t with R row-major in [0:9], t (metres) in [9:12], scale 1.
+    xform = _create_math_transform(
+        adapter,
+        [c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0,
+         px - (px * c - py * s), py - (px * s + py * c), 0.0,
+         1.0, 0.0, 0.0, 0.0],
+    )
+    drag = _early_bound(
+        adapter._attempt(lambda: asm_h.GetDragOperator(), default=None),
+        "IDragOperator",
+    )
+    if not adapter._attempt(lambda: drag.AddComponent(component, False), default=False):
+        raise RuntimeError(f"drag AddComponent failed for {name!r}")
+    drag.CollisionDetectionEnabled = False
+    drag.DynamicClearanceEnabled = False
+    drag.TransformType = 1  # axial rotation
+    drag.DragMode = mode
+    if not adapter._attempt(lambda: drag.BeginDrag(), default=False):
+        raise RuntimeError(f"drag BeginDrag failed for {name!r}")
+    accepted = 0
+    try:
+        for _ in range(steps):
+            accepted += bool(adapter._attempt(lambda: drag.Drag(xform), default=False))
+    finally:
+        adapter._attempt(lambda: drag.EndDrag(), default=False)
+    _telemetry.event("component.drag", component=name, mode=mode,
+                     requested_deg=total_deg, accepted_steps=accepted)
+    return accepted
 
 
 def delete_assembly_feature(adapter: Any, name: str) -> None:
