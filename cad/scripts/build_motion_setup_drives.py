@@ -247,30 +247,37 @@ async def _drive_p2(adapter: Any) -> dict[str, str]:
 async def _drive_p0(adapter: Any) -> dict[str, str]:
     """p0: an amplitude bar swings about its top pin (the channel's amplitude
     coefficient). The station is DRIVEN in the shipped model (the J6
-    rocker<->bar angle mate, PR #458 -- the physical bar is friction-held),
-    so the setup act is modelled faithfully: SUPPRESS this bar's J6 (the
-    'lift against friction'), then motor it about its top-pin bore (Axis1).
-    The other 19 bars stay pinned by their own J6 mates. The doc is discarded
-    unsaved, so the suppression is transient."""
+    rocker<->bar station chord mate, PR #458 -- the physical bar is
+    friction-held), so the setup act is modelled faithfully: SUPPRESS this
+    bar's J6 (the 'lift against friction'), then motor it about its top-pin
+    bore (Axis1); the J5 foot-on-arc distance stays active, so the freed bar
+    slides its foot ALONG the arc exactly like the physical shove. The other
+    19 bars stay pinned by their own J6 mates. The doc is discarded unsaved,
+    so the suppression is transient."""
     path = str(OUT_SLDASM / "channel.SLDASM")
     check("open channel", await adapter.open_model(path))
     bar, bar_name = _find_one(adapter, "amplitude-bar")
     if bar is None:
         raise RuntimeError("p0: amplitude-bar not found")
-    # THIS bar's J6: the one ANGLE mate joining exactly {a rocker, this bar}.
-    station = [
-        name for _f, _m, name, mtype, parts, _v in _iter_mates(
-            adapter, adapter.currentModel, read_values=False, progress_every=40)
-        if mtype == ANGLE
+    # THIS bar's rocker<->bar DISTANCE pair: J5 (foot on arc, the ~802 mm
+    # radius) and J6 (station chord to the rod pin, <= ~221 mm across the
+    # whole +/-88 mm span). The station is always the SMALLER value -- a
+    # unit-independent discriminator, since copies inherit auto mate names.
+    pair = [
+        (name, val) for _f, _m, name, mtype, parts, val in _iter_mates(
+            adapter, adapter.currentModel, read_values=True, progress_every=40)
+        if mtype == DISTANCE
         and sorted(_family(p) for p in _real_parts(parts, "channel"))
         == ["amplitude-bar", "rocker-arm"]
         and bar_name in _real_parts(parts, "channel")
+        and val is not None
     ]
-    if len(station) != 1:
+    if len(pair) != 2:
         raise RuntimeError(
-            f"p0: expected exactly one rocker<->{bar_name} station angle mate "
-            f"(J6), found {station!r} -- rebuild the assembly"
+            f"p0: expected the rocker<->{bar_name} J5+J6 distance pair, "
+            f"found {pair!r} -- rebuild the assembly"
         )
+    station = [min(pair, key=lambda nv: nv[1])[0]]
     await _suppress(adapter, station, f"p0 station mate ({bar_name})")
     motor_axis = _entity_ref(bar_name, "Axis1", "AXIS")
     return await _run_swing_study(

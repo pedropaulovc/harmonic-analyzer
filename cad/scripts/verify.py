@@ -583,7 +583,8 @@ def _expected_free_dof(name: str) -> int:
     drive-train frees the crank spin, the cone-platform swing, the pinion
     engage swing and the lift-rod/cam spin (4 DOF, PR8); channel frees 2 DOF
     per active channel (rocker swing + connecting-rod follow; the amplitude
-    station is DRIVEN by the J6 rocker<->bar angle mate, PR #458). Each freed
+    station is DRIVEN by the J6 rocker<->bar station chord mate, PR #458).
+    Each freed
     DOF's drive spec is recorded in the assembly's DOF manifest, never
     authored. Every other assembly stays fully defined (0).
     """
@@ -618,8 +619,8 @@ _REQUIRED_FREE_STEMS = {
                     "pinion-bracket", "pinion-lift-rod"),
     # Rocker swing + rod follow (the two freed DOF), plus the amplitude bar and
     # channel lever which must read under-constrained WITH the chain (the bar
-    # station is DRIVEN by the J6 rocker<->bar angle mate and the J5
-    # roof-on-arc tangent closes the lever, both off the free rocker -- a
+    # station is DRIVEN by the J6 rocker<->bar station chord mate and the J5
+    # foot-on-arc distance closes the lever, both off the free rocker -- a
     # frozen bar or lever means a coupling died, PR #458).
     "channel": ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever"),
     # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
@@ -1256,6 +1257,8 @@ _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
 _CHANNEL_STATION_MATE = "J6-station-ch00"  # build_channel_assembly's pinned name
 _CHANNEL_CONTACT_TOL_MM = 0.10
 _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG = 0.05
+_CHANNEL_CHORD_TOL_MM = 0.05  # per-step driven-dimension geometric readback
+_CHANNEL_STROKE_SLIDE_TOL_MM = 0.5  # foot slide along the edge over a stroke
 _CHANNEL_MIN_UPRIGHT_DOT = 0.25
 _CHANNEL_MAX_STEP_DEG = 30.0
 _CHANNEL_ROCKER_TEST_ANGLE_DEG = 85.0
@@ -1264,14 +1267,16 @@ _CHANNEL_ROCKER_TEST_ANGLE_DEG = 85.0
 async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) -> None:
     """Drive both bar endpoints and the rocker stroke without branch inversion."""
     from build_channel_assembly import (
-        AMPLITUDE_ANGLE_LIMITS,
+        _AMPLITUDE_MAX_TRAVEL_MM,
         ARM_ARC_CENTER_LOCAL_Y,
         ARM_TOP_RADIUS,
         BAR_TANGENT_DISTANCE,
         BAR_CONTACT_GAP,
         BAR_FOOT_LOCAL,
         BAR_FOOT_NOTCH,
+        PIVOT,
         ROCKER_ROD_BORE_LOCAL,
+        solve_state,
     )
 
     name = CHANNEL_OWNER
@@ -1283,7 +1288,20 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
     if not _assert_fresh(name, report):
         return
 
-    async def _exercise_endpoint(endpoint: float) -> None:
+    async def _exercise_endpoint(travel: float) -> None:
+        # The station targets come from the SAME closed-form solve the build
+        # placed the seed with: foot X = pivot + travel, foot Y from the
+        # tangent + lever closure, chord = |foot - rod pin| (the J6 driven
+        # dimension), and the expected rocker<->bar angle as the independent
+        # geometric readback of a correct seat.
+        st_target = solve_state(travel)
+        target_chord = math.hypot(
+            PIVOT[0] + travel - st_target["pin_x"],
+            st_target["bar_bottom"] - st_target["pin_y"],
+        )
+        expected_angle = 90.0 - (
+            st_target["bar_tilt"] - st_target["arm_tilt"]
+        )
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
         check(f"open {name}", await adapter.open_model(str(sldasm)))
         try:
@@ -1328,13 +1346,17 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                     [BAR_FOOT_LOCAL[0], BAR_FOOT_NOTCH, BAR_FOOT_LOCAL[2]],
                 )
                 rocker_u, bar_u = _vectors()
-                plane_distance = abs(
-                    (arc[0] - foot[0]) * bar_u[0]
-                    + (arc[1] - foot[1]) * bar_u[1]
+                # RADIAL contact errors (not projections onto the bar's own
+                # axis): the notch is a POINT contact riding the R800 arc, so
+                # the invariants are the foot's and roof's radial distances
+                # from the arc centre.  A projection would read a spurious
+                # cos(tilt) error the moment the rocker tilts under the
+                # hanging bar -- which is exactly the working stroke.
+                plane_distance = math.hypot(
+                    arc[0] - foot[0], arc[1] - foot[1]
                 )
-                roof_distance = abs(
-                    (arc[0] - roof[0]) * bar_u[0]
-                    + (arc[1] - roof[1]) * bar_u[1]
+                roof_distance = math.hypot(
+                    arc[0] - roof[0], arc[1] - roof[1]
                 )
                 plane_error = abs(plane_distance - BAR_TANGENT_DISTANCE)
                 roof_error = abs(
@@ -1364,11 +1386,11 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                     amplitude_angle,
                 )
 
-            # The production J6 station mate IS the signed amplitude
-            # coordinate (build_channel_assembly names ch00's
+            # The production J6 station mate IS the amplitude coordinate: the
+            # foot-to-rod-pin chord (build_channel_assembly names ch00's
             # ``J6-station-ch00``); repositioning = editing its dimension.
-            # Starting at the 90-degree neutral and ramping through
-            # intermediate values reproduces the setup slide while making a
+            # Starting at the as-built neutral and ramping through
+            # intermediate chords reproduces the setup slide while making a
             # branch jump visible at the step where it occurs.
             bar_param = adapter._attempt(
                 lambda: model.Parameter(f"D1@{_CHANNEL_STATION_MATE}"),
@@ -1378,13 +1400,21 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 raise RuntimeError(
                     f"cannot read channel station mate D1@{_CHANNEL_STATION_MATE}"
                 )
+
+            def _measured_chord() -> float:
+                foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+                rodpin = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
+                return math.hypot(
+                    foot[0] - rodpin[0], foot[1] - rodpin[1]
+                )
+
+            start_chord = _measured_chord()
             previous_rocker_angle: float | None = None
-            endpoint_state: tuple[
-                float, float, float, float, float, float
-            ] | None = None
-            for step in range(9):
-                requested = 90.0 + (endpoint - 90.0) * step / 8.0
-                bar_param.SystemValue = math.radians(requested)
+            for step in range(1, 9):
+                requested = start_chord + (
+                    target_chord - start_chord
+                ) * step / 8.0
+                bar_param.SystemValue = requested / 1000.0
                 _rebuild(adapter)
                 state = _contact_state()
                 (
@@ -1395,25 +1425,27 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                     rocker_angle,
                     actual_amplitude_angle,
                 ) = state
-                angle_error = abs(math.remainder(
-                    actual_amplitude_angle - requested, 360.0
-                ))
-                if angle_error > _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG:
+                # A successful D1 assignment does not prove SolidWorks solved
+                # to it -- read the chord back from component geometry.
+                chord_error = abs(_measured_chord() - requested)
+                if chord_error > _CHANNEL_CHORD_TOL_MM:
                     raise RuntimeError(
-                        f"amplitude requested {requested:.3f} deg but geometric "
-                        f"readback reached {actual_amplitude_angle:.3f} deg "
-                        f"(error {angle_error:.3f} deg)"
+                        f"station chord requested {requested:.3f} mm but "
+                        f"geometric readback reached "
+                        f"{_measured_chord():.3f} mm "
+                        f"(error {chord_error:.3f} mm)"
                     )
                 if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
                     raise RuntimeError(
-                        f"amplitude {requested:.3f} deg left the exact rocker "
-                        f"tangent: plane error {plane_error:.3f} mm, roof error "
-                        f"{roof_error:.3f} mm"
+                        f"station chord {requested:.3f} mm left the rocker "
+                        f"arc: foot radial error {plane_error:.3f} mm, roof "
+                        f"radial error {roof_error:.3f} mm"
                     )
                 if min(rocker_dot, bar_dot) < _CHANNEL_MIN_UPRIGHT_DOT:
                     raise RuntimeError(
-                        f"amplitude {requested:.3f} deg inverted a component: "
-                        f"rocker dot {rocker_dot:.3f}, bar dot {bar_dot:.3f}"
+                        f"station chord {requested:.3f} mm inverted a "
+                        f"component: rocker dot {rocker_dot:.3f}, bar dot "
+                        f"{bar_dot:.3f}"
                     )
                 if previous_rocker_angle is not None:
                     jump = abs(math.remainder(
@@ -1421,11 +1453,24 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                     ))
                     if jump > _CHANNEL_MAX_STEP_DEG:
                         raise RuntimeError(
-                            f"amplitude {requested:.3f} deg caused a {jump:.1f} "
-                            "degree rocker branch jump"
+                            f"station chord {requested:.3f} mm caused a "
+                            f"{jump:.1f} degree rocker branch jump"
                         )
                 previous_rocker_angle = rocker_angle
-                endpoint_state = state
+
+            # The independent SEAT readback: the rocker<->bar relative angle
+            # the solve predicts for this travel (the observable the retired
+            # angle mate drove directly).
+            seated_angle = _contact_state()[5]
+            seat_error = abs(math.remainder(
+                seated_angle - expected_angle, 360.0
+            ))
+            if seat_error > _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG:
+                raise RuntimeError(
+                    f"travel {travel:+.1f} mm seated at "
+                    f"{seated_angle:.3f} deg, solve predicts "
+                    f"{expected_angle:.3f} deg (error {seat_error:.3f} deg)"
+                )
 
             # Replay the production rocker DOF specification instead of adding
             # an unrelated plane-angle mate.  The saved driver uses Axis2's
@@ -1448,6 +1493,25 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                     "distance": rod_bore[1],
                 },
             }
+
+            def _foot_in_rocker_frame() -> tuple[float, float]:
+                """The foot pin's coordinates IN THE ROCKER'S FRAME -- the
+                material point of the edge the friction grips.  Tandem means
+                this does not move while the rocker strokes."""
+                pivot = world_point(adapter, rocker, [0.0, 8.0, 0.0])
+                foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+                rocker_u, _bar_u = _vectors()
+                vx, vy = foot[0] - pivot[0], foot[1] - pivot[1]
+                return (
+                    vx * rocker_u[1] - vy * rocker_u[0],
+                    vx * rocker_u[0] + vy * rocker_u[1],
+                )
+
+            pre_stroke = _contact_state()
+            rf_seated = _foot_in_rocker_frame()
+            foot_seated = world_point(adapter, bar, BAR_FOOT_LOCAL)
+            bar_tilt_seated = _rotation_from_rest(_vectors()[1], rest_bar)
+
             (rocker_mate,) = await author_dof_drives(adapter, [rocker_spec])
             rocker_param = adapter._attempt(
                 lambda: model.Parameter(f"D1@{rocker_mate}"), default=None
@@ -1472,89 +1536,107 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 rocker_dot,
                 bar_dot,
                 rocker_angle,
-                actual_amplitude_angle,
+                _moved_amplitude_angle,
             ) = moved_state
-            # TANDEM: the driven station must ride the rocker stroke exactly
-            # (PR #458 -- the physical bar is friction-held in its seat, so
-            # lowering the rocker lowers the bar WITH it, station unchanged).
-            angle_error = abs(math.remainder(
-                actual_amplitude_angle - endpoint, 360.0
-            ))
-            if angle_error > _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG:
+            # TANDEM: friction means the foot never slides along the edge --
+            # its position IN THE ROCKER'S FRAME (the material point) is
+            # pinned while the stroke carries it (PR #458).  The bar's
+            # ORIENTATION is allowed to stay with its hang from the lever;
+            # asserting the rocker<->bar relative angle constant here would
+            # re-demand the retired angle-mate physics that broke the
+            # zero-amplitude station.
+            rf_moved = _foot_in_rocker_frame()
+            slide = math.hypot(
+                rf_moved[0] - rf_seated[0], rf_moved[1] - rf_seated[1]
+            )
+            if slide > _CHANNEL_STROKE_SLIDE_TOL_MM:
                 raise RuntimeError(
-                    f"bar station slid {angle_error:.3f} deg off the "
-                    f"{endpoint:.3f} deg seat during the rocker stroke -- the "
-                    "bar did not lower in tandem"
+                    f"rocker stroke slid the foot {slide:.3f} mm along the "
+                    f"edge at travel {travel:+.1f} mm (tol "
+                    f"{_CHANNEL_STROKE_SLIDE_TOL_MM}) -- the bar did not ride "
+                    "its material point in tandem"
                 )
             if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
                 raise RuntimeError(
-                    f"rocker stroke at amplitude {endpoint:.3f} deg left the "
-                    f"tangent: plane error {plane_error:.3f} mm, roof error "
-                    f"{roof_error:.3f} mm"
+                    f"rocker stroke at travel {travel:+.1f} mm left the arc: "
+                    f"foot radial error {plane_error:.3f} mm, roof radial "
+                    f"error {roof_error:.3f} mm"
                 )
             if min(rocker_dot, bar_dot) < _CHANNEL_MIN_UPRIGHT_DOT:
                 raise RuntimeError(
-                    f"rocker stroke inverted a component at amplitude "
-                    f"{endpoint:.3f} deg: rocker dot {rocker_dot:.3f}, "
+                    f"rocker stroke inverted a component at travel "
+                    f"{travel:+.1f} mm: rocker dot {rocker_dot:.3f}, "
                     f"bar dot {bar_dot:.3f}"
                 )
-            if endpoint_state is None:
-                raise RuntimeError("channel amplitude ramp produced no samples")
-            endpoint_rocker_angle = endpoint_state[4]
             rocker_motion = abs(math.remainder(
-                rocker_angle - endpoint_rocker_angle, 360.0
+                rocker_angle - pre_stroke[4], 360.0
             ))
             if rocker_motion < 2.0:
                 raise RuntimeError(
                     f"rocker moved only {rocker_motion:.2f} deg during the "
                     "lowering proof"
                 )
+            foot_moved = world_point(adapter, bar, BAR_FOOT_LOCAL)
+            ride = math.hypot(
+                foot_moved[0] - foot_seated[0], foot_moved[1] - foot_seated[1]
+            )
+            bar_tilt_change = abs(
+                _rotation_from_rest(_vectors()[1], rest_bar) - bar_tilt_seated
+            )
             _telemetry.info(
-                f"channel amplitude endpoint {endpoint:.3f} deg: tangent errors "
+                f"channel travel {travel:+.1f} mm: radial errors "
                 f"{plane_error:.4f}/{roof_error:.4f} mm, upright dots "
                 f"{rocker_dot:.3f}/{bar_dot:.3f}, rocker motion "
-                f"{rocker_motion:.3f} deg, seated station "
-                f"{actual_amplitude_angle:.3f} deg (drift {angle_error:.3f} deg)"
+                f"{rocker_motion:.3f} deg rode the foot {ride:.3f} mm "
+                f"(edge slide {slide:.4f} mm, bar tilt change "
+                f"{bar_tilt_change:.3f} deg)"
             )
             delete_assembly_feature(adapter, rocker_mate)
         finally:
             discard_open_documents(adapter)
 
-    for endpoint in AMPLITUDE_ANGLE_LIMITS:
-        direction = "left" if endpoint < 90.0 else "right"
+    for travel in (-_AMPLITUDE_MAX_TRAVEL_MM, _AMPLITUDE_MAX_TRAVEL_MM):
+        st_dir = solve_state(travel)
+        angle = 90.0 - (st_dir["bar_tilt"] - st_dir["arm_tilt"])
+        direction = "left" if angle < 90.0 else "right"
         await report.agate(
             f"chain:{name}:bar-roof-{direction}-endpoint",
-            lambda endpoint=endpoint: _exercise_endpoint(endpoint),
+            lambda travel=travel: _exercise_endpoint(travel),
         )
 
 
 # Manual-manipulation station hold (PR #458).  The transient-drive stroke above
 # uses the MATE solver; the user lowers the rocker with Move Components, whose
 # DRAG solver spends free DOF by its own move-minimisation.  Live-probed on the
-# shipped scheme: the mate re-solve holds the bar's rocker-relative station to
-# 0.06 deg while every IDragOperator mode slides it 1:1 with the rocker -- the
-# bar visibly hangs in the air as the arm tips away under it.  The physical
-# machine holds station by notch friction (book ch.15), so the model must keep
-# it through a rocker drag.  Every mode must hold the station; full-stroke
-# draggability is proven by mode 0 (see _CHANNEL_DRAG_MIN_MOTION_DEG).
+# free-station scheme: the mate re-solve held the station while every
+# IDragOperator mode slid it 1:1 with the rocker -- the bar visibly hangs in
+# the air as the arm tips away under it.  The physical machine holds station
+# by notch friction (book ch.15): the foot grips its MATERIAL POINT of the
+# edge, so through a rocker drag the foot's rocker-frame position must not
+# move.  Every mode must hold it; full-stroke draggability is proven by
+# mode 0 (see _CHANNEL_DRAG_MIN_MOTION_DEG).
 _CHANNEL_DRAG_STROKE_DEG = 3.0
 _CHANNEL_DRAG_STEPS = 6
-# Minimum rocker motion per stroke, by DragMode. Mode 0 (maximum/rigid move)
-# carries the coupled rocker+rod+bar+lever chain through the full stroke and
-# proves draggability. The iterative solvers (1 min-move, 2 relaxation)
-# advance the coupled chain only fractionally per request (measured ~0.29 deg
-# of a 3 deg stroke, INVARIANT to step size -- 6x0.5 and 60x0.05 both stall
-# there), so they carry only a frozen-DOF floor; an interactive drag's
-# continuous stream of updates does not stall this way.
-_CHANNEL_DRAG_MIN_MOTION_DEG = {0: 2.0, 1: 0.1, 2: 0.1}
-_CHANNEL_DRAG_STATION_TOL_DEG = 0.25  # station drift allowed over one stroke
+# Minimum rocker motion per stroke, by DragMode. Under the J5+J6 foot-pin
+# scheme every mode carries the coupled rocker+rod+bar+lever chain through
+# the FULL stroke (measured 3.000/3.000 deg in modes 0/1/2 at both test
+# stations), so all three floors are tight. (Historical: under the retired
+# rocker<->bar angle coupling the iterative solvers 1/2 stalled at ~0.29 deg
+# regardless of step size -- a regression back to that sluggishness should
+# fail here, not pass under a token floor.)
+_CHANNEL_DRAG_MIN_MOTION_DEG = {0: 2.0, 1: 2.0, 2: 2.0}
+_CHANNEL_DRAG_STATION_TOL_MM = 0.5  # foot slide along the edge per stroke
 
 
 async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
     """Drag the rocker (Move Components path) and pin the bar station."""
     from build_channel_assembly import (
-        AMPLITUDE_ANGLE_LIMITS,
+        _AMPLITUDE_MAX_TRAVEL_MM,
         ARM_ARC_CENTER_LOCAL_Y,
+        BAR_FOOT_LOCAL,
+        PIVOT,
+        ROCKER_ROD_BORE_LOCAL,
+        solve_state,
     )
 
     name = CHANNEL_OWNER
@@ -1590,23 +1672,41 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                     _unit((bar1[0] - bar0[0], bar1[1] - bar0[1])),
                 )
 
-            rest_rocker, rest_bar = _vectors()
-
             def _rot(cur: tuple[float, float], rest: tuple[float, float]) -> float:
                 cross = rest[0] * cur[1] - rest[1] * cur[0]
                 dot = rest[0] * cur[0] + rest[1] * cur[1]
                 return math.degrees(math.atan2(cross, dot))
 
-            def station() -> float:
-                rocker_u, bar_u = _vectors()
-                return 90.0 + _rot(rocker_u, rest_rocker) - _rot(bar_u, rest_bar)
+            def _foot_in_rocker_frame() -> tuple[float, float]:
+                """The foot pin IN THE ROCKER'S FRAME -- the material point
+                the friction grips.  A drag must not move it."""
+                pivot = world_point(adapter, rocker, pivot_local)
+                foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+                rocker_u, _bar_u = _vectors()
+                vx, vy = foot[0] - pivot[0], foot[1] - pivot[1]
+                return (
+                    vx * rocker_u[1] - vy * rocker_u[0],
+                    vx * rocker_u[0] + vy * rocker_u[1],
+                )
 
-            async def _seat_station(target: float) -> None:
-                """Ramp the PRODUCTION J6 station dimension to *target* -- the
-                manual 'slide the bar to a station' setup act (repositioning
-                IS editing this dimension). Ramped in steps from the current
-                value: a one-solve jump is the branch hazard the contact
-                sweep ramps to avoid."""
+            def _measured_chord() -> float:
+                foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
+                rodpin = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
+                return math.hypot(
+                    foot[0] - rodpin[0], foot[1] - rodpin[1]
+                )
+
+            async def _seat_station(travel: float) -> None:
+                """Ramp the PRODUCTION J6 station chord to the solve's value
+                for *travel* -- the manual 'slide the bar to a station' setup
+                act (repositioning IS editing this dimension). Ramped in
+                steps from the current value: a one-solve jump is the branch
+                hazard the contact sweep ramps to avoid."""
+                st = solve_state(travel)
+                target = math.hypot(
+                    PIVOT[0] + travel - st["pin_x"],
+                    st["bar_bottom"] - st["pin_y"],
+                )
                 param = adapter._attempt(
                     lambda: model.Parameter(f"D1@{_CHANNEL_STATION_MATE}"),
                     default=None,
@@ -1615,33 +1715,36 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                     raise RuntimeError(
                         f"cannot read station mate D1@{_CHANNEL_STATION_MATE}"
                     )
-                start = station()
+                start = _measured_chord()
                 for step in range(1, 9):
-                    param.SystemValue = math.radians(
+                    param.SystemValue = (
                         start + (target - start) * step / 8.0
-                    )
+                    ) / 1000.0
                     _rebuild(adapter)
-                seated = station()
-                if abs(math.remainder(seated - target, 360.0)) > 0.5:
+                seated = _measured_chord()
+                if abs(seated - target) > 0.1:
                     raise RuntimeError(
-                        f"station seat missed: asked {target:.3f} deg, "
-                        f"seated at {seated:.3f} deg"
+                        f"station seat missed: asked chord {target:.3f} mm, "
+                        f"seated at {seated:.3f} mm"
                     )
 
             def _drag_stroke(mode: int, stroke_deg: float) -> None:
                 pivot = world_point(adapter, rocker, pivot_local)
                 before_rocker, _ = _vectors()
-                before_station = station()
+                before_rf = _foot_in_rocker_frame()
                 drag_rotate_component(
                     adapter, rocker, pivot, stroke_deg,
                     steps=_CHANNEL_DRAG_STEPS, mode=mode,
                 )
                 after_rocker, _ = _vectors()
                 motion = _rot(after_rocker, before_rocker)
-                drift = station() - before_station
+                after_rf = _foot_in_rocker_frame()
+                drift = math.hypot(
+                    after_rf[0] - before_rf[0], after_rf[1] - before_rf[1]
+                )
                 _telemetry.info(
                     f"drag mode={mode} stroke={stroke_deg:+.1f} deg: rocker "
-                    f"moved {motion:+.3f} deg, station drift {drift:+.3f} deg"
+                    f"moved {motion:+.3f} deg, foot edge-slide {drift:.3f} mm"
                 )
                 if abs(motion) < _CHANNEL_DRAG_MIN_MOTION_DEG[mode]:
                     raise RuntimeError(
@@ -1649,18 +1752,18 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
                         f"the rocker only {motion:+.3f} deg -- the operational "
                         "DOF no longer drags"
                     )
-                if abs(drift) > _CHANNEL_DRAG_STATION_TOL_DEG:
+                if drift > _CHANNEL_DRAG_STATION_TOL_MM:
                     raise RuntimeError(
                         f"drag mode {mode} stroke {stroke_deg:+.1f} deg slid "
-                        f"the bar station {drift:+.3f} deg (tol "
-                        f"{_CHANNEL_DRAG_STATION_TOL_DEG}) -- the bar does not "
+                        f"the foot {drift:.3f} mm along the edge (tol "
+                        f"{_CHANNEL_DRAG_STATION_TOL_MM}) -- the bar does not "
                         "follow the rocker under manual manipulation"
                     )
 
             # The user's repro station: the arc end.  Then the neutral rest,
             # where a slide has the most room in both directions.
-            for target in (max(AMPLITUDE_ANGLE_LIMITS), 90.0):
-                await _seat_station(target)
+            for target_travel in (_AMPLITUDE_MAX_TRAVEL_MM, 0.0):
+                await _seat_station(target_travel)
                 for mode in (0, 2, 1):
                     _drag_stroke(mode, -_CHANNEL_DRAG_STROKE_DEG)
                     _drag_stroke(mode, +_CHANNEL_DRAG_STROKE_DEG)

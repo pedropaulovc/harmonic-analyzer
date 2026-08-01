@@ -1,58 +1,72 @@
 ---
 name: channel-bar-station-driven
-description: PR #458 — amplitude-bar station is DRIVEN (J6 rocker↔bar angle mate), not a freed DOF; drag solver provably slides any free station; cam-follower mate not COM-authorable; IDragOperator drag ≠ mate re-solve
+description: PR #458 — amplitude-bar station is DRIVEN via a foot-pin (J5 arc radius + J6 station chord), NOT freed and NOT a rocker↔bar angle; the angle form transmitted rocker rotation 1:1 into the bar at neutral; drag solver provably slides any free station; cam-follower mate not COM-authorable; IDragOperator drag ≠ mate re-solve
 metadata:
   type: project
 ---
 
-**Decision (2026-08-01, PR #458):** the channel amplitude-bar STATION (the Fourier
-coefficient a_j) is a **driven dimension**, not a freed operational DOF. Each channel
-carries a hard rocker↔bar plane angle mate, ch00's renamed **`J6-station-ch00`**
-(`rename_assembly_feature`; copies inherit the seed's mate with auto names). Channel
-freed DOF: **2 per channel** (rocker swing + rod follow), manifest = 40 specs at 20
-channels. Repositioning = edit the mate dimension (verify gates ramp
-`D1@J6-station-ch00`) or suppress it — the physical "lift against friction" act
-(book ch.15: the bar's foot notch rides a SMOOTH rocker edge, friction-held,
-"satisfying metallic squeak").
+**Decision (2026-08-01, PR #458, two iterations):** the channel amplitude-bar
+STATION (Fourier coefficient a_j) is **driven, not freed** — but the driven
+coordinate must be the **material contact point**, not the rocker↔bar angle.
+Each channel pins the bar's FOOT AXIS with two distance mates: **J5
+foot-on-arc** (`Axis2@bar` ↔ arc-centre `Axis3@rocker` = `BAR_TANGENT_DISTANCE`)
++ **`J6-station-chNN` station chord** (`Axis2@bar` ↔ rod-pin `Axis2@rocker`,
+value = the solve's foot↔rod-pin chord). The rod pin sits at +132.76, BEYOND
+the +88 mm arc end, so the unsigned chord is monotone across the whole ±88 span
+— measuring from the mid Right Plane would fold ± stations (the v0
+bidirectional bug). Channel freed DOF stay **2 per channel** (rocker + rod, 40
+specs at 20 channels); bar + lever are coupled through the foot pin.
+Repositioning = edit `D1@J6-station-chNN` (in mm; gates ramp it) or suppress
+J6 (the physical "lift against friction"; J5 stays, so the freed bar slides
+ALONG the arc like the real shove). Copies inherit J5+J6 verbatim
+(same-amplitude seeds); their mates keep AUTO names, so classifiers pick a
+bar's station as the SMALLER of its two rocker↔bar distance values
+(unit-independent; J5 ≈ 802 mm, J6 ≤ ~221 mm).
 
-**Why:** the user repro — bar at arc end, lower the rocker → bar must lower in
-tandem — fails with ANY free-station scheme. Live evidence (probe_drag_station /
+**Why the angle mate was wrong (user repro #2):** a hard rocker↔bar ANGLE mate
+holds the RELATIVE orientation, so a rocker stroke θ forces the bar to tilt θ
+at EVERY station — at the a_j=0 neutral the bar visibly tilted and walked
+(~6 mm + full θ per 5° stroke) when physically zero amplitude transmits ZERO
+output (the neutral contact point sits ~16 mm above the rocker pivot and
+barely moves; the bar's orientation belongs to its HANG from the lever).
+Friction pins WHERE the notch grips (the material point), never the bar's
+tilt. Gate: `chain:channel:bar-neutral-isolation` (bar tilt ≤ 0.5°, foot walk
+≤ 2.5 mm, lever-end ≤ 1.5 mm over a ±5° stroke). The tandem gates are
+expressed as **foot-in-rocker-frame pinned** (edge slide ≤ 0.5 mm), NOT
+angle-constancy — the relative angle legitimately changes by ~θ during a
+stroke. Contact checks are RADIAL distances to the arc centre, not
+projections onto the bar axis (a projection reads a spurious cos(tilt) error
+the moment the rocker tilts under the hanging bar).
+
+**Why driven at all (user repro #1):** live evidence (probe_drag_station /
 probe_cam_station, diagnostics/):
-- The **Move Components drag solver (IDragOperator) is a DIFFERENT solver from the
-  mate re-solve**: a transient-drive rocker stroke held station to 0.06°, while the
-  same stroke via drag slid it 1:1 (mode 0/2) or worse (mode 1: −7.7° on −3°).
-  A kinematic gate about MANUAL behaviour must use the drag path
+- The **Move Components drag solver (IDragOperator) is a DIFFERENT solver from
+  the mate re-solve**: a transient-drive rocker stroke held a free station to
+  0.06° while the same stroke via drag slid it 1:1 (mode 0/2) or worse (mode
+  1). A kinematic gate about MANUAL behaviour must use the drag path
   (`_assembly.drag_rotate_component`; gate `chain:channel:bar-station-drag`).
-- Every contact representation slides: shipped plane-tangent (J5), main's
-  foot-on-circle (11.3° roll in the PR regression), face-tangent (−3.6/−7.2/−3.0 by
-  mode). They differ only in how contact is written; all leave station free and the
-  drag solver spends free DOF by its own move-minimisation. No mate expresses friction.
-- **Cam-follower mate (swMateCAMFOLLOWER=9) is not COM-authorable here**: the typelib
-  puts `ICamFollowerMateFeatureData::SetEntitiesToMate` value as bare `(9,1)`
-  VT_DISPATCH — wrapper + raw-Invoke VT_ARRAY|VT_VARIANT / VT_ARRAY|VT_DISPATCH all
-  "Type mismatch", single dispatch "succeeds" but stores nothing (readback 0); the
-  documented Mark=1/Mark=8 preselect + `CreateMate` throws server-side on a single
-  arc face and returns None on the rocker's 6-face outer loop (not
-  tangent-continuous, so likely never a valid cam profile). Positive control: a
-  TANGENT mate (type 4) authors fine via the identical recipe. Even if authorable,
-  it is the same tangency family that measurably slides.
+- Every free-station contact representation slides: plane-tangent,
+  foot-on-circle, face-tangent. No mate expresses friction.
+- **Cam-follower mate (swMateCAMFOLLOWER=9) was not COM-authorable** through
+  the stock adapter: the 2026 typelib mistypes `SetEntitiesToMate` as bare
+  `(9,1)` VT_DISPATCH on exactly {ICamFollowerMateFeatureData,
+  IRackPinionMateFeatureData} (hinge uses `(12,1)` VT_VARIANT — the working
+  convention). Fixed by typelib fixup in SolidworksMCP-python PR #96; even
+  authorable, the cam family constrains tangency, not arc position, so it
+  cannot hold a station (pending live drag measurement).
 
-**Drag-solver calibration:** with the chain coupled, IDragOperator mode 0
-(maximum/rigid move) carries the whole channel in coarse 0.5° steps with 0.000°
-station drift, but mode 2 (relaxation) converges only ~0.1° of each step's
-rotation (measured −0.29° from six 0.5° steps) — give relaxation FINE steps
-(60×0.05°, like the UI's stream of small updates), don't read slow convergence
-as "the DOF is frozen".
+**Drag-solver calibration:** mode 0 (rigid) carries the coupled chain full
+stroke; mode 2 (relaxation) converges only ~0.1°/step regardless of step size
+— per-mode min-motion floors {0: 2.0, 1: 0.1, 2: 0.1} deg, don't read slow
+convergence as "frozen DOF".
 
-**Consequences wired in:** `verify._expected_free_dof` channel = 2×active_count;
-bar+lever stay in `_REQUIRED_FREE_STEMS`/`_ALLOWED_FREE_STEMS` (coupled →
-under-constrained WITH the free rocker); the contact sweep + drag gate drive the
-production `D1@J6-station-ch00` (no transient rocker↔bar angle mate — it would
-over-define against J6); the COPY path records only rocker/rod specs (a copied
-bar_amplitude spec would replay a second driver onto the driven coordinate);
+**Consequences wired in:** `verify._expected_free_dof` channel =
+2×active_count; bar+lever stay in `_REQUIRED_FREE_STEMS`/`_ALLOWED_FREE_STEMS`;
+gates drive the production `D1@J6-station-ch00` in mm (no transient rocker↔bar
+drive — it would over-define); the COPY path records only rocker/rod specs;
 `build_motion_setup_drives._drive_p0` and `build_mobility_probe` suppress the
-two-real J6 (their single-real driver classifiers do NOT see it). AGENTS.md
-"Default-free DOF" updated.
+smaller-value rocker↔bar distance (the chord). AGENTS.md "Default-free DOF"
+updated.
 
 Related: [[default-free-dof-park-drivers]], [[mate-flip-determinism]],
 [[cwm-free-dof-by-design]], [[verify-assumptions-live-sw]],

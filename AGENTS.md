@@ -436,14 +436,22 @@ setup motion, formerly park-driven at the engaged pose) **and lift-rod/cam spin*
 2026-08-01/PR #458 the **amplitude-bar station is DRIVEN, not freed**: the
 physical bar is friction-held in its rocker seat, no contact mate can express
 that friction, and the Move Components drag solver provably slides a free
-station 1:1 under a rocker drag — so each channel carries a hard rocker↔bar
-angle mate `J6-station-chNN` at its config a_j station; repositioning = edit
-that dimension (the verify sweeps do) or suppress it. The **bar and channel
-lever are COUPLED**, not separately freed: J6 plus the J5 roof-on-arc mate —
-the bar's bottom plane held tangent to the rocker about its arc-centre axis
-`Axis3@rocker` — close the rocker → bar → lever chain, so dragging the rocker
-articulates the whole channel in exact tandem and the bar + lever read
-under-constrained WITH it; the old J4 hard spin pin is gone), plus magnifier's **lever
+station 1:1 under a rocker drag. The friction pins the notch to a **material
+point of the rocker edge**, so each channel pins the bar's FOOT AXIS with two
+distance mates: J5 foot-on-arc (`Axis2@bar` to the arc-centre axis
+`Axis3@rocker`) plus the `J6-station-chNN` station chord (`Axis2@bar` to the
+rod-pin axis `Axis2@rocker` — measured to the rod pin BEYOND the +88 mm arc
+end, so the unsigned chord never folds ± stations); repositioning = edit the
+J6 dimension (the verify sweeps do) or suppress it. The bar's ORIENTATION is
+NOT tied to the rocker — it hangs from the lever, so at the a_j = 0 neutral a
+rocker stroke moves the bar ~nothing (zero amplitude transmits zero output;
+the `bar-neutral-isolation` gate pins this — an earlier rocker↔bar ANGLE mate
+transmitted the stroke 1:1 into the bar at every station), while at the arc
+ends the material point carries the bar in tandem. The **bar and channel
+lever are COUPLED**, not separately freed: the J5+J6 foot pin closes the
+rocker → bar → lever chain, so dragging the rocker articulates the whole
+channel and the bar + lever read under-constrained WITH it; the old J4 hard
+spin pin is gone), plus magnifier's **lever
 knife-rock + lever-wire swing/spin** (3 DOF, 2026-07-04: the lever pivots about
 the summing bar's knife-edge ridge — engineerguy video 2/4+4/4, ~6 mm tip arc —
 carrying the clamp/vertical-rod/fixture group AND the magnifying-bracket

@@ -27,9 +27,9 @@ swing) and just that quasi-static freedom opens. The probe NEVER saves.
 
 Drive mates land as TOP-LEVEL mates of each standalone subassembly (drive-train
 carries crank + p1 + p2; channel replays its rocker/rod drives, while the 20 p0
-amplitude stations are the PRODUCTION J6 rocker<->bar angle mates -- driven, not
-freed, PR #458), so they are suppressible by name without the flexible-sub
-indirection the motion study needs.
+amplitude stations are the PRODUCTION J6 rocker<->bar station chord mates --
+driven, not freed, PR #458), so they are suppressible by name without the
+flexible-sub indirection the motion study needs.
 
 Run (SolidWorks already open)::
 
@@ -114,21 +114,35 @@ def _drivers_by_family(adapter: Any, model: Any, root: str) -> dict[str, list[st
     dim references that root plane plus exactly one real part, so ``_real_parts``
     leaving one name marks a driver and names the part it controls."""
     out: dict[str, list[str]] = {}
-    for _f, _m, name, mtype, parts, _v in _iter_mates(
-            adapter, model, read_values=False, progress_every=40):
+    # The p0 amplitude station is DRIVEN part<->part (the J6 rocker<->bar
+    # station chord mate, PR #458), not a single-real root-plane dim. Each
+    # bar carries TWO rocker<->bar distance mates -- J5 (foot on arc, the
+    # ~802 mm radius) and J6 (station chord, <= ~221 mm) -- and copies
+    # inherit auto names, so the station is discriminated per bar as the
+    # SMALLER value of its pair (unit-independent).
+    bar_pairs: dict[str, list[tuple[str, float]]] = {}
+    for _f, _m, name, mtype, parts, val in _iter_mates(
+            adapter, model, read_values=True, progress_every=40):
         if mtype not in (DISTANCE, ANGLE):
             continue
         reals = _real_parts(parts, root)
         if len(reals) == 1:
             out.setdefault(_family(reals[0]), []).append(name)
             continue
-        # The p0 amplitude station is DRIVEN part<->part (the J6 rocker<->bar
-        # angle mate, PR #458), not a single-real root-plane dim -- classify
-        # it under the bar family it pins.
-        if (mtype == ANGLE
+        if (mtype == DISTANCE
+                and val is not None
                 and sorted(_family(r) for r in reals)
                 == ["amplitude-bar", "rocker-arm"]):
-            out.setdefault("amplitude-bar", []).append(name)
+            bar = next(r for r in reals if _family(r) == "amplitude-bar")
+            bar_pairs.setdefault(bar, []).append((name, val))
+    for bar, pair in sorted(bar_pairs.items()):
+        if len(pair) != 2:
+            raise RuntimeError(
+                f"expected the {bar} J5+J6 distance pair, found {pair!r}"
+            )
+        out.setdefault("amplitude-bar", []).append(
+            min(pair, key=lambda nv: nv[1])[0]
+        )
     return out
 
 
