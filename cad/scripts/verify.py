@@ -1670,6 +1670,190 @@ async def _verify_channel_bar_drag_one(adapter: Any, report: Report) -> None:
     await report.agate(f"chain:{name}:bar-station-drag", _exercise_drag)
 
 
+# Zero-amplitude isolation (PR #458 follow-up, user repro on the J6 build).
+# The Fourier a_j = 0 station is the point of the amplitude mechanism: with
+# the bar seated at NEUTRAL, rocking the rocker must contribute NOTHING to
+# the channel output.  Geometrically the neutral contact point sits ~16 mm
+# above the rocker pivot, so a 5-degree stroke shuffles it ~1.4 mm
+# horizontally and lifts it ~0.06 mm -- the bar "stays put".  The friction
+# the station models pins the notch to that MATERIAL POINT of the rocker
+# edge; the bar's own orientation stays governed by its hang from the lever,
+# NOT by the rocker's tilt.  A scheme that instead pins the rocker<->bar
+# RELATIVE angle transmits the full rocker rotation into the bar at every
+# station -- at neutral the bar visibly tilts and walks (the user repro this
+# gate encodes).
+_CHANNEL_NEUTRAL_SWEEP_DEG = 5.0
+_CHANNEL_NEUTRAL_STEPS = 5
+_CHANNEL_NEUTRAL_ROCKER_TRACK_TOL_DEG = 0.3  # drive must actually move rocker
+_CHANNEL_NEUTRAL_BAR_TILT_TOL_DEG = 0.5
+_CHANNEL_NEUTRAL_FOOT_TOL_MM = 2.5  # >= the material point's own ~1.4 mm walk
+_CHANNEL_NEUTRAL_TOP_TOL_MM = 1.5  # the lever end: the channel's OUTPUT
+
+
+async def _verify_channel_bar_neutral_isolation_one(
+    adapter: Any, report: Report
+) -> None:
+    """At the neutral station a rocker stroke must leave the bar in place."""
+    from build_channel_assembly import (
+        ARM_ARC_CENTER_LOCAL_Y,
+        ARM_TOP_RADIUS,
+        BAR_FOOT_LOCAL,
+        ROCKER_ROD_BORE_LOCAL,
+    )
+
+    name = CHANNEL_OWNER
+    sldasm = OUT_SLDASM / f"{name}.SLDASM"
+    if not sldasm.exists():
+        report.failed.append((f"chain:{name}:open", f"not built: {sldasm}"))
+        _telemetry.error(f"{sldasm.name} not built -- run doit")
+        return
+    if not _assert_fresh(name, report):
+        return
+
+    async def _exercise_neutral() -> None:
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        check(f"open {name}", await adapter.open_model(str(sldasm)))
+        model = adapter.currentModel
+        try:
+            rocker, bar = "rocker-arm-1", "amplitude-bar-1"
+            pivot_local = [0.0, 8.0, 0.0]
+            # The bar is ARM_TOP_RADIUS long: its lever pin sits that far up
+            # the foot axis.  Its world walk is the channel's output motion.
+            bar_top_local = [
+                BAR_FOOT_LOCAL[0], ARM_TOP_RADIUS, BAR_FOOT_LOCAL[2],
+            ]
+
+            def _unit(v: tuple[float, float]) -> tuple[float, float]:
+                mag = math.hypot(*v)
+                if mag <= 1e-9:
+                    raise RuntimeError("zero-length channel orientation witness")
+                return (v[0] / mag, v[1] / mag)
+
+            def _rocker_unit() -> tuple[float, float]:
+                pivot = world_point(adapter, rocker, pivot_local)
+                arc = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
+                return _unit((arc[0] - pivot[0], arc[1] - pivot[1]))
+
+            def _bar_unit() -> tuple[float, float]:
+                bar0 = world_point(adapter, bar, [0.0, 0.0, 0.0])
+                bar1 = world_point(adapter, bar, [0.0, 1.0, 0.0])
+                return _unit((bar1[0] - bar0[0], bar1[1] - bar0[1]))
+
+            def _rot(cur: tuple[float, float], rest: tuple[float, float]) -> float:
+                cross = rest[0] * cur[1] - rest[1] * cur[0]
+                dot = rest[0] * cur[0] + rest[1] * cur[1]
+                return math.degrees(math.atan2(cross, dot))
+
+            def _planar(p: list[float]) -> tuple[float, float]:
+                return (p[0], p[1])
+
+            rest_rocker = _rocker_unit()
+            rest_bar = _bar_unit()
+            rest_foot = _planar(world_point(adapter, bar, BAR_FOOT_LOCAL))
+            rest_top = _planar(world_point(adapter, bar, bar_top_local))
+
+            # Replay the production rocker DOF specification (the same
+            # manifest drive the endpoint gate authors): the freed rocker
+            # coordinate is Axis2's world distance to Top Plane.
+            rocker_specs = [
+                spec for spec in load_dof_manifest(name)
+                if spec.get("key") == "rocker_angle_00"
+            ]
+            if len(rocker_specs) != 1:
+                raise RuntimeError(
+                    "expected exactly one rocker_angle_00 DOF specification, "
+                    f"found {len(rocker_specs)}"
+                )
+            pivot_point = world_point(adapter, rocker, pivot_local)
+            rod_bore = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
+            rocker_spec = {
+                **rocker_specs[0],
+                "params": {
+                    **rocker_specs[0]["params"],
+                    "distance": rod_bore[1],
+                },
+            }
+            (rocker_mate,) = await author_dof_drives(adapter, [rocker_spec])
+            rocker_param = adapter._attempt(
+                lambda: model.Parameter(f"D1@{rocker_mate}"), default=None
+            )
+            if rocker_param is None:
+                raise RuntimeError(
+                    f"cannot read transient channel rocker drive {rocker_mate!r}"
+                )
+            dx = rod_bore[0] - pivot_point[0]
+            dy = rod_bore[1] - pivot_point[1]
+
+            # Down through the working stroke and back to rest, asserting at
+            # every step: the rocker actually tracked the request, and the
+            # bar stayed put -- orientation, foot AND lever end.
+            steps = list(range(1, _CHANNEL_NEUTRAL_STEPS + 1))
+            sweep = [
+                -_CHANNEL_NEUTRAL_SWEEP_DEG * s / _CHANNEL_NEUTRAL_STEPS
+                for s in steps
+            ] + [
+                -_CHANNEL_NEUTRAL_SWEEP_DEG
+                * (_CHANNEL_NEUTRAL_STEPS - s) / _CHANNEL_NEUTRAL_STEPS
+                for s in steps
+            ]
+            worst = {"tilt": 0.0, "foot": 0.0, "top": 0.0}
+            for requested in sweep:
+                theta = math.radians(requested)
+                rocker_param.SystemValue = (
+                    pivot_point[1] + dx * math.sin(theta) + dy * math.cos(theta)
+                ) / 1000.0
+                _rebuild(adapter)
+                rocker_moved = _rot(_rocker_unit(), rest_rocker)
+                if abs(rocker_moved - requested) > _CHANNEL_NEUTRAL_ROCKER_TRACK_TOL_DEG:
+                    raise RuntimeError(
+                        f"rocker drive requested {requested:+.3f} deg but the "
+                        f"rocker read {rocker_moved:+.3f} deg -- the sweep did "
+                        "not happen"
+                    )
+                bar_tilt = abs(_rot(_bar_unit(), rest_bar))
+                foot = _planar(world_point(adapter, bar, BAR_FOOT_LOCAL))
+                top = _planar(world_point(adapter, bar, bar_top_local))
+                foot_walk = math.hypot(
+                    foot[0] - rest_foot[0], foot[1] - rest_foot[1]
+                )
+                top_walk = math.hypot(
+                    top[0] - rest_top[0], top[1] - rest_top[1]
+                )
+                worst["tilt"] = max(worst["tilt"], bar_tilt)
+                worst["foot"] = max(worst["foot"], foot_walk)
+                worst["top"] = max(worst["top"], top_walk)
+                if bar_tilt > _CHANNEL_NEUTRAL_BAR_TILT_TOL_DEG:
+                    raise RuntimeError(
+                        f"rocker at {requested:+.3f} deg tilted the neutral "
+                        f"bar {bar_tilt:.3f} deg (tol "
+                        f"{_CHANNEL_NEUTRAL_BAR_TILT_TOL_DEG}) -- zero "
+                        "amplitude must transmit no rotation"
+                    )
+                if foot_walk > _CHANNEL_NEUTRAL_FOOT_TOL_MM:
+                    raise RuntimeError(
+                        f"rocker at {requested:+.3f} deg walked the neutral "
+                        f"bar foot {foot_walk:.3f} mm (tol "
+                        f"{_CHANNEL_NEUTRAL_FOOT_TOL_MM})"
+                    )
+                if top_walk > _CHANNEL_NEUTRAL_TOP_TOL_MM:
+                    raise RuntimeError(
+                        f"rocker at {requested:+.3f} deg walked the neutral "
+                        f"bar's lever end {top_walk:.3f} mm (tol "
+                        f"{_CHANNEL_NEUTRAL_TOP_TOL_MM}) -- zero amplitude "
+                        "must feed no output"
+                    )
+            _telemetry.info(
+                f"neutral isolation over ±{_CHANNEL_NEUTRAL_SWEEP_DEG:.0f} deg "
+                f"stroke: worst bar tilt {worst['tilt']:.3f} deg, foot walk "
+                f"{worst['foot']:.3f} mm, lever-end walk {worst['top']:.3f} mm"
+            )
+            delete_assembly_feature(adapter, rocker_mate)
+        finally:
+            discard_open_documents(adapter)
+
+    await report.agate(f"chain:{name}:bar-neutral-isolation", _exercise_neutral)
+
+
 async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     """Kinematic proof that the crank drives the WHOLE paper feed (codex #189).
 
@@ -2354,6 +2538,7 @@ async def build(adapter: Any) -> dict[str, str]:
         await _verify_live_chain_one(adapter, report)
         await _verify_channel_amplitude_contact_one(adapter, report)
         await _verify_channel_bar_drag_one(adapter, report)
+        await _verify_channel_bar_neutral_isolation_one(adapter, report)
         await _verify_paper_feed_one(adapter, report)
     if suite == "math":
         verify_truth(report)
