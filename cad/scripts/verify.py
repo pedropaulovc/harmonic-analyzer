@@ -1251,6 +1251,7 @@ _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
 # a reflected endpoint in the other.  Then lower the rocker with the amplitude
 # setting held and prove the exact roof tangent follows it.
 _CHANNEL_CONTACT_TOL_MM = 0.10
+_CHANNEL_AMPLITUDE_ANGLE_TOL_DEG = 0.05
 _CHANNEL_MIN_UPRIGHT_DOT = 0.25
 _CHANNEL_MAX_STEP_DEG = 30.0
 _CHANNEL_ROCKER_TEST_ANGLE_DEG = 85.0
@@ -1302,7 +1303,18 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
 
             rest_rocker, rest_bar = _vectors()
 
-            def _contact_state() -> tuple[float, float, float, float, float]:
+            def _rotation_from_rest(
+                current: tuple[float, float],
+                rest: tuple[float, float],
+            ) -> float:
+                """Return the signed in-plane rotation from *rest* to *current*."""
+                cross = rest[0] * current[1] - rest[1] * current[0]
+                dot = rest[0] * current[0] + rest[1] * current[1]
+                return math.degrees(math.atan2(cross, dot))
+
+            def _contact_state() -> tuple[
+                float, float, float, float, float, float
+            ]:
                 pivot = world_point(adapter, rocker, [0.0, 8.0, 0.0])
                 arc = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
                 foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
@@ -1328,7 +1340,24 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 rocker_angle = math.degrees(math.atan2(
                     arc[1] - pivot[1], arc[0] - pivot[0]
                 ))
-                return plane_error, roof_error, rocker_dot, bar_dot, rocker_angle
+                # Independent geometric readback of the signed angle mate.  A
+                # successful D1 assignment does not prove SolidWorks solved to
+                # it: an unsolved mate can retain the requested parameter while
+                # both components remain at their previous pose.  Relative
+                # component rotation proves the bar actually reached the step.
+                amplitude_angle = (
+                    90.0
+                    + _rotation_from_rest(rocker_u, rest_rocker)
+                    - _rotation_from_rest(bar_u, rest_bar)
+                )
+                return (
+                    plane_error,
+                    roof_error,
+                    rocker_dot,
+                    bar_dot,
+                    rocker_angle,
+                    amplitude_angle,
+                )
 
             # An angle driver between the rocker and bar is the signed amplitude
             # coordinate.  Starting at the 90-degree neutral and ramping through
@@ -1350,13 +1379,31 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                     f"cannot read transient channel angle drive {bar_mate!r}"
                 )
             previous_rocker_angle: float | None = None
-            endpoint_state: tuple[float, float, float, float, float] | None = None
+            endpoint_state: tuple[
+                float, float, float, float, float, float
+            ] | None = None
             for step in range(9):
                 requested = 90.0 + (endpoint - 90.0) * step / 8.0
                 bar_param.SystemValue = math.radians(requested)
                 _rebuild(adapter)
                 state = _contact_state()
-                plane_error, roof_error, rocker_dot, bar_dot, rocker_angle = state
+                (
+                    plane_error,
+                    roof_error,
+                    rocker_dot,
+                    bar_dot,
+                    rocker_angle,
+                    actual_amplitude_angle,
+                ) = state
+                angle_error = abs(math.remainder(
+                    actual_amplitude_angle - requested, 360.0
+                ))
+                if angle_error > _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG:
+                    raise RuntimeError(
+                        f"amplitude requested {requested:.3f} deg but geometric "
+                        f"readback reached {actual_amplitude_angle:.3f} deg "
+                        f"(error {angle_error:.3f} deg)"
+                    )
                 if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
                     raise RuntimeError(
                         f"amplitude {requested:.3f} deg left the exact rocker "
@@ -1393,7 +1440,14 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
             rocker_mate = rocker_result["name"]
             _rebuild(adapter)
             moved_state = _contact_state()
-            plane_error, roof_error, rocker_dot, bar_dot, rocker_angle = moved_state
+            (
+                plane_error,
+                roof_error,
+                rocker_dot,
+                bar_dot,
+                rocker_angle,
+                _actual_amplitude_angle,
+            ) = moved_state
             if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
                 raise RuntimeError(
                     f"rocker stroke at amplitude {endpoint:.3f} deg left the "
@@ -1408,7 +1462,7 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 )
             if endpoint_state is None:
                 raise RuntimeError("channel amplitude ramp produced no samples")
-            endpoint_rocker_angle = endpoint_state[-1]
+            endpoint_rocker_angle = endpoint_state[4]
             rocker_motion = abs(math.remainder(
                 rocker_angle - endpoint_rocker_angle, 360.0
             ))

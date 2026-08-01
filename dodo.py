@@ -1942,6 +1942,12 @@ def task_check():
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".
         SCRIPTS_DIR / "test_cwm_mate_guard.py",
+        # The channel amplitude fix has two independent contracts: the solved
+        # endpoint geometry stays on the upright tangent branch, and finite
+        # range stops are suppressed/restored around mobility probes without
+        # being lost.  Both must run in the mandatory recipe gate.
+        SCRIPTS_DIR / "test_channel_installation_cascade.py",
+        SCRIPTS_DIR / "test_range_stop_dof_gate.py",
         # The [out]-param binding rule is ENFORCED, not just documented: no
         # VT_BYREF on the (uniformly early-bound) build path, late-bound probes
         # declare themselves, and _early_bound never falls back to a raw

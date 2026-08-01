@@ -59,6 +59,8 @@ def _install_solidworks_stub() -> None:
     asm = sys.modules["solidworks_mcp.adapters.solidworks.assembly"]
     if not hasattr(asm, "_gear_mate_links"):
         asm._gear_mate_links = lambda adapter: []  # type: ignore[attr-defined]
+    if not hasattr(asm, "_mate_group_subfeatures"):
+        asm._mate_group_subfeatures = lambda adapter: []  # type: ignore[attr-defined]
     # _common._flag does `from solidworks_mcp.adapters import sw_type_info` then
     # sw_type_info.flag_methods(...). Provide a no-op so method-flagging is a
     # silent no-op on the mock (real seat flags COM dispatch; the mock needs none).
