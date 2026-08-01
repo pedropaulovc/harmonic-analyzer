@@ -1248,8 +1248,9 @@ _CHAIN_REST_TOL = 0.02  # mm / deg drift allowed after restoring the rest pose
 
 # Channel amplitude contact sweep.  Exercise BOTH signed travel directions from
 # a fresh open: the former unsigned distance stop covered only one and admitted
-# a reflected endpoint in the other.  Then lower the rocker with the amplitude
-# setting held and prove the exact roof tangent follows it.
+# a reflected endpoint in the other.  Then release the amplitude driver, lower
+# the rocker, and prove the free slide stays inside its shipped range while the
+# exact roof tangent follows it.
 _CHANNEL_CONTACT_TOL_MM = 0.10
 _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG = 0.05
 _CHANNEL_MIN_UPRIGHT_DOT = 0.25
@@ -1267,6 +1268,7 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
         BAR_CONTACT_GAP,
         BAR_FOOT_LOCAL,
         BAR_FOOT_NOTCH,
+        ROCKER_ROD_BORE_LOCAL,
     )
 
     name = CHANNEL_OWNER
@@ -1427,17 +1429,44 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 previous_rocker_angle = rocker_angle
                 endpoint_state = state
 
-            # Hold the chosen amplitude and lower the rocker through its working
-            # stroke.  The exact plane-axis mate must carry the roof with it.
-            rocker_result = await angle_driver(
-                adapter,
-                named_ref(f"Right Plane@{rocker}", "PLANE"),
-                named_ref("Top Plane", "PLANE"),
-                _CHANNEL_ROCKER_TEST_ANGLE_DEG,
-                label=(f"VERIFY channel rocker at amplitude "
-                       f"{endpoint:.3f} deg"),
+            # Replay the production rocker DOF specification instead of adding
+            # an unrelated plane-angle mate.  The saved driver uses Axis2's
+            # distance to Top Plane as the linearized rocker coordinate.
+            rocker_specs = [
+                spec for spec in load_dof_manifest(name)
+                if spec.get("key") == "rocker_angle_00"
+            ]
+            if len(rocker_specs) != 1:
+                raise RuntimeError(
+                    "expected exactly one rocker_angle_00 DOF specification, "
+                    f"found {len(rocker_specs)}"
+                )
+            pivot_point = world_point(adapter, rocker, [0.0, 8.0, 0.0])
+            rod_bore = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
+            rocker_spec = {
+                **rocker_specs[0],
+                "params": {
+                    **rocker_specs[0]["params"],
+                    "distance": rod_bore[1],
+                },
+            }
+            (rocker_mate,) = await author_dof_drives(adapter, [rocker_spec])
+            rocker_param = adapter._attempt(
+                lambda: model.Parameter(f"D1@{rocker_mate}"), default=None
             )
-            rocker_mate = rocker_result["name"]
+            if rocker_param is None:
+                raise RuntimeError(
+                    f"cannot read transient channel rocker drive {rocker_mate!r}"
+                )
+            delete_assembly_feature(adapter, bar_mate)
+
+            # Lower the rocker five degrees about its real pivot.  Distance mate
+            # system values are metres even though manifest distances are mm.
+            theta = math.radians(_CHANNEL_ROCKER_TEST_ANGLE_DEG - 90.0)
+            dx = rod_bore[0] - pivot_point[0]
+            dy = rod_bore[1] - pivot_point[1]
+            target_y = pivot_point[1] + dx * math.sin(theta) + dy * math.cos(theta)
+            rocker_param.SystemValue = target_y / 1000.0
             _rebuild(adapter)
             moved_state = _contact_state()
             (
@@ -1446,8 +1475,21 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 rocker_dot,
                 bar_dot,
                 rocker_angle,
-                _actual_amplitude_angle,
+                actual_amplitude_angle,
             ) = moved_state
+            angle_error = abs(math.remainder(
+                actual_amplitude_angle - endpoint, 360.0
+            ))
+            lower, upper = AMPLITUDE_ANGLE_LIMITS
+            if not (
+                lower - _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG
+                <= actual_amplitude_angle
+                <= upper + _CHANNEL_AMPLITUDE_ANGLE_TOL_DEG
+            ):
+                raise RuntimeError(
+                    f"released amplitude moved outside {lower:.3f}..{upper:.3f} "
+                    f"deg during rocker stroke: {actual_amplitude_angle:.3f} deg"
+                )
             if max(plane_error, roof_error) > _CHANNEL_CONTACT_TOL_MM:
                 raise RuntimeError(
                     f"rocker stroke at amplitude {endpoint:.3f} deg left the "
@@ -1475,10 +1517,10 @@ async def _verify_channel_amplitude_contact_one(adapter: Any, report: Report) ->
                 f"channel amplitude endpoint {endpoint:.3f} deg: tangent errors "
                 f"{plane_error:.4f}/{roof_error:.4f} mm, upright dots "
                 f"{rocker_dot:.3f}/{bar_dot:.3f}, rocker motion "
-                f"{rocker_motion:.3f} deg"
+                f"{rocker_motion:.3f} deg, released amplitude "
+                f"{actual_amplitude_angle:.3f} deg (shift {angle_error:.3f} deg)"
             )
             delete_assembly_feature(adapter, rocker_mate)
-            delete_assembly_feature(adapter, bar_mate)
         finally:
             discard_open_documents(adapter)
 
