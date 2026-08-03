@@ -5,8 +5,11 @@ flange and 17.5 x 10.5 x 1.5 in pad. The v2 post/carrier fit preserves their
 both plates remain on the legacy centred footprint; the v2 post/carrier fit is
 handled by the mechanism installation contracts.
 
-Deferred: the legacy 0.125"/0.0625" edge fillets are cosmetic and need
-edge-selection tooling — re-added with the M4 finishing pass.
+Finishing: the legacy HarmonicBase.cs edge treatment is modeled — R3.18
+(1/8 in) fillets on the eight vertical plan corners, R1.59 (1/16 in)
+rounds on both plates' exposed top rims, and a C1.59 x 45-degree break on
+the underside rim (ch06/ch30 photos: every exposed plate edge reads
+softened, none sharp).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 6" — annotated (high) footprint,
 legacy thicknesses (photo-verify note).
@@ -99,6 +102,15 @@ CBORE_DIA = 23.0  # lag head O22, recessed
 CBORE_DEPTH = 6.5  # lag head 22 x 6 recessed 0.5
 CBORE_XZ = HOLE_XZ  # all four heads counterbored
 
+# Edge finishing: the legacy HarmonicBase.cs 0.125"/0.0625" treatment. Plan
+# corners get the 1/8 in fillet on both plates; the exposed top rims roll
+# over at 1/16 in (tangent-propagated around the corner arcs); the underside
+# rim carries a 1/16 in x 45-degree edge break. All hole features sit >= 26
+# from every plate edge, so the breaks never touch a rim or seat.
+CORNER_FILLET_R = 0.125 * IN  # 3.175
+RIM_FILLET_R = 0.0625 * IN  # 1.5875
+BOTTOM_CHAMFER = 0.0625 * IN  # 1.5875
+
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords,
 # and since #151 the drive-train derivation is machine-handed too, so the
 # assembly asserts agreement DIRECTLY: pivot = cone_station(PIVOT_STATION).x
@@ -142,14 +154,13 @@ STOP_SCREW_DRILL_DEPTH = 9.0
 # Ø3.2 holes under the black foot screws (build_foot_screw): the spring foot
 # and the arbor-pedestal flange.
 _FORMER_BLOCK_SCREW_XZ = (
-    (15.240530460002873, -98.0),   # front block, east screw
-    (42.24053046000287, -98.0),    # front block, west screw
-    (15.240530460002873, 82.0),    # back block, east screw
-    (42.24053046000287, 82.0),     # back block, west screw
+    (15.240530460002873, -98.0),  # front block, east screw
+    (42.24053046000287, -98.0),  # front block, west screw
+    (15.240530460002873, 82.0),  # back block, east screw
+    (42.24053046000287, 82.0),  # back block, west screw
 )
 BLOCK_SCREW_XZ = tuple(
-    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT)
-    for x, z in _FORMER_BLOCK_SCREW_XZ
+    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
 )
 # block seats: #8-32 tap drill -- the slotted screws thread into the base
 BLOCK_SCREW_HOLE_DEPTH = 3.5  # 22 shank - 18.75 block = 3.25 buried + 0.25 air
@@ -157,13 +168,12 @@ BLOCK_SCREW_DRILL_DEPTH = 7.0
 _FORMER_FOOT_SCREW_XZ = (
     (43.13610240207359, 70.95),  # spring foot: 1-in reach keeps its screw head
     # clear of the unchanged rocker-arm-support casting after the rig recenter
-    (-54.7, -95.5),   # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
-    (-54.7, 102.5),   # NORTH arbor-pedestal flange (PR8, ch12 img09: the
+    (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
+    (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
 )
 FOOT_SCREW_XZ = tuple(
-    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT)
-    for x, z in _FORMER_FOOT_SCREW_XZ
+    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
 # foot seats: #4-40 tap drill -- the foot screws thread into the base
 FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
@@ -174,18 +184,33 @@ FOOT_SCREW_DRILL_DEPTH = 11.0
 # hand-authored *_HOLE_DIA constants are derived from the specs now -- one
 # chokepoint, no drift).
 PIVOT_SEAT_SPEC = HoleSpec(
-    "tapped", PIVOT_THREAD, end="blind", depth_mm=PIVOT_HOLE_DEPTH,
+    "tapped",
+    PIVOT_THREAD,
+    end="blind",
+    depth_mm=PIVOT_HOLE_DEPTH,
     thread_class="2B",
 )
 STOP_SEAT_SPEC = HoleSpec(
-    "tapped", "#8-32", end="blind", depth_mm=STOP_SCREW_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": STOP_SCREW_HOLE_DEPTH})
+    "tapped",
+    "#8-32",
+    end="blind",
+    depth_mm=STOP_SCREW_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": STOP_SCREW_HOLE_DEPTH},
+)
 BLOCK_SEAT_SPEC = HoleSpec(
-    "tapped", "#8-32", end="blind", depth_mm=BLOCK_SCREW_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": BLOCK_SCREW_HOLE_DEPTH})
+    "tapped",
+    "#8-32",
+    end="blind",
+    depth_mm=BLOCK_SCREW_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": BLOCK_SCREW_HOLE_DEPTH},
+)
 FOOT_SEAT_SPEC = HoleSpec(
-    "tapped", "#4-40", end="blind", depth_mm=FOOT_SCREW_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH})
+    "tapped",
+    "#4-40",
+    end="blind",
+    depth_mm=FOOT_SCREW_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH},
+)
 PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 3.797 tap drill
 STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # #8-32 tap drill
 BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # #8-32 tap drill
@@ -202,6 +227,31 @@ def _pos_drive(global_name: str, sketch_value: float) -> str:
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success and res.data else float("nan")
+
+
+def _fillet_section_area(r: float) -> float:
+    """Cross-section a radius-r round removes from a square 90-degree edge."""
+    return (1.0 - math.pi / 4.0) * r * r
+
+
+def _fillet_section_inset(r: float) -> float:
+    """Centroid distance of that removed section from either adjacent face."""
+    return r * (5.0 / 6.0 - math.pi / 4.0) / (1.0 - math.pi / 4.0)
+
+
+def _rim_removal(length: float, width: float, area: float, inset: float) -> float:
+    """Volume an edge break removes along one plate's top/bottom rim.
+
+    The rim is the plate's rectangle perimeter with its plan corners already
+    rounded at CORNER_FILLET_R: the straight runs remove ``area`` per unit
+    length, and each quarter-circle corner sweeps the section by Pappus at
+    the corner-arc radius minus the section's centroid inset (the section
+    rides the inside of the convex corner). Exact for a constant section
+    swept along a tangent-continuous 90-degree rim.
+    """
+    straight = 2.0 * (length + width) - 8.0 * CORNER_FILLET_R
+    corner = (math.pi / 2.0) * area * (CORNER_FILLET_R - inset)
+    return area * straight + 4.0 * corner
 
 
 async def _define_fixed_edge_rectangle(
@@ -336,11 +386,15 @@ async def build(adapter) -> dict[str, str]:
     pre_holes = await _volume(adapter)
     fastener_cut = wizard_holes(
         adapter,
-        HoleSpec("counterbore_fillister", "9/16", overrides_mm={
-            "HoleDiameter": HOLE_DIA,
-            "CounterBoreDiameter": CBORE_DIA,
-            "CounterBoreDepth": CBORE_DEPTH,
-        }),
+        HoleSpec(
+            "counterbore_fillister",
+            "9/16",
+            overrides_mm={
+                "HoleDiameter": HOLE_DIA,
+                "CounterBoreDiameter": CBORE_DIA,
+                "CounterBoreDepth": CBORE_DEPTH,
+            },
+        ),
         [[x, 0.0, z] for x, z in HOLE_XZ],
         (0.0, -1.0, 0.0),
         "lag-screw counterbored holes (9/16)",
@@ -360,7 +414,8 @@ async def build(adapter) -> dict[str, str]:
         + math.pi * ((CBORE_DIA / 2.0) ** 2 - (HOLE_DIA / 2.0) ** 2) * CBORE_DEPTH
     )
     _telemetry.info(
-        f"volume after fastener holes: {after:.1f} mm^3 (removed analytic {v_holes:.1f})")
+        f"volume after fastener holes: {after:.1f} mm^3 (removed analytic {v_holes:.1f})"
+    )
     if abs((pre_holes - after) - v_holes) > 0.02 * v_holes:
         raise RuntimeError(
             f"fastener holes removed {pre_holes - after:.1f}, expected {v_holes:.1f}"
@@ -372,31 +427,137 @@ async def build(adapter) -> dict[str, str]:
     # on the pivot screw's shoulder. A wizard blind hole ends in a 118-degree drill point, so the
     # analytic expectation is blind_hole_volume_mm3 (cylinder + point).
     for tag, spec, xz, label in (
-        ("PivotSeat", PIVOT_SEAT_SPEC,
-         (PIVOT_SCREW_XZ,),
-         f"cone-pivot screw tapped seat ({PIVOT_THREAD} UNC-2B)"),
-        ("StopSeat", STOP_SEAT_SPEC,
-         (STOP_SCREW_XZ,),
-         "swing-stop tapped seat (#8-32)"),
-        ("BlockScrewHoles", BLOCK_SEAT_SPEC,
-         BLOCK_SCREW_XZ,
-         "pinion-pivot-block tapped seats (#8-32)"),
-        ("FootScrewHoles", FOOT_SEAT_SPEC,
-         FOOT_SCREW_XZ,
-         "foot-screw tapped seats (#4-40)"),
+        (
+            "PivotSeat",
+            PIVOT_SEAT_SPEC,
+            (PIVOT_SCREW_XZ,),
+            f"cone-pivot screw tapped seat ({PIVOT_THREAD} UNC-2B)",
+        ),
+        (
+            "StopSeat",
+            STOP_SEAT_SPEC,
+            (STOP_SCREW_XZ,),
+            "swing-stop tapped seat (#8-32)",
+        ),
+        (
+            "BlockScrewHoles",
+            BLOCK_SEAT_SPEC,
+            BLOCK_SCREW_XZ,
+            "pinion-pivot-block tapped seats (#8-32)",
+        ),
+        (
+            "FootScrewHoles",
+            FOOT_SEAT_SPEC,
+            FOOT_SCREW_XZ,
+            "foot-screw tapped seats (#4-40)",
+        ),
     ):
         dia = blind_cut_dia_mm(spec)
         wizard_holes(
-            adapter, spec,
+            adapter,
+            spec,
             [[sx, total, sz] for sx, sz in xz],
-            (0.0, 1.0, 0.0), label, name=tag,
+            (0.0, 1.0, 0.0),
+            label,
+            name=tag,
         )
         after_cut = await _volume(adapter)
         v_cut = len(xz) * blind_hole_volume_mm3(dia, spec.depth_mm)
         if abs((after - after_cut) - v_cut) > 0.02 * v_cut:
             raise RuntimeError(
-                f"{tag} removed {after - after_cut:.1f}, expected {v_cut:.1f}")
+                f"{tag} removed {after - after_cut:.1f}, expected {v_cut:.1f}"
+            )
         after = after_cut
+
+    # Edge finishing (the legacy HarmonicBase.cs fillets, restored now the
+    # adapter has edge selection): plan corners FIRST, so the rim features
+    # propagate tangent around the corner arcs and the Pappus expectations
+    # in _rim_removal hold exactly.
+    check(
+        "fillet plan corners",
+        await adapter.add_fillet(
+            CORNER_FILLET_R,
+            [
+                [
+                    sx * BOTTOM_LENGTH / 2.0,
+                    BOTTOM_THICKNESS / 2.0,
+                    sz * BOTTOM_WIDTH / 2.0,
+                ]
+                for sx in (-1.0, 1.0)
+                for sz in (-1.0, 1.0)
+            ]
+            + [
+                [
+                    sx * TOP_LENGTH / 2.0,
+                    total - TOP_THICKNESS / 2.0,
+                    sz * TOP_WIDTH / 2.0,
+                ]
+                for sx in (-1.0, 1.0)
+                for sz in (-1.0, 1.0)
+            ],
+        ),
+    )
+    name_last_feature(adapter, "CornerFillets")
+    v_corners = 4.0 * _fillet_section_area(CORNER_FILLET_R) * total
+    after = await volume_check(
+        adapter, "plan corner fillets", after - v_corners, 0.01 * v_corners + 2.0
+    )
+
+    # Top rims: 1/16 in rounds on both plates' exposed top perimeter edges
+    # (the flange's reveal rim and the pad's top rim). Tangent propagation
+    # (always on in add_fillet) carries each rim around its corner arcs.
+    check(
+        "fillet top rims",
+        await adapter.add_fillet(
+            RIM_FILLET_R,
+            [
+                [0.0, BOTTOM_THICKNESS, BOTTOM_FRONT_Z],
+                [0.0, BOTTOM_THICKNESS, BOTTOM_REAR_Z],
+                [BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, 0.0],
+                [-BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, 0.0],
+                [0.0, total, TOP_FRONT_Z],
+                [0.0, total, TOP_REAR_Z],
+                [TOP_LENGTH / 2.0, total, 0.0],
+                [-TOP_LENGTH / 2.0, total, 0.0],
+            ],
+        ),
+    )
+    name_last_feature(adapter, "TopRimRounds")
+    rim_area = _fillet_section_area(RIM_FILLET_R)
+    rim_inset = _fillet_section_inset(RIM_FILLET_R)
+    v_rims = _rim_removal(
+        BOTTOM_LENGTH, BOTTOM_WIDTH, rim_area, rim_inset
+    ) + _rim_removal(TOP_LENGTH, TOP_WIDTH, rim_area, rim_inset)
+    after = await volume_check(
+        adapter, "top rim rounds", after - v_rims, 0.01 * v_rims + 2.0
+    )
+
+    # Underside rim: 1/16 in x 45-degree edge break around the bottom face
+    # perimeter (tangent propagation wraps the corner arcs). The chamfer
+    # section is c^2/2 with centroid c/3 from either face.
+    check(
+        "chamfer underside rim",
+        await adapter.add_chamfer(
+            BOTTOM_CHAMFER,
+            [
+                [0.0, 0.0, BOTTOM_FRONT_Z],
+                [0.0, 0.0, BOTTOM_REAR_Z],
+                [BOTTOM_LENGTH / 2.0, 0.0, 0.0],
+                [-BOTTOM_LENGTH / 2.0, 0.0, 0.0],
+            ],
+            tangent_propagation=True,
+        ),
+    )
+    name_last_feature(adapter, "BottomEdgeBreak")
+    v_break = _rim_removal(
+        BOTTOM_LENGTH,
+        BOTTOM_WIDTH,
+        BOTTOM_CHAMFER**2 / 2.0,
+        BOTTOM_CHAMFER / 3.0,
+    )
+    after = await volume_check(
+        adapter, "underside edge break", after - v_break, 0.01 * v_break + 2.0
+    )
 
     # Apply the deferred drive equations after the whole model exists, then
     # re-check neutrality against the as-built volume. Frame components are
@@ -406,9 +567,7 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(
-        adapter, "driven base (equations neutral)", after, 0.005 * after
-    )
+    await volume_check(adapter, "driven base (equations neutral)", after, 0.005 * after)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
@@ -417,9 +576,7 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(
         adapter, "base length (annotated 46 cm / 18 in)", "x", BOTTOM_LENGTH
     )
-    await bbox_extent_check(
-        adapter, "base depth (28 cm plate)", "z", BOTTOM_WIDTH
-    )
+    await bbox_extent_check(adapter, "base depth (28 cm plate)", "z", BOTTOM_WIDTH)
 
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)

@@ -32,6 +32,11 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   the web thins to 12.7 (0.5 in) centred on each rail and STAYS thin through
   the bottom edge (ch19 img04/img05 + user read), with full-thickness lands
   at the bosses, hub rib and crossbar junctions.
+* Finishing: R3 cast rounds on the top-face rims (the outer rail rim
+  between the proud bosses, both window rims with R3 corner coves --
+  ch19 img04/ch30 p002: every top edge reads softened) and C1 x 45
+  machined breaks on both ends of the column + gooseneck bores (note 9;
+  the lead-ins the frame slides down the columns on).
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -43,8 +48,10 @@ web ring -> crossbar junction lands -> top-flange ring -> hub rib
 restore -> crossbar+gussets -> corner bosses (up/down pair) -> hub boss
 + V-gussets -> set-screw pocket -> spot-faces -> column bores ->
 gooseneck bore -> wizard holes (hanger-stud clearances, side-screw taps,
-set-screw tap, keeper taps). Wizard holes come after the face cuts so
-every seat face is final. Analytic volume checks after every feature;
+set-screw tap, keeper taps) -> cast finishing (R3 window corner coves,
+R3 top-face rim rounds) -> C1 bore-end chamfers. Wizard holes come after
+the face cuts so every seat face is final; the edge breaks come last so
+they cut final faces. Analytic volume checks after every feature;
 the boss/hub/spot-face/tap expectations use small grid integrals (no
 tidy closed form against the webbed solid).
 
@@ -191,6 +198,10 @@ LAND_X0 = BAR_X0 - GUSSET - 6.0  # -50; crossbar-junction land pads on the
 LAND_X1 = BAR_X1 + GUSSET + 6.0  # +20; front/rear inner faces (6 margin)
 
 THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
+
+# --- Edge finishing ----------------------------------------------------------
+CAST_FILLET_R = 3.0  # drawing note 1: FILLETS R3 UNLESS NOTED (ch19 img04)
+BORE_CHAMFER = 1.0  # note 9: C1 x 45 end breaks on every machined bore
 
 if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
     raise AssertionError("top-frame assumes a symmetric column span about z 0")
@@ -380,6 +391,52 @@ def _set_tap_removal() -> float:
         vol += chord * length * step
         d += step
     return vol
+
+
+def _fillet_section_area(r: float) -> float:
+    """Cross-section a radius-r round removes from a square 90-degree edge."""
+    return (1.0 - math.pi / 4.0) * r * r
+
+
+def _fillet_section_inset(r: float) -> float:
+    """Centroid distance of that removed section from either adjacent face."""
+    return r * (5.0 / 6.0 - math.pi / 4.0) / (1.0 - math.pi / 4.0)
+
+
+def _top_rim_removal() -> tuple[float, float]:
+    """(outer, window) volumes the R3 top-face rim rounds remove.
+
+    Outer rim: four straight edges, each ending where a proud corner-boss
+    cylinder crosses the rail face. Window rims: both windows' straight runs
+    (rail inner faces shortened by the R3 corner coves, front/rear inner
+    faces up to the junction gussets, the four gusset hypotenuses, the two
+    crossbar flanks) plus, by Pappus, the sweep around the four corner-cove
+    arcs (concave: section centroid rides OUTSIDE the arc radius). The blunt
+    135-degree gusset vertices and the fillet ends dying into the boss walls
+    are not modeled -- the check tolerance absorbs them.
+    """
+    area = _fillet_section_area(CAST_FILLET_R)
+    inset = _fillet_section_inset(CAST_FILLET_R)
+    cut_side = math.sqrt((BOSS_DIA / 2.0) ** 2 - (OUTER_X - COLUMN_X) ** 2)
+    cut_fr = math.sqrt((BOSS_DIA / 2.0) ** 2 - (OUTER_Z - abs(FRONT_COLUMN_Z)) ** 2)
+    outer = area * (4.0 * (abs(FRONT_COLUMN_Z) - cut_side) + 4.0 * (COLUMN_X - cut_fr))
+    rail = 2.0 * (INNER_Z - CAST_FILLET_R)  # one window's rail inner edge
+    east_fr = (INNER_X - CAST_FILLET_R) - (abs(BAR_X0) + GUSSET)
+    west_fr = (INNER_X - CAST_FILLET_R) - (BAR_X1 + GUSSET)
+    hyp = GUSSET * math.sqrt(2.0)
+    flank = 2.0 * (INNER_Z - GUSSET)  # one crossbar flank between gussets
+    runs = 2.0 * rail + 2.0 * east_fr + 2.0 * west_fr + 4.0 * hyp + 2.0 * flank
+    cove = (math.pi / 2.0) * area * (CAST_FILLET_R + inset)
+    return outer, area * runs + 4.0 * cove
+
+
+def _bore_chamfer_removal() -> float:
+    """Volume the C1 45-degree breaks remove from all ten bore-end rims."""
+
+    def ring(bore_dia: float) -> float:
+        return math.pi * BORE_CHAMFER**2 * (bore_dia / 2.0 + BORE_CHAMFER / 3.0)
+
+    return 8.0 * ring(BORE_DIA) + 2.0 * ring(GOOSENECK_BORE_DIA)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -983,6 +1040,92 @@ async def build(adapter) -> dict[str, str]:
     )
     v_keeper = 2.0 * blind_hole_volume_mm3(TAP_DRILL_MM["#10-24"], 10.0)
     volume = await volume_check(adapter, "keeper taps", volume - v_keeper, 10.0)
+
+    # 16. Window corner coves: R3 on the four flange-band window corner
+    #     edges (reentrant, so the fillet ADDS material), letting the rim
+    #     rounds roll tangent around the corners (ch19 img04: the window
+    #     corners read rounded, not sharp).
+    check(
+        "fillet window coves",
+        await adapter.add_fillet(
+            CAST_FILLET_R,
+            [
+                [sx * INNER_X, FLANGE_BOT_Y + FLANGE / 2.0, sz * INNER_Z]
+                for sx in (-1.0, 1.0)
+                for sz in (-1.0, 1.0)
+            ],
+        ),
+    )
+    name_last_feature(adapter, "WindowCoves")
+    v_coves = 4.0 * _fillet_section_area(CAST_FILLET_R) * FLANGE
+    volume = await volume_check(
+        adapter, "window coves", volume + v_coves, 0.05 * v_coves + 5.0
+    )
+
+    # 17. Top-face rim rounds: R3 on the outer rail rim (four edges between
+    #     the proud bosses) and both windows' rims -- note 1's cast fillets
+    #     on the faces every photo reads softened (ch30 p002/p006, ch19).
+    v_outer, v_window = _top_rim_removal()
+    check(
+        "fillet top rims",
+        await adapter.add_fillet(
+            CAST_FILLET_R,
+            [
+                [OUTER_X, HALF_H, 0.0],
+                [-OUTER_X, HALF_H, 0.0],
+                [0.0, HALF_H, OUTER_Z],
+                [0.0, HALF_H, -OUTER_Z],
+                [-INNER_X, HALF_H, 0.0],
+                [INNER_X, HALF_H, 0.0],
+                [BAR_X0, HALF_H, 0.0],
+                [BAR_X1, HALF_H, 0.0],
+                # front/rear inner-face runs, east + west of the crossbar
+                [-(abs(BAR_X0) + GUSSET + INNER_X) / 2.0, HALF_H, INNER_Z],
+                [-(abs(BAR_X0) + GUSSET + INNER_X) / 2.0, HALF_H, -INNER_Z],
+                [(BAR_X1 + GUSSET + INNER_X) / 2.0, HALF_H, INNER_Z],
+                [(BAR_X1 + GUSSET + INNER_X) / 2.0, HALF_H, -INNER_Z],
+                # gusset hypotenuse midpoints
+                [BAR_X0 - GUSSET / 2.0, HALF_H, INNER_Z - GUSSET / 2.0],
+                [BAR_X0 - GUSSET / 2.0, HALF_H, -(INNER_Z - GUSSET / 2.0)],
+                [BAR_X1 + GUSSET / 2.0, HALF_H, INNER_Z - GUSSET / 2.0],
+                [BAR_X1 + GUSSET / 2.0, HALF_H, -(INNER_Z - GUSSET / 2.0)],
+            ],
+        ),
+    )
+    name_last_feature(adapter, "TopRimRounds")
+    v_rims = v_outer + v_window
+    volume = await volume_check(
+        adapter, "top rim rounds", volume - v_rims, 0.03 * v_rims + 100.0
+    )
+
+    # 18. Bore-end chamfers: C1 x 45 on both ends of the four column bores
+    #     and the gooseneck bore (note 9's machined breaks; the lead-ins
+    #     the frame slides down the columns on).
+    boss_top_y = HALF_H + BOSS_ABOVE
+    boss_bot_y = -(HALF_H + BOSS_BELOW)
+    r_bore = BORE_DIA / 2.0
+    r_gn = GOOSENECK_BORE_DIA / 2.0
+    check(
+        "chamfer bore ends",
+        await adapter.add_chamfer(
+            BORE_CHAMFER,
+            [
+                [sx * COLUMN_X, y_rim, z_world + r_bore]
+                for sx in (-1.0, 1.0)
+                for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z)
+                for y_rim in (boss_top_y, boss_bot_y)
+            ]
+            + [
+                [GOOSENECK_X, HALF_H, GOOSENECK_Z + r_gn],
+                [GOOSENECK_X, -(HALF_H + HUB_BOSS_DROP), GOOSENECK_Z + r_gn],
+            ],
+        ),
+    )
+    name_last_feature(adapter, "BoreEndBreaks")
+    v_breaks = _bore_chamfer_removal()
+    volume = await volume_check(
+        adapter, "bore end breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
+    )
 
     # Deferred drive equations: after the whole model + a rebuild exist so
     # every target resolves; the re-check proves the equations are neutral.

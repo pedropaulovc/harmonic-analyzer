@@ -80,6 +80,7 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "2X DRILL + TAP #10-24 UNC-2B X 10.00 DEEP INTO THE WEST RAIL TOP" in notes
     assert "FULCRUM-KEEPER FEET" in notes
     assert "ALL BORES Ra 1.6" in notes
+    assert "ENDS BROKEN C1.00 X 45 DEG" in notes
     assert "MASK DATUMS, BORES, BOSS END LANDS AND TAPPED HOLES" in notes_flat
     assert "DIMENSIONS/GD&T APPLY BEFORE COATING" in notes
     assert "MAX-MIN RADIAL WALL THICKNESS" in inspection_flat
