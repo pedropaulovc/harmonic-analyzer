@@ -27,6 +27,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OuterProfile": {"Width", "Depth"},
 }
 
+# Two linked note blocks: notes 1-5 in the lower-left column, 6-10 in the
+# right-hand column -- one 29-line block ran off the sheet bottom.
 DRAWING_NOTES = "\n".join(
     (
         "1. GREEN-PAINTED GRAY IRON CASTING; MACHINE DATUM FACES, BORES AND",
@@ -47,6 +49,10 @@ DRAWING_NOTES = "\n".join(
         "   FLANGE ONLY -- THE WEB THINS AND STAYS THIN TO THE BOTTOM);",
         "   FULL-THICKNESS LANDS AT BOSSES, HUB RIB AND CROSSBAR JUNCTIONS.",
         "   CAST FINISH INSIDE PANELS.",
+    )
+)
+DRAWING_NOTES_B = "\n".join(
+    (
         "6. GOOSENECK HUB, EAST RAIL AT Z +3.09: RIB 27.00 WIDE FULL HEIGHT,",
         "   BORE <MOD-DIAM>17.00 +0.20/0 THRU; UNDERSIDE BOSS DIA30 X 8.00 WITH",
         "   TWIN GUSSETS; DRILL + TAP 1/4-20 UNC-2B THRU RIB TO BORE ON THE BAND",

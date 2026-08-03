@@ -176,14 +176,28 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="keeper seating face",
     )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=(LUG_FACE_X, _front_y(12.0)),
-        symbol_xy=(LUG_FACE_X + 0.014, _front_y(12.0)),
-        datum="B",
-        label="outboard lug face",
-    )
+    # Datum B is a VERTICAL silhouette edge -- maximally sensitive to the
+    # view's outline-vs-geometry x asymmetry (live-probed 2026-08-03: the
+    # lug edge sat +0.75 mm sheet right of the bbox-centred nominal while
+    # the outline centre matched the request exactly). Scan a short
+    # deterministic x ladder around the nominal; first hit wins.
+    datum_b_error: Exception | None = None
+    for dx in (0.0, 0.0005, 0.001, -0.0005, -0.001, 0.0015, -0.0015):
+        try:
+            add_datum_feature(
+                adapter,
+                front,
+                edge_xy=(LUG_FACE_X + dx, _front_y(12.0)),
+                symbol_xy=(LUG_FACE_X + dx + 0.014, _front_y(12.0)),
+                datum="B",
+                label="outboard lug face",
+            )
+            datum_b_error = None
+            break
+        except RuntimeError as exc:
+            datum_b_error = exc
+    if datum_b_error is not None:
+        raise datum_b_error
     add_feature_control_frame(
         adapter,
         front,

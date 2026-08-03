@@ -92,7 +92,7 @@ STUD_X = (BAR_X0 + BAR_X1) / 2.0  # -15.0 crossbar centreline
 # the hanger-stud holes; the front elevation makes the 36.5 rail band, the
 # 47.3 boss stack and datum A visible.
 TOP_CENTER = (0.135, 0.175)
-FRONT_CENTER = (0.345, 0.150)
+FRONT_CENTER = (0.345, 0.130)
 DATUM_C_SYMBOL_XY = (0.210, 0.105)
 
 
@@ -103,7 +103,9 @@ TOP_KEEP = {
         TOP_CENTER[0],
         TOP_CENTER[1] + PLAN_HALF_Z * VIEW_SCALE / 1000.0 + 0.012,
     ),
-    "Depth": (TOP_CENTER[0] + PLAN_HALF_X * VIEW_SCALE / 1000.0 + 0.016, TOP_CENTER[1]),
+    # Depth rides the LEFT flank: the right flank hosts the notes-B block
+    # and the text landed mid-block (eye-pass 2026-08-03).
+    "Depth": (TOP_CENTER[0] - PLAN_HALF_X * VIEW_SCALE / 1000.0 - 0.006, TOP_CENTER[1] - 0.030),
 }
 
 
@@ -227,6 +229,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Manufacturing Notes B",
             "Inspection Notes",
             "Top View Note",
             "Front View Note",
@@ -237,6 +240,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Manufacturing Notes B",
             "Inspection Notes",
             "Top View Note",
             "Front View Note",
@@ -351,9 +355,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
-    add_property_linked_note(adapter, "Inspection Notes", 0.270, 0.255)
-    add_property_linked_note(adapter, "Top View Note", 0.280, 0.200)
-    add_property_linked_note(adapter, "Front View Note", 0.300, 0.095)
+    # NOTE anchors pass through IAnnotation::SetPosition, which this 2:1
+    # sheet MULTIPLIES by the sheet scale -- physical = 2x the argument
+    # (Inspection Notes (0.270, 0.255) render at (0.54, 0.51); the first
+    # notes-B anchor (0.560, 0.300) landed off-sheet at (1.12, 0.60)).
+    # (0.259, 0.089) -> physical (0.518, 0.178): the free band between
+    # the FRONT VIEW label and the title block top edge.
+    add_property_linked_note(adapter, "Manufacturing Notes B", 0.2585, 0.200)
+    add_property_linked_note(adapter, "Inspection Notes", 0.2965, 0.260)
+    add_property_linked_note(adapter, "Top View Note", 0.280, 0.2055)
+    add_property_linked_note(adapter, "Front View Note", 0.300, 0.0785)
 
     return await finalize_drawing(
         adapter,

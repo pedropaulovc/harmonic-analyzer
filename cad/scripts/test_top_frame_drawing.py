@@ -32,7 +32,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 
 def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
-    notes = top_frame_spec.DRAWING_NOTES
+    notes = top_frame_spec.DRAWING_NOTES + "\n" + top_frame_spec.DRAWING_NOTES_B
     notes_flat = " ".join(notes.split())
     inspection = top_frame_spec.INSPECTION_NOTES
     inspection_flat = " ".join(inspection.split())
@@ -93,8 +93,9 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes B"' in source
     assert (
-        'add_property_linked_note(adapter, "Inspection Notes", 0.270, 0.255)' in source
+        'add_property_linked_note(adapter, "Inspection Notes", 0.2965, 0.260)' in source
     )
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 4
@@ -161,7 +162,7 @@ def test_view_scales_are_explicit() -> None:
     assert '"*Front"' in source
     assert "scale=(1, 4)" in source
     assert top_frame_spec.TOP_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
-    assert '"Top View Note", 0.280, 0.200' in source
+    assert '"Top View Note", 0.280, 0.2055' in source
     assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4"
 
 
