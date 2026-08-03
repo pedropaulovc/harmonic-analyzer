@@ -168,16 +168,17 @@ TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
 SIDE_SCREW_HEAD_Z = 137.6  # under-head seat station (spot-faced boss face)
 #
 # gooseneck-set-screw: 1x 1/4-20 UNC x 16 square-head set screw gripping the
-# gooseneck post through the casting's west-hub tapped rib hole, axis along X
+# gooseneck post through the casting's east-hub tapped rib hole, axis along X
 # at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline). Entered from the
-# west outer face x -214.1: local +Y -> -X (rot_z_rows(90), euler [0,0,90])
-# points the 16 shank inboard, tip at x -204.85 = 0.15 clear of the Ø16 post
-# surface (post at x -197), under-head plane at x -220.85 (bearing face 6.75
-# off the outer face; the contract's "~7.05" standoff was approximate -- the
-# 0.15 tip clearance is the pinned number), square head outboard to -226.85.
+# east outer face x -214.1: local +Y -> -X (rot_z_rows(90), euler [0,0,90])
+# points the 16 shank inboard, tip at x -205.15 = 0.15 CLEAR (outboard) of the
+# Ø16 post surface at x -205 (post centre -197) -- the first build pinned the
+# tip at -204.85, 0.15 INSIDE the post (1.39 mm^3 top-level interference),
+# under-head plane at x -221.15 (bearing face 7.05 off the outer face,
+# the contract standoff), square head outboard to -227.15.
 GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
-SET_SCREW_TIP_X = -204.85  # 0.15 clear of the Ø16 post surface at -205
-SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - 16.0  # -220.85 under-head plane
+SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
+SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - 16.0  # -221.15 under-head plane
 
 # Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
 # on the base top, decorated side up, on the EAST (+X) face -- read off the in-situ

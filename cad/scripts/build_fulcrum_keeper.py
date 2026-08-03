@@ -145,7 +145,11 @@ async def build(adapter) -> dict[str, str]:
     ]
     lines = await add_line_chain(adapter, pts)
     await define_rectilinear_chain(
-        adapter, lines, pts, label="foot profile", dims=foot,
+        adapter,
+        lines,
+        pts,
+        label="foot profile",
+        dims=foot,
         names=["PadLen", "ReliefRise", None, "FootRise", "FootReach"],
         drives=[
             '"FootReach" - "PadEndX"',
@@ -185,7 +189,11 @@ async def build(adapter) -> dict[str, str]:
     ]
     lug_lines = await add_line_chain(adapter, lug_pts)
     await define_rectilinear_chain(
-        adapter, lug_lines, lug_pts, label="lug profile", dims=lug,
+        adapter,
+        lug_lines,
+        lug_pts,
+        label="lug profile",
+        dims=lug,
         names=["LugWidth", "LugRise", "LugAnchorZ", "LugBaseH"],
         drives=[
             '"KeeperWidth"',
@@ -214,7 +222,12 @@ async def build(adapter) -> dict[str, str]:
     crown = SketchDims()
     check("create_sketch crown", await adapter.create_sketch("Right"))
     await define_circle(
-        adapter, 0.0, SHAFT_AXIS_H, CROWN_DIA / 2.0, "lug crown", dims=crown,
+        adapter,
+        0.0,
+        SHAFT_AXIS_H,
+        CROWN_DIA / 2.0,
+        "lug crown",
+        dims=crown,
         names=("CrownCz", "ShaftAxisH", "CrownDia"),
         drives=(None, '"ShaftAxisH"', '"CrownDia"'),
     )
@@ -235,15 +248,18 @@ async def build(adapter) -> dict[str, str]:
     # The crown circle's lower half merges into the lug rectangle (its
     # centre sits ON the lug top edge), so only the upper half adds metal.
     v_crown = 0.5 * math.pi * r_c * r_c * LUG_T
-    volume = await volume_check(
-        adapter, "lug crown", volume + v_crown, 0.01 * v_crown
-    )
+    volume = await volume_check(adapter, "lug crown", volume + v_crown, 0.01 * v_crown)
 
     # --- Spherical seat: socket cut, ball, shaft bore ---------------------
     socket = SketchDims()
     check("create_sketch socket", await adapter.create_sketch("Right"))
     await define_circle(
-        adapter, 0.0, SHAFT_AXIS_H, BALL_DIA / 2.0, "ball socket", dims=socket,
+        adapter,
+        0.0,
+        SHAFT_AXIS_H,
+        BALL_DIA / 2.0,
+        "ball socket",
+        dims=socket,
         names=("SocketCz", "SocketH", "SocketDia"),
         drives=(None, '"ShaftAxisH"', '"BallDia"'),
     )
@@ -260,9 +276,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Socket")
     r_b = BALL_DIA / 2.0
     v_socket = math.pi * r_b * r_b * LUG_T
-    volume = await volume_check(
-        adapter, "socket", volume - v_socket, 0.01 * v_socket
-    )
+    volume = await volume_check(adapter, "socket", volume - v_socket, 0.01 * v_socket)
 
     # --- Foot screw hole: cheese-head counterbore in the pad centre -------
     # Placed while the part is still ONE body: the hole wizard's
@@ -272,7 +286,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         SCREW_HOLE_SPEC,
         [[SCREW_X, FOOT_H, 0.0]],
-        (0.0, -1.0, 0.0),
+        (0.0, 1.0, 0.0),
         "keeper foot screw hole (#10 cbore)",
         name="FootScrewHole",
     )
@@ -316,9 +330,7 @@ async def build(adapter) -> dict[str, str]:
     )
     arc = check(
         "add_arc ball",
-        await adapter.add_arc(
-            0.0, SHAFT_AXIS_H, r_b, SHAFT_AXIS_H, -r_b, SHAFT_AXIS_H
-        ),
+        await adapter.add_arc(0.0, SHAFT_AXIS_H, r_b, SHAFT_AXIS_H, -r_b, SHAFT_AXIS_H),
     )
     set_sketch_direct_db(adapter, False)
     for end in ("start", "end"):
@@ -357,7 +369,12 @@ async def build(adapter) -> dict[str, str]:
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Right"))
     await define_circle(
-        adapter, 0.0, SHAFT_AXIS_H, BORE_DIA / 2.0, "shaft bore", dims=bore,
+        adapter,
+        0.0,
+        SHAFT_AXIS_H,
+        BORE_DIA / 2.0,
+        "shaft bore",
+        dims=bore,
         names=("BoreCz", "BoreH", "BoreDia"),
         drives=(None, '"ShaftAxisH"', '"BoreDia"'),
     )
@@ -375,9 +392,7 @@ async def build(adapter) -> dict[str, str]:
     # Coaxial Ø6.5 cylinder through the Ø9.5 sphere only (the lug material
     # inside the socket ring is already gone): V = 4pi/3 (R^3 - (R^2-a^2)^1.5).
     r_a = BORE_DIA / 2.0
-    v_bore = (4.0 * math.pi / 3.0) * (
-        r_b**3 - (r_b * r_b - r_a * r_a) ** 1.5
-    )
+    v_bore = (4.0 * math.pi / 3.0) * (r_b**3 - (r_b * r_b - r_a * r_a) ** 1.5)
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to

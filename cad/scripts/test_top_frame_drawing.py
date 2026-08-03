@@ -60,7 +60,8 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "DATUM A = RAIL BOTTOM FACE" in notes
     assert "B = EAST (-X) OUTER RAIL FACE; C = REAR OUTER RAIL FACE" in notes_flat
     assert "PANELS RECESSED 3.50" in notes
-    assert "BETWEEN 8.00 TOP/BOTTOM FLANGES" in notes_flat
+    assert "THROUGH THE BOTTOM EDGE" in notes_flat
+    assert "WEB THINS AND STAYS THIN" in notes_flat
     assert "CAST FINISH INSIDE PANELS" in notes
     assert "GOOSENECK HUB, EAST RAIL AT Z +3.09" in notes
     assert "RIB 27.00 WIDE FULL HEIGHT" in notes
@@ -92,7 +93,9 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert 'add_property_linked_note(adapter, "Inspection Notes", 0.270, 0.255)' in source
+    assert (
+        'add_property_linked_note(adapter, "Inspection Notes", 0.270, 0.255)' in source
+    )
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 4
     assert 'symbol_xy=DATUM_C_SYMBOL_XY, datum="C"' in source

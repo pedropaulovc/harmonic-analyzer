@@ -28,21 +28,25 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   O30 x 8 with twin V-gussets (ch30 p004), a 16 x 16 x 2 cast pocket and
   a 1/4-20 tap through the rib to the bore for the square-head set screw
   (book p.45: "a square-head screw pinches the post in its socket").
-* Webbed faces: panels recessed 3.5 into every inner and outer rail face
-  between 8-tall top/bottom flanges (ch19 img04/img05), with full-
-  thickness lands at the bosses, hub rib and crossbar junctions.
+* Webbed faces (T-rail section): an 8-tall full-thickness top flange, then
+  the web thins 3.5 per face and STAYS thin through the bottom edge (ch19
+  img04/img05 + user read), with full-thickness lands at the bosses, hub
+  rib and crossbar junctions.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
 (x, y) -> (X, -Z) handedness; sketches on Right-plane offsets map
-(x, y) -> (Z, Y) (build_rocker_arm_support precedent). Build order:
-outer slab -> window cut -> crossbar+gussets boss -> corner bosses
-(up/down pair) -> hub boss + V-gussets -> face panels -> set-screw
-pocket -> spot-faces -> column bores -> gooseneck bore -> wizard holes
-(hanger-stud clearances, side-screw taps, set-screw tap). Wizard holes
-come after the face cuts so every seat face is final. Analytic volume
-checks after every feature; the boss/hub/spot-face/tap expectations use
-small grid integrals (no tidy closed form against the webbed solid).
+(x, y) -> (Z, Y) (build_rocker_arm_support precedent; NEGATIVE-offset
+planes mirror sketch x -- see the gusset/pocket sites). Build order
+(ADDITIVE T-section -- the web/flange rings are extruded, not pocketed):
+web ring -> crossbar junction lands -> top-flange ring -> hub rib
+restore -> crossbar+gussets -> corner bosses (up/down pair) -> hub boss
++ V-gussets -> set-screw pocket -> spot-faces -> column bores ->
+gooseneck bore -> wizard holes (hanger-stud clearances, side-screw taps,
+set-screw tap, keeper taps). Wizard holes come after the face cuts so
+every seat face is final. Analytic volume checks after every feature;
+the boss/hub/spot-face/tap expectations use small grid integrals (no
+tidy closed form against the webbed solid).
 
 Run (SolidWorks already open)::
 
@@ -67,6 +71,7 @@ from _common import (
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
+    extrude_at_offset,
     force_rebuild,
     name_last_feature,
     report_mass_properties,
@@ -164,17 +169,21 @@ KEEPER_TAP_Z_FRONT = SUMMING_Z - 74.0  # -70.912
 KEEPER_TAP_Z_REAR = SUMMING_Z + 74.0  # +77.088
 
 # --- Webbing ----------------------------------------------------------------
-FLANGE = 8.0  # top/bottom flange bands
-RECESS = 3.5  # panel recess into each face
-PANEL_HALF_H = (RING_HEIGHT - 2.0 * FLANGE) / 2.0  # 10.25
-# Panel spans (part z or x). Lands survive at bosses, hub rib and the
-# crossbar junction; margins keep the recesses off the boss face
-# intersections (|z| 92.3 on the side-face planes, |x| 179.1 on the
-# front/rear planes) and off the hub rib / gusset toes.
-PANEL_W_SIDE_HUB = ((-86.0, -14.0), (20.0, 86.0))  # east faces (hub rib gap)
-PANEL_W_SIDE_FULL = ((-86.0, 86.0),)  # west faces
-PANEL_FR_OUTER = ((-174.0, 174.0),)  # front/rear outer faces
-PANEL_FR_INNER = ((-174.0, -50.0), (20.0, 174.0))  # inner faces (bar junction gap)
+# T-rail section (user-corrected vs ch19 img04): an 8-tall full-thickness top
+# flange, below which the web thins by RECESS per face and STAYS thin through
+# the bottom edge (no bottom flange). Built ADDITIVELY: a full-height thin web
+# ring + an 8-tall full-width flange ring (two nested-rectangle sketches),
+# plus full-thickness restore pads at the hub rib and the crossbar junctions.
+# The corner bosses supply the corner lands.
+FLANGE = 8.0  # top flange band (the only full-thickness band)
+RECESS = 3.5  # web setback per face
+FLANGE_BOT_Y = RING_HEIGHT / 2.0 - FLANGE  # +10.25 (flange underside)
+WEB_OUT_X = OUTER_X - RECESS  # 210.6
+WEB_IN_X = INNER_X + RECESS  # 183.4
+WEB_OUT_Z = OUTER_Z - RECESS  # 127.5
+WEB_IN_Z = INNER_Z + RECESS  # 96.5
+LAND_X0 = BAR_X0 - GUSSET - 6.0  # -50; crossbar-junction land pads on the
+LAND_X1 = BAR_X1 + GUSSET + 6.0  # +20; front/rear inner faces (6 margin)
 
 THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
 
@@ -191,36 +200,94 @@ if STUD_Z_REAR + STUD_HOLE_DIA / 2.0 >= INNER_Z + GUSSET:
 # --------------------------------------------------------------------------
 
 
-def _boss_extra_in_band_area() -> float:
-    """Plan area ONE corner boss adds beyond the ring solid, in the rail band.
+def _in_web_plan(x: float, z: float) -> bool:
+    """Full-height web-ring plan membership (NE-quadrant symmetric test)."""
+    ax, az = abs(x), abs(z)
+    return (WEB_IN_X <= ax <= WEB_OUT_X and az <= WEB_OUT_Z) or (
+        WEB_IN_Z <= az <= WEB_OUT_Z and ax <= WEB_OUT_X
+    )
 
-    Grid-integrated over the NE corner: circle O52.2 at (197, 112) minus the
-    ring plan solid (side rail x 179.9..214.1 union rear rail z 93..131,
-    clipped to the slab x <= 214.1, z <= 131). All four corners match by
-    symmetry (the crossbar is far away).
+
+def _in_flange_plan(x: float, z: float) -> bool:
+    """Top-flange ring plan membership."""
+    ax, az = abs(x), abs(z)
+    return (INNER_X <= ax <= OUTER_X and az <= OUTER_Z) or (
+        INNER_Z <= az <= OUTER_Z and ax <= OUTER_X
+    )
+
+
+def _boss_add_volumes() -> tuple[float, float]:
+    """(up, down) volume ONE corner boss extrude pair adds to the T-section.
+
+    Grid over the NE boss circle. Existing material per plan cell: web ring
+    -> full band (-18.25..18.25); flange-only (the web setback crescents) ->
+    10.25..18.25; else empty. BossUp fills y 0..22.75, BossDown 0..-24.55.
+    All four corners match by symmetry (lands/rib/crossbar are far away).
     """
     r = BOSS_DIA / 2.0
     step = 0.05
-    n = int(2.0 * r / step) + 2
-    x0, z0 = COLUMN_X - r, abs(FRONT_COLUMN_Z) - r
-    extra = 0.0
-    for i in range(n):
-        x = x0 + (i + 0.5) * step
-        dx2 = (x - COLUMN_X) ** 2
+    up = down = 0.0
+    x = COLUMN_X - r
+    while x < COLUMN_X + r:
+        xx = x + 0.5 * step
+        dx2 = (xx - COLUMN_X) ** 2
         if dx2 > r * r:
+            x += step
             continue
         half = math.sqrt(r * r - dx2)
-        z_lo, z_hi = abs(FRONT_COLUMN_Z) - half, abs(FRONT_COLUMN_Z) + half
-        z = z_lo
+        z = abs(FRONT_COLUMN_Z) - half
+        z_hi = abs(FRONT_COLUMN_Z) + half
         while z < z_hi:
             zz = z + 0.5 * step
             if zz < z_hi:
-                in_slab = zz <= OUTER_Z and x <= OUTER_X
-                in_ring = in_slab and (x >= INNER_X or zz >= INNER_Z)
-                if not in_ring:
-                    extra += step * step
+                da = step * step
+                if _in_web_plan(xx, zz):
+                    up += (BOSS_ABOVE) * da
+                    down += (BOSS_BELOW) * da
+                elif _in_flange_plan(xx, zz):
+                    up += (HALF_H + BOSS_ABOVE - FLANGE) * da
+                    down += (HALF_H + BOSS_BELOW) * da
+                else:
+                    up += (HALF_H + BOSS_ABOVE) * da
+                    down += (HALF_H + BOSS_BELOW) * da
             z += step
-    return extra
+        x += step
+    return up, down
+
+
+def _hub_boss_add_volume() -> float:
+    """Volume the hub under-boss extrude (circle, y 0..-26.25) adds.
+
+    Covered cells (hub rib plan or web ring) already hold -18.25..0, so the
+    boss adds only the 8 below; the web-setback slivers (circle past the web
+    faces, under the flange) are empty below +10.25 and gain the full 26.25.
+    """
+    r = HUB_BOSS_DIA / 2.0
+    rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0
+    rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0
+    step = 0.02
+    vol = 0.0
+    x = GOOSENECK_X - r
+    while x < GOOSENECK_X + r:
+        xx = x + 0.5 * step
+        dx2 = (xx - GOOSENECK_X) ** 2
+        if dx2 > r * r:
+            x += step
+            continue
+        half = math.sqrt(r * r - dx2)
+        z = GOOSENECK_Z - half
+        z_hi = GOOSENECK_Z + half
+        while z < z_hi:
+            zz = z + 0.5 * step
+            if zz < z_hi:
+                in_rib = rib_lo <= zz <= rib_hi and INNER_X <= abs(xx) <= OUTER_X
+                covered = in_rib or _in_web_plan(xx, zz)
+                vol += (
+                    (HUB_BOSS_DROP if covered else HALF_H + HUB_BOSS_DROP) * step * step
+                )
+            z += step
+        x += step
+    return vol
 
 
 def _hub_underhang_volume() -> float:
@@ -306,73 +373,6 @@ def _set_tap_removal() -> float:
     return vol
 
 
-async def _panel_cut(
-    adapter,
-    label: str,
-    base_plane: str,
-    plane_offset: float,
-    spans: tuple[tuple[float, float], ...],
-    reverse: bool,
-    feature: str,
-    planes: list[str],
-) -> float:
-    """Cut RECESS-deep webbing panels into one rail face.
-
-    ``base_plane`` "Front Plane" sketches map (x, y) -> (X, Y); "Right
-    Plane" offsets map (x, y) -> (Z, Y) (build_rocker_arm_support).
-    NEGATIVE-offset planes MIRROR the sketch x-axis (live-proven on the hub
-    gusset plane: the trapezoid landed z-mirrored about the plane origin,
-    union volume 680.4 == the mirrored prediction exactly; the plane normal
-    is NOT flipped -- the +normal boss extrude and the cut directions
-    behave as for a positive offset). Each span becomes one rectangle
-    between the flanges (y -/+10.25); returns the exact removed volume.
-    """
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
-
-    plane = check(
-        f"create_plane {label}",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset", base_plane=base_plane, offset=plane_offset
-            )
-        ),
-    )
-    plane_name = getattr(plane, "name", plane)
-    planes.append(str(plane_name))
-    mirror = plane_offset < 0.0  # sketch x = -(model axis) on flipped planes
-    panel = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch(plane_name))
-    for k, (a, b) in enumerate(spans):
-        sa, sb = (-b, -a) if mirror else (a, b)
-        pts = [
-            (sa, -PANEL_HALF_H),
-            (sb, -PANEL_HALF_H),
-            (sb, PANEL_HALF_H),
-            (sa, PANEL_HALF_H),
-        ]
-        lines = await add_line_chain(adapter, pts)
-        await define_rectilinear_chain(
-            adapter,
-            lines,
-            pts,
-            label=f"{label} panel {k}",
-            dims=panel,
-            names=[f"P{k}Run", f"P{k}Rise", f"P{k}Off", f"P{k}Drop"],
-        )
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
-    name_last_feature(adapter, f"{feature}Profile")
-    panel.apply(adapter, f"{feature}Profile")  # named, undriven (cast cosmetics)
-    check(
-        f"cut {label}",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=RECESS, reverse_direction=reverse)
-        ),
-    )
-    name_last_feature(adapter, feature)
-    return sum((b - a) for a, b in spans) * 2.0 * PANEL_HALF_H * RECESS
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -391,6 +391,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "GooseneckZ", f"{GOOSENECK_Z}mm")
     await set_global(adapter, "GooseneckBoreDia", f"{GOOSENECK_BORE_DIA}mm")
     await set_global(adapter, "HubBossDia", f"{HUB_BOSS_DIA}mm")
+    await set_global(adapter, "Recess", f"{RECESS}mm")
+    await set_global(adapter, "Flange", f"{FLANGE}mm")
     await set_global(adapter, "OuterX", '"ColumnX" + "RailWSide" / 2')
     await set_global(adapter, "OuterZ", '"ColumnZ" + "RailWFR" / 2')
     await set_global(adapter, "InnerX", '"ColumnX" - "RailWSide" / 2')
@@ -399,63 +401,158 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
     ref_planes: list[str] = []  # created offset planes, blanked before save
 
-    # 1. Outer slab (origin-centred plan rectangle, mid-plane band).
+    # 1. Web ring: the full-height THIN section (T-rail web) as one annular
+    #    extrude -- two nested origin-centred rectangles, web faces RECESS
+    #    inside the rail faces on every side.
+    web = SketchDims()
+    check("create_sketch web ring", await adapter.create_sketch("Top"))
+    await define_centered_rectangle(
+        adapter,
+        WEB_OUT_X,
+        WEB_OUT_Z,
+        "web outer rectangle",
+        dims=web,
+        name_width="Width",
+        name_depth="Depth",
+        drive_width='2 * ("OuterX" - "Recess")',
+        drive_depth='2 * ("OuterZ" - "Recess")',
+    )
+    await define_centered_rectangle(
+        adapter,
+        WEB_IN_X,
+        WEB_IN_Z,
+        "web inner rectangle",
+        dims=web,
+        name_width="WinWidth",
+        name_depth="WinDepth",
+        drive_width='2 * ("InnerX" + "Recess")',
+        drive_depth='2 * ("InnerZ" + "Recess")',
+    )
+    await ensure_fully_defined(adapter, "web ring sketch")
+    check("exit_sketch web ring", await adapter.exit_sketch())
+    name_last_feature(adapter, "WebProfile")
+    drive_jobs += web.apply(adapter, "WebProfile")
+    check(
+        "extrude web ring",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=RING_HEIGHT, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "WebRing")
+    v_web = 4.0 * (WEB_OUT_X * WEB_OUT_Z - WEB_IN_X * WEB_IN_Z) * RING_HEIGHT
+    volume = await volume_check(adapter, "web ring", v_web, 0.001 * v_web)
+
+    # 2. Crossbar junction lands: full-thickness pads on the front/rear
+    #    inner faces where the crossbar + gussets butt in (x -50..20,
+    #    z +/-(93..96.5)), full height. Sketch z flipped: (x, y) -> (X, -Z).
+    lands = SketchDims()
+    check("create_sketch junction lands", await adapter.create_sketch("Top"))
+    for k, (z_lo, z_hi) in enumerate(((-WEB_IN_Z, -INNER_Z), (INNER_Z, WEB_IN_Z))):
+        pts = [
+            (LAND_X0, -z_hi),
+            (LAND_X1, -z_hi),
+            (LAND_X1, -z_lo),
+            (LAND_X0, -z_lo),
+        ]
+        land_lines = await add_line_chain(adapter, pts)
+        await define_rectilinear_chain(
+            adapter,
+            land_lines,
+            pts,
+            label=f"junction land {k}",
+            dims=lands,
+            names=[f"L{k}Run", f"L{k}Rise", f"L{k}OffX", f"L{k}OffZ"],
+        )
+    await ensure_fully_defined(adapter, "junction lands sketch")
+    check("exit_sketch junction lands", await adapter.exit_sketch())
+    name_last_feature(adapter, "LandProfile")
+    drive_jobs += lands.apply(adapter, "LandProfile")
+    check(
+        "extrude junction lands",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=RING_HEIGHT, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "JunctionLands")
+    v_lands = 2.0 * (LAND_X1 - LAND_X0) * RECESS * RING_HEIGHT
+    volume = await volume_check(adapter, "junction lands", volume + v_lands, 50.0)
+
+    # 3. Top flange ring: the full-width 8-tall band, extruded from the
+    #    flange underside plane up to the rail top (extrude_at_offset,
+    #    positive offset -- proven helper). The OUTER rectangle carries the
+    #    print's marked Width/Depth dims (OuterProfile contract).
     outer = SketchDims()
-    check("create_sketch outer", await adapter.create_sketch("Top"))
+    check("create_sketch flange ring", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
         adapter,
         OUTER_X,
         OUTER_Z,
-        "outer rectangle",
+        "flange outer rectangle",
         dims=outer,
         name_width="Width",
         name_depth="Depth",
         drive_width='2 * "OuterX"',
         drive_depth='2 * "OuterZ"',
     )
-    await ensure_fully_defined(adapter, "outer rectangle")
-    check("exit_sketch outer", await adapter.exit_sketch())
-    name_last_feature(adapter, "OuterProfile")
-    drive_jobs += outer.apply(adapter, "OuterProfile")
-    check(
-        "extrude slab",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=RING_HEIGHT, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "OuterSlab")
-    v_slab = 4.0 * OUTER_X * OUTER_Z * RING_HEIGHT
-    volume = await volume_check(adapter, "slab", v_slab, 0.001 * v_slab)
-
-    # 2. Window cut (full rectangle; the crossbar comes back as a boss).
-    window = SketchDims()
-    check("create_sketch window", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
         adapter,
         INNER_X,
         INNER_Z,
-        "window rectangle",
-        dims=window,
-        name_width="Width",
-        name_depth="Depth",
+        "flange window rectangle",
+        dims=outer,
+        name_width="WinWidth",
+        name_depth="WinDepth",
         drive_width='2 * "InnerX"',
         drive_depth='2 * "InnerZ"',
     )
-    await ensure_fully_defined(adapter, "window rectangle")
-    check("exit_sketch window", await adapter.exit_sketch())
-    name_last_feature(adapter, "WindowProfile")
-    drive_jobs += window.apply(adapter, "WindowProfile")
+    await ensure_fully_defined(adapter, "flange ring sketch")
+    check("exit_sketch flange ring", await adapter.exit_sketch())
+    name_last_feature(adapter, "OuterProfile")
+    drive_jobs += outer.apply(adapter, "OuterProfile")
+    extrude_at_offset(adapter, FLANGE, FLANGE_BOT_Y)
+    name_last_feature(adapter, "TopFlange")
+    # New material only where the flange band is not already web/land solid.
+    v_flange = (
+        4.0 * (OUTER_X * OUTER_Z - INNER_X * INNER_Z)
+        - 4.0 * (WEB_OUT_X * WEB_OUT_Z - WEB_IN_X * WEB_IN_Z)
+        - 2.0 * (LAND_X1 - LAND_X0) * RECESS
+    ) * FLANGE
+    volume = await volume_check(adapter, "top flange", volume + v_flange, 100.0)
+
+    # 4. Hub rib restore: full rail thickness across the east rail at the
+    #    gooseneck station, full height (the web setback comes back).
+    rib = SketchDims()
+    check("create_sketch hub rib", await adapter.create_sketch("Top"))
+    rib_pts = [
+        (-OUTER_X, -(GOOSENECK_Z + HUB_RIB_W / 2.0)),
+        (-INNER_X, -(GOOSENECK_Z + HUB_RIB_W / 2.0)),
+        (-INNER_X, -(GOOSENECK_Z - HUB_RIB_W / 2.0)),
+        (-OUTER_X, -(GOOSENECK_Z - HUB_RIB_W / 2.0)),
+    ]
+    rib_lines = await add_line_chain(adapter, rib_pts)
+    await define_rectilinear_chain(
+        adapter,
+        rib_lines,
+        rib_pts,
+        label="hub rib",
+        dims=rib,
+        names=["RibRun", "RibWidth", "RibOffX", "RibOffZ"],
+    )
+    await ensure_fully_defined(adapter, "hub rib sketch")
+    check("exit_sketch hub rib", await adapter.exit_sketch())
+    name_last_feature(adapter, "RibProfile")
+    drive_jobs += rib.apply(adapter, "RibProfile")
     check(
-        "cut window",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        "extrude hub rib",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=RING_HEIGHT, both_directions=True)
         ),
     )
-    name_last_feature(adapter, "WindowCut")
-    v_window = 4.0 * INNER_X * INNER_Z * RING_HEIGHT
-    volume = await volume_check(adapter, "rail band", volume - v_window, 500.0)
+    name_last_feature(adapter, "HubRib")
+    v_rib = 2.0 * RECESS * HUB_RIB_W * (RING_HEIGHT - FLANGE)
+    volume = await volume_check(adapter, "hub rib", volume + v_rib, 30.0)
 
-    # 3. Integral crossbar + plan gussets (one 8-vertex polygon, sketch z
+    # 5. Integral crossbar + plan gussets (one 8-vertex polygon, sketch z
     #    flipped: (x, y) -> (X, -Z)).
     bar_pts_part = [
         (BAR_X0 - GUSSET, -INNER_Z),
@@ -508,10 +605,11 @@ async def build(adapter) -> dict[str, str]:
     v_bar = bar_area * RING_HEIGHT
     volume = await volume_check(adapter, "crossbar", volume + v_bar, 500.0)
 
-    # 4. Corner bosses: one circle set extruded UP to the boss top, a second
+    # 6. Corner bosses: one circle set extruded UP to the boss top, a second
     #    identical set extruded DOWN to the boss bottom (one-direction pair;
     #    a mid-plane extrude cannot land the asymmetric 22.75/24.55 split).
-    boss_extra_band = _boss_extra_in_band_area()
+    #    Expected adds come from the T-section grid (web/flange/empty cells).
+    v_boss_up, v_boss_down = _boss_add_volumes()
     r_boss = BOSS_DIA / 2.0
     for updown, depth, feat in (
         ("up", HALF_H + BOSS_ABOVE, "BossesUpper"),
@@ -544,8 +642,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, feat)
-        proud = BOSS_ABOVE if updown == "up" else BOSS_BELOW
-        v_add = 4.0 * (boss_extra_band * HALF_H + math.pi * r_boss**2 * proud)
+        v_add = 4.0 * (v_boss_up if updown == "up" else v_boss_down)
         volume = await volume_check(
             adapter,
             f"bosses {updown}",
@@ -553,8 +650,9 @@ async def build(adapter) -> dict[str, str]:
             0.005 * v_add + 50.0,
         )
 
-    # 5. Gooseneck hub: underside boss (extruded down 26.25 from the Top
-    #    plane; only the 8 below the underside is new material) ...
+    # 7. Gooseneck hub: underside boss (extruded down 26.25 from the Top
+    #    plane; the covered plan adds the 8 below the underside, the web
+    #    setback slivers fill their full 26.25) ...
     hub = SketchDims()
     check("create_sketch hub boss", await adapter.create_sketch("Top"))
     await define_circle(
@@ -578,9 +676,9 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "HubBoss")
-    v_hub_boss = math.pi * (HUB_BOSS_DIA / 2.0) ** 2 * HUB_BOSS_DROP
+    v_hub_boss_add = _hub_boss_add_volume()
     volume = await volume_check(
-        adapter, "hub boss", volume + v_hub_boss, 0.001 * v_hub_boss + 20.0
+        adapter, "hub boss", volume + v_hub_boss_add, 0.01 * v_hub_boss_add + 20.0
     )
 
     # ... and the twin V-gussets: one trapezoid on a Right-plane offset at
@@ -598,7 +696,7 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
-    # Negative-offset plane: sketch x = -(model Z) (see _panel_cut). The
+    # Negative-offset plane: sketch x = -(model Z) (negative-offset plane mirror -- see the module docstring). The
     # trapezoid is authored mirrored so it lands centred on GOOSENECK_Z.
     gus_pts = [
         (-(GOOSENECK_Z - HUB_GUSSET_HALF_OUT), -HALF_H),
@@ -639,89 +737,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=HUB_GUSSET_T)),
     )
     name_last_feature(adapter, "HubGussets")
-    v_gus_extra = v_hub_union - v_hub_boss
+    v_gus_extra = v_hub_union - math.pi * (HUB_BOSS_DIA / 2.0) ** 2 * HUB_BOSS_DROP
     volume = await volume_check(
         adapter, "hub gussets", volume + v_gus_extra, 0.01 * v_gus_extra + 30.0
     )
 
-    # 6. Webbed faces: 8 recessed panels. reverse_direction puts each cut
-    #    INTO the body (the blind face-cut default runs against the base
-    #    plane normal -- build_gooseneck_clamp's proven idiom, so planes on
-    #    the -X/-Z faces reverse and the +X/+Z faces do not... the OUTER
-    #    faces sit past the body on their axis sign, the INNER faces face
-    #    the window).
-    for label, base, off, spans, reverse, feat in (
-        (
-            "panel east outer",
-            "Right Plane",
-            -OUTER_X,
-            PANEL_W_SIDE_HUB,
-            True,
-            "PanelEastOuter",
-        ),
-        (
-            "panel east inner",
-            "Right Plane",
-            -INNER_X,
-            PANEL_W_SIDE_HUB,
-            False,
-            "PanelEastInner",
-        ),
-        (
-            "panel west outer",
-            "Right Plane",
-            OUTER_X,
-            PANEL_W_SIDE_FULL,
-            False,
-            "PanelWestOuter",
-        ),
-        (
-            "panel west inner",
-            "Right Plane",
-            INNER_X,
-            PANEL_W_SIDE_FULL,
-            True,
-            "PanelWestInner",
-        ),
-        (
-            "panel front outer",
-            "Front Plane",
-            -OUTER_Z,
-            PANEL_FR_OUTER,
-            True,
-            "PanelFrontOuter",
-        ),
-        (
-            "panel front inner",
-            "Front Plane",
-            -INNER_Z,
-            PANEL_FR_INNER,
-            False,
-            "PanelFrontInner",
-        ),
-        (
-            "panel rear outer",
-            "Front Plane",
-            OUTER_Z,
-            PANEL_FR_OUTER,
-            False,
-            "PanelRearOuter",
-        ),
-        (
-            "panel rear inner",
-            "Front Plane",
-            INNER_Z,
-            PANEL_FR_INNER,
-            True,
-            "PanelRearInner",
-        ),
-    ):
-        removed = await _panel_cut(
-            adapter, label, base, off, spans, reverse, feat, ref_planes
-        )
-        volume = await volume_check(adapter, label, volume - removed, 60.0)
-
-    # 7. Set-screw cast pocket on the hub rib (east outer face, -X).
+    # 8. Set-screw cast pocket on the hub rib (east outer face, -X).
     pocket_plane = check(
         "create_plane set pocket",
         await adapter.create_plane(
@@ -737,7 +758,7 @@ async def build(adapter) -> dict[str, str]:
     )
     ref_planes.append(str(getattr(pocket_plane, "name", pocket_plane)))
     half_p = SET_POCKET / 2.0
-    # Negative-offset plane: sketch x = -(model Z) (see _panel_cut).
+    # Negative-offset plane: sketch x = -(model Z) (negative-offset plane mirror -- see the module docstring).
     pk_pts = [
         (-(GOOSENECK_Z - half_p), -half_p),
         (-(GOOSENECK_Z + half_p), -half_p),
@@ -767,7 +788,7 @@ async def build(adapter) -> dict[str, str]:
     v_pocket = SET_POCKET * SET_POCKET * SET_POCKET_DEPTH
     volume = await volume_check(adapter, "set pocket", volume - v_pocket, 20.0)
 
-    # 8. Side-screw spot-faces: O9 x 0.9 flats on the curved boss z-faces
+    # 9. Side-screw spot-faces: O9 x 0.9 flats on the curved boss z-faces
     #    (planar seats the tapped holes need).
     v_spot = _spotface_removal()
     for side, sign, reverse in (("front", -1.0, True), ("rear", 1.0, False)):
@@ -814,7 +835,7 @@ async def build(adapter) -> dict[str, str]:
             adapter, f"spotface {side}", volume - 2.0 * v_spot, 0.2 * v_spot + 15.0
         )
 
-    # 9. Column bores (through the boss stacks).
+    # 10. Column bores (through the boss stacks).
     bores = SketchDims()
     check("create_sketch bores", await adapter.create_sketch("Top"))
     n = 0
@@ -846,7 +867,7 @@ async def build(adapter) -> dict[str, str]:
     v_bores = 4.0 * math.pi * (BORE_DIA / 2.0) ** 2 * boss_h
     volume = await volume_check(adapter, "column bores", volume - v_bores, 100.0)
 
-    # 10. Gooseneck clearance bore (through the rail band + hub boss).
+    # 11. Gooseneck clearance bore (through the rib + hub boss).
     gneck = SketchDims()
     check("create_sketch gooseneck bore", await adapter.create_sketch("Top"))
     await define_circle(
@@ -873,7 +894,7 @@ async def build(adapter) -> dict[str, str]:
     v_gn = math.pi * (GOOSENECK_BORE_DIA / 2.0) ** 2 * (RING_HEIGHT + HUB_BOSS_DROP)
     volume = await volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
 
-    # 11. Hanger-stud clearance holes (1/2 close) through the crossbar,
+    # 12. Hanger-stud clearance holes (1/2 close) through the crossbar,
     #     drilled from the underside seat plane (one wizard feature, both
     #     stations; the rear hole nicks the junction gusset -- material
     #     continues, the removal is a full cylinder either way).
@@ -889,7 +910,7 @@ async def build(adapter) -> dict[str, str]:
     v_studs = 2.0 * math.pi * (STUD_HOLE_DIA / 2.0) ** 2 * RING_HEIGHT
     volume = await volume_check(adapter, "hanger stud holes", volume - v_studs, 60.0)
 
-    # 12. Side-screw taps (#10-24 x 14 blind): one per boss, on the
+    # 13. Side-screw taps (#10-24 x 14 blind): one per boss, on the
     #     spot-face seats, breaking into the column bores.
     v_side_tap = _side_tap_removal()
     for feat, x_pt, z_face in (
@@ -912,7 +933,7 @@ async def build(adapter) -> dict[str, str]:
             adapter, f"side tap {feat}", volume - v_side_tap, 0.1 * v_side_tap + 10.0
         )
 
-    # 13. Gooseneck set-screw tap (1/4-20 blind) on the pocket floor,
+    # 14. Gooseneck set-screw tap (1/4-20 blind) on the pocket floor,
     #     through the rib into the bore.
     v_set_tap = _set_tap_removal()
     wizard_holes(
@@ -928,7 +949,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "gooseneck set tap", volume - v_set_tap, 0.1 * v_set_tap + 10.0
     )
 
-    # 14. Fulcrum-keeper taps (#10-24 x 10 blind) into the west rail TOP
+    # 15. Fulcrum-keeper taps (#10-24 x 10 blind) into the west rail TOP
     #     face: the two shaft-end keeper brackets' feet (ch17 p.40; the
     #     lever-pair ball mounts are replaced by keepers in channel.SLDASM).
     #     Solid flange + 27.1-thick web under both points -- exact blind
