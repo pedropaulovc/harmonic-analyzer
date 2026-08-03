@@ -32,11 +32,12 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   the web thins to 12.7 (0.5 in) centred on each rail and STAYS thin through
   the bottom edge (ch19 img04/img05 + user read), with full-thickness lands
   at the bosses, hub rib and crossbar junctions.
-* Finishing: R3 cast rounds on the top-face rims (the outer rail rim
-  between the proud bosses, both window rims with R3 corner coves --
-  ch19 img04/ch30 p002: every top edge reads softened) and C1 x 45
-  machined breaks on both ends of the column + gooseneck bores (note 9;
-  the lead-ins the frame slides down the columns on).
+* Finishing: R3 cast rounds on the top-face rims -- the outer rail rim
+  and both window rims, every edge terminating on a proud corner-boss
+  barrel (the bosses round all eight plan corners natively; ch19 img04/
+  ch30 p002: every top edge reads softened) -- and C1 x 45 machined
+  breaks on both ends of the column + gooseneck bores (note 9; the
+  lead-ins the frame slides down the columns on).
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -48,10 +49,10 @@ web ring -> crossbar junction lands -> top-flange ring -> hub rib
 restore -> crossbar+gussets -> corner bosses (up/down pair) -> hub boss
 + V-gussets -> set-screw pocket -> spot-faces -> column bores ->
 gooseneck bore -> wizard holes (hanger-stud clearances, side-screw taps,
-set-screw tap, keeper taps) -> cast finishing (R3 window corner coves,
-R3 top-face rim rounds) -> C1 bore-end chamfers. Wizard holes come after
-the face cuts so every seat face is final; the edge breaks come last so
-they cut final faces. Analytic volume checks after every feature;
+set-screw tap, keeper taps) -> cast finishing (R3 top-face rim rounds) ->
+C1 bore-end chamfers. Wizard holes come after the face cuts so every
+seat face is final; the edge breaks come last so they cut final faces.
+Analytic volume checks after every feature;
 the boss/hub/spot-face/tap expectations use small grid integrals (no
 tidy closed form against the webbed solid).
 
@@ -406,28 +407,31 @@ def _fillet_section_inset(r: float) -> float:
 def _top_rim_removal() -> tuple[float, float]:
     """(outer, window) volumes the R3 top-face rim rounds remove.
 
-    Outer rim: four straight edges, each ending where a proud corner-boss
-    cylinder crosses the rail face. Window rims: both windows' straight runs
-    (rail inner faces shortened by the R3 corner coves, front/rear inner
-    faces up to the junction gussets, the four gusset hypotenuses, the two
-    crossbar flanks) plus, by Pappus, the sweep around the four corner-cove
-    arcs (concave: section centroid rides OUTSIDE the arc radius). The blunt
-    135-degree gusset vertices and the fillet ends dying into the boss walls
-    are not modeled -- the check tolerance absorbs them.
+    The proud corner-boss barrels round ALL EIGHT plan corners natively:
+    each boss centre sits 25.56 from its window corner, inside the 26.1
+    radius, so the Ø52.2 cylinder bulges past the corner and every rim
+    edge -- outer AND window -- terminates on a boss wall (build-proven:
+    a fillet aimed at the "window corner edge" resolved to the boss top
+    rim, removing 4 x 2*pi*a*(r_boss - inset) = 1232 mm^3). Straight runs
+    only: rail inner/outer faces between boss cuts, front/rear faces
+    between boss cut and junction gusset, the four gusset hypotenuses,
+    the two crossbar flanks. The blunt 135-degree gusset vertices and the
+    fillet ends dying into the boss walls are not modeled -- the check
+    tolerance absorbs them.
     """
     area = _fillet_section_area(CAST_FILLET_R)
-    inset = _fillet_section_inset(CAST_FILLET_R)
-    cut_side = math.sqrt((BOSS_DIA / 2.0) ** 2 - (OUTER_X - COLUMN_X) ** 2)
-    cut_fr = math.sqrt((BOSS_DIA / 2.0) ** 2 - (OUTER_Z - abs(FRONT_COLUMN_Z)) ** 2)
-    outer = area * (4.0 * (abs(FRONT_COLUMN_Z) - cut_side) + 4.0 * (COLUMN_X - cut_fr))
-    rail = 2.0 * (INNER_Z - CAST_FILLET_R)  # one window's rail inner edge
-    east_fr = (INNER_X - CAST_FILLET_R) - (abs(BAR_X0) + GUSSET)
-    west_fr = (INNER_X - CAST_FILLET_R) - (BAR_X1 + GUSSET)
+    r_boss = BOSS_DIA / 2.0
+    cut_side = math.sqrt(r_boss**2 - (RAIL_W_SIDE / 2.0) ** 2)  # x = +/-InnerX|OuterX
+    cut_fr = math.sqrt(r_boss**2 - (RAIL_W_FR / 2.0) ** 2)  # z = +/-InnerZ|OuterZ
+    side_run = 2.0 * (abs(FRONT_COLUMN_Z) - cut_side)  # one side-face edge
+    fr_full = COLUMN_X - cut_fr  # boss cut to plan centre on a front/rear face
+    outer = area * (2.0 * side_run + 4.0 * fr_full)
+    east_fr = fr_full - (abs(BAR_X0) + GUSSET)
+    west_fr = fr_full - (BAR_X1 + GUSSET)
     hyp = GUSSET * math.sqrt(2.0)
     flank = 2.0 * (INNER_Z - GUSSET)  # one crossbar flank between gussets
-    runs = 2.0 * rail + 2.0 * east_fr + 2.0 * west_fr + 4.0 * hyp + 2.0 * flank
-    cove = (math.pi / 2.0) * area * (CAST_FILLET_R + inset)
-    return outer, area * runs + 4.0 * cove
+    runs = 2.0 * side_run + 2.0 * east_fr + 2.0 * west_fr + 4.0 * hyp + 2.0 * flank
+    return outer, area * runs
 
 
 def _bore_chamfer_removal() -> float:
@@ -1041,30 +1045,13 @@ async def build(adapter) -> dict[str, str]:
     v_keeper = 2.0 * blind_hole_volume_mm3(TAP_DRILL_MM["#10-24"], 10.0)
     volume = await volume_check(adapter, "keeper taps", volume - v_keeper, 10.0)
 
-    # 16. Window corner coves: R3 on the four flange-band window corner
-    #     edges (reentrant, so the fillet ADDS material), letting the rim
-    #     rounds roll tangent around the corners (ch19 img04: the window
-    #     corners read rounded, not sharp).
-    check(
-        "fillet window coves",
-        await adapter.add_fillet(
-            CAST_FILLET_R,
-            [
-                [sx * INNER_X, FLANGE_BOT_Y + FLANGE / 2.0, sz * INNER_Z]
-                for sx in (-1.0, 1.0)
-                for sz in (-1.0, 1.0)
-            ],
-        ),
-    )
-    name_last_feature(adapter, "WindowCoves")
-    v_coves = 4.0 * _fillet_section_area(CAST_FILLET_R) * FLANGE
-    volume = await volume_check(
-        adapter, "window coves", volume + v_coves, 0.05 * v_coves + 5.0
-    )
-
-    # 17. Top-face rim rounds: R3 on the outer rail rim (four edges between
-    #     the proud bosses) and both windows' rims -- note 1's cast fillets
-    #     on the faces every photo reads softened (ch30 p002/p006, ch19).
+    # 16. Top-face rim rounds: R3 on the outer rail rim and both windows'
+    #     rims -- note 1's cast fillets on the faces every photo reads
+    #     softened (ch30 p002/p006, ch19 img04). Every rim edge, outer AND
+    #     window, terminates on a proud corner-boss barrel: the bosses
+    #     round all eight plan corners natively (their centres sit 25.56
+    #     from the window corners, inside the 26.1 radius), so there are
+    #     no corner edges to treat.
     v_outer, v_window = _top_rim_removal()
     check(
         "fillet top rims",
@@ -1098,7 +1085,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "top rim rounds", volume - v_rims, 0.03 * v_rims + 100.0
     )
 
-    # 18. Bore-end chamfers: C1 x 45 on both ends of the four column bores
+    # 17. Bore-end chamfers: C1 x 45 on both ends of the four column bores
     #     and the gooseneck bore (note 9's machined breaks; the lead-ins
     #     the frame slides down the columns on).
     boss_top_y = HALF_H + BOSS_ABOVE
