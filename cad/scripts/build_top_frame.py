@@ -29,9 +29,9 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   a 1/4-20 tap through the rib to the bore for the square-head set screw
   (book p.45: "a square-head screw pinches the post in its socket").
 * Webbed faces (T-rail section): an 8-tall full-thickness top flange, then
-  the web thins 3.5 per face and STAYS thin through the bottom edge (ch19
-  img04/img05 + user read), with full-thickness lands at the bosses, hub
-  rib and crossbar junctions.
+  the web thins to 12.7 (0.5 in) centred on each rail and STAYS thin through
+  the bottom edge (ch19 img04/img05 + user read), with full-thickness lands
+  at the bosses, hub rib and crossbar junctions.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -171,18 +171,22 @@ KEEPER_TAP_Z_REAR = SUMMING_Z + 74.0  # +77.088
 
 # --- Webbing ----------------------------------------------------------------
 # T-rail section (user-corrected vs ch19 img04): an 8-tall full-thickness top
-# flange, below which the web thins by RECESS per face and STAYS thin through
-# the bottom edge (no bottom flange). Built ADDITIVELY: a full-height thin web
-# ring + an 8-tall full-width flange ring (two nested-rectangle sketches),
-# plus full-thickness restore pads at the hub rib and the crossbar junctions.
-# The corner bosses supply the corner lands.
+# flange, below which the web thins to WEB_T centred on each rail's centreline
+# and STAYS thin through the bottom edge (no bottom flange). Built ADDITIVELY:
+# a full-height thin web ring + an 8-tall full-width flange ring (two
+# nested-rectangle sketches), plus full-thickness restore pads at the hub rib
+# and the crossbar junctions. The corner bosses supply the corner lands. The
+# per-face setback differs by rail family (the rails are 34.2/38.0 wide but
+# share one web thickness).
 FLANGE = 8.0  # top flange band (the only full-thickness band)
-RECESS = 3.5  # web setback per face
+WEB_T = 12.7  # 0.5 in web, centred on each rail's centreline
+RECESS_SIDE = (RAIL_W_SIDE - WEB_T) / 2.0  # 10.75 setback per side-rail face
+RECESS_FR = (RAIL_W_FR - WEB_T) / 2.0  # 12.65 setback per front/rear-rail face
 FLANGE_BOT_Y = RING_HEIGHT / 2.0 - FLANGE  # +10.25 (flange underside)
-WEB_OUT_X = OUTER_X - RECESS  # 210.6
-WEB_IN_X = INNER_X + RECESS  # 183.4
-WEB_OUT_Z = OUTER_Z - RECESS  # 127.5
-WEB_IN_Z = INNER_Z + RECESS  # 96.5
+WEB_OUT_X = COLUMN_X + WEB_T / 2.0  # 203.35
+WEB_IN_X = COLUMN_X - WEB_T / 2.0  # 190.65
+WEB_OUT_Z = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.35
+WEB_IN_Z = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.65
 LAND_X0 = BAR_X0 - GUSSET - 6.0  # -50; crossbar-junction land pads on the
 LAND_X1 = BAR_X1 + GUSSET + 6.0  # +20; front/rear inner faces (6 margin)
 
@@ -192,6 +196,10 @@ if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
     raise AssertionError("top-frame assumes a symmetric column span about z 0")
 if STUD_Z_REAR + STUD_HOLE_DIA / 2.0 >= INNER_Z + GUSSET:
     raise AssertionError("rear hanger-stud hole escapes the junction material")
+if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
+    raise AssertionError("hub V-gussets escape the east-rail web")
+if abs(KEEPER_TAP_X - COLUMN_X) + TAP_DRILL_MM["#10-24"] / 2.0 > WEB_T / 2.0:
+    raise AssertionError("keeper taps break out of the west-rail web")
 
 
 # --------------------------------------------------------------------------
@@ -392,7 +400,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "GooseneckZ", f"{GOOSENECK_Z}mm")
     await set_global(adapter, "GooseneckBoreDia", f"{GOOSENECK_BORE_DIA}mm")
     await set_global(adapter, "HubBossDia", f"{HUB_BOSS_DIA}mm")
-    await set_global(adapter, "Recess", f"{RECESS}mm")
+    await set_global(adapter, "WebT", f"{WEB_T}mm")
     await set_global(adapter, "Flange", f"{FLANGE}mm")
     await set_global(adapter, "OuterX", '"ColumnX" + "RailWSide" / 2')
     await set_global(adapter, "OuterZ", '"ColumnZ" + "RailWFR" / 2')
@@ -403,8 +411,9 @@ async def build(adapter) -> dict[str, str]:
     ref_planes: list[str] = []  # created offset planes, blanked before save
 
     # 1. Web ring: the full-height THIN section (T-rail web) as one annular
-    #    extrude -- two nested origin-centred rectangles, web faces RECESS
-    #    inside the rail faces on every side.
+    #    extrude -- two nested origin-centred rectangles, the WEB_T-wide web
+    #    centred on each rail's centreline (per-face setback: side rails
+    #    10.75, front/rear 12.65).
     web = SketchDims()
     check("create_sketch web ring", await adapter.create_sketch("Top"))
     await define_centered_rectangle(
@@ -415,8 +424,8 @@ async def build(adapter) -> dict[str, str]:
         dims=web,
         name_width="Width",
         name_depth="Depth",
-        drive_width='2 * ("OuterX" - "Recess")',
-        drive_depth='2 * ("OuterZ" - "Recess")',
+        drive_width='2 * "ColumnX" + "WebT"',
+        drive_depth='2 * "ColumnZ" + "WebT"',
     )
     await define_centered_rectangle(
         adapter,
@@ -426,8 +435,8 @@ async def build(adapter) -> dict[str, str]:
         dims=web,
         name_width="WinWidth",
         name_depth="WinDepth",
-        drive_width='2 * ("InnerX" + "Recess")',
-        drive_depth='2 * ("InnerZ" + "Recess")',
+        drive_width='2 * "ColumnX" - "WebT"',
+        drive_depth='2 * "ColumnZ" - "WebT"',
     )
     await ensure_fully_defined(adapter, "web ring sketch")
     check("exit_sketch web ring", await adapter.exit_sketch())
@@ -445,7 +454,7 @@ async def build(adapter) -> dict[str, str]:
 
     # 2. Crossbar junction lands: full-thickness pads on the front/rear
     #    inner faces where the crossbar + gussets butt in (x -50..20,
-    #    z +/-(93..96.5)), full height. Sketch z flipped: (x, y) -> (X, -Z).
+    #    z +/-(93..105.65)), full height. Sketch z flipped: (x, y) -> (X, -Z).
     lands = SketchDims()
     check("create_sketch junction lands", await adapter.create_sketch("Top"))
     for k, (z_lo, z_hi) in enumerate(((-WEB_IN_Z, -INNER_Z), (INNER_Z, WEB_IN_Z))):
@@ -475,7 +484,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "JunctionLands")
-    v_lands = 2.0 * (LAND_X1 - LAND_X0) * RECESS * RING_HEIGHT
+    v_lands = 2.0 * (LAND_X1 - LAND_X0) * RECESS_FR * RING_HEIGHT
     volume = await volume_check(adapter, "junction lands", volume + v_lands, 50.0)
 
     # 3. Top flange ring: the full-width 8-tall band, extruded from the
@@ -516,7 +525,7 @@ async def build(adapter) -> dict[str, str]:
     v_flange = (
         4.0 * (OUTER_X * OUTER_Z - INNER_X * INNER_Z)
         - 4.0 * (WEB_OUT_X * WEB_OUT_Z - WEB_IN_X * WEB_IN_Z)
-        - 2.0 * (LAND_X1 - LAND_X0) * RECESS
+        - 2.0 * (LAND_X1 - LAND_X0) * RECESS_FR
     ) * FLANGE
     volume = await volume_check(adapter, "top flange", volume + v_flange, 100.0)
 
@@ -550,7 +559,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "HubRib")
-    v_rib = 2.0 * RECESS * HUB_RIB_W * (RING_HEIGHT - FLANGE)
+    v_rib = 2.0 * RECESS_SIDE * HUB_RIB_W * (RING_HEIGHT - FLANGE)
     volume = await volume_check(adapter, "hub rib", volume + v_rib, 30.0)
 
     # 5. Integral crossbar + plan gussets (one 8-vertex polygon, sketch z
@@ -958,7 +967,7 @@ async def build(adapter) -> dict[str, str]:
     # 15. Fulcrum-keeper taps (#10-24 x 10 blind) into the west rail TOP
     #     face: the two shaft-end keeper brackets' feet (ch17 p.40; the
     #     lever-pair ball mounts are replaced by keepers in channel.SLDASM).
-    #     Solid flange + 27.1-thick web under both points -- exact blind
+    #     Solid flange + 12.7-thick web under both points -- exact blind
     #     volumes, no break-in.
     wizard_holes(
         adapter,

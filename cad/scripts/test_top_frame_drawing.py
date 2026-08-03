@@ -59,7 +59,9 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "POSITION <MOD-DIAM>0.20 A|B|C ON 394.00 X 224.00 BASIC PITCH" in notes_flat
     assert "DATUM A = RAIL BOTTOM FACE" in notes
     assert "B = EAST (-X) OUTER RAIL FACE; C = REAR OUTER RAIL FACE" in notes_flat
-    assert "PANELS RECESSED 3.50" in notes
+    assert "12.70 WEB CENTRED ON EACH RAIL" in notes
+    assert "PANELS RECESSED 10.75 INTO THE SIDE-RAIL FACES" in notes_flat
+    assert "12.65 INTO THE FRONT/REAR-RAIL FACES" in notes_flat
     assert "THROUGH THE BOTTOM EDGE" in notes_flat
     assert "WEB THINS AND STAYS THIN" in notes_flat
     assert "CAST FINISH INSIDE PANELS" in notes
