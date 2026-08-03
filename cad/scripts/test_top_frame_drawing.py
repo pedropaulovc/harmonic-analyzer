@@ -38,10 +38,10 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     inspection_flat = " ".join(inspection.split())
     assert "GREEN-PAINTED GRAY IRON CASTING" in notes
     assert "MACHINE DATUM FACES, BORES" in notes
-    assert "1.5 MAX DRAFT. WEB/FLANGE T-ROOT" in notes_flat
-    assert "FILLETS R3 (BOTH SHELVES, ALL RAILS)" in notes_flat
-    assert "TOP-FACE RIM EDGES C2.00 X 45 DEG (OUTER RING AND WINDOWS)" in notes_flat
-    assert "INCL. BAND BOTTOM RIM AND BOSS UNDERSIDES LEFT SHARP" in notes_flat
+    assert "1.5 MAX DRAFT. T-ROOT FILLETS R3; TOP-FACE RIM EDGES" in notes_flat
+    assert (
+        "C2.00 X 45 DEG; ALL OTHER CAST EDGES (BAND BOTTOM, BOSSES) SHARP" in notes_flat
+    )
     assert "UNLESS NOTED" not in notes
     assert "MACHINE FROM SOLID STOCK" not in notes
     assert "ASTM A48" not in notes
