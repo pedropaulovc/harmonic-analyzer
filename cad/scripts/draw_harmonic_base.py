@@ -344,6 +344,13 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in ALL_HOLES),
         datum_axes=(datum_b_edge, datum_c_edge),
         hole_entities=hole_entities,
+        # Every printed LOC is re-derived from the shared stations: X from the
+        # C face (x = -L/2), Y from the B face (z = +W/2) -- proven against
+        # the seat (A1 stop, B1 pivot, E1-E4 lags all exact).
+        expected_locations_mm=tuple(
+            (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
+            for x, z, _diameter in ALL_HOLES
+        ),
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=True,
         label="harmonic-base mounting",

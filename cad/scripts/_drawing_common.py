@@ -2436,6 +2436,7 @@ def insert_hole_table(
     datum_entity: Any | None = None,
     datum_axes: tuple[Any, Any] | None = None,
     hole_entities: Sequence[Any] | None = None,
+    expected_locations_mm: Sequence[tuple[float, float]] | None = None,
     anchor_xy: tuple[float, float],
     basic_locations: bool = True,
     label: str,
@@ -2578,8 +2579,64 @@ def insert_hole_table(
     )
     if tuple(value.upper() for value in header) != expected:
         raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
+    if expected_locations_mm is not None:
+        _check_hole_table_locations(contents, expected_locations_mm, label=label)
     _telemetry.success(f"native hole table inserted: {rows - 1} holes, header={header}")
     return table
+
+
+def _check_hole_table_locations(
+    contents: Sequence[Sequence[str]],
+    expected_mm: Sequence[tuple[float, float]],
+    *,
+    label: str,
+    tol_mm: float = 0.02,
+) -> None:
+    """Match every printed X/Y LOC cell against an expected station, one-to-one.
+
+    SolidWorks computes the LOC cells from the model against the selected
+    datum origin, and ``insert_hole_table`` otherwise validates only the
+    header and row count -- so a mis-anchored origin (e.g. a fillet-arc
+    endpoint picked instead of the theoretical corner) would shift every
+    coordinate SILENTLY. Expected stations are matched as a SET (table rows
+    are tag-ordered, not selection-ordered) within ``tol_mm`` (cells print
+    at 2 decimals, so the honest floor is 0.005 rounding).
+    """
+    if len(expected_mm) != len(contents) - 1:
+        raise RuntimeError(
+            f"{label} hole table: {len(expected_mm)} expected locations for "
+            f"{len(contents) - 1} rows"
+        )
+    printed: list[tuple[float, float, str]] = []
+    for row in contents[1:]:
+        try:
+            printed.append((float(row[1]), float(row[2]), row[0]))
+        except ValueError as error:
+            raise RuntimeError(
+                f"{label} hole table: unparseable LOC cells in row {row!r}"
+            ) from error
+    unmatched = list(range(len(printed)))
+    for ex, ey in expected_mm:
+        hit = next(
+            (
+                index
+                for index in unmatched
+                if abs(printed[index][0] - ex) <= tol_mm
+                and abs(printed[index][1] - ey) <= tol_mm
+            ),
+            None,
+        )
+        if hit is None:
+            table_dump = ", ".join(f"{tag}({x:g}, {y:g})" for x, y, tag in printed)
+            raise RuntimeError(
+                f"{label} hole table: no printed row matches expected "
+                f"({ex:g}, {ey:g}) mm within {tol_mm}; table: {table_dump}"
+            )
+        unmatched.remove(hit)
+    _telemetry.success(
+        f"{label} hole table locations verified: {len(expected_mm)} stations "
+        f"within {tol_mm} mm"
+    )
 
 
 def bom_table_template(adapter: Any) -> Path:

@@ -93,6 +93,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "_visible_hole_table_entities(" in source
     assert "datum_axes=(datum_b_edge, datum_c_edge)" in source
     assert "hole_entities=hole_entities" in source
+    assert "expected_locations_mm=tuple(" in source
     assert "GetVisibleEntities2(c, 1)" in source
     assert "GetVisibleEntities2(c, 2)" not in source
     assert source.count("add_datum_feature(") == 3
