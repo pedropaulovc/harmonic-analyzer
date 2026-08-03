@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import build_knife_hanger_stud as part
@@ -9,6 +10,7 @@ import draw_knife_hanger_stud as drawing
 import knife_hanger_stud_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import DriveStyle, HeadStyle, fastener
+from _holes import TAP_DRILL_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -51,6 +53,7 @@ def test_stack_arithmetic_matches_the_top_frame_rederive_contract() -> None:
     # stack above the casting top face: washer 2.5 + hex 11 + collar 3 +
     # tip 4; ONE merged part, machine y 987.45 .. 1056.7.
     assert spec.THREAD_LEN == 12.0
+    assert spec.THREAD_DIA == 10.6
     assert spec.MOUNT_GAP == 0.25
     assert spec.CROSSBAR_SPAN == 36.5
     assert spec.THREAD_LEN + spec.MOUNT_GAP + spec.CROSSBAR_SPAN == spec.SHANK_LEN
@@ -63,17 +66,29 @@ def test_stack_arithmetic_matches_the_top_frame_rederive_contract() -> None:
     assert 987.45 + spec.TOTAL_LEN == 1056.7
     # The plain shank rides the crossbar's 1/2-close clearance bore.
     assert spec.SHANK_DIA < 13.49
+    # The threaded engagement is modeled at a reduced diameter just under
+    # the knife-mount's 1/2-13 tap drill (repo convention: modeled thread
+    # < tap drill), so the stud/mount overlap volume is exactly ZERO.
+    assert spec.THREAD_DIA < TAP_DRILL_MM["1/2-13"] == 10.716
+    overlap_area = math.pi / 4.0 * max(
+        spec.THREAD_DIA**2 - TAP_DRILL_MM["1/2-13"] ** 2, 0.0
+    )
+    assert overlap_area * spec.THREAD_LEN == 0.0
+    # The reduced neck must stay a neck: strictly under the plain shank.
+    assert spec.THREAD_DIA < spec.SHANK_DIA
 
 
 def test_lengths_are_marked_extrude_depth_model_dims() -> None:
     # The vertical (axis +Y) profile cannot point-select the edge-on stack
-    # steps, so the three lengths ship as extrude-DEPTH model dimensions:
+    # steps, so the four lengths ship as extrude-DEPTH model dimensions:
     # the build names them, the drawing inserts them in the side view.
     part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'name_dimensions(adapter, "Thread", ["ThreadLg"])' in part_source
     assert 'name_dimensions(adapter, "Shank", ["ShankLg"])' in part_source
     assert 'name_dimensions(adapter, "HexNut", ["NutHt"])' in part_source
     assert 'name_dimensions(adapter, "Tip", ["TipLg"])' in part_source
     assert spec.SIDE_VIEW_DIMENSIONS == {
+        "Thread": {"ThreadLg"},
         "Shank": {"ShankLg"},
         "HexNut": {"NutHt"},
         "Tip": {"TipLg"},
@@ -87,6 +102,7 @@ def test_partial_thread_note_completely_defines_the_unmodeled_features() -> None
     # on the lower 12 only, so the spec spells the contract out directly.
     notes = spec.DRAWING_NOTES
     assert "1/2-13 UNC-2A PER ASME B1.1-2024, LOWER END X 12.00 LONG." in notes
+    assert "THREADED END MODELED AT REDUCED DIA 10.60, UNDER 10.716 TAP DRILL." in notes
     assert "13.49 CLOSE-CLEARANCE BORE" in notes
     assert "HEX 19.00 +/-0.10 ACROSS FLATS X 11.00 +/-0.10 HIGH." in notes
     assert "WASHER DIA 28.00 +/-0.10 X 2.50 +/-0.10 HIGH." in notes

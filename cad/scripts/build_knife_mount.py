@@ -168,7 +168,11 @@ async def build(adapter) -> dict[str, str]:
     ]
     block = await add_line_chain(adapter, block_rect)
     await define_rectilinear_chain(
-        adapter, block, block_rect, label="block", dims=block_dims,
+        adapter,
+        block,
+        block_rect,
+        label="block",
+        dims=block_dims,
         names=["BlockWidth", "BlockHeight", "BlockAnchorX", "BlockAnchorZ"],
         drives=[
             '2 * "BlkHalfX"',
@@ -201,7 +205,12 @@ async def build(adapter) -> dict[str, str]:
     bore_dims = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, BORE_CY, R_BORE, "knife bore", dims=bore_dims,
+        adapter,
+        0.0,
+        BORE_CY,
+        R_BORE,
+        "knife bore",
+        dims=bore_dims,
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, '-"BoreCy"', '2 * "RBore"'),
     )
@@ -232,7 +241,9 @@ async def build(adapter) -> dict[str, str]:
     for sy in (-RIDGE_Y + HEX_H / 4.0, -RIDGE_Y - HEX_H / 4.0):
         d = math.hypot(HEX_W / 2.0, sy - BORE_CY)
         if d > R_BORE - 0.5:
-            raise RuntimeError(f"hex shoulder {d:.3f} mm too close to Ø{2*R_BORE} bore")
+            raise RuntimeError(
+                f"hex shoulder {d:.3f} mm too close to Ø{2 * R_BORE} bore"
+            )
 
     # Hanger-stud tap: ONE native Hole Wizard 1/2-13 blind tapped hole x12.0 in
     # the block top, on the trunnion-axis centreline (both placement coords are
@@ -240,16 +251,19 @@ async def build(adapter) -> dict[str, str]:
     # expectation subtracts the full cylinder + drill-point volume; the point's
     # break-in to the bore crown re-removes only ~1 mm^3 of already-void space,
     # far inside the 1% gate.
-    tap = wizard_holes(
+    wizard_holes(
         adapter,
         STUD_TAP_SPEC,
         [[0.0, BLK_TOP, 0.0]],
         (0.0, 1.0, 0.0),
         "hanger-stud tapped hole (1/2-13)",
         name="StudTap",
-        expect_dia_mm=STUD_TAP_DIA,
+        # no expect_dia_mm: a BLIND hole's definition reads 0.0 for both
+        # diameter knobs on this seat (the tripwire is through-hole only);
+        # the pinned dia is what HoleWizard5 was handed, and the volume
+        # gate below proves the cut.
     )
-    expected -= blind_hole_volume_mm3(tap.hole_dia_mm, tap.depth_mm)
+    expected -= blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DEPTH)
     vol = await _volume(adapter)
     _telemetry.info(f"volume after stud tap: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:

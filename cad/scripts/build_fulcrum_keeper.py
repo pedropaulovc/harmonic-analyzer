@@ -17,6 +17,11 @@ outboard of the pad the underside is relieved to y = 4.8 so the bracket
 clears the top-frame's 4.5-proud corner-boss land (0.3 margin). The ball is
 bored Ø6.5 so the shaft end (placed 2.25 outboard of the ball centre by
 build_channel_assembly) floats with the standard 0.15 diametral clearance.
+The ball ships as its own solid body inside the part (the released
+two-piece press-fit construction -- the pinion-handle cross-rod
+precedent): merging the Ø9.5 sphere into the bracket is impossible, the
+sphere meets the equal-diameter socket wall only along its equator
+circle, a zero-thickness tangent boolean SolidWorks rejects.
 
 One part serves both ends: the assembly places the +Z (rear) end keeper
 part-X -> machine +Z and the front keeper flipped Ry180.
@@ -50,6 +55,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -258,26 +264,70 @@ async def build(adapter) -> dict[str, str]:
         adapter, "socket", volume - v_socket, 0.01 * v_socket
     )
 
-    # Ball: revolved Ø9.5 sphere merged into the socket (the bright pressed
+    # --- Foot screw hole: cheese-head counterbore in the pad centre -------
+    # Placed while the part is still ONE body: the hole wizard's
+    # placement-face scan reads GetBodies2()[0] (see _holes), so it must
+    # precede the ball, which ships as a SECOND solid body.
+    screw_hole = wizard_holes(
+        adapter,
+        SCREW_HOLE_SPEC,
+        [[SCREW_X, FOOT_H, 0.0]],
+        (0.0, -1.0, 0.0),
+        "keeper foot screw hole (#10 cbore)",
+        name="FootScrewHole",
+    )
+    v_cb = math.pi * (screw_hole.cbore_dia_mm / 2.0) ** 2 * screw_hole.cbore_depth_mm
+    v_thru = (
+        math.pi
+        * (screw_hole.hole_dia_mm / 2.0) ** 2
+        * (FOOT_H - screw_hole.cbore_depth_mm)
+    )
+    volume = await volume_check(
+        adapter, "foot screw hole", volume - v_cb - v_thru, 0.01 * (v_cb + v_thru)
+    )
+
+    # Ball: revolved Ø9.5 sphere seated in the socket (the bright pressed
     # ball of the p. 40 closeup; it renders black with the part -- the
-    # single-appearance simplification, noted on the print). Half-disc
-    # profile on Front (XY), revolved about the shaft-axis centerline.
+    # single-appearance simplification, noted on the print). A SEPARATE
+    # body (merge_result=False), the two-piece press-fit construction of
+    # the pinion-handle cross rod: the sphere meets the equal-diameter
+    # socket wall only along its equator circle, so a merged revolve is
+    # the zero-thickness tangent-contact boolean SolidWorks rejects (the
+    # sliver class the pivot-ball-mount profile avoids by design -- its
+    # stem meets the ball at a chord; here there is no stem to fuse
+    # through, the ball is held by the shaft). Proven half-disc revolve
+    # idiom (tube-frame dome cap / gooseneck pin): Front-plane profile in
+    # direct DB, so the on-axis centerline, the axis closure line and the
+    # arc merge their endpoints by exact coordinates with no inference
+    # relations; CCW arc from the +X pole over the top to the -X pole.
+    # The centre anchor on the Y axis + the diameter dim size the arc;
+    # one horizontal_points per arc end (the pinion-bracket cap-level
+    # idiom) pins the flat edge onto the revolve axis -- fully defined.
     ball = SketchDims()
     check("create_sketch ball", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
     check(
         "add_centerline ball axis",
         await adapter.add_centerline(-r_b, SHAFT_AXIS_H, r_b, SHAFT_AXIS_H),
     )
+    check(
+        "add_line ball axis closure",
+        await adapter.add_line(-r_b, SHAFT_AXIS_H, r_b, SHAFT_AXIS_H),
+    )
     arc = check(
         "add_arc ball",
         await adapter.add_arc(
-            0.0, SHAFT_AXIS_H, -r_b, SHAFT_AXIS_H, r_b, SHAFT_AXIS_H
+            0.0, SHAFT_AXIS_H, r_b, SHAFT_AXIS_H, -r_b, SHAFT_AXIS_H
         ),
     )
-    check(
-        "add_line ball closure",
-        await adapter.add_line(r_b, SHAFT_AXIS_H, -r_b, SHAFT_AXIS_H),
-    )
+    set_sketch_direct_db(adapter, False)
+    for end in ("start", "end"):
+        check(
+            f"ball arc {end} level with centre",
+            await adapter.add_sketch_constraint(
+                f"{arc}.{end}", f"{arc}.center", "horizontal_points"
+            ),
+        )
     await anchor_point_to_origin(
         adapter, f"{arc}.center", 0.0, SHAFT_AXIS_H, "ball centre"
     )
@@ -287,18 +337,23 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(arc, None, "diameter", BALL_DIA),
     )
     ball.record("BallDia", '"BallDia"')
+    await ensure_fully_defined(adapter, "ball sketch")
     check("exit_sketch ball", await adapter.exit_sketch())
     name_last_feature(adapter, "BallProfile")
     drive_jobs += ball.apply(adapter, "BallProfile")
     check(
         "revolve ball",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        await adapter.create_revolve(
+            RevolveParameters(angle=360.0, merge_result=False)
+        ),
     )
     name_last_feature(adapter, "Ball")
     v_ball = (4.0 / 3.0) * math.pi * r_b**3
     volume = await volume_check(adapter, "ball", volume + v_ball, 0.01 * v_ball)
 
-    # Shaft bore through the ball (and the socket line) along X.
+    # Shaft bore through the ball (and the socket line) along X. Two-body
+    # part here: the cut's default scope (all bodies) meets only the ball --
+    # the bracket keeps no material inside the Ø9.5 socket cylinder.
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Right"))
     await define_circle(
@@ -324,25 +379,6 @@ async def build(adapter) -> dict[str, str]:
         r_b**3 - (r_b * r_b - r_a * r_a) ** 1.5
     )
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
-
-    # --- Foot screw hole: cheese-head counterbore in the pad centre -------
-    screw_hole = wizard_holes(
-        adapter,
-        SCREW_HOLE_SPEC,
-        [[SCREW_X, FOOT_H, 0.0]],
-        (0.0, -1.0, 0.0),
-        "keeper foot screw hole (#10 cbore)",
-        name="FootScrewHole",
-    )
-    v_cb = math.pi * (screw_hole.cbore_dia_mm / 2.0) ** 2 * screw_hole.cbore_depth_mm
-    v_thru = (
-        math.pi
-        * (screw_hole.hole_dia_mm / 2.0) ** 2
-        * (FOOT_H - screw_hole.cbore_depth_mm)
-    )
-    volume = await volume_check(
-        adapter, "foot screw hole", volume - v_cb - v_thru, 0.01 * (v_cb + v_thru)
-    )
 
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).

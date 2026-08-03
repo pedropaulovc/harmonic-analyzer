@@ -81,6 +81,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_symmetric_tolerance,
 )
+from _visibility import blank_reference_geometry
 from _holes import (
     CLEARANCE_MM,
     HoleSpec,
@@ -313,13 +314,18 @@ async def _panel_cut(
     spans: tuple[tuple[float, float], ...],
     reverse: bool,
     feature: str,
+    planes: list[str],
 ) -> float:
     """Cut RECESS-deep webbing panels into one rail face.
 
     ``base_plane`` "Front Plane" sketches map (x, y) -> (X, Y); "Right
-    Plane" offsets map (x, y) -> (Z, Y) (build_rocker_arm_support). Each
-    span becomes one rectangle between the flanges (y -/+10.25); returns
-    the exact removed volume.
+    Plane" offsets map (x, y) -> (Z, Y) (build_rocker_arm_support).
+    NEGATIVE-offset planes MIRROR the sketch x-axis (live-proven on the hub
+    gusset plane: the trapezoid landed z-mirrored about the plane origin,
+    union volume 680.4 == the mirrored prediction exactly; the plane normal
+    is NOT flipped -- the +normal boss extrude and the cut directions
+    behave as for a positive offset). Each span becomes one rectangle
+    between the flanges (y -/+10.25); returns the exact removed volume.
     """
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -332,14 +338,17 @@ async def _panel_cut(
         ),
     )
     plane_name = getattr(plane, "name", plane)
+    planes.append(str(plane_name))
+    mirror = plane_offset < 0.0  # sketch x = -(model axis) on flipped planes
     panel = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch(plane_name))
     for k, (a, b) in enumerate(spans):
+        sa, sb = (-b, -a) if mirror else (a, b)
         pts = [
-            (a, -PANEL_HALF_H),
-            (b, -PANEL_HALF_H),
-            (b, PANEL_HALF_H),
-            (a, PANEL_HALF_H),
+            (sa, -PANEL_HALF_H),
+            (sb, -PANEL_HALF_H),
+            (sb, PANEL_HALF_H),
+            (sa, PANEL_HALF_H),
         ]
         lines = await add_line_chain(adapter, pts)
         await define_rectilinear_chain(
@@ -388,6 +397,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "InnerZ", '"ColumnZ" - "RailWFR" / 2')
 
     drive_jobs: list[tuple[str, str]] = []
+    ref_planes: list[str] = []  # created offset planes, blanked before save
 
     # 1. Outer slab (origin-centred plan rectangle, mid-plane band).
     outer = SketchDims()
@@ -588,17 +598,20 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
+    # Negative-offset plane: sketch x = -(model Z) (see _panel_cut). The
+    # trapezoid is authored mirrored so it lands centred on GOOSENECK_Z.
     gus_pts = [
-        (GOOSENECK_Z - HUB_GUSSET_HALF_OUT, -HALF_H),
-        (GOOSENECK_Z - HUB_GUSSET_HALF_IN, -HALF_H - HUB_BOSS_DROP),
-        (GOOSENECK_Z + HUB_GUSSET_HALF_IN, -HALF_H - HUB_BOSS_DROP),
-        (GOOSENECK_Z + HUB_GUSSET_HALF_OUT, -HALF_H),
+        (-(GOOSENECK_Z - HUB_GUSSET_HALF_OUT), -HALF_H),
+        (-(GOOSENECK_Z - HUB_GUSSET_HALF_IN), -HALF_H - HUB_BOSS_DROP),
+        (-(GOOSENECK_Z + HUB_GUSSET_HALF_IN), -HALF_H - HUB_BOSS_DROP),
+        (-(GOOSENECK_Z + HUB_GUSSET_HALF_OUT), -HALF_H),
     ]
     gus = SketchDims()
     check(
         "create_sketch hub gussets",
         await adapter.create_sketch(getattr(gusset_plane, "name", gusset_plane)),
     )
+    ref_planes.append(str(getattr(gusset_plane, "name", gusset_plane)))
     gus_lines = await add_line_chain(adapter, gus_pts)
     await define_polygon_chain(
         adapter,
@@ -703,7 +716,9 @@ async def build(adapter) -> dict[str, str]:
             "PanelRearInner",
         ),
     ):
-        removed = await _panel_cut(adapter, label, base, off, spans, reverse, feat)
+        removed = await _panel_cut(
+            adapter, label, base, off, spans, reverse, feat, ref_planes
+        )
         volume = await volume_check(adapter, label, volume - removed, 60.0)
 
     # 7. Set-screw cast pocket on the hub rib (east outer face, -X).
@@ -720,12 +735,14 @@ async def build(adapter) -> dict[str, str]:
         "create_sketch set pocket",
         await adapter.create_sketch(getattr(pocket_plane, "name", pocket_plane)),
     )
+    ref_planes.append(str(getattr(pocket_plane, "name", pocket_plane)))
     half_p = SET_POCKET / 2.0
+    # Negative-offset plane: sketch x = -(model Z) (see _panel_cut).
     pk_pts = [
-        (GOOSENECK_Z - half_p, -half_p),
-        (GOOSENECK_Z + half_p, -half_p),
-        (GOOSENECK_Z + half_p, half_p),
-        (GOOSENECK_Z - half_p, half_p),
+        (-(GOOSENECK_Z - half_p), -half_p),
+        (-(GOOSENECK_Z + half_p), -half_p),
+        (-(GOOSENECK_Z + half_p), half_p),
+        (-(GOOSENECK_Z - half_p), half_p),
     ]
     pk_lines = await add_line_chain(adapter, pk_pts)
     await define_rectilinear_chain(
@@ -769,6 +786,7 @@ async def build(adapter) -> dict[str, str]:
             f"create_sketch spotface {side}",
             await adapter.create_sketch(getattr(spot_plane, "name", spot_plane)),
         )
+        ref_planes.append(str(getattr(spot_plane, "name", spot_plane)))
         for k, sx in enumerate((-1.0, 1.0)):
             await define_circle(
                 adapter,
@@ -859,7 +877,7 @@ async def build(adapter) -> dict[str, str]:
     #     drilled from the underside seat plane (one wizard feature, both
     #     stations; the rear hole nicks the junction gusset -- material
     #     continues, the removal is a full cylinder either way).
-    stud = await wizard_holes(
+    wizard_holes(
         adapter,
         STUD_HOLE_SPEC,
         [[BAR_X0 + 11.0, -HALF_H, STUD_Z_FRONT], [BAR_X0 + 11.0, -HALF_H, STUD_Z_REAR]],
@@ -881,14 +899,14 @@ async def build(adapter) -> dict[str, str]:
         ("SideTapRearWest", COLUMN_X, SPOTFACE_FLOOR),
     ):
         normal = (0.0, 0.0, -1.0 if z_face < 0 else 1.0)
-        await wizard_holes(
+        wizard_holes(
             adapter,
             SIDE_TAP_SPEC,
             [[x_pt, 0.0, z_face]],
             normal,
             f"side screw tap {feat}",
             name=feat,
-            expect_dia_mm=TAP_DRILL_MM["#10-24"],
+            # blind tap: no expect_dia_mm (definition reads 0.0 on blinds)
         )
         volume = await volume_check(
             adapter, f"side tap {feat}", volume - v_side_tap, 0.1 * v_side_tap + 10.0
@@ -897,14 +915,14 @@ async def build(adapter) -> dict[str, str]:
     # 13. Gooseneck set-screw tap (1/4-20 blind) on the pocket floor,
     #     through the rib into the bore.
     v_set_tap = _set_tap_removal()
-    await wizard_holes(
+    wizard_holes(
         adapter,
         SET_TAP_SPEC,
         [[-(OUTER_X - SET_POCKET_DEPTH), 0.0, GOOSENECK_Z]],
         (-1.0, 0.0, 0.0),
         "gooseneck set-screw tap",
         name="GooseneckTap",
-        expect_dia_mm=TAP_DRILL_MM["1/4-20"],
+        # blind tap: no expect_dia_mm (definition reads 0.0 on blinds)
     )
     volume = await volume_check(
         adapter, "gooseneck set tap", volume - v_set_tap, 0.1 * v_set_tap + 10.0
@@ -915,7 +933,7 @@ async def build(adapter) -> dict[str, str]:
     #     lever-pair ball mounts are replaced by keepers in channel.SLDASM).
     #     Solid flange + 27.1-thick web under both points -- exact blind
     #     volumes, no break-in.
-    await wizard_holes(
+    wizard_holes(
         adapter,
         KEEPER_TAP_SPEC,
         [
@@ -925,7 +943,7 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 1.0, 0.0),
         "fulcrum keeper taps",
         name="KeeperTaps",
-        expect_dia_mm=TAP_DRILL_MM["#10-24"],
+        # blind tap: no expect_dia_mm (definition reads 0.0 on blinds)
     )
     v_keeper = 2.0 * blind_hole_volume_mm3(TAP_DRILL_MM["#10-24"], 10.0)
     volume = await volume_check(adapter, "keeper taps", volume - v_keeper, 10.0)
@@ -943,6 +961,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "OuterProfile", "Depth", OUTER_PROFILE_TOLERANCE_MM
     )
     await volume_check(adapter, "driven casting (equations neutral)", volume, 200.0)
+
+    # Hide the construction offset planes -- shown reference geometry renders
+    # in the part PNG and every assembly instance (fix_shown_sketches idiom).
+    blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)

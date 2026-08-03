@@ -8,12 +8,15 @@ plain shank crosses the 0.25 mount gap and rides the casting crossbar's
 O13.49 close-clearance bore (999.7..1036.2), and the washer/hex/collar/tip
 stack stands above the casting top face.  Two in summing.SLDASM at
 (x -15, z -83.972 / +90.148), bottom at machine y 987.45 (top 1056.7).
-Thread not modeled.
+Thread geometry not modeled; the engagement is a reduced O10.6 neck, just
+under the mount's 10.716 tap drill (repo convention: modeled thread < tap
+drill), so the assembly interference gate sees zero stud/mount overlap.
 
 Layout: axis along Y, AUTHORED IN FINAL ORIENTATION (threaded end down):
-origin at the BOTTOM of the shank.  Shank 0..48.75, washer 48.75..51.25,
-hex 51.25..62.25, collar 62.25..65.25, tip 65.25..69.25 with the cosmetic
-center-drill cut in its end face.  Symmetric about local x = 0.
+origin at the BOTTOM of the shank.  Thread 0..12 (O10.6), plain shank
+12..48.75 (O12.7), washer 48.75..51.25, hex 51.25..62.25, collar
+62.25..65.25, tip 65.25..69.25 with the cosmetic center-drill cut in its
+end face.  Symmetric about local x = 0.
 
 Run (SolidWorks already open)::
 
@@ -63,6 +66,8 @@ from knife_hanger_stud_spec import (
     NUT_H,
     SHANK_DIA,
     SHANK_LEN,
+    THREAD_DIA,
+    THREAD_LEN,
     TIP_DIA,
     TIP_LEN,
     TOTAL_LEN,
@@ -81,11 +86,13 @@ _INV_SQRT3 = 1.0 / math.sqrt(3.0)  # radius / AF
 _HALF_INV_SQRT3 = 0.5 * _INV_SQRT3  # (radius/2) / AF
 
 # Feature stack stations (local y, bottom of the shank = 0).
+PLAIN_LEN = SHANK_LEN - THREAD_LEN  # plain-shank run above the thread (36.75)
 WASHER_Y = SHANK_LEN
 NUT_Y = WASHER_Y + WASHER_T
 COLLAR_Y = NUT_Y + NUT_H
 TIP_Y = COLLAR_Y + COLLAR_H
 assert TIP_Y + TIP_LEN == TOTAL_LEN
+assert THREAD_LEN + PLAIN_LEN == SHANK_LEN
 
 
 async def build(adapter) -> dict[str, str]:
@@ -96,8 +103,10 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document).
     # The lengths are extrude DEPTHS (feature parameters) -- declared as knobs,
     # but nothing in drive_jobs references them.
+    await set_global(adapter, "ThreadDia", f"{THREAD_DIA}mm")
+    await set_global(adapter, "ThreadLen", f"{THREAD_LEN}mm")
     await set_global(adapter, "ShankDia", f"{SHANK_DIA}mm")
-    await set_global(adapter, "ShankLen", f"{SHANK_LEN}mm")
+    await set_global(adapter, "ShankLen", f"{PLAIN_LEN}mm")
     await set_global(adapter, "WasherDia", f"{WASHER_DIA}mm")
     await set_global(adapter, "WasherT", f"{WASHER_T}mm")
     await set_global(adapter, "NutAF", f"{NUT_AF}mm")
@@ -110,7 +119,29 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Shank 0..48.75 (on-axis circle: only the diameter is a dim).
+    # Threaded engagement 0..12: modeled at the reduced O10.6, just under the
+    # knife-mount's 10.716 tap drill (repo convention: modeled thread < tap
+    # drill), so the assembly interference gate sees zero stud/mount overlap.
+    thread_dims = SketchDims()
+    check("create_sketch thread", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter, 0.0, 0.0, THREAD_DIA / 2.0, "thread", dims=thread_dims,
+        names=("ThreadCx", "ThreadCz", "ThreadDia"),
+        drives=(None, None, '"ThreadDia"'),
+    )
+    await ensure_fully_defined(adapter, "thread sketch")
+    check("exit_sketch thread", await adapter.exit_sketch())
+    name_last_feature(adapter, "ThreadProfile")
+    drive_jobs += thread_dims.apply(adapter, "ThreadProfile")
+    extrude_at_offset(adapter, THREAD_LEN, 0.0)
+    name_last_feature(adapter, "Thread")
+    name_dimensions(adapter, "Thread", ["ThreadLg"])
+    v_thread = math.pi * (THREAD_DIA / 2.0) ** 2 * THREAD_LEN
+    expected = v_thread
+    await volume_check(adapter, "thread", expected, 0.005 * v_thread)
+
+    # Plain shank 12..48.75 (rides the crossbar's O13.49 close-clearance bore
+    # at the full 1/2-13 major; on-axis circle: only the diameter is a dim).
     shank_dims = SketchDims()
     check("create_sketch shank", await adapter.create_sketch("Top"))
     await define_circle(
@@ -122,11 +153,11 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch shank", await adapter.exit_sketch())
     name_last_feature(adapter, "ShankProfile")
     drive_jobs += shank_dims.apply(adapter, "ShankProfile")
-    extrude_at_offset(adapter, SHANK_LEN, 0.0)
+    extrude_at_offset(adapter, PLAIN_LEN, THREAD_LEN)
     name_last_feature(adapter, "Shank")
     name_dimensions(adapter, "Shank", ["ShankLg"])
-    v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * SHANK_LEN
-    expected = v_shank
+    v_shank = math.pi * (SHANK_DIA / 2.0) ** 2 * PLAIN_LEN
+    expected += v_shank
     await volume_check(adapter, "shank", expected, 0.005 * v_shank)
 
     # Integral washer disc 48.75..51.25.

@@ -15,6 +15,7 @@ from knife_hanger_stud_spec import (
     COLLAR_H,
     NUT_H,
     SHANK_LEN,
+    THREAD_LEN,
     TIP_LEN,
     TOTAL_LEN,
     WASHER_T,
@@ -32,10 +33,11 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 
-# Authored on the Top plane, axis +Y, threaded end DOWN: shank 0..48.75, then
-# washer / hex / collar / tip up to 69.25.  The concentric stack (tip, collar,
-# hex, washer) projects in the *Top view; the profile (axis VERTICAL, stack up)
-# in the *Front view.
+# Authored on the Top plane, axis +Y, threaded end DOWN: thread 0..12 (the
+# reduced O10.6 engagement neck), plain shank 12..48.75, then washer / hex /
+# collar / tip up to 69.25.  The concentric stack (tip, collar, hex, washer)
+# projects in the *Top view; the profile (axis VERTICAL, stack up) in the
+# *Front view.
 END_CENTER = (0.080, 0.160)
 SIDE_CENTER = (0.190, 0.190)
 ISO_CENTER = (0.320, 0.170)
@@ -48,7 +50,8 @@ def _side_y(model_y: float) -> float:
     return SIDE_CENTER[1] + (model_y - _Y_MID) * _S
 
 
-_SHANK_MID_Y = _side_y(SHANK_LEN / 2.0)
+_THREAD_MID_Y = _side_y(THREAD_LEN / 2.0)
+_SHANK_MID_Y = _side_y((THREAD_LEN + SHANK_LEN) / 2.0)
 _NUT_MID_Y = _side_y(SHANK_LEN + WASHER_T + NUT_H / 2.0)
 _TIP_MID_Y = _side_y(TOTAL_LEN - TIP_LEN / 2.0)
 assert TOTAL_LEN == SHANK_LEN + WASHER_T + NUT_H + COLLAR_H + TIP_LEN
@@ -61,10 +64,11 @@ END_KEEP = {
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
-# Side view: the shank/nut/tip lengths as the extrude-depth model dims (the
-# vertical profile cannot point-select the edge-on stack steps), stacked to
-# the right of the profile clear of the geometry.
+# Side view: the thread/shank/nut/tip lengths as the extrude-depth model
+# dims (the vertical profile cannot point-select the edge-on stack steps),
+# stacked to the right of the profile clear of the geometry.
 SIDE_KEEP = {
+    "ThreadLg": (SIDE_CENTER[0] + 0.052, _THREAD_MID_Y),
     "ShankLg": (SIDE_CENTER[0] + 0.052, _SHANK_MID_Y),
     "NutHt": (SIDE_CENTER[0] + 0.052, _NUT_MID_Y),
     "TipLg": (SIDE_CENTER[0] + 0.052, _TIP_MID_Y),

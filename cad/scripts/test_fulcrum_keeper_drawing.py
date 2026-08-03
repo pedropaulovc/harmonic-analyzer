@@ -70,6 +70,20 @@ def test_notes_cover_the_ball_seat_and_the_boss_relief() -> None:
     assert "2 REQUIRED" in notes
 
 
+def test_ball_is_a_separate_pressed_body() -> None:
+    # A merged Ø9.5 sphere in the Ø9.5 socket is a zero-thickness tangent
+    # boolean (equator-circle contact only) -- the ball must stay its own
+    # solid body, like the pinion-handle cross rod.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "merge_result=False" in source
+    assert 'name_last_feature(adapter, "Ball")' in source
+    # And the wizard screw hole must land while the part is one body (its
+    # placement-face scan reads GetBodies2()[0]).
+    assert source.index('name="FootScrewHole"') < source.index(
+        '"revolve ball"'
+    )
+
+
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
     assert "FootScrewHole" not in part.DRAWING_DIMENSIONS
     marked = set().union(*part.DRAWING_DIMENSIONS.values())
