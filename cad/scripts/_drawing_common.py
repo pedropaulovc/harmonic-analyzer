@@ -767,10 +767,10 @@ def project_part_pmi(
         if gtol_frame_signature(str(frame.GetSymbolXml() or "")) != (
             gtol_frame_signature(control.frame_xml)
         ):
-            raise RuntimeError(f"{label}: projected gtol {control.key} changed semantics")
-        annotation = _name(
-            gtol.GetAnnotation(), control.annotation_name, control.key
-        )
+            raise RuntimeError(
+                f"{label}: projected gtol {control.key} changed semantics"
+            )
+        annotation = _name(gtol.GetAnnotation(), control.annotation_name, control.key)
         after = tuple(annotation.GetPosition() or ())
         drift = (
             math.inf
@@ -858,8 +858,7 @@ def add_surface_finish(
             for item in signatures
         )
         _telemetry.info(
-            f"SURFACE_AUDIT {label}: entity_type={entity_type}, "
-            f"faces={diagnostic!r}"
+            f"SURFACE_AUDIT {label}: entity_type={entity_type}, faces={diagnostic!r}"
         )
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
@@ -2435,7 +2434,9 @@ def insert_hole_table(
     datum_xy: tuple[float, float],
     hole_points: Sequence[tuple[float, float]],
     datum_entity: Any | None = None,
+    datum_axes: tuple[Any, Any] | None = None,
     hole_entities: Sequence[Any] | None = None,
+    expected_locations_mm: Sequence[tuple[float, float]] | None = None,
     anchor_xy: tuple[float, float],
     basic_locations: bool = True,
     label: str,
@@ -2446,8 +2447,12 @@ def insert_hole_table(
     hole EDGE, all in sheet meters.  Callers that can identify drawing-context
     entities topologically may additionally supply ``datum_entity`` and
     ``hole_entities``; those are selected directly with the same hole-table
-    marks and the coordinates remain the count/diagnostic contract.  The table
-    lands with its top-left corner at ``anchor_xy`` and is validated before
+    marks and the coordinates remain the count/diagnostic contract.  A part
+    whose plan corners are broken (filleted/chamfered) has NO corner vertex to
+    anchor: ``datum_axes=(x_axis_edge, y_axis_edge)`` instead selects the two
+    datum edges (marks 4/8), and SolidWorks anchors the table origin at their
+    VIRTUAL intersection -- the theoretical sharp corner.  The table lands
+    with its top-left corner at ``anchor_xy`` and is validated before
     returning.
     """
     draw = adapter.currentModel
@@ -2473,14 +2478,21 @@ def insert_hole_table(
         selectable = _early_bound(entity, "IEntity")
         return bool(selectable.Select4(append, selection_data))
 
-    if datum_entity is not None:
+    if datum_axes is not None and datum_entity is not None:
+        raise ValueError(f"{label} supplied both a datum vertex and datum axes")
+    if datum_axes is not None:
+        x_axis, y_axis = datum_axes
+        datum = _select_entity(x_axis, append=False, mark=4) and _select_entity(
+            y_axis, append=True, mark=8
+        )
+    elif datum_entity is not None:
         datum = _select_entity(datum_entity, append=False, mark=1)
     else:
         datum = draw.Extension.SelectByID2(
             "", "VERTEX", datum_xy[0], datum_xy[1], 0.0, False, 1, null_callout(), 0
         )
     if not datum:
-        raise RuntimeError(f"failed to select {label} hole-table datum vertex")
+        raise RuntimeError(f"failed to select {label} hole-table datum origin")
     selections = (
         zip(hole_points, hole_entities, strict=True)
         if hole_entities is not None
@@ -2567,8 +2579,64 @@ def insert_hole_table(
     )
     if tuple(value.upper() for value in header) != expected:
         raise RuntimeError(f"native hole-table header is unexpected: {header!r}")
+    if expected_locations_mm is not None:
+        _check_hole_table_locations(contents, expected_locations_mm, label=label)
     _telemetry.success(f"native hole table inserted: {rows - 1} holes, header={header}")
     return table
+
+
+def _check_hole_table_locations(
+    contents: Sequence[Sequence[str]],
+    expected_mm: Sequence[tuple[float, float]],
+    *,
+    label: str,
+    tol_mm: float = 0.02,
+) -> None:
+    """Match every printed X/Y LOC cell against an expected station, one-to-one.
+
+    SolidWorks computes the LOC cells from the model against the selected
+    datum origin, and ``insert_hole_table`` otherwise validates only the
+    header and row count -- so a mis-anchored origin (e.g. a fillet-arc
+    endpoint picked instead of the theoretical corner) would shift every
+    coordinate SILENTLY. Expected stations are matched as a SET (table rows
+    are tag-ordered, not selection-ordered) within ``tol_mm`` (cells print
+    at 2 decimals, so the honest floor is 0.005 rounding).
+    """
+    if len(expected_mm) != len(contents) - 1:
+        raise RuntimeError(
+            f"{label} hole table: {len(expected_mm)} expected locations for "
+            f"{len(contents) - 1} rows"
+        )
+    printed: list[tuple[float, float, str]] = []
+    for row in contents[1:]:
+        try:
+            printed.append((float(row[1]), float(row[2]), row[0]))
+        except ValueError as error:
+            raise RuntimeError(
+                f"{label} hole table: unparseable LOC cells in row {row!r}"
+            ) from error
+    unmatched = list(range(len(printed)))
+    for ex, ey in expected_mm:
+        hit = next(
+            (
+                index
+                for index in unmatched
+                if abs(printed[index][0] - ex) <= tol_mm
+                and abs(printed[index][1] - ey) <= tol_mm
+            ),
+            None,
+        )
+        if hit is None:
+            table_dump = ", ".join(f"{tag}({x:g}, {y:g})" for x, y, tag in printed)
+            raise RuntimeError(
+                f"{label} hole table: no printed row matches expected "
+                f"({ex:g}, {ey:g}) mm within {tol_mm}; table: {table_dump}"
+            )
+        unmatched.remove(hit)
+    _telemetry.success(
+        f"{label} hole table locations verified: {len(expected_mm)} stations "
+        f"within {tol_mm} mm"
+    )
 
 
 def bom_table_template(adapter: Any) -> Path:

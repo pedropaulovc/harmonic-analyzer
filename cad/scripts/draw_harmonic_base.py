@@ -139,26 +139,20 @@ ALL_HOLES = (
 
 def _visible_hole_table_entities(
     adapter: Any, view: Any
-) -> tuple[Any, tuple[Any, ...], Any, Any]:
-    """Return plan origin, hole rims, and the B/C datum edges."""
+) -> tuple[tuple[Any, ...], Any, Any]:
+    """Return hole rims and the B/C datum edges in the top view.
+
+    The plan corners are broken (CornerFillets R3.18), so no B-C corner
+    vertex exists to anchor the hole table; the caller passes the two datum
+    edges as ``datum_axes`` and the table origin lands on their VIRTUAL
+    intersection -- the theoretical sharp corner, keeping every LOC value
+    measured from B-C exactly as note 3 states.
+    """
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    vertices: list[tuple[tuple[float, float, float], Any]] = []
     circles: list[tuple[float, float, float, Any]] = []
     lines: list[tuple[tuple[float, ...], Any]] = []
 
     for component in components:
-        visible_vertices = (
-            adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 2),  # swViewEntityType_Vertex
-                default=(),
-            )
-            or ()
-        )
-        for vertex in visible_vertices:
-            vertex = _early_bound(vertex, "IVertex")
-            point = tuple(float(value) for value in vertex.GetPoint())
-            vertices.append((point, vertex))
-
         visible_edges = (
             adapter._attempt(
                 lambda c=component: view.GetVisibleEntities2(
@@ -179,9 +173,6 @@ def _visible_hole_table_entities(
                 parameters = tuple(float(value) for value in curve.LineParams)
                 lines.append((parameters, edge))
 
-    if not vertices:
-        raise RuntimeError("harmonic-base plan has no visible footprint vertices")
-
     visible_counterbores = [
         (x_mm, z_mm)
         for x_mm, z_mm in HOLE_XZ
@@ -197,19 +188,6 @@ def _visible_hole_table_entities(
         raise RuntimeError(
             "underside-only counterbore rims are visible in the top view: "
             f"{visible_counterbores!r}"
-        )
-
-    x_min = min(point[0] for point, _entity in vertices)
-    z_max = max(point[2] for point, _entity in vertices)
-    datum_candidates = [
-        (point[1], entity)
-        for point, entity in vertices
-        if abs(point[0] - x_min) <= 2e-6 and abs(point[2] - z_max) <= 2e-6
-    ]
-    if not datum_candidates:
-        raise RuntimeError(
-            "harmonic-base plan has no visible lower-left outer vertex at "
-            f"drawing-context X={x_min:g}, Z={z_max:g} m"
         )
 
     selected_edges: list[Any] = []
@@ -258,7 +236,6 @@ def _visible_hole_table_entities(
         )
 
     return (
-        max(datum_candidates, key=lambda candidate: candidate[0])[1],
         tuple(selected_edges),
         datum_b_candidates[0],
         datum_c_candidates[0],
@@ -352,8 +329,8 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
-    datum_entity, hole_entities, datum_b_edge, datum_c_edge = (
-        _visible_hole_table_entities(adapter, top)
+    hole_entities, datum_b_edge, datum_c_edge = _visible_hole_table_entities(
+        adapter, top
     )
     datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
 
@@ -365,8 +342,15 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         datum_xy=_DATUM_XY,
         hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in ALL_HOLES),
-        datum_entity=datum_entity,
+        datum_axes=(datum_b_edge, datum_c_edge),
         hole_entities=hole_entities,
+        # Every printed LOC is re-derived from the shared stations: X from the
+        # C face (x = -L/2), Y from the B face (z = +W/2) -- proven against
+        # the seat (A1 stop, B1 pivot, E1-E4 lags all exact).
+        expected_locations_mm=tuple(
+            (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
+            for x, z, _diameter in ALL_HOLES
+        ),
         anchor_xy=HOLE_TABLE_ANCHOR,
         basic_locations=True,
         label="harmonic-base mounting",

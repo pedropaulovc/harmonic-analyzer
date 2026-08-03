@@ -40,7 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from build_rocker_arm_support import BOSS_DEPTH, HALF_Y, HOLES, WIDE
+from build_rocker_arm_support import BOSS_DEPTH, CHAMFER, HALF_Y, HOLES, WIDE
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -192,6 +192,15 @@ async def build(adapter: Any) -> dict[str, str]:
             BOTTOM_CENTER[1] - WIDE * VIEW_SCALE / 1000.0,
         ),
         hole_points=tuple(_bottom_sheet_xy(hole) for hole in HOLES),
+        # The nominal foot corner (-BossDepth/2, -Wide) is broken by the 1.27
+        # RimChamfer, so the vertex SolidWorks anchors the table on is the
+        # chamfer-edge vertex 1.27 INBOARD on both axes -- the shipped table's
+        # LOCs (27.31/147.95, 13.02/47.94) are pinned here verbatim. The B/C
+        # datum planes sit 1.27 outside this origin; follow-up: anchor via
+        # datum_axes on the virtual B-C intersection like the harmonic base.
+        expected_locations_mm=tuple(
+            (x + BOSS_DEPTH / 2.0 - CHAMFER, z + WIDE - CHAMFER) for x, z in HOLES
+        ),
         anchor_xy=HOLE_TABLE_ANCHOR,
         label="rocker-arm-support",
     )

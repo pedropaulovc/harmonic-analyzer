@@ -189,6 +189,15 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_points=tuple(
             (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M) for station in stations
         ),
+        # X LOC = the station from the left face (datum C); Y LOC = the bar's
+        # hole-line height above the bottom face, a constant 2.50.
+        expected_locations_mm=tuple(
+            (
+                station,
+                (FRONT_HOLE_Y_M - FRONT_BOTTOM_Y_M) * 1000.0,
+            )
+            for station in stations
+        ),
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         label="platen-guide",
     )

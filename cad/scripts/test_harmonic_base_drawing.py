@@ -78,6 +78,9 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "A1/B1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
     assert "MASK DATUM A/B/C FACES, ALL BORES/THREADS" in notes
     assert "PAD TOP; COAT PAD SIDES AND ROOTS" in notes
+    assert "VERTICAL PLAN CORNERS R3.18 BOTH PLATES" in notes
+    assert "EXPOSED TOP RIMS R1.59" in notes
+    assert "UNDERSIDE RIM C1.59 X 45 DEG" in notes
     assert "A1-A4" not in notes
     assert "FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES" in notes
     assert "LOCATIONS ARE BASIC" in notes
@@ -87,11 +90,12 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert 'adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025' in source
     assert 'add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)' in source
     assert "insert_hole_table(" in source
-    assert "_visible_hole_table_entities(adapter, top)" in source
-    assert "datum_entity=datum_entity" in source
+    assert "_visible_hole_table_entities(" in source
+    assert "datum_axes=(datum_b_edge, datum_c_edge)" in source
     assert "hole_entities=hole_entities" in source
-    assert "GetVisibleEntities2(c, 2)" in source
+    assert "expected_locations_mm=tuple(" in source
     assert "GetVisibleEntities2(c, 1)" in source
+    assert "GetVisibleEntities2(c, 2)" not in source
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 5
     assert 'quantity="E1-E4 DIA 13 THRU"' in source
@@ -139,13 +143,10 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         -141.14905420183916 + POST_X_SHIFT,
         -33.08089452405298 + POST_Z_SHIFT,
     )
-    east_slope = (
-        platform.EAST_HALF_S - platform.HALF_WIDTH_N
-    ) / platform.PLATE_LEN
+    east_slope = (platform.EAST_HALF_S - platform.HALF_WIDTH_N) / platform.PLATE_LEN
     stop_local_z = -105.0
     stop_local_x = -(
-        platform.HALF_WIDTH_N
-        + east_slope * (platform.NORTH_OVERHANG - stop_local_z)
+        platform.HALF_WIDTH_N + east_slope * (platform.NORTH_OVERHANG - stop_local_z)
     )
 
     edge_x, edge_z = -1.0, east_slope
@@ -204,12 +205,10 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
         (-54.7, 102.5),
     )
     assert part.BLOCK_SCREW_XZ == tuple(
-        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT)
-        for x, z in former_blocks
+        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_blocks
     )
     assert part.FOOT_SCREW_XZ == tuple(
-        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT)
-        for x, z in former_feet
+        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
 
 
