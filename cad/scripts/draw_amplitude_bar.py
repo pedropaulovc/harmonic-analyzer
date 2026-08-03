@@ -4,7 +4,7 @@ The SLDPRT remains authoritative.  This recipe supplies only the amplitude-bar
 views, dimension layout, and manufacturing notes; every shared sheet/template,
 import, curation, and export behavior lives in ``_drawing_common``.
 
-The bar is ~813 mm long but only 6.35 mm square, so the print shows a 1:4
+The bar is ~808 mm long but only 6.35 mm square, so the print shows a 1:4
 full-length front view (overall length only), a 4:1 top end view for the square
 section, and a small 1:8 isometric; the two tiny end notches and the top pin
 hole are dimensioned in the notes.  The sheet runs at 1:4.

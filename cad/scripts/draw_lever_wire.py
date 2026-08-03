@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the lever wire (WIRE 1).
 
-The lever wire is a Ø0.8 drawn-steel cylinder ~363 long -- a hair-thin
+The lever wire is a Ø0.8 drawn-steel cylinder ~353 long -- a hair-thin
 silhouette with no flat face, no pickable end and no selectable silhouette edge,
 so the print is note-based: nothing is a marked dimension, and the diameter +
 straight rest-run length ride the notes (the build stamps the computed length).
@@ -49,7 +49,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-WIRE_SCALE = (1, 5)  # ~363 long reduced to ~73 mm on the sheet
+WIRE_SCALE = (1, 5)  # ~353 long reduced to ~71 mm on the sheet
 FRONT_CENTER = (0.135, 0.150)
 ISO_CENTER = (0.320, 0.160)
 

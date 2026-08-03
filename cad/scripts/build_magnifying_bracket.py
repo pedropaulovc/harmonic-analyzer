@@ -3,13 +3,14 @@ r"""Reproduction script: magnifying-lever bracket (book ch. 20, pp. 46-49).
 The black fitting that affixes the magnifying lever rod to the summing
 lever: a flange butted against the coefficients plate's front edge FACE
 and a forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps
-into. The collar/rod sit at the plate centreline (machine y 990) so the
-rod is coplanar with the plate; the flange spans the plate's full height
-(987.46..992.54). The current source model is an UNDRILLED blank. The older
+into. The collar/rod sit at the plate centreline (machine y 979.7, after the
+2026-08-02 Cascade-A drop) so the rod is coplanar with the plate; the flange
+spans the plate's full height
+(977.16..982.24). The current source model is an UNDRILLED blank. The older
 mounting-screw description predates the butt-flange orientation and conflicts
 on the screw axis/stations, so no hole geometry is asserted here.
 
-Layout: origin at the collar centre (machine (+40, 990, -128.3) after the
+Layout: origin at the collar centre (machine (+40, 979.7, -128.3) after the
 2026-07-04 depth re-anchor); collar axis along X (the rod direction), arm
 runs +Z from the collar back beside the plate's east edge (machine
 -124.3 -> -70), flange at local z 47.3..51.85 (machine -81..-76.45,
@@ -86,9 +87,9 @@ FLANGE_X = (-20.0, 5.0)  # mounting flange, machine x +20..+45. The collar sits
 # remains on the unchanged front-column/output side. The re-anchored channel
 # spring bank now starts at z -64.012, still clear of this flange.
 FLANGE_Y = (-2.54, 2.54)  # spans the plate's FULL height: with the collar/rod now
-# at the plate centreline (machine 990, see build_magnifier_assembly LEVER_ROD_Y), the
-# flange butts the plate FRONT FACE rather than tucking under it -- machine
-# 987.46..992.54 = the coplanar .cs plate band
+# at the plate centreline (machine 979.7, see build_magnifier_assembly LEVER_ROD_Y),
+# the flange butts the plate FRONT FACE rather than tucking under it -- machine
+# 977.16..982.24 = the coplanar .cs plate band
 FLANGE_Z = (47.3, 51.85)  # SAME machine band as ever (-81..-76.45): north face
 # at machine -76.45 = 0.25 south of the plate's real FRONT (-Z) face at -76.2
 # (the plate is the Top-rect z +-76.2, centred on the pivot -- NOT -70, an

@@ -87,7 +87,7 @@ ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]         # pivot bore = rocker Axis1
 # Amplitude-bar foot axis (build_channel_assembly BAR_FOOT_LOCAL = bar Axis2) and
 # top-pin (bar Axis1, the swing pivot, BAR_TOP_PIN_LOCAL); part-local mm.
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]
-BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]
+BAR_TOP_PIN_LOCAL = [3.175, 801.95, 3.175]  # 808.3 bar - 6.35 pin drop
 
 # ---- study constants --------------------------------------------------------
 ASM = "harmonic-analyzer"

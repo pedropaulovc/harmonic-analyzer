@@ -11,13 +11,17 @@ Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
 
 * pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z, centred z 22.715)
-  + fulcrum-shaft x1 (lever bank at (199.9, 1065.9), 182 long - the
+  + fulcrum-shaft x1 (lever bank at (199.9, 1061.4), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
-* pivot-ball-mount x4 (rocker pair translated with the channel bank: north
+* pivot-ball-mount x2 (rocker pair translated with the channel bank: north
   at (72.9, 228.6, +116.915), south at (72.9, 228.6, -75.585),
   the front stand is the rocker-arm-support's transgear-A-frame leg
-  (frame.SLDASM) whose ears flank this mount's O16 base; lever pair on the top-frame west rail,
-  seats (199.9, 1040.7, -49.585/+120.415))
+  (frame.SLDASM) whose ears flank this mount's O16 base)
+* fulcrum-keeper x2 + frame-side-screw x2 (the black shaft-END brackets on
+  the top-frame west rail top face -- ch17 p.40 bottom-left / ch30 p008;
+  ball centres (199.9, 1061.4, 3.088 +- 88.75), foot screws down into the
+  rail's tapped #10-24 holes at z 3.088 +- 74.0; replaces the photo-refuted
+  chrome baluster lever pair, 2026-08-02)
 * rocker-arm x20, pivot-bushing x19, connecting-rod x20,
   amplitude-bar x20, channel-lever x20, lever-bushing x19,
   channel-spring-installed x20 (M6.4: the stretched in-machine spring --
@@ -38,7 +42,8 @@ tapered-strap lever angle; rod tilt 0 -- the rod hangs PLUMB from the
 arm's rod-side tip onto its cam, ch30 photos + ch14 end views);
 the bar rests its foot-notch roof on the tilted arm's top-edge arc
 (contact at the bar's +X edge, machine frame); the bar's top pin height
-tilts the levers (~ +0.36 deg); the spring's top eye hangs 3.37 below the
+leaves the levers essentially level (-0.002 deg at neutral, the ch14 ROM
+re-derive rest pose); the spring's top eye hangs 3.37 below the
 lever spring hole so its ring threads the O4 hole without touching (margins
 asserted > 0.1); the bottom eye now sits just ABOVE the plate (no longer
 threading it) on the arm of a spring-hook fastener whose shank seats in the
@@ -166,7 +171,13 @@ from _cwm import (
     put_component_pose,
     resolve_entity,
 )
-from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler
+from _transforms import (
+    ROT_Y_180,
+    ROT_Y_POS90,
+    compose_rows,
+    euler_from_rows,
+    rows_from_euler,
+)
 from cone_pivot_post_installation import (
     CHANNEL_Z0,
     DRUM_X,
@@ -261,7 +272,8 @@ RING_CENTER = (
 
 # --- amplitude bars ---------------------------------------------------------
 BAR_WIDTH = 6.35
-BAR_LENGTH = 812.8
+BAR_LENGTH = 808.3  # legacy 812.8 trimmed 4.5 at the TOP (top-frame rederive
+# 2026-08-02: fulcrum chain -4.5; foot end untouched) = amplitude_bar_spec
 BAR_FOOT_NOTCH = 2.381
 BAR_TOP_PIN_DROP = 6.35
 # The bar foot-notch roof rests on the rocker's top-edge arc. In the legacy
@@ -276,7 +288,9 @@ BAR_TOP_PIN_DROP = 6.35
 BAR_CONTACT_GAP = _config.fit("cam_follower_contact", "contact_gap_mm")  # cad/config/tolerances.yaml
 
 # --- lever bank -------------------------------------------------------------
-FULCRUM = (199.9, 1065.9)  # lever fulcrum shaft axis (x, y); machine frame
+FULCRUM = (199.9, 1061.4)  # lever fulcrum shaft axis (x, y); machine frame
+# (2026-08-02 top-frame rederive: casting top face 1036.2 + ball rise 25.2;
+# was 1065.9 off the old 1040.7 rail top)
 LEVER_BAR_PIN_X = 127.0
 LEVER_SPRING_X = 177.8  # 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
@@ -291,19 +305,35 @@ SUPPORT_Z = 81.5 + CHANNEL_BANK_REAR_SHIFT  # 116.915 north rocker mount
 AFRAME_MOUNT_Z = -111.0 + CHANNEL_BANK_REAR_SHIFT  # -75.585 south rocker mount
 # Keep the proven 203.2-mm shaft and support overhangs, translated with the bank.
 PIVOT_SHAFT_Z = -12.7 + CHANNEL_BANK_REAR_SHIFT  # 22.715; span -78.885..124.315
-RAIL_TOP_Y = 1040.7
+RAIL_TOP_Y = 1036.2  # new top-frame casting top face (was 1040.7; the rederive
+# dropped the rail top 4.5 -- the ball-mount seats and the whole fulcrum chain
+# follow)
 FULCRUM_SHAFT_Z = CHANNEL_BANK_REAR_SHIFT
-LEVER_MOUNT_Z = (
-    -85.0 + CHANNEL_BANK_REAR_SHIFT,
-    85.0 + CHANNEL_BANK_REAR_SHIFT,
-)  # (-49.585, 120.415), translated with the lever bank
+from fulcrum_shaft_spec import SHAFT_LENGTH as FULCRUM_SHAFT_LENGTH  # noqa: E402
+
+FULCRUM_SHAFT_HALF = FULCRUM_SHAFT_LENGTH / 2.0  # 91.0; ends at 3.088 -+ 91
+# Part +X (outboard) -> machine +Z for the rear keeper; ROT_Y_POS90 maps
+# +X -> machine -Z for the flipped front keeper.
+ROT_Y_NEG90 = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
+# Fulcrum end keepers (MHA-120) replace the baluster lever pair (the ch17
+# p.40 / ch30 p008 black shaft-END brackets). The keeper's ball centre sits
+# KEEPER_BALL_TO_END inboard of each shaft end, so the Ø6.35 end floats
+# inside its Ø6.5 ball bore with the standard 0.15 diametral clearance.
+KEEPER_BALL_TO_END = 2.25
+KEEPER_Z_OFF = FULCRUM_SHAFT_HALF - KEEPER_BALL_TO_END  # 88.75 off centre
+# Foot screws (frame-side-screw MHA-117): the keeper pad centre is 14.75
+# inboard of its ball centre -> z = FULCRUM_SHAFT_Z +- 74.0. The under-head
+# plane is the foot top (8.0) minus the 3.0 counterbore = rail top + 5.0;
+# they thread the top-frame's tapped #10-24 holes (build_top_frame.py).
+KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF - 14.75  # 74.0
+KEEPER_SCREW_SEAT_H = 5.0
 
 # --- spring (channel_spring_installed_spec) ---------------------------------
 from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
 from channel_spring_installed_spec import (  # noqa: E402
     HOOK_LEAD as SPRING_HOOK_LEAD,  # 2.0 each end (no longer spans the plate)
-    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 61.98: the neutral installed body
-    PLATE_EYE_Y,  # 996.54: bottom-eye y, ABOVE the plate on the hook arm
+    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 67.78: the neutral installed body
+    PLATE_EYE_Y,  # 986.24: bottom-eye y, ABOVE the plate on the hook arm
 )
 
 SPRING_BOTTOM_LEAD = SPRING_HOOK_LEAD
@@ -336,10 +366,11 @@ from build_lever_bushing import OUTER_DIA as LEVER_BUSHING_OD  # noqa: E402  (Ø
 
 # --- summing-lever plate interface (build_summing_lever.py) ------------------
 # The corrected .cs lever is a coplanar casting: the plate is mid-plane ON the
-# pivot (knife line y=990), so its top is 992.54 -- 5.46 BELOW the old M6.4 998.
-# The 20 channel springs were dropped to meet it (PLATE_EYE_Y, below) and so they
-# elongate 5.46 against the fixed channel-lever tabs at 1063.65.
-PLATE_TOP_Y = 992.54
+# pivot (knife line y=979.7 after the top-frame rederive's summing cascade
+# -10.3), so its top is 982.24. The 20 channel springs meet it at PLATE_EYE_Y
+# (below); with the lever tabs down only 4.5 (fulcrum chain) the springs
+# elongate a net 5.8 vs the pre-rederive pose (installed body 61.98 -> 67.78).
+PLATE_TOP_Y = 982.24
 PLATE_THICKNESS = 5.1
 PLATE_HOLE_DIA = 2.0  # snug bore for the O1.4 hook shank (build_summing_lever.HOLE_DIA)
 
@@ -449,8 +480,8 @@ ROCKER_ROD_BORE_LOCAL = [ARM_ROD_HOLE_X, ARM_ROD_PIN_LOCAL_Y, 0.0]  # rocker Axi
 ROD_STRAP_BORE_LOCAL = [0.0, 0.0, 0.0]  # rod Axis1 (cam ring centre = origin)
 ROD_PIN_BORE_LOCAL = [0.0, ROD_C2C, 0.0]  # rod Axis2 (rocker pin = swing pivot)
 LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
-BAR_TOP_PIN_LOCAL = [3.175, 806.45, 3.175]  # bar Axis1 (swing pivot)
-BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~806 mm arm)
+BAR_TOP_PIN_LOCAL = [3.175, 801.95, 3.175]  # bar Axis1 (swing pivot; 808.3 - 6.35)
+BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~802 mm arm)
 
 # --- CopyWithMates2 slice replication (PR #220 probes -> production) ---------
 # A channel's 4 moving parts + their 9 mates are one repeatable SLICE: author
@@ -625,7 +656,7 @@ async def _seat_bushing_on_shaft(
 
 # Top-pin-to-foot span of the rigid bar (Axis1 local y - Axis2 local y); the
 # amplitude swing pivots the bar about its top pin over this lever arm.
-BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 806.45
+BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 801.95
 # Foot-axis -> notch-roof contact offset in the bar's UNtilted (vertical) XY
 # frame: the roof sits at the bar's +X edge (+BAR_WIDTH/2) and BAR_FOOT_NOTCH up,
 # lifted BAR_CONTACT_GAP off the arc. (Machine frame: the amplitude foot slides
@@ -695,7 +726,7 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
     ``amplitude`` is the foot-axis X offset from the rocker pivot (mm), the
     Fourier coefficient a_j (channels.yaml ``amplitude_mm``); 0 reproduces the
     neutral pose bit-exactly. The mechanism is a 4-bar loop: the bar top pin
-    rides the lever's 127 mm crank, the rigid bar (806.45 mm) hangs to the foot,
+    rides the lever's 127 mm crank, the rigid bar (801.95 mm) hangs to the foot,
     and the foot-notch roof rests on the rocker's R800 top-edge arc. Positive
     amplitude slides the foot +X along the arc (the machine-frame lifting side,
     clear of the pivot shaft; the mirror of the pre-#151 -X side), tilting the
@@ -935,7 +966,8 @@ def _assert_hook_fastener(eye_y: float) -> None:
     if shank_poke < 0.1 or abs(seat_drop) > 0.5:
         raise RuntimeError(
             f"hook shank does not seat the bore: poke-above {shank_poke:.3f},"
-            f" base-vs-bore-mouth {seat_drop:+.3f} (want shank to fill 987.44..992.54)"
+            f" base-vs-bore-mouth {seat_drop:+.3f} (want shank to fill"
+            f" {plate_bottom:.2f}..{PLATE_TOP_Y:.2f})"
         )
     if bore_clear < 0.05 or ring_clear < 0.05:
         raise RuntimeError(
@@ -1045,7 +1077,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(
             f"channel-spring-installed body {SPRING_BASE_BODY:.3f} != neutral gap "
             f"{neutral_body:.3f}: update LEVER_EYE_Y in "
-            f"build_channel_spring_installed.py to the re-anchored neutral eye"
+            f"channel_spring_installed_spec.py to the re-anchored neutral eye"
         )
     variant_by_body: dict[float, str] = {}
     for spec in spring_specs:
@@ -1094,7 +1126,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await _locate_to_datum(adapter, fulcrum)
     pivot_w = (PIVOT[0], PIVOT[1])  # (72.9, 253.8) machine world
-    fulc_w = (FULCRUM[0], FULCRUM[1])  # (199.9, 1065.9) machine world
+    fulc_w = (FULCRUM[0], FULCRUM[1])  # (199.9, 1061.4) machine world
     pivot_od = [pivot_w[0] + SHAFT_R, pivot_w[1], 0.0]
     fulc_od = [fulc_w[0] + SHAFT_R, fulc_w[1], 0.0]
 
@@ -1111,14 +1143,33 @@ async def build(adapter) -> dict[str, str]:
             label=f"ball-mount rocker z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
-    for mount_z in LEVER_MOUNT_Z:
-        mount = await place_component(
-            adapter, "pivot-ball-mount",
-            [FULCRUM[0], RAIL_TOP_Y, mount_z],
-            [0.0, 0.0, 0.0], IDENTITY, ground=False,
-            label=f"ball-mount lever z{mount_z:+.0f}",
+    # Fulcrum end keepers (MHA-120): the black shaft-END brackets of the
+    # ch17 p.40 closeup -- an upright lug sockets a ball on each shaft end,
+    # the foot screwed down to the rail top face. Part +X points outboard
+    # along the shaft: the rear (+Z) keeper maps part X -> machine +Z
+    # (Ry -90), the front keeper is the same part flipped (Ry +90). The
+    # keepers are GROUNDED at their computed transform (the cosmetic-bank
+    # idiom below): _locate_to_datum assumes IDENTITY parts whose planes map
+    # same-name, which a Ry+-90 part breaks. The IDENTITY screws are
+    # datum-located like the mounts they accompany.
+    for sign, euler, rows in (
+        (1.0, [0.0, -90.0, 0.0], ROT_Y_NEG90),
+        (-1.0, [0.0, 90.0, 0.0], ROT_Y_POS90),
+    ):
+        await place_component(
+            adapter, "fulcrum-keeper",
+            [FULCRUM[0], RAIL_TOP_Y, FULCRUM_SHAFT_Z + sign * KEEPER_Z_OFF],
+            euler, rows, ground=True,
+            label=f"fulcrum-keeper z{sign * KEEPER_Z_OFF:+.0f}",
         )
-        await _locate_to_datum(adapter, mount)
+        screw = await place_component(
+            adapter, "frame-side-screw",
+            [FULCRUM[0], RAIL_TOP_Y + KEEPER_SCREW_SEAT_H,
+             FULCRUM_SHAFT_Z + sign * KEEPER_SCREW_Z_OFF],
+            [0.0, 0.0, 0.0], IDENTITY, ground=False,
+            label=f"keeper foot screw z{sign * KEEPER_SCREW_Z_OFF:+.0f}",
+        )
+        await _locate_to_datum(adapter, screw)
 
     # Bushings FIRST (before the moving-part loop), so each channel's rocker can
     # take its axial (Z) seat as a DISTANCE to the pivot-bushing in the gap below

@@ -31,6 +31,13 @@ def test_tube_nominals_are_single_sourced() -> None:
     assert tube_frame_spec.OUTER_DIA == 25.4
     # 1 in OD, 0.12 in wall -> Ø19.304 bore.
     assert abs(tube_frame_spec.INNER_DIA - 19.304) < 1e-6
+    # 2026-08-02 top-frame rederive: 1014.0 overall = 1010.7 tube + 3.3
+    # integral dome cap (capped stub top at machine 1064.8).
+    assert tube_frame_spec.COLUMN_LENGTH == 1014.0
+    assert tube_frame_spec.CAP_HEIGHT == 3.3
+    assert abs(tube_frame_spec.BODY_LENGTH - 1010.7) < 1e-9
+    # Full-width spherical cap: R = (a^2 + h^2) / (2h) with a = OD/2.
+    assert abs(tube_frame_spec.CAP_SPHERE_RADIUS - 26.08787878787879) < 1e-9
 
 
 def test_notes_and_native_gdt() -> None:
@@ -46,7 +53,12 @@ def test_notes_and_native_gdt() -> None:
     assert "ASME RULE 1" in notes
     assert "FORM DOES NOT OVERRIDE SIZE" in notes
     assert "AS-RECEIVED OD 25.40 MIN" in notes
-    assert "TOP/BOTTOM ORIENTATION IS NONFUNCTIONAL" in notes
+    # Domed top (2026-08-02): orientation is now functional -- cap up; only
+    # the bottom end face keeps a perpendicularity control.
+    assert "ORIENT DOMED (CAPPED) END UP" in notes
+    assert "ONLY THE BOTTOM END FACE" in notes
+    assert "SR26.09 X 3.3 SPHERICAL CAP" in notes
+    assert "TOP/BOTTOM ORIENTATION IS NONFUNCTIONAL" not in notes
     assert "BORE" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -59,7 +71,8 @@ def test_notes_and_native_gdt() -> None:
     )
     assert "tolerance=GEOMETRIC_TOLERANCES_MM['full-length OD cylindricity']" in source
     assert '"BOTTOM END FACE"' in source
-    assert '"TOP END FACE"' in source
+    assert '"TOP END FACE"' not in source
+    assert "top end perpendicularity" not in tube_frame_spec.GEOMETRIC_TOLERANCES_MM
     assert source.count('characteristic="perpendicularity"') == 1
     assert "set_dimension_callouts" not in source
     assert source.count("add_surface_finish(") == 0

@@ -162,8 +162,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-depth overall",
     )
 
-    # Datum A = the block top seat (abuts the crossbar); Ra 0.8 on the bore's
-    # working upper wall, tagged on the bore rim (a real circular edge).
+    # Datum A = the block top seat (hangs 0.25 under the top-frame casting
+    # underside; carries the 1/2-13 knife-hanger-stud tap); Ra 0.8 on the
+    # bore's working upper wall, tagged on the bore rim (a real circular edge).
     add_datum_feature(
         adapter,
         front,

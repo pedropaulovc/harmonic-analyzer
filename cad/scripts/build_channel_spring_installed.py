@@ -10,19 +10,22 @@ the spring's bottom eye links onto its arm just ABOVE the plate. So the bottom
 lead is a normal short hook lead (symmetric with the top), not a plate-spanning
 one, and the bottom eye sits above the plate:
 
-    top eye centre    1062.52  (lever spring hole 1065.89 - drop 3.37)
-    bottom eye centre  996.54  (on the hook arm; its O5.5 ring bottom 993.29
-                                clears the plate top 992.54 by 0.75)
-    coil body bottom   998.54  (bottom eye + 2.0 bottom lead)
-    body = 1062.52 - 2.0 (top lead) - 998.54             = 61.98
+    top eye centre    1058.02  (lever spring hole 1061.39 - drop 3.37)
+    bottom eye centre  986.24  (on the hook arm; its O5.5 ring bottom 982.99
+                                clears the plate top 982.24 by 0.75)
+    coil body bottom   988.24  (bottom eye + 2.0 bottom lead)
+    body = 1058.02 - 2.0 (top lead) - 988.24             = 67.78
     bottom lead                                          = 2.0
 
-    The plate is the coplanar .cs casting (top 992.54, see build_summing_lever).
+    The plate is the coplanar .cs casting (top 982.24, see build_summing_lever;
+    it dropped 10.3 with the 2026-08-02 top-frame rederive's summing cascade).
     The top eye is the LIVE neutral lever spring hole (level rest pose, ch14 ROM
-    re-derive): the lever pivots about FULCRUM=(-199.9, 1065.9) with the spring
+    re-derive): the lever pivots about FULCRUM=(199.9, 1061.4) (fulcrum chain
+    down 4.5 in the same rederive: rail top 1040.7 -> 1036.2) with the spring
     hole 177.8 out along the arm, and the level rocker rest pose leaves the
     neutral lever tilt at -0.002 deg -- the hole sits essentially at the fulcrum
-    height, 1065.89, NOT the tilted-era 1066.52/1066.62. build_channel_assembly is
+    height, 1061.39. The bottom eye dropped 10.3 (summing) vs 4.5 up top, a
+    NET +5.8 stretch (installed body 61.98 -> 67.78). build_channel_assembly is
     the authority: its verify:math gate (spring:neutral-body-canonical) fails loud
     if this drifts from the solver's neutral gap, so neutral always mates this one
     canonical body x20 instead of spawning a stretch variant.
@@ -62,7 +65,7 @@ PART_NAME = "channel-spring-installed"
 # assembly-facing placement contract; codex #354).
 TOP_LEAD = HOOK_LEAD  # 2.0
 BOTTOM_LEAD = HOOK_LEAD  # 2.0: normal hook lead (no longer spans the plate)
-TOP_EYE_LOCAL_Y = INSTALLED_BODY_LENGTH + TOP_LEAD  # 63.98 above the part origin
+TOP_EYE_LOCAL_Y = INSTALLED_BODY_LENGTH + TOP_LEAD  # 69.78 above the part origin
 
 assert INSTALLED_BODY_LENGTH > COIL_BODY_LENGTH, "installed spring must be stretched"
 

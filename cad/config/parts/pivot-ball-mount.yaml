@@ -3,6 +3,6 @@ pivot-ball-mount:
   material: AISI 1018 cold-finished steel
   material_specification: AISI 1018 cold-finished steel
   finish: ASTM B733-22 Ni-P, MP (5-9% P), SC1 5 um min, no bake; mask bore/seat; dims after plate
-  quantity: 4
+  quantity: 2
   tolerance_class: machined_block
   process: "machine and polish exposed turned surfaces before electroless nickel"

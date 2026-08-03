@@ -16,14 +16,18 @@ from enum import StrEnum
 class HeadStyle(StrEnum):
     FILLISTER = "fillister"
     HEX = "hex"
+    # Integral washer + hex + turned collar/tip stack (knife-hanger stud).
+    HEX_STACK = "hex-stack"
     KNURLED_THUMB = "knurled-thumb"
     ROUND = "round"
     SET_SCREW = "set-screw"
     SHOULDER = "shoulder"
+    SQUARE = "square"
 
 
 class DriveStyle(StrEnum):
     EXTERNAL_HEX = "external-hex"
+    EXTERNAL_SQUARE = "external-square"
     KNURLED = "knurled"
     SLOT = "slot"
 
@@ -118,6 +122,14 @@ FASTENERS: dict[str, FastenerSpec] = {
         "foot-screw", "#4-40", 8.0, 2.0,
         HeadStyle.FILLISTER, DriveStyle.SLOT, Finish.BLACK,
     ),
+    "frame-side-screw": _steel(
+        "frame-side-screw", "#10-24", 12.7, 3.45,
+        HeadStyle.FILLISTER, DriveStyle.SLOT,
+    ),
+    "gooseneck-set-screw": _steel(
+        "gooseneck-set-screw", "1/4-20", 16.0, 4.7,
+        HeadStyle.SQUARE, DriveStyle.EXTERNAL_SQUARE, Finish.BLACK,
+    ),
     "hanger-screw": _steel(
         "hanger-screw", "#6-32", 11.5, 2.4,
         HeadStyle.HEX, DriveStyle.EXTERNAL_HEX, Finish.BLACK,
@@ -125,6 +137,10 @@ FASTENERS: dict[str, FastenerSpec] = {
     "hex-bolt": _steel(
         "hex-bolt", "5/16-18", 32.0, 7.8,
         HeadStyle.HEX, DriveStyle.EXTERNAL_HEX, Finish.BLACK,
+    ),
+    "knife-hanger-stud": _steel(
+        "knife-hanger-stud", "1/2-13", 48.75, 12.7,
+        HeadStyle.HEX_STACK, DriveStyle.EXTERNAL_HEX,
     ),
     "lag-screw": _steel(
         "lag-screw", "9/16-12", 63.0, 12.0,
@@ -142,8 +158,10 @@ FASTENERS: dict[str, FastenerSpec] = {
         "swing-stop-screw", "#8-32", 14.0, 3.15,
         HeadStyle.FILLISTER, DriveStyle.SLOT,
     ),
+    # 11 (was 12): the head top must hold >= 0.25 below the one-piece
+    # top-frame casting underside y 999.7 (build_magnifier_assembly tscrew).
     "thumb-screw": _brass(
-        "thumb-screw", "#4-40", 12.0, 2.0,
+        "thumb-screw", "#4-40", 11.0, 2.0,
         HeadStyle.KNURLED_THUMB, DriveStyle.KNURLED,
     ),
 }

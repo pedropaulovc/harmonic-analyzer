@@ -5,9 +5,10 @@ diameter/length dimensions, and manufacturing notes; every shared sheet/template
 import, curation, and export behavior lives in ``_drawing_common``.
 
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
-(tube vertical) and the annulus end view is ``*Top``.  The column is ~990 mm
-long, so the sheet runs 1:5; the end view carries an explicit 2:1 override so the
-Ø25.4/Ø19.3 annulus is legible.  A plain polished tube is fully described by the
+(tube vertical) and the annulus end view is ``*Top``.  The column is ~1014 mm
+long overall (1010.7 tube + the 3.3 integral dome cap), so the sheet runs 1:5;
+the end view carries an explicit 2:1 override so the Ø25.4/Ø19.3 annulus is
+legible.  A plain polished tube with a domed top is fully described by the
 length view + annulus end view + notes, so no isometric is drawn (it would only
 crowd the tall length view).
 
@@ -78,7 +79,7 @@ END_KEEP = {
     ),
 }
 LENGTH_KEEP = {
-    "Depth": (LENGTH_CENTER[0] + 0.028, LENGTH_CENTER[1]),
+    "CapApexY": (LENGTH_CENTER[0] + 0.028, LENGTH_CENTER[1]),
 }
 
 
@@ -162,32 +163,21 @@ async def build(adapter: Any) -> dict[str, str]:
         label="full-length OD cylindricity",
         entity_type="SILHOUETTE",
     )
+    # Only the BOTTOM end face survives as a perpendicularity target: the top
+    # end is the integral dome cap (no planar top face; the notes own the
+    # cap's finish/blend requirement).
     half_length_on_sheet = COLUMN_LENGTH / 10000.0
-    for edge_y, frame_y, label, quantity in (
-        (
-            LENGTH_CENTER[1] - half_length_on_sheet,
-            0.045,
-            "bottom end perpendicularity",
-            "BOTTOM END FACE",
-        ),
-        (
-            LENGTH_CENTER[1] + half_length_on_sheet,
-            0.255,
-            "top end perpendicularity",
-            "TOP END FACE",
-        ),
-    ):
-        add_feature_control_frame(
-            adapter,
-            length,
-            edge_xy=(LENGTH_CENTER[0], edge_y),
-            frame_xy=(0.090, frame_y),
-            characteristic="perpendicularity",
-            tolerance=GEOMETRIC_TOLERANCES_MM[label],
-            datums=("A",),
-            quantity=quantity,
-            label=label,
-        )
+    add_feature_control_frame(
+        adapter,
+        length,
+        edge_xy=(LENGTH_CENTER[0], LENGTH_CENTER[1] - half_length_on_sheet),
+        frame_xy=(0.090, 0.045),
+        characteristic="perpendicularity",
+        tolerance=GEOMETRIC_TOLERANCES_MM["bottom end perpendicularity"],
+        datums=("A",),
+        quantity="BOTTOM END FACE",
+        label="bottom end perpendicularity",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.125)
     add_property_linked_note(adapter, "End View Note", 0.275, 0.162)

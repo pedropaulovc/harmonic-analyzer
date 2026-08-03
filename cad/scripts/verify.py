@@ -163,7 +163,8 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
 # active_count build-speed knob): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
-# shafts + 4 ball-mounts + 2 bushings per inter-channel gap), drive-train = 61 + N
+# shafts + 2 rocker ball-mounts + 2 fulcrum keepers + 2 keeper foot screws
+# + 2 bushings per inter-channel gap), drive-train = 61 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
 # platform + tip block that joined the pivot post in the p1 swing rework, and
 # the NORTH arbor pedestal + its foot screw (PR8, ch12 img09) -- + the ch25
@@ -177,12 +178,18 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # (164, 77 pre-PR8 -> 81) and stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
-    "frame": (11, 16),          # measured 13 (9 structure + 4 lag-screw hold-downs)
+    "frame": (16, 21),          # measured 18 (9 structure + 4 lag-screw hold-downs
+    # + 4 #10-24 frame-side screws + 1 gooseneck set screw — 2026-08-02 top-frame
+    # rederive; plain capped column stubs, NO column nuts)
     "drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
-    "channel": (8 * _N_CH + 4 - 6, 8 * _N_CH + 4 + 6),  # N=20 -> (158,170), measured 164
+    "channel": (8 * _N_CH + 6 - 6, 8 * _N_CH + 6 + 6),  # N=20 -> (160,172), expected 166
+    # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
+    # keepers +2 keeper foot screws nets +2)
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
-    "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in the real device)
+    "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in
+    # the real device; 2026-08-02 rederive: -top-crossbar -gooseneck-clamp
+    # +2 knife-hanger-studs nets zero)
     "magnifier": (11, 13),      # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
     "pen": (7, 9),              # ch 24, measured 8 (+pen-wire, 2026-07-04)
     "paper-drive": (112, 120),  # ch 22-23-25, expected 116 (54 placed + 62-link
@@ -1536,6 +1543,12 @@ def verify_spring_base(report: Report) -> None:
     neutral gap the kinematic solver computes. If the lever anchor drifts (e.g.
     another OD re-anchor), they diverge and the assembly silently spawns a
     stretch00 again -- this gate fails loud first (SolidWorks-free; pure trig).
+
+    Current derivation (2026-08-02 top-frame rederive): FULCRUM (199.9, 1061.4)
+    + 177.8 along the neutral lever (tilt -0.002 deg) puts the spring hole at
+    y 1061.3934; top eye = hole - 3.37 drop = 1058.0234 (LEVER_EYE_Y); bottom
+    eye PLATE_EYE_Y 986.24 (summing plate down 10.3); body = eye gap 71.7834
+    - 2x2.0 hook leads = 67.7834 (was 61.9834 -- net stretch +5.8).
     """
 
     def _matches_neutral_gap() -> None:
@@ -1552,7 +1565,7 @@ def verify_spring_base(report: Report) -> None:
             f"channel-spring-installed body {base:.3f} != neutral gap body "
             f"{neutral_body:.3f} (>= 0.05 mm): neutral would mate a generated "
             f"stretch variant, not the canonical spring -- update LEVER_EYE_Y in "
-            f"build_channel_spring_installed.py to the re-anchored neutral eye",
+            f"channel_spring_installed_spec.py to the re-anchored neutral eye",
         )
 
     report.gate("spring:neutral-body-canonical", _matches_neutral_gap)

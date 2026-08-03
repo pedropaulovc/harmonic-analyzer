@@ -2,11 +2,12 @@ r"""Reproduction script: pivot ball mount (book ch. 14 p. 27 / ch. 17 p. 40; 4 u
 
 The ball-end pillar that carries each pivot shaft end: a short pedestal
 rising from its seat to a Ø13 ball whose centre sits 25.2 above the seat,
-cross-bored Ø6.5 for the Ø6.35 shaft. Two seat on the rocker-support
-apexes (seat y 228.6 -> pivot axis 253.8); two on the top-frame west rail
-(seat y 1040.7 -> fulcrum axis 1065.9). The book's clevis-and-ball detail
-(p. 40) is simplified to a monolithic base + stem + ball - the clamping
-hardware is not modeled.
+cross-bored Ø6.5 for the Ø6.35 shaft. Two used, on the rocker-support
+apexes (seat y 228.6 -> pivot axis 253.8). The book's clevis-and-ball detail
+(p. 40) is the top-lever fulcrum's shaft-END bracket, modeled as its own
+part since the 2026-08-02 rederive (build_fulcrum_keeper.py, MHA-120) --
+the former baluster lever pair on the top-frame west rail is retired
+(photo-refuted: ch30 top view shows black end brackets, no chrome posts).
 
 Dimensions: cad/DIMENSIONS.md ch. 14 layout "Ball mounts" row - ball rise
 25.2 derived from the photo-measured pivot height; everything else

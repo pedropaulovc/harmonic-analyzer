@@ -1,13 +1,16 @@
-r"""Create the curated machinist drawing for the gray-iron top-frame ring.
+r"""Create the curated machinist drawing for the green-painted top-frame casting.
 
 The SLDPRT remains authoritative.  This recipe supplies only the ring's views,
 profile dimensions, datum-controlled bores, and manufacturing notes; every shared sheet/template,
 import, curation, and export behavior lives in ``_drawing_common``.
 
-The finished envelope is 442 x 307.415 x 41 with a 416 x 281.415 rectangular rail
-outside profile, four Ø48 corner bosses bored Ø25.5 to clamp the columns, and
-a Ø17 gooseneck bore through one rail. The sheet runs 1:2; the front elevation
-drops to 1:4.
+The finished envelope is 446.2 x 276.2 x 47.3 over the corner bosses, with a
+428.2 x 262.0 rectangular rail outside profile around the 359.8 x 186.0 clear
+window, a 36.5-tall webbed ring band, four Ø52.2 corner bosses bored Ø25.5 to
+clamp the columns, a Ø17 gooseneck bore through the east-rail hub, and an
+integral crossbar carrying two Ø13.49 hanger-stud holes.  The side-facing
+tapped holes (#10-24 side screws and keeper feet, 1/4-20 set screw) stay in
+the notes.  The sheet runs 1:2; the front elevation drops to 1:4.
 
 Run with SolidWorks open::
 
@@ -38,18 +41,23 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_top_frame import (
+    BAR_X0,
+    BAR_X1,
     BORE_DIA,
+    BOSS_ABOVE,
+    BOSS_BELOW,
     BOSS_DIA,
     COLUMN_X,
     FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
     GOOSENECK_Z,
-    OUTER_FRONT_Z,
-    OUTER_REAR_Z,
     OUTER_X,
+    OUTER_Z,
     REAR_COLUMN_Z,
     RING_HEIGHT,
+    STUD_HOLE_DIA,
+    STUD_Z_REAR,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -69,13 +77,22 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 2.0)  # 1:2 whole sheet (442 mm finished envelope)
+SHEET_SCALE = (1.0, 2.0)  # 1:2 whole sheet (446.2 mm envelope over the bosses)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5
 
-# Sheet layout (meters). The plan defines the profile and bore pattern; the
-# front elevation makes the full 41 mm rail/boss thickness and datum A visible.
+# Plan extents including the proud corner bosses (the straight rails alone
+# stop at x +/-214.1 / z +/-131.0): x +/-223.1 -> 446.2 and z +/-138.1 ->
+# 276.2 envelope; the boss stack is 47.3 tall around the 36.5 rail band.
+PLAN_HALF_X = COLUMN_X + BOSS_DIA / 2.0  # 223.1
+PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0  # 138.1
+BOSS_BAND = RING_HEIGHT + BOSS_ABOVE + BOSS_BELOW  # 47.3
+STUD_X = (BAR_X0 + BAR_X1) / 2.0  # -15.0 crossbar centreline
+
+# Sheet layout (meters). The plan defines the profile, the bore pattern and
+# the hanger-stud holes; the front elevation makes the 36.5 rail band, the
+# 47.3 boss stack and datum A visible.
 TOP_CENTER = (0.135, 0.175)
-FRONT_CENTER = (0.345, 0.150)
+FRONT_CENTER = (0.345, 0.130)
 DATUM_C_SYMBOL_XY = (0.210, 0.105)
 
 
@@ -84,16 +101,18 @@ DATUM_C_SYMBOL_XY = (0.210, 0.105)
 TOP_KEEP = {
     "Width": (
         TOP_CENTER[0],
-        TOP_CENTER[1]
-        + max(abs(OUTER_FRONT_Z), abs(OUTER_REAR_Z)) * VIEW_SCALE / 1000.0
-        + 0.012,
+        TOP_CENTER[1] + PLAN_HALF_Z * VIEW_SCALE / 1000.0 + 0.012,
     ),
-    "Depth": (TOP_CENTER[0] + OUTER_X * VIEW_SCALE / 1000.0 + 0.016, TOP_CENTER[1]),
+    # Depth rides the LEFT flank: the right flank hosts the notes-B block
+    # and the text landed mid-block (eye-pass 2026-08-03).
+    "Depth": (TOP_CENTER[0] - PLAN_HALF_X * VIEW_SCALE / 1000.0 - 0.006, TOP_CENTER[1] - 0.030),
 }
 
 
-def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any, Any]:
-    """Return one column bore/OD pair, gooseneck bore, and B/C rail edges."""
+def _visible_plan_controls(
+    adapter: Any, view: Any
+) -> tuple[Any, Any, Any, Any, Any, Any]:
+    """Return a column bore/OD pair, gooseneck bore, stud hole, and B/C edges."""
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     circles: list[tuple[float, float, float, Any]] = []
     lines: list[tuple[tuple[float, ...], Any]] = []
@@ -147,7 +166,7 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
     datum_c = [
         edge
         for values, edge in lines
-        if abs(values[2] - OUTER_REAR_Z / 1000.0) <= 2e-6 and abs(values[3]) >= 0.99
+        if abs(values[2] - OUTER_Z / 1000.0) <= 2e-6 and abs(values[3]) >= 0.99
     ]
     if not datum_b or not datum_c:
         raise RuntimeError("top-frame plan is missing the B/C outer rail datum edges")
@@ -163,6 +182,9 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any, Any, Any,
             allow_coincident=True,
         ),
         _circle(GOOSENECK_X, GOOSENECK_Z, GOOSENECK_BORE_DIA, "gooseneck bore"),
+        # The rear hanger-stud hole carries the 2X position control; its rim
+        # stays one top-face circle even where the hole nicks the junction.
+        _circle(STUD_X, STUD_Z_REAR, STUD_HOLE_DIA, "hanger-stud hole"),
         datum_b[0],
         datum_c[0],
     )
@@ -207,6 +229,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Manufacturing Notes B",
             "Inspection Notes",
             "Top View Note",
             "Front View Note",
@@ -217,6 +240,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Manufacturing Notes B",
             "Inspection Notes",
             "Top View Note",
             "Front View Note",
@@ -232,7 +256,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Top Frame Ring Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "top frame; machined gray iron ring; column bores",
+            3: "top frame; webbed gray iron ring casting; column bores",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -243,12 +267,15 @@ async def build(adapter: Any) -> dict[str, str]:
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to the ring bores")
+        raise RuntimeError(
+            "failed to add ASME center marks to the ring bores and stud holes"
+        )
 
     (
         column_bore,
         column_boss,
         gooseneck_bore,
+        stud_hole,
         datum_b_edge,
         datum_c_edge,
     ) = _visible_plan_controls(adapter, top)
@@ -267,7 +294,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         symbol_xy=(0.020, 0.175),
         datum="B",
-        label="left outer rail-face datum",
+        label="east outer rail-face datum",
         entity=datum_b_edge,
         shoulder=True,
     )
@@ -275,7 +302,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         symbol_xy=DATUM_C_SYMBOL_XY, datum="C",
-        label="lower outer rail-face datum", entity=datum_c_edge,
+        label="rear outer rail-face datum", entity=datum_c_edge,
         shoulder=True,
     )
     add_feature_control_frame(
@@ -314,11 +341,30 @@ async def build(adapter: Any) -> dict[str, str]:
         label="gooseneck-bore true position",
         entity=gooseneck_bore,
     )
+    add_feature_control_frame(
+        adapter,
+        top,
+        frame_xy=(0.205, 0.125),
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_MM["hanger-stud-hole true position"],
+        datums=("A", "B", "C"),
+        diameter=True,
+        quantity="2X HANGER-STUD HOLES",
+        label="hanger-stud-hole true position",
+        entity=stud_hole,
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
-    add_property_linked_note(adapter, "Inspection Notes", 0.270, 0.255)
-    add_property_linked_note(adapter, "Top View Note", 0.280, 0.200)
-    add_property_linked_note(adapter, "Front View Note", 0.300, 0.095)
+    # NOTE anchors pass through IAnnotation::SetPosition, which this 2:1
+    # sheet MULTIPLIES by the sheet scale -- physical = 2x the argument
+    # (Inspection Notes (0.270, 0.255) render at (0.54, 0.51); the first
+    # notes-B anchor (0.560, 0.300) landed off-sheet at (1.12, 0.60)).
+    # (0.259, 0.089) -> physical (0.518, 0.178): the free band between
+    # the FRONT VIEW label and the title block top edge.
+    add_property_linked_note(adapter, "Manufacturing Notes B", 0.2585, 0.200)
+    add_property_linked_note(adapter, "Inspection Notes", 0.2965, 0.260)
+    add_property_linked_note(adapter, "Top View Note", 0.280, 0.2055)
+    add_property_linked_note(adapter, "Front View Note", 0.300, 0.0785)
 
     return await finalize_drawing(
         adapter,

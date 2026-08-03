@@ -862,7 +862,8 @@ sections:
       was ±80 / ±5.6° at the 9" arm — the "nonlinearity ameliorated" by the 813 length.
       Default assembly state: all bars at the pivot (d = 0, all coefficients
       zero), exactly vertical, foot notch on the arm top edge at y ≈ 261.8,
-      top at ≈ 1072.3, pin at ≈ 1065.9.
+      top at ≈ 1067.8, pin at ≈ 1061.4 (bar shortened 4.5 at the top — 2026-08-02
+      top-frame rederive).
 - heading: Chapter 16 — Measuring Stick (pp. 34–37)
   elements:
   - prose: ''
@@ -991,11 +992,11 @@ sections:
         - derived
         - med
       - - Lever fulcrum
-        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`) along Z at (x, y, centre-z) = (+199.9, 1065.9, +3.088), with ball mounts on the top-frame west rail at z −81.912/+88.088; Ø12 × 4.0565 spacer bushings ×19'
+        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`) along Z at (x, y, centre-z) = (+199.9, 1061.4, +3.088), with black end keepers (`fulcrum-keeper`, MHA-120) on the rail top face 1036.2: ball centres z 3.088 ± 88.75 = −85.662/+91.838 (2.25 inboard of the shaft ends), feet screwed by #10-24 frame-side screws (MHA-117) into tapped rail holes at z 3.088 ± 74.0 = −70.912/+77.088; Ø12 × 4.0565 spacer bushings ×19'
         - —
-        - p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1065.9 − 25.2 = 1040.7
-        - derived
-        - low-med
+        - 'p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1061.4 − 25.2 = 1036.2; ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - measured
+        - med
       - raw: '| Lever tip | bar steps to a 6.0-tall centred tab at x 169 (p.39/p.41), rounded r3 tip, Ø4 spring-hook hole at 177.8, 8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring''s r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |'
   - prose: |2
 
@@ -1003,9 +1004,10 @@ sections:
       rocker arm/amplitude bar pinned at mid-length, and pulls one of 20 helical
       springs attached to the pivoted summing lever below. Amplitude bar at rocker
       pivot → lever motionless; at rocker edge → full amplitude; opposite end →
-      180° phase flip. M6.3 closure: fulcrum height 1065.9 = bar-top pin height
-      (levers level in the d = 0 default state) — consistent with the 1070
-      columns + top frame + 25.2 ball mounts within photo error (ball measured
+      180° phase flip. M6.3 closure, renumbered by the 2026-08-02 rederive:
+      fulcrum height 1061.4 = bar-top pin height (levers level in the d = 0
+      default state) — rail top 1036.2 + 25.2 ball mounts; the capped columns
+      continue to 1064.8, all within photo error (ball measured
       (−205, 1078) on the tilted museum machine). Spring row hangs at
       x = +54.1 (lever tips), z = lever stations; lower ends reach the summing
       lever (ch. 18, M6.4).
@@ -1028,25 +1030,25 @@ sections:
         - ch. 14 layout table
         - med
       - - Top-lever fulcrum shaft
-        - 'Ø6.35 × 182 (`fulcrum-shaft`) along Z at (−199.9, 1065.9) — M6.5: 228.6 tips fell inside the west columns'
-        - ch. 17 rows
+        - 'Ø6.35 × 182 (`fulcrum-shaft`) along Z at (+199.9, 1061.4) — M6.5: 228.6 tips fell inside the west columns'
+        - ch. 17 rows (2026-08-02 rederive)
         - med
       - - Top frame (NEW part)
-        - 'green cast symmetric rectangular ring around the 4 columns at z ±112; column pitch 394 × 224 and plan centre z 0. Rails are 22 wide × 41 tall (y 999.7…1040.7), outer z ±123 and inner z ±101; corner bosses Ø48 bored Ø25.5. The counter-spring/gooseneck bore follows the recentered summing chain to z +3.088.'
-        - 'eight-views: green ring at y ≈ 1010–1055 in all views, columns continue above it to caps ≈ 1090–1120. The original front/rear column locations are retained; X and height remain ±197 and 1040.7 top.'
-        - med (GT flag pending)
-      - - Ball mounts ×4
-        - 'rocker pair at seats y 228.6: z −107.912 and +84.588; lever pair on the top-frame west rail (seat y 1040.7): z −81.912 and +88.088. The channel/summing families share the +3.088 recentered residual while the support and columns retain their original stations.'
-        - ch. 14 / ch. 17; lever z from boss-bore clearance
-        - med
+        - 'green cast ring around the 4 columns at z ±112 (column pitch 394 × 224, plan centre z 0) — ONE casting absorbing the old top-crossbar and gooseneck clamp. Rail band y 999.7..1036.2 (H 36.5; assembly insert TOP_FRAME_MID_Y 1017.95); side rails 34.2 wide, outer faces x ±214.1 / inner ±179.9; front/rear rails 38.0 wide, outer z ±131.0 / inner ±93.0; corner bosses Ø52.2 at (±197, ±112), y 993.4..1040.7 (proud 4.5 above the rail top, hanging 6.3 below the bottom), bored Ø25.5 through, tapped #10-24 side-screw holes with Ø9 × 0.5 spot-faces; integral FULL-height crossbar 22 wide on the knife line, spanning z −93..+93 flush top and bottom, 2 stud clearance holes Ø13.49 at z −83.972/+90.148, plan gussets ~18 × 18 at the rail junctions; gooseneck hub on the east rail (full-height rib 27 wide centred z +3.088 at the rail-face planes, Ø17.0 bore through along Y, underside boss Ø30 proud 8.0 + 2 V-gussets, tapped 1/4-20 set-screw hole along X at y 1017.95 with a 16 × 16 × 2 cast pocket); recessed web panels (flanges 8.0, depth 3.5) on BOTH faces of all 4 rails.'
+        - 'ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - measured/med
+      - - Ball mounts ×2
+        - 'rocker pair at seats y 228.6: z −107.912 and +84.588; the lever pair is SUPERSEDED by fulcrum-keeper end brackets (`fulcrum-keeper`, MHA-120, AISI 1018 black oxide, qty 2) on the rail top face 1036.2 (ch17 p.40 clevis+ball; ch30 top view: black brackets + slotted screws, no chrome posts) — 2026-08-02 remount. Keeper: foot 26 × 14 × 8 (pad ends z-extent 85.34 < boss circle 85.9; underside relieved to +4.8 over the 4.5-proud boss land), lug 14 wide × 6 thick, crown Ø14 about the shaft axis (25.2 above the seat), Ø9.5 pressed ball bored Ø6.5 for the Ø6.35 shaft end. The channel/summing families share the +3.088 recentered residual while the support and columns retain their original stations. Rocker-pair part itself unchanged.'
+        - 'ch. 14 / ch. 17; lever z from boss-bore clearance; seat from ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - measured/med
       - - Amplitude bars (default)
-        - 'vertical, slot centred on the pivot x = −72.9 (d = 0, bar rotated 90° about its long axis: slot/pin across Z); foot roof on the LEVEL arm''s top edge at 261.81 (contact at the bar −X edge, arc max), bar bottom 259.45, top 1072.25, top pin 1065.90'
-        - ch. 15 notes + assembly solve (level rest pose, ch14 ROM re-derive)
-        - med
+        - 'vertical, slot centred on the pivot x = −72.9 (d = 0, bar rotated 90° about its long axis: slot/pin across Z); foot roof on the LEVEL arm''s top edge at 261.81 (contact at the bar −X edge, arc max), bar bottom 259.45, top 1067.75, top pin 1061.40 (bar SHORTENED 4.5 at the top; foot/arc contact unchanged — level rest pose d = 0 preserved)'
+        - 'ch. 15 notes + assembly solve (level rest pose); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - measured/med
       - - Springs (default)
-        - 'INSTALLED (stretched) between lever tab holes (−22.10, 1065.89 at the −0.002° neutral lever tilt) and the summing-plate hook arms, rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; top eye centre 3.37 below the hole (1062.52), bottom eye on the spring-hook arm at 996.54; installed body 61.98 (canonical channel-spring-installed — verify:math spring:neutral-body-canonical pins it to the solver''s neutral gap)'
-        - ch. 17/18 + assembly solve (level rest pose)
-        - med
+        - 'INSTALLED (stretched) between lever tab holes (−22.10, 1061.39 at the −0.002° neutral lever tilt) and the summing-plate hook arms, rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; top eye centre 3.37 below the hole (1058.02), bottom eye on the spring-hook arm at 986.24; installed body 67.78 (+5.8: top eye −4.5 with the fulcrum bank, bottom eye −10.3 with the summing plate — canonical channel-spring-installed re-derived; verify:math spring:neutral-body-canonical pins it to the solver''s neutral gap)'
+        - 'ch. 17/18 + assembly solve (level rest pose); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - measured/med
       - - Default mechanism state
         - 'gear notches near +Y with the drive-train''s preserved +1.5° local-Y tooth phase → cam centres at (−60.167, 99.155) = drum (−60.394, 90.518) + 8.64·(sin 1.5°, cos 1.5°). The asymmetric cylinder bodies are Ry180 end-for-end, putting each cam plane at z_j −3.25; 163.101 rods reach the level-arm pins. 0 cranks = cos mode reading +1 on every channel.'
         - ch. 13/14 end views + ch. 25 + assembly solve (ch14 ROM re-derive 2026-07-02)
@@ -1117,19 +1119,19 @@ sections:
         - derived
         - low
       - - Knife mount
-        - 8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube's slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 × 28 × 24 below; Ø8 stud through the tube slot rising to machine y 1065
+        - '8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube''s slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); brass block 24 × 28 × 24 below, seated under the casting underside 999.7 (knife edge at 979.7, contact ridge 984.834); tapped 1/2-13 blind hole × 12 deep in the block top on the trunnion axis for the knife-hanger-stud: Ø12.7 shank up through the tube slot and the casting crossbar (Ø13.49 close clearance), capped above the top face 1036.2 by integral washer Ø28 × 2.5 + HEX nut AF19 × 11 + turned collar Ø11 × 3 + centre-drilled tip Ø6 × 4 — one merged part, total 69.25 (y 987.45..1056.7), ×2 at z −83.972/+90.148'
         - —
-        - p.42/43 (square-head bolt + stirrup strap collapsed to block + stud — simplification)
-        - scaled
-        - low
+        - 'p.42/43 + top.png stud crops (tmp_measure/crops/top_stud1/2.png); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - measured
+        - med
       - - Top crossbar
-        - 22 × 41 rail section (ch. 6), 202 long along Z (M6.5 — the M6.4 372 mistakenly used the ring's inner X half-span 186; the bar spans the ring WINDOW along Z, inner faces at z ±101), Ø8.2 stud hole at centre; bottom face machine y 1010 (0.5 above the summing-lever tube top 1009.5) — the bar floats 10.3 proud of the top-frame ring band (999.7..1040.7), ends face-flush against the north/south rail inner faces over y 1010..1040.7
+        - 'merged into top-frame — full-height integral bar, 2 stud holes Ø13.49 at z −83.972/+90.148 (the old single 5/16 stud hole at z +3.088 aligned with NEITHER knife mount)'
         - —
-        - ch. 30 views + top-frame ring inner span
-        - scaled + derived
+        - 'ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - measured
         - med
       - - Boss hook
-        - 'Ø3 J-hook: shank +Y in the boss hole, rise 12, elbow R 3, arm +X 3.5 — rod top machine y 1015, tip x 97'
+        - 'Ø3 J-hook: shank +Y in the boss hole, rise 12, elbow R 3, arm +X 3.5 — rod top machine y 1004.7 (−10.3, 2026-08-02 rederive), tip x 97'
         - —
         - p.43/45 (hook + chrome link ring collapsed to one hook; the spring's own loop is the ring)
         - derived
@@ -1181,9 +1183,9 @@ sections:
         - derived
         - low
       - - Bottom lead
-        - straight 40 mm drop, coil bottom → ring that hangs on the boss hook (ring centre machine y 1012, rod top 1015)
+        - straight 40 mm drop, coil bottom → ring that hangs on the boss hook (ring centre machine y 1001.7, rod top 1004.7 — summing end −10.3, 2026-08-02 rederive)
         - —
-        - 'M6.4 hang solve (`build_summing_assembly.py`: ring inner top 1016.45 vs rod top 1016.5)'
+        - 'M6.4 hang solve (`build_summing_assembly.py`: ring inner top 1006.15 vs rod top 1006.2), shifted −10.3 with the casting underside 999.7'
         - derived
         - low
       - - Adjustment post
@@ -1193,26 +1195,29 @@ sections:
         - stated
         - high (feature)
       - - Gooseneck
-        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — the post drops ≈120 below the rail underside (999.7) and ends in a free tip, passing through a Ø17 clearance bore in the east rail (`build_top_frame`) and gripped by the clamp above; 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring''s top loop'
+        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring''s top loop'
         - —
         - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin'
         - scaled + derived
         - leg-top med, drop med
       - - Gooseneck clamp
-        - green cast block 30 × 29 × 24 at machine (197, 1040.7, 0) on the east rail end; Ø16.5 vertical bore; square-head pinch screw (10 × 10 × 6 head, Ø5 shank stopped at the bore wall)
+        - 'deleted — square-head set screw in the top-frame hub, book p.45 ("a square-head screw pinches the post in its socket" — the screw survives as gooseneck-set-screw, 1/4-20 square head 10 × 10 × 6)'
         - —
-        - 'p.45: "a square-head screw pinches the post in its socket"'
-        - scaled
-        - low
+        - 'ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
+        - measured
+        - med
   - prose: |2
 
       Notes: single large spring balancing the combined pull of the 20 channel
-      springs. Hang chain (machine y): boss hook rod 1015 → bottom ring 1012 →
-      coil 1052..1367 → top loop 1370.6 → gooseneck pin 1373. Tension is set by
-      sliding the tube in the clamp; the post passes through the east rail's Ø17
-      clearance bore and drops ~120 below the plate underside, ending in a free
-      tip at machine y 880 (below the rail bottom 999.7) — the support extends
-      well below the top plate (ch. 7 page001_img17 back-left ¾ view).
+      springs. Hang chain (machine y): boss hook rod 1004.7 → bottom ring 1001.7 →
+      coil ~1041.7..1367 → top loop 1370.6 → gooseneck pin 1373 (summing end −10.3
+      with the 2026-08-02 rederive, gooseneck end unchanged ⇒ installed length
+      +10.3, parametric spring re-derived). Tension is set by sliding the tube
+      through the top-frame hub bore against its set screw; the post passes
+      through the east rail's Ø17 clearance bore and drops ~120 below the rail
+      underside, ending in a free tip at machine y 880 (below the rail bottom
+      999.7) — the support extends well below the top plate (ch. 7 page001_img17
+      back-left ¾ view).
 - heading: Chapter 20 — Magnifying Lever (pp. 46–49)
   elements:
   - prose: |2
@@ -1291,28 +1296,40 @@ sections:
       KINEMATICS (2026-07-04, engineerguy video 2/4 + 4/4): the rod does NOT
       spin in the bracket collar — it "extends from the pivoted summing bar"
       and pivots WITH it about the knife-edge ridge line (pre-mirror (15,
-      995.134), along Z; the ~6 mm tip arc ≈ 1.6° of knife rock); the clamp
+      984.834) after the 2026-08-02 rederive's −10.3 summing shift, along Z;
+      the ~6 mm tip arc ≈ 1.6° of knife rock); the clamp
       position along the rod is the radius from THAT pivot, which is what the
       ≤4× adjustment really is. The bracket collar is a loose Ø6.2/Ø6 guide.
 
-      DEPTH RE-ANCHOR (2026-07-04, ch30 p.4): the side view shows the whole
-      output line (fixture wire → wheel → rim wire → pen rod) as one PLUMB
-      vertical at the machine front — the old z −85 (M6.4 low) hung the wire
-      hook 50 behind the wheel plane (~8° lean, photo-refuted). Re-derived:
-      lever rod z −128.3 — the ONLY depth window: the thumb-screw head (pokes
-      above the top-frame ring bottom 999.7) must clear the ring's front rail
-      z −101..−123, the rod must clear the front column surface −124.7, and
-      the wire's rim-duck route caps the hook at ~−137.96. Vertical rod z
-      −134.8 (skew bore 6.5), wire hook at (−150, 925.35, −137.95) tied under
-      the fixture collar beside the rod; the bracket arm lengthens to machine
-      −124.3..−70 (flange band on the plate front unchanged at −81..−76.45).
+      DEPTH RE-ANCHOR (2026-07-04, ch30 p.4; window re-solved 2026-08-02 with
+      the new casting): the side view shows the whole output line (fixture
+      wire → wheel → rim wire → pen rod) as one PLUMB vertical at the machine
+      front — the old z −85 (M6.4 low) hung the wire hook 50 behind the wheel
+      plane (~8° lean, photo-refuted). Lever rod z −128.3 KEPT. The whole
+      lever/clamp/rod/fixture chain rides the summing bar −10.3 (rod at
+      LEVER_ROD_Y 979.7, ridge contact 984.834): the clamp thumb screw is
+      shortened 12 → 11 under-head so its head top lands at y 998.7 — a 1.0
+      margin below the casting underside 999.7 — and the new front rail
+      (inner z −93, outer −131, band 999.7..1036.2) therefore imposes NO z
+      bound (escaping past the outer face −131 would need lever rod
+      z ≤ −136.25, infeasible vs the rim-duck floor −128.31). Surviving
+      window: front column surface −127.95 (gap 0.6) .. rim-duck −128.31 ⇒
+      z −128.3. Vertical rod z −134.8 (skew bore 6.5, top y 984.7), wire hook
+      at (−150, 915.05, −137.95) tied under the fixture collar beside the
+      rod; hub end z −142.77, yoke WIRE_END (63.324, 573.083, −142.77),
+      YOKE_PLANE_OFFSET −0.0564; bracket arm machine −124.3..−70 (flange
+      band on the plate front unchanged at −81..−76.45). Lever-wire straight
+      rest run 362.731 → 352.813 (−9.918: the hook DROPS toward the fixed
+      wheel, so the wire SHRINKS — the contract's "+10.3" was a sign slip).
       Derived from the plumb-line photo + wire clearance solve (≥0.25
       everywhere; a perfectly planar wire is impossible — the rim ring blocks
       it — so the wire leans ~0.8°, ducking behind the rim into the hub's
-      back groove band). Confidence med.
-      Clamp block at x −150; fixture at y 926; clamp thumb screw modeled
-      BACKED OUT (head tangent above the rod it pinches — seated it would
-      overlap); the fixture's screw is omitted at assembly level.
+      back groove band). ch30 px measurement anchored on column pitch + GT
+      rescale + ch19 closeups (2026-08-02 rederive); confidence measured/med.
+      Clamp block at x −150; fixture at y 915.7 (collar 915.7..923.7); clamp
+      thumb screw modeled BACKED OUT (head tangent above the rod it pinches —
+      seated it would overlap); the fixture's screw is omitted at assembly
+      level.
 - heading: Chapter 21 — Magnifying Wheel (pp. 50–53)
   elements:
   - prose: ''
@@ -1871,7 +1888,7 @@ sections:
         - SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`)
       - - tube-frame
         - 'ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book'
-        - 'RE-AUTHORED — `build_tube_frame.py` at 1070 mm (book wins). OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
+        - 'RE-AUTHORED — `build_tube_frame.py`; 2026-08-02 rederive: COLUMN_LENGTH 989.9 → 1014.0 (top y 1064.8 — the columns run +28.6 proud of the new rail top 1036.2 through the Ø25.5 boss bores, reconciling the book''s 107 cm with the ch30 stub reads), each stub closed by an integral spherical dome cap r 12.7 × h 3.3 from y 1061.5 — plain capped tops, NO nut, NO thread (user-corrected: the polished tops in top.png/ch30 p002 are pressed-in turned caps; supersedes the old "no stub above" read). Source: ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive), measured/med. OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
   - prose: |2
 
       No legacy part contradicts a book annotation. Every part still gets re-authored

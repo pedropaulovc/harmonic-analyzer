@@ -10,11 +10,11 @@ the ring (simplification, see build_counter_spring.py).
 
 Dimensions: cad/DIMENSIONS.md ch. 18/19 (M6.4, low). Geometry constraints
 that size it (see build_summing_assembly.py): shank at machine x 90.5
-(boss hole), rod centreline at machine y 1015 so the spring ring (mean
-r 5.35, wire 1.8) hanging at centre y 1012 touches the rod top; rod tip
+(boss hole), rod centreline at machine y 1004.7 so the spring ring (mean
+r 5.35, wire 1.8) hanging at centre y 1001.8 touches the rod top; rod tip
 at machine x 97 so the ring's wire band (x 94.1..95.9) sits mid-rod.
 
-Layout: shank axis +Y from the origin (machine (90.5, 1000, 0)); path =
+Layout: shank axis +Y from the origin (machine (90.5, 989.7, 0)); path =
 vertical line, 90-degree elbow (R 3), horizontal line +X. Single sweep
 along a line/arc/line chain — the old equation-curve workaround (fix on
 lines/arcs left endpoint DOFs) reverted once sketch points became
@@ -67,7 +67,7 @@ MATERIAL = "Plain Carbon Steel"  # black hardware
 # import); re-imported here so the build and the assembly can never drift.
 from boss_hook_geom import ELBOW_R, ROD_DIA, SHANK_RISE  # noqa: E402
 ARM_RUN = 3.5  # straight run after the elbow; tip at x 6.5 (derived)
-# Rod centreline tops out at y = SHANK_RISE + ELBOW_R = 15 (machine 1015);
+# Rod centreline tops out at y = SHANK_RISE + ELBOW_R = 15 (machine 1004.7);
 # tip at x = ELBOW_R + ARM_RUN = 6.5 (machine 97).
 
 

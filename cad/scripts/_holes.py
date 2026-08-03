@@ -43,18 +43,18 @@ _STD_ANSI_INCH = 0
 
 # kind -> (swWzdGeneralHoleTypes_e, swWzdHoleStandardFastenerTypes_e)
 _KINDS = {
-    "tapped": (4, 27),               # straight tap, AnsiInchTappedHole
-    "tapped_bottoming": (4, 26),     # AnsiInchBottomingTappedHole
-    "clearance": (2, 22),            # plain hole, AnsiInchScrewClearances
-    "drilled_number": (2, 24),       # AnsiInchNumberDrillSizes
-    "drilled_fractional": (2, 19),   # AnsiInchFractionalDrillSizes
-    "drilled_letter": (2, 20),       # AnsiInchLetterDrillSizes
-    "counterbore_hex": (0, 3),       # AnsiInchHexBolt
-    "counterbore_fillister": (0, 2), # AnsiInchFillister
-    "counterbore_socket": (0, 9),    # AnsiInchSocketCapScrew
-    "counterbore_binding": (0, 0),   # AnsiInchBinding
-    "counterbore_pan": (0, 8),       # AnsiInchPan
-    "dowel": (2, 703),               # AnsiInchDowelHole
+    "tapped": (4, 27),  # straight tap, AnsiInchTappedHole
+    "tapped_bottoming": (4, 26),  # AnsiInchBottomingTappedHole
+    "clearance": (2, 22),  # plain hole, AnsiInchScrewClearances
+    "drilled_number": (2, 24),  # AnsiInchNumberDrillSizes
+    "drilled_fractional": (2, 19),  # AnsiInchFractionalDrillSizes
+    "drilled_letter": (2, 20),  # AnsiInchLetterDrillSizes
+    "counterbore_hex": (0, 3),  # AnsiInchHexBolt
+    "counterbore_fillister": (0, 2),  # AnsiInchFillister
+    "counterbore_socket": (0, 9),  # AnsiInchSocketCapScrew
+    "counterbore_binding": (0, 0),  # AnsiInchBinding
+    "counterbore_pan": (0, 8),  # AnsiInchPan
+    "dowel": (2, 703),  # AnsiInchDowelHole
 }
 _ENDS = {"blind": 0, "through_all": 1, "through_next": 2}
 _FITS = {"close": 0, "normal": 1, "loose": 2}  # swWzdHoleScrewClearanceTypes_e
@@ -85,29 +85,70 @@ DIAMETER_TOLERANCE_MM = 0.005
 # ThruHoleDiameter (live #4 normal = 0.0032639 m). Scripts take analytic volume
 # expectations from these pinned values; diag_hole_wizard.py re-proves the
 # representative cases by measured volume.
-TAP_DRILL_MM = {          # taps cut the tap-drill diameter (TAP_DRILL column)
-    "#2-56": 1.778, "#3-48": 1.994, "#4-40": 2.261, "#6-32": 2.705,
-    "#8-32": 3.454, "#10-24": 3.797, "1/4-20": 5.105, "5/16-18": 6.528,
+TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
+    "#2-56": 1.778,
+    "#3-48": 1.994,
+    "#4-40": 2.261,
+    "#6-32": 2.705,
+    "#8-32": 3.454,
+    "#10-24": 3.797,
+    "1/4-20": 5.105,
+    "5/16-18": 6.528,
+    "1/2-13": 10.716,
     "9/16-12": 12.304,
 }
-THREAD_MAJOR_MM = {       # basic external-thread major diameters (ASME B1.1)
-    "#2-56": 2.184, "#3-48": 2.515, "#4-40": 2.845, "#6-32": 3.505,
-    "#8-32": 4.166, "#10-24": 4.826, "1/4-20": 6.350, "5/16-18": 7.938,
+THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
+    "#2-56": 2.184,
+    "#3-48": 2.515,
+    "#4-40": 2.845,
+    "#6-32": 3.505,
+    "#8-32": 4.166,
+    "#10-24": 4.826,
+    "1/4-20": 6.350,
+    "5/16-18": 7.938,
+    "1/2-13": 12.700,
     "9/16-12": 14.288,
 }
-CLEARANCE_MM = {          # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
-    ("#2", "close"): 2.388, ("#2", "normal"): 2.591, ("#2", "loose"): 2.946,
-    ("#3", "close"): 2.692, ("#3", "normal"): 2.946, ("#3", "loose"): 3.251,
-    ("#4", "close"): 3.048, ("#4", "normal"): 3.264, ("#4", "loose"): 3.658,
-    ("#6", "close"): 3.912, ("#6", "normal"): 4.318, ("#6", "loose"): 4.699,
-    ("#8", "close"): 4.572, ("#8", "normal"): 4.978, ("#8", "loose"): 5.410,
-    ("1/4", "close"): 6.756, ("1/4", "normal"): 7.137, ("1/4", "loose"): 7.544,
-    ("5/16", "close"): 8.331, ("5/16", "normal"): 8.738, ("5/16", "loose"): 9.119,
-    ("9/16", "close"): 14.684, ("9/16", "normal"): 15.080, ("9/16", "loose"): 15.479,
+CLEARANCE_MM = {  # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
+    ("#2", "close"): 2.388,
+    ("#2", "normal"): 2.591,
+    ("#2", "loose"): 2.946,
+    ("#3", "close"): 2.692,
+    ("#3", "normal"): 2.946,
+    ("#3", "loose"): 3.251,
+    ("#4", "close"): 3.048,
+    ("#4", "normal"): 3.264,
+    ("#4", "loose"): 3.658,
+    ("#6", "close"): 3.912,
+    ("#6", "normal"): 4.318,
+    ("#6", "loose"): 4.699,
+    ("#8", "close"): 4.572,
+    ("#8", "normal"): 4.978,
+    ("#8", "loose"): 5.410,
+    ("1/4", "close"): 6.756,
+    ("1/4", "normal"): 7.137,
+    ("1/4", "loose"): 7.544,
+    ("5/16", "close"): 8.331,
+    ("5/16", "normal"): 8.738,
+    ("5/16", "loose"): 9.119,
+    ("1/2", "close"): 13.492,
+    ("1/2", "normal"): 14.288,
+    ("1/2", "loose"): 15.081,
+    ("9/16", "close"): 14.684,
+    ("9/16", "normal"): 15.080,
+    ("9/16", "loose"): 15.479,
 }
-NUMBER_DRILL_MM = {       # number drills cut DIAMETER exactly
-    "#9": 4.978, "#19": 4.216, "#20": 4.089, "#21": 4.039, "#29": 3.454,
-    "#14": 4.623, "#37": 2.642, "#43": 2.261, "#47": 1.994, "#54": 1.397,
+NUMBER_DRILL_MM = {  # number drills cut DIAMETER exactly
+    "#9": 4.978,
+    "#19": 4.216,
+    "#20": 4.089,
+    "#21": 4.039,
+    "#29": 3.454,
+    "#14": 4.623,
+    "#37": 2.642,
+    "#43": 2.261,
+    "#47": 1.994,
+    "#54": 1.397,
 }
 FRACTIONAL_DRILL_MM = {"1/8": 3.175, "3/16": 4.763, "15/64": 5.953}
 LETTER_DRILL_MM = {"F": 6.528, "V": 9.576}  # V = 0.377in (transgear stud seat)
@@ -121,6 +162,7 @@ DRILL_POINT_H = 0.60086
 def blind_hole_volume_mm3(dia_mm: float, depth_mm: float) -> float:
     """Analytic volume of one blind wizard hole (cylinder + drill point)."""
     import math
+
     r = dia_mm / 2.0
     return math.pi * r * r * depth_mm + math.pi / 3.0 * r * r * (r * DRILL_POINT_H)
 
@@ -185,7 +227,8 @@ def blind_cut_dia_mm(spec: HoleSpec) -> float:
     if key not in table:
         raise ValueError(
             f"size {key!r} not pinned for {spec.kind!r} -- add it to the "
-            "table in _holes.py (values from the wizard-database dump)")
+            "table in _holes.py (values from the wizard-database dump)"
+        )
     return table[key]
 
 
@@ -218,6 +261,7 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
             "face-exploding features"
         )
     best = None
+    seed = None  # spans at least the FIRST point (co-planar-disjoint fallback)
     for f in faces:
         f = _early_bound(f, "IFace2")
         try:
@@ -231,10 +275,28 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
             continue
         spans = all(
             box[k] - tol_mm <= p[k] <= box[k + 3] + tol_mm
-            for p in points_mm for k in others
+            for p in points_mm
+            for k in others
         )
         if spans and (best is None or f.GetArea() > best.GetArea()):
             best = f
+        first = all(
+            box[k] - tol_mm <= points_mm[0][k] <= box[k + 3] + tol_mm for k in others
+        )
+        if first and (seed is None or f.GetArea() > seed.GetArea()):
+            seed = f
+    if best is None and seed is not None and len(points_mm) > 1:
+        # No single face spans every point: the stations sit on CO-PLANAR
+        # DISJOINT faces (e.g. the top-frame side-screw spot floors, one per
+        # boss). The seed face only supplies the placement-sketch PLANE --
+        # each instance lands at its absolute sketch point regardless of
+        # which co-planar face seeded it -- so the first-point face is a
+        # valid anchor (top-frame SideTaps* live case, 2026-08-03).
+        _telemetry.debug(
+            "find_planar_face: no single face spans all points; seeding from "
+            "the first point's co-planar face"
+        )
+        best = seed
     return best
 
 
@@ -377,13 +439,28 @@ def wizard_holes(
             vals = [fit, ang, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
             tclass = ""
         feat = fm.HoleWizard5(
-            hole_type, _STD_ANSI_INCH, fastener, spec.size, _ENDS["blind"],
-            dia, d, -1.0, *vals, tclass,
-            False, True, True, True, True, False)
+            hole_type,
+            _STD_ANSI_INCH,
+            fastener,
+            spec.size,
+            _ENDS["blind"],
+            dia,
+            d,
+            -1.0,
+            *vals,
+            tclass,
+            False,
+            True,
+            True,
+            True,
+            True,
+            False,
+        )
         if feat is None:
             raise RuntimeError(
                 f"hole wizard {label}: HoleWizard5 (blind) failed -- size "
-                f"{spec.size!r} may be invalid for kind {spec.kind!r}")
+                f"{spec.size!r} may be invalid for kind {spec.kind!r}"
+            )
     else:
         data = fm.CreateDefinition(SW_FM_HOLE_WZD)
         data = _early_bound(data, "IWizardHoleFeatureData2")
@@ -392,8 +469,10 @@ def wizard_holes(
             # Pre-create sets are the support-foot precedent for these two;
             # every other customization (fit, dim overrides) must go through
             # the post-create ModifyDefinition flow.
-            for prop, val in (("ThreadClass", spec.thread_class),
-                              ("ThreadEndCondition", end)):
+            for prop, val in (
+                ("ThreadClass", spec.thread_class),
+                ("ThreadEndCondition", end),
+            ):
                 try:
                     setattr(data, prop, val)
                 except Exception:  # noqa: BLE001
@@ -435,8 +514,7 @@ def wizard_holes(
     xform = _early_bound(xform, "IMathTransform")
 
     def _sketch_xy(pt_mm):
-        arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8,
-                      [v / 1000.0 for v in pt_mm])
+        arr = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [v / 1000.0 for v in pt_mm])
         mpt = math_util.CreatePoint(arr)
         mpt = _early_bound(mpt, "IMathPoint")
         spt = mpt.MultiplyTransform(xform)
@@ -445,7 +523,8 @@ def wizard_holes(
 
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
-            place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
+        place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
         raise RuntimeError(f"hole wizard {label}: cannot edit {place_name}")
     model.EditSketch()
     sm = model.SketchManager
@@ -493,7 +572,8 @@ def wizard_holes(
         adapter.currentSketchManager = sm
         try:
             for index, ((point, sx, sy), point_dims) in enumerate(
-                    zip(placed_points, placement_dims, strict=True)):
+                zip(placed_points, placement_dims, strict=True)
+            ):
                 point_id = adapter._register_sketch_entity("Point", point)
                 zero_x = abs(sx) < 1e-12
                 zero_y = abs(sy) < 1e-12
@@ -542,7 +622,8 @@ def wizard_holes(
     npts = len(place_sk.GetSketchPoints2() or [])
     if npts != len(points_mm):
         raise RuntimeError(
-            f"hole wizard {label}: expected {len(points_mm)} placement points, got {npts}")
+            f"hole wizard {label}: expected {len(points_mm)} placement points, got {npts}"
+        )
 
     if name:
         try:
@@ -645,8 +726,12 @@ def wizard_holes(
             f"expected {expect_dia_mm:.3f} -- wrong size token {spec.size!r}?"
         )
     _telemetry.event(
-        "hole_wizard.created", label=label, kind=spec.kind, size=spec.size,
-        points=len(points_mm), dia_mm=round(result.hole_dia_mm, 3),
+        "hole_wizard.created",
+        label=label,
+        kind=spec.kind,
+        size=spec.size,
+        points=len(points_mm),
+        dia_mm=round(result.hole_dia_mm, 3),
     )
     _telemetry.success(
         f"hole wizard {label}: {len(points_mm)}x {spec.size} {spec.kind} "
@@ -655,29 +740,41 @@ def wizard_holes(
     return result
 
 
-def cross_hole_volume_mm3(hole_dia_mm: float, shaft_dia_mm: float,
-                          n: int = 20001) -> float:
+def cross_hole_volume_mm3(
+    hole_dia_mm: float, shaft_dia_mm: float, n: int = 20001
+) -> float:
     """Removed volume of a radial THROUGH hole drilled diametrally through a
     full cylinder (perpendicular cylinder-cylinder intersection, axes
     crossing): V = integral 2*sqrt(R^2-x^2) * 2*sqrt(r^2-x^2) dx, numeric --
     no clean closed form. Probe-verified 228.39 measured vs 228.41 analytic
     (#9 through Ø12, diag_hole_wizard_cyl 2026-07-11)."""
     import math
+
     r, big_r = hole_dia_mm / 2.0, shaft_dia_mm / 2.0
     total = 0.0
     dx = 2.0 * r / (n - 1)
     for i in range(n):
         x = -r + i * dx
         w = 0.5 if i in (0, n - 1) else 1.0
-        total += w * 2.0 * math.sqrt(max(big_r**2 - x * x, 0.0)) * \
-            2.0 * math.sqrt(max(r**2 - x * x, 0.0))
+        total += (
+            w
+            * 2.0
+            * math.sqrt(max(big_r**2 - x * x, 0.0))
+            * 2.0
+            * math.sqrt(max(r**2 - x * x, 0.0))
+        )
     return total * dx
 
 
-def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
-                            *, name: str = "",
-                            y_dim: PlacementDimension | None = None
-                            ) -> list[tuple[str, str]]:
+def wizard_hole_on_cylinder(
+    adapter,
+    spec: HoleSpec,
+    point_mm,
+    label: str,
+    *,
+    name: str = "",
+    y_dim: PlacementDimension | None = None,
+) -> list[tuple[str, str]]:
     """ONE through wizard hole drilled RADIALLY into a cylindrical face at
     ``point_mm`` (a model point ON the face; the drill axis is the surface
     normal there, through the shaft axis).
@@ -726,13 +823,15 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
 
     data = fm.CreateDefinition(SW_FM_HOLE_WZD)
     data = _early_bound(data, "IWizardHoleFeatureData2")
-    data.InitializeHole(hole_type, _STD_ANSI_INCH, fastener, spec.size,
-                        _ENDS["through_all"])
+    data.InitializeHole(
+        hole_type, _STD_ANSI_INCH, fastener, spec.size, _ENDS["through_all"]
+    )
     feat = fm.CreateFeature(data)
     if feat is None:
         raise RuntimeError(
             f"hole wizard {label}: CreateFeature (cylinder) failed -- size "
-            f"{spec.size!r} may be invalid for kind {spec.kind!r}")
+            f"{spec.size!r} may be invalid for kind {spec.kind!r}"
+        )
     feat = _early_bound(feat, "IFeature")
     _telemetry.debug(f"hole wizard {label}: feature created, placing point")
 
@@ -756,13 +855,13 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
     sub, sk = place
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
-            str(sub.Name), "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
+        str(sub.Name), "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
         raise RuntimeError(f"hole wizard {label}: cannot edit {sub.Name}")
     model.EditSketch()
     pt = (sk.GetSketchPoints2() or [None])[0]
     pt = _early_bound(pt, "ISketchPoint")
-    pt.SetCoords(point_mm[0] / 1000.0, point_mm[1] / 1000.0,
-                 point_mm[2] / 1000.0)
+    pt.SetCoords(point_mm[0] / 1000.0, point_mm[1] / 1000.0, point_mm[2] / 1000.0)
 
     placement_drive_jobs: list[tuple[str, str]] = []
     if y_dim is not None:
@@ -802,9 +901,14 @@ def wizard_hole_on_cylinder(adapter, spec: HoleSpec, point_mm, label: str,
         except Exception:  # noqa: BLE001
             _telemetry.warn(f"hole wizard {label}: rename to {name!r} failed")
     _telemetry.event(
-        "hole_wizard.created", label=label, kind=spec.kind, size=spec.size,
-        points=1, placement="cylindrical",
+        "hole_wizard.created",
+        label=label,
+        kind=spec.kind,
+        size=spec.size,
+        points=1,
+        placement="cylindrical",
     )
     _telemetry.success(
-        f"hole wizard {label}: radial {spec.size} {spec.kind} through cylinder")
+        f"hole wizard {label}: radial {spec.size} {spec.kind} through cylinder"
+    )
     return placement_drive_jobs

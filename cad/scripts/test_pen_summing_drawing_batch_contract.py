@@ -1,10 +1,9 @@
-"""Cross-sheet offline contracts for the eight pen/summing drawings."""
+"""Cross-sheet offline contracts for the seven pen/summing drawings."""
 
 from __future__ import annotations
 
 import _config
 import boss_hook_spec
-import gooseneck_clamp_spec
 import gooseneck_spec
 import measuring_stick_spec
 import output_fixture_spec
@@ -16,7 +15,6 @@ import pen_wire_spec
 SHEETS = (
     ("boss-hook", boss_hook_spec),
     ("gooseneck", gooseneck_spec),
-    ("gooseneck-clamp", gooseneck_clamp_spec),
     ("measuring-stick", measuring_stick_spec),
     ("output-fixture", output_fixture_spec),
     ("pen-frame", pen_frame_spec),

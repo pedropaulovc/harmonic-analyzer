@@ -2,9 +2,11 @@ r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
 Static structure of the machine: the two-plate cast base, four smooth
 polished columns at the corners, the rocker-arm-support that carries the
-rocker-pivot shaft, and the top-frame ring capping the columns
--- column tops flush with the ring's top face at 1040.7 (M6.8 8-view pass:
-no stub above).
+rocker-pivot shaft, the top-frame casting clamped around the columns, and
+the five fasteners that pin the casting (4 corner-boss side screws + the
+gooseneck set screw). Column tops rise to 1064.8 -- +28.6 plain capped
+stubs above the casting's top face 1036.2 (2026-08-02 top-frame rederive;
+supersedes the M6.8 "flush at 1040.7, no stub above" stack).
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
 axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
@@ -39,9 +41,14 @@ depth):
   reclosed rod-pin hole 125.890 out reaches the cam centre at -52.990, rods plumb; the old
   "arbor 47.5 + 25.4 rod lever" chain died with the ch30 re-anchor).
   Inserted at its exact authored transform and locked to the fixed base.
-* top-frame x1: the green ring at ring mid-plane Y = 1020.2 (rails 22 x
-  41, y 999.7..1040.7), corner bosses bored around the four columns; its
-  west rail seats the top-lever ball mounts (channel.SLDASM).
+* top-frame x1: the green one-piece casting at mid-plane Y = 1017.95 (side
+  rails 34.2 wide / front-rear rails 38 wide x 36.5 tall, band
+  y 999.7..1036.2; corner bosses Ø52.2 rise to 1040.7), bored around the
+  four columns; its east rail (-X) carries the gooseneck hub and its west
+  rail top face seats the fulcrum-keeper feet (channel.SLDASM).
+* frame-side-screw x4 + gooseneck-set-screw x1: the casting's fasteners
+  (see the constants below) -- each placed on its exact machine transform
+  and locked to the fixed base (the frame's single-mate fix-all strategy).
 * nameplate x1: the maker's plate (book ch. 26), laid FLAT on the base top
   face on the EAST (+X) side, decorated side up, centred front-back between the
   two east columns and read by an operator at that face. Cosmetic; constrained
@@ -95,7 +102,7 @@ from _assembly import (
     place_component,
     save_assembly_and_images,
 )
-from _transforms import ROT_Y_POS90
+from _transforms import ROT_X_NEG90, ROT_X_POS90, ROT_Y_POS90, rot_z_rows
 from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
@@ -139,7 +146,39 @@ SUPPORT_ROWS = ROT_Y_POS90
 LAG_SCREW_XZ = SUPPORT_HOLD_DOWN_XZ
 LAG_SCREW_UNDER_HEAD_Y = 6.5
 
-TOP_FRAME_MID_Y = 1020.2  # ring mid-plane: rails y 999.7..1040.7 (M6.3)
+TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
+# rails 38 wide x 36.5 tall, band y 999.7..1036.2; corner bosses rise to
+# 1040.7 (2026-08-02 top-frame rederive)
+
+# --- Top-frame fasteners (2026-08-02 top-frame rederive; MHA-117/118). Both
+# parts are authored axis along local +Y with the origin at the UNDER-HEAD
+# bearing plane and the head ABOVE it (+Y), so the placement point is the
+# under-head seat and the rotation turns local +Y toward the head side. ---
+#
+# frame-side-screw: 4x #10-24 UNC x 12.7 slotted cheese-head screws pin the
+# casting's four corner bosses (Ø52.2 at x ±197, z ±112) against the columns,
+# screwed from OUTSIDE the frame: front bosses from the front (head -Z), rear
+# bosses from the rear (head +Z), axes along Z at (x ±197, y TOP_FRAME_MID_Y).
+# The under-head plane seats on the boss spot-face (Ø9 x 0.5 into the boss
+# extreme z ±138.1) at z ±137.6; local +Y -> -Z for the front pair
+# (ROT_X_NEG90, euler [-90,0,0]) and +Y -> +Z for the rear pair (ROT_X_POS90,
+# euler [90,0,0]) point the 12.7 shank inboard: tips at z ±124.9, 0.2 clear
+# of the column surface z ±124.7 (tapped #10-24 boss holes live in the
+# top-frame part).
+SIDE_SCREW_HEAD_Z = 137.6  # under-head seat station (spot-faced boss face)
+#
+# gooseneck-set-screw: 1x 1/4-20 UNC x 16 square-head set screw gripping the
+# gooseneck post through the casting's east-hub tapped rib hole, axis along X
+# at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline). Entered from the
+# east outer face x -214.1: local +Y -> -X (rot_z_rows(90), euler [0,0,90])
+# points the 16 shank inboard, tip at x -205.15 = 0.15 CLEAR (outboard) of the
+# Ø16 post surface at x -205 (post centre -197) -- the first build pinned the
+# tip at -204.85, 0.15 INSIDE the post (1.39 mm^3 top-level interference),
+# under-head plane at x -221.15 (bearing face 7.05 off the outer face,
+# the contract standoff), square head outboard to -227.15.
+GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
+SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
+SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - 16.0  # -221.15 under-head plane
 
 # Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
 # on the base top, decorated side up, on the EAST (+X) face -- read off the in-situ
@@ -171,7 +210,9 @@ IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 def _part(name: str) -> str:
     path = (OUT_SLDPRT / f"{name}.SLDPRT").resolve()
     if not path.exists():
-        raise RuntimeError(f"missing part {path}; run build_{name.replace('-', '_')}.py first")
+        raise RuntimeError(
+            f"missing part {path}; run build_{name.replace('-', '_')}.py first"
+        )
     return str(path)
 
 
@@ -182,14 +223,14 @@ async def build(adapter) -> dict[str, str]:
     column_path = _part("tube-frame")
     _part("rocker-arm-support")  # placed via place_component below; assert it exists
     _part("lag-screw")  # support hold-down; placed via place_component below
+    _part("frame-side-screw")  # corner-boss screws; placed via place_component
+    _part("gooseneck-set-screw")  # west-hub set screw; placed via place_component
     top_frame_path = _part("top-frame")
 
     check("create_assembly", await adapter.create_assembly())
 
     # Base: first insert is auto-fixed by SolidWorks.
-    res = await adapter.insert_component(
-        InsertComponentParameters(file_path=base_path)
-    )
+    res = await adapter.insert_component(InsertComponentParameters(file_path=base_path))
     check("insert_component harmonic-base (auto-fixed)", res)
     base_name = res.data["name"]
     if not res.data.get("fixed"):
@@ -216,8 +257,12 @@ async def build(adapter) -> dict[str, str]:
     column_instances = await grid_component_pattern(
         adapter,
         [column_name],
-        axis1="x", spacing1_mm=2.0 * COLUMN_X, instances1=2,
-        axis2="z", spacing2_mm=REAR_COLUMN_Z - FRONT_COLUMN_Z, instances2=2,
+        axis1="x",
+        spacing1_mm=2.0 * COLUMN_X,
+        instances1=2,
+        axis2="z",
+        spacing2_mm=REAR_COLUMN_Z - FRONT_COLUMN_Z,
+        instances2=2,
         direction1=PatternDirection.FORWARD,
         direction2=PatternDirection.REVERSE,
         label="tube-frame column grid",
@@ -307,15 +352,12 @@ async def build(adapter) -> dict[str, str]:
     assert_pattern_targets(
         adapter,
         pattern_instances,
-        [
-            [x, LAG_SCREW_UNDER_HEAD_Y, z]
-            for x, z in LAG_SCREW_XZ[1:]
-        ],
+        [[x, LAG_SCREW_UNDER_HEAD_Y, z] for x, z in LAG_SCREW_XZ[1:]],
         IDENTITY,
         "lag-screw hold-down grid",
     )
 
-    # Top-frame ring clamped around the four columns, mid-plane y 1020.2.
+    # Top-frame casting clamped around the four columns, mid-plane y 1017.95.
     target = [0.0, TOP_FRAME_MID_Y, 0.0]
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=top_frame_path, position=target)
@@ -349,6 +391,58 @@ async def build(adapter) -> dict[str, str]:
         label="nameplate fixed to base",
     )
     assert_component_placed(adapter, nameplate_name, NAMEPLATE_POS, NAMEPLATE_ROWS)
+
+    # Corner-boss side screws: one #10-24 cheese-head per boss, screwed from
+    # OUTSIDE the frame (front pair from -Z, rear pair from +Z), under-head
+    # seat on the boss spot-face at z -/+137.6 (see SIDE_SCREW_HEAD_Z). Rigid
+    # fasteners -> the frame's single-mate fix-all strategy: placed on their
+    # exact machine transforms, one lock mate to the fixed base each, readback
+    # assert proves the mate did not move them.
+    for tag, sx, sz, s_euler, s_rows in (
+        ("front west", -COLUMN_X, -SIDE_SCREW_HEAD_Z, [-90.0, 0.0, 0.0], ROT_X_NEG90),
+        ("front east", COLUMN_X, -SIDE_SCREW_HEAD_Z, [-90.0, 0.0, 0.0], ROT_X_NEG90),
+        ("rear west", -COLUMN_X, SIDE_SCREW_HEAD_Z, [90.0, 0.0, 0.0], ROT_X_POS90),
+        ("rear east", COLUMN_X, SIDE_SCREW_HEAD_Z, [90.0, 0.0, 0.0], ROT_X_POS90),
+    ):
+        side_target = [sx, TOP_FRAME_MID_Y, sz]
+        side_screw = await place_component(
+            adapter,
+            "frame-side-screw",
+            side_target,
+            s_euler,
+            s_rows,
+            ground=False,
+            label=f"frame-side-screw ({tag})",
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Right Plane@{side_screw}", "PLANE"),
+            named_ref(f"Right Plane@{base_name}", "PLANE"),
+            label=f"frame-side-screw ({tag}) fixed to base",
+        )
+        assert_component_placed(adapter, side_screw, side_target, s_rows)
+
+    # Gooseneck set screw: 1/4-20 square head through the west-hub tapped rib
+    # hole along +X at the hub centreline; tip 0.15 clear of the Ø16 post
+    # (see SET_SCREW_* constants). Same fix-all treatment.
+    set_target = [SET_SCREW_UNDER_HEAD_X, TOP_FRAME_MID_Y, GOOSENECK_HUB_Z]
+    set_rows = rot_z_rows(90.0)
+    set_screw = await place_component(
+        adapter,
+        "gooseneck-set-screw",
+        set_target,
+        [0.0, 0.0, 90.0],
+        set_rows,
+        ground=False,
+        label="gooseneck-set-screw (west hub)",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{set_screw}", "PLANE"),
+        named_ref(f"Right Plane@{base_name}", "PLANE"),
+        label="gooseneck-set-screw fixed to base",
+    )
+    assert_component_placed(adapter, set_screw, set_target, set_rows)
 
     assert_components_fully_defined(adapter)
     check_no_interference(adapter)

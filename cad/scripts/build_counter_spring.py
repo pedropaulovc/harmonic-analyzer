@@ -8,19 +8,22 @@ springs; tension is set by sliding the post (square-head screw).
 M6.4 revision: the M2 "300 x O22, wire 2.5" read came from the cut-off p1
 front page (the spring exits the page top). Recalibrated against the ch. 19
 full-machine photo (gooseneck scale 0.515 px/mm, top ~ y 1438) and the p3
-90-degree page: body ~315 long, OD ~12.5, wire ~1.8, visibly close-wound
-(dark, no light through the coils). The bottom wire is a LONG straight drop
-(40 mm) from the coil to the ring that hangs on the summing-lever boss
-J-hook (build_boss_hook.py, rod along X at (95, 1015)); the top hook hangs
-on the X-pin under the gooseneck tip lug at (95, 1373). Both loops lie in
-the YZ plane after the assembly's 90-degree Y-rotation, so each encircles
-its X-rod nail-through-ring style (the p.43 black hook + chrome ring chain
-collapsed to loop-on-hook -- simplification). See DIMENSIONS.md ch. 19.
+90-degree page: body ~315 at the pre-rederive hang, OD ~12.5, wire ~1.8,
+visibly close-wound (dark, no light through the coils). The top-frame
+rederive (Cascade A, 2026-08-02) dropped the bottom anchor 10.3 with the
+summing chain while the gooseneck top stayed put, so the modeled installed
+body is 325.3. The bottom wire is a LONG straight drop (40 mm) from the coil
+to the ring that hangs on the summing-lever boss J-hook (build_boss_hook.py,
+rod along X at (95, 1004.7)); the top hook hangs on the X-pin under the
+gooseneck tip lug at (95, 1373). Both loops lie in the YZ plane after the
+assembly's 90-degree Y-rotation, so each encircles its X-rod
+nail-through-ring style (the p.43 black hook + chrome ring chain collapsed
+to loop-on-hook -- simplification). See DIMENSIONS.md ch. 19.
 
 Layout: coil axis along +Y from the origin (helix base circle on the Top
 plane); the helix starts and ends on the +X side (whole number of coils).
-In the machine the origin lands at (95, 1052, 0): bottom ring centre at
-y 1012, top loop centre at y 1370.6.
+In the machine the origin lands at (95, 1041.8, 0): bottom ring centre at
+y 1001.8, top loop centre at y 1370.6 (unchanged by the rederive).
 
 Run (SolidWorks already open)::
 

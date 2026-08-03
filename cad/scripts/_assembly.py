@@ -2,6 +2,7 @@
 interference gates, assembly save/refresh. Imported only by the assembly
 build scripts (never by a leaf part), so edits here never invalidate parts.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -32,6 +33,8 @@ from _common import (
     log,
     set_isometric_view,
 )
+
+
 def assembly_title_properties(assembly_name: str) -> dict[str, str]:
     """Return title-block properties for an assembly document.
 
@@ -47,13 +50,10 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
         "TOL_LIN_XXX": str(_config.title_block("linear_3pl")["display"]),
         "TOL_ANG": str(_config.title_block("angular")["display"]),
         "TOL_SURFACE": str(_config.title_block("surface")["display"]),
-        "TOL_HOLE_MINUS": str(
-            _config.title_block("drilled_hole")["display_minus"]
-        ),
-        "TOL_HOLE_PLUS": str(
-            _config.title_block("drilled_hole")["display_plus"]
-        ),
+        "TOL_HOLE_MINUS": str(_config.title_block("drilled_hole")["display_minus"]),
+        "TOL_HOLE_PLUS": str(_config.title_block("drilled_hole")["display_plus"]),
     }
+
 
 # The sprockets the chain seats on (the mounted T24 + crank T12 removables).
 # A chain link touching one of these is intended MESH, not a fault: the chain
@@ -123,20 +123,30 @@ def insert_sketch_text(
     finally:
         sketch_mgr.AddToDB = prev_add_to_db
     if sk_text is None:
-        raise RuntimeError(f"insert_sketch_text {label!r}: InsertSketchText returned None")
+        raise RuntimeError(
+            f"insert_sketch_text {label!r}: InsertSketchText returned None"
+        )
     fmt = _read_member(sk_text, "GetTextFormat")
     if fmt is None:
         raise RuntimeError(f"insert_sketch_text {label!r}: GetTextFormat returned None")
     fmt.CharHeight = height_mm / 1000.0  # ITextFormat.CharHeight is metres
     ok = adapter._attempt(lambda: sk_text.SetTextFormat(False, fmt), default=False)
     if not ok:
-        raise RuntimeError(f"insert_sketch_text {label!r}: SetTextFormat returned False")
+        raise RuntimeError(
+            f"insert_sketch_text {label!r}: SetTextFormat returned False"
+        )
     model.ClearSelection2(True)
     _telemetry.success(f"sketch text {label!r} h{height_mm:g} @ ({x_mm:g}, {y_mm:g})")
     return sk_text
 
+
 def add_ellipse(
-    adapter: Any, cx_mm: float, cy_mm: float, rx_mm: float, ry_mm: float, label: str = "ellipse"
+    adapter: Any,
+    cx_mm: float,
+    cy_mm: float,
+    rx_mm: float,
+    ry_mm: float,
+    label: str = "ellipse",
 ) -> Any:
     """Add a full ellipse to the OPEN 2D sketch; return the sketch segment.
 
@@ -150,17 +160,26 @@ def add_ellipse(
     sketch_mgr.AddToDB = True
     try:
         seg = sketch_mgr.CreateEllipse(
-            cx_mm / 1000.0, cy_mm / 1000.0, 0.0,
-            (cx_mm + rx_mm) / 1000.0, cy_mm / 1000.0, 0.0,  # major-axis point (+X)
-            cx_mm / 1000.0, (cy_mm + ry_mm) / 1000.0, 0.0,  # minor-axis point (+Y)
+            cx_mm / 1000.0,
+            cy_mm / 1000.0,
+            0.0,
+            (cx_mm + rx_mm) / 1000.0,
+            cy_mm / 1000.0,
+            0.0,  # major-axis point (+X)
+            cx_mm / 1000.0,
+            (cy_mm + ry_mm) / 1000.0,
+            0.0,  # minor-axis point (+Y)
         )
     finally:
         sketch_mgr.AddToDB = prev_add_to_db
     if seg is None:
         raise RuntimeError(f"add_ellipse {label!r}: CreateEllipse returned None")
     adapter.currentModel.ClearSelection2(True)
-    _telemetry.success(f"ellipse {label!r} r({rx_mm:g}, {ry_mm:g}) @ ({cx_mm:g}, {cy_mm:g})")
+    _telemetry.success(
+        f"ellipse {label!r} r({rx_mm:g}, {ry_mm:g}) @ ({cx_mm:g}, {cy_mm:g})"
+    )
     return seg
+
 
 async def apply_component_color(
     adapter: Any,
@@ -195,20 +214,26 @@ async def apply_component_color(
     )
     back = tuple(float(v) for v in (back_raw or ())[:3])
     if len(back) != 3 or any(abs(b - w) > 1 / 255 for b, w in zip(back, rgb)):
-        raise RuntimeError(f"component colour readback mismatch on {name}: set {rgb}, got {back}")
+        raise RuntimeError(
+            f"component colour readback mismatch on {name}: set {rgb}, got {back}"
+        )
     adapter._attempt(lambda: adapter.currentModel.GraphicsRedraw2(), default=None)
     log(f"component colour {name}: {tuple(round(v, 3) for v in back)}")
+
 
 def component_transform(adapter: Any, name: str) -> list[float]:
     """Return a component's ``Transform2`` ArrayData (rotation rows in
     [0:9], translation in metres in [9:12])."""
-    component = _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(name)
+    component = _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(
+        name
+    )
     if component is None:
         raise RuntimeError(f"component not found for transform readback: {name!r}")
     return [
         float(v)
         for v in _read_member(_read_member(component, "Transform2"), "ArrayData")
     ]
+
 
 def world_point(adapter: Any, name: str, local_mm: list[float]) -> list[float]:
     """Map a component-local point (mm) to the assembly frame (mm).
@@ -224,10 +249,12 @@ def world_point(adapter: Any, name: str, local_mm: list[float]) -> list[float]:
         for k in range(3)
     ]
 
+
 def component_origin(adapter: Any, name: str) -> list[float]:
     """A component's current origin (mm) in the assembly frame."""
     a = component_transform(adapter, name)
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
+
 
 def part_path(part: str) -> str:
     """Resolve ``<part>.SLDPRT`` under the part-output dir, or raise."""
@@ -237,6 +264,7 @@ def part_path(part: str) -> str:
             f"missing part {path}; run build_{part.replace('-', '_')}.py first"
         )
     return str(path)
+
 
 # As-authored pose ledger (the foundational placement gate, 2026-07-05).
 # ``place_component`` and ``place_components_batch`` record every inserted
@@ -278,7 +306,9 @@ def reledger_to_solved(adapter: Any, name: str) -> None:
 
 
 def assert_pose_ledger(
-    adapter: Any, tol_mm: float = 0.5, rot_tol: float = 1e-3,
+    adapter: Any,
+    tol_mm: float = 0.5,
+    rot_tol: float = 1e-3,
 ) -> None:
     """Verify every ledger component still sits at its authored world pose."""
     offenders: list[str] = []
@@ -292,9 +322,7 @@ def assert_pose_ledger(
                 f"{[round(v, 2) for v in expected]} (drift {delta:.2f})"
             )
             continue
-        rot_drift = max(
-            abs(a - e) for a, e in zip(array[0:9], exp_rows, strict=True)
-        )
+        rot_drift = max(abs(a - e) for a, e in zip(array[0:9], exp_rows, strict=True))
         if rot_drift > rot_tol:
             offenders.append(
                 f"{name}: rotation {[round(v, 4) for v in array[0:9]]} != "
@@ -340,6 +368,7 @@ def assert_component_placed(
             )
     _telemetry.success(f"{name} placed at {[round(v, 3) for v in actual]}")
 
+
 def named_ref(name: str, entity_type: str) -> Any:
     """A ``MateEntityRef`` selecting an entity by qualified name."""
     from solidworks_mcp.adapters.base import MateEntityRef
@@ -364,8 +393,11 @@ def suspend_automatic_assembly_rebuilds(adapter: Any):
     finally:
         assembly.EnableAssemblyRebuild = previous
 
+
 def component_named_ref(
-    component: str, name: str, entity_type: str = "AXIS",
+    component: str,
+    name: str,
+    entity_type: str = "AXIS",
 ) -> Any:
     """A ``MateEntityRef`` selecting a named reference feature inside a nested
     component via ``IComponent2.GetCorresponding``.
@@ -383,6 +415,7 @@ def component_named_ref(
 
     return MateEntityRef(entity_type=entity_type, component=component, name=name)
 
+
 def bore_axis_ref(point_mm: list[float], entity_type: str = "FACE") -> Any:
     """A ``MateEntityRef`` selecting a cylindrical face/axis by a point on it.
 
@@ -395,6 +428,7 @@ def bore_axis_ref(point_mm: list[float], entity_type: str = "FACE") -> Any:
     from solidworks_mcp.adapters.base import MateEntityRef
 
     return MateEntityRef(entity_type=entity_type, point=list(point_mm))
+
 
 async def _add_mate(
     adapter: Any,
@@ -427,6 +461,7 @@ async def _add_mate(
         )
     )
 
+
 def _mate_hard_error(adapter: Any, name: str) -> int:
     """The named mate feature's HARD ``swFeatureError_e`` code (0 if clean or
     only a warning). SW can create a mate in an ERROR state (e.g. 47 "cannot
@@ -437,7 +472,9 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
     (e.g. legitimate over-define co-flags) stay tolerated."""
     if not name:
         return 0
-    model = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc for FeatureByName (same dispatch)
+    model = _early_bound(
+        adapter.currentModel, "IAssemblyDoc"
+    )  # IAssemblyDoc for FeatureByName (same dispatch)
     feat = adapter._attempt(lambda: model.FeatureByName(name), default=None)
     if feat is None:
         return 0
@@ -468,78 +505,83 @@ def _mate_hard_error(adapter: Any, name: str) -> int:
 # (see `_mate`); add those signatures here and rebuild -> zero flips. The
 # readback guard in `_mate` stays as the safety net AND regression alarm: a flip
 # in a normal build means this heuristic broke for that mate -- re-learn its side.
-_FLIP_INVERT: frozenset[str] = frozenset({
-    # Per-signature flip polarity, learned once from the discovery build (see
-    # `_seed_flip`/`_orient_suffix`): a signature here seats on the side
-    # OPPOSITE the plain sign rule. Rotation/mirror twins carry an ` @<diag>`
-    # orientation suffix so each is seeded independently of its sibling.
-    # Re-derive after a mate/geometry change: build with this empty, read the
-    # `flip-seed MISS` warns, paste their sigs here, rebuild -> zero flips.
-    "alignment pinion axial",
-    "arbor pedestal datum X",
-    "arbor pedestal datum Y",
-    "arbor pedestal datum Y @npn",
-    "arbor pedestal datum Z",
-    "axial seat",
-    "cam follower back seat depth",
-    "cam follower front seat depth",
-    "cone gear axial seat",
-    "cone lock knob datum X",
-    "cone lock knob datum Y",
-    "cone lock knob datum Z",
-    "cone pivot screw datum X",
-    "cone pivot screw datum Y",
-    "cone pivot screw datum Z",
-    "cone platform height",
-    "crank wheel axial",
-    "crankshaft axial (on the plate)",
-    "cylinder gear axial anchor",
-    "cylinder gear axial pitch",
-    "foot screw datum X",
-    "foot screw datum Y",
-    "foot screw datum Z",
-    "fulcrum shaft datum x",
-    "fulcrum shaft datum y",
-    "fulcrum shaft datum z",
-    "hanger screw head plane",
-    "knob wheel axial",
-    "lever axial seat",
-    "lever bushing axial z",
-    "lift rod axial",
-    "mag lever depth @npn",
-    "mag lever knife line across @npn",
-    # (was "pen rod travel snapshot" -- the label gained the PARK-driver tag
-    # 2026-07-07; same mate, same learned side)
-    "pen rod travel PARK driver (freed in default build)",
-    "pinch head seat @ppn",
-    "pinion arbor axial",
-    "pinion cam back set pin axial",
-    "pinion cam front set pin axial",
-    "pinion pivot block datum Y @npn",
-    "pinion pivot shaft datum X",
-    "pinion pivot shaft datum Y",
-    "pinion pivot shaft datum Z",
-    "pinion spring datum Y @npn",
-    "pivot ball mount datum x",
-    "pivot ball mount datum y",
-    "pivot ball mount datum z",
-    "pivot bushing axial z",
-    "platen feed snapshot",
-    # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
-    # disc" in the PR #196 real-train rework; same mate, same learned side.
-    # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
-    "reducer disc axial",
-    "slotted screw datum X",
-    "slotted screw datum Y",
-    "slotted screw datum Z",
-    "spring hook datum y @npn",
-    "summing lever axial",
-    "swing stop screw datum X",
-    "swing stop screw datum Y",
-    "swing stop screw datum Z",
-    "tip block axial seat",
-    "tip bushing axial seat",
-})
+_FLIP_INVERT: frozenset[str] = frozenset(
+    {
+        # Per-signature flip polarity, learned once from the discovery build (see
+        # `_seed_flip`/`_orient_suffix`): a signature here seats on the side
+        # OPPOSITE the plain sign rule. Rotation/mirror twins carry an ` @<diag>`
+        # orientation suffix so each is seeded independently of its sibling.
+        # Re-derive after a mate/geometry change: build with this empty, read the
+        # `flip-seed MISS` warns, paste their sigs here, rebuild -> zero flips.
+        "alignment pinion axial",
+        "arbor pedestal datum X",
+        "arbor pedestal datum Y",
+        "arbor pedestal datum Y @npn",
+        "arbor pedestal datum Z",
+        "axial seat",
+        "cam follower back seat depth",
+        "cam follower front seat depth",
+        "cone gear axial seat",
+        "cone lock knob datum X",
+        "cone lock knob datum Y",
+        "cone lock knob datum Z",
+        "cone pivot screw datum X",
+        "cone pivot screw datum Y",
+        "cone pivot screw datum Z",
+        "cone platform height",
+        "crank wheel axial",
+        "crankshaft axial (on the plate)",
+        "cylinder gear axial anchor",
+        "cylinder gear axial pitch",
+        "frame side screw datum x",
+        "frame side screw datum y",
+        "frame side screw datum z",
+        "foot screw datum X",
+        "foot screw datum Y",
+        "foot screw datum Z",
+        "fulcrum shaft datum x",
+        "fulcrum shaft datum y",
+        "fulcrum shaft datum z",
+        "hanger screw head plane",
+        "knob wheel axial",
+        "lever axial seat",
+        "lever bushing axial z",
+        "lift rod axial",
+        "mag lever depth @npn",
+        "mag lever knife line across @npn",
+        # (was "pen rod travel snapshot" -- the label gained the PARK-driver tag
+        # 2026-07-07; same mate, same learned side)
+        "pen rod travel PARK driver (freed in default build)",
+        "pinch head seat @ppn",
+        "pinion arbor axial",
+        "pinion cam back set pin axial",
+        "pinion cam front set pin axial",
+        "pinion pivot block datum Y @npn",
+        "pinion pivot shaft datum X",
+        "pinion pivot shaft datum Y",
+        "pinion pivot shaft datum Z",
+        "pinion spring datum Y @npn",
+        "pivot ball mount datum x",
+        "pivot ball mount datum y",
+        "pivot ball mount datum z",
+        "pivot bushing axial z",
+        "platen feed snapshot",
+        # (was "rack pinion disc axial" -- the 120T disc's label became "reducer
+        # disc" in the PR #196 real-train rework; same mate, same learned side.
+        # Latent until 2026-07-07's full paper-drive rebuild re-keyed it.)
+        "reducer disc axial",
+        "slotted screw datum X",
+        "slotted screw datum Y",
+        "slotted screw datum Z",
+        "spring hook datum y @npn",
+        "summing lever axial",
+        "swing stop screw datum X",
+        "swing stop screw datum Y",
+        "swing stop screw datum Z",
+        "tip block axial seat",
+        "tip bushing axial seat",
+    }
+)
 
 
 def _flip_sig(label: str) -> str:
@@ -601,8 +643,7 @@ def witness_from_ledger(comp_name: str, local_mm: list[float]) -> list[float]:
         )
     pos, rows = _POSE_LEDGER[comp_name]
     return [
-        sum(local_mm[i] * rows[i * 3 + k] for i in range(3)) + pos[k]
-        for k in range(3)
+        sum(local_mm[i] * rows[i * 3 + k] for i in range(3)) + pos[k] for k in range(3)
     ]
 
 
@@ -678,7 +719,8 @@ async def _mate(
             # failure mode the origin readback is structurally blind to (#154).
             msp.set_attribute("witness_miss", True)
             _telemetry.event(
-                "mate.witness_miss", label=label, moved_mm=round(w_moved, 3))
+                "mate.witness_miss", label=label, moved_mm=round(w_moved, 3)
+            )
             raise RuntimeError(
                 f"witness MISS: {label!r} solved the WRONG branch -- the witness"
                 f" point drifted {w_moved:.2f} mm from its authored pose while the"
@@ -693,9 +735,11 @@ async def _mate(
         # flipped: that reflip fired every build for an unseeded reference and is
         # precisely the inefficiency the seeding system exists to eliminate.
         _telemetry.event(
-            "mate.flip_miss", label=label, moved_mm=round(moved, 3), error=err)
+            "mate.flip_miss", label=label, moved_mm=round(moved, 3), error=err
+        )
         _seed_sig = _flip_sig(label) + (
-            _orient_suffix(adapter, comp_name) if comp_name else "")
+            _orient_suffix(adapter, comp_name) if comp_name else ""
+        )
         raise RuntimeError(
             f"flip-seed MISS: {label!r} landed on the WRONG side"
             f" (off by {moved:.2f} mm, error={err}). The correct side is"
@@ -705,6 +749,7 @@ async def _mate(
             f" this reference so the mate lands on-target in ONE solve. Do NOT"
             f" rely on a runtime reflip -- there is none any more."
         )
+
 
 async def plane_distance_mate(
     adapter: Any,
@@ -761,6 +806,7 @@ async def plane_distance_mate(
         verify=(comp_name, target_origin),
     )
 
+
 async def concentric_mate(
     adapter: Any,
     ref_a: Any,
@@ -782,6 +828,7 @@ async def concentric_mate(
         verify=verify,
     )
 
+
 async def coincident_mate(
     adapter: Any,
     ref_a: Any,
@@ -800,6 +847,7 @@ async def coincident_mate(
         alignment=alignment,
         verify=verify,
     )
+
 
 async def parallel_mate(
     adapter: Any,
@@ -837,6 +885,7 @@ async def parallel_mate(
         witness=witness,
     )
 
+
 async def distance_driver(
     adapter: Any,
     ref_a: Any,
@@ -867,10 +916,17 @@ async def distance_driver(
         comp = verify[0] if verify else ""
         flip = _seed_flip(label, distance, _orient_suffix(adapter, comp))
     return await _driver_or_record(
-        adapter, "distance", ref_a, ref_b,
-        label=label, verify=verify, free_dof_key=free_dof_key, flip=flip,
+        adapter,
+        "distance",
+        ref_a,
+        ref_b,
+        label=label,
+        verify=verify,
+        free_dof_key=free_dof_key,
+        flip=flip,
         distance=abs(distance),
     )
+
 
 async def angle_driver(
     adapter: Any,
@@ -904,11 +960,17 @@ async def angle_driver(
             raise RuntimeError(f"{label!r}: witness_local requires verify")
         witness = (list(witness_local), witness_from_ledger(verify[0], witness_local))
     return await _driver_or_record(
-        adapter, "angle", ref_a, ref_b,
-        label=label, verify=verify, free_dof_key=free_dof_key,
+        adapter,
+        "angle",
+        ref_a,
+        ref_b,
+        label=label,
+        verify=verify,
+        free_dof_key=free_dof_key,
         witness=witness,
         angle=angle,
     )
+
 
 async def spin_driver(
     adapter: Any,
@@ -959,6 +1021,7 @@ async def spin_driver(
         free_dof_key=free_dof_key,
     )
 
+
 async def tangent_mate(
     adapter: Any,
     ref_a: Any,
@@ -978,9 +1041,13 @@ async def tangent_mate(
         verify=verify,
     )
 
-async def lock_mate(adapter: Any, ref_a: Any, ref_b: Any, *, label: str = "lock") -> Any:
+
+async def lock_mate(
+    adapter: Any, ref_a: Any, ref_b: Any, *, label: str = "lock"
+) -> Any:
     """Lock mate: rigidly fix two components' relative pose (e.g. crank parts)."""
     return await _mate(adapter, label, "lock", [ref_a, ref_b])
+
 
 async def gear_mate(
     adapter: Any,
@@ -1053,13 +1120,15 @@ def gear_mates_batch(
                 model.ClearSelection2(True)
                 name = _sw_asm._mate_feature_name(adapter, mate)
                 names.append((name, mate_label))
-                results.append({
-                    "name": name,
-                    "mate_type": "gear",
-                    "alignment": "closest",
-                    "entities": 2,
-                    "gear_ratio": ratio,
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "mate_type": "gear",
+                        "alignment": "closest",
+                        "entities": 2,
+                        "gear_ratio": ratio,
+                    }
+                )
                 _telemetry.event("mate.created", label=mate_label, kind="gear")
 
         if not bool(adapter._attempt(lambda: model.EditRebuild3(), default=False)):
@@ -1072,11 +1141,13 @@ def gear_mates_batch(
                 )
     return results
 
+
 async def cam_follower_mate(
     adapter: Any, cam_ref: Any, follower_ref: Any, *, label: str = "cam_follower"
 ) -> Any:
     """Cam-follower mate; the adapter applies the cam selection mark (8)."""
     return await _mate(adapter, label, "cam_follower", [cam_ref, follower_ref])
+
 
 async def rack_pinion_mate(
     adapter: Any,
@@ -1110,6 +1181,7 @@ async def rack_pinion_mate(
         flip=flip,
         verify=verify,
     )
+
 
 async def place_component(
     adapter: Any,
@@ -1146,7 +1218,9 @@ async def place_component(
     # the full-build waterfall shows where each part's time went and a failed
     # insert/mate is attributed to the part by name.
     async with _telemetry.aspan(
-        f"part {label}", part=part, ground=ground,
+        f"part {label}",
+        part=part,
+        ground=ground,
         configuration=configuration or "default",
     ) as psp:
         path = (OUT_SLDPRT / f"{part}.SLDPRT").resolve()
@@ -1214,7 +1288,9 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     from solidworks_mcp.adapters.com_variant import null_callout
 
     model = adapter.currentModel
-    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for FeatureByName; keep `model` for ClearSelection2/Extension/SelectionManager
+    asm_h = _early_bound(
+        model, "IAssemblyDoc"
+    )  # IAssemblyDoc for FeatureByName; keep `model` for ClearSelection2/Extension/SelectionManager
     name = f"PatternAxis{key.upper()}"
     existing = adapter._attempt(lambda: asm_h.FeatureByName(name), default=None)
     if existing is not None:
@@ -1241,9 +1317,7 @@ def ensure_global_pattern_axis(adapter: Any, axis: str) -> str:
     # directly: reference geometry is inserted near the front of an assembly's
     # feature tree, so searching backward from the tail took 39-78 seconds on
     # large mechanisms and any fixed scan bound eventually failed.
-    selection = _early_bound(
-        model.SelectionManager, "ISelectionMgr"
-    )
+    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
     created = adapter._attempt(
         lambda: selection.GetSelectedObject6(1, -1), default=None
     )
@@ -1271,7 +1345,9 @@ def _select_pattern_inputs(
     from solidworks_mcp.adapters.com_variant import null_callout
 
     model = adapter.currentModel
-    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponentByName; keep `model` for ClearSelection2/Extension
+    asm_h = _early_bound(
+        model, "IAssemblyDoc"
+    )  # IAssemblyDoc for GetComponentByName; keep `model` for ClearSelection2/Extension
     model.ClearSelection2(True)
     selected = model.Extension.SelectByID2(
         direction_name,
@@ -1318,7 +1394,8 @@ def _select_pattern_inputs(
 def _new_pattern_components(model: Any, before: set[str]) -> list[Any]:
     components = _early_bound(model, "IAssemblyDoc").GetComponents(False) or []
     return [
-        component for component in components
+        component
+        for component in components
         if str(_read_member(component, "Name2")) not in before
     ]
 
@@ -1337,7 +1414,9 @@ def assert_pattern_targets(
             name
             for name in unmatched
             if all(
-                abs(component_transform(adapter, name)[9 + axis] * 1000.0 - target[axis])
+                abs(
+                    component_transform(adapter, name)[9 + axis] * 1000.0 - target[axis]
+                )
                 < 0.05
                 for axis in range(3)
             )
@@ -1374,20 +1453,24 @@ async def linear_component_pattern(
         raise ValueError("linear component pattern seeds must be unique")
 
     model = adapter.currentModel
-    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
+    asm_h = _early_bound(
+        model, "IAssemblyDoc"
+    )  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     direction_name = ensure_global_pattern_axis(adapter, axis)
     before = {
         str(_read_member(component, "Name2"))
         for component in (asm_h.GetComponents(False) or [])
     }
     async with _telemetry.aspan(
-        f"pattern {label}", kind="linear", seeds=",".join(seeds),
-        axis=axis.lower(), instances=instances, spacing_mm=spacing_mm,
+        f"pattern {label}",
+        kind="linear",
+        seeds=",".join(seeds),
+        axis=axis.lower(),
+        instances=instances,
+        spacing_mm=spacing_mm,
     ):
         _select_pattern_inputs(adapter, seeds, direction_name, "AXIS")
-        manager = _early_bound(
-            model.FeatureManager, "IFeatureManager"
-        )
+        manager = _early_bound(model.FeatureManager, "IFeatureManager")
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
         if definition is None:
             raise RuntimeError("cannot create local linear pattern definition")
@@ -1452,7 +1535,9 @@ async def grid_component_pattern(
         raise ValueError("grid component pattern seeds must be unique")
 
     model = adapter.currentModel
-    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
+    asm_h = _early_bound(
+        model, "IAssemblyDoc"
+    )  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     direction1_name = ensure_global_pattern_axis(adapter, axis1)
     direction2_name = ensure_global_pattern_axis(adapter, axis2)
     before = {
@@ -1460,16 +1545,20 @@ async def grid_component_pattern(
         for component in (asm_h.GetComponents(False) or [])
     }
     async with _telemetry.aspan(
-        f"pattern {label}", kind="grid", seeds=",".join(seeds),
-        axis1=axis1.lower(), instances1=instances1, spacing1_mm=spacing1_mm,
-        axis2=axis2.lower(), instances2=instances2, spacing2_mm=spacing2_mm,
+        f"pattern {label}",
+        kind="grid",
+        seeds=",".join(seeds),
+        axis1=axis1.lower(),
+        instances1=instances1,
+        spacing1_mm=spacing1_mm,
+        axis2=axis2.lower(),
+        instances2=instances2,
+        spacing2_mm=spacing2_mm,
     ):
         _select_pattern_inputs(
             adapter, seeds, direction1_name, "AXIS", direction2_name, "AXIS"
         )
-        manager = _early_bound(
-            model.FeatureManager, "IFeatureManager"
-        )
+        manager = _early_bound(model.FeatureManager, "IFeatureManager")
         definition = manager.CreateDefinition(_LOCAL_LINEAR_PATTERN)
         if definition is None:
             raise RuntimeError("cannot create local grid pattern definition")
@@ -1525,19 +1614,22 @@ async def circular_component_pattern(
         raise ValueError("circular component pattern seeds must be unique")
 
     model = adapter.currentModel
-    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
+    asm_h = _early_bound(
+        model, "IAssemblyDoc"
+    )  # IAssemblyDoc for GetComponents; keep `model` for FeatureManager/ClearSelection2
     before = {
         str(_read_member(component, "Name2"))
         for component in (asm_h.GetComponents(False) or [])
     }
     async with _telemetry.aspan(
-        f"pattern {label}", kind="circular", seeds=",".join(seeds),
-        axis=axis_name, instances=instances,
+        f"pattern {label}",
+        kind="circular",
+        seeds=",".join(seeds),
+        axis=axis_name,
+        instances=instances,
     ):
         _select_pattern_inputs(adapter, seeds, axis_name, "AXIS")
-        manager = _early_bound(
-            model.FeatureManager, "IFeatureManager"
-        )
+        manager = _early_bound(model.FeatureManager, "IFeatureManager")
         definition = manager.CreateDefinition(_LOCAL_CIRCULAR_PATTERN)
         if definition is None:
             raise RuntimeError("cannot create local circular pattern definition")
@@ -1569,7 +1661,10 @@ async def circular_component_pattern(
         _telemetry.success(f"{label}: created {len(names)} pattern instances")
         return names
 
-def _placement_transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
+
+def _placement_transform(
+    rows: list[list[float]], position_mm: list[float]
+) -> list[float]:
     """The 16-double ``IMathTransform`` for a component at ``rows``/``position_mm``.
 
     Matches the ``Transform2.ArrayData`` layout SolidWorks reports (and that
@@ -1585,7 +1680,10 @@ def _placement_transform(rows: list[list[float]], position_mm: list[float]) -> l
         position_mm[0] / 1000.0,
         position_mm[1] / 1000.0,
         position_mm[2] / 1000.0,
-        1.0, 0.0, 0.0, 0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
     ]
 
 
@@ -1675,7 +1773,9 @@ async def place_components_batch(
     out_names: list[str] = [""] * len(specs)
     grounded_comps: list[Any] = []
     async with _telemetry.aspan(
-        f"batch {label}", count=len(specs), grounded=sum(grounds),
+        f"batch {label}",
+        count=len(specs),
+        grounded=sum(grounds),
     ):
         with _telemetry.span("batch.insert", count=len(names)):
             raw = adapter._attempt(
@@ -1750,7 +1850,8 @@ async def place_components_batch(
                 # components (grounded or not) enter the ledger too (Codex,
                 # 2026-07-05 -- the channel build batches ground=False banks).
                 _POSE_LEDGER[out_names[best_i]] = (
-                    list(finals[best_i]), list(expected_rows[best_i]),
+                    list(finals[best_i]),
+                    list(expected_rows[best_i]),
                 )
                 if grounds[best_i]:
                     grounded_comps.append(comp)
@@ -1770,7 +1871,9 @@ async def place_components_batch(
                 n_sel = sum(
                     1
                     for comp in grounded_comps
-                    if adapter._attempt(lambda c=comp: c.Select2(True, 0), default=False)
+                    if adapter._attempt(
+                        lambda c=comp: c.Select2(True, 0), default=False
+                    )
                 )
                 if n_sel != len(grounded_comps):
                     raise RuntimeError(
@@ -1816,8 +1919,12 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
             with _telemetry.span("dof.rebuild"):
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
         with _telemetry.span("dof.collect_components"):
-            asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
-            components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
+            asm_h = _early_bound(
+                asm, "IAssemblyDoc"
+            )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
+            components = (
+                adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
+            )
         gsp.set_attribute("components", len(components))
         log(f"checking {len(components)} components for free DOF ...")
         # NO span per component. A span per component floods the trace with one
@@ -1831,22 +1938,24 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
         for component in components:
             # Wrap once as IComponent2 so both zero-arg methods invoke known
             # DISPIDs; Name2/IsFixed remain property reads.
-            component = _early_bound(
-                component, "IComponent2"
-            )
+            component = _early_bound(component, "IComponent2")
             comp_name = str(_read_member(component, "Name2"))
             if bool(_read_member(component, "IsFixed")):
                 fixed += 1
                 log(f"{comp_name}: fixed")
                 continue
             if bool(
-                adapter._attempt(lambda c=component: c.IsPatternInstance(), default=False)
+                adapter._attempt(
+                    lambda c=component: c.IsPatternInstance(), default=False
+                )
             ):
                 pattern += 1
                 log(f"{comp_name}: pattern instance (feature-driven)")
                 continue
             status = int(
-                adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)
+                adapter._attempt(
+                    lambda c=component: c.GetConstrainedStatus(), default=-1
+                )
             )
             log(f"{comp_name}: constrained status {status}")
             if status != FULLY_CONSTRAINED:
@@ -1897,9 +2006,13 @@ def collected_dof_specs() -> list[dict[str, Any]]:
 
 
 def _record_dof_spec(
-    key: str, kind: str, entities: list[Any],
-    *, verify: tuple[str, list[float]] | None = None,
-    witness: tuple[list[float], list[float]] | None = None, flip: bool = False,
+    key: str,
+    kind: str,
+    entities: list[Any],
+    *,
+    verify: tuple[str, list[float]] | None = None,
+    witness: tuple[list[float], list[float]] | None = None,
+    flip: bool = False,
     **params: Any,
 ) -> None:
     """Record one freed operational DOF as a machine-independent drive spec
@@ -1918,30 +2031,41 @@ def _record_dof_spec(
     flip-ambiguous angle driver is guarded exactly like the build would be (the
     replay runs in a fresh process with no pose ledger, so the expected world
     position must ride the spec)."""
-    _DOF_SPECS.append({
-        "key": key,
-        "kind": kind,
-        "entities": [e.model_dump() for e in entities],
-        "verify": [verify[0], [float(v) for v in verify[1]]] if verify else None,
-        "witness": (
-            [[float(v) for v in witness[0]], [float(v) for v in witness[1]]]
-            if witness else None
-        ),
-        "flip": bool(flip),
-        "params": {
-            k: (float(v) if isinstance(v, (int, float)) else v)
-            for k, v in params.items()
-        },
-    })
-    _telemetry.debug(f"dof manifest {key}: {kind} drive recorded (not authored, flip={flip})")
+    _DOF_SPECS.append(
+        {
+            "key": key,
+            "kind": kind,
+            "entities": [e.model_dump() for e in entities],
+            "verify": [verify[0], [float(v) for v in verify[1]]] if verify else None,
+            "witness": (
+                [[float(v) for v in witness[0]], [float(v) for v in witness[1]]]
+                if witness
+                else None
+            ),
+            "flip": bool(flip),
+            "params": {
+                k: (float(v) if isinstance(v, (int, float)) else v)
+                for k, v in params.items()
+            },
+        }
+    )
+    _telemetry.debug(
+        f"dof manifest {key}: {kind} drive recorded (not authored, flip={flip})"
+    )
 
 
 async def _driver_or_record(
-    adapter: Any, kind: str, ref_a: Any, ref_b: Any,
-    *, label: str, verify: tuple[str, list[float]] | None,
+    adapter: Any,
+    kind: str,
+    ref_a: Any,
+    ref_b: Any,
+    *,
+    label: str,
+    verify: tuple[str, list[float]] | None,
     free_dof_key: str | None,
     witness: tuple[list[float], list[float]] | None = None,
-    flip: bool = False, **params: Any,
+    flip: bool = False,
+    **params: Any,
 ) -> Any:
     """Author a driver mate, OR (a ``free_dof_key``) record it into the DOF
     manifest and skip -- the DOF stays free in the saved model.
@@ -1952,12 +2076,24 @@ async def _driver_or_record(
     resolved side (flip-free, like the build)."""
     if free_dof_key is not None:
         _record_dof_spec(
-            free_dof_key, kind, [ref_a, ref_b],
-            verify=verify, witness=witness, flip=flip, **params)
+            free_dof_key,
+            kind,
+            [ref_a, ref_b],
+            verify=verify,
+            witness=witness,
+            flip=flip,
+            **params,
+        )
         return {"free_dof": free_dof_key, "name": ""}
     return await _mate(
-        adapter, label, kind, [ref_a, ref_b],
-        verify=verify, witness=witness, flip=flip, **params
+        adapter,
+        label,
+        kind,
+        [ref_a, ref_b],
+        verify=verify,
+        witness=witness,
+        flip=flip,
+        **params,
     )
 
 
@@ -1977,9 +2113,7 @@ def write_dof_manifest(name: str) -> Any:
         return None
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"stem": name, "specs": _DOF_SPECS}, indent=2))
-    _telemetry.success(
-        f"wrote {len(_DOF_SPECS)} free-DOF drive spec(s) -> {path.name}"
-    )
+    _telemetry.success(f"wrote {len(_DOF_SPECS)} free-DOF drive spec(s) -> {path.name}")
     return path
 
 
@@ -1991,22 +2125,51 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
     "summing": ("summing-lever", "boss-hook"),
     "pen": ("pen-rod", "pen-marker", "pen-wire"),
     "drive-train": (
-        "alignment-pinion", "cone-gear", "cone-gear-shaft", "cone-pivot-post",
-        "cone-swing-platform", "cone-tip-adjuster", "cone-tip-block",
-        "cone-tip-bushing", "cone-tip-pinch-screw", "crank-arm",
-        "crank-drive-gear", "crank-handle", "crank-pinion", "crankshaft",
-        "cylinder-gear", "pinion-arbor", "pinion-bracket", "pinion-cam",
-        "pinion-cam-pin", "pinion-handle", "pinion-lever", "pinion-lift-rod",
+        "alignment-pinion",
+        "cone-gear",
+        "cone-gear-shaft",
+        "cone-pivot-post",
+        "cone-swing-platform",
+        "cone-tip-adjuster",
+        "cone-tip-block",
+        "cone-tip-bushing",
+        "cone-tip-pinch-screw",
+        "crank-arm",
+        "crank-drive-gear",
+        "crank-handle",
+        "crank-pinion",
+        "crankshaft",
+        "cylinder-gear",
+        "pinion-arbor",
+        "pinion-bracket",
+        "pinion-cam",
+        "pinion-cam-pin",
+        "pinion-handle",
+        "pinion-lever",
+        "pinion-lift-rod",
     ),
     "magnifier": (
-        "lever-wire", "magnifying-bracket", "magnifying-clamp",
-        "magnifying-lever", "magnifying-vertical-rod", "magnifying-wheel",
-        "output-fixture", "thumb-screw",
+        "lever-wire",
+        "magnifying-bracket",
+        "magnifying-clamp",
+        "magnifying-lever",
+        "magnifying-vertical-rod",
+        "magnifying-wheel",
+        "output-fixture",
+        "thumb-screw",
     ),
     "paper-drive": (
-        "fillister-screw", "guide-lock", "platen", "platen-clip",
-        "platen-guide", "platen-paper", "platen-rack", "rack-pinion",
-        "transgear-feed-pinion", "transgear-knob-shaft", "transgear-pinion",
+        "fillister-screw",
+        "guide-lock",
+        "platen",
+        "platen-clip",
+        "platen-guide",
+        "platen-paper",
+        "platen-rack",
+        "rack-pinion",
+        "transgear-feed-pinion",
+        "transgear-knob-shaft",
+        "transgear-pinion",
         "transgear-removable",
     ),
 }
@@ -2053,10 +2216,6 @@ def assert_manifest_dof_state(
     )
 
 
-
-
-
-
 def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list[str]:
     """Re-solve and return the non-fixed, non-pattern top-level components that read
     UNDER-constrained (status 2) -- i.e. carry a real free DOF. Mirrors the status
@@ -2067,19 +2226,23 @@ def _under_constrained_components(adapter: Any, *, resolve: bool = True) -> list
     asm = adapter.currentModel
     if resolve:
         adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-    asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
+    asm_h = _early_bound(
+        asm, "IAssemblyDoc"
+    )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
     components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
     under = []
     for component in components:
-        component = _early_bound(
-            component, "IComponent2"
-        )
+        component = _early_bound(component, "IComponent2")
         comp_name = str(_read_member(component, "Name2"))
         if bool(_read_member(component, "IsFixed")):
             continue
-        if bool(adapter._attempt(lambda c=component: c.IsPatternInstance(), default=False)):
+        if bool(
+            adapter._attempt(lambda c=component: c.IsPatternInstance(), default=False)
+        ):
             continue
-        status = int(adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1))
+        status = int(
+            adapter._attempt(lambda c=component: c.GetConstrainedStatus(), default=-1)
+        )
         if status == UNDER_CONSTRAINED:
             under.append(comp_name)
     return under
@@ -2163,9 +2326,7 @@ def assert_free_dof_necessity(
                 )
         if allowed_stems:
             allowed = set(allowed_stems)
-            stray = sorted(
-                n for n in under if re.sub(r"-\d+$", "", n) not in allowed
-            )
+            stray = sorted(n for n in under if re.sub(r"-\d+$", "", n) not in allowed)
             gsp.set_attribute("stray_under_constrained", len(stray))
             if stray:
                 raise RuntimeError(
@@ -2180,8 +2341,6 @@ def assert_free_dof_necessity(
             "free DOF (necessity"
             + ("; exact-set: no strays)" if allowed_stems else ")")
         )
-
-
 
 
 def component_names(adapter: Any) -> list[str]:
@@ -2203,7 +2362,9 @@ def delete_assembly_feature(adapter: Any, name: str) -> None:
     the feature; the seeds survive) before re-creating it with ``FlipDir1``.
     Fails loud when the feature is still present after."""
     model = adapter.currentModel
-    asm_h = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for FeatureByName; keep `model` for ClearSelection2/Extension/EditDelete
+    asm_h = _early_bound(
+        model, "IAssemblyDoc"
+    )  # IAssemblyDoc for FeatureByName; keep `model` for ClearSelection2/Extension/EditDelete
     feat = adapter._attempt(lambda: asm_h.FeatureByName(name), default=None)
     if feat is None:
         raise RuntimeError(f"feature to delete not found: {name!r}")
@@ -2214,6 +2375,7 @@ def delete_assembly_feature(adapter: Any, name: str) -> None:
         adapter._attempt(lambda: model.EditDelete(), default=None)
     if adapter._attempt(lambda: asm_h.FeatureByName(name), default=None) is not None:
         raise RuntimeError(f"feature {name!r} still present after delete")
+
 
 def check_no_interference(
     adapter: Any,
@@ -2240,9 +2402,7 @@ def check_no_interference(
     way the gate already tolerates face-flush and tangent contacts). Any link
     touching a NON-link part is still a hard fault.
     """
-    asm = _early_bound(
-        adapter.currentModel,
-        "IAssemblyDoc")
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
     with _telemetry.span("gate.interference") as isp:
         log("interference detection: starting ...")
         adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
@@ -2258,7 +2418,9 @@ def check_no_interference(
         mgr.UseTransform = False
         with _telemetry.span("interference.compute"):
             log("interference detection: computing interferences ...")
-            interferences = adapter._attempt(lambda: mgr.GetInterferences(), default=None)
+            interferences = adapter._attempt(
+                lambda: mgr.GetInterferences(), default=None
+            )
         details = []
         bounded_contacts = []
         chain_contacts = []
@@ -2274,10 +2436,17 @@ def check_no_interference(
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
             pair = frozenset(names)
             allowed_volume = (allowed_pairs or {}).get(pair)
-            if len(names) == 2 and allowed_volume is not None and volume_mm3 <= allowed_volume:
+            if (
+                len(names) == 2
+                and allowed_volume is not None
+                and volume_mm3 <= allowed_volume
+            ):
                 bounded_contacts.append((names, volume_mm3, allowed_volume))
                 continue
-            if all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names) and len(names) == 2:
+            if (
+                all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names)
+                and len(names) == 2
+            ):
                 chain_contacts.append(volume_mm3)
                 continue
             # Chain link <-> sprocket: intended mesh. The chain seats on the
@@ -2288,8 +2457,10 @@ def check_no_interference(
             # T18 spare is a real clash and must NOT be whitelisted (codex #189).
             links = [n for n in names if n.startswith(_CHAIN_LINK_PREFIXES)]
             sprockets = [
-                n for n, cfg in zip(names, configs)
-                if n.startswith(_CHAIN_SPROCKET_PREFIXES) and cfg in _CHAIN_SPROCKET_CONFIGS
+                n
+                for n, cfg in zip(names, configs)
+                if n.startswith(_CHAIN_SPROCKET_PREFIXES)
+                and cfg in _CHAIN_SPROCKET_CONFIGS
             ]
             if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
                 chain_mesh_contacts.append(volume_mm3)
@@ -2317,10 +2488,9 @@ def check_no_interference(
                 f"{volume_mm3:.2f} mm^3 allowed (limit {allowed_volume:.2f} mm^3)"
             )
         if details:
-            raise RuntimeError(
-                f"{len(details)} interference(s): " + "; ".join(details)
-            )
+            raise RuntimeError(f"{len(details)} interference(s): " + "; ".join(details))
         _telemetry.success("interference check: none found")
+
 
 def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
     """Return ``[(feature_name, error_code, is_warning), ...]`` for a model.
@@ -2355,11 +2525,16 @@ def whats_wrong(adapter: Any, model: Any) -> list[tuple[str, int, bool]]:
         out.append((name, code, warn))
     return out
 
+
 _REBUILD_UNSET: Any = object()
 
 
 def assert_model_healthy(
-    adapter: Any, *, label: str = "", model: Any = None, deep: bool = True,
+    adapter: Any,
+    *,
+    label: str = "",
+    model: Any = None,
+    deep: bool = True,
     rebuilt: Any = _REBUILD_UNSET,
 ) -> None:
     """Force-rebuild and raise on any ERROR-state feature/mate -- fail fast.
@@ -2395,17 +2570,22 @@ def assert_model_healthy(
         with _telemetry.span("health.collect_targets") as csp:
             targets = [(label or "top", model_doc)]
             if deep:
-                comps = adapter._attempt(
-                    lambda: asm_doc.GetComponents(False), default=None
-                ) or []
+                comps = (
+                    adapter._attempt(lambda: asm_doc.GetComponents(False), default=None)
+                    or []
+                )
                 for comp in comps:
                     # Wrap once as IComponent2 so GetModelDoc2 invokes its known
                     # DISPID; Name2 remains a property read.
                     comp = _early_bound(comp, "IComponent2")
                     name = str(_read_member(comp, "Name2"))
-                    if "/" in name:  # top-level instances only; their docs cover nested parts
+                    if (
+                        "/" in name
+                    ):  # top-level instances only; their docs cover nested parts
                         continue
-                    sub = adapter._attempt(lambda c=comp: c.GetModelDoc2(), default=None)
+                    sub = adapter._attempt(
+                        lambda c=comp: c.GetModelDoc2(), default=None
+                    )
                     if sub is not None and sub is not raw_model:
                         targets.append((name, sub))
             csp.set_attribute("targets", len(targets))
@@ -2441,6 +2621,7 @@ def assert_model_healthy(
             )
         _telemetry.success(f"model healthy ({label or 'top'})")
 
+
 def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
     """Return ``[(body_name, fault_count), ...]`` for any faulty solid bodies.
 
@@ -2470,6 +2651,7 @@ def body_faults(adapter: Any, model: Any) -> list[tuple[str, int]]:
             faults.append((str(_read_member(body, "Name")), count))
     return faults
 
+
 def remap_front_to_machine_front(adapter: Any) -> None:
     """Redefine the active document's standard views so SolidWorks ``Front``
     shows the MACHINE front (the paper/output side at -Z).
@@ -2493,6 +2675,7 @@ def remap_front_to_machine_front(adapter: Any) -> None:
     model.ShowNamedView2("", SW_FRONT)  # activate the (now machine-front) Front
     adapter._zoom_to_fit(model)
     log("standard views remapped: Front now shows the machine front (-Z paper side)")
+
 
 async def _export_assembly_images(
     adapter: Any, asm_name: str, views: Iterable[str]
@@ -2527,9 +2710,15 @@ async def _export_assembly_images(
                 # redraw the view here, then ask the adapter to capture CURRENT
                 # so it does not change orientation again after the repaint.
                 view_constants = {
-                    "front": 1, "back": 2, "left": 3, "right": 4,
-                    "top": 5, "bottom": 6, "isometric": 7,
-                    "dimetric": 8, "trimetric": 9,
+                    "front": 1,
+                    "back": 2,
+                    "left": 3,
+                    "right": 4,
+                    "top": 5,
+                    "bottom": 6,
+                    "isometric": 7,
+                    "dimetric": 8,
+                    "trimetric": 9,
                 }
                 view_const = view_constants.get(view.lower())
                 if view_const is None:
@@ -2553,6 +2742,7 @@ async def _export_assembly_images(
             artefacts[view] = str(img_path)
 
     return artefacts
+
 
 async def save_assembly_and_images(
     adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
@@ -2653,6 +2843,7 @@ def _discard_copy_source(adapter: Any) -> None:
     adapter.currentModel = None
     _telemetry.success(f"discard dirty assembly source {title!r}")
 
+
 def _massprops_sidecar(asm_name: str):
     """Sidecar holding the last-saved resolved-geometry fingerprint of an assembly.
 
@@ -2701,9 +2892,7 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
     """
     target = adapter.currentModel if model is None else model
     with _telemetry.span("assembly.final_rebuild", asm=label) as sp:
-        rebuilt = adapter._attempt(
-            lambda: target.ForceRebuild3(False), default=None
-        )
+        rebuilt = adapter._attempt(lambda: target.ForceRebuild3(False), default=None)
         status = saved_rebuild_status(adapter, target)
         sp.set_attribute("needs_rebuild", status)
         if rebuilt is False or rebuilt is None:
@@ -2715,7 +2904,9 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
         _telemetry.success(f"final rebuild clean before save ({label})")
 
 
-async def reconcile_saved_rebuild_state(adapter: Any, asm_name: str, asm_path: Any) -> None:
+async def reconcile_saved_rebuild_state(
+    adapter: Any, asm_name: str, asm_path: Any
+) -> None:
     """Reopen a just-saved assembly and, if it loads needing a rebuild, EditRebuild3
     + in-place Save3 so the persisted artifact reopens clean (issue #267).
 
@@ -2741,18 +2932,24 @@ async def reconcile_saved_rebuild_state(adapter: Any, asm_name: str, asm_path: A
         status = saved_rebuild_status(adapter, model)
         sp.set_attribute("needs_rebuild_on_open", status)
         if status == 0:
-            _telemetry.success(f"saved artifact already clean, no reconcile ({asm_name})")
+            _telemetry.success(
+                f"saved artifact already clean, no reconcile ({asm_name})"
+            )
             return
         rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
         if rebuilt is False or rebuilt is None:
             raise RuntimeError(
-                f"{asm_name}: reconcile EditRebuild3 returned {rebuilt!r}")
-        result = adapter._attempt(lambda: model.Save3(1, 0, 0), default=None)  # Silent, in place
+                f"{asm_name}: reconcile EditRebuild3 returned {rebuilt!r}"
+            )
+        result = adapter._attempt(
+            lambda: model.Save3(1, 0, 0), default=None
+        )  # Silent, in place
         in_mem = saved_rebuild_status(adapter, model)
         if in_mem != 0:
             raise RuntimeError(
                 f"{asm_name}: reconcile left NeedsRebuild2={in_mem} after EditRebuild3+Save3 "
-                f"(save result={result!r})")
+                f"(save result={result!r})"
+            )
         _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
 
 
@@ -2844,18 +3041,25 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
         if not res.is_success:
             raise RuntimeError(
                 f"{asm_name}: get_mass_properties failed for config {cfg!r}: "
-                f"{res.error}")
+                f"{res.error}"
+            )
         mp = res.data
         moi = mp.moments_of_inertia
-        rows.append((
-            cfg,
-            round(float(mp.mass), 6),
-            round(float(mp.volume), 3),
-            round(float(mp.surface_area), 3),  # catches edits that preserve mass+volume+inertia
-            tuple(round(float(c), 4) for c in mp.center_of_mass),
-            tuple(round(float(moi[k]), 4)
-                  for k in ("Ixx", "Iyy", "Izz", "Ixy", "Ixz", "Iyz")),
-        ))
+        rows.append(
+            (
+                cfg,
+                round(float(mp.mass), 6),
+                round(float(mp.volume), 3),
+                round(
+                    float(mp.surface_area), 3
+                ),  # catches edits that preserve mass+volume+inertia
+                tuple(round(float(c), 4) for c in mp.center_of_mass),
+                tuple(
+                    round(float(moi[k]), 4)
+                    for k in ("Ixx", "Iyy", "Izz", "Ixy", "Ixz", "Iyz")
+                ),
+            )
+        )
         # Per-top-level-component POSE rows (codex #241): the aggregates above
         # are blind to a LIGHT component moving -- a 10 g screw re-solving 5 mm
         # over shifts the whole-assembly COM by ~10 um, far under the 1e-4
@@ -2873,23 +3077,29 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
         # GetComponentByName scan per component (measured ~140 s for the 122
         # top-level components; this walk is ~seconds). Row shape and sort
         # match the per-name form exactly, so the digest VALUE is unchanged.
-        asm = _early_bound(adapter.currentModel, "IAssemblyDoc")  # IAssemblyDoc for GetComponents (same dispatch)
+        asm = _early_bound(
+            adapter.currentModel, "IAssemblyDoc"
+        )  # IAssemblyDoc for GetComponents (same dispatch)
         with _telemetry.span(
             "geometry_digest.component_poses", configuration=cfg
         ) as psp:
-            comps = adapter._attempt(
-                lambda: asm.GetComponents(True), default=None
-            ) or []
+            comps = (
+                adapter._attempt(lambda: asm.GetComponents(True), default=None) or []
+            )
             psp.set_attribute("components", len(comps))
             pose_rows = []
             for comp in comps:
-                a16 = [float(v) for v in _read_member(
-                    _read_member(comp, "Transform2"), "ArrayData")]
-                pose_rows.append((
-                    str(_read_member(comp, "Name2")),
-                    tuple(round(v, 6) for v in a16[0:9]),
-                    tuple(round(v, 4) for v in a16[9:12]),
-                ))
+                a16 = [
+                    float(v)
+                    for v in _read_member(_read_member(comp, "Transform2"), "ArrayData")
+                ]
+                pose_rows.append(
+                    (
+                        str(_read_member(comp, "Name2")),
+                        tuple(round(v, 6) for v in a16[0:9]),
+                        tuple(round(v, 4) for v in a16[9:12]),
+                    )
+                )
         rows.extend((cfg, *pr) for pr in sorted(pose_rows))
     if multi and rest is not None:
         await activate_resolved(rest)
@@ -2905,26 +3115,36 @@ def select_mates_folder(adapter: Any, model: Any = None) -> bool:
     tail."""
     if model is None:
         model = adapter.currentModel
-    model = _early_bound(
-        model,
-        "IModelDoc2")
+    model = _early_bound(model, "IModelDoc2")
     count = int(adapter._attempt(lambda: model.GetFeatureCount(), default=0) or 0)
     for i in range(min(count, 8)):  # MateGroup is the last top-level feature (i=0)
-        feat = adapter._attempt(lambda i=i: model.FeatureByPositionReverse(i), default=None)
+        feat = adapter._attempt(
+            lambda i=i: model.FeatureByPositionReverse(i), default=None
+        )
         if feat is None:
             continue
         feat = _early_bound(feat, "IFeature")
-        if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
-            return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
+        if (
+            str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default=""))
+            == "MateGroup"
+        ):
+            return bool(
+                adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False)
+            )
     feat = adapter._attempt(lambda: model.FirstFeature(), default=None)
     while feat is not None:
-        feat = _early_bound(
-            feat, "IFeature"
-        )
-        if str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default="")) == "MateGroup":
-            return bool(adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False))
+        feat = _early_bound(feat, "IFeature")
+        if (
+            str(adapter._attempt(lambda f=feat: f.GetTypeName2(), default=""))
+            == "MateGroup"
+        ):
+            return bool(
+                adapter._attempt(lambda f=feat: f.Select2(False, 0), default=False)
+            )
         feat = adapter._attempt(lambda f=feat: f.GetNextFeature(), default=None)
     return False
+
+
 def _rebuild_faults(adapter: Any) -> list[str]:
     """Non-warning What's Wrong entries for the active model, formatted for a log."""
     return [
@@ -2932,6 +3152,8 @@ def _rebuild_faults(adapter: Any) -> list[str]:
         for name, code, warn in whats_wrong(adapter, adapter.currentModel)
         if not warn
     ]
+
+
 def repair_dangling_mates(adapter: Any, model: Any = None) -> int:
     """Auto-heal mates whose referenced topology was re-IDed by a from-scratch part
     rebuild (the "sharp edge"): ``IAssemblyDoc.AutoMateRepair`` re-binds the broken
@@ -2944,9 +3166,7 @@ def repair_dangling_mates(adapter: Any, model: Any = None) -> int:
     + the standard DOF/interference/health gates, never from this code.
     """
     raw_model = adapter.currentModel if model is None else model
-    asm = _early_bound(
-        raw_model,
-        "IAssemblyDoc")
+    asm = _early_bound(raw_model, "IAssemblyDoc")
     if not select_mates_folder(adapter, raw_model):
         log("AutoMateRepair: could not select the Mates folder -- skipping repair")
         return 0
@@ -2956,9 +3176,13 @@ def repair_dangling_mates(adapter: Any, model: Any = None) -> int:
     ret, processed, failed = result if result else (-1, None, None)
     n_proc = len(list(processed or [])) if processed is not None else 0
     n_fail = len(list(failed or [])) if failed is not None else 0
-    log(f"AutoMateRepair: ret={ret} (1=PartialSuccess is normal) "
-        f"re-bound {n_proc} mate(s), {n_fail} already-valid skipped")
+    log(
+        f"AutoMateRepair: ret={ret} (1=PartialSuccess is normal) "
+        f"re-bound {n_proc} mate(s), {n_fail} already-valid skipped"
+    )
     return n_proc
+
+
 def save_assembly_in_place(
     adapter: Any,
     asm_name: str,
@@ -3043,9 +3267,11 @@ def save_assembly_in_place(
     if after <= before:
         raise RuntimeError(
             f"{sldasm.name} mtime unchanged after Save3(Silent) "
-            f"(ret={ret}, err={err}, warn={warn})")
-    log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, "
-        f"warn={warn})")
+            f"(ret={ret}, err={err}, warn={warn})"
+        )
+    log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, warn={warn})")
+
+
 async def refresh_assembly(
     adapter: Any,
     asm_name: str,
@@ -3083,8 +3309,7 @@ async def refresh_assembly(
     """
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     if not asm_path.exists():
-        raise RuntimeError(
-            f"missing assembly {asm_path}; build it from scratch first")
+        raise RuntimeError(f"missing assembly {asm_path}; build it from scratch first")
     with _telemetry.span("open", asm=asm_name):
         check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
         opened_rebuild_status = saved_rebuild_status(adapter)
@@ -3103,9 +3328,12 @@ async def refresh_assembly(
         for cfg in configs:
             with _telemetry.span("rebuild_config", config=cfg):
                 if active_configuration_name(adapter) != cfg:
-                    check(f"activate {cfg}", await adapter.set_active_configuration(cfg))
+                    check(
+                        f"activate {cfg}", await adapter.set_active_configuration(cfg)
+                    )
                 adapter._attempt(
-                    lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+                    lambda: adapter.currentModel.ForceRebuild3(False), default=None
+                )
                 faults = _rebuild_faults(adapter)
                 if faults:
                     # The sharp edge: a from-scratch part rebuild re-IDs the faces
@@ -3113,18 +3341,22 @@ async def refresh_assembly(
                     # AutoMateRepair before failing, then rebuild + re-read. Success
                     # is judged by the CLEAN re-read below + the standard gates --
                     # not by AutoMateRepair's own return code.
-                    log(f"refresh {asm_name}: configuration {cfg!r} has {len(faults)} "
-                        f"rebuild fault(s) (dangling mate / re-IDed face?); auto-healing ...")
+                    log(
+                        f"refresh {asm_name}: configuration {cfg!r} has {len(faults)} "
+                        f"rebuild fault(s) (dangling mate / re-IDed face?); auto-healing ..."
+                    )
                     repaired_any = repair_dangling_mates(adapter) > 0 or repaired_any
                     adapter._attempt(
-                        lambda: adapter.currentModel.ForceRebuild3(False), default=None)
+                        lambda: adapter.currentModel.ForceRebuild3(False), default=None
+                    )
                     faults = _rebuild_faults(adapter)
                 if faults:
                     raise RuntimeError(
                         f"refresh {asm_name}: configuration {cfg!r} STILL has rebuild faults "
                         f"after AutoMateRepair (unhealable -- escalate to a full rebuild: "
                         f"delete the .SLDASM target + `doit assembly:{asm_name}`): "
-                        + ", ".join(faults))
+                        + ", ".join(faults)
+                    )
                 log(f"refresh {asm_name}: configuration {cfg} rebuilt clean")
 
     # Back to the rest pose for the gates + save: the saved active config and the
@@ -3185,13 +3417,17 @@ async def refresh_assembly(
         # to the last gated save, and verify:soundness independently reopens
         # the saved artefact and runs the full battery on every build.
         _telemetry.event("refresh.noop_gates_skipped", asm=asm_name)
-        log(f"refresh {asm_name}: fingerprint unchanged, no repairs -- gates "
+        log(
+            f"refresh {asm_name}: fingerprint unchanged, no repairs -- gates "
             "skipped (proven by the last gated save; verify:soundness "
-            "re-proves the artefact independently)")
+            "re-proves the artefact independently)"
+        )
 
     with _telemetry.span("save", asm=asm_name, changed=geometry_changed):
         if geometry_changed:
-            set_isometric_view(adapter)  # opens isometric; only when we actually re-save
+            set_isometric_view(
+                adapter
+            )  # opens isometric; only when we actually re-save
         save_assembly_in_place(adapter, asm_name, geometry_changed)
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(digest + "\n", encoding="utf-8")
