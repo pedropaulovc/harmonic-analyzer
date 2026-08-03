@@ -38,7 +38,8 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     inspection_flat = " ".join(inspection.split())
     assert "GREEN-PAINTED GRAY IRON CASTING" in notes
     assert "MACHINE DATUM FACES, BORES" in notes
-    assert "1.5 MAX DRAFT, FILLETS R3 UNLESS NOTED" in notes
+    assert "1.5 MAX DRAFT; INTERNAL FILLETS R3," in notes
+    assert "EXTERNAL EDGES C2.00 X 45 DEG UNLESS NOTED" in notes
     assert "MACHINE FROM SOLID STOCK" not in notes
     assert "ASTM A48" not in notes
     assert "GREEN ENAMEL" not in notes
@@ -80,7 +81,7 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "2X DRILL + TAP #10-24 UNC-2B X 10.00 DEEP INTO THE WEST RAIL TOP" in notes
     assert "FULCRUM-KEEPER FEET" in notes
     assert "ALL BORES Ra 1.6" in notes
-    assert "ENDS BROKEN C1.00 X 45 DEG" in notes
+    assert "TOP ENDS BROKEN C1.00 X 45 DEG" in notes
     assert "MASK DATUMS, BORES, BOSS END LANDS AND TAPPED HOLES" in notes_flat
     assert "DIMENSIONS/GD&T APPLY BEFORE COATING" in notes
     assert "MAX-MIN RADIAL WALL THICKNESS" in inspection_flat

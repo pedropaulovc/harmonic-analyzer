@@ -78,9 +78,9 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "A1/B1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
     assert "MASK DATUM A/B/C FACES, ALL BORES/THREADS" in notes
     assert "PAD TOP; COAT PAD SIDES AND ROOTS" in notes
-    assert "VERTICAL PLAN CORNERS R3.18 BOTH PLATES" in notes
-    assert "EXPOSED TOP RIMS R1.59" in notes
-    assert "UNDERSIDE RIM C1.59 X 45 DEG" in notes
+    assert "VERTICAL PLAN CORNERS C3.18 X 45 DEG BOTH PLATES" in notes
+    assert "EXPOSED TOP RIMS" in notes
+    assert "AND UNDERSIDE RIM C1.59 X 45 DEG" in notes
     assert "A1-A4" not in notes
     assert "FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES" in notes
     assert "LOCATIONS ARE BASIC" in notes

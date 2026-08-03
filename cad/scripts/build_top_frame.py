@@ -32,12 +32,13 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   the web thins to 12.7 (0.5 in) centred on each rail and STAYS thin through
   the bottom edge (ch19 img04/img05 + user read), with full-thickness lands
   at the bosses, hub rib and crossbar junctions.
-* Finishing: R3 cast rounds on the top-face rims -- the outer rail rim
-  and both window rims, every edge terminating on a proud corner-boss
-  barrel (the bosses round all eight plan corners natively; ch19 img04/
-  ch30 p002: every top edge reads softened) -- and C1 x 45 machined
-  breaks on both ends of the column + gooseneck bores (note 9; the
-  lead-ins the frame slides down the columns on).
+* Finishing (chamfer external, fillet internal): R3 cast fillets along
+  the internal web/flange T-roots (both shelves of every rail, ch19
+  img04's panel blends), C2 x 45 breaks on the top-face rims -- outer
+  rail rim and both window rims, every edge terminating on a proud
+  corner-boss barrel (the bosses round all eight plan corners natively)
+  -- and C1 x 45 lead-ins on the bore TOP ends only (note 9). The web
+  ring's bottom rim and the boss undersides keep sharp edges.
 
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
@@ -49,9 +50,10 @@ web ring -> crossbar junction lands -> top-flange ring -> hub rib
 restore -> crossbar+gussets -> corner bosses (up/down pair) -> hub boss
 + V-gussets -> set-screw pocket -> spot-faces -> column bores ->
 gooseneck bore -> wizard holes (hanger-stud clearances, side-screw taps,
-set-screw tap, keeper taps) -> cast finishing (R3 top-face rim rounds) ->
-C1 bore-end chamfers. Wizard holes come after the face cuts so every
-seat face is final; the edge breaks come last so they cut final faces.
+set-screw tap, keeper taps) -> internal T-root fillets (R3) -> external
+top-rim breaks (C2) -> C1 bore top lead-ins. Wizard holes come after the
+face cuts so every seat face is final; the edge breaks come last so
+they cut final faces.
 Analytic volume checks after every feature;
 the boss/hub/spot-face/tap expectations use small grid integrals (no
 tidy closed form against the webbed solid).
@@ -201,8 +203,12 @@ LAND_X1 = BAR_X1 + GUSSET + 6.0  # +20; front/rear inner faces (6 margin)
 THROUGH_CUT_DEPTH = 110.0  # mid-plane total; > boss stack (47.3)
 
 # --- Edge finishing ----------------------------------------------------------
-CAST_FILLET_R = 3.0  # drawing note 1: FILLETS R3 UNLESS NOTED (ch19 img04)
-BORE_CHAMFER = 1.0  # note 9: C1 x 45 end breaks on every machined bore
+# Convention (2026-08-03): CHAMFER external edges, FILLET internal wall
+# junctions. The web ring's bottom rim and the boss undersides keep sharp
+# edges (no low-side breaks -- explicit instruction).
+ROOT_FILLET_R = 3.0  # internal web/flange T-root blends (cast root, ch19 img04)
+EDGE_CHAMFER = 2.0  # external top-face rim breaks, 45 deg (one grinding pass)
+BORE_CHAMFER = 1.0  # note 9: C1 x 45 TOP-end bore breaks; low ends stay sharp
 
 if abs(FRONT_COLUMN_Z + REAR_COLUMN_Z) > 1e-12 or abs(FRAME_CENTER_Z) > 1e-12:
     raise AssertionError("top-frame assumes a symmetric column span about z 0")
@@ -395,17 +401,13 @@ def _set_tap_removal() -> float:
 
 
 def _fillet_section_area(r: float) -> float:
-    """Cross-section a radius-r round removes from a square 90-degree edge."""
+    """Cross-section a radius-r fillet adds to (or a round removes from) a
+    square 90-degree edge."""
     return (1.0 - math.pi / 4.0) * r * r
 
 
-def _fillet_section_inset(r: float) -> float:
-    """Centroid distance of that removed section from either adjacent face."""
-    return r * (5.0 / 6.0 - math.pi / 4.0) / (1.0 - math.pi / 4.0)
-
-
 def _top_rim_removal() -> tuple[float, float]:
-    """(outer, window) volumes the R3 top-face rim rounds remove.
+    """(outer, window) volumes the C2 x 45 top-face rim breaks remove.
 
     The proud corner-boss barrels round ALL EIGHT plan corners natively:
     each boss centre sits 25.56 from its window corner, inside the 26.1
@@ -416,10 +418,10 @@ def _top_rim_removal() -> tuple[float, float]:
     only: rail inner/outer faces between boss cuts, front/rear faces
     between boss cut and junction gusset, the four gusset hypotenuses,
     the two crossbar flanks. The blunt 135-degree gusset vertices and the
-    fillet ends dying into the boss walls are not modeled -- the check
+    chamfer ends dying into the boss walls are not modeled -- the check
     tolerance absorbs them.
     """
-    area = _fillet_section_area(CAST_FILLET_R)
+    area = EDGE_CHAMFER**2 / 2.0
     r_boss = BOSS_DIA / 2.0
     cut_side = math.sqrt(r_boss**2 - (RAIL_W_SIDE / 2.0) ** 2)  # x = +/-InnerX|OuterX
     cut_fr = math.sqrt(r_boss**2 - (RAIL_W_FR / 2.0) ** 2)  # z = +/-InnerZ|OuterZ
@@ -434,13 +436,34 @@ def _top_rim_removal() -> tuple[float, float]:
     return outer, area * runs
 
 
+def _t_root_add() -> float:
+    """Volume the R3 internal T-root fillets add along the web-flange shelf.
+
+    The reentrant junction where each recessed web face meets the flange
+    underside (y +10.25), on BOTH the outer and the window side of every
+    rail. Every web face sits WEB_T/2 = 6.35 off its rail centreline, so
+    one boss chord covers all four families; the hub rib interrupts both
+    east-rail runs, the junction lands interrupt both front/rear WINDOW
+    runs. The fillet ends dying into boss barrels / rib / land walls and
+    the small vertical junction coves at those walls are not modeled --
+    the check tolerance absorbs the ends; the vertical coves stay sharp.
+    """
+    area = _fillet_section_area(ROOT_FILLET_R)
+    cut = math.sqrt((BOSS_DIA / 2.0) ** 2 - (WEB_T / 2.0) ** 2)
+    side = 2.0 * (abs(FRONT_COLUMN_Z) - cut)  # one side-rail run, west
+    fr = 2.0 * (COLUMN_X - cut)  # one front/rear run, uninterrupted
+    outer = side + (side - HUB_RIB_W) + 2.0 * fr
+    window = side + (side - HUB_RIB_W) + 2.0 * (fr - (LAND_X1 - LAND_X0))
+    return area * (outer + window)
+
+
 def _bore_chamfer_removal() -> float:
-    """Volume the C1 45-degree breaks remove from all ten bore-end rims."""
+    """Volume the C1 45-degree breaks remove from the five TOP bore rims."""
 
     def ring(bore_dia: float) -> float:
         return math.pi * BORE_CHAMFER**2 * (bore_dia / 2.0 + BORE_CHAMFER / 3.0)
 
-    return 8.0 * ring(BORE_DIA) + 2.0 * ring(GOOSENECK_BORE_DIA)
+    return 4.0 * ring(BORE_DIA) + ring(GOOSENECK_BORE_DIA)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1045,18 +1068,62 @@ async def build(adapter) -> dict[str, str]:
     v_keeper = 2.0 * blind_hole_volume_mm3(TAP_DRILL_MM["#10-24"], 10.0)
     volume = await volume_check(adapter, "keeper taps", volume - v_keeper, 10.0)
 
-    # 16. Top-face rim rounds: R3 on the outer rail rim and both windows'
-    #     rims -- note 1's cast fillets on the faces every photo reads
-    #     softened (ch30 p002/p006, ch19 img04). Every rim edge, outer AND
-    #     window, terminates on a proud corner-boss barrel: the bosses
-    #     round all eight plan corners natively (their centres sit 25.56
-    #     from the window corners, inside the 26.1 radius), so there are
-    #     no corner edges to treat.
+    # 16. Internal T-root fillets: R3 along the reentrant junction where
+    #     each recessed web face meets the flange underside (y +10.25) --
+    #     the cast root blend ch19 img04 shows on every panel. One edge
+    #     per uninterrupted run: the hub rib splits both east-rail runs,
+    #     the junction lands split both front/rear window runs. The web
+    #     ring's BOTTOM rim stays sharp (no low-side breaks).
+    x_shelf_out = COLUMN_X + WEB_T / 2.0  # 203.35
+    x_shelf_in = COLUMN_X - WEB_T / 2.0  # 190.65
+    z_shelf_out = abs(FRONT_COLUMN_Z) + WEB_T / 2.0  # 118.35
+    z_shelf_in = abs(FRONT_COLUMN_Z) - WEB_T / 2.0  # 105.65
+    rib_lo = GOOSENECK_Z - HUB_RIB_W / 2.0  # -10.41
+    rib_hi = GOOSENECK_Z + HUB_RIB_W / 2.0  # +16.59
+    east_mid_lo = (-abs(FRONT_COLUMN_Z) + rib_lo) / 2.0  # rib-split run mids
+    east_mid_hi = (rib_hi + abs(FRONT_COLUMN_Z)) / 2.0
+    land_mid_w = (LAND_X0 - COLUMN_X) / 2.0  # land-split window run mids
+    land_mid_e = (LAND_X1 + COLUMN_X) / 2.0
+    check(
+        "fillet T-roots",
+        await adapter.add_fillet(
+            ROOT_FILLET_R,
+            [
+                # outer shelf: west rail, east rail (rib-split), front, rear
+                [x_shelf_out, FLANGE_BOT_Y, 0.0],
+                [-x_shelf_out, FLANGE_BOT_Y, east_mid_lo],
+                [-x_shelf_out, FLANGE_BOT_Y, east_mid_hi],
+                [0.0, FLANGE_BOT_Y, -z_shelf_out],
+                [0.0, FLANGE_BOT_Y, z_shelf_out],
+                # window shelf: west rail, east rail (rib-split),
+                # front/rear (land-split)
+                [x_shelf_in, FLANGE_BOT_Y, 0.0],
+                [-x_shelf_in, FLANGE_BOT_Y, east_mid_lo],
+                [-x_shelf_in, FLANGE_BOT_Y, east_mid_hi],
+                [land_mid_w, FLANGE_BOT_Y, -z_shelf_in],
+                [land_mid_w, FLANGE_BOT_Y, z_shelf_in],
+                [land_mid_e, FLANGE_BOT_Y, -z_shelf_in],
+                [land_mid_e, FLANGE_BOT_Y, z_shelf_in],
+            ],
+        ),
+    )
+    name_last_feature(adapter, "TRootFillets")
+    v_root = _t_root_add()
+    volume = await volume_check(
+        adapter, "T-root fillets", volume + v_root, 0.03 * v_root + 80.0
+    )
+
+    # 17. External top-face rim breaks: C2 x 45 on the outer rail rim and
+    #     both windows' rims (chamfer-for-external-edges convention). Every
+    #     rim edge, outer AND window, terminates on a proud corner-boss
+    #     barrel: the bosses round all eight plan corners natively (their
+    #     centres sit 25.56 from the window corners, inside the 26.1
+    #     radius), so there are no corner edges to treat.
     v_outer, v_window = _top_rim_removal()
     check(
-        "fillet top rims",
-        await adapter.add_fillet(
-            CAST_FILLET_R,
+        "chamfer top rims",
+        await adapter.add_chamfer(
+            EDGE_CHAMFER,
             [
                 [OUTER_X, HALF_H, 0.0],
                 [-OUTER_X, HALF_H, 0.0],
@@ -1079,39 +1146,34 @@ async def build(adapter) -> dict[str, str]:
             ],
         ),
     )
-    name_last_feature(adapter, "TopRimRounds")
+    name_last_feature(adapter, "TopRimBreaks")
     v_rims = v_outer + v_window
     volume = await volume_check(
-        adapter, "top rim rounds", volume - v_rims, 0.03 * v_rims + 100.0
+        adapter, "top rim breaks", volume - v_rims, 0.03 * v_rims + 100.0
     )
 
-    # 17. Bore-end chamfers: C1 x 45 on both ends of the four column bores
-    #     and the gooseneck bore (note 9's machined breaks; the lead-ins
-    #     the frame slides down the columns on).
+    # 18. Bore lead-in chamfers: C1 x 45 on the TOP ends of the four column
+    #     bores and the gooseneck bore only -- the boss undersides keep
+    #     sharp rims (no low-side breaks).
     boss_top_y = HALF_H + BOSS_ABOVE
-    boss_bot_y = -(HALF_H + BOSS_BELOW)
     r_bore = BORE_DIA / 2.0
     r_gn = GOOSENECK_BORE_DIA / 2.0
     check(
-        "chamfer bore ends",
+        "chamfer bore tops",
         await adapter.add_chamfer(
             BORE_CHAMFER,
             [
-                [sx * COLUMN_X, y_rim, z_world + r_bore]
+                [sx * COLUMN_X, boss_top_y, z_world + r_bore]
                 for sx in (-1.0, 1.0)
                 for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z)
-                for y_rim in (boss_top_y, boss_bot_y)
             ]
-            + [
-                [GOOSENECK_X, HALF_H, GOOSENECK_Z + r_gn],
-                [GOOSENECK_X, -(HALF_H + HUB_BOSS_DROP), GOOSENECK_Z + r_gn],
-            ],
+            + [[GOOSENECK_X, HALF_H, GOOSENECK_Z + r_gn]],
         ),
     )
-    name_last_feature(adapter, "BoreEndBreaks")
+    name_last_feature(adapter, "BoreTopBreaks")
     v_breaks = _bore_chamfer_removal()
     volume = await volume_check(
-        adapter, "bore end breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
+        adapter, "bore top breaks", volume - v_breaks, 0.02 * v_breaks + 10.0
     )
 
     # Deferred drive equations: after the whole model + a rebuild exist so
