@@ -65,7 +65,7 @@ geometry is casting-shaped, not milling-shaped.
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× Ø2.0 spring holes through 5.08 plate @ 7.0565 pitch (web ~5.06); Ø3.0 anchor bore | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
-| **`knife-mount`** | rectangular block 34×43.77×14 (bar/plate); **2 identical** | Ø25.4 through bore (bearing bore for the trunnion), centre ~27.1 below the top face (`BORE_CY` −12.45 from the knife-edge origin, block top +14.62); walls 4.0 under bore, ~4.3 flanks | watch **bore breakout on the 4 mm floor**; otherwise trivial | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or trivial manual. **Gap:** mount-to-crossbar fastener holes are *not modeled* — add before drawing |
+| **`knife-mount`** | rectangular block 34×43.77×14 (bar/plate); **2 identical** | Ø25.4 through bore (bearing bore for the trunnion), centre ~27.1 below the top face (`BORE_CY` −12.45 from the knife-edge origin, block top +14.62); tapped 1/2-13 blind hole ×12 in the block top (hanger-stud seat); walls 4.0 under bore, ~4.3 flanks | watch **bore breakout on the 4 mm floor**; otherwise trivial | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or trivial manual. Hangs from the top-frame casting's integral crossbar (the former separate top-crossbar part is merged into the top-frame) via a 1/2-13 knife-hanger stud |
 
 ### Cylinder gear + cam, connecting rod (T1 — the 20 function generators)
 
@@ -108,8 +108,9 @@ geometry is casting-shaped, not milling-shaped.
 2. **Decide the `summing-lever` fabrication method** (cast / fabricate / hog) and the **knife-edge
    insert** now — it drives whether this is a 5-setup nightmare or two simple operations, and it is the
    critical interface.
-3. **Model the `knife-mount` mounting holes** — the block is placed on the crossbar but its fastener
-   holes aren't in the script, so a generated drawing would omit them.
+3. ~~**Model the `knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02): the
+   block hangs from the top-frame casting's integral crossbar via a 1/2-13 hanger stud threaded
+   into a tapped hole in the block top; both the stud and the tapped hole are modeled.
 4. **Reconcile the `rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
    drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
 5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a

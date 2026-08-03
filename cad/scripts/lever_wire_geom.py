@@ -36,17 +36,21 @@ CLEARANCE = 0.25  # surface stand-off (interference-gate margin convention)
 # back groove band. Solving the clearance system (>= 0.25 surface everywhere;
 # rim back-face bound at radius 43.35, axle-flange bound inside radius 17.9,
 # spoke fronts at -144.9) gives the hook/hub-end pair below: a 10 mm z drop
-# over the ~363 run = 1.6 deg, visually plumb.
+# over the ~353 run = 1.6 deg, visually plumb.
 CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 # The wire TIES through the fixture's cross hole and hangs beside the vertical
 # rod, just under the collar's bottom face: wire r + 0.25 below it in y, and
 # off the rod axis in -z by rod r 2.5 + wire r 0.4 + 0.25 = 3.15 (the front
 # face of the rod). So HOOK_Z = VROD_Z - 3.15 with VROD_Z = -134.8
-# (LEVER_ROD_Z -128.3 -- the ONLY depth window: the top-frame ring rail
-# (z -101..-123, y >= 999.7) forces the thumb-screw head band deeper than
-# -128.25 and the front column forces the rod deeper than -127.95, while the
-# wire's rim-duck feasibility caps the hook at ~-137.96).
-HOOK_Y = 925.35  # FIXTURE_Y0 926 - wire r 0.4 - 0.25 (under the collar bottom)
+# (LEVER_ROD_Z -128.3 -- depth window RE-SOLVED 2026-08-02 for the one-piece
+# top-frame casting (front rail z -93..-131, band y 999.7..1036.2): the
+# thumb-screw head top now stays at 998.7, >= 0.25 (actual 1.0) below the
+# casting underside 999.7 (#4-40 shortened 12 -> 11), so the rail imposes NO
+# depth bound -- pushing the head band past the rail outer face -131 would
+# instead need <= -136.25, beyond the rim-duck floor. Remaining window: the
+# front column surface -124.7 forces the rod deeper than -127.95, while the
+# wire's rim-duck feasibility caps the hook at ~-137.96 => rod >= -128.31).
+HOOK_Y = 915.05  # FIXTURE_Y0 915.7 - wire r 0.4 - 0.25 (under the collar bottom)
 HOOK_Z = -137.95
 WHEEL_X = 53.0  # magnifying-wheel centre
 WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)

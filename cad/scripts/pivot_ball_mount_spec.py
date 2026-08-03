@@ -11,8 +11,9 @@ from _surface_finish import GROUND_UM, MACHINED_UM, SurfaceFinishControl
 
 
 # Nickel-plated ball-end pillar carrying each pivot shaft end: a seat pad, a stem,
-# and a Ø13 ball cross-bored for the Ø6.35 pivot shaft. Four are used (two on
-# the rocker-support apexes, two on the top-frame west rail).
+# and a Ø13 ball cross-bored for the Ø6.35 pivot shaft. Two are used, on the
+# rocker-support apexes (the top-lever fulcrum's end mounts are the black
+# fulcrum-keeper brackets since the 2026-08-02 rederive).
 BALL_DIA = 13.0  # the pivot ball (spherical)
 BALL_CENTER_H = 25.2  # ball + cross-bore axis above the seat
 BASE_DIA = 13.0  # seat pad diameter

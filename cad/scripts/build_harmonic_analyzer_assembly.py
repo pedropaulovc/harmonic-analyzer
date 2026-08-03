@@ -14,8 +14,9 @@ Cross-subassembly fits proven by the top-level interference check:
   summing-lever plate's O4.5 holes (summing.SLDASM), each presenting its arm
   just above the plate where the spring's bottom eye links on -- gated
   analytically by build_channel_assembly._assert_hook_fastener;
-* top-crossbar ends face-flush on the top-frame ring rail inner faces
-  (frame.SLDASM), gooseneck-clamp around the east column (all summing.SLDASM);
+* knife-hanger studs (summing.SLDASM) rise through the top-frame casting's
+  integral crossbar (frame.SLDASM), whose set screw grips the gooseneck post
+  at the east-rail hub;
 * column-clamps (magnifier + paper-drive) ride the Ø25.4 columns (frame) with
   a 25.6 bore;
 * the pen-hanger (pen.SLDASM) clamps the wheel-bar (magnifier.SLDASM), and the
@@ -65,8 +66,15 @@ import _telemetry
 
 ASM_NAME = "harmonic-analyzer"
 
-SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen",
-                 "paper-drive")
+SUBASSEMBLIES = (
+    "frame",
+    "drive-train",
+    "channel",
+    "summing",
+    "magnifier",
+    "pen",
+    "paper-drive",
+)
 
 # Loose hardware on the base top -- a generic tool, not part of any mechanism.
 # Parked in the FAR-WEST margin lane running along Z (machine x -220..-212,
@@ -85,6 +93,7 @@ SUBASSEMBLIES = ("frame", "drive-train", "channel", "summing", "magnifier", "pen
 STICK_POS = (-212.0, 53.8, -100.0)
 STICK_EULER = [90.0, -90.0, 0.0]
 STICK_ROWS = [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
+
 
 def _subassembly(name: str) -> str:
     path = (OUT_SLDASM / f"{name}.SLDASM").resolve()
@@ -124,8 +133,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Loose hardware on the base top (not part of any mechanism). Exact machine
     # transform: flat, graduated face up, long axis along Z.
-    await place_component(adapter, "measuring-stick", list(STICK_POS),
-                          STICK_EULER, STICK_ROWS)
+    await place_component(
+        adapter, "measuring-stick", list(STICK_POS), STICK_EULER, STICK_ROWS
+    )
 
     assert_components_fully_defined(adapter)
     check_no_interference(

@@ -12,7 +12,7 @@ originally kept no geom split; codex #360 showed the note text leaking into
 both closures through the ``build_lever_wire`` import chain, so the solver
 moved wholesale into ``lever_wire_geom``.)
 
-The wire is a Ø0.8 drawn-steel cylinder ~363 long -- a thin silhouette with no
+The wire is a Ø0.8 drawn-steel cylinder ~353 long -- a thin silhouette with no
 flat face, no end-face big enough to pick and no selectable silhouette edge, so
 NOTHING is a marked dimension; the diameter and straight rest-run length ride the
 notes.  The rest-run length is COMPUTED between the two solved endpoints, but it

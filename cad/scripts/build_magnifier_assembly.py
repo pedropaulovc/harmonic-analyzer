@@ -121,18 +121,26 @@ BAR_FRONT_Z = BAR_BACK_Z - WHEEL_BAR_DEPTH  # -138.9: bar front = platen-back pl
 BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
 
 # --- magnifying group --------------------------------------------------------
-# Rod at the plate centreline (990) so it is coplanar with the coefficients plate
-# (raised from 985); the bracket flange butts the plate front face. The clamp +
-# vertical rod ride up with it (CLAMP_POS and VROD_TOP_Y derive from LEVER_ROD_Y).
-LEVER_ROD_Y = 990.0
+# Rod at the plate centreline (979.7 -- the whole summing chain dropped 10.3
+# with the one-piece top-frame casting, crossbar underside 1010 -> 999.7) so it
+# stays coplanar with the coefficients plate; the bracket flange butts the
+# plate front face. The clamp + vertical rod ride with it (CLAMP_POS and
+# VROD_TOP_Y derive from LEVER_ROD_Y).
+LEVER_ROD_Y = 979.7
 # DEPTH RE-ANCHOR (2026-07-04): the ch30 p.4 side view shows the whole output
 # line (fixture wire, wheel, rim wire, pen rod) as ONE plumb vertical at the
 # machine front -- the old z -85 (M6.4, low) hung the wire hook 50 behind the
-# wheel plane, an ~8 deg lean the photo refutes. -128.3 is the ONLY window:
-# the thumb-screw head (top y 1010, pokes above the top-frame ring bottom
-# 999.7) must clear the ring's front rail z -101..-123 (=> <= -128.25), the
-# lever rod must clear the front column surface -124.7 (=> <= -127.95), and
-# the lever-wire's rim-duck route caps the hook at ~-137.96 (=> >= -128.31).
+# wheel plane, an ~8 deg lean the photo refutes. Window RE-SOLVED 2026-08-02
+# for the one-piece top-frame casting (front rail z -93..-131, band
+# y 999.7..1036.2): the thumb-screw head (Ø10) no longer pokes above the
+# casting underside 999.7 -- its top lands at 998.7 (>= 0.25 margin, actual
+# 1.0) after the #4-40 was shortened 12 -> 11 (see the tscrew placement
+# below), so the rail imposes NO depth bound at all (the z escape would need
+# the whole head band past the rail outer face -131, i.e. <= -136.25, far
+# beyond the rim-duck floor -128.31 -- infeasible). Surviving bounds: the
+# lever rod (Ø6) must clear the front column surface -124.7 by 0.25
+# (=> <= -127.95, actual surface gap 0.6) and the lever-wire's rim-duck
+# route caps the hook at ~-137.96 (=> >= -128.31). -128.3 stands unchanged.
 # VROD_Z = -134.8 (clamp's 6.5 skew bore); wire hook -137.95; the bracket arm
 # reaches back to the unchanged plate flange (build_magnifying_bracket).
 LEVER_ROD_Z = -128.3
@@ -167,7 +175,7 @@ CLAMP_POS = (
 )
 VROD_Z = LEVER_ROD_Z - CLAMP_ROD_DX  # -134.8 (local +x -> machine -z)
 VROD_TOP_Y = LEVER_ROD_Y + 5.0  # dome inside the clamp's rod bore (rides the rod)
-FIXTURE_Y0 = 926.0  # collar y 926..934 on the vertical rod
+FIXTURE_Y0 = 915.7  # collar y 915.7..923.7 on the vertical rod (rode down 10.3)
 
 # --- wheel -------------------------------------------------------------------
 WHEEL_X = 53.0
@@ -392,13 +400,18 @@ async def build(adapter) -> dict[str, str]:
                     named_ref(f"Front Plane@{ml}", "PLANE"),
                     label="mag-clamp locked to lever")
     # Backed-out thumb screw: shank tip tangent to the rod top (a seated
-    # screw would overlap the rod it pinches -- see module docstring). Rz(-90)
-    # points the shank down the clamp bore; the extra Ry(180) turns its head
-    # features to the machine hand ([180, 0, -90] is the same rotation's Euler
-    # form).
+    # screw would overlap the rod it pinches -- see module docstring). Stack:
+    # rod top +3.0 + under-head 11.0 + head 5.0 = head top y 998.7, kept
+    # >= 0.25 (actual 1.0) BELOW the top-frame casting underside 999.7 -- the
+    # #4-40 was shortened 12 -> 11 (2026-08-02, _fastener_catalog) exactly so
+    # the head clears the full-depth front rail (z -93..-131) in y; the clamp
+    # tap band (block top +7 down to bore top +3.1) stays fully engaged.
+    # Rz(-90) points the shank down the clamp bore; the extra Ry(180) turns
+    # its head features to the machine hand ([180, 0, -90] is the same
+    # rotation's Euler form).
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
     tscrew = await place_component(adapter, "thumb-screw",
-                                   [CLAMP_X, LEVER_ROD_Y + 3.0 + 12.0 + 5.0, LEVER_ROD_Z],
+                                   [CLAMP_X, LEVER_ROD_Y + 3.0 + 11.0 + 5.0, LEVER_ROD_Z],
                                    [180.0, 0.0, -90.0], _rz90_ry180, ground=False,
                                    label="thumb-screw (clamp)")
     await lock_mate(adapter, named_ref(f"Front Plane@{tscrew}", "PLANE"),

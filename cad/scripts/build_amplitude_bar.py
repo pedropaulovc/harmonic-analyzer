@@ -1,13 +1,15 @@
 r"""Reproduction script: amplitude bar (book ch. 15, pp. 30-33).
 
-One of the 20 chrome-finished bars (~80 cm long, 1/4" square) that set each
+One of the 20 chrome-finished bars (~81 cm long, 1/4" square) that set each
 channel's Fourier coefficient. The bottom-end notch rides the rocker arm;
 the deeper top-end notch straddles the channel lever and hangs from its Ø2
 bar pin through the top pin hole (M6.3 layout: bars run UP the spine from
 the rocker bank to the top-lever bank).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 15" — width 6.35 mm is book-annotated,
-length ~80 cm book-stated (legacy 32" = 812.8 mm consistent, used exactly);
+length legacy 32" = 812.8 mm SHORTENED 4.5 at the top to 808.3 by the
+2026-08-02 top-frame rederive (fulcrum chain -4.5: bar top 1067.75, top pin
+1061.4; foot/arc contact unchanged, level d=0 rest pose preserved);
 notch sizes are uncontradicted legacy values; top pin hole derived (M6.3).
 Audit verdict: PASS.
 
@@ -68,7 +70,9 @@ import _telemetry
 PART_NAME = "amplitude-bar"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-BAR_LENGTH = 32.0 * IN  # 812.8  DIMENSIONS.md ch15: ~80 cm stated; legacy 32" (high)
+BAR_LENGTH = 32.0 * IN - 4.5  # 808.3: legacy 32" minus the 4.5 top-frame-rederive
+# top trim (fulcrum chain -4.5, 2026-08-02; foot end untouched). MUST equal
+# amplitude_bar_spec.BAR_LENGTH.
 BAR_WIDTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: annotated (high)
 BAR_DEPTH = 0.25 * IN  # 6.35   DIMENSIONS.md ch15: legacy, square section (med)
 BOTTOM_NOTCH_WIDTH = 0.125 * IN  # 3.175  DIMENSIONS.md ch15: legacy (med)
@@ -237,7 +241,7 @@ async def build(adapter) -> dict[str, str]:
     # Named axes (parallel to the top-pin bore, view-independent selection):
     # Axis1 = top-pin bore at (y = pin_y, z = mid-depth) -- the hole runs along
     # local X, so the axis is (Top + pin_y) ∩ (Front + depth/2); Axis2 = a foot
-    # reference axis at the bar bottom (y = 0), an ~806 mm lever arm from the
+    # reference axis at the bar bottom (y = 0), an ~802 mm lever arm from the
     # top pin that the assembly spin driver uses to pin the bar's swing.
     # Tie each axis's offset planes to the same globals that drive the bore/body,
     # so a GUI edit moves the named axes (and the channel-assembly mates to them)
@@ -307,7 +311,7 @@ async def build(adapter) -> dict[str, str]:
     # direct, view-independent proof of the book-sourced overall length.
     await bbox_extent_check(
         adapter,
-        "bar length (stated ~80 cm / legacy 32 in)",
+        "bar length (32 in - 4.5 top trim = 808.3)",
         "y",
         BAR_LENGTH,
     )

@@ -131,11 +131,15 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "MP (5-9% P)" in str(config["finish"])
     assert "SC1" in str(config["finish"])
     assert "after plate" in str(config["finish"])
-    assert int(config["quantity"]) == 4
+    # 2026-08-02 top-frame rederive: the lever pair on the rail top was
+    # replaced by fulcrum-keeper brackets; only the rocker pair remains.
+    assert int(config["quantity"]) == 2
 
 
 def test_surface_finishes_are_part_owned_authored_and_consumed() -> None:
-    by_key = {control.key: control for control in pivot_ball_mount_spec.SURFACE_FINISHES}
+    by_key = {
+        control.key: control for control in pivot_ball_mount_spec.SURFACE_FINISHES
+    }
     assert set(by_key) == {"cross_bore", "turned_exterior_before_plate"}
     bore = by_key["cross_bore"]
     assert bore.roughness_um == _surface_finish.MACHINED_UM

@@ -113,6 +113,17 @@ def hex_head_notes(*, across_flats_mm: float, head_height_mm: float) -> tuple[st
     )
 
 
+def square_head_notes(
+    *, across_flats_mm: float, head_height_mm: float
+) -> tuple[str, ...]:
+    """Return controls for a custom square head (period wrench-driven style)."""
+    return (
+        f"CUSTOM SQUARE HEAD {across_flats_mm:.2f} +/-0.10 ACROSS FLATS X "
+        f"{head_height_mm:.2f} +/-0.10 HIGH.",
+        "B18 HEAD DIMENSIONS DO NOT APPLY.",
+    )
+
+
 def reeded_head_notes(
     *, head_name: str, head_dia_mm: float, head_length_mm: float, groove_count: int
 ) -> tuple[str, ...]:

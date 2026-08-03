@@ -1,7 +1,8 @@
 r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
 The cast bearing block that suspends the summing lever's knife edge from the
-top crossbar. The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
+top-frame casting's integral crossbar (hung by a 1/2-13 knife-hanger stud
+threaded into the block top). The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
 
@@ -17,10 +18,12 @@ There are TWO supports, one per trunnion (placed front/back in the assembly at
 |z| ~ 87). This single part is built once and placed twice.
 
 Layout (part-local): origin = the **knife-edge contact line** = the hex top
-vertex ridge (placed at machine (15, 995.13, +-87)); local Z = the bore/trunnion
+vertex ridge (placed at machine (15, 984.83, +-87)); local Z = the bore/trunnion
 axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
-block rises from below the bore up to the top-crossbar lower face (held there).
+block rises from below the bore up to just under the top-frame casting underside
+(999.7); the hanger stud threads 12 into the block-top tap and carries the hang.
+The tap-drill point breaks into the bore crown (accepted; see the notes).
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@summing-lever``) coincident to
@@ -58,6 +61,12 @@ from _common import (
     volume_check,
 )
 from summing_lever_spec import HEX_H, HEX_W
+from _holes import (
+    HoleSpec,
+    blind_cut_dia_mm,
+    blind_hole_volume_mm3,
+    wizard_holes,
+)
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -91,14 +100,27 @@ BLK_HALF_X = 17.0  # bore wall + flank
 WALL = 4.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -29.15
 
-# Mount: the block top abuts the top-crossbar lower face (held to the top frame).
-KNIFE_Y = 990.0  # machine y of the pivot centreline (build_summing_assembly KNIFE)
-CROSSBAR_BOTTOM_Y = 1010.0  # top-crossbar lower face (build_summing_assembly)
-MOUNT_GAP = 0.25  # design clearance to the crossbar (sliver-flag margin)
-CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (995.13)
-BLK_TOP = CROSSBAR_BOTTOM_Y - CONTACT_Y - MOUNT_GAP  # local top (14.62)
+# Mount: the block top seat hangs MOUNT_GAP below the top-frame casting
+# underside (the integral crossbar's flush lower face); the knife-hanger stud
+# threaded into the block top carries the hang (build_summing_assembly).
+KNIFE_Y = 979.7  # machine y of the pivot centreline (build_summing_assembly KNIFE)
+CASTING_UNDERSIDE_Y = 999.7  # top-frame casting underside (integral crossbar)
+MOUNT_GAP = 0.25  # design clearance to the casting (sliver-flag margin)
+CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
+BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.62)
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
+
+# --- hanger-stud tap: 1/2-13 UNC-2B blind x12.0 in the block top -------------
+# On the trunnion-axis centreline (local x 0, z 0): the knife-hanger stud
+# threads STUD_TAP_DEPTH in and hangs the mount from the casting's integral
+# crossbar. Material above the bore crown is only BLK_TOP - TOP_CLEAR = 14.37,
+# so the 118-deg tap-drill point (r * 0.60086 = 3.22 tall) breaks into the bore
+# crown -- accepted: the bearing contact line is interrupted only over ~2 mm at
+# mid-length (called out in the drawing notes).
+STUD_TAP_DEPTH = 12.0
+STUD_TAP_SPEC = HoleSpec("tapped", "1/2-13", end="blind", depth_mm=STUD_TAP_DEPTH)
+STUD_TAP_DIA = blind_cut_dia_mm(STUD_TAP_SPEC)  # 10.716 tap drill (27/64)
 
 
 async def _volume(adapter) -> float:
@@ -211,6 +233,27 @@ async def build(adapter) -> dict[str, str]:
         d = math.hypot(HEX_W / 2.0, sy - BORE_CY)
         if d > R_BORE - 0.5:
             raise RuntimeError(f"hex shoulder {d:.3f} mm too close to Ø{2*R_BORE} bore")
+
+    # Hanger-stud tap: ONE native Hole Wizard 1/2-13 blind tapped hole x12.0 in
+    # the block top, on the trunnion-axis centreline (both placement coords are
+    # zero -> origin-axis relations, no placement dims). The analytic
+    # expectation subtracts the full cylinder + drill-point volume; the point's
+    # break-in to the bore crown re-removes only ~1 mm^3 of already-void space,
+    # far inside the 1% gate.
+    tap = wizard_holes(
+        adapter,
+        STUD_TAP_SPEC,
+        [[0.0, BLK_TOP, 0.0]],
+        (0.0, 1.0, 0.0),
+        "hanger-stud tapped hole (1/2-13)",
+        name="StudTap",
+        expect_dia_mm=STUD_TAP_DIA,
+    )
+    expected -= blind_hole_volume_mm3(tap.hole_dia_mm, tap.depth_mm)
+    vol = await _volume(adapter)
+    _telemetry.info(f"volume after stud tap: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 0.01 * expected:
+        raise RuntimeError(f"stud tap volume {vol:.1f} != {expected:.1f}")
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The
     # assembly mates Axis3@summing-lever (the hex ridge) coincident to it.

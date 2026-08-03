@@ -105,16 +105,16 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_fulcrum_shaft.py",
     ),
     DrawingSpec(
+        name="fulcrum_keeper",
+        part="fulcrum_keeper",
+        artifact_stem="fulcrum-keeper",
+        script_name="draw_fulcrum_keeper.py",
+    ),
+    DrawingSpec(
         name="pivot_shaft",
         part="pivot_shaft",
         artifact_stem="pivot-shaft",
         script_name="draw_pivot_shaft.py",
-    ),
-    DrawingSpec(
-        name="top_crossbar",
-        part="top_crossbar",
-        artifact_stem="top-crossbar",
-        script_name="draw_top_crossbar.py",
     ),
     DrawingSpec(
         name="pen_assembly",
@@ -382,12 +382,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_gooseneck.py",
     ),
     DrawingSpec(
-        name="gooseneck_clamp",
-        part="gooseneck_clamp",
-        artifact_stem="gooseneck-clamp",
-        script_name="draw_gooseneck_clamp.py",
-    ),
-    DrawingSpec(
         name="measuring_stick",
         part="measuring_stick",
         artifact_stem="measuring-stick",
@@ -578,6 +572,24 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="thumb_screw",
         artifact_stem="thumb-screw",
         script_name="draw_thumb_screw.py",
+    ),
+    DrawingSpec(
+        name="frame_side_screw",
+        part="frame_side_screw",
+        artifact_stem="frame-side-screw",
+        script_name="draw_frame_side_screw.py",
+    ),
+    DrawingSpec(
+        name="gooseneck_set_screw",
+        part="gooseneck_set_screw",
+        artifact_stem="gooseneck-set-screw",
+        script_name="draw_gooseneck_set_screw.py",
+    ),
+    DrawingSpec(
+        name="knife_hanger_stud",
+        part="knife_hanger_stud",
+        artifact_stem="knife-hanger-stud",
+        script_name="draw_knife_hanger_stud.py",
     ),
     DrawingSpec(
         name="summing_assembly",

@@ -34,7 +34,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
 # The spec table (rendered as a property-linked note).  Columns are space-padded
 # for a monospace-style read.
-# The free pitch is stated (165 x 1.80 close-wound would be 297, not 315 --
+# The free pitch is stated (165 x 1.80 close-wound would be 297, not 325.3 --
 # the body is wound slightly OPEN and the table must say so); hook leads carry
 # their measurement endpoints; the rate is a REF functional requirement.
 DRAWING_NOTES = "\n".join(

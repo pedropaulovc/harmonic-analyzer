@@ -52,12 +52,12 @@ import build_summing_assembly as s
 
 expect("summing", "knife-mount-1", [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.SUMMING_Z + s.HEX_Z_MID], IDENTITY, "knife-mount front")
 expect("summing", "knife-mount-2", [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.SUMMING_Z - s.HEX_Z_MID], IDENTITY, "knife-mount back")
-expect("summing", "top-crossbar-1", [s.KNIFE[0], 1010.0, s.BAR_CENTER_Z], IDENTITY, "top-crossbar")
+expect("summing", "knife-hanger-stud-1", [s.KNIFE[0], s.HANGER_STUD_Y, s.SUMMING_Z + s.HEX_Z_MID], IDENTITY, "knife-hanger-stud front")
+expect("summing", "knife-hanger-stud-2", [s.KNIFE[0], s.HANGER_STUD_Y, s.SUMMING_Z - s.HEX_Z_MID], IDENTITY, "knife-hanger-stud back")
 expect("summing", "summing-lever-1", [s.KNIFE[0], s.KNIFE[1], s.SUMMING_Z], IDENTITY, "summing-lever")
 expect("summing", "boss-hook-1", list(s.BOSS_HOOK_POS), ROT_Y_180, "boss-hook")
 expect("summing", "counter-spring-1", list(s.SPRING_POS), ROT_Y_POS90, "counter-spring")
 expect("summing", "gooseneck-1", [s.COLUMN_X, 1210.0, s.SUMMING_Z], ROT_Y_180, "gooseneck")
-expect("summing", "gooseneck-clamp-1", [s.COLUMN_X, 1040.7, s.SUMMING_Z], IDENTITY, "gooseneck-clamp")
 
 # ---- pen ------------------------------------------------------------------
 import build_pen_assembly as p
@@ -91,7 +91,7 @@ expect("magnifier", "magnifying-lever-1", [m.LEVER_X0, m.LEVER_ROD_Y, m.LEVER_RO
 expect("magnifier", "magnifying-bracket-1", [40.0, m.LEVER_ROD_Y, m.LEVER_ROD_Z], IDENTITY, "magnifying-bracket")
 expect("magnifier", "magnifying-clamp-1", list(m.CLAMP_POS), ROT_Y_POS90, "magnifying-clamp")
 _rz = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
-expect("magnifier", "thumb-screw-1", [m.CLAMP_X, m.LEVER_ROD_Y + 20.0, m.LEVER_ROD_Z], _rz, "thumb-screw")
+expect("magnifier", "thumb-screw-1", [m.CLAMP_X, m.LEVER_ROD_Y + 19.0, m.LEVER_ROD_Z], _rz, "thumb-screw")
 expect("magnifier", "magnifying-vertical-rod-1", [m.CLAMP_X, m.VROD_TOP_Y, m.VROD_Z], _rz, "vertical-rod")
 expect("magnifier", "output-fixture-1", [m.CLAMP_X, m.FIXTURE_Y0, m.VROD_Z], IDENTITY, "output-fixture")
 expect("magnifier", "wheel-axle-1", [m.WHEEL_X, m.WHEEL_BAR_Y, m.BAR_FRONT_Z], ROT_X_NEG90, "wheel-axle")
@@ -236,11 +236,13 @@ _t = math.radians(st0["arm_tilt"])
 arm_dx = c.ARM_PIVOT_LOCAL_Y * math.sin(_t)
 arm_dy = c.ARM_PIVOT_LOCAL_Y * math.cos(_t)
 expect(CH, "pivot-shaft-1", [c.PIVOT[0], c.PIVOT[1], c.PIVOT_SHAFT_Z], IDENTITY, "pivot-shaft")
-expect(CH, "fulcrum-shaft-1", [c.FULCRUM[0], c.FULCRUM[1], 0.0], IDENTITY, "fulcrum-shaft")
-expect(CH, "pivot-ball-mount-1", [c.PIVOT[0], c.SUPPORT_APEX_Y, -c.AFRAME_MOUNT_Z_ABS], IDENTITY, "ball-mount rocker south")
+expect(CH, "fulcrum-shaft-1", [c.FULCRUM[0], c.FULCRUM[1], c.FULCRUM_SHAFT_Z], IDENTITY, "fulcrum-shaft")
+expect(CH, "pivot-ball-mount-1", [c.PIVOT[0], c.SUPPORT_APEX_Y, c.AFRAME_MOUNT_Z], IDENTITY, "ball-mount rocker south")
 expect(CH, "pivot-ball-mount-2", [c.PIVOT[0], c.SUPPORT_APEX_Y, c.SUPPORT_Z], IDENTITY, "ball-mount rocker north")
-expect(CH, "pivot-ball-mount-3", [c.FULCRUM[0], c.RAIL_TOP_Y, -c.LEVER_MOUNT_Z], IDENTITY, "ball-mount lever -z")
-expect(CH, "pivot-ball-mount-4", [c.FULCRUM[0], c.RAIL_TOP_Y, c.LEVER_MOUNT_Z], IDENTITY, "ball-mount lever +z")
+expect(CH, "fulcrum-keeper-1", [c.FULCRUM[0], c.RAIL_TOP_Y, c.FULCRUM_SHAFT_Z + c.KEEPER_Z_OFF], [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]], "fulcrum keeper +z (rear)")
+expect(CH, "fulcrum-keeper-2", [c.FULCRUM[0], c.RAIL_TOP_Y, c.FULCRUM_SHAFT_Z - c.KEEPER_Z_OFF], [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]], "fulcrum keeper -z (front)")
+expect(CH, "frame-side-screw-1", [c.FULCRUM[0], c.RAIL_TOP_Y + c.KEEPER_SCREW_SEAT_H, c.FULCRUM_SHAFT_Z + c.KEEPER_SCREW_Z_OFF], IDENTITY, "keeper foot screw +z")
+expect(CH, "frame-side-screw-2", [c.FULCRUM[0], c.RAIL_TOP_Y + c.KEEPER_SCREW_SEAT_H, c.FULCRUM_SHAFT_Z - c.KEEPER_SCREW_Z_OFF], IDENTITY, "keeper foot screw -z")
 _SOLV = dict(pos_tol=0.005, row_tol=1e-5)
 for j in range(1, 20):
     z_gap = c.z_station(j) + c.ARM_MID_DZ - c.PITCH / 2.0

@@ -19,6 +19,8 @@ FASTENER_SPECS = {
     "cone-tip-pinch-screw": "cone_tip_pinch_screw_spec",
     "fillister-screw": "fillister_screw_spec",
     "foot-screw": "foot_screw_spec",
+    "frame-side-screw": "frame_side_screw_spec",
+    "gooseneck-set-screw": "gooseneck_set_screw_spec",
     "hanger-screw": "hanger_screw_spec",
     "lag-screw": "lag_screw_spec",
     "pen-set-screw": "pen_set_screw_spec",
@@ -32,6 +34,7 @@ SLOTTED_MADE_PARTS = {
     "clamp_screw_spec": "build_clamp_screw",
     "fillister_screw_spec": "build_fillister_screw",
     "foot_screw_spec": "build_foot_screw",
+    "frame_side_screw_spec": "build_frame_side_screw",
     "lag_screw_spec": "build_lag_screw",
     "slotted_screw_spec": "build_slotted_screw",
 }

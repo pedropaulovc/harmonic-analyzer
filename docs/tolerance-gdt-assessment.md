@@ -208,7 +208,7 @@ means, so it is called out per row.
 
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
-| **Flatness** | knife-mount seat face; pedestal + base mating faces; top-crossbar seat | ≤0.02–0.05 mm | surface-grind or single-setup face; dial-indicator sweep on 3 jacks, or CMM |
+| **Flatness** | knife-mount seat face; pedestal + base mating faces; top-frame integral-crossbar underside (stud seat; the former top-crossbar is merged into the top-frame casting) | ≤0.02–0.05 mm | surface-grind or single-setup face; dial-indicator sweep on 3 jacks, or CMM |
 | **Straightness** (axis, Ø zone) | `pivot-shaft`, `fulcrum-shaft`, `cone-gear-shaft` tip, `crank-pin` axes | ≤0.02–0.05 mm over length | between-centres turn + steady; indicate on Vee-blocks. Rule #1 (below) already bounds it at MMC |
 | **Circularity / Cylindricity** | gear + cam blanks, running journals, bearing bores | folds into runout, below | 4-jaw indicate true; rotate-and-probe, polar plot |
 
@@ -332,7 +332,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 | **Drive train** `crankshaft`, `crank-pin`, `crank-drive-gear`, `crank-pinion`, `crank-arm`, `crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
 | **Paper drive** `rack-pinion`, `platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | rack/pinion **DP 30 / 14.5°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
 | **Magnifier & pen** `magnifying-wheel`, `magnifying-lever`, `magnifying-bracket/clamp`, `magnifying-vertical-rod`, pen parts | **T2** | wheel/lever bores `precision` + runout on the wheel; linkage pivots squareness. Amplifies output, so play here is visible — but downstream of the sum. |
-| **Frame** `harmonic-base`, `top-frame`, `top-crossbar`, pedestals, clamps, columns, `gooseneck*` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
+| **Frame** `harmonic-base`, `top-frame` (one casting: ring + integral crossbar + gooseneck hub — absorbed the former `top-crossbar` and `gooseneck-clamp`, 2026-08-02), pedestals, clamps, columns, `gooseneck` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
 | **Springs** `channel-spring-installed`, `counter-spring` | **T2** | **match rate + free length across the 20 channels** (consistency, not absolute rate); counter spring is the **coarse tare** — leave loose. |
 | **Measuring stick** `measuring-stick` | **T3** | leave loose — original was hand-stamped & uneven; what matters is **one stick sets all 20 bars**. |
 | **Fasteners / misc** `hex-bolt`, `lag-screw`, `hanger-screw`, `fillister-screw`, `thumb-screw`, `nameplate`, knobs | **T3** | `fastener_clearance` close/normal as-is; no additions. |

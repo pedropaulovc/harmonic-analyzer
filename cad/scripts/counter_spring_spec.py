@@ -11,7 +11,11 @@ The nominal values MUST match build_counter_spring.py.
 from __future__ import annotations
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 19"). ---
-COIL_BODY_LENGTH = 315.0  # close-wound coil body length
+COIL_BODY_LENGTH = 325.3  # INSTALLED coil body length. The ch. 19 read was
+# ~315 at the pre-rederive hang; the top-frame rederive (Cascade A,
+# 2026-08-02) dropped the bottom anchor 10.3 with the summing chain while the
+# gooseneck top loop stayed at 1370.6, so the modeled installed body
+# stretched +10.3. The part models the installed hang, as it always has.
 COIL_OD = 12.5  # coil outer diameter
 WIRE_DIA = 1.8  # music-wire diameter
 COIL_COUNT = 165  # total coils (close-wound)
@@ -22,7 +26,7 @@ BOTTOM_HOOK_LEAD = 40.0
 TOP_HOOK_LEAD = 2.0 * WIRE_DIA
 HOOK_CL_RADIUS = MEAN_DIA / 2.0
 FREE_EYE_C2C = COIL_BODY_LENGTH + BOTTOM_HOOK_LEAD + TOP_HOOK_LEAD
-FREE_PITCH = COIL_BODY_LENGTH / COIL_COUNT  # 1.91 -- NOT close-wound
+FREE_PITCH = COIL_BODY_LENGTH / COIL_COUNT  # 1.97 -- NOT close-wound
 # Nominal rate k = G d^4 / (8 Dm^3 n), ASTM A228 G = 79.3 GPa -- stated REF so
 # the table carries a functional requirement, not just geometry.
 SPRING_RATE_REF = 79300.0 * WIRE_DIA**4 / (8.0 * MEAN_DIA**3 * COIL_COUNT)

@@ -55,7 +55,12 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     fulcrum_min = channel.FULCRUM_SHAFT_Z - fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
     fulcrum_max = channel.FULCRUM_SHAFT_Z + fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
     assert fulcrum_min < row_min < row_max < fulcrum_max
-    assert fulcrum_min < channel.LEVER_MOUNT_Z[0] < channel.LEVER_MOUNT_Z[1] < fulcrum_max
+    # The end keepers grip the shaft ENDS: ball centres 2.25 inboard of each
+    # end, feet + screws inboard of the corner-boss lands (2026-08-02 remount).
+    keeper_lo = channel.FULCRUM_SHAFT_Z - channel.KEEPER_Z_OFF
+    keeper_hi = channel.FULCRUM_SHAFT_Z + channel.KEEPER_Z_OFF
+    assert fulcrum_min < keeper_lo < row_min < row_max < keeper_hi < fulcrum_max
+    assert channel.KEEPER_Z_OFF - channel.KEEPER_SCREW_Z_OFF == 14.75
 
 
 def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:

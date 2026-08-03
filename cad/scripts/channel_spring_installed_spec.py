@@ -24,22 +24,27 @@ COIL_COUNT = 28
 # Installed (in-machine) eye anchor heights -- the assembly-facing placement
 # contract (build_channel_assembly imports these; moved here from
 # build_channel_spring_installed so the assembly needs no builder import).
-LEVER_EYE_Y = 1062.5234  # LIVE neutral top eye = lever spring hole 1065.89 -
-# drop 3.37 (ch14 ROM re-derive: the LEVEL rocker rest pose flattens the neutral
-# lever tilt to -0.002 deg, dropping the eye 0.73; was 1063.25 at the ch30 GT
-# re-anchor's 0.231 deg tilt). The assembly's solve_state is the authority --
-# verify:math spring:neutral-body-canonical guards this value.
-PLATE_EYE_Y = 996.54  # bottom eye centre, ABOVE the .cs plate (top 992.54) on the
-# spring-hook arm: plate bottom 987.44 + hook arm height (SHANK_RISE 7.6 + ELBOW_R
-# 1.5 = 9.1). High enough that the eye's O5.5 ring clears the plate (its bottom
-# 993.29 > 992.54). The spring no longer threads the plate -- the hook bridges it.
+LEVER_EYE_Y = 1058.0234  # LIVE neutral top eye = lever spring hole 1061.3934 -
+# drop 3.37. The hole: FULCRUM (199.9, 1061.4) + 177.8 along the neutral lever
+# (tilt -0.002 deg, level rest pose, ch14 ROM re-derive) = y 1061.3934. Was
+# 1062.5234 before the 2026-08-02 top-frame rederive dropped the fulcrum chain
+# 4.5 (rail top 1040.7 -> 1036.2, fulcrum 1065.9 -> 1061.4). The assembly's
+# solve_state is the authority -- verify:math spring:neutral-body-canonical
+# guards this value.
+PLATE_EYE_Y = 986.24  # bottom eye centre, ABOVE the .cs plate (top 982.24) on the
+# spring-hook arm: plate bottom 977.14 + hook arm height (SHANK_RISE 7.6 + ELBOW_R
+# 1.5 = 9.1). Was 996.54: the summing chain dropped 10.3 with the top-frame
+# rederive (crossbar underside 1010 -> 999.7), taking plate + hook + eye along.
+# High enough that the eye's O5.5 ring clears the plate (its bottom 982.99 >
+# 982.24). The spring no longer threads the plate -- the hook bridges it.
 
 COIL_ID = COIL_OD - 2.0 * WIRE_DIA  # 4.5
 MEAN_DIA = COIL_OD - WIRE_DIA  # 5.5
 HOOK_LEAD = 2.0 * WIRE_DIA
 HOOK_CL_RADIUS = MEAN_DIA / 2.0
 FREE_EYE_C2C = FREE_BODY_LENGTH + 2.0 * HOOK_LEAD
-# Installed (in-machine) stretched body length -- exact (61.9834); the table
+# Installed (in-machine) stretched body length -- exact (67.7834, +5.8 vs the
+# pre-rederive 61.9834: top eye -4.5, bottom eye -10.3); the table
 # renders it .2f. build_channel_spring_installed and the channel assembly both
 # derive from this single value.
 INSTALLED_BODY_LENGTH = LEVER_EYE_Y - PLATE_EYE_Y - 2.0 * HOOK_LEAD

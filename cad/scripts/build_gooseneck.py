@@ -6,8 +6,9 @@ line, a 90-DEGREE bend (R 51) at the top, and a horizontal arm reaching
 west over the summing-lever boss, carrying the spring pin under its end.
 (M6.8 ch30 8-view pass: 90 degrees, not the earlier 180 candy-cane --
 user-confirmed against the ch. 19 photos; the ch30 plates crop below the
-bend.) Tension is set by sliding the tube in its clamp
-(build_gooseneck_clamp.py).
+bend.) Tension is set by sliding the tube through the top-frame casting's
+rail-hub bore, gripped by its 1/4-20 square-head set screw
+(build_top_frame).
 
 Geometry: vertical leg at machine x 197 (east column line), y 880 -- the
 post passes through a clearance bore in the east rail (build_top_frame

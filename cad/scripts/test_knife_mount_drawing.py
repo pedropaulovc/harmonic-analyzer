@@ -48,11 +48,13 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert abs(knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
 
 
-def test_linked_notes_expose_the_unresolved_knife_seat_and_mounting_pattern() -> None:
+def test_linked_notes_expose_the_stud_tap_and_unresolved_knife_seat() -> None:
     notes = knife_mount_spec.DRAWING_NOTES
     assert "BORE Ø25.4 THRU" in notes
+    assert "TAP 1/2-13 UNC-2B X 12.0 DEEP" in notes
+    assert "KNIFE-HANGER STUD" in notes
+    assert "TAP-DRILL POINT BREAKS INTO THE BORE CROWN" in notes
     assert "NO HARDENED KNIFE SEAT" in notes
-    assert "MOUNT-TO-CROSSBAR" in notes
     assert "DO NOT RELEASE" in notes
     assert "Ra 0.8" not in notes
     assert "GRAY IRON" not in notes and "PAINT BLACK" not in notes

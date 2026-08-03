@@ -109,7 +109,10 @@ def test_direct_tolerances_are_owned_by_named_model_dimensions() -> None:
         },
         build_tube_frame: {
             ("AnnulusProfile", "OuterDia"): "*deviations(OUTER_DIA_BAND)",
-            ("Column", "Depth"): "COLUMN_LENGTH_TOLERANCE_MM",
+            # Overall-length acceptance moved to the cap sketch's apex station
+            # when the integral dome cap landed (2026-08-02): Column/Depth is
+            # now the driven 1010.7 tube portion, not the acceptance length.
+            ("CapProfile", "CapApexY"): "COLUMN_LENGTH_TOLERANCE_MM",
         },
         build_top_frame: {
             ("OuterProfile", "Width"): "OUTER_PROFILE_TOLERANCE_MM",
