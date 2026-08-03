@@ -90,11 +90,11 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert 'adapter, "Manufacturing Notes", 0.016, 0.075, char_height=0.0025' in source
     assert 'add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)' in source
     assert "insert_hole_table(" in source
-    assert "_visible_hole_table_entities(adapter, top)" in source
-    assert "datum_entity=datum_entity" in source
+    assert "_visible_hole_table_entities(" in source
+    assert "datum_axes=(datum_b_edge, datum_c_edge)" in source
     assert "hole_entities=hole_entities" in source
-    assert "GetVisibleEntities2(c, 2)" in source
     assert "GetVisibleEntities2(c, 1)" in source
+    assert "GetVisibleEntities2(c, 2)" not in source
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 5
     assert 'quantity="E1-E4 DIA 13 THRU"' in source

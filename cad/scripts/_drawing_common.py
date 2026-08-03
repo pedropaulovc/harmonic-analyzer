@@ -767,10 +767,10 @@ def project_part_pmi(
         if gtol_frame_signature(str(frame.GetSymbolXml() or "")) != (
             gtol_frame_signature(control.frame_xml)
         ):
-            raise RuntimeError(f"{label}: projected gtol {control.key} changed semantics")
-        annotation = _name(
-            gtol.GetAnnotation(), control.annotation_name, control.key
-        )
+            raise RuntimeError(
+                f"{label}: projected gtol {control.key} changed semantics"
+            )
+        annotation = _name(gtol.GetAnnotation(), control.annotation_name, control.key)
         after = tuple(annotation.GetPosition() or ())
         drift = (
             math.inf
@@ -858,8 +858,7 @@ def add_surface_finish(
             for item in signatures
         )
         _telemetry.info(
-            f"SURFACE_AUDIT {label}: entity_type={entity_type}, "
-            f"faces={diagnostic!r}"
+            f"SURFACE_AUDIT {label}: entity_type={entity_type}, faces={diagnostic!r}"
         )
     draw = adapter.currentModel
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
@@ -2435,6 +2434,7 @@ def insert_hole_table(
     datum_xy: tuple[float, float],
     hole_points: Sequence[tuple[float, float]],
     datum_entity: Any | None = None,
+    datum_axes: tuple[Any, Any] | None = None,
     hole_entities: Sequence[Any] | None = None,
     anchor_xy: tuple[float, float],
     basic_locations: bool = True,
@@ -2446,8 +2446,12 @@ def insert_hole_table(
     hole EDGE, all in sheet meters.  Callers that can identify drawing-context
     entities topologically may additionally supply ``datum_entity`` and
     ``hole_entities``; those are selected directly with the same hole-table
-    marks and the coordinates remain the count/diagnostic contract.  The table
-    lands with its top-left corner at ``anchor_xy`` and is validated before
+    marks and the coordinates remain the count/diagnostic contract.  A part
+    whose plan corners are broken (filleted/chamfered) has NO corner vertex to
+    anchor: ``datum_axes=(x_axis_edge, y_axis_edge)`` instead selects the two
+    datum edges (marks 4/8), and SolidWorks anchors the table origin at their
+    VIRTUAL intersection -- the theoretical sharp corner.  The table lands
+    with its top-left corner at ``anchor_xy`` and is validated before
     returning.
     """
     draw = adapter.currentModel
@@ -2473,14 +2477,21 @@ def insert_hole_table(
         selectable = _early_bound(entity, "IEntity")
         return bool(selectable.Select4(append, selection_data))
 
-    if datum_entity is not None:
+    if datum_axes is not None and datum_entity is not None:
+        raise ValueError(f"{label} supplied both a datum vertex and datum axes")
+    if datum_axes is not None:
+        x_axis, y_axis = datum_axes
+        datum = _select_entity(x_axis, append=False, mark=4) and _select_entity(
+            y_axis, append=True, mark=8
+        )
+    elif datum_entity is not None:
         datum = _select_entity(datum_entity, append=False, mark=1)
     else:
         datum = draw.Extension.SelectByID2(
             "", "VERTEX", datum_xy[0], datum_xy[1], 0.0, False, 1, null_callout(), 0
         )
     if not datum:
-        raise RuntimeError(f"failed to select {label} hole-table datum vertex")
+        raise RuntimeError(f"failed to select {label} hole-table datum origin")
     selections = (
         zip(hole_points, hole_entities, strict=True)
         if hole_entities is not None
