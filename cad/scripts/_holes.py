@@ -261,6 +261,7 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
             "face-exploding features"
         )
     best = None
+    seed = None  # spans at least the FIRST point (co-planar-disjoint fallback)
     for f in faces:
         f = _early_bound(f, "IFace2")
         try:
@@ -279,6 +280,23 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
         )
         if spans and (best is None or f.GetArea() > best.GetArea()):
             best = f
+        first = all(
+            box[k] - tol_mm <= points_mm[0][k] <= box[k + 3] + tol_mm for k in others
+        )
+        if first and (seed is None or f.GetArea() > seed.GetArea()):
+            seed = f
+    if best is None and seed is not None and len(points_mm) > 1:
+        # No single face spans every point: the stations sit on CO-PLANAR
+        # DISJOINT faces (e.g. the top-frame side-screw spot floors, one per
+        # boss). The seed face only supplies the placement-sketch PLANE --
+        # each instance lands at its absolute sketch point regardless of
+        # which co-planar face seeded it -- so the first-point face is a
+        # valid anchor (top-frame SideTaps* live case, 2026-08-03).
+        _telemetry.debug(
+            "find_planar_face: no single face spans all points; seeding from "
+            "the first point's co-planar face"
+        )
+        best = seed
     return best
 
 

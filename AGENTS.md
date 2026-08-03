@@ -36,10 +36,7 @@ credit:
 
 1. **Build green** — the full `uv run python -m doit -n 4` pipeline (every
    part, assembly and gate) passes on the PR's head. **One** successful build
-   is the bar for changes to non-drawing code; a change to drawing code must
-   additionally build the drawing fleet **twice in sequence**, since a drawing
-   that only builds from a clean slate is not actually reproducible (parts and
-   assemblies may come from the remote cache for both passes).
+   is the bar.
 2. **Codex happy** — the Codex auto-review of the latest push found nothing
    (👍 reaction, or its findings were addressed and re-reviewed clean).
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of

@@ -911,26 +911,31 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "hanger stud holes", volume - v_studs, 60.0)
 
     # 13. Side-screw taps (#10-24 x 14 blind): one per boss, on the
-    #     spot-face seats, breaking into the column bores.
+    #     spot-face seats, breaking into the column bores. ONE feature per
+    #     side with BOTH positions (the two spot floors are co-planar
+    #     disjoint faces sharing one placement sketch -- the StudHoles
+    #     idiom); opposed blind holes cannot share a feature across sides,
+    #     the drill direction is per-feature.
     v_side_tap = _side_tap_removal()
-    for feat, x_pt, z_face in (
-        ("SideTapFrontEast", -COLUMN_X, -SPOTFACE_FLOOR),
-        ("SideTapFrontWest", COLUMN_X, -SPOTFACE_FLOOR),
-        ("SideTapRearEast", -COLUMN_X, SPOTFACE_FLOOR),
-        ("SideTapRearWest", COLUMN_X, SPOTFACE_FLOOR),
+    for feat, z_face in (
+        ("SideTapsFront", -SPOTFACE_FLOOR),
+        ("SideTapsRear", SPOTFACE_FLOOR),
     ):
         normal = (0.0, 0.0, -1.0 if z_face < 0 else 1.0)
         wizard_holes(
             adapter,
             SIDE_TAP_SPEC,
-            [[x_pt, 0.0, z_face]],
+            [[-COLUMN_X, 0.0, z_face], [COLUMN_X, 0.0, z_face]],
             normal,
-            f"side screw tap {feat}",
+            f"side screw taps {feat}",
             name=feat,
             # blind tap: no expect_dia_mm (definition reads 0.0 on blinds)
         )
         volume = await volume_check(
-            adapter, f"side tap {feat}", volume - v_side_tap, 0.1 * v_side_tap + 10.0
+            adapter,
+            f"side taps {feat}",
+            volume - 2.0 * v_side_tap,
+            0.1 * v_side_tap + 15.0,
         )
 
     # 14. Gooseneck set-screw tap (1/4-20 blind) on the pocket floor,
