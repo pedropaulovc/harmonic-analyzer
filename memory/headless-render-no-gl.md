@@ -23,9 +23,9 @@ still ships a **self-contained** `osmesa.dll` (x64, gallium+llvmpipe baked in �
 sibling DLLs needed, ~55 MB). Pinned: **pal1000/mesa-dist-win 25.0.7**
 `mesa3d-25.0.7-release-msvc.7z` → `x64/osmesa.dll`.
 
-`comparisons/tools/osmesa_win.py` automates it: `enable_offscreen_gl()` (call
+`cad/comparisons/tools/osmesa_win.py` automates it: `enable_offscreen_gl()` (call
 BEFORE `import vtk`/`pyvista`) fetches that DLL on demand into a gitignored cache
-(`comparisons/tools/.osmesa-cache/`), `os.add_dll_directory`s it, and sets
+(`cad/comparisons/tools/.osmesa-cache/`), `os.add_dll_directory`s it, and sets
 `VTK_DEFAULT_OPENGL_WINDOW=vtkOSOpenGLRenderWindow`. `render_diff.py` wires it in
 before its pyvista import, so the **release-diff render now works headless** (no
 matplotlib needed). Gotcha: Mesa's `.7z` uses the **BCJ2** filter that `py7zr`
@@ -34,7 +34,7 @@ downloads it). `cut_release.py`'s `render_diff()` is now **fatal** — a failed 
 render blocks the release instead of shipping an empty `diff/` folder.
 
 **Legacy fallback (no longer needed, kept for reference):**
-`comparisons/tools/render_diff_mpl.py` — pure matplotlib Agg, no GL. Renders the
+`cad/comparisons/tools/render_diff_mpl.py` — pure matplotlib Agg, no GL. Renders the
 scene graph (`cad/out/boxes/harmonic-analyzer.json` + STLs): changed base parts as
 RED geometry, rest as grey bbox wireframe, 4 ortho views. Colors ALL instances of
 a changed base part (over-inclusive vs render_diff's per-config classification).

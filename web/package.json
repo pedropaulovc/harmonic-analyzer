@@ -1,0 +1,23 @@
+{
+  "name": "harmonic-analyzer-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Interactive simulator of Michelson's harmonic analyzer, driven by the exported CAD model",
+  "license": "MIT",
+  "scripts": {
+    "fetch-model": "node scripts/fetch-model.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "typescript": "^5.6.0",
+    "vite": "^7.0.0"
+  }
+}

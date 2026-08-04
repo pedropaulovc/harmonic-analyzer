@@ -1,0 +1,44 @@
+---
+title: "Springs"
+status: stub
+---
+
+# Springs {#sec-springs}
+
+Twenty matched channel springs and one large counter spring. Not off-the-shelf.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `channel-spring-installed` ×20 | TODO | TODO | TODO |
+| `counter-spring` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+Michelson chose springs specifically because Kelvin's ropes stretched. The rate matching across the twenty channel springs is what makes the sum linear — this is a specification problem before it is a machining one.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

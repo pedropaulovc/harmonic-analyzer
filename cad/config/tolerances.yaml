@@ -1,4 +1,4 @@
-# Fits & clearances — applied UNIFORMLY across channels (see docs/tolerance-policy.md).
+# Fits & clearances — applied UNIFORMLY across channels (see cad/docs/tolerance-policy.md).
 #
 # Because the output is a force balance, channel-to-channel consistency matters
 # more than absolute precision: these are shared named classes, never per-part

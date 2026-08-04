@@ -1,13 +1,13 @@
 """Trim background margins from assembly renders into README copies.
 
 Run this explicitly after a model change to refresh the committed
-``docs/images`` README renders from the latest ``cad/out/png`` build output,
+``cad/docs/images`` README renders from the latest ``cad/out/png`` build output,
 then commit the result::
 
     uv run python cad/scripts/trim_renders.py
 
 Decoupled from the build on purpose: ``save_assembly_and_images`` no longer
-writes ``docs/images``, so a normal build/release never dirties a tracked file
+writes ``cad/docs/images``, so a normal build/release never dirties a tracked file
 (which would block ``doit release``'s clean-tree preflight). The crop is
 deterministic, so re-running on unchanged renders is a no-op.
 """
@@ -24,7 +24,7 @@ import _telemetry  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT_PNG = ROOT / "cad" / "out" / "png"
-DOCS_IMAGES = ROOT / "docs" / "images"
+DOCS_IMAGES = ROOT / "cad" / "docs" / "images"
 PAD = 24
 THRESHOLD = 30
 
@@ -62,7 +62,7 @@ def trim(src: Path, dst: Path) -> str:
 
 
 def trim_readme_render(asm_name: str) -> str | None:
-    """Trim ``<asm>_isometric.png`` into docs/images if the README uses it."""
+    """Trim ``<asm>_isometric.png`` into cad/docs/images if the README uses it."""
     docs_name = README_RENDERS.get(asm_name)
     if docs_name is None:
         return None

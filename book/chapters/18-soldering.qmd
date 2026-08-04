@@ -1,0 +1,48 @@
+---
+title: "Soft and silver soldering"
+status: stub
+---
+
+# Soft and silver soldering {#sec-soldering}
+
+There is not a single keyway in this machine. The cone gears are soldered to their shaft.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Soft solder versus silver solder: strength, temperature, when each
+
+TODO
+
+## Cleanliness and flux
+
+TODO
+
+## Heating brass and steel together without overheating the brass
+
+TODO
+
+## Fixturing a joint that must stay square and concentric
+
+TODO
+
+## Soldering twenty gears onto one shaft, in position
+
+TODO
+
+## Undoing a joint you got wrong
+
+TODO
+
+::: {.callout-tip}
+## Now make
+A test joint at temperature, pulled to destruction, before touching the real cone gear set.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `cad/docs/machining-dfm.md` (gears soldered, no keys)
+

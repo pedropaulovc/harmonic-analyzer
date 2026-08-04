@@ -1,0 +1,54 @@
+---
+title: "The alignment pinion"
+status: stub
+---
+
+# The alignment pinion {#sec-alignment-pinion}
+
+The mechanism that sets the machine for sines or cosines, and the reason the cone set swings out of mesh.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `alignment-pinion` | TODO | TODO | TODO |
+| `pinion-arbor` | TODO | TODO | TODO |
+| `pinion-bracket` | TODO | TODO | TODO |
+| `pinion-lever` | TODO | TODO | TODO |
+| `pinion-cam` | TODO | TODO | TODO |
+| `pinion-cam-pin` | TODO | TODO | TODO |
+| `pinion-lift-rod` | TODO | TODO | TODO |
+| `pinion-handle` | TODO | TODO | TODO |
+| `pinion-pivot-block` | TODO | TODO | TODO |
+| `pinion-pivot-shaft` | TODO | TODO | TODO |
+| `pinion-spring` | TODO | TODO | TODO |
+| `swing-stop-screw` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+This sub-assembly is a setup mechanism, not a running one — it engages, does its job, and disengages. Model it that way at assembly.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

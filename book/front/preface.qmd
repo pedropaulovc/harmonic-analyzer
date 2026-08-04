@@ -1,0 +1,50 @@
+---
+title: "Preface"
+status: stub
+---
+
+# Preface {#sec-preface}
+
+Why this machine, why this book, and what it is not.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Finding the machine
+
+TODO
+
+## A well-documented machine that nobody has written down how to build
+
+TODO — the distinction this book depends on. Hammack, Kranz and Carpenter's
+2014 book and the engineerguy series document the analyzer thoroughly: what each
+mechanism does, how the maths maps onto the metal, and what it looks like from
+eight angles. They are not the gap. The gap is that no dimensioned drawing, no
+tolerance, no stock list and no setup sheet has ever been published for it.
+
+## Where this one is going
+
+TODO — the finished machine is donated to Matemateca, the mathematics outreach
+collection at IME-USP, and will be used with middle and high school students.
+That sets the bar: it has to survive being operated, not just photographed.
+
+## What this book is not — it is not the 2014 visual tour, and it is not a kit
+
+TODO
+
+## Who I am and why that helps: a software engineer learning machining in public
+
+TODO
+
+## Credit where it is due
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `kickstarter/campaign/positioning.md`
+- `README.md`
+

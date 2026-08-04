@@ -1,0 +1,51 @@
+---
+title: "A channel, twenty times"
+status: stub
+---
+
+# A channel, twenty times {#sec-channel}
+
+One channel is easy. Twenty identical channels is the actual project. This chapter is about batch discipline.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `rocker-arm` ×20 | TODO | TODO | TODO |
+| `connecting-rod` ×20 | TODO | TODO | TODO |
+| `amplitude-bar` ×20 | TODO | TODO | TODO |
+| `channel-lever` ×20 | TODO | TODO | TODO |
+| `pivot-bushing` ×19 | TODO | TODO | TODO |
+| `lever-bushing` ×19 | TODO | TODO | TODO |
+| `pivot-shaft` | TODO | TODO | TODO |
+| `fulcrum-shaft` | TODO | TODO | TODO |
+| `spring-hook` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+Bushing **length** sets the 7.0565 mm channel pitch and the error stacks nineteen times. The rocker's R800 top edge is a profile, not a pocket. Make all twenty of a part in one session, on one setup, or accept drift.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

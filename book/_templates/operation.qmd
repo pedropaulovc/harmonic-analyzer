@@ -1,0 +1,50 @@
+---
+title: "<Operation name>"
+status: stub          # stub | drafted | verified
+---
+
+# <Operation name> {#sec-<label>}
+
+One paragraph: what this operation is for, and which parts of the machine
+depend on it.
+
+## What it is
+
+The plain explanation, for a reader who has never done it.
+
+## <Technique section>
+
+Each section is one thing the reader must be able to do. Numbers, not
+adjectives.
+
+## <Technique section>
+
+## Speeds and feeds
+
+| material | tool | Ø | RPM | feed | DOC |
+|---|---|---|---|---|---|
+| | | | | | |
+
+: Values used in this build. Cross-check against Machinery's Handbook for your
+machine — these worked on a <machine>, which is not necessarily yours.
+{tbl-colwidths="[20,25,10,15,15,15]"}
+
+## Common failures
+
+| symptom | cause | fix |
+|---|---|---|
+| | | |
+
+::: {.callout-tip}
+## Now make
+The real part from the machine that this skill unlocks. Every skill chapter
+ends by making something that goes in the analyzer — never a practice piece.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `references/machinerys-handbook/`
+- `logbook/curriculum/<module>.md`
+- `logbook/entries/<date>-<slug>.md`

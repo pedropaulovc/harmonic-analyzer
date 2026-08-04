@@ -2686,7 +2686,7 @@ async def _export_assembly_images(
     (:func:`refresh_assembly`) shares the exact same export tail. Returns
     ``{<view>: path}``; the caller adds the assembly path.
 
-    Does NOT touch the committed ``docs/images`` README renders -- those are
+    Does NOT touch the committed ``cad/docs/images`` README renders -- those are
     refreshed deliberately via ``python cad/scripts/trim_renders.py`` and
     committed on purpose, so a model build never dirties a tracked file (which
     would otherwise block ``doit release``'s clean-tree preflight).

@@ -1,0 +1,49 @@
+---
+title: "Indexing and the dividing head"
+status: stub
+---
+
+# Indexing and the dividing head {#sec-indexing}
+
+Forty gears, twenty notches, all of them phased to a common datum. This is where the dividing head earns its cost.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## How a dividing head works
+
+TODO
+
+## Plates, holes and the division you actually need
+
+TODO
+
+## Simple indexing for 6, 12, 18 … 120 divisions
+
+TODO
+
+## Setting a datum you can return to
+
+TODO
+
+## Co-phasing twenty parts: the alignment notch problem
+
+TODO
+
+## Checking your indexing before you commit a part
+
+TODO
+
+::: {.callout-tip}
+## Now make
+The 0.4 mm alignment notch on one `cylinder-gear`, indexed to +Y — then prove you can repeat it on a second.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `references/gears-and-gear-cutting/`
+- `cad/scripts/build_cylinder_gear.py`
+

@@ -19,14 +19,14 @@ delta to a SolidWorks build-script edit.
   <tag> -p "*.zip"`, extract `boxes/` + `stl/` → `cad/out/`, and the SLDASM →
   `cad/out/sldasm/harmonic-analyzer.SLDASM` (its presence gates the per-part branch
   vs a monolithic assembly mesh — the per-assembly export is now `gltf/<asm>.glb`, the mono STL is retired), and the prepared ref →
-  `comparisons/ref/<id>.jpg`. All gitignored.
-- **Fit:** `uv run comparisons/tools/pose_studio.py --pair ch30-p003` → N-panel →
+  `cad/comparisons/ref/<id>.jpg`. All gitignored.
+- **Fit:** `uv run cad/comparisons/tools/pose_studio.py --pair ch30-p003` → N-panel →
   Build/Reload Scene. Native Blender `G` move / `S` resize on a selected part
   (constrain axis with X/Y/Z; resize with Pivot=Individual Origins so size doesn't
   leak into translation). **Part fitting → Export Part Deltas** writes moved parts
   (translate_mm / scale / rotate_deg, above ~0.5 mm floor) to
-  `comparisons/findings/<pair>_deltas.json`.
-- **Map:** `uv run comparisons/tools/map_deltas.py --pair <id>` (SolidWorks-free).
+  `cad/comparisons/findings/<pair>_deltas.json`.
+- **Map:** `uv run cad/comparisons/tools/map_deltas.py --pair <id>` (SolidWorks-free).
   RESIZE → `build_<stem>.py` dimension constants with confidence tags: `(low)`/
   photo-scaled = editable, `(high)` book-annotated = LOCKED (the *pose* is the
   suspect, not the geometry). SHIFT → the `build_*_assembly.py` that

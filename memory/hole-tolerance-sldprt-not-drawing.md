@@ -7,7 +7,7 @@ metadata:
 
 How this project tolerances holes (settled 2026-07-17, PR #334). Pairs with the
 policy: only a few CRITICAL features carry explicit callouts, the general block
-governs everything else (`docs/tolerance-policy.md` §Scope; ASME Y14.5 §1.4(a)).
+governs everything else (`cad/docs/tolerance-policy.md` §Scope; ASME Y14.5 §1.4(a)).
 
 - **The drawing hole callout DISPLAYS the part's tolerance; it does not own one.**
   Set the fit on the PART hole-wizard feature. `_holes._tolerance_hole_diameter`

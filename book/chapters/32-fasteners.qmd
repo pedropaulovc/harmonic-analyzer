@@ -1,0 +1,55 @@
+---
+title: "Fasteners and small parts"
+status: stub
+---
+
+# Fasteners and small parts {#sec-fasteners}
+
+The screws, and the small parts that do not belong anywhere else.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `fillister-screw` | TODO | TODO | TODO |
+| `slotted-screw` | TODO | TODO | TODO |
+| `thumb-screw` | TODO | TODO | TODO |
+| `hex-bolt` | TODO | TODO | TODO |
+| `lag-screw` | TODO | TODO | TODO |
+| `hanger-screw` | TODO | TODO | TODO |
+| `clamp-screw` | TODO | TODO | TODO |
+| `bracket-screw` | TODO | TODO | TODO |
+| `gooseneck-set-screw` | TODO | TODO | TODO |
+| `guide-lock` | TODO | TODO | TODO |
+| `column-clamp-front` | TODO | TODO | TODO |
+| `column-clamp-back` | TODO | TODO | TODO |
+| `nameplate` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+Fastener policy is US customary throughout — see `memory/fastener-policy-us-customary.md`. Period-appropriate heads (fillister, slotted) are a fidelity choice with a real availability cost.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

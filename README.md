@@ -1,194 +1,163 @@
-# Michelson Harmonic Analyzer (Recreation Project)
-
-This repository documents the full reconstruction of Albert A. Michelson’s 20-element harmonic analyzer—an analog mechanical computer that performs Fourier synthesis and analysis via a system of gears, springs, levers, and cams.
+<h1 align="center">Michelson's Harmonic Analyzer</h1>
 
 <p align="center">
-  <img src="docs/images/hero.png" alt="Top-level SolidWorks assembly, isometric view">
+  <em>Learn how to build the beautiful 19th century analog mechanical computer
+  that performs Fourier synthesis and analysis via a system of gears, springs,
+  levers, and cams. Interact with it in detail both physically and
+  virtually.</em>
 </p>
 
-## 📐 Project Scope
+<table align="center">
+<tr>
+<td align="center" width="50%"><img src="cad/docs/images/real-machine-display-case.jpg" width="250" alt="The surviving Michelson analyzer, stood on end in a glass case at the University of Illinois"></td>
+<td align="center" width="50%"><img src="cad/docs/images/cad-model-display-pose.png" width="250" alt="The CAD reconstruction rendered in the same pose"></td>
+</tr>
+<tr>
+<td align="center"><sub><b>The machine.</b> The surviving 20-element analyzer, in a corridor case at the University of Illinois.<br>Photographed 2025-08-28.</sub></td>
+<td align="center"><sub><b>The model.</b> 102 parts, generated from Python, gated on every build.<br>Same pose, rendered from the glTF this repository exports.</sub></td>
+</tr>
+</table>
 
-This is a high-fidelity, didactic recreation of the original machine described in:
+<p align="center">
+  <a href="kickstarter/README.md">Kickstarter</a> ·
+  <a href="book/README.md">The book</a> ·
+  <a href="logbook/README.md">Learning log</a> ·
+  <a href="web/README.md">Simulator</a> ·
+  <a href="ai-story/README.md">Built with AI</a>
+</p>
 
-- *Albert Michelson’s Harmonic Analyzer: A Visual Tour of a Nineteenth Century Machine that Performs Fourier Analysis* by Bill Hammack, Steve Kranz, and Bruce Carpenter.
-- EngineerGuy YouTube video series: ["A Machine That Uses Gears to Add Sines and Cosines"](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30)
+---
 
-The project is designed as an advanced, hands-on learning experience in mechanical engineering, digital fabrication, and precision machining.
+Turn the crank and the machine performs Fourier synthesis. Twenty weighted
+cosines get summed by twenty springs pulling on a knife-edge lever, and a pen
+draws the result as a continuous curve. Set it up differently and it runs the
+operation backwards, doing Fourier analysis, which Michelson himself declined to
+explain on the grounds that it "involves so much mathematics that I shall not
+undertake it here."
 
-## 🧩 Components
+One of these machines survives in a glass case at the University of Illinois,
+and it is very well documented. Bill Hammack, Steve Kranz and Bruce Carpenter
+photographed it, took it apart on camera, and published both a book and a
+[four-part video series](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30)
+explaining exactly how it works. If you want to understand the machine, go read
+theirs first. It is free.
 
-The analyzer is composed of 20 mechanical channels operating in parallel, each contributing one sinusoidal term. Key subsystems include:
+What none of that gives you is a way to make one. No dimensioned drawings, no
+tolerances, no stock list, no setups, no process. A beautifully explained
+machine that nobody has written down how to build.
 
-- Crank and translational gearing
-- Cone gear set (variable frequency generation)
-- Cylinder gear set (frequency transmission)
-- Rocker arms and amplitude bars
-- Summing lever and spring systems
-- Magnifying and pen mechanism
-- Platen (paper transport)
+So: 102 parts modelled in SolidWorks, generated from Python, verified on every
+build and checked against those same photographs. Plus a book being written to
+turn all of that into chips on a shop floor.
 
-### CAD renders
+## Where it ends up
+
+The finished machine is being donated to
+[Matemateca](https://matemateca.ime.usp.br/index_ingles.html), the mathematics
+outreach collection at the Institute of Mathematics and Statistics of the
+University of São Paulo. They put mathematical objects in front of the public
+and in front of students, and they will use this one with middle and high
+schoolers. The professor who runs the collection is on board.
+
+It slots into a gap they already have. The collection includes a harmonograph,
+Chladni plates, a piece on the harmonic series, one on sampling, and one on
+gears, plus an adding machine and a slide rule. What it does not have is the
+thing that ties the harmonics half and the analog-computing half together: a
+machine that decomposes a curve into its frequencies while you watch.
+
+There is also a line on their donations page that reads, in hindsight, like a
+description of this project:
+
+> As there is immense difficulty in finding a professional who can bring object
+> theory to practice, the value becomes very variable for each idea. The
+> simpler, the lower its cost, which makes it difficult to produce more complex
+> parts.
+
+That destination sets the engineering bar. The machine has to work, not
+photograph well. A fourteen-year-old gets to turn the crank, and the pen has to
+draw the right curve when they do.
+
+## Where it is now
 
 | Frame | Drive train | Channels (×20) | Summing |
 |:---:|:---:|:---:|:---:|
-| <img src="docs/images/frame.png" alt="Frame sub-assembly"> | <img src="docs/images/drive-train.png" alt="Drive train sub-assembly: crank, cone gears, cylinder gears"> | <img src="docs/images/channel.png" alt="Channel sub-assembly: rocker arms, amplitude bars, springs"> | <img src="docs/images/summing.png" alt="Summing sub-assembly: knife-edge lever, counter-spring chain"> |
+| <img src="cad/docs/images/frame.png" alt="Frame sub-assembly"> | <img src="cad/docs/images/drive-train.png" alt="Drive train: crank, cone gears, cylinder gears"> | <img src="cad/docs/images/channel.png" alt="Channel: rocker arms, amplitude bars, springs"> | <img src="cad/docs/images/summing.png" alt="Summing: knife-edge lever, counter-spring"> |
 
 | Magnifier | Pen | Paper drive |
 |:---:|:---:|:---:|
-| <img src="docs/images/magnifier.png" alt="Magnifier sub-assembly: magnifying lever and wheel"> | <img src="docs/images/pen.png" alt="Pen sub-assembly: pen carriage and kinematic driver"> | <img src="docs/images/paper-drive.png" alt="Paper-drive sub-assembly: platen, transgear, roller chain"> |
+| <img src="cad/docs/images/magnifier.png" alt="Magnifier: magnifying lever and wheel"> | <img src="cad/docs/images/pen.png" alt="Pen carriage"> | <img src="cad/docs/images/paper-drive.png" alt="Platen, transgear, roller chain"> |
 
-### Engineering drawings
-
-The release bundle also includes production-ready drawings for selected parts.
+There are production drawings too. The release bundle ships a sheet per part:
 
 | Rocker-arm support | Platen guide |
 |:---:|:---:|
-| <img src="docs/images/rocker-arm-support-drawing.png" alt="Engineering drawing for the rocker-arm support"> | <img src="docs/images/platen-guide-drawing.png" alt="Engineering drawing for the platen guide"> |
+| <img src="cad/docs/images/rocker-arm-support-drawing.png" alt="Engineering drawing, rocker-arm support"> | <img src="cad/docs/images/platen-guide-drawing.png" alt="Engineering drawing, platen guide"> |
 
-Every part and assembly is generated from **Python reproduction scripts** in
-[`cad/scripts/`](./cad/scripts) that drive SolidWorks over its COM API (via the
-[`SolidworksMCP-python`](https://github.com/pedropaulovc/SolidworksMCP-python) adapter). The
-scripts are the source of truth; the `.sldprt`/`.sldasm` files and renders are build
-artefacts and are **not** versioned — regenerate them with `doit` (see below).
-Binaries are snapshotted only at tagged releases.
+Every part and assembly is generated by Python reproduction scripts in
+[`cad/scripts/`](./cad/scripts) driving SolidWorks over its COM API. The scripts
+are the source of truth. The `.sldprt`/`.sldasm` files and the renders are build
+artefacts, regenerated by `doit` and snapshotted only at
+[tagged releases](../../releases).
 
-## 🏗️ Building the model
+Every dimension traces back to a source (a book page, a photograph, or a
+derivation) and carries a confidence level. Every assembly is gated on degrees
+of freedom, interference and mass properties before it is allowed to save. And
+the whole model gets scored against Hammack, Kranz and Carpenter's photographs
+of the surviving machine, pair by pair, on every export.
 
-The model is generated headlessly from a clean checkout. SolidWorks must be installed and
-running (launched via the 3DEXPERIENCE desktop shortcut, not `sldworks.exe` directly).
+## The five things being built
 
-The **entire** pipeline — build → verify → export → release — is one
-[`doit`](https://pydoit.org) graph (`dodo.py` at the repo root). doit hashes
-script + config content (immune to git/worktree mtime churn) to decide what is stale,
-and propagates a part → assembly dependency DAG. When only a part changed, the dependent
-assembly is **refreshed** (reopen + per-config `ForceRebuild3` + health/DOF/interference
-gates + in-place save — seconds) instead of rebuilt from scratch (re-insert + re-mate ~122
-components — ~500 s). A refresh that hits a dangling mate, free DOF, or interference **fails
-loud** (non-zero exit, the `.SLDASM` left untouched).
+| | |
+|---|---|
+| **[Kickstarter](kickstarter/README.md)** | Funding the build and the book. Pre-launch. |
+| **[The book](book/README.md)** | *A Project for Hobby Machinists*: every part, every setup, every cut, on a manual mill and lathe. The main deliverable. |
+| **[Learning log](logbook/README.md)** | I am a software engineer who has never cut metal. Twelve modules of lathe and mill work, each one ending by making a real part of the machine. The book gets written from this. |
+| **[Simulator](web/README.md)** | The machine in your browser, running on the exported CAD model, paced like the engineerguy videos. |
+| **[Built with AI](ai-story/README.md)** | An honest account of using LLM agents for all of this, failures included. |
 
-Tasks are grouped by whether they need SolidWorks — the prefix tells you at a glance:
+## The hard parts, which are already identified
 
-| group | needs SW? | what it does |
-|-------|:---:|--------------|
-| `part:<stem>` / `assembly:<stem>` | yes | build/refresh a part or assembly |
-| `verify:soundness` / `verify:kinematics` | yes | DOF/interference/health gates per (sub)assembly · motion-study pen sweep (gear-ratios verified at release preflight) |
-| `check:math` / `check:config` / `check:graph` / `check:nameplate` / `check:recipe` | **no** | Fourier math · config audit · pure-python unit tests |
-| `export` | yes | neutral STEP/STL + scene-graph export |
-| `release` | yes | Pack-and-Go + exports + diff + GitHub release (opt-in) |
-| **`build`** | yes | **every** part + assembly + **every** gate — the one fully-safe entry |
-| `build_bare` | yes | parts + assemblies only — a quick rebuild |
+A per-part manufacturability pass ([`cad/docs/machining-dfm.md`](cad/docs/machining-dfm.md))
+found three parts carrying essentially all of the risk:
 
-One-off: initialize the submodule and install the locked environment with `uv`.
+- A six-tooth gear about 4 mm across with a 0.49 mm wall at the tooth root over
+  a 0.79 mm bore. The hardest part in the machine, and not by a small margin.
+- The knife edge, which is the precision interface of the whole instrument and
+  sits on a hex trunnion cantilevered 21.7 mm off an organic cast lever.
+- A Ø0.79 × 34 mm journal in steel, 43:1 slenderness. Whip city.
+
+There is also one settled finding that shapes the entire build: off-the-shelf
+involute cutters for this gear train's pitch do not exist. You make your own.
+
+## Build the model yourself
+
+You need a SolidWorks seat. Full instructions are in
+[`cad/docs/BUILDING.md`](cad/docs/BUILDING.md).
 
 ```powershell
 git submodule update --init --recursive
 uv sync
-
-# The one fully-safe build: every part + assembly + every gate (= default task)
-uv run python -m doit
-
-# Same, but fan the SolidWorks-free check:* gates out across 4 workers while the
-# COM build/verify stream stays serial (safe -- see "Parallelism" below)
-uv run python -m doit -n 4
-
-# Quick rebuild -- parts + assemblies only, no gates or export
-uv run python -m doit build_bare
-
-# Just one part (doit selection does NOT run reverse dependents -- the dependent
-# .SLDASM/renders stay stale until you run plain `doit` or select them explicitly)
-uv run python -m doit part:cone_gear
-
-# Just one assembly (+ its stale prerequisites), or a single gate
-uv run python -m doit assembly:paper_drive
-uv run python -m doit verify:soundness        # one SW gate
-uv run python -m doit check:math              # one offline gate
-
-# Neutral export, then cut the next vNN release (explicit tag after `--` is optional)
-uv run python -m doit export
-uv run python -m doit release
-
-# Inspect the graph / clean
-uv run python -m doit list --all
-uv run python -m doit clean
+uv run python -m doit          # every part + assembly + every gate
 ```
 
-**Parallelism.** There is one SolidWorks STA seat, so COM work must stay serial — but
-the SolidWorks-*free* `check:*` gates need not. Serialization is enforced at runtime by a
-cross-process **file lock** (the COM seat lock): every COM subprocess grabs it before
-driving SolidWorks, so at most one COM task touches the seat **even under `-n N`**, while
-`check:*` tasks (which never take the lock) fan out in parallel. (This replaces both the
-old "never pass `-n`" rule *and* the later `task_dep` **spine** that linearized every COM
-task — the graph now carries only real dependency edges.) The lock is machine-global
-(`%PROGRAMDATA%/harmonic-analyzer/com-seat.lock`, override `HARMONIC_COM_LOCK`), so it also
-serializes COM across worktrees on the seat. Outputs land in `cad/out/` (gitignored).
+Without a seat you can still run the offline gates
+(`uv run python -m doit check:math`), and every release ships the STEP, STL and
+glTF exports plus the drawing PDFs.
 
-**Force a full from-scratch rebuild of one assembly** (bypass the cheap refresh) by deleting
-its target — a missing target makes doit take the FULL branch (hooks included):
+## References
 
-```powershell
-del cad\out\sldasm\paper-drive.SLDASM
-uv run python -m doit assembly:paper_drive
-```
+- Hammack, Kranz & Carpenter, *Albert Michelson's Harmonic Analyzer: A Visual
+  Tour of a Nineteenth Century Machine that Performs Fourier Analysis*
+  (Articulate Noise Books, 2014). Free to read, and the reason this project
+  exists at all.
+- engineerguy, ["A Machine That Uses Gears to Add Sines and Cosines"](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30)
+- Michelson & Stratton, "A New Harmonic Analyzer", *American Journal of Science*
+  25 (1898): 1-13.
 
-### Repository layout
+This project is independent of those authors and the University of Illinois, and
+is not endorsed by any of them.
 
-```
-cad/
-  scripts/        Python reproduction scripts (build_<part>.py, build_<sub>_assembly.py),
-                  shared helpers (_common.py, _gear.py, _chain.py); refresh_assembly.py,
-                  _buildgraph.py (the doit build graph lives in dodo.py at the repo root)
-  scripts/diagnostics/   archived one-off probe/diag scripts (not part of the build)
-  config/         YAML source-of-truth for parametrics, tolerances, materials (data layer)
-  DIMENSIONS.md   dimension provenance (book/photo source + confidence per dim)
-  out/            generated artefacts — gitignored, regenerated by doit (dodo.py)
-comparisons/      photo-vs-CAD alignment + render pipeline (manifest-driven)
-docs/             design policies: motion, tolerance, assumptions, known limitations
-references/       source book, video keyframes, manuals (git submodule)
-research/         per-phase research notes
-dodo.py           doit build graph (part→assembly DAG; refresh vs full rebuild)
-```
+## License
 
-### Toolchain (pinned)
-
-A book supplement must reproduce for years, so the toolchain is pinned like a compiler:
-
-- **SolidWorks**: 3DEXPERIENCE for Makers, **R2026x** — the COM API surface and file format
-  change yearly; readers need a compatible release.
-- **Python**: the `SolidworksMCP-python` venv (always `uv` + venv, never `--system`).
-
-## 🛠️ Implementation Plan
-
-The implementation follows a structured seven-phase process:
-
-| Phase | Duration | Description |
-|-------|----------|-------------|
-| 1. Research & Documentation | 2 weeks | Study source materials, identify mechanical principles |
-| 2. Preliminary Design        | 3 weeks | Create core CAD assemblies of gears, linkages |
-| 3. Detailed CAD Modeling     | 4 weeks | Full-featured models with tolerances and annotations |
-| 4. Manufacturing             | 6 weeks | CNC machining, lathe work, and parts procurement |
-| 5. Assembly & Calibration    | 4 weeks | Physical build-up and iterative tuning |
-| 6. Testing & Validation      | 3 weeks | Compare machine output with known Fourier series |
-| 7. Publication               | 2 weeks | Prepare final documentation and make it open-source |
-
-Research notes per phase: [`research/`](./research)
-
-## 🔧 Tooling and Capabilities
-
-This project is built using:
-
-- **CAD**: SOLIDWORKS 3DEXPERIENCE for Makers (R2026x), scripted via the COM API in Python
-- **Machinery**: 
-  - Mill: PM-30MV (1 HP, R8, 4000 RPM)
-  - Lathe: JET BD-920N (9″ × 20″)
-- **Manufacturing Methods**: Manual milling/turning, custom jigs, DROs, hand finishing.
-
-## 📚 References
-
-- Hammack, Kranz, Carpenter. *Albert Michelson’s Harmonic Analyzer*. Articulate Noise Books, 2014.
-- Michelson & Stratton. "A New Harmonic Analyzer", American Journal of Science, 1898.
-- EngineerGuy YouTube Series [Playlist](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30)
-
-## 🔓 License
-
-All original documentation, code, and CAD files are released under the [MIT License](./LICENSE). Reuse of book content or video transcripts must respect original copyright.
-
+Code, CAD and documentation are [MIT](./LICENSE). Reuse of the source book's
+content or the video transcripts has to respect their original copyright.

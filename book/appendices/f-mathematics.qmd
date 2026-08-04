@@ -1,0 +1,45 @@
+---
+title: "The mathematics"
+status: stub
+---
+
+# The mathematics {#sec-mathematics}
+
+The full Fourier treatment, deliberately kept out of the build chapters.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Fourier series: synthesis
+
+TODO
+
+## Fourier analysis and the discrete approximation the machine implements
+
+TODO
+
+## Why twenty elements, and what the truncation costs
+
+TODO
+
+## How the machine's geometry maps onto the equation
+
+TODO
+
+## The gear ratios that make it work
+
+TODO
+
+## Error sources: cam profile, lever nonlinearity, spring rate mismatch
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- Michelson & Stratton 1898
+- `check:math`
+- `cad/config/`
+

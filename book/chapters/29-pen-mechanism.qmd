@@ -1,0 +1,50 @@
+---
+title: "The pen mechanism"
+status: stub
+---
+
+# The pen mechanism {#sec-pen}
+
+The one sub-assembly with no original to copy.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `pen-frame` | TODO | TODO | TODO |
+| `pen-v-block` | TODO | TODO | TODO |
+| `pen-rod` | TODO | TODO | TODO |
+| `pen-marker` | TODO | TODO | TODO |
+| `pen-wire` | TODO | TODO | TODO |
+| `pen-hanger` | TODO | TODO | TODO |
+| `pen-set-screw` | TODO | TODO | TODO |
+| `output-fixture` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+The surviving machine's writing mechanism was lost; the brass parts on it today were designed and built in 2013 at the University of Illinois. This chapter reproduces that reconstruction, and says so.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

@@ -6,8 +6,66 @@
 > SolidWorks COM conventions and pitfalls the rest of this repo assumes you know;
 > reading this file isn't a substitute for loading it. If you've already produced
 > output this session without it, invoke it now rather than skipping it.
+>
+> **Scope:** this applies to any session that touches `cad/`, `dodo.py`,
+> `cad/comparisons/tools/`, or anything COM. A session confined to the prose and
+> web areas below (`book/`, `logbook/`, `kickstarter/`, `ai-story/`, `web/`)
+> does not need it — but the moment such a task sends you into `cad/`, load it
+> before the first edit.
 
-Orientation for coding agents. Pairs with `docs/pipeline/` (flow diagrams).
+Orientation for coding agents. Pairs with `cad/docs/pipeline/` (flow diagrams).
+
+## Repository areas — read the local AGENTS.md first
+
+The repo now carries the CAD reconstruction **and** the publishing project built
+on top of it. Each area has its own `AGENTS.md` with rules that override the
+general guidance here; read it before working in that area.
+
+| area | what it is | needs SolidWorks | local AGENTS.md |
+|---|---|:---:|---|
+| `cad/`, `dodo.py`, `cad/comparisons/` | the CAD reconstruction and its build pipeline — **this file** | yes | — |
+| [`book/`](book/README.md) | *A Project for Hobby Machinists* (Quarto) — the main deliverable | no | [`book/AGENTS.md`](book/AGENTS.md) |
+| [`logbook/`](logbook/README.md) | machining curriculum + practice log; feeds the book | no | [`logbook/AGENTS.md`](logbook/AGENTS.md) |
+| [`kickstarter/`](kickstarter/README.md) | campaign planning | no | [`kickstarter/AGENTS.md`](kickstarter/AGENTS.md) |
+| [`web/`](web/README.md) | interactive simulator (Vite + three.js, driven by the exported GLB) | no | [`web/AGENTS.md`](web/AGENTS.md) |
+| [`ai-story/`](ai-story/README.md) | the write-up of building this with AI agents | no | [`ai-story/AGENTS.md`](ai-story/AGENTS.md) |
+| `research/`, `cad/docs/`, `memory/` | notes, design policies, findings | no | — |
+
+Three rules cut across all of them, because they are what the project's
+credibility rests on:
+
+1. **The CAD is the source of truth for geometry.** `cad/config/` and
+   `cad/scripts/build_*.py` — never a remembered number, never a figure read off
+   a render.
+2. **The logbook is the source of truth for process.** No machining operation is
+   written up in the book that hasn't been performed and logged. An agent may
+   never author a logbook entry.
+3. **Nothing from the 2014 Hammack/Kranz/Carpenter book goes into a commercial
+   product.** It is free for *non-commercial* use; the book and the campaign are
+   commercial. See `kickstarter/campaign/risks.md`.
+
+The **minimum merge gate below applies to changes under `cad/`**; a
+prose-only or `web/`-only PR is gated by its own area's rules (and, for `web/`,
+a green `npm run build`).
+
+### Tracking — the board sequences, the files hold status
+
+Work is tracked in GitHub issues, grouped by milestone (one per deliverable) and
+sequenced on the [publishing project board](https://github.com/users/pedropaulovc/projects/1).
+The board carries **only** what a file cannot: cross-area dependencies (its
+`Blocked by` field) and target dates.
+
+**Status of record stays in the repo**, because two sources drift and the files
+are the ones the book renders from:
+
+| status | source of truth |
+|---|---|
+| chapter progress (`stub` → `drafted` → `verified`) | the `.qmd` frontmatter + `book/outline.md` |
+| curriculum module progress, competency | `logbook/curriculum/*.md` + `logbook/progress.md` |
+| hours, parts made, scrap | `logbook/entries/` |
+
+Do not copy any of those into a board field, and do not update a board field
+instead of the file.
 
 ## Clone with submodules
 
@@ -690,7 +748,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
 
 ## Release-diff parallelism
 
-`comparisons/tools/render_diff.py` (the SolidWorks-free diff `cut_release` runs)
+`cad/comparisons/tools/render_diff.py` (the SolidWorks-free diff `cut_release` runs)
 parallelizes its per-mesh Hausdorff classification across a process pool
 (`--jobs`, default auto). `cut_release` benefits with no change. `--jobs 1`
 forces serial (debugging / a fallback if the spawn-mode pool misbehaves).
@@ -702,9 +760,9 @@ photos) is **derived**: its CAD renders, composites, RMS scores, `index.html` an
 even the prepared reference crops drift as the model (or a crop param) changes.
 Tracking them dirtied the tree on every rebuild and shipped a stale showcase, so
 the whole gallery is now **gitignored and regenerated** —
-`comparisons/{ref,render,composite}/`, `comparisons/scores.json`,
-`comparisons/index.html`. Only the **source** stays tracked:
-`comparisons/manifest.json` (the pose/align source of truth), `ATTRIBUTION.md`
+`cad/comparisons/{ref,render,composite}/`, `cad/comparisons/scores.json`,
+`cad/comparisons/index.html`. Only the **source** stays tracked:
+`cad/comparisons/manifest.json` (the pose/align source of truth), `ATTRIBUTION.md`
 (CC BY credits) and `tools/`; the reference *photos* live in the pinned
 `references` submodule and their crops are re-derived by `prepare_reference`.
 Because nothing tracked is rewritten, the refresh can never dirty the worktree
@@ -720,8 +778,8 @@ whose pair id left the manifest (targeted, so it does *not* force a full
 re-render) — so a removed/renamed pair leaves nothing stale and the pair count
 stays honest. `cut_release.py:stage_comparisons` then simply **copies** that
 gallery — plus `ATTRIBUTION.md`, so the redistributed CC BY imagery stays credited
-— under the bundle's `comparisons/`. Each release therefore publishes a fresh,
-self-contained snapshot (`open comparisons/index.html`).
+— under the bundle's `cad/comparisons/`. Each release therefore publishes a fresh,
+self-contained snapshot (`open cad/comparisons/index.html`).
 
 Both steps are **best-effort** on the Blender front: the renderer lives on a
 separate GPU seat, so an `export` run on the SolidWorks seat logs a `warn`
@@ -730,7 +788,7 @@ finds no gallery and ships the bundle without it (`release.comparisons`,
 `staged=false`) — or, if an *old* gallery lingers, ships it with a loud
 `STALE vs geometry` warning rather than silently publishing stale renders. Refresh
 it standalone anytime — unchanged — with
-`uv run comparisons/tools/render_offline.py` (Blender), then `gallery.py`.
+`uv run cad/comparisons/tools/render_offline.py` (Blender), then `gallery.py`.
 
 ## Considered but NOT done (with reasons)
 

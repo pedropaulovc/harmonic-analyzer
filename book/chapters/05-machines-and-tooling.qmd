@@ -1,0 +1,48 @@
+---
+title: "Machines and tooling"
+status: stub
+---
+
+# Machines and tooling {#sec-shop}
+
+The minimum shop that can build this machine, and what the author used.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## The lathe: size, and what actually matters (spindle bore, steady rest)
+
+TODO
+
+## The mill: size, tram, and the R8 question
+
+TODO
+
+## The dividing head: non-negotiable — forty indexed gears
+
+TODO
+
+## Cutting tools: what you need on day one versus what can wait
+
+TODO
+
+## The DRO question
+
+TODO
+
+## What the author used: PM-30MV, JET BD-920N
+
+TODO
+
+## What you can substitute, and what you cannot
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `references/machining-for-hobbyists-getting-started/`
+- `research/4-manufacturing-procurement/`
+

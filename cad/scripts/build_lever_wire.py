@@ -8,7 +8,7 @@ hooks below"; ch. 21 p. 51 shows it riding the hub groove). Modeled as the
 STRAIGHT REST-POSE RUN only -- a plain cylinder from the fixture's cross-hole
 mouth to the XY-tangent point on the hub groove. The hub wrap, the hook/knot
 at the fixture and the wire's compliance are NOT modeled (the kinematic
-coupling stays a Motion-study gear mate -- docs/motion-policy.md); every
+coupling stays a Motion-study gear mate -- cad/docs/motion-policy.md); every
 surface stands >= 0.25 off its neighbour so the interference gate reads zero
 (the binding pair is the axle flange's back-face edge vs the spoke fronts --
 see the HUB_END_Z note below).

@@ -1,0 +1,48 @@
+---
+title: "Gear tables"
+status: stub
+---
+
+# Gear tables {#sec-gear-tables}
+
+Everything numeric about the gear train in one place.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Cone gear set: tooth counts, pitch and outside diameters, bores
+
+TODO
+
+## Cylinder gear set
+
+TODO
+
+## Translational gearing: the three removable sizes
+
+TODO
+
+## Diametral pitch and pressure angle used throughout
+
+TODO
+
+## Centre distances
+
+TODO
+
+## Dividing-head plate and hole count per division
+
+TODO
+
+## Cutter number per tooth count
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_cone_gear.py` (DP, PA)
+- `cad/config/machine/gear_train.yaml`
+

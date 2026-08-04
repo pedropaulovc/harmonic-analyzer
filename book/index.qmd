@@ -1,0 +1,48 @@
+---
+title: "Albert Michelson's Harmonic Analyzer"
+subtitle: "A Project for Hobby Machinists"
+status: stub
+---
+
+# About this book {.unnumbered}
+
+In 1898 Albert Michelson built a machine that adds twenty sine waves together
+using gears, cams, springs and levers, and draws the result with a pen. Turn
+the crank and it performs Fourier synthesis. Turn it the other way — set up
+differently — and it performs Fourier analysis, the operation Michelson himself
+called too mathematical to explain.
+
+One of these machines survives in a glass case at the University of Illinois.
+There has never been a plan for building one.
+
+This book is that plan: every part, every setup, every cut, on a manual mill
+and a lathe.
+
+::: {.callout-important}
+## Status: in progress
+
+This book is being written as the machine is built. Chapters are marked
+`stub`, `drafted` or `verified` — a chapter is only `verified` once the part
+has actually been made by following exactly the text you are reading. Nothing
+in this book is a process that was imagined rather than performed.
+:::
+
+## What comes with it
+
+The CAD model, the neutral STEP exports, the drawing sheets and the interactive
+simulator are open source, MIT-licensed, and free whether or not you buy this
+book:
+
+- **[github.com/pedropaulovc/harmonic-analyzer](https://github.com/pedropaulovc/harmonic-analyzer)**
+
+## Acknowledgements
+
+This project would not exist without Bill Hammack, Steve Kranz and Bruce
+Carpenter, whose book *Albert Michelson's Harmonic Analyzer: A Visual Tour of a
+Nineteenth Century Machine that Performs Fourier Analysis* (Articulate Noise
+Books, 2014) and the accompanying engineerguy video series rescued this machine
+from obscurity, photographed it beautifully, and explained it clearly. Their
+book is free to read and you should read it.
+
+This book is independent of, and not endorsed by, that work, its authors, or
+the University of Illinois.

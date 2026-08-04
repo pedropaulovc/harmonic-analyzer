@@ -1,0 +1,48 @@
+---
+title: "The cone gear set"
+status: stub
+---
+
+# The cone gear set {#sec-cone-gears}
+
+Twenty spur gears from six to a hundred and twenty teeth on one shaft, turning one rotation into twenty frequencies. **This is the hardest chapter in the book.**
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `cone-gear` ×20 (T006–T120) | TODO | TODO | TODO |
+| `cone-gear-shaft` | TODO | TODO | TODO |
+| `cone-tip-block` | TODO | TODO | TODO |
+| `cone-tip-bushing` | TODO | TODO | TODO |
+| `cone-tip-adjuster` | TODO | TODO | TODO |
+| `cone-tip-pinch-screw` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+The T006 gear is ~4.08 mm outside diameter on a Ø0.79 mm bore — a **0.49 mm wall** at the tooth root, the single hardest feature in the machine. T012/T018/T024 are 0.83/0.78/0.71 mm. The original used a harder yellow metal for the tip gears. Enlarging them is **not** a free change: at fixed tooth count it changes the diametral pitch and breaks the shared DP-49.82 mesh with the cylinder gears.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

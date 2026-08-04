@@ -48,7 +48,7 @@ task had *just* produced in `cad/out`.
 - **STEP/STL stay re-exported per document via SaveAs3** (the proven v0.9.1 path).
   ⚠️ A first cut of this work tried to COPY STEP/STL from `cad/out` to skip the 81
   opens — **WRONG, caught by Codex P1 on PR #91.** `cad/out` is the *render cache*, not
-  the per-document neutral set: `comparisons/manifest.json` lists only `harmonic_analyzer`,
+  the per-document neutral set: `cad/comparisons/manifest.json` lists only `harmonic_analyzer`,
   so `export_models` writes per-mesh STLs + the top assembly's STEP/STL ONLY — **no
   per-part STEPs, no subassembly STEP/STL**. Copying would fail on the first missing part
   STEP. The bundle ships 81 STEPs (73 parts + 8 asms); release must generate them itself.

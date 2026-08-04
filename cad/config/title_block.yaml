@@ -34,7 +34,7 @@ surface:    { value_uin: 125,  display: "Ra 3.2" }  # µm (= 125 µin), machined
 # and the plus side is drill allowance. This is the ASME Y14.5 §1.4(a)
 # supplementary-block general tolerance for a feature class: it governs every
 # drilled hole UOS, so individual clearance holes need no per-feature callout
-# (docs/tolerance-policy.md — only the few critical features carry explicit
+# (cad/docs/tolerance-policy.md — only the few critical features carry explicit
 # callouts, via _holes.wizard_holes dia_tolerance_mm when TIGHTER is needed).
 # Stamped as TOL_HOLE_MINUS / TOL_HOLE_PLUS; the title block's DRILLED HOLES row
 # reads them via $PRPSHEET, pasted verbatim like "±0.51". The nil limit is a

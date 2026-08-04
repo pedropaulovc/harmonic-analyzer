@@ -1,0 +1,47 @@
+---
+title: "Safety"
+status: stub
+---
+
+# Safety {#sec-safety}
+
+The hazards specific to this build. Not a generic shop-safety list — the operations in this book that will actually hurt you.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## The general rules, stated once
+
+TODO
+
+## Slitting saws: the 0.4 mm notch cut on the cylinder gears
+
+TODO
+
+## Small-diameter work: a 4 mm gear leaving the chuck
+
+TODO
+
+## Long slender turning: whip on the Ø0.79 mm cone-gear shaft journal
+
+TODO
+
+## Indexing with power: never index a live spindle
+
+TODO
+
+## Assembly under spring tension: twenty channel springs plus the counter spring
+
+TODO
+
+## Soldering: flux fumes, and hot brass that looks cold
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/docs/machining-dfm.md` (fragile-feature list)
+

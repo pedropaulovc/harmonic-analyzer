@@ -13,11 +13,11 @@ repository script rather than copying those 1600×1000 SolidWorks canvases direc
 uv run python cad/scripts/trim_renders.py
 ```
 
-`cad/scripts/trim_renders.py` owns the assembly-to-`docs/images` mapping and crops
+`cad/scripts/trim_renders.py` owns the assembly-to-`cad/docs/images` mapping and crops
 each render deterministically to its non-background content with a fixed padding.
 Keeping this explicit and outside the doit graph prevents normal builds from dirtying
 tracked README assets and blocking the release clean-tree preflight.
 
 Engineering-drawing PNGs are full sheets, so they are not inputs to this crop script;
-copy selected existing sheets into `docs/images` unchanged. Visually inspect every
+copy selected existing sheets into `cad/docs/images` unchanged. Visually inspect every
 cropped assembly image and selected drawing before committing them.

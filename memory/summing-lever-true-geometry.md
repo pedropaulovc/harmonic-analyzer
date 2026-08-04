@@ -115,7 +115,7 @@ render_offline → composite for all 8 ch30 views. Mean photo score **76.28 → 
 +-2 jitter is sub-pixel tessellation noise from the full mesh re-export, NOT the occluded rib trim
 (p002 65.65 / p003 86.46 / p004 77.16 / p005 82.7 / p006 64.82 / p007 78.16 / p008 73.62 / p009 85.27).
 No parity regression from the .cs summing-lever integration. parity_check.py = a one-off SW-vs-Blender
-CAMERA-framing IoU check (globs comparisons/composite/.parity_sw/*.jpg, now EMPTY → no rows); it is
+CAMERA-framing IoU check (globs cad/comparisons/composite/.parity_sw/*.jpg, now EMPTY → no rows); it is
 NOT the photo-match metric (that's scores.json). HEX TRUNNION TUNING (the plan's lone open item):
 RETAINED as-is, NOT tuned — the ch30 8-views occlude the pivot/hex and the photogrammetry close-ups
 (20250828_1946*) are museum-glass/reflective/low-res, so there's no reliable signal to re-dimension

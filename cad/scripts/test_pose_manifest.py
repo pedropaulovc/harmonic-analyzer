@@ -8,9 +8,9 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MODULE_PATH = REPO_ROOT / "comparisons" / "tools" / "pose_manifest.py"
-COMPOSITE_PATH = REPO_ROOT / "comparisons" / "tools" / "composite.py"
-MANIFEST_PATH = REPO_ROOT / "comparisons" / "manifest.json"
+MODULE_PATH = REPO_ROOT / "cad" / "comparisons" / "tools" / "pose_manifest.py"
+COMPOSITE_PATH = REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py"
+MANIFEST_PATH = REPO_ROOT / "cad" / "comparisons" / "manifest.json"
 
 # Pairs deliberately left on the legacy content_fit path (null target_mm +
 # manifest 2D align). EMPTY, and it should stay that way: content_fit fits the

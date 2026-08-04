@@ -6,7 +6,7 @@ metadata:
 ---
 
 Settled 2026-07-28 from a 10-sheet audit (45 verified findings; report in the
-scratchpad, `docs/tolerance-gdt-assessment.md` is the natural home).
+scratchpad, `cad/docs/tolerance-gdt-assessment.md` is the natural home).
 
 **The rule.** A `draw_<part>.py` owns sheet coordinates, view centres, view
 scale, text placement, leader anchors and log labels. Every NUMBER that

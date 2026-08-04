@@ -1,0 +1,48 @@
+---
+title: "Slender work: steadies and followers"
+status: stub
+---
+
+# Slender work: steadies and followers {#sec-slender}
+
+Two shafts in this machine are 30:1 or worse, and one tapers to 0.79 mm in steel. They will whip.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Why slender work whips, and what it costs you
+
+TODO
+
+## Between centres
+
+TODO
+
+## The fixed steady
+
+TODO
+
+## The travelling steady (follower)
+
+TODO
+
+## Cut depth, feed and the finishing pass on slender work
+
+TODO
+
+## When to give up and change the design
+
+TODO
+
+::: {.callout-tip}
+## Now make
+`pivot-shaft` (Ø6.35 × 203.2, L/D 32:1), then the `cone-gear-shaft` — five steps ending in a Ø0.79 × 34 mm journal.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `cad/docs/machining-dfm.md` (`cone-gear-shaft`, `pivot-shaft`, `fulcrum-shaft`)
+

@@ -1,0 +1,46 @@
+---
+title: "Design decisions and deviations"
+status: stub
+---
+
+# Design decisions and deviations {#sec-design-decisions}
+
+Where this reproduction departs from the surviving machine, and why. Read this before you cut anything you intend to be authentic.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## How the dimensions were derived, and how confident each one is
+
+TODO
+
+## What was measured from photographs versus what was derived
+
+TODO
+
+## The pen mechanism: the original was lost; this follows the 2013 reconstruction
+
+TODO
+
+## Fastener policy: US customary throughout
+
+TODO
+
+## Where fidelity was traded for machinability, and where it was not
+
+TODO
+
+## Known open questions in the model
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/config/dimensions.yaml`
+- `cad/DIMENSIONS.md` (rendered)
+- `cad/docs/assumptions.md`
+- `cad/docs/known-limitations.md`
+

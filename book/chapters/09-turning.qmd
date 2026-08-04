@@ -1,0 +1,48 @@
+---
+title: "Turning: facing, OD and shoulders"
+status: stub
+---
+
+# Turning: facing, OD and shoulders {#sec-turning}
+
+The foundation operation. Everything round in this machine starts here.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Holding and facing a bar
+
+TODO
+
+## Turning to a diameter, and what your machine's repeatability really is
+
+TODO
+
+## Shoulders and steps
+
+TODO
+
+## Speeds and feeds for brass and steel at these diameters
+
+TODO
+
+## Finishing cuts: why the last 0.05 mm behaves differently
+
+TODO
+
+## Common failures: chatter, taper, a bad finish
+
+TODO
+
+::: {.callout-tip}
+## Now make
+`crank-pin` and the `pivot-shaft` blank — plain turned steel, no bore, no step.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `references/machining-for-hobbyists-getting-started/08_chapter-6-working-on-lathe.pdf`
+

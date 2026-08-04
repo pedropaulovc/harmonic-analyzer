@@ -1,0 +1,52 @@
+---
+title: "The crank and drive train"
+status: stub
+---
+
+# The crank and drive train {#sec-drive-train}
+
+One input, and the 4:1 reduction that feeds the cone gear set.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `crank-arm` | TODO | TODO | TODO |
+| `crank-handle` | TODO | TODO | TODO |
+| `crank-pin` | TODO | TODO | TODO |
+| `crankshaft` | TODO | TODO | TODO |
+| `crank-drive-gear` | TODO | TODO | TODO |
+| `crank-pinion` | TODO | TODO | TODO |
+| `cone-swing-platform` | TODO | TODO | TODO |
+| `cone-pivot-post` | TODO | TODO | TODO |
+| `cone-pivot-screw` | TODO | TODO | TODO |
+| `cone-lock-knob` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+The crank mesh is a crossed-helical pair — see `memory/crank-mesh-crossed-helical.md`. The swing platform carries the whole cone set and pivots to disengage.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

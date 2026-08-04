@@ -7,7 +7,7 @@ metadata:
   originSessionId: 532b8e19-586c-4c3d-aa5c-7896df30430f
 ---
 
-2026-06-17, on main. Goal: a downloaded GitHub release should be renderable by `comparisons/tools/render_offline.py` with NO SolidWorks (replacing the throwaway `C:\ha-render` STEP→glb workaround).
+2026-06-17, on main. Goal: a downloaded GitHub release should be renderable by `cad/comparisons/tools/render_offline.py` with NO SolidWorks (replacing the throwaway `C:\ha-render` STEP→glb workaround).
 
 **Unit insight:** Blender rendering is unit-agnostic — `blender_worker.py` frames from bbox *ratios*; it only requires mesh unit == transform unit. The old render cache (cad/out) was internally consistent in metres and rendered fine. The real bug was *inconsistency*: export_models wrote per-part STLs in metres but the monolithic asm STL in mm, and the scene JSON was metres while the release `stl/` is mm — so the release couldn't pair. User chose "normalize all to mm" (one clean convention; matches the project's mm sketches + slicer-friendly release stl/).
 

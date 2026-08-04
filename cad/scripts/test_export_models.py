@@ -541,7 +541,7 @@ def test_gallery_digest_includes_blender_worker(tmp_path: Path, monkeypatch) -> 
 
 
 def test_render_diff_local_source_uses_top_scene(tmp_path: Path) -> None:
-    module_path = Path(__file__).parents[2] / "comparisons" / "tools" / "render_diff.py"
+    module_path = Path(__file__).parents[1] / "comparisons" / "tools" / "render_diff.py"
     spec = importlib.util.spec_from_file_location("render_diff_under_test", module_path)
     assert spec is not None and spec.loader is not None
     render_diff = importlib.util.module_from_spec(spec)

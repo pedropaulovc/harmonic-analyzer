@@ -1,0 +1,58 @@
+---
+title: "Cutting the gears"
+status: stub
+---
+
+# Cutting the gears {#sec-gear-cutting}
+
+With a cutter you made and a dividing head you trust, gear cutting is just careful repetition. Start at the easy end.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Blank preparation: OD, bore, face — the bore is the datum
+
+TODO
+
+## Mounting on a mandrel
+
+TODO
+
+## Depth of cut and the full tooth depth
+
+TODO
+
+## Cutting a first tooth and checking it
+
+TODO
+
+## Working round: the 120-tooth gear
+
+TODO
+
+## Deburring without destroying the form
+
+TODO
+
+## Inspecting: over-pins measurement, runout on a mandrel
+
+TODO
+
+## Working down in size: where it starts to fight you
+
+TODO
+
+::: {.callout-tip}
+## Now make
+`cone-gear` T120 — the largest and most forgiving gear in the set.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_cone_gear.py`
+- `cad/scripts/build_cylinder_gear.py`
+- Appendix @sec-gear-tables
+

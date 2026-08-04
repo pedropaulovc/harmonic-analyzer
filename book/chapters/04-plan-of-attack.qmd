@@ -1,0 +1,45 @@
+---
+title: "The plan of attack"
+status: stub
+---
+
+# The plan of attack {#sec-plan}
+
+Build order, what gates what, and where you can stop.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## The dependency chain: skills gate parts, parts gate assemblies
+
+TODO
+
+## The seven build stages
+
+TODO
+
+## Roughly how long each stage takes (real hours, from the logbook)
+
+TODO
+
+## The three parts that carry the risk — do a first article of each early
+
+TODO
+
+## Sensible stopping points if you do not want the whole machine
+
+TODO
+
+## What to outsource if you decide to
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/docs/machining-dfm.md`
+- `logbook/curriculum/README.md`
+- `kickstarter/campaign/timeline.md`
+

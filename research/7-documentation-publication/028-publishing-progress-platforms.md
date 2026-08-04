@@ -232,7 +232,7 @@ Here are the best-fit venues—ranked by how well they match the kind of detaile
 | Why it works | Implementation tips |
 |--------------|--------------------|
 | *Source-of-truth for CAD, code, BOMs*; built-in diff + issue tracking. | • Keep CAD in `/cad` and STEP exports in `/release`. <br>• Turn on *Discussions* → “Show and tell” category for progress posts citeturn0search12. |
-| Markdown-native project logs (README or `/docs`) render nicely on GitHub Pages. | • Enable Pages from `docs/` branch; each commit auto-publishes a static site. |
+| Markdown-native project logs (README or `/docs`) render nicely on GitHub Pages. | • Enable Pages from `cad/docs/` branch; each commit auto-publishes a static site. |
 | Status-update feature lets you pin periodic summaries to the repo timeline citeturn0search4. | • Weekly “changelogs” keep outsiders oriented. |
 
 **Assumption**: you’re already planning to host CAD here; leverage that instead of duplicating files elsewhere.

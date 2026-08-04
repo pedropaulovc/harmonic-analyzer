@@ -1,0 +1,47 @@
+---
+title: "Workholding and fixturing"
+status: stub
+---
+
+# Workholding and fixturing {#sec-workholding}
+
+This machine creates four specific fixturing problems. Solve them before you meet them.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Collets, chucks, and repeatability
+
+TODO
+
+## Problem 1: holding a 4 mm gear blank without crushing it
+
+TODO
+
+## Problem 2: a 43:1 slenderness shaft — steadies and followers
+
+TODO
+
+## Problem 3: thin discs (3 mm) that want to dish
+
+TODO
+
+## Problem 4: twenty identical parts, and holding the length
+
+TODO
+
+## Mandrels: making and using them
+
+TODO
+
+## Soft jaws and simple fixtures worth the time
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/docs/machining-dfm.md` (per-part hazards + setup counts)
+

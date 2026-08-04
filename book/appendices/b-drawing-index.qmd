@@ -1,0 +1,32 @@
+---
+title: "Drawing index"
+status: stub
+---
+
+# Drawing index {#sec-drawings}
+
+Every drawing sheet in the pack, cross-referenced to its chapter.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## The drawing pack and where to download it
+
+TODO
+
+## Sheet index
+
+TODO
+
+## Reading the GD&T used in this pack
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/draw_*.py`
+- `cad/docs/tolerance-gdt-assessment.md` §11
+

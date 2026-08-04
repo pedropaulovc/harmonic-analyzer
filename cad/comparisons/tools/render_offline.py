@@ -1,0 +1,329 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pillow"]
+# ///
+"""Offline (Blender) renderer for comparison pairs — no SolidWorks needed.
+
+Consumes the STL/boxes render cache written by cad/scripts/export_models.py
+and the same manifest cameras. One Blender
+headless invocation per model renders all of its pairs; outputs are
+composited onto the reference background and stored with registration metadata.
+Concrete Pose Studio targets preserve their camera frame; legacy target-less
+turntable poses retain content-fit. Composites/scores are then refreshed.
+
+    uv run cad/comparisons/tools/render_offline.py [--only id,..] [--model m]
+                                               [--stale-only]
+"""
+
+import argparse
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+from PIL import Image
+
+TOOLS = Path(__file__).resolve().parent
+sys.path.insert(0, str(TOOLS))
+import composite  # noqa: E402
+
+REPO = composite.REPO
+CAD_OUT = REPO / "cad" / "out"
+WORKER = TOOLS / "blender_worker.py"
+# Resolved LAZILY on first worker launch and cached here. Deferred so the no-op
+# path (nothing stale to render) never needs Blender, and so module consumers
+# that import this without calling main() (cad/comparisons/bench/render_server.py)
+# still get a working path.
+BLENDER: str | None = None
+_BLENDER_OVERRIDE: str | None = None  # set by main() from --blender
+BLENDER_UNAVAILABLE = "BLENDER_UNAVAILABLE:"
+
+
+def blender_exe() -> str:
+    """Blender path, resolved on first call and cached in ``BLENDER``."""
+    global BLENDER
+    if BLENDER is None:
+        BLENDER = resolve_blender(_BLENDER_OVERRIDE)
+        print(f"blender: {BLENDER}", file=sys.stderr)
+    return BLENDER
+
+
+def _blender_version(exe: str) -> tuple[int, int] | None:
+    """(major, minor) reported by ``<exe> --version``, or None if undeterminable."""
+    try:
+        out = subprocess.run([exe, "--version"], capture_output=True, text=True,
+                             timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"Blender (\d+)\.(\d+)", out)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def resolve_blender(override: str | None = None) -> str:
+    """Path to any available Blender executable for the headless worker.
+
+    ``--blender`` / ``$HARMONIC_BLENDER`` win; otherwise choose the highest
+    version under the standard Windows install directory or on PATH. The worker
+    uses stable ``bpy`` rendering operations, so discovery does not reject an
+    otherwise runnable installation based only on its version number.
+    """
+    cand = override or os.environ.get("HARMONIC_BLENDER")
+    if cand:
+        if not Path(cand).exists():
+            raise SystemExit(f"{BLENDER_UNAVAILABLE} Blender not found at {cand} "
+                             "(--blender / $HARMONIC_BLENDER)")
+        return cand
+    found: list[tuple[tuple[int, int], str]] = []
+    for exe in glob.glob(r"C:/Program Files/Blender Foundation/Blender */blender.exe"):
+        m = re.search(r"Blender (\d+)\.(\d+)", exe)
+        if m:
+            found.append(((int(m.group(1)), int(m.group(2))), exe))
+    which = shutil.which("blender")
+    if which:
+        version = _blender_version(which)
+        found.append((version or (-1, -1), which))
+    if found:
+        return max(found)[1]
+    raise SystemExit(f"{BLENDER_UNAVAILABLE} no Blender found; install Blender or set "
+                     "$HARMONIC_BLENDER / pass --blender")
+
+
+STL_DIR = CAD_OUT / "stl"
+
+
+def _stale(path: Path, src: Path, what: str) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"{path} missing — run cad/scripts/export_models.py")
+    if path.stat().st_mtime < src.stat().st_mtime:
+        raise RuntimeError(f"{what} older than {src.name} — re-run export_models.py")
+
+
+def model_source(model: str) -> Path:
+    dashed = model.replace("_", "-")
+    asm = CAD_OUT / "sldasm" / f"{dashed}.SLDASM"
+    prt = CAD_OUT / "sldprt" / f"{dashed}.SLDPRT"
+    if asm.exists():
+        return asm
+    if prt.exists():
+        return prt
+    raise FileNotFoundError(f"no artefact for {model}")
+
+
+def model_paths(model: str) -> tuple[Path, dict]:
+    """(solidworks artefact, worker-job geometry fields).
+
+    Parts: single STL + appearance RGB from colors.json. Assemblies: the
+    boxes/scene JSON + the per-part STL dir (each referenced part checked
+    against its own SLDPRT).
+    """
+    dashed = model.replace("_", "-")
+    src = model_source(model)
+    if src.suffix.lower() == ".sldasm":
+        scene = CAD_OUT / "boxes" / f"{dashed}.json"
+        _stale(scene, src, scene.name)
+        data = json.loads(scene.read_text(encoding="utf-8"))
+        comps = data.get("components") or []
+        if not comps or any("mesh" not in c for c in comps):
+            raise RuntimeError(f"{scene.name} has no mesh scene graph — re-run export_models.py")
+        for stem, mesh in {(c["part"], c["mesh"]) for c in comps}:
+            part_src = CAD_OUT / "sldprt" / f"{stem}.SLDPRT"
+            _stale(STL_DIR / f"{mesh}.STL", part_src, f"{mesh}.STL")
+        return src, {"scene": str(scene), "parts_dir": str(STL_DIR)}
+    stl = STL_DIR / f"{dashed}.STL"
+    _stale(stl, src, stl.name)
+    colors_file = STL_DIR / "colors.json"
+    colors = json.loads(colors_file.read_text(encoding="utf-8")) if colors_file.exists() else {}
+    return src, {"stl": str(stl), "rgb": colors.get(dashed)}
+
+
+def _sidecar(pair_id: str) -> Path:
+    return composite.sidecar_path(pair_id)
+
+
+def is_stale(pair: dict, src: Path) -> bool:
+    return composite.stale_stage(pair, src.stat().st_mtime) is not None
+
+
+def pair_size(ref_img: Path, max_side: int) -> tuple[int, int]:
+    with Image.open(ref_img) as img:
+        rw, rh = img.size
+    scale = min(max_side * 1.4, 2400) / max(rw, rh)
+    return max(1, round(rw * scale)), max(1, round(rh * scale))
+
+
+def _run_worker(geom: dict, jobpairs: list[dict], tmpdir: Path, model: str,
+                probe: bool = False) -> str:
+    """Run one blender worker invocation; return stdout (raises on failure)."""
+    job_file = tmpdir / f"{model}.{'probe' if probe else 'render'}.json"
+    payload = geom | ({"probe": True} if probe else {}) | {"pairs": jobpairs}
+    job_file.write_text(json.dumps(payload), encoding="utf-8")
+    proc = subprocess.run(
+        [blender_exe(), "-b", "--factory-startup", "-P", str(WORKER), "--", str(job_file)],
+        capture_output=True, text=True)
+    ok = proc.returncode == 0 and (probe or "RENDERED" in proc.stdout)
+    if not ok:
+        print(proc.stdout[-3000:])
+        print(proc.stderr[-2000:])
+        raise RuntimeError(f"blender {'probe' if probe else 'render'} failed for {model}")
+    return proc.stdout
+
+
+def _bench_paths(out_root: Path, pid: str) -> dict[str, Path]:
+    return {"ref": out_root / "ref" / f"{pid}.jpg",
+            "render": out_root / "render" / f"{pid}.jpg",
+            "sidecar": out_root / "render" / f"{pid}.meta.json"}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", help="comma-separated pair ids")
+    ap.add_argument("--model")
+    ap.add_argument("--stale-only", action="store_true")
+    # Bench (cad/comparisons/bench) fixed-frame flags — see cad/docs/pose-presentation-benchmark.md.
+    ap.add_argument("--manifest", help="alternate manifest json (bench synthetic cases)")
+    ap.add_argument("--out-root", help="write ref/render/sidecars under DIR/{ref,render}/ "
+                    "instead of the shipping cad/comparisons/ tree")
+    ap.add_argument("--no-trim", action="store_true",
+                    help="skip content-trim (fixed framing — trimming cancels target/zoom signal)")
+    ap.add_argument("--canvas", help="fixed render canvas WxH (overrides per-ref sizing)")
+    ap.add_argument("--fixed-frame", action="store_true",
+                    help="honor each pair's frozen{need_w,canvas} — freeze the aim_camera fit")
+    ap.add_argument("--skip-composites", action="store_true",
+                    help="do not regenerate the gallery composites/scores")
+    ap.add_argument("--probe-out", help="compute base framing per pair, write json, render nothing")
+    ap.add_argument("--blender", help="Blender executable (default: $HARMONIC_BLENDER or "
+                                      "the highest installed)")
+    args = ap.parse_args()
+    global _BLENDER_OVERRIDE
+    _BLENDER_OVERRIDE = args.blender
+    only = set(args.only.split(",")) if args.only else None
+    out_root = Path(args.out_root) if args.out_root else None
+    canvas = None
+    if args.canvas:
+        cw, ch = args.canvas.lower().split("x")
+        canvas = (int(cw), int(ch))
+
+    manifest = composite.load_manifest(Path(args.manifest)) if args.manifest \
+        else composite.load_manifest()
+    max_side = int(manifest.get("defaults", {}).get("width", 1600))
+    by_model: dict[str, list[dict]] = {}
+    composite_only: dict[str, dict] = {}
+    for pair in manifest["pairs"]:
+        if only and pair["id"] not in only:
+            continue
+        if args.model and pair["model"] != args.model:
+            continue
+        src = model_source(pair["model"])
+        if args.stale_only and not out_root:
+            stage = composite.stale_stage(pair, src.stat().st_mtime)
+            if stage is None:
+                continue
+            if stage == "composite":
+                composite_only[pair["id"]] = pair
+                continue
+        by_model.setdefault(pair["model"], []).append(pair)
+    if not by_model:
+        if composite_only and not args.skip_composites:
+            composite.regenerate(set(composite_only))
+            for pair in composite_only.values():
+                composite.record_composite_align(pair)
+                print(f"  REFRESHED  {pair['id']}", flush=True)
+            return 0
+        print("nothing to render")
+        return 0
+
+    def size_for(pair) -> tuple[int, int]:
+        if args.fixed_frame and pair.get("frozen", {}).get("canvas"):
+            return tuple(pair["frozen"]["canvas"])
+        if canvas:
+            return canvas
+        ref = composite.prepare_reference(
+            pair, out=_bench_paths(out_root, pair["id"])["ref"] if out_root else None)
+        return pair_size(ref, max_side)
+
+    n_total = sum(len(v) for v in by_model.values())
+    with tempfile.TemporaryDirectory(prefix="harm_render_") as tmp:
+        tmpdir = Path(tmp)
+
+        # --- probe mode: emit base framing, render nothing ---
+        if args.probe_out:
+            framing: dict[str, dict] = {}
+            for model, pairs in sorted(by_model.items()):
+                _src, geom = model_paths(model)
+                sizes = {p["id"]: size_for(p) for p in pairs}
+                jobpairs = [{"id": p["id"], "camera": p["camera"],
+                             "width": sizes[p["id"]][0], "height": sizes[p["id"]][1]}
+                            for p in pairs]
+                out = _run_worker(geom, jobpairs, tmpdir, model, probe=True)
+                for line in out.splitlines():
+                    if line.startswith("PROBE "):
+                        d = json.loads(line[6:])
+                        d["canvas"] = list(sizes[d["id"]])
+                        framing[d["id"]] = d
+            Path(args.probe_out).write_text(json.dumps(framing, indent=1), encoding="utf-8")
+            print(f"probe framing for {len(framing)} pairs -> {args.probe_out}", flush=True)
+            return 0
+
+        print(f"offline-rendering {n_total} pairs across {len(by_model)} models", flush=True)
+        rendered: set[str] = set()
+        for model, pairs in sorted(by_model.items()):
+            src, geom = model_paths(model)
+            jobs = []
+            for pair in pairs:
+                w, h = size_for(pair)
+                job = {"id": pair["id"], "camera": pair["camera"], "width": w, "height": h,
+                       "out": str(tmpdir / f"{pair['id'].replace('/', '_')}.png"), "_size": (w, h)}
+                if args.fixed_frame and pair.get("frozen", {}).get("need_w") is not None:
+                    job["frozen"] = {"need_w": pair["frozen"]["need_w"]}
+                jobs.append(job)
+            print(f"  {model}: {len(pairs)} pairs, blender starting ...", flush=True)
+            out = _run_worker(geom, [{k: v for k, v in j.items() if k != "_size"} for j in jobs],
+                              tmpdir, model)
+            del out
+            for pair, j in zip(pairs, jobs, strict=True):
+                img = Image.open(Path(j["out"])).convert("RGBA")
+                bg = Image.new("RGB", img.size, pair["reference"].get("background", "black"))
+                bg.paste(img, mask=img.getchannel("A"))
+                paths = _bench_paths(out_root, pair["id"]) if out_root \
+                    else {"render": composite.pair_paths(pair["id"])["render"],
+                          "sidecar": _sidecar(pair["id"])}
+                paths["render"].parent.mkdir(parents=True, exist_ok=True)
+                bg.save(paths["render"], **composite.JPEG_OPTS)
+                if args.no_trim:
+                    registration = "camera_frame"
+                elif out_root is None:
+                    registration = composite.blender_registration(pair)
+                else:
+                    registration = "content_fit"
+                if registration == "content_fit":
+                    composite.trim_render_file(
+                        paths["render"],
+                        background=pair["reference"].get("background", "black"))
+                paths["sidecar"].write_text(json.dumps({
+                    "camera": pair["camera"], "reference": pair["reference"],
+                    "align": pair.get("align"),
+                    "size": list(j["_size"]), "model_mtime": src.stat().st_mtime,
+                    "engine": "blender",
+                    "registration": registration,
+                    # exact uniform colour behind the render's pixels --
+                    # composite._content_mask seeds its knockout flood from it
+                    "render_bg": pair["reference"].get("background", "black"),
+                }), encoding="utf-8")
+                rendered.add(pair["id"])
+                print(f"  OK  {pair['id']}", flush=True)
+
+    if not args.skip_composites and not out_root:
+        composite.regenerate(rendered | set(composite_only))
+        for pair in composite_only.values():
+            composite.record_composite_align(pair)
+            print(f"  REFRESHED  {pair['id']}", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

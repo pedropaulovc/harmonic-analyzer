@@ -1,0 +1,49 @@
+---
+title: "The summing lever and knife edge"
+status: stub
+---
+
+# The summing lever and knife edge {#sec-summing}
+
+Twenty springs pull on one end, one big spring on the other, and the whole thing balances on a knife edge with a few millimetres of travel.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `summing-lever` | TODO | TODO | TODO |
+| `knife-mount` ×2 | TODO | TODO | TODO |
+| `knife-hanger-stud` | TODO | TODO | TODO |
+| `boss-hook` | TODO | TODO | TODO |
+| `counter-spring` | TODO | TODO | TODO |
+| `fulcrum-keeper` | TODO | TODO | TODO |
+| `gooseneck` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+The knife edge is the precision interface of the entire machine and it is the top-vertex ridge of a hex trunnion cantilevered 21.717 mm past each end of a casting-shaped organic lever. Strongly consider a separate hardened tool-steel insert. The cast-versus-fabricate-versus-hog decision must be made **before** you buy stock.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

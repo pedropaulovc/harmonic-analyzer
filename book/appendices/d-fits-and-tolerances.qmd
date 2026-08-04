@@ -1,0 +1,40 @@
+---
+title: "Fits and tolerances"
+status: stub
+---
+
+# Fits and tolerances {#sec-fits}
+
+Every fit in the machine, what it does, and the shop check that verifies it.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## The tolerance philosophy: where a tight number buys something
+
+TODO
+
+## Running fits
+
+TODO
+
+## Located fits
+
+TODO
+
+## Interference and soldered joints
+
+TODO
+
+## The geometric callouts and how to inspect each one
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/docs/tolerance-policy.md`
+- `cad/docs/tolerance-gdt-assessment.md`
+

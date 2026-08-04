@@ -21,7 +21,7 @@ top-level components.
   call + docstring; `_transforms.py`: dropped the `"knife-stay": "z"`
   MIRROR_PLANE entry; `build_harmonic_analyzer_assembly.py` docstring; verify.py
   summing `_COMPONENT_BAND` (8,10)→**(7,9)** measured 8; narrative
-  `dimensions.yaml` "Knife stay" row; `docs/tolerance-gdt-assessment.md` T1 row.
+  `dimensions.yaml` "Knife stay" row; `cad/docs/tolerance-gdt-assessment.md` T1 row.
 - Offline gates all green after: pytest test_buildgraph/test_dodo_recipe (23),
   doit check:graph/config/nameplate/recipe.
 
