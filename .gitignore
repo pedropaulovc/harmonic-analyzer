@@ -457,3 +457,7 @@ agent-sessions-backup/
 # Unrelated checkout that happens to sit here. Also its own git repo, so the
 # same `git add -A` gitlink trap applies.
 migration-baseline-bootstrap/
+
+# Scratch output from local preview smoke runs.
+preview-smoke/
+preview-smoke-2/
