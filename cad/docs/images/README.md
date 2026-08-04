@@ -94,9 +94,9 @@ upper-left in the case and upper-right at azimuth 45.
 
 Four things in there are load-bearing, and each one cost a wasted render:
 
-- **`--aspect-ratio` must equal `width / height`** (1050 / 2814 = 0.3731).
-  `view-frame` persists the framing it computed, and `render-image` warns and
-  reframes if the resolution disagrees.
+- **`--aspect-ratio` must equal `width / height`** (1180 / 3690 = 0.3198, which
+  is the photograph's aspect). `view-frame` persists the framing it computed,
+  and `render-image` warns and reframes if the resolution disagrees.
 - **`--margin 0.60`**, not the 1.25 default. The default fits a bounding sphere,
   and this machine is 1394 mm tall in a 468 x 405 mm footprint, so the sphere is
   nearly three times the silhouette and the machine ends up filling half the
@@ -104,8 +104,18 @@ Four things in there are load-bearing, and each one cost a wasted render:
 - **`--background-srgb`, not `--background-rgb`.** The latter is
   linear-referred and tone-mapped, so `1 1 1` comes out mid-grey.
 - **`high_key`.** `neutral_studio` washes the teal out and `raking_left` renders
-  this pose almost black. `--style shaded_edges` is also worth skipping here:
-  it is slower and, at this camera angle, flatter.
+  this pose almost black. Note that the presets are fixed in world space, so
+  moving the camera changes the exposure as well as the angle: the same preset
+  that reads richly at azimuth 45 reads bright and flat at azimuth 100. Judge
+  tone only after the azimuth is settled.
+
+`--style screen_edges` is the default and is what this render uses, but only
+because it is 12x cheaper (3.3 s against 42.4 s here). It is not the better
+image: a controlled comparison at one camera and one sample count
+([meshprobe#179](https://github.com/pedropaulovc/meshprobe/issues/179)) had
+`shaded_edges` brighter, wider in tonal range, and clearly better at separating
+the chain, the gear teeth and the crank rig. Use it if this figure ever needs to
+show the base mechanism rather than the machine's overall shape.
 
 Finally, confirm the pose still matches rather than assuming it does:
 
