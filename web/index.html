@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Michelson's Harmonic Analyzer — interactive</title>
+    <meta
+      name="description"
+      content="Turn the crank of Albert Michelson's 1898 harmonic analyzer in your browser: twenty sine waves added by gears, cams, springs and levers."
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="stage"></canvas>
+
+      <div id="loading" role="status">
+        <p>Loading the machine…</p>
+        <p class="hint">
+          No model? Run <code>npm run fetch-model</code> after
+          <code>doit export</code>.
+        </p>
+      </div>
+
+      <aside id="panel" hidden>
+        <h1>Harmonic Analyzer</h1>
+        <p id="chapter-title"></p>
+        <p id="chapter-body"></p>
+        <div id="controls">
+          <label>
+            Crank
+            <input id="crank" type="range" min="0" max="40" step="0.01" value="0" />
+          </label>
+          <output id="readout"></output>
+          <button id="play">Play</button>
+        </div>
+      </aside>
+
+      <canvas id="trace" aria-label="Machine output trace"></canvas>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
