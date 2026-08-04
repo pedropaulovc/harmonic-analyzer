@@ -27,10 +27,23 @@ changes, or the pair stops being a fair comparison.
 
 First-party, taken 2025-08-28 at the University of Illinois, where the machine
 lives in a glass case in a corridor outside room 241, stood on its end so it
-fits. Cropped from `20250828_202633247_iOS.jpg` (4032x3024) at box
-`(1690, 210, 2740, 3024)`, which removes the person standing beside the case for
-scale. No third-party rights attach to it: this is our own photograph, which is
-the point of using it rather than a plate from the 2014 book.
+fits. No third-party rights attach to it, which is the point of using it rather
+than a plate from the 2014 book.
+
+```powershell
+uv run python cad/scripts/prepare_display_photo.py --source <original.jpg>
+```
+
+The source is `references/photogrammetry/raw/20250828_202633247_iOS.jpg`, and
+the script does two things to it: crops to the machine, dropping the wooden
+stand and the person who was standing beside the case for scale, and undoes the
+display glass, which is green and costs about a stop. Both are recorded as
+constants at the top of the script, and both are decisions about one specific
+photograph rather than anything reusable.
+
+The tone work is white balance off the blank half of the sheet on the platen,
+then a luma-percentile stretch, gamma 0.82, and a little saturation. It is a
+tonal correction and nothing else: no cloning, no retouching, no geometry.
 
 Note what the photo does *not* show. It is shot through display glass at an
 angle, the case is lit by a corridor fixture, and the machine is at rest with a
@@ -68,10 +81,16 @@ azimuth sweep against the photo.
 
 ```powershell
 uv run meshprobe -s ha illumination-set high_key --background-srgb 1 1 1
-uv run meshprobe -s ha view-frame @ids --azimuth 100 --elevation 8 --margin 0.60 --aspect-ratio 0.3731
+uv run meshprobe -s ha view-frame @ids --azimuth 95 --elevation 8 --margin 0.60 --aspect-ratio 0.3198
 uv run meshprobe -s ha render-image --output cad/docs/images/cad-model-display-pose.png `
-    --width 1050 --height 2814 --style screen_edges --samples 128
+    --width 1180 --height 3690 --style screen_edges --samples 128
 ```
+
+Azimuth 90 is a straight front view, so 95 is the machine turned five degrees
+right, which is what the photograph shows. It was picked by rendering the sweep
+from 15 to 165 degrees and comparing against the photo; anything in the first
+hemisphere is mirrored, which is obvious once you notice the pen-wire rod is
+upper-left in the case and upper-right at azimuth 45.
 
 Four things in there are load-bearing, and each one cost a wasted render:
 
@@ -88,8 +107,44 @@ Four things in there are load-bearing, and each one cost a wasted render:
   this pose almost black. `--style shaded_edges` is also worth skipping here:
   it is slower and, at this camera angle, flatter.
 
-Finally, confirm the pose still matches rather than assuming it does. Scale both
-images to the same height, put them side by side, and check the landmarks: the
-platen and its paper low on the left, the magnifying wheel above it, the
-pen-wire rod rising past the top beam on the right, the crank at the bottom
-right.
+Finally, confirm the pose still matches rather than assuming it does:
+
+```powershell
+uv run python cad/scripts/compare_display_pose.py
+```
+
+That writes `cad/out/reports/display-pose-alignment.jpg`. It fixes the scale
+from two points only, the top of the pen-wire rod and the underside of the base,
+then rules lines across both panels at four landmarks the fit never saw, and
+prints how far each one moved.
+
+### What the alignment currently shows
+
+| landmark | apparent offset |
+|---|---|
+| base, top surface | +20 mm |
+| platen, top edge | +41 mm |
+| top beam, upper edge | +52 mm |
+| magnifying wheel, centre | +87 mm |
+
+Read those carefully, because it is easy to read them as accuracy figures and
+they are not. The photograph is uncalibrated: a phone lens close to the case, at
+an unknown height, shooting through glass. Vertical position in a perspective
+image is not linear in height, so a two-point fit cannot remove the difference
+between that camera and a 50 mm render, and the residue lands in exactly this
+pattern, growing with distance from the fit points. Positive offsets throughout
+are what an uncorrected camera difference looks like, not evidence of anything.
+
+What *is* worth following up is the magnifying wheel, because it breaks the
+pattern. It sits lower than the trend of its neighbours by roughly 40 mm, even
+though the top beam above it and the platen below it both agree more closely.
+The most likely explanation is not a modelling error at all: the magnifying
+bracket slides on its vertical rod, and where it sits is how the x4 lever
+magnification gets set. The real machine is wherever somebody last left it, and
+the model is at its as-built rest pose. Confirming that means checking the
+photogrammetry set, not re-cutting a part.
+
+So the figure is a qualitative check on pose and layout, and a way to notice
+something like the wheel. For real fidelity numbers, use the comparison gallery
+in [`../../comparisons/`](../../comparisons), which aligns against known camera
+poses and scores RMS per pair.
