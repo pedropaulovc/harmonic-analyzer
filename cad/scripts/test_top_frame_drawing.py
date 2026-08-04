@@ -106,8 +106,9 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     )
     assert source.count("add_datum_feature(") == 3
     assert source.count("add_feature_control_frame(") == 4
-    assert 'symbol_xy=DATUM_C_SYMBOL_XY, datum="C"' in source
-    assert 'label="rear outer rail-face datum", entity=datum_c_edge' in source
+    source_flat = " ".join(source.split())
+    assert 'symbol_xy=DATUM_C_SYMBOL_XY, datum="C"' in source_flat
+    assert 'label="rear outer rail-face datum", entity=datum_c_edge' in source_flat
     assert 'label="east outer rail-face datum"' in source
     assert drawing.DATUM_C_SYMBOL_XY[0] < drawing.TOP_CENTER[0] + part.OUTER_X / 2000.0
     assert set(top_frame_spec.GEOMETRIC_TOLERANCES_MM) == {
