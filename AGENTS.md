@@ -6,8 +6,47 @@
 > SolidWorks COM conventions and pitfalls the rest of this repo assumes you know;
 > reading this file isn't a substitute for loading it. If you've already produced
 > output this session without it, invoke it now rather than skipping it.
+>
+> **Scope:** this applies to any session that touches `cad/`, `dodo.py`,
+> `comparisons/tools/`, or anything COM. A session confined to the prose and
+> web areas below (`book/`, `logbook/`, `kickstarter/`, `ai-story/`, `web/`)
+> does not need it — but the moment such a task sends you into `cad/`, load it
+> before the first edit.
 
 Orientation for coding agents. Pairs with `docs/pipeline/` (flow diagrams).
+
+## Repository areas — read the local AGENTS.md first
+
+The repo now carries the CAD reconstruction **and** the publishing project built
+on top of it. Each area has its own `AGENTS.md` with rules that override the
+general guidance here; read it before working in that area.
+
+| area | what it is | needs SolidWorks | local AGENTS.md |
+|---|---|:---:|---|
+| `cad/`, `dodo.py`, `comparisons/` | the CAD reconstruction and its build pipeline — **this file** | yes | — |
+| [`book/`](book/README.md) | *A Project for Hobby Machinists* (Quarto) — the main deliverable | no | [`book/AGENTS.md`](book/AGENTS.md) |
+| [`logbook/`](logbook/README.md) | machining curriculum + practice log; feeds the book | no | [`logbook/AGENTS.md`](logbook/AGENTS.md) |
+| [`kickstarter/`](kickstarter/README.md) | campaign planning | no | [`kickstarter/AGENTS.md`](kickstarter/AGENTS.md) |
+| [`web/`](web/README.md) | interactive simulator (Vite + three.js, driven by the exported GLB) | no | [`web/AGENTS.md`](web/AGENTS.md) |
+| [`ai-story/`](ai-story/README.md) | the write-up of building this with AI agents | no | [`ai-story/AGENTS.md`](ai-story/AGENTS.md) |
+| `research/`, `docs/`, `memory/` | notes, design policies, findings | no | — |
+
+Three rules cut across all of them, because they are what the project's
+credibility rests on:
+
+1. **The CAD is the source of truth for geometry.** `cad/config/` and
+   `cad/scripts/build_*.py` — never a remembered number, never a figure read off
+   a render.
+2. **The logbook is the source of truth for process.** No machining operation is
+   written up in the book that hasn't been performed and logged. An agent may
+   never author a logbook entry.
+3. **Nothing from the 2014 Hammack/Kranz/Carpenter book goes into a commercial
+   product.** It is free for *non-commercial* use; the book and the campaign are
+   commercial. See `kickstarter/campaign/risks.md`.
+
+The **minimum merge gate below applies to changes under `cad/`**; a
+prose-only or `web/`-only PR is gated by its own area's rules (and, for `web/`,
+a green `npm run build`).
 
 ## Clone with submodules
 
