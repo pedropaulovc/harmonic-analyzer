@@ -50,7 +50,7 @@ A single table, before any prose:
 
 Short. One diagram: crank → cone gears → cylinder gears + cams → rocker arms →
 amplitude bars → springs → summing lever → magnifier → pen. The repo already
-has renders of every one of those sub-assemblies (`docs/images/`).
+has renders of every one of those sub-assemblies (`cad/docs/images/`).
 
 Link out rather than explain in full — the engineerguy series does this better
 than any campaign page can, and pointing at it builds trust.
@@ -65,7 +65,7 @@ setup — not the prettiest.
 
 The differentiator: the design work is done and inspectable *now*.
 
-- Photo-vs-render comparison slider (from `comparisons/`)
+- Photo-vs-render comparison slider (from `cad/comparisons/`)
 - The dimension-provenance table: every dimension tagged with its source and a
   confidence level
 - A machining-DFM excerpt: the three parts that carry the risk, named with real

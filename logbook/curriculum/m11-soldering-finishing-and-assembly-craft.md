@@ -24,7 +24,7 @@ hours_actual: 0
 ## References
 
 - `references/machining-for-hobbyists-getting-started/`
-- `docs/machining-dfm.md` (gears soldered, no keys)
+- `cad/docs/machining-dfm.md` (gears soldered, no keys)
 - `cad/config/parts/*.yaml` (appearance per part)
 
 ## Practice

@@ -51,6 +51,6 @@ TODO
 
 **Sources for this chapter**
 
-- `docs/images/*.png`
+- `cad/docs/images/*.png`
 - `cad/scripts/build_*_assembly.py`
 

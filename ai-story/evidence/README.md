@@ -10,11 +10,11 @@ can't be sourced from one of these.**
 | `git log` | what changed, when, and why — commit messages here carry context first, then the change, then verification | `git log --format='%h %ad %s' --date=short` |
 | `memory/` | 130+ findings, mostly bugs that cost real time | `memory/MEMORY.md` is the index |
 | `AGENTS.md` | design decisions **with their history**: several sections end in a "(History: this replaced X — see memory/Y)" note | read the parenthetical asides; that's where the reversals are |
-| `docs/` | the engineering assessments: assumptions, known limitations, DFM, tolerances | `docs/known-limitations.md` is the most honest file in the repo |
+| `cad/docs/` | the engineering assessments: assumptions, known limitations, DFM, tolerances | `cad/docs/known-limitations.md` is the most honest file in the repo |
 | `cad/out/reports/telemetry/` | real span durations and log records per build | `traces.jsonl` / `logs.jsonl`, one OTel record per line |
 | `cad/out/reports/cache.jsonl` | every cache hit/miss/store, with keys | append-only event log |
 | `memory/usage.jsonl` | token/cost accounting | the only defensible source for cost claims |
-| `comparisons/` | how close the model got to the photographs, over time | `scores.json` is a regression trend, comparable within one render engine |
+| `cad/comparisons/` | how close the model got to the photographs, over time | `scores.json` is a regression trend, comparable within one render engine |
 
 ## GitHub sources
 

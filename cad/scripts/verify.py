@@ -29,7 +29,7 @@ is the single fully-safe entry point that runs every gate.
                       truth_model.pen_y (mapped to the physical half-stroke)
                       with NO force solver -- the computed-not-simulated
                       summation realised through the equation-driven pen-rod
-                      mate (pen_driver.py / docs/motion-policy.md).
+                      mate (pen_driver.py / cad/docs/motion-policy.md).
   math                no-SolidWorks analytic self-check of ``truth_model``: the
                       synthesis math is symmetric / band-limited / correct.
   config              no-SolidWorks cross-checks: build config (machine/channels)
@@ -51,7 +51,7 @@ NOT YET WIRED (tracked, not silently skipped):
   * Stepped-crank interference across the full gear train (turning the real
     crank through the gear train) needs the Basic Motion solver -- the lock mates
     that key the cone cluster are outside the gear-mate graph, so a kinematic
-    rotate desyncs the train (see docs/motion-policy.md). The pen-vs-truth_model
+    rotate desyncs the train (see cad/docs/motion-policy.md). The pen-vs-truth_model
     output proof, by contrast, IS wired: ``--suite kinematics`` drives the pen
     kinematically off the CrankDeg global (no train rotation needed).
 """
@@ -136,7 +136,7 @@ CHANNELS = _config.active_count()
 # the drive mate transiently from the recorded DOF manifest and installs the
 # equation before the sweep (discarded unsaved). It sweeps CrankDeg and proves
 # the pen tip traces truth_model.pen_y -- the computed-not-simulated summation,
-# with no force solver (docs/motion-policy.md).
+# with no force solver (cad/docs/motion-policy.md).
 MOTION_OWNER = "pen"
 PEN_MARKER_STEM = "pen-marker"  # the carriage tip whose Y traces the curve
 # CrankDeg angles to sample; spans a full fundamental period (0..360) so both
@@ -1507,7 +1507,7 @@ def verify_truth(report: Report) -> None:
         # The summation IS the machine's job: the pen for an arbitrary coefficient
         # vector must equal the sum of the per-channel single-term traces. This is
         # the linearity the 21-spring force balance realises in hardware and the
-        # truth model realises numerically (docs/motion-policy.md).
+        # truth model realises numerically (cad/docs/motion-policy.md).
         js = truth_model.harmonics()
         coeffs = truth_model.coefficients("sawtooth")
         for i in range(11):

@@ -195,7 +195,7 @@ def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
 def compute_framing(c, boxes, mesh_lo, mesh_hi, ext, w, h, frozen=None):
     """Framing scalars for camera spec ``c`` — bpy-free, so probe + render share it.
 
-    ``frozen`` (bench fixed-frame mode, comparisons/bench) pins ``need_w`` — the
+    ``frozen`` (bench fixed-frame mode, cad/comparisons/bench) pins ``need_w`` — the
     projected world width the fit is derived from — to a value computed ONCE from
     the family's unperturbed camera, so an az/el/roll perturbation reuses the base
     framing instead of silently re-fitting to its own projected bbox. ``target``
@@ -275,7 +275,7 @@ def main():
 
     # Probe mode (bench gen_cases): compute + emit the base framing for each
     # pair's camera and render nothing. gen_cases reads PROBE lines to resolve
-    # target0/need_w0 for the fixed-frame family (see comparisons/bench).
+    # target0/need_w0 for the fixed-frame family (see cad/comparisons/bench).
     if job.get("probe"):
         for pair in job["pairs"]:
             f = compute_framing(pair["camera"], boxes, mesh_lo, mesh_hi, ext,

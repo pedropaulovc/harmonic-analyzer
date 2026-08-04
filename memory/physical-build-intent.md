@@ -21,8 +21,8 @@ Toolchain (as of 2026-07-04):
   DXF**; DXF is a narrow 2D niche (flat parts, 2.5D cam/gear-tooth profiles, inspection overlays).
   CAM cuts nominal → the toleranced 2D print (§8) carries fits/finish, not the STEP.
 
-**Doc state (resolved 2026-07-04):** [[tolerance-gdt-assessment]] `docs/tolerance-gdt-assessment.md`
-§11 and `docs/tolerance-policy.md` "Scope of manufacturing outputs" were revised to match this
+**Doc state (resolved 2026-07-04):** [[tolerance-gdt-assessment]] `cad/docs/tolerance-gdt-assessment.md`
+§11 and `cad/docs/tolerance-policy.md` "Scope of manufacturing outputs" were revised to match this
 toolchain: **CAM = IN SCOPE** (deferred until the nominal model is frozen/validated; targets the
 20 cams / 19 spacers / gear train) and **DXF = IN SCOPE** as CNC 2.5D-profile input (was "optional
 exhibit"). Manual mill+lathe stay primary for one-off parts. The prior "no CNC / manual-only"
@@ -31,11 +31,11 @@ mismatch, Ø6.5/6.35 pivot clearance, R800 vs 812.8 rocker radius) are the valid
 metal gate and must close before CAM authoring.
 
 **How to apply:** treat tolerances/fits/surface-finish as real manufacturing outputs (see
-`docs/tolerance-policy.md`), not render metadata; when scoping drawings/DXF/CAM, remember CNC exists
+`cad/docs/tolerance-policy.md`), not render metadata; when scoping drawings/DXF/CAM, remember CNC exists
 for repeat parts. Fidelity-to-original constrains DFA part-count reduction (don't consolidate away
 period brackets/screws).
 
-**Real-build findings (2026-07-04, from `docs/machining-dfm.md` "How to get this reviewed"):**
+**Real-build findings (2026-07-04, from `cad/docs/machining-dfm.md` "How to get this reviewed"):**
 - **Automated DFM false-greens on this machine.** DFMPro (SW add-in) AND Xometry's auto-DFM both
   passed every SLDPRT — but miss the real hazards (sharp internal corners at every gear-tooth root +
   the cam notch; sub-mm walls like T006 0.49mm). Don't trust an automated-DFM green here.

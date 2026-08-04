@@ -19,9 +19,9 @@ Bundles are read straight from the GitHub release zips over HTTP range
 requests -- only the central directory and the needed members are fetched,
 never the whole 460 MB asset.
 
-    uv run comparisons/tools/release_diff.py v0.1.1 v0.2.0
-    uv run comparisons/tools/release_diff.py v0.1.1 v0.2.0 --parts summing-lever,knife-mount
-    uv run comparisons/tools/release_diff.py v0.1.1 v0.2.0 --top 5   # auto-pick most-changed
+    uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0
+    uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0 --parts summing-lever,knife-mount
+    uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0 --top 5   # auto-pick most-changed
 """
 
 import argparse

@@ -1994,9 +1994,9 @@ def task_check():
         *(str(path.resolve()) for path in recipe_tests),
         *(dep for path in recipe_tests for dep in module_deps_of(path)),
         *scanned_by_binding_gate,
-        str((REPO_ROOT / "comparisons" / "tools" / "composite.py").resolve()),
-        str((REPO_ROOT / "comparisons" / "tools" / "pose_manifest.py").resolve()),
-        str((REPO_ROOT / "comparisons" / "tools" / "render_offline.py").resolve()),
+        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()),
+        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "pose_manifest.py").resolve()),
+        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py").resolve()),
     })
     specs = {
         "math": {
@@ -2191,7 +2191,7 @@ def task_export():
     """Export neutral CAD plus the offline comparison gallery.
 
     ``export_models.py`` writes STEP / STL / assembly glTF / PNG manifest + scene,
-    then invokes ``comparisons/tools/render_offline.py`` so the export task leaves
+    then invokes ``cad/comparisons/tools/render_offline.py`` so the export task leaves
     the comparison renders, composites, scores, and gallery current. COM seat.
 
     Always runs ``export_models.py`` (``uptodate: False``) -- it self-checks every
@@ -2211,11 +2211,11 @@ def task_export():
     deps = ([_sldprt(s) for s in part_stems()]
             + [_sldasm(s) for s in ASSEMBLY_ORDER])
     comparison_tools = [
-        str((REPO_ROOT / "comparisons" / "manifest.json").resolve()),
-        str((REPO_ROOT / "comparisons" / "tools" / "render_offline.py").resolve()),
-        str((REPO_ROOT / "comparisons" / "tools" / "blender_worker.py").resolve()),
-        str((REPO_ROOT / "comparisons" / "tools" / "composite.py").resolve()),
-        str((REPO_ROOT / "comparisons" / "tools" / "gallery.py").resolve()),
+        str((REPO_ROOT / "cad" / "comparisons" / "manifest.json").resolve()),
+        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py").resolve()),
+        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "blender_worker.py").resolve()),
+        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()),
+        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "gallery.py").resolve()),
     ]
     return {
         "file_dep": [str(EXPORT_PY), *deps, *comparison_tools],

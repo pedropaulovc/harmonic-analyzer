@@ -44,5 +44,5 @@ TODO
 
 **Sources for this chapter**
 
-- `docs/machining-dfm.md` (`rocker-arm-support`, `summing-lever`)
+- `cad/docs/machining-dfm.md` (`rocker-arm-support`, `summing-lever`)
 

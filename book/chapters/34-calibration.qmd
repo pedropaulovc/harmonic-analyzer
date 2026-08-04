@@ -48,5 +48,5 @@ TODO
 **Sources for this chapter**
 
 - `verify:kinematics`
-- `docs/motion-policy.md`
+- `cad/docs/motion-policy.md`
 

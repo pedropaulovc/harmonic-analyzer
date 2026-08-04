@@ -11,7 +11,7 @@ composited onto the reference background and stored with registration metadata.
 Concrete Pose Studio targets preserve their camera frame; legacy target-less
 turntable poses retain content-fit. Composites/scores are then refreshed.
 
-    uv run comparisons/tools/render_offline.py [--only id,..] [--model m]
+    uv run cad/comparisons/tools/render_offline.py [--only id,..] [--model m]
                                                [--stale-only]
 """
 
@@ -37,7 +37,7 @@ CAD_OUT = REPO / "cad" / "out"
 WORKER = TOOLS / "blender_worker.py"
 # Resolved LAZILY on first worker launch and cached here. Deferred so the no-op
 # path (nothing stale to render) never needs Blender, and so module consumers
-# that import this without calling main() (comparisons/bench/render_server.py)
+# that import this without calling main() (cad/comparisons/bench/render_server.py)
 # still get a working path.
 BLENDER: str | None = None
 _BLENDER_OVERRIDE: str | None = None  # set by main() from --blender
@@ -184,10 +184,10 @@ def main() -> int:
     ap.add_argument("--only", help="comma-separated pair ids")
     ap.add_argument("--model")
     ap.add_argument("--stale-only", action="store_true")
-    # Bench (comparisons/bench) fixed-frame flags — see docs/pose-presentation-benchmark.md.
+    # Bench (cad/comparisons/bench) fixed-frame flags — see cad/docs/pose-presentation-benchmark.md.
     ap.add_argument("--manifest", help="alternate manifest json (bench synthetic cases)")
     ap.add_argument("--out-root", help="write ref/render/sidecars under DIR/{ref,render}/ "
-                    "instead of the shipping comparisons/ tree")
+                    "instead of the shipping cad/comparisons/ tree")
     ap.add_argument("--no-trim", action="store_true",
                     help="skip content-trim (fixed framing — trimming cancels target/zoom signal)")
     ap.add_argument("--canvas", help="fixed render canvas WxH (overrides per-ref sizing)")

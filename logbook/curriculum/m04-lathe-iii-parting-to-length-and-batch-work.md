@@ -21,7 +21,7 @@ hours_actual: 0
 ## References
 
 - `references/machining-for-hobbyists-getting-started/08_chapter-6-working-on-lathe.pdf`
-- `docs/machining-dfm.md` (pivot-bushing / lever-bushing rows)
+- `cad/docs/machining-dfm.md` (pivot-bushing / lever-bushing rows)
 
 ## Practice
 

@@ -22,7 +22,7 @@ hours_actual: 0
 
 - `references/machining-for-hobbyists-getting-started/03_chapter-1-machine-shop-overview.pdf`
 - `references/jet-bd-920n-operators-manual.pdf`
-- `docs/machining-dfm.md` — the fragile-feature list is the hazard list
+- `cad/docs/machining-dfm.md` — the fragile-feature list is the hazard list
 
 ## Practice
 

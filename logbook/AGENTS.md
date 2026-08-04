@@ -12,7 +12,7 @@ A machining curriculum and its practice log. Prose only.
   `references/gears-and-gear-cutting/`, and write them into a module **with the
   citation attached**.
 - Derive which parts a module unlocks from `cad/scripts/build_*.py`,
-  `cad/config/parts/*.yaml` and `docs/machining-dfm.md`.
+  `cad/config/parts/*.yaml` and `cad/docs/machining-dfm.md`.
 - Tidy, format and cross-link entries the user has written.
 - Update `progress.md` and `SKILLS.md` from what the entries actually say.
 

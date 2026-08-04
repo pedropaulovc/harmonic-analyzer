@@ -102,7 +102,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 | A | Bill of materials | Every part, quantity, material, stock size. Generated from `cad/config/parts/`. | stub |
 | B | Drawing index | Every drawing sheet, cross-referenced to its chapter. Generated from the CAD build. | stub |
 | C | Gear tables | Tooth counts, DP, PA, pitch/outside diameters, centre distances, cutter numbers, dividing-head plates and hole counts for every gear in the machine. | stub |
-| D | Fits and tolerances | Every fit in the machine with the shop check that verifies it. From `docs/tolerance-gdt-assessment.md`. | stub |
+| D | Fits and tolerances | Every fit in the machine with the shop check that verifies it. From `cad/docs/tolerance-gdt-assessment.md`. | stub |
 | E | Suppliers and sources | Stock, tooling, springs, chain. | stub |
 | F | The mathematics | The full Fourier treatment for readers who want it, kept out of the build chapters deliberately. | stub |
 | G | Further reading | Michelson & Stratton 1898; Hammack, Kranz & Carpenter 2014; the engineerguy series; the machining literature. | stub |

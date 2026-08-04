@@ -44,5 +44,5 @@ The full sets: 19× `pivot-bushing` at 4.5565 mm and 19× `lever-bushing` at 4.0
 
 **Sources for this chapter**
 
-- `docs/machining-dfm.md` (pivot/lever bushing rows)
+- `cad/docs/machining-dfm.md` (pivot/lever bushing rows)
 

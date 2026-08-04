@@ -11,7 +11,7 @@ Tracked = source; **regen** = derived, gitignored and rebuilt by the tools below
 produces the gallery from the freshly-exported STLs
 (`cad/scripts/export_models.py:refresh_comparison_gallery`, best-effort: needs
 Blender), and each release then **ships that snapshot inside its bundle** under
-`comparisons/` (`cad/scripts/cut_release.py:stage_comparisons`). The only tracked
+`cad/comparisons/` (`cad/scripts/cut_release.py:stage_comparisons`). The only tracked
 inputs are `manifest.json`, `ATTRIBUTION.md`, this README and `tools/`; everything
 else regenerates (the reference *source* photos live in the pinned `references`
 submodule).
@@ -21,7 +21,7 @@ submodule).
 | `manifest.json` | tracked | source of truth: pair id → reference, model, camera pose, legacy content-fit 2D align, tier, status |
 | `ATTRIBUTION.md` | tracked | CC BY credits/licensing for the reference photos (ships in every release bundle) |
 | `ref/<id>.jpg` | regen | prepared reference (cropped/rotated, ≤1600 px) — re-derived from the `references` submodule by `prepare_reference` |
-| `index.html` | regen | inspection gallery (tier + text filters; drag the ref⇆cad reveal slider) — `uv run comparisons/tools/gallery.py` |
+| `index.html` | regen | inspection gallery (tier + text filters; drag the ref⇆cad reveal slider) — `uv run cad/comparisons/tools/gallery.py` |
 | `render/<id>.jpg` | regen | raw CAD render (+ `.meta.json` staleness/engine/registration sidecar); Blender preserves concrete Pose Studio camera frames, while legacy target-less poses and SolidWorks captures are content-fit |
 | `composite/<id>_cad.jpg` | regen | render registered from sidecar metadata into the reference frame (same scale/offset as the blend layer) — the slider's top image |
 | `composite/<id>_blend.jpg` | regen | red-tinted render over grayscale ref — misalignment is instantly visible |
@@ -32,16 +32,16 @@ submodule).
 
 ```powershell
 # 1. curate / re-seed pairs (merge keeps hand-tuned poses)
-uv run comparisons/tools/dedup_stills.py
+uv run cad/comparisons/tools/dedup_stills.py
 # ... vision agents write references/curation/batches/*.json ...
-uv run comparisons/tools/merge_catalog.py
-uv run comparisons/tools/extract_frames.py          # full-res video keepers
-uv run comparisons/tools/seed_manifest.py
+uv run cad/comparisons/tools/merge_catalog.py
+uv run cad/comparisons/tools/extract_frames.py          # full-res video keepers
+uv run cad/comparisons/tools/seed_manifest.py
 
 # 2. render offline (no SolidWorks): refresh the STL cache once after
 #     any rebuild, then Blender replays the same manifest cameras
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\export_models.py
-uv run comparisons/tools/render_offline.py [--only id,..] [--stale-only]
+uv run cad/comparisons/tools/render_offline.py [--only id,..] [--stale-only]
 #    parts render from their own STL; assemblies instance per-part STLs
 #    (metres, untranslated) through the scene graph in cad/out/boxes/*.json,
 #    with each component's SolidWorks appearance RGB as Workbench object
@@ -51,7 +51,7 @@ uv run comparisons/tools/render_offline.py [--only id,..] [--stale-only]
 #    baseline: 0.99+).
 
 # 3. recompute composites/scores without rendering (e.g. after align edits)
-uv run comparisons/tools/composite.py [--only id1,id2]
+uv run cad/comparisons/tools/composite.py [--only id1,id2]
 
 # 4. selective model rebuild after fixing a part script (dependent assemblies refresh)
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit part:cone_gear
@@ -68,7 +68,7 @@ just `uv` + Blender.
 # export the STL cache once after any rebuild (same prerequisite as render_offline)
 C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\export_models.py
 # launch — the script relaunches itself inside Blender's GUI
-uv run comparisons/tools/pose_studio.py --pair ch30-p003
+uv run cad/comparisons/tools/pose_studio.py --pair ch30-p003
 ```
 
 `--pair` matches a manifest pair id or any substring. Point at a different
@@ -116,23 +116,23 @@ uv run python cad/scripts/export_glb.py <dir-with-the-assembly>/harmonic-analyze
 
 ```powershell
 # print the commands for one pair (id substring)
-uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002
+uv run cad/comparisons/tools/pose_to_meshprobe.py --pair ch30-p002
 
 # actually render it: pipe the emitted commands to a shell (bash — see quoting note)
-uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002 | bash
+uv run cad/comparisons/tools/pose_to_meshprobe.py --pair ch30-p002 | bash
 uv run meshprobe close --all            # stop the Blender daemon when done
 
 # many poses, ONE open: --batch shares a single meshprobe session so the (large)
 # GLB is imported once instead of re-opened per pair
-uv run comparisons/tools/pose_to_meshprobe.py --batch | bash
+uv run cad/comparisons/tools/pose_to_meshprobe.py --batch | bash
 
 # just the computed params, no shell
-uv run comparisons/tools/pose_to_meshprobe.py --pair ch30-p002 --format json
+uv run cad/comparisons/tools/pose_to_meshprobe.py --pair ch30-p002 --format json
 ```
 
 The emitted commands invoke `uv run meshprobe` (so the pipe-to-`bash` flow works
 without a global install; override with `--meshprobe`). Renders land in
-`comparisons/render/meshprobe/<id>.png`. Useful flags: `--batch` / `--session
+`cad/comparisons/render/meshprobe/<id>.png`. Useful flags: `--batch` / `--session
 <name>` (one shared session, open once), `--canvas WxH` (forces the render
 canvas — **distance depends on its portrait/landscape aspect**, so pass it when
 no reference image is available or the run warns about the landscape default),

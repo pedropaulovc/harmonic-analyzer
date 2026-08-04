@@ -32,7 +32,7 @@ These need a decision before a module can be written for them:
 
 | part | question |
 |---|---|
-| `summing-lever` | Cast, fabricate, or hog from solid? Each answer is a different skill. `docs/machining-dfm.md` recommends not hogging. |
+| `summing-lever` | Cast, fabricate, or hog from solid? Each answer is a different skill. `cad/docs/machining-dfm.md` recommends not hogging. |
 | `summing-lever` knife edge | Machine into the parent, or make a hardened tool-steel insert? |
 | `rocker-arm-support`, `connecting-rod` | Cast or cut from bar? (Both benign as bar.) |
 | `counter-spring`, `channel-spring-installed` ×20 | Wind your own (a module) or specify to a spring house (a procurement task)? |
@@ -41,6 +41,6 @@ These need a decision before a module can be written for them:
 
 ## Coverage check
 
-Run this occasionally: does every Tier-1 part in `docs/machining-dfm.md` appear
+Run this occasionally: does every Tier-1 part in `cad/docs/machining-dfm.md` appear
 in the "parts it unlocks" column above? A T1 part with no module is a hole in
 the curriculum, and it will become a hole in the book.

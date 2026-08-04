@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-`comparisons/tools/pose_studio.py` — leaving camera view (Numpad 0) used to fling
+`cad/comparisons/tools/pose_studio.py` — leaving camera view (Numpad 0) used to fling
 the model into a corner/onto its side.
 
 **Root cause (verified empirically, not guessed):** Blender's stock

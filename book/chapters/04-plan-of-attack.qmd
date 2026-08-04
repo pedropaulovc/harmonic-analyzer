@@ -39,7 +39,7 @@ TODO
 
 **Sources for this chapter**
 
-- `docs/machining-dfm.md`
+- `cad/docs/machining-dfm.md`
 - `logbook/curriculum/README.md`
 - `kickstarter/campaign/timeline.md`
 

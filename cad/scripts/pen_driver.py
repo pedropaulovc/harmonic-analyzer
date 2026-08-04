@@ -1,7 +1,7 @@
 r"""Kinematic pen driver (plan F5): equation-drive the pen-rod travel mate from
 a crank-angle global so the SW pose reproduces ``truth_model.pen_y`` with NO
 force solver. The 21-spring summation is computed, not simulated — see
-``docs/motion-policy.md``.
+``cad/docs/motion-policy.md``.
 
 Shared by ``build_pen_assembly.py`` (installs the driver inline as the pen
 group is built) and ``verify.py`` (sweeps the global, samples the pen tip, and

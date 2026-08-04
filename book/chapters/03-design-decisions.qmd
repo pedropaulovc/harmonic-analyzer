@@ -41,6 +41,6 @@ TODO
 
 - `cad/config/dimensions.yaml`
 - `cad/DIMENSIONS.md` (rendered)
-- `docs/assumptions.md`
-- `docs/known-limitations.md`
+- `cad/docs/assumptions.md`
+- `cad/docs/known-limitations.md`
 

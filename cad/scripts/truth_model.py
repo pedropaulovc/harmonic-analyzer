@@ -3,7 +3,7 @@ r"""Deterministic kinematic truth model — the machine's output, computed.
 The harmonic analyzer synthesises ``f(x) = Σ a_j · cos(j·x + phase_j)`` over
 j = 1..20, scaled by the magnifying lever to the pen. The 21-spring summation
 is a static force balance that Basic Motion cannot solve reliably, so the pen
-output is reproduced NUMERICALLY here (see docs/motion-policy.md) and the pen is
+output is reproduced NUMERICALLY here (see cad/docs/motion-policy.md) and the pen is
 driven kinematically from this curve. This module is also the reference that
 ``verify.py`` compares the motion-study pen samples against.
 

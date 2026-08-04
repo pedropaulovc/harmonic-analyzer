@@ -13,7 +13,7 @@ frame so slow drift (e.g. the 360deg turntable bonus video) still splits.
 The sharpest member (edge variance) represents each cluster.
 
 Usage:
-    uv run comparisons/tools/dedup_stills.py [--threshold 6]
+    uv run cad/comparisons/tools/dedup_stills.py [--threshold 6]
 
 Writes references/curation/dedup.json.
 """
@@ -25,7 +25,7 @@ from pathlib import Path
 import imagehash
 from PIL import Image, ImageFilter, ImageStat
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 STILLS = REPO / "references" / "engineerguy-youtube" / "stills"
 OUT = REPO / "references" / "curation" / "dedup.json"
 

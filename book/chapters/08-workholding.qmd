@@ -43,5 +43,5 @@ TODO
 
 **Sources for this chapter**
 
-- `docs/machining-dfm.md` (per-part hazards + setup counts)
+- `cad/docs/machining-dfm.md` (per-part hazards + setup counts)
 

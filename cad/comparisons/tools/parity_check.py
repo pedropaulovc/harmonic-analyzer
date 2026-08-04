@@ -8,7 +8,7 @@ Both render sets are content-trimmed already; normalise to a common height and
 compare silhouettes (content masks) via IoU. High IoU (>0.95) means the offline
 camera/framing replicates the SolidWorks pipeline.
 
-    uv run comparisons/tools/parity_check.py
+    uv run cad/comparisons/tools/parity_check.py
 """
 
 import sys

@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["pillow"]
 # ///
-"""Generate the pose-presentation-benchmark case grid (docs/pose-presentation-benchmark.md).
+"""Generate the pose-presentation-benchmark case grid (cad/docs/pose-presentation-benchmark.md).
 
 Perturbs the manifest cameras one parameter at a time (plus a seeded mixed
 tier and an unperturbed control), converts image-plane target deltas to
@@ -11,15 +11,15 @@ aim_camera fit (target0 / need_w0 / canvas) so a rotation/target/zoom
 perturbation moves the model in a fixed frame instead of silently re-fitting,
 and renders every case through render_offline.py's fixed-frame path.
 
-Ground truth is written to comparisons/bench/cases.jsonl (TRACKED — never under
+Ground truth is written to cad/comparisons/bench/cases.jsonl (TRACKED — never under
 the ignored out/): case_id -> delta, the rendered camera, the frozen frame, and
 the base r/u basis the scorer needs to interpret target reads. Stimuli land
 under --out-root/render/ with the case id as filename; presentations.py builds
 the per-arm sheets from ref+render, run.py serves them under opaque ids.
 
-    uv run comparisons/bench/gen_cases.py            # 6 first-pass pairs, 45 cases each
-    uv run comparisons/bench/gen_cases.py --all      # all 18 manifest pairs
-    uv run comparisons/bench/gen_cases.py --pairs id1,id2 --no-render   # regen ground truth only
+    uv run cad/comparisons/bench/gen_cases.py            # 6 first-pass pairs, 45 cases each
+    uv run cad/comparisons/bench/gen_cases.py --all      # all 18 manifest pairs
+    uv run cad/comparisons/bench/gen_cases.py --pairs id1,id2 --no-render   # regen ground truth only
 """
 
 import argparse
@@ -32,7 +32,7 @@ from pathlib import Path
 
 BENCH = Path(__file__).resolve().parent
 TOOLS = BENCH.parent / "tools"
-REPO = BENCH.parents[1]
+REPO = BENCH.parents[2]
 sys.path.insert(0, str(TOOLS))
 import composite  # noqa: E402
 

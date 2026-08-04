@@ -44,5 +44,5 @@ TODO
 
 **Sources for this chapter**
 
-- `docs/machining-dfm.md` (`cone-gear-shaft`, `pivot-shaft`, `fulcrum-shaft`)
+- `cad/docs/machining-dfm.md` (`cone-gear-shaft`, `pivot-shaft`, `fulcrum-shaft`)
 

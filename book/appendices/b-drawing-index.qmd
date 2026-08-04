@@ -28,5 +28,5 @@ TODO
 **Sources for this chapter**
 
 - `cad/scripts/draw_*.py`
-- `docs/tolerance-gdt-assessment.md` §11
+- `cad/docs/tolerance-gdt-assessment.md` §11
 

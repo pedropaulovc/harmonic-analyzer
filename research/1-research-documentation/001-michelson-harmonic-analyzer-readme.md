@@ -146,7 +146,7 @@ The analyzer is composed of 20 mechanical channels operating in parallel, each c
 - Magnifying and pen mechanism
 - Platen (paper transport)
 
-See `docs/components/` for engineering drawings and CAD assemblies.
+See `cad/docs/components/` for engineering drawings and CAD assemblies.
 
 ## 🛠️ Implementation Plan
 
@@ -246,7 +246,7 @@ The analyzer is composed of 20 mechanical channels operating in parallel, each c
 - Magnifying and pen mechanism
 - Platen (paper transport)
 
-See `docs/components/` for engineering drawings and CAD assemblies.
+See `cad/docs/components/` for engineering drawings and CAD assemblies.
 
 ## 🛠️ Implementation Plan
 

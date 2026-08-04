@@ -10,7 +10,7 @@ self-checks) used to re-export ALL ~119 parts on every release. Two causes:
 
 - **(A) dominant, deterministic:** `part_stl_stale` required a `<stem>.STEP` to
   exist, but referenced-only parts get NO per-part STEP — only *manifest* parts
-  and assemblies do. Since `comparisons/manifest.json` now lists a single model
+  and assemblies do. Since `cad/comparisons/manifest.json` now lists a single model
   (`harmonic_analyzer`, the top assembly), NO part is ever a manifest part, so
   every referenced part was stale forever regardless of mtimes.
 - **(B) latent:** staleness compared source `.SLDPRT` mtime vs the exported STL

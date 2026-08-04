@@ -91,7 +91,7 @@ in `references/engineerguy-youtube/` — paraphrased, never pasted.
 | # | feature | notes |
 |---|---|---|
 | 0 | **Write the narration copy** | the ten chapters currently ship placeholder text. This is the part every visitor actually reads, and it is not blocked on anything. Issue #481. |
-| 1 | Camera moves per chapter | hints exist in `narration.ts`; needs a tween and a framing helper. Reuse the azimuth/elevation convention from `comparisons/manifest.json` so poses transfer. |
+| 1 | Camera moves per chapter | hints exist in `narration.ts`; needs a tween and a framing helper. Reuse the azimuth/elevation convention from `cad/comparisons/manifest.json` so poses transfer. |
 | 2 | Draggable amplitude bars | the single most engaging interaction: set your own coefficients, watch the trace change |
 | 3 | Cam-driven rocker motion | replace the ideal cosine with the eccentric-cam profile from `build_cylinder_gear.py` |
 | 4 | Section/exploded views | isolate one channel; fade the other nineteen |

@@ -7,7 +7,7 @@ magnifying wheel"). The pen rod's wire hole sits exactly one rim radius east
 of the wheel axis, so the hanging run is the vertical tangent off the rim's
 3 o'clock point down to the hole. Modeled as the STRAIGHT REST-POSE RUN only
 -- the rim wrap over the wheel top and the tie-off knot are NOT modeled (the
-kinematic coupling stays a Motion-study scotch-yoke -- docs/motion-policy.md);
+kinematic coupling stays a Motion-study scotch-yoke -- cad/docs/motion-policy.md);
 the run stands 0.25 off the rim surface so the interference gate reads zero.
 
 Endpoint derivation lives HERE; ``build_pen_assembly`` imports

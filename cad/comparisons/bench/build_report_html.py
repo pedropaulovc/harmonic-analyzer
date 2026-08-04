@@ -8,7 +8,7 @@ Ranking table + an arm gallery (each of the 11 presentations rendered on the
 SAME perturbed case, ranked, with its scores) + per-parameter heatmap +
 findings. Images are embedded as data URIs so the page is self-contained.
 
-    uv run comparisons/bench/build_report_html.py --model codex
+    uv run cad/comparisons/bench/build_report_html.py --model codex
 """
 
 import argparse

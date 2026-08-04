@@ -99,7 +99,7 @@ TOP_ASSEMBLY = "harmonic-analyzer"
 # SolidWorks). See refresh_comparison_gallery -- best-effort (Blender is on a
 # separate GPU seat), and cut_release.stage_comparisons ships the result.
 REPO = CAD_ROOT.parent
-COMPARISONS_DIR = REPO / "comparisons"
+COMPARISONS_DIR = CAD_ROOT / "comparisons"
 RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
 BLENDER_WORKER = COMPARISONS_DIR / "tools" / "blender_worker.py"
 COMPOSITE_PY = COMPARISONS_DIR / "tools" / "composite.py"
@@ -203,7 +203,7 @@ def _png_needs_export(
 
 def manifest_models() -> list[str]:
     manifest = json.loads(
-        (CAD_ROOT.parent / "comparisons" / "manifest.json").read_text(encoding="utf-8")
+        (CAD_ROOT / "comparisons" / "manifest.json").read_text(encoding="utf-8")
     )
     return sorted({p["model"] for p in manifest["pairs"]})
 
@@ -1193,7 +1193,7 @@ def refresh_comparison_gallery() -> bool:
             _telemetry.warn(
                 f"comparison gallery not refreshed ({exc}); export continues -- "
                 "refresh on a Blender-equipped seat with "
-                "`uv run comparisons/tools/render_offline.py`.")
+                "`uv run cad/comparisons/tools/render_offline.py`.")
             _telemetry.event("comparisons.skipped", reason=str(exc)[:200])
             sp.set_attribute("outcome", "skipped")
             return False

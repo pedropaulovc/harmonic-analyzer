@@ -21,7 +21,7 @@ hours_actual: 0
 ## References
 
 - `references/machining-for-hobbyists-getting-started/09_chapter-7-milling-machines.pdf`
-- `docs/machining-dfm.md` (`rocker-arm`, `connecting-rod` rows)
+- `cad/docs/machining-dfm.md` (`rocker-arm`, `connecting-rod` rows)
 - `cad/scripts/build_rocker_arm.py`
 
 ## Practice

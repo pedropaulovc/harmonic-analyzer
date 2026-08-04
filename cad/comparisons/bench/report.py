@@ -11,8 +11,8 @@ control false-positive rate, parameter confusion; T3 fraction-correct and 75%
 threshold) plus a machine-readable summary.json and the per-model arm ranking
 the decision rule consumes.
 
-    uv run comparisons/bench/report.py                 # all models present
-    uv run comparisons/bench/report.py --model codex
+    uv run cad/comparisons/bench/report.py                 # all models present
+    uv run cad/comparisons/bench/report.py --model codex
 """
 
 import argparse

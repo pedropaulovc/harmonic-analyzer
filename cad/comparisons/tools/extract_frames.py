@@ -12,7 +12,7 @@ first frame of each 3 s interval — so thumb tNNNN.jpg corresponds to
 t=(N-1)*3 s and -ss <t> lands on the same content (verified in the pilot).
 
 Usage:
-    uv run comparisons/tools/extract_frames.py [--only v4-t0160,...] [--force]
+    uv run cad/comparisons/tools/extract_frames.py [--only v4-t0160,...] [--force]
 """
 
 import argparse
@@ -20,7 +20,7 @@ import json
 import subprocess
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 EG = REPO / "references" / "engineerguy-youtube"
 FULL = EG / "stills" / "full"
 CATALOG = REPO / "references" / "curation" / "stills_catalog.json"

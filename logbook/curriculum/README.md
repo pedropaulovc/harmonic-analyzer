@@ -42,7 +42,7 @@ lathe track is longer; start it first and slot mill modules in around it.
 **M09 → M10.** The dividing head is not yet acquired and everything about the
 gear train waits on it. Off-the-shelf involute cutters for this machine's
 diametral pitch (DP 49.82) **do not exist** — that is a settled finding, not an
-assumption (`docs/machining-dfm.md`) — so M10 includes generating your own
+assumption (`cad/docs/machining-dfm.md`) — so M10 includes generating your own
 cutters by the Eureka method before a single tooth is cut.
 
 Buy the dividing head early. It unblocks 40 gears and 20 notches.

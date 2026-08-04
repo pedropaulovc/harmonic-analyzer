@@ -18,7 +18,7 @@ at this point in the order.
 
 ## What will fight you
 
-The specific hazards, with numbers, from `docs/machining-dfm.md`. Thin walls,
+The specific hazards, with numbers, from `cad/docs/machining-dfm.md`. Thin walls,
 slender ratios, fragile crests, breakout risk. Name them before the reader
 meets them.
 
@@ -68,5 +68,5 @@ What to verify before moving on, and what is still adjustable later.
 
 - `cad/scripts/build_<part>.py` (geometry — the source of truth)
 - `cad/config/parts/<dashed-name>.yaml` (material, registry)
-- `docs/machining-dfm.md`
+- `cad/docs/machining-dfm.md`
 - `logbook/entries/<date>-<slug>.md`

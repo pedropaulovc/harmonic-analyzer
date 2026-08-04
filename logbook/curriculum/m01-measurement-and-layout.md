@@ -22,7 +22,7 @@ hours_actual: 0
 
 - `references/machining-for-hobbyists-getting-started/04_chapter-2-measuring-tools.pdf`
 - `references/machinerys-handbook/` (limits and fits)
-- `docs/tolerance-policy.md`, `docs/tolerance-gdt-assessment.md`
+- `cad/docs/tolerance-policy.md`, `cad/docs/tolerance-gdt-assessment.md`
 - `references/magxact-mx100m-mill-dro-manual/`, `references/el400-operation-manual/`
 
 ## Practice

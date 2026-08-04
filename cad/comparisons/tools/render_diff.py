@@ -23,9 +23,9 @@ Pipeline:
      diff_summary.json (changed parts + per-mesh deviation + image names).
 
     # release vs release
-    uv run comparisons/tools/render_diff.py v0.1.1 v0.2.0 --out /tmp/diff
+    uv run cad/comparisons/tools/render_diff.py v0.1.1 v0.2.0 --out /tmp/diff
     # previous release vs local staged bundle (what cut_release does)
-    uv run comparisons/tools/render_diff.py --old-release v0.2.0 \
+    uv run cad/comparisons/tools/render_diff.py --old-release v0.2.0 \
         --new-local cad/out/release/harmonic-analyzer-v0.3.0 --out <stage>/diff
 
 On Linux run under ``xvfb-run`` for the offscreen GL context; on Windows the

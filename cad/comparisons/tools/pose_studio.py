@@ -3,14 +3,14 @@
 # ///
 """pose_studio.py — interactive Blender studio for posing a comparison pair's
 camera against its book reference, writing the euler pose to
-``comparisons/manifest.json``.
+``cad/comparisons/manifest.json``.
 
 One file, two roles
 -------------------
 * **Launcher** (plain uv/system Python, no ``bpy``): finds ``blender.exe`` and
   relaunches itself *inside* Blender's GUI with the same arguments::
 
-      uv run comparisons/tools/pose_studio.py --pair ch30-p003
+      uv run cad/comparisons/tools/pose_studio.py --pair ch30-p003
 
   ``--pair`` matches a manifest pair id (full ``harmonic_analyzer--ch30-p003-img01``
   or any substring). ``--repo`` / ``--blender`` / ``$HARMONIC_BLENDER`` override.
@@ -62,7 +62,7 @@ def _launch() -> None:
     here = Path(__file__).resolve()
     ap = argparse.ArgumentParser(description="Launch the Blender pose studio.")
     ap.add_argument("--pair", default="", help="manifest pair id or substring")
-    ap.add_argument("--repo", default=str(here.parents[2]), help="repo checkout root")
+    ap.add_argument("--repo", default=str(here.parents[3]), help="repo checkout root")
     ap.add_argument(
         "--blender",
         default=os.environ.get(
@@ -141,7 +141,7 @@ def _repo(props) -> Path:
 
 
 def _manifest_path(props) -> Path:
-    return _repo(props) / "comparisons" / "manifest.json"
+    return _repo(props) / "cad" / "comparisons" / "manifest.json"
 
 
 def _load_manifest(props) -> dict:
@@ -155,7 +155,7 @@ def _pair(props, manifest=None) -> dict | None:
 
 def _ref_image_path(props, pair) -> Path | None:
     """Prefer the prepared ref (cropped/rotated, sets render aspect); else raw."""
-    prepared = _repo(props) / "comparisons" / "ref" / f"{pair['id']}.jpg"
+    prepared = _repo(props) / "cad" / "comparisons" / "ref" / f"{pair['id']}.jpg"
     if prepared.exists():
         return prepared
     raw = _repo(props) / pair["reference"]["path"]
@@ -797,7 +797,7 @@ class HAC_OT_export_deltas(bpy.types.Operator):
     bl_idname = "hac.export_deltas"
     bl_label = "Export Part Deltas"
     bl_description = ("Diff every hand-moved/-scaled part against its release "
-                     "position and write the shifts to comparisons/findings/"
+                     "position and write the shifts to cad/comparisons/findings/"
                      "<pair>_deltas.json (for mapping back to SolidWorks dims)")
 
     # Below-noise moves are dropped so the findings file lists only real edits.
@@ -851,7 +851,7 @@ class HAC_OT_export_deltas(bpy.types.Operator):
                        "focal_length_mm": round(props.focal_mm, 2) if props.perspective else None},
             "moved": moved,
         }
-        dst = _repo(props) / "comparisons" / "findings" / f"{props.pair_id}_deltas.json"
+        dst = _repo(props) / "cad" / "comparisons" / "findings" / f"{props.pair_id}_deltas.json"
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(json.dumps(out, indent=2), encoding="utf-8")
         self.report({"INFO"}, f"{len(moved)} part(s) moved -> {dst.name}")
@@ -1042,7 +1042,7 @@ def _cli_args():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     ap = argparse.ArgumentParser()
     ap.add_argument("--pair", default="")
-    ap.add_argument("--repo", default=str(Path(__file__).resolve().parents[2]))
+    ap.add_argument("--repo", default=str(Path(__file__).resolve().parents[3]))
     ap.add_argument("--shots", default="", help="verify: capture camera<->free "
                     "toggle screenshots to this dir, then quit Blender")
     return ap.parse_known_args(argv)[0]

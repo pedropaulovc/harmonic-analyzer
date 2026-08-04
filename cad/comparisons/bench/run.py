@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["pillow"]
 # ///
-"""Multi-model runner for the pose-presentation benchmark (docs/pose-presentation-benchmark.md).
+"""Multi-model runner for the pose-presentation benchmark (cad/docs/pose-presentation-benchmark.md).
 
 Fans out one fresh-context call per cell x subject model. Two Codex variants
 (gpt-5.5 and gpt-5.6-sol, both high reasoning) via `codex exec` with
@@ -13,13 +13,13 @@ served), N repeats, resumable (answered cells skipped), results appended to
 results.jsonl tagged by model. Ground truth is recorded on each row for the
 scorer but NEVER shown to a subject.
 
-    uv run comparisons/bench/run.py --task t1 --model codex               # T1, Codex gpt-5.5
-    uv run comparisons/bench/run.py --task t1 --model codex-sol           # T1, Codex gpt-5.6-sol
-    uv run comparisons/bench/run.py --task t1 --model codex-sol --limit 10 --arms P1,P2  # smoke
-    uv run comparisons/bench/run.py --task t3 --model codex-sol
-    uv run comparisons/bench/run.py --task t1 --model opus                # after codex
-    uv run comparisons/bench/run.py --task t1 --model opus-5              # pinned claude-opus-5 (Read-only)
-    uv run comparisons/bench/run.py --task t1 --model opus-5-tools        # side-probe: unrestricted tools
+    uv run cad/comparisons/bench/run.py --task t1 --model codex               # T1, Codex gpt-5.5
+    uv run cad/comparisons/bench/run.py --task t1 --model codex-sol           # T1, Codex gpt-5.6-sol
+    uv run cad/comparisons/bench/run.py --task t1 --model codex-sol --limit 10 --arms P1,P2  # smoke
+    uv run cad/comparisons/bench/run.py --task t3 --model codex-sol
+    uv run cad/comparisons/bench/run.py --task t1 --model opus                # after codex
+    uv run cad/comparisons/bench/run.py --task t1 --model opus-5              # pinned claude-opus-5 (Read-only)
+    uv run cad/comparisons/bench/run.py --task t1 --model opus-5-tools        # side-probe: unrestricted tools
 
 Resume is automatic: rerun the same command; done cells are skipped.
 """

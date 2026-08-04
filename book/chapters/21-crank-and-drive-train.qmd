@@ -47,6 +47,6 @@ TODO
 
 - `cad/scripts/build_*.py` (geometry — the source of truth)
 - `cad/config/parts/*.yaml` (material, appearance, registry)
-- `docs/machining-dfm.md` (setups, hazards, routing)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
 - `logbook/entries/` (what actually happened)
 

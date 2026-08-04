@@ -21,7 +21,7 @@ hours_actual: 0
 ## References
 
 - `references/machining-for-hobbyists-getting-started/08_chapter-6-working-on-lathe.pdf`
-- `docs/machining-dfm.md` (`cone-gear-shaft`, `pivot-shaft`, `fulcrum-shaft`)
+- `cad/docs/machining-dfm.md` (`cone-gear-shaft`, `pivot-shaft`, `fulcrum-shaft`)
 
 ## Practice
 

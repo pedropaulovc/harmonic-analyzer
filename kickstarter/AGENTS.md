@@ -13,7 +13,7 @@ directory** — it is required before touching `cad/`, not for prose.
   `TBD` / `[EST]`. A plausible-looking fabricated price is worse than a blank.
 - **Never claim work is finished that isn't.** The campaign's whole credibility
   rests on the already-public CAD work. Check the claim against the repo before
-  writing it: `docs/`, `comparisons/`, the release tags, `cad/scripts/`.
+  writing it: `cad/docs/`, `cad/comparisons/`, the release tags, `cad/scripts/`.
 - **Marketing voice, not spec-sheet voice** — but no hype. The audience is
   hobby machinists and people who liked the engineerguy videos; they can smell
   a padded claim. Run drafts through `/humanizer`.
@@ -29,7 +29,7 @@ directory** — it is required before touching `cad/`, not for prose.
 | claim you want to make | check it here |
 |---|---|
 | "N parts modelled" | `cad/scripts/build_*.py` |
-| "the model matches the real machine" | `comparisons/manifest.json`, the gallery from `doit export` |
-| "we know which parts are hard" | `docs/machining-dfm.md`, `docs/tolerance-gdt-assessment.md` |
+| "the model matches the real machine" | `cad/comparisons/manifest.json`, the gallery from `doit export` |
+| "we know which parts are hard" | `cad/docs/machining-dfm.md`, `cad/docs/tolerance-gdt-assessment.md` |
 | "the design is documented to source" | `cad/config/dimensions.yaml`, `cad/DIMENSIONS.md` (rendered) |
 | "it's verified, not just drawn" | `verify:soundness` / `verify:kinematics` in `dodo.py` |

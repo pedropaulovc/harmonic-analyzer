@@ -8,7 +8,7 @@ as real (decimated) RED geometry; everything else as a light-grey bounding-box
 wireframe for spatial context. Four views to PNG via the Agg backend -- no GPU,
 no GL context, no external driver.
 
-    .render-venv/Scripts/python.exe comparisons/tools/render_diff_mpl.py \
+    .render-venv/Scripts/python.exe cad/comparisons/tools/render_diff_mpl.py \
         --scene cad/out/boxes/harmonic-analyzer.json --stl-dir cad/out/stl \
         --changed channel-spring-installed,measuring-stick,rocker-arm,transgear-removable \
         --out .render_diff_v020

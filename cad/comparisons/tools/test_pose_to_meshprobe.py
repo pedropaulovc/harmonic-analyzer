@@ -10,8 +10,8 @@ two renderers' conventions, so it gets a re-runnable check rather than a comment
   the SAME pair and asserts they agree in sign and magnitude. It SKIPS unless
   both renders exist, since it needs a Blender seat + a meshprobe run:
 
-      uv run comparisons/tools/pose_to_meshprobe.py --pair ch11-p002-img05 | bash
-      uv run pytest comparisons/tools/test_pose_to_meshprobe.py
+      uv run cad/comparisons/tools/pose_to_meshprobe.py --pair ch11-p002-img05 | bash
+      uv run pytest cad/comparisons/tools/test_pose_to_meshprobe.py
 """
 from __future__ import annotations
 
@@ -23,10 +23,10 @@ import pytest
 
 import pose_to_meshprobe as p2m
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 PAIR = "harmonic_analyzer--ch11-p002-img05"
-MESHPROBE_PNG = REPO / "comparisons" / "render" / "meshprobe" / f"{PAIR}.png"
-BLENDER_JPG = REPO / "comparisons" / "render" / f"{PAIR}.jpg"
+MESHPROBE_PNG = REPO / "cad" / "comparisons" / "render" / "meshprobe" / f"{PAIR}.png"
+BLENDER_JPG = REPO / "cad" / "comparisons" / "render" / f"{PAIR}.jpg"
 
 # A level camera (el=0) renders parallel verticals, so one tilt angle describes
 # the whole frame — that is why this pair is the fixture.

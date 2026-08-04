@@ -53,5 +53,5 @@ One form cutter, tested on a brass disc, tooth form checked against the drawing 
 **Sources for this chapter**
 
 - `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` ch. 12
-- `docs/machining-dfm.md` (go/no-go: cutters resolved as self-made)
+- `cad/docs/machining-dfm.md` (go/no-go: cutters resolved as self-made)
 

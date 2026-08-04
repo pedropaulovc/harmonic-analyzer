@@ -41,7 +41,7 @@ overlap it); the output fixture's clamp screw is omitted (its cross hole doubles
 as the wire hook); the wires are modeled as straight rest-pose rods only
 (lever-wire here, pen-wire in pen.SLDASM) -- hub/rim wraps, hooks and compliance
 are not, and the kinematic couplings stay Motion-study mates
-(docs/motion-policy.md), so each run stands 0.25 off its wheel surface.
+(cad/docs/motion-policy.md), so each run stands 0.25 off its wheel surface.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact final
 transform and fixed; the lever + bracket + wheel + wire are left free and

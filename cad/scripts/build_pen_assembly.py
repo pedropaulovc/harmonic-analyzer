@@ -20,7 +20,7 @@ the curve.
 * pen-wire -- WIRE 2's straight rest-pose run from the wheel-rim tangent down
   to the rod's wire hole, locked to the rod so it rides the pen travel. The
   rim wrap and tie-off are not modeled; the kinematic coupling stays a
-  Motion-study mate (docs/motion-policy.md).
+  Motion-study mate (cad/docs/motion-policy.md).
 * hanger-screw -- fastens the pen-hanger from behind the wheel bar.
 
 Cross-subassembly fits (checked at the top level): the pen-hanger clamps the
@@ -197,7 +197,7 @@ async def build(adapter) -> dict[str, str]:
     # Kinematic pen driver (plan F5): re-drives the Y-travel mate from a
     # CrankDeg global through the chained Fourier sum, so the pose reproduces
     # truth_model.pen_y with no force solver (the 21-spring summation is
-    # computed, not simulated -- docs/motion-policy.md). The build never
+    # computed, not simulated -- cad/docs/motion-policy.md). The build never
     # authors this mate or its equation -- verify:kinematics replays the
     # recorded DOF-manifest spec and installs the equation transiently on the
     # replayed mate (renamed DRIVE_pen_travel), then discards the model

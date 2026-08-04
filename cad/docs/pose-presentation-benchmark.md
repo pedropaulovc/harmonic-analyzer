@@ -324,17 +324,17 @@ authorize it.
 
 ## Harness sketch (all new code lives outside the shipping pipeline)
 
-- `comparisons/bench/presentations.py` — the 11 builders, **all** operating
+- `cad/comparisons/bench/presentations.py` — the 11 builders, **all** operating
   on the same fixed-frame ref/render pair (~10 lines of Pillow each; P1
   reuses only `composite._render_rgba`'s tint math — never `_fitted_render`,
   see the P1 row).
-- `comparisons/bench/gen_cases.py` — perturb manifest cameras (image-plane →
+- `cad/comparisons/bench/gen_cases.py` — perturb manifest cameras (image-plane →
   world target conversion, seeded mixed draws, frozen baseline align — see
   "Ground truth") → temp manifest with synthetic case ids
   (`<pair_id>+<delta_tag>`, e.g. `…-img01+az+7`) → `render_offline.py` →
   stimuli + `cases.jsonl`. **Prerequisite flags on `render_offline.py`** (it
   currently hardcodes `composite.load_manifest()`, writes through
-  `composite.pair_paths()` into the shipping `comparisons/render/` tree, and
+  `composite.pair_paths()` into the shipping `cad/comparisons/render/` tree, and
   ends with `composite.regenerate()` — all three must be bypassable):
   `--manifest <path>`, `--no-trim --canvas WxH` (fixed framing — including
   the frozen `aim_camera` framing solve, see "Presentation arms": the
@@ -342,12 +342,12 @@ authorize it.
   target/zoom/frame-width/distance, not re-fit their own), `--out-root <dir>` (renders + sidecars under
   `<dir>/render/` **and prepared references under `<dir>/ref/`** —
   `prepare_reference` also writes through `pair_paths()` into
-  `comparisons/ref/`, which `cut_release.stage_comparisons` ships wholesale,
+  `cad/comparisons/ref/`, which `cut_release.stage_comparisons` ships wholesale,
   so bench refs must be redirected too, not just renders), and
   `--skip-composites` (no gallery/scores regeneration — bench stimuli are
   built by `presentations.py`). Together these guarantee bench cases never
   touch the shipping gallery cache or release bundle, whatever their ids.
-- `comparisons/bench/run.py` — fans out one fresh-context call per cell ×
+- `cad/comparisons/bench/run.py` — fans out one fresh-context call per cell ×
   subject model: Opus via the Agent tool with the explicit `model: "opus"`
   override, Codex via `codex exec` (see "Subject models"); structured-output
   schema per task, appends `results.jsonl` tagged with the model; resumable
@@ -359,7 +359,7 @@ authorize it.
   binds hardest on the Codex arm: `codex exec` must run with its cwd in that
   sandbox dir, NOT the repo, or it can simply read `cases.jsonl` (or the
   filename) and answer without looking at the pixels.
-- `comparisons/bench/report.py` — tables above + per-arm exemplar sheets.
+- `cad/comparisons/bench/report.py` — tables above + per-arm exemplar sheets.
 
 ## Decision rule
 
@@ -388,7 +388,7 @@ release would ship galleryless with a "gallery incomplete" warning.
 
 ## Runbook — everything an executor needs
 
-The instruction "run the benchmark in docs/pose-presentation-benchmark.md" is
+The instruction "run the benchmark in cad/docs/pose-presentation-benchmark.md" is
 sufficient given this section. All decisions are pinned; do not re-ask them.
 
 1. **Seat preconditions**: Blender seat (the render_offline path must work),
@@ -399,16 +399,16 @@ sufficient given this section. All decisions are pinned; do not re-ask them.
    ran the export); do not attempt `doit export` locally. Also: `codex` CLI
    installed and authenticated, with both `gpt-5.5` and `gpt-5.6-sol` available.
 2. **Build the harness first** (nothing exists yet): the four
-   `comparisons/bench/` files from the harness sketch, plus the four
+   `cad/comparisons/bench/` files from the harness sketch, plus the four
    `render_offline.py` flags (`--manifest <path>`, `--no-trim --canvas WxH`,
    `--out-root <dir>`, `--skip-composites`). Bench outputs live in
-   `comparisons/bench/out/` — add it to `.gitignore`; the bench *code* is
-   tracked, and so is **`comparisons/bench/cases.jsonl`** — the committed
+   `cad/comparisons/bench/out/` — add it to `.gitignore`; the bench *code* is
+   tracked, and so is **`cad/comparisons/bench/cases.jsonl`** — the committed
    ground truth (mixed draws, resolved world targets, schedules) must NOT
    be written under the ignored `out/`, or later runs could silently
    regenerate different cases while reports claim they were fixed. Nothing
-   the bench renders may land under `comparisons/render/` or
-   `comparisons/composite/`.
+   the bench renders may land under `cad/comparisons/render/` or
+   `cad/comparisons/composite/`.
 3. **First-pass pairs** (stratified, pinned — manifest-exact ids, the
    renderer's `--only` matches `pair["id"]` verbatim):
    `harmonic_analyzer--ch30-p002-img01` (wide, dark),

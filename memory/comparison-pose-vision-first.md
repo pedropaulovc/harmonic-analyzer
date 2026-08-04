@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-When matching CAD renders to book/photo references (comparisons/), iterate the
+When matching CAD renders to book/photo references (cad/comparisons/), iterate the
 3D camera (az/el/roll/target_mm/zoom) **by vision**: render, read the
 `_blend.jpg` overlay, correct the manifest numbers, re-render. There is no
 second, numeric stage any more — RMS scoring in `scores.json` is a guide to

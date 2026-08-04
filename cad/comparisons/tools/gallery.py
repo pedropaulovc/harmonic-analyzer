@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Generate comparisons/index.html — all pairs for inspection.
+"""Generate cad/comparisons/index.html — all pairs for inspection.
 
 Static page, relative image paths, no dependencies. Pairs are grouped by
 model; each row shows a reveal slider (reference under, the pixel-registered
@@ -10,7 +10,7 @@ with id, camera pose, score, status and notes. A text box filters rows
 (id/model/source/notes), and broken/missing renders are flagged.
 
 Usage:
-    uv run comparisons/tools/gallery.py
+    uv run cad/comparisons/tools/gallery.py
 """
 
 import html

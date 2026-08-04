@@ -44,5 +44,5 @@ One `pivot-bushing`: Ø10.0 OD, Ø6.5 through bore running on a Ø6.35 shaft.
 
 **Sources for this chapter**
 
-- `docs/tolerance-gdt-assessment.md`
+- `cad/docs/tolerance-gdt-assessment.md`
 

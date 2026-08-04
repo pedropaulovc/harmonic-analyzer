@@ -16,7 +16,7 @@ Tiers gate iteration order: pose fixing and model tuning work P0 outward.
       output-trace chapters)
 
 Usage:
-    uv run comparisons/tools/assign_tiers.py
+    uv run cad/comparisons/tools/assign_tiers.py
 """
 
 import json
@@ -25,7 +25,7 @@ from collections import Counter
 from pathlib import Path
 
 COMP = Path(__file__).resolve().parents[1]
-REPO = COMP.parent
+REPO = COMP.parent.parent
 MANIFEST = COMP / "manifest.json"
 CATALOG = REPO / "references" / "curation" / "stills_catalog.json"
 

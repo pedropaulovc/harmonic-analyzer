@@ -7,13 +7,13 @@ Validates component vocabulary against cad/scripts/build_*.py stems, checks
 image paths exist, and reports id collisions.
 
 Usage:
-    uv run comparisons/tools/merge_catalog.py
+    uv run cad/comparisons/tools/merge_catalog.py
 """
 
 import json
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 BATCHES = REPO / "references" / "curation" / "batches"
 OUT = REPO / "references" / "curation" / "stills_catalog.json"
 

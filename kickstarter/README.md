@@ -30,7 +30,7 @@ verifiable chunk of the work is already done and already public:
 - A photo-vs-CAD comparison gallery scoring the model against Hammack, Kranz and
   Carpenter's photographs of the surviving University of Illinois machine.
 - A per-part manufacturability pass
-  ([`docs/machining-dfm.md`](../docs/machining-dfm.md)) that already names the
+  ([`cad/docs/machining-dfm.md`](../docs/machining-dfm.md)) that already names the
   three parts carrying the whole risk.
 
 The campaign should lead with that evidence rather than with a promise.

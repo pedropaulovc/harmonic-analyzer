@@ -23,7 +23,7 @@ hours_actual: 0
 ## References
 
 - `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` **ch. 12 (Eureka method)**
-- `docs/machining-dfm.md` (gear routing; cutters confirmed non-existent)
+- `cad/docs/machining-dfm.md` (gear routing; cutters confirmed non-existent)
 - `cad/scripts/build_cone_gear.py`, `cad/scripts/build_cylinder_gear.py`
 
 ## Practice

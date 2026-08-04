@@ -36,7 +36,7 @@ The crank also drives the paper sideways, through a reduction, a chain, and a ra
 
 ## What will fight you
 
-Two of the six translational gears are removable in three sizes, which is how the operator sets the horizontal scale. The engaged path in the CAD model is a documented kinematic coupling, not a geometric mesh — see `AGENTS.md` and `docs/known-limitations.md` before you take the model's centre distances as gospel.
+Two of the six translational gears are removable in three sizes, which is how the operator sets the horizontal scale. The engaged path in the CAD model is a documented kinematic coupling, not a geometric mesh — see `AGENTS.md` and `cad/docs/known-limitations.md` before you take the model's centre distances as gospel.
 
 ## Making each part
 
@@ -53,6 +53,6 @@ TODO
 
 - `cad/scripts/build_*.py` (geometry — the source of truth)
 - `cad/config/parts/*.yaml` (material, appearance, registry)
-- `docs/machining-dfm.md` (setups, hazards, routing)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing)
 - `logbook/entries/` (what actually happened)
 

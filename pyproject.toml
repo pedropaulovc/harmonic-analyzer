@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 # diff tooling import directly.
 #   doit      - pipeline orchestrator (dodo.py)
 #   pyyaml    - cad/config registry parsing (_config.py, gen_dimensions.py)
-#   pillow    - PNG export/trim (_common, trim_renders, comparisons/tools)
+#   pillow    - PNG export/trim (_common, trim_renders, cad/comparisons/tools)
 #   numpy     - geometry / Hausdorff diff (render_diff, release_diff)
 #   trimesh   - mesh diff (render_diff.py, the SolidWorks-free release diff)
 #   matplotlib- offline render fallback (render_diff_mpl)
@@ -71,7 +71,7 @@ dev = [
 ]
 
 [tool.uv]
-# This repo is a workspace of scripts (cad/scripts, comparisons/tools added to
+# This repo is a workspace of scripts (cad/scripts, cad/comparisons/tools added to
 # sys.path at runtime), not an installable package — don't try to build it.
 package = false
 

@@ -1,6 +1,6 @@
 """Map pose_studio part deltas back to SolidWorks edit targets.
 
-Reads ``comparisons/findings/<pair>_deltas.json`` (written by pose_studio's
+Reads ``cad/comparisons/findings/<pair>_deltas.json`` (written by pose_studio's
 *Export Part Deltas*) and, for each hand-moved part, prints where in the CAD
 source to apply the change. Parts that moved by the SAME delta are grouped --
 a rigid-group drag reports as one edit, not N.
@@ -16,7 +16,7 @@ a rigid-group drag reports as one edit, not N.
 
 SolidWorks-free: pure text analysis of the build scripts. Run:
 
-    python comparisons/tools/map_deltas.py --pair harmonic_analyzer--ch30-p003-img01
+    python cad/comparisons/tools/map_deltas.py --pair harmonic_analyzer--ch30-p003-img01
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ import json
 import re
 from pathlib import Path
 
-_REPO = Path(__file__).resolve().parents[2]
+_REPO = Path(__file__).resolve().parents[3]
 _SCRIPTS = _REPO / "cad" / "scripts"
 # UPPER_SNAKE = <value>  # ... trailing comment (carries the (high)/(low) tag).
 # Value is captured up to the '#' so expression-valued dims (0.375 * IN,
@@ -147,7 +147,7 @@ def main() -> int:
     args = ap.parse_args()
 
     path = Path(args.findings) if args.findings else (
-        _REPO / "comparisons" / "findings" / f"{args.pair}_deltas.json")
+        _REPO / "cad" / "comparisons" / "findings" / f"{args.pair}_deltas.json")
     if not path.exists():
         raise SystemExit(f"no deltas file: {path}\n"
                          "run pose_studio.py, move parts, press Export Part Deltas")

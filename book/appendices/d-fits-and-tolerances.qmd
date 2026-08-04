@@ -35,6 +35,6 @@ TODO
 
 **Sources for this chapter**
 
-- `docs/tolerance-policy.md`
-- `docs/tolerance-gdt-assessment.md`
+- `cad/docs/tolerance-policy.md`
+- `cad/docs/tolerance-gdt-assessment.md`
 

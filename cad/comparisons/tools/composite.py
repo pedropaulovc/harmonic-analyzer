@@ -7,7 +7,7 @@
 Importable from the SolidWorks build venv and runnable
 standalone with uv to regenerate composites/scores without SolidWorks:
 
-    uv run comparisons/tools/composite.py [--only id1,id2]
+    uv run cad/comparisons/tools/composite.py [--only id1,id2]
 
 Per pair (see ../manifest.json):
     ref/<id>.jpg                prepared reference (cropped/rotated copy)
@@ -29,7 +29,7 @@ from typing import Literal
 from PIL import Image, ImageOps
 
 COMP = Path(__file__).resolve().parents[1]
-REPO = COMP.parent
+REPO = COMP.parent.parent
 MANIFEST = COMP / "manifest.json"
 SCORES = COMP / "scores.json"
 StaleStage = Literal["render", "composite"]
@@ -110,8 +110,8 @@ def record_composite_align(pair: dict) -> None:
 def prepare_reference(pair: dict, max_px: int = 1600, out: Path | None = None) -> Path:
     """Copy the pair's source reference into ref/<id>.png (crop/rotate/cap).
 
-    ``out`` overrides the destination (bench comparisons/bench redirects refs
-    out of the shipping comparisons/ref/ tree cut_release ships wholesale).
+    ``out`` overrides the destination (bench cad/comparisons/bench redirects refs
+    out of the shipping cad/comparisons/ref/ tree cut_release ships wholesale).
     """
     src = REPO / pair["reference"]["path"]
     out = out or pair_paths(pair["id"])["ref"]

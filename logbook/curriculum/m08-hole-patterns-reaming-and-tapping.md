@@ -21,7 +21,7 @@ hours_actual: 0
 ## References
 
 - `references/machinerys-handbook/` (tap drill sizes, thread data)
-- `docs/machining-dfm.md` (`rocker-arm-support`, `summing-lever`)
+- `cad/docs/machining-dfm.md` (`rocker-arm-support`, `summing-lever`)
 
 ## Practice
 

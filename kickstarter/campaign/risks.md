@@ -7,7 +7,7 @@ carefully are the ones who back at the top tiers.
 
 **The six-tooth cone gear may not be machinable in my shop.** It is a ~4.08 mm
 outside diameter gear on a 0.79 mm bore, leaving a 0.49 mm wall at the tooth
-root. `docs/machining-dfm.md` calls it the single hardest part in the machine.
+root. `cad/docs/machining-dfm.md` calls it the single hardest part in the machine.
 *Mitigation:* the original used a harder yellow metal for the tip gears; if my
 first articles fail, the book documents the failure and the fallback (outsourced
 wire-EDM), which is itself useful to a reader. **The book ships either way.**
@@ -95,11 +95,37 @@ non-commercial purposes**. This project is commercial. Therefore:
   readers are pointed to it.
 - The reference material in `references/` (submodule) and the comparison
   gallery are **research inputs and open-source artefacts**, not campaign or
-  book assets. Keep that boundary sharp: `comparisons/ATTRIBUTION.md` covers
+  book assets. Keep that boundary sharp: `cad/comparisons/ATTRIBUTION.md` covers
   the CC BY imagery in the open repo, not in a product for sale.
 
+**Unresolved: which licence actually covers the book's photographs.**
+`cad/comparisons/ATTRIBUTION.md` states that both the 2014 book and the video
+series are published under **CC BY**, which would permit commercial reuse with
+attribution. The book PDF's own front matter says something different: "© 2014
+... All rights reserved" and "free for you to view and share for
+**non-commercial** purposes". Those cannot both be right, and the difference
+decides whether a single book photograph may appear anywhere near this campaign.
+
+This is live right now, not theoretical: the repository README shows a ch30
+plate side by side with the CAD render, credited, and the README links to the
+campaign. The engineerguy *videos* are CC BY with high confidence; the *book* is
+the doubtful one, and the ch30 plates are book plates.
+
+*Action:* resolve it before launch, in this order.
+1. Ask Bill Hammack directly. One email settles it, and it pairs naturally with
+   the courtesy note below.
+2. Until it is settled, keep book imagery out of anything that is itself for
+   sale (the book interior, the campaign page, reward material). The open-source
+   README is a weaker case than a priced product, but it is not a clear one.
+3. If the answer is "non-commercial only", swap the README image. The
+   replacement is not free: the only first-party photographs
+   (`references/photogrammetry/raw/`, 90 of them, taken 2025-08-28) are
+   photogrammetry captures shot through display-case glass with a scale bar in
+   frame, so they are unusable as a clean full-machine view. A commercial-safe
+   substitute means a new photograph of the real machine, or a CAD-only image.
+
 *Action before launch:* a courtesy note to Bill Hammack. Not legally required;
-obviously right, and he may well be a supporter.
+obviously right, and he may well be a supporter. Fold question 1 above into it.
 
 **This project is not affiliated with or endorsed by the authors of the 2014
 book, engineerguy, or the University of Illinois.** Say so on the page.

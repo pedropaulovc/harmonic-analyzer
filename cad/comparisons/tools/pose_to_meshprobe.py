@@ -2,15 +2,15 @@
 """Convert pose_studio camera poses into runnable meshprobe commands.
 
 pose_studio.py fits a book-photo camera and writes the euler pose into
-``comparisons/manifest.json`` (per pair) — and, when part-fitting, echoes the same
-pose into ``comparisons/findings/<pair>_deltas.json``. This tool reads either and
+``cad/comparisons/manifest.json`` (per pair) — and, when part-fitting, echoes the same
+pose into ``cad/comparisons/findings/<pair>_deltas.json``. This tool reads either and
 emits the ``meshprobe`` command sequence that reproduces that vantage on a release
 GLB, so a pose fitted in Blender can be re-inspected head-less in meshprobe.
 
-    uv run comparisons/tools/pose_to_meshprobe.py               # every manifest pair
-    uv run comparisons/tools/pose_to_meshprobe.py --pair p002   # id substring filter
-    uv run comparisons/tools/pose_to_meshprobe.py findings/ch30-p003_deltas.json
-    uv run comparisons/tools/pose_to_meshprobe.py --format json # machine-readable params
+    uv run cad/comparisons/tools/pose_to_meshprobe.py               # every manifest pair
+    uv run cad/comparisons/tools/pose_to_meshprobe.py --pair p002   # id substring filter
+    uv run cad/comparisons/tools/pose_to_meshprobe.py findings/ch30-p003_deltas.json
+    uv run cad/comparisons/tools/pose_to_meshprobe.py --format json # machine-readable params
 
 Coordinate frames — pose_studio/blender_worker is the source of truth:
   * MODEL (SolidWorks/machine) mm, +Y up; az 0 / el 0 looks from +Z (SW Front),
@@ -32,7 +32,7 @@ the v24 machine GLB: open's root_bounds read [457.2, 404.7, 1394.0] mm and its
 source_to_world is exactly the (x,-z,y) map used below. (Override --unit-scale only
 for a mis-authored asset whose open bounds come back 1000x off.)
 
-The framing math below MIRRORS comparisons/tools/blender_worker.py (its bpy-free
+The framing math below MIRRORS cad/comparisons/tools/blender_worker.py (its bpy-free
 half). blender_worker imports bpy at module scope so it cannot be imported here;
 keep the two copies in sync.
 """
@@ -49,7 +49,7 @@ import zipfile
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
-REPO = TOOLS.parents[1]
+REPO = TOOLS.parents[2]
 CAD_OUT = REPO / "cad" / "out"
 
 # Book camera: Nikon D60, APS-C "DX" sensor 23.6 x 15.8 mm (long, short edge).
@@ -188,7 +188,7 @@ def _enrich_from_manifest(pair: dict) -> None:
     """Best-effort: a deltas file carries no ``reference``, so canvas_for would fall
     back to the landscape default and distort the distance. Pull the reference/model
     from the manifest pair this delta derives from (by id) when available."""
-    mf = REPO / "comparisons" / "manifest.json"
+    mf = REPO / "cad" / "comparisons" / "manifest.json"
     if not mf.exists():
         return
     try:
@@ -318,7 +318,7 @@ def convert(pair: dict, bbox, w: int, h: int) -> dict:
         # to blender_worker's roll_deg, so passing it through tilts the image the
         # wrong way (a post leans by 2x roll vs the Blender render). Measured on
         # ch11-p002-img05 (roll_deg=-1.81): the dominant vertical-line tilt reads
-        # +1.812 deg in comparisons/render/<pair>.jpg and -1.813 deg in the
+        # +1.812 deg in cad/comparisons/render/<pair>.jpg and -1.813 deg in the
         # meshprobe render of the un-negated pose. Re-check with the Radon scan in
         # test_pose_to_meshprobe.py if either renderer's convention changes.
         "roll_deg": round(-cam["roll_deg"], 4),
@@ -354,13 +354,13 @@ def _size_from(img_path: Path, max_side: int):
 def canvas_for(pair: dict, max_side: int, override) -> tuple[int, int, str]:
     """Canvas WxH — distance depends on its portrait/landscape aspect.
 
-    Priority: explicit override > the exact prepared ref (comparisons/ref, what
+    Priority: explicit override > the exact prepared ref (cad/comparisons/ref, what
     render_offline uses) > the raw source photo's aspect (approximate — the
     manifest crop may differ) > the landscape default (warns; likely wrong for a
     portrait plate, so pass --canvas)."""
     if override:
         return override[0], override[1], "override"
-    prepared = REPO / "comparisons" / "ref" / f"{pair['id']}.jpg"
+    prepared = REPO / "cad" / "comparisons" / "ref" / f"{pair['id']}.jpg"
     if prepared.exists():
         wh = _size_from(prepared, max_side)
         if wh:
@@ -530,9 +530,9 @@ def _fmt(argv: list[str]) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("input", nargs="?", default=str(REPO / "comparisons" / "manifest.json"),
+    ap.add_argument("input", nargs="?", default=str(REPO / "cad" / "comparisons" / "manifest.json"),
                     help="pose_studio JSON: manifest.json, findings/<pair>_deltas.json, "
-                         "or a bare camera dict (default: comparisons/manifest.json)")
+                         "or a bare camera dict (default: cad/comparisons/manifest.json)")
     ap.add_argument("--pair", help="only pairs whose id contains this substring")
     ap.add_argument("--boxes", type=Path, help="scene/boxes JSON for the mm bbox "
                                                 "(default: cad/out/boxes/<model>.json)")
@@ -546,7 +546,7 @@ def main() -> int:
     ap.add_argument("--blender", default=None,
                     help="Blender >= 5.2 path to pass to meshprobe open; omitted by default "
                          "so meshprobe locates Blender itself (pass this only to override)")
-    ap.add_argument("--out-dir", default="comparisons/render/meshprobe",
+    ap.add_argument("--out-dir", default="cad/comparisons/render/meshprobe",
                     help="render-image --output directory")
     ap.add_argument("--format", choices=["sh", "json"], default="sh",
                     help="emit meshprobe commands (sh) or the computed params (json)")

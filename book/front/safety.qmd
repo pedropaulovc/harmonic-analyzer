@@ -43,5 +43,5 @@ TODO
 
 **Sources for this chapter**
 
-- `docs/machining-dfm.md` (fragile-feature list)
+- `cad/docs/machining-dfm.md` (fragile-feature list)
 

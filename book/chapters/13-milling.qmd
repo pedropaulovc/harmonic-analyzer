@@ -44,6 +44,6 @@ One `rocker-arm`: 2.5 mm steel plate, R800 concave top edge — it is the **outl
 
 **Sources for this chapter**
 
-- `docs/machining-dfm.md` (`rocker-arm` row)
+- `cad/docs/machining-dfm.md` (`rocker-arm` row)
 - `cad/scripts/build_rocker_arm.py`
 

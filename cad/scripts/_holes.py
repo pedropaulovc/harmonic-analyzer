@@ -317,7 +317,7 @@ def _tolerance_hole_diameter(
     hole is 3.048 against a 2.845 screw -- 0.203 total -- while the title block's
     general two-decimal rule is +/-0.51, five times the whole clearance, and
     permits a 2.54 hole the screw cannot pass. That is why
-    docs/tolerance-policy.md lists fastener<->clearance-hole as a CRITICAL
+    cad/docs/tolerance-policy.md lists fastener<->clearance-hole as a CRITICAL
     interface: the general block cannot govern it.
 
     This is the EXCEPTION hook, not the default path. Every drilled hole already

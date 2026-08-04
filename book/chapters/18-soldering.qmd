@@ -44,5 +44,5 @@ A test joint at temperature, pulled to destruction, before touching the real con
 
 **Sources for this chapter**
 
-- `docs/machining-dfm.md` (gears soldered, no keys)
+- `cad/docs/machining-dfm.md` (gears soldered, no keys)
 

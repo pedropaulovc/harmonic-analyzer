@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MODULE_PATH = REPO_ROOT / "comparisons" / "tools" / "render_offline.py"
+MODULE_PATH = REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py"
 
 
 def _load_render_offline():

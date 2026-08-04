@@ -11,7 +11,7 @@ Pedro is refitting the model against the ch30 p002 front photo in stages
 1. **DONE (PR #340):** magnifier wheel group (wheel, wheel-bar, column-clamps,
    clamp-screws) raised 565.0 → 575.7 (+10.7).
 2. **NEXT — reducer group down 42.9 mm:** pose-studio deltas in
-   `comparisons/findings/harmonic_analyzer--ch30-p002-img01_deltas.json` move
+   `cad/comparisons/findings/harmonic_analyzer--ch30-p002-img01_deltas.json` move
    `support-bar` + `rack-pinion` + `transgear-knob-shaft` + `transgear-removable`
    as ONE rigid group by translate_mm [0.129, −42.891, −4.103] (machine mm; fit
    vs release v0.20.0). y −42.9 is the intended lowering (support-bar 338.5 →

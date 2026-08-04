@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["pillow"]
 # ///
-"""The 11 presentation arms for the pose benchmark (docs/pose-presentation-benchmark.md).
+"""The 11 presentation arms for the pose benchmark (cad/docs/pose-presentation-benchmark.md).
 
 Every builder consumes the SAME fixed-frame ref + render pair (produced by
 gen_cases.py -> render_offline.py --no-trim --fixed-frame) and emits a stimulus

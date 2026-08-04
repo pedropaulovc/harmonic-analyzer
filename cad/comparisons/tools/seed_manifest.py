@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Seed comparisons/manifest.json from the curation catalog + the photo index.
+"""Seed cad/comparisons/manifest.json from the curation catalog + the photo index.
 
 Rules (all poses start status="rough"; the discrepancy loop refines them):
 - catalog keep=true entries:
@@ -19,7 +19,7 @@ Default is a merge: existing manifest pairs (same id) are preserved verbatim
 so hand-tuned poses survive re-seeding; --reset rebuilds from scratch.
 
 Usage:
-    uv run comparisons/tools/seed_manifest.py [--reset]
+    uv run cad/comparisons/tools/seed_manifest.py [--reset]
 """
 
 import argparse
@@ -27,11 +27,11 @@ import json
 import re
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 SCRIPTS = REPO / "cad" / "scripts"
 CATALOG = REPO / "references" / "curation" / "stills_catalog.json"
 PHOTOS_MD = REPO / "references" / "photogrammetry" / "raw" / "README.md"
-MANIFEST = REPO / "comparisons" / "manifest.json"
+MANIFEST = REPO / "cad" / "comparisons" / "manifest.json"
 
 def part_stems() -> set[str]:
     return {

@@ -165,7 +165,7 @@ discovered during harmonic-analyzer M6.4:
 - **`mirror_placement` needs the part's STL bbox at insert time**: it
   calls `stl_bbox_mm(stem)` on `cad/out/stl/<stem>.STL` to locate the
   part-local mirror plane, but brand-new parts have NO STL yet —
-  `export_models.py` only exports comparisons/manifest.json models plus
+  `export_models.py` only exports cad/comparisons/manifest.json models plus
   assembly-component meshes, and running it before the part is in an
   assembly exports nothing useful (it re-exported unrelated stale models
   for ~4 min). Fix: give every new x-symmetric part an explicit
@@ -280,7 +280,7 @@ discovered during harmonic-analyzer M6.4:
   for an assembly-only change (config + mate suppression) the part docs stay clean
   so even plain `Silent` writes. Proven by `cad/scripts/diagnostics/repro_inplace_save.py`
   (open from disk → add config → `Save3` on a copy, real file untouched). Canonical
-  per SW docs/forums (CodeStack "save all silently"; SW "Rename Components and Save
+  per SW cad/docs/forums (CodeStack "save all silently"; SW "Rename Components and Save
   Assembly" notes a bare save errors "without first saving its references" → why
   the SaveReferenced flag). Still gate on `model.GetSaveFlag()` (True = dirty) to skip a clean
   idempotent re-save. `_click_save_all.ps1` + the watchdog are DELETED.

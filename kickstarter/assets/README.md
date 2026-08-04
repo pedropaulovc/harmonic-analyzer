@@ -19,10 +19,10 @@ what exists, what's missing, and to what spec.
 
 | # | asset | source | status |
 |---|---|---|---|
-| A1 | Hero render, iso view | `docs/images/hero.png` | **exists** — re-render at campaign resolution |
-| A2 | Sub-assembly renders (frame, drive train, channel, summing, magnifier, pen, paper drive) | `docs/images/*.png` | **exists** |
-| A3 | Drawing sheets | `docs/images/*-drawing.png`, `doit export` | **exists** — pick the two most legible |
-| A4 | Photo-vs-render comparison slider stills | `comparisons/` gallery (`doit export`) | regenerate; needs Blender seat |
+| A1 | Hero render, iso view | `cad/docs/images/hero.png` | **exists** — re-render at campaign resolution |
+| A2 | Sub-assembly renders (frame, drive train, channel, summing, magnifier, pen, paper drive) | `cad/docs/images/*.png` | **exists** |
+| A3 | Drawing sheets | `cad/docs/images/*-drawing.png`, `doit export` | **exists** — pick the two most legible |
+| A4 | Photo-vs-render comparison slider stills | `cad/comparisons/` gallery (`doit export`) | regenerate; needs Blender seat |
 | A5 | Exploded view of one channel | new render | **missing** |
 | A6 | Cone gear set close-up, showing the T006 tip gear against a coin for scale | new render + later a photo | **missing** |
 | A7 | The signal diagram: crank → cones → cylinders+cams → rockers → bars → springs → summing → magnifier → pen | new, vector | **missing** |
@@ -40,5 +40,5 @@ what exists, what's missing, and to what spec.
   release — a stale render on the campaign page is a claim about the current
   design.
 - Every render used publicly should be reproducible: note the pair id or the
-  `comparisons/manifest.json` pose that produced it.
+  `cad/comparisons/manifest.json` pose that produced it.
 - Keep an `[EST]`-free asset list: an asset is either done or missing.

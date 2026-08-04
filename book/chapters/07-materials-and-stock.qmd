@@ -40,6 +40,6 @@ TODO
 **Sources for this chapter**
 
 - `cad/config/parts/*.yaml` (material per part)
-- `docs/machining-dfm.md` (casting substitutions)
+- `cad/docs/machining-dfm.md` (casting substitutions)
 - `research/1-research-documentation/029-material-selection-for-components.md`
 
