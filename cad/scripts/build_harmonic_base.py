@@ -5,11 +5,11 @@ flange and 17.5 x 10.5 x 1.5 in pad. The v2 post/carrier fit preserves their
 both plates remain on the legacy centred footprint; the v2 post/carrier fit is
 handled by the mechanism installation contracts.
 
-Finishing: the legacy HarmonicBase.cs edge treatment is modeled — R3.18
-(1/8 in) fillets on the eight vertical plan corners, R1.59 (1/16 in)
-rounds on both plates' exposed top rims, and a C1.59 x 45-degree break on
-the underside rim (ch06/ch30 photos: every exposed plate edge reads
-softened, none sharp).
+Finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes): C3.18
+x 45 breaks on the eight vertical plan corners, C1.59 x 45 breaks on both
+plates' exposed top rims and the underside rim, and the R0.50 pad-to-flange
+root fillet note 1 caps -- the one internal wall junction on the part
+(ch06/ch30 photos: every exposed plate edge reads softened, none sharp).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 6" — annotated (high) footprint,
 legacy thicknesses (photo-verify note).
@@ -102,14 +102,17 @@ CBORE_DIA = 23.0  # lag head O22, recessed
 CBORE_DEPTH = 6.5  # lag head 22 x 6 recessed 0.5
 CBORE_XZ = HOLE_XZ  # all four heads counterbored
 
-# Edge finishing: the legacy HarmonicBase.cs 0.125"/0.0625" treatment. Plan
-# corners get the 1/8 in fillet on both plates; the exposed top rims roll
-# over at 1/16 in (tangent-propagated around the corner arcs); the underside
-# rim carries a 1/16 in x 45-degree edge break. All hole features sit >= 26
-# from every plate edge, so the breaks never touch a rim or seat.
-CORNER_FILLET_R = 0.125 * IN  # 3.175
-RIM_FILLET_R = 0.0625 * IN  # 1.5875
-BOTTOM_CHAMFER = 0.0625 * IN  # 1.5875
+# Edge finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes).
+# The machined plate gets 45-degree edge breaks on every external edge: the
+# vertical plan corners at 1/8 in legs, the exposed top rims and the
+# underside rim at 1/16 in (single-pass mill/file breaks). The one internal
+# wall junction -- the pad side walls meeting the flange top face -- carries
+# the R0.50 root fillet note 1 already caps (a cutter-corner radius). All
+# hole features sit >= 26 from every plate edge, so no break touches a rim
+# or seat.
+CORNER_CHAMFER = 0.125 * IN  # 3.175 legs, vertical plan corners
+RIM_CHAMFER = 0.0625 * IN  # 1.5875 legs, top rims + underside rim
+PAD_ROOT_R = 0.5  # pad-to-flange root fillet (note 1: R0.50 MAX)
 
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords,
 # and since #151 the drive-train derivation is machine-handed too, so the
@@ -230,28 +233,23 @@ async def _volume(adapter) -> float:
 
 
 def _fillet_section_area(r: float) -> float:
-    """Cross-section a radius-r round removes from a square 90-degree edge."""
+    """Cross-section a radius-r fillet adds to a square reentrant edge."""
     return (1.0 - math.pi / 4.0) * r * r
 
 
-def _fillet_section_inset(r: float) -> float:
-    """Centroid distance of that removed section from either adjacent face."""
-    return r * (5.0 / 6.0 - math.pi / 4.0) / (1.0 - math.pi / 4.0)
+def _plan_perimeter(length: float, width: float) -> float:
+    """Plate outline length after the 45-degree plan-corner chamfers.
 
-
-def _rim_removal(length: float, width: float, area: float, inset: float) -> float:
-    """Volume an edge break removes along one plate's top/bottom rim.
-
-    The rim is the plate's rectangle perimeter with its plan corners already
-    rounded at CORNER_FILLET_R: the straight runs remove ``area`` per unit
-    length, and each quarter-circle corner sweeps the section by Pappus at
-    the corner-arc radius minus the section's centroid inset (the section
-    rides the inside of the convex corner). Exact for a constant section
-    swept along a tangent-continuous 90-degree rim.
+    Each corner trades two CORNER_CHAMFER legs for one sqrt(2) flat. A rim
+    section swept along this polyline removes area x perimeter; the eight
+    blunt 135-degree vertices contribute only O(section^3) corner patches,
+    absorbed by the check tolerances.
     """
-    straight = 2.0 * (length + width) - 8.0 * CORNER_FILLET_R
-    corner = (math.pi / 2.0) * area * (CORNER_FILLET_R - inset)
-    return area * straight + 4.0 * corner
+    return (
+        2.0 * (length + width)
+        - 8.0 * CORNER_CHAMFER
+        + 4.0 * CORNER_CHAMFER * math.sqrt(2.0)
+    )
 
 
 async def _define_fixed_edge_rectangle(
@@ -469,14 +467,15 @@ async def build(adapter) -> dict[str, str]:
             )
         after = after_cut
 
-    # Edge finishing (the legacy HarmonicBase.cs fillets, restored now the
-    # adapter has edge selection): plan corners FIRST, so the rim features
-    # propagate tangent around the corner arcs and the Pappus expectations
-    # in _rim_removal hold exactly.
+    # Edge finishing (chamfer external, fillet internal). Plan corners
+    # FIRST: the rim breaks then run along the chamfered outline whose
+    # length _plan_perimeter gives exactly. Corner flats are separate
+    # non-tangent edges, so every rim loop selects its four side edges AND
+    # its four corner-flat edges explicitly.
     check(
-        "fillet plan corners",
-        await adapter.add_fillet(
-            CORNER_FILLET_R,
+        "chamfer plan corners",
+        await adapter.add_chamfer(
+            CORNER_CHAMFER,
             [
                 [
                     sx * BOTTOM_LENGTH / 2.0,
@@ -497,66 +496,76 @@ async def build(adapter) -> dict[str, str]:
             ],
         ),
     )
-    name_last_feature(adapter, "CornerFillets")
-    v_corners = 4.0 * _fillet_section_area(CORNER_FILLET_R) * total
+    name_last_feature(adapter, "CornerBreaks")
+    v_corners = 4.0 * (CORNER_CHAMFER**2 / 2.0) * total
     after = await volume_check(
-        adapter, "plan corner fillets", after - v_corners, 0.01 * v_corners + 2.0
+        adapter, "plan corner breaks", after - v_corners, 0.01 * v_corners + 2.0
     )
 
-    # Top rims: 1/16 in rounds on both plates' exposed top perimeter edges
-    # (the flange's reveal rim and the pad's top rim). Tangent propagation
-    # (always on in add_fillet) carries each rim around its corner arcs.
+    def _rim_points(half_x: float, y_rim: float, half_z: float) -> list[list[float]]:
+        """One rim loop: four side-edge midpoints + four corner-flat midpoints."""
+        flat_x = half_x - CORNER_CHAMFER / 2.0
+        flat_z = half_z - CORNER_CHAMFER / 2.0
+        return [
+            [0.0, y_rim, -half_z],
+            [0.0, y_rim, half_z],
+            [half_x, y_rim, 0.0],
+            [-half_x, y_rim, 0.0],
+        ] + [
+            [sx * flat_x, y_rim, sz * flat_z]
+            for sx in (-1.0, 1.0)
+            for sz in (-1.0, 1.0)
+        ]
+
+    # Top rims: 1/16 in x 45-degree breaks on both plates' exposed top
+    # perimeter edges (the flange's reveal rim and the pad's top rim).
     check(
-        "fillet top rims",
-        await adapter.add_fillet(
-            RIM_FILLET_R,
-            [
-                [0.0, BOTTOM_THICKNESS, BOTTOM_FRONT_Z],
-                [0.0, BOTTOM_THICKNESS, BOTTOM_REAR_Z],
-                [BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, 0.0],
-                [-BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, 0.0],
-                [0.0, total, TOP_FRONT_Z],
-                [0.0, total, TOP_REAR_Z],
-                [TOP_LENGTH / 2.0, total, 0.0],
-                [-TOP_LENGTH / 2.0, total, 0.0],
-            ],
+        "chamfer top rims",
+        await adapter.add_chamfer(
+            RIM_CHAMFER,
+            _rim_points(BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, BOTTOM_WIDTH / 2.0)
+            + _rim_points(TOP_LENGTH / 2.0, total, TOP_WIDTH / 2.0),
         ),
     )
-    name_last_feature(adapter, "TopRimRounds")
-    rim_area = _fillet_section_area(RIM_FILLET_R)
-    rim_inset = _fillet_section_inset(RIM_FILLET_R)
-    v_rims = _rim_removal(
-        BOTTOM_LENGTH, BOTTOM_WIDTH, rim_area, rim_inset
-    ) + _rim_removal(TOP_LENGTH, TOP_WIDTH, rim_area, rim_inset)
+    name_last_feature(adapter, "TopRimBreaks")
+    rim_area = RIM_CHAMFER**2 / 2.0
+    v_rims = rim_area * (
+        _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH)
+        + _plan_perimeter(TOP_LENGTH, TOP_WIDTH)
+    )
     after = await volume_check(
-        adapter, "top rim rounds", after - v_rims, 0.01 * v_rims + 2.0
+        adapter, "top rim breaks", after - v_rims, 0.02 * v_rims + 5.0
     )
 
-    # Underside rim: 1/16 in x 45-degree edge break around the bottom face
-    # perimeter (tangent propagation wraps the corner arcs). The chamfer
-    # section is c^2/2 with centroid c/3 from either face.
+    # Underside rim: the same 1/16 in break around the bottom face perimeter.
     check(
         "chamfer underside rim",
         await adapter.add_chamfer(
-            BOTTOM_CHAMFER,
-            [
-                [0.0, 0.0, BOTTOM_FRONT_Z],
-                [0.0, 0.0, BOTTOM_REAR_Z],
-                [BOTTOM_LENGTH / 2.0, 0.0, 0.0],
-                [-BOTTOM_LENGTH / 2.0, 0.0, 0.0],
-            ],
-            tangent_propagation=True,
+            RIM_CHAMFER,
+            _rim_points(BOTTOM_LENGTH / 2.0, 0.0, BOTTOM_WIDTH / 2.0),
         ),
     )
     name_last_feature(adapter, "BottomEdgeBreak")
-    v_break = _rim_removal(
-        BOTTOM_LENGTH,
-        BOTTOM_WIDTH,
-        BOTTOM_CHAMFER**2 / 2.0,
-        BOTTOM_CHAMFER / 3.0,
-    )
+    v_break = rim_area * _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH)
     after = await volume_check(
-        adapter, "underside edge break", after - v_break, 0.01 * v_break + 2.0
+        adapter, "underside edge break", after - v_break, 0.02 * v_break + 5.0
+    )
+
+    # Pad root: the one INTERNAL wall junction -- the pad sides meeting the
+    # flange top face -- filleted at the R0.50 note 1 caps (the cutter-corner
+    # radius that machining the reveal leaves anyway). Reentrant: ADDS
+    # material along the pad's chamfered base outline.
+    check(
+        "fillet pad root",
+        await adapter.add_fillet(
+            PAD_ROOT_R,
+            _rim_points(TOP_LENGTH / 2.0, BOTTOM_THICKNESS, TOP_WIDTH / 2.0),
+        ),
+    )
+    name_last_feature(adapter, "PadRootFillet")
+    v_root = _fillet_section_area(PAD_ROOT_R) * _plan_perimeter(TOP_LENGTH, TOP_WIDTH)
+    after = await volume_check(
+        adapter, "pad root fillet", after + v_root, 0.05 * v_root + 3.0
     )
 
     # Apply the deferred drive equations after the whole model exists, then

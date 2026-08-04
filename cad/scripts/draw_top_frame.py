@@ -105,7 +105,10 @@ TOP_KEEP = {
     ),
     # Depth rides the LEFT flank: the right flank hosts the notes-B block
     # and the text landed mid-block (eye-pass 2026-08-03).
-    "Depth": (TOP_CENTER[0] - PLAN_HALF_X * VIEW_SCALE / 1000.0 - 0.006, TOP_CENTER[1] - 0.030),
+    "Depth": (
+        TOP_CENTER[0] - PLAN_HALF_X * VIEW_SCALE / 1000.0 - 0.006,
+        TOP_CENTER[1] - 0.030,
+    ),
 }
 
 
@@ -301,8 +304,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=DATUM_C_SYMBOL_XY, datum="C",
-        label="rear outer rail-face datum", entity=datum_c_edge,
+        symbol_xy=DATUM_C_SYMBOL_XY,
+        datum="C",
+        label="rear outer rail-face datum",
+        entity=datum_c_edge,
         shoulder=True,
     )
     add_feature_control_frame(
@@ -354,7 +359,10 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=stud_hole,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.100)
+    # y=0.102 (physical 0.204): the finishing rework left note 1 one line
+    # taller than the original block and note 5's tail printed on the
+    # bottom border at y=0.100 -- one line-height up restores the margin.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.102)
     # NOTE anchors pass through IAnnotation::SetPosition, which this 2:1
     # sheet MULTIPLIES by the sheet scale -- physical = 2x the argument
     # (Inspection Notes (0.270, 0.255) render at (0.54, 0.51); the first
