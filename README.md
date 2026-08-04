@@ -9,12 +9,12 @@
 
 <table align="center">
 <tr>
-<td align="center" width="50%"><img src="cad/docs/images/real-machine-ch30.jpg" alt="The surviving Michelson analyzer at the University of Illinois, three-quarter view"></td>
-<td align="center" width="50%"><img src="cad/docs/images/hero.png" alt="The CAD reconstruction, isometric view"></td>
+<td align="center" width="50%"><img src="cad/docs/images/real-machine-display-case.jpg" width="250" alt="The surviving Michelson analyzer, stood on end in a glass case at the University of Illinois"></td>
+<td align="center" width="50%"><img src="cad/docs/images/cad-model-display-pose.png" width="250" alt="The CAD reconstruction rendered in the same pose"></td>
 </tr>
 <tr>
-<td align="center"><sub><b>The machine.</b> The surviving 20-element analyzer at the University of Illinois.<br>Photograph © Hammack, Kranz &amp; Carpenter, <a href="http://www.engineerguy.com/fourier"><i>Albert Michelson's Harmonic Analyzer</i></a> (2014), used with attribution.</sub></td>
-<td align="center"><sub><b>The model.</b> 102 parts, generated from Python, gated on every build.<br>Rendered from the SolidWorks assembly this repository builds.</sub></td>
+<td align="center"><sub><b>The machine.</b> The surviving 20-element analyzer, in a corridor case at the University of Illinois.<br>Photographed 2025-08-28.</sub></td>
+<td align="center"><sub><b>The model.</b> 102 parts, generated from Python, gated on every build.<br>Same pose, rendered from the glTF this repository exports.</sub></td>
 </tr>
 </table>
 

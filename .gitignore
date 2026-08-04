@@ -453,3 +453,7 @@ logbook/media/
 # `git add -A` picks it up as a gitlink; it is machine-local and may contain
 # paths and personal detail, so it never belongs in this repo.
 agent-sessions-backup/
+
+# Unrelated checkout that happens to sit here. Also its own git repo, so the
+# same `git add -A` gitlink trap applies.
+migration-baseline-bootstrap/

@@ -106,23 +106,26 @@ attribution. The book PDF's own front matter says something different: "© 2014
 **non-commercial** purposes". Those cannot both be right, and the difference
 decides whether a single book photograph may appear anywhere near this campaign.
 
-This is live right now, not theoretical: the repository README shows a ch30
-plate side by side with the CAD render, credited, and the README links to the
-campaign. The engineerguy *videos* are CC BY with high confidence; the *book* is
-the doubtful one, and the ch30 plates are book plates.
+The engineerguy *videos* are CC BY with high confidence; the *book* is the
+doubtful one, and the ch30 plates are book plates.
 
-*Action:* resolve it before launch, in this order.
+The README no longer depends on the answer. It used to pair a ch30 plate with
+the CAD render; it now pairs a first-party photograph of the machine in its
+display case with a render posed to match
+(`cad/docs/images/real-machine-display-case.jpg`, and see that folder's README).
+That closes the only place a book plate was doing load-bearing work in public.
+
+*Action:* resolve it before launch anyway, because the book and the campaign
+page still need to know.
 1. Ask Bill Hammack directly. One email settles it, and it pairs naturally with
    the courtesy note below.
 2. Until it is settled, keep book imagery out of anything that is itself for
-   sale (the book interior, the campaign page, reward material). The open-source
-   README is a weaker case than a priced product, but it is not a clear one.
-3. If the answer is "non-commercial only", swap the README image. The
-   replacement is not free: the only first-party photographs
-   (`references/photogrammetry/raw/`, 90 of them, taken 2025-08-28) are
-   photogrammetry captures shot through display-case glass with a scale bar in
-   frame, so they are unusable as a clean full-machine view. A commercial-safe
-   substitute means a new photograph of the real machine, or a CAD-only image.
+   sale (the book interior, the campaign page, reward material).
+3. If the answer is "non-commercial only", nothing has to be pulled, but every
+   future figure has to be first-party. The photogrammetry set
+   (`references/photogrammetry/raw/`, 90 captures from 2025-08-28) is close-ups
+   through glass with a scale bar in frame, so it does not double as
+   illustration; budget for a proper photo session, or use CAD renders.
 
 *Action before launch:* a courtesy note to Bill Hammack. Not legally required;
 obviously right, and he may well be a supporter. Fold question 1 above into it.
