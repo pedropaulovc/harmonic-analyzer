@@ -1,0 +1,60 @@
+---
+title: "Assembly"
+status: stub
+---
+
+# Assembly {#sec-assembly}
+
+The order matters. Some things cannot be reached once something else is in place.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Sub-assembly first: build and check each one standalone
+
+TODO
+
+## Frame, square and level
+
+TODO
+
+## Drive train onto the frame
+
+TODO
+
+## The cone set and its swing platform
+
+TODO
+
+## The cylinder arbor and the twenty cams — phased
+
+TODO
+
+## Twenty channels, bottom to top
+
+TODO
+
+## The summing lever onto its knife mounts
+
+TODO
+
+## Magnifier, wires, pen
+
+TODO
+
+## Paper drive
+
+TODO
+
+## What to leave loose for calibration
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_harmonic_analyzer_assembly.py` (mate order)
+- `verify:soundness`
+

@@ -1,0 +1,43 @@
+---
+title: "How to use this book"
+status: stub
+---
+
+# How to use this book {#sec-how-to-use}
+
+Three routes through the book, and the conventions used throughout.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Route 1: read it and never cut anything
+
+TODO
+
+## Route 2: build one sub-assembly (the cone gear set is the good one)
+
+TODO
+
+## Route 3: build the whole machine
+
+TODO
+
+## Conventions: units (mm primary, inch in parentheses where you buy the tool), drawing references, the *Now make:* boxes, the difficulty marks
+
+TODO
+
+## What the CAD download gives you, and how to open it
+
+TODO
+
+## Errata and how to report a mistake
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `book/AGENTS.md` (units + status conventions)
+

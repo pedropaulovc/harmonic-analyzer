@@ -1,0 +1,58 @@
+---
+title: "The paper drive"
+status: stub
+---
+
+# The paper drive {#sec-paper-drive}
+
+The crank also drives the paper sideways, through a reduction, a chain, and a rack and pinion.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `platen` | TODO | TODO | TODO |
+| `platen-rack` | TODO | TODO | TODO |
+| `platen-guide` | TODO | TODO | TODO |
+| `platen-clip` | TODO | TODO | TODO |
+| `platen-paper` | TODO | TODO | TODO |
+| `rack-pinion` | TODO | TODO | TODO |
+| `transgear-pinion` | TODO | TODO | TODO |
+| `transgear-feed-pinion` | TODO | TODO | TODO |
+| `transgear-knob-shaft` | TODO | TODO | TODO |
+| `transgear-bracket` | TODO | TODO | TODO |
+| `transgear-latch` | TODO | TODO | TODO |
+| `transgear-removable` | TODO | TODO | TODO |
+| `transgear-stub` | TODO | TODO | TODO |
+| `chain-sprocket` | TODO | TODO | TODO |
+| `chain-inner-link` | TODO | TODO | TODO |
+| `chain-outer-link` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+Two of the six translational gears are removable in three sizes, which is how the operator sets the horizontal scale. The engaged path in the CAD model is a documented kinematic coupling, not a geometric mesh — see `AGENTS.md` and `docs/known-limitations.md` before you take the model's centre distances as gospel.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

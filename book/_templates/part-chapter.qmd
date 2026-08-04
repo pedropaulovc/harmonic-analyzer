@@ -1,0 +1,72 @@
+---
+title: "<Sub-assembly name>"
+status: stub          # stub | drafted | verified
+---
+
+# <Sub-assembly name> {#sec-<label>}
+
+One paragraph: what this sub-assembly does in the machine, and why it is built
+at this point in the order.
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `part-name` | 1 | Brass | Ø25 × 60 bar |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+The specific hazards, with numbers, from `docs/machining-dfm.md`. Thin walls,
+slender ratios, fragile crests, breakout risk. Name them before the reader
+meets them.
+
+---
+
+## `<part-name>` {#sec-<label>-<part>}
+
+**Drawing:** sheet N (`figures/generated/drawings/<part>.pdf`)
+**Stock:** <size and form>
+**Setups:** <n>
+**Time:** <real hours, from the logbook>
+
+### Setup 1 — <what is held, in what, on which datum>
+
+::: {layout-ncol=2}
+![Setup 1](figures/generated/renders/<part>.png){#fig-<part>-setup1}
+
+![The finished part](figures/generated/renders/<part>.png){#fig-<part>-done}
+:::
+
+1. Operation, with tool, speed, feed and depth of cut. **These come from the
+   logbook entry for this part — never from memory.**
+2. …
+
+### Setup 2 — …
+
+### Inspection
+
+| feature | nominal | tolerance | how to check |
+|---|---|---|---|
+| | | | |
+
+### What went wrong the first time
+
+The honest paragraph. This is the most valuable text in the chapter and the
+reason the book is worth buying — link the logbook entry.
+
+---
+
+## Checking the sub-assembly
+
+What to verify before moving on, and what is still adjustable later.
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_<part>.py` (geometry — the source of truth)
+- `cad/config/parts/<dashed-name>.yaml` (material, registry)
+- `docs/machining-dfm.md`
+- `logbook/entries/<date>-<slug>.md`

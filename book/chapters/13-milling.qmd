@@ -1,0 +1,49 @@
+---
+title: "Milling: squaring, profiling and edges"
+status: stub
+---
+
+# Milling: squaring, profiling and edges {#sec-milling}
+
+Flat, square, and to a profile.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Tramming, and how often to re-check it
+
+TODO
+
+## Squaring a block
+
+TODO
+
+## Profile milling a 2D outline
+
+TODO
+
+## Climb versus conventional on a manual machine
+
+TODO
+
+## Edge finishing: chamfer outside, fillet inside
+
+TODO
+
+## Twenty identical profiles without a CNC: templates and stops
+
+TODO
+
+::: {.callout-tip}
+## Now make
+One `rocker-arm`: 2.5 mm steel plate, R800 concave top edge — it is the **outline of the plate**, not a pocket.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `docs/machining-dfm.md` (`rocker-arm` row)
+- `cad/scripts/build_rocker_arm.py`
+

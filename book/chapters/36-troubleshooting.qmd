@@ -1,0 +1,51 @@
+---
+title: "When it doesn't work"
+status: stub
+---
+
+# When it doesn't work {#sec-troubleshooting}
+
+Symptom, cause, fix. Written from the real calibration — every entry here happened.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## The pen does not move
+
+TODO
+
+## The output is flat when it should not be
+
+TODO
+
+## One channel contributes nothing
+
+TODO
+
+## The trace drifts across the paper
+
+TODO
+
+## The trace is noisy or stepped
+
+TODO
+
+## The crank binds at one point in the rotation
+
+TODO
+
+## The wheel unwinds and the wires fly off
+
+TODO
+
+## The output is right but the amplitude is wrong
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `logbook/entries/`
+

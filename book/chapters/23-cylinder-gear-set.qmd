@@ -1,0 +1,46 @@
+---
+title: "The cylinder gear set"
+status: stub
+---
+
+# The cylinder gear set {#sec-cylinder-gears}
+
+Twenty equal gears that spin at twenty different rates, each carrying the cam that turns rotation into a sine wave.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `cylinder-gear` ×20 (120T + integral eccentric cam + 0.4 mm notch) | TODO | TODO | TODO |
+| `cylinder-gear-shaft` | TODO | TODO | TODO |
+| `arbor-pedestal` | TODO | TODO | TODO |
+| `connecting-rod` ×20 | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+Double-sided part: teeth and notch on one face, cam boss on the other. Cam thin-side wall is 1.90 mm; the notch kerf is 0.4 mm (slitting saw, fragile crests). **Every one of the twenty must be co-phased +Y** — scattered phasing is not recoverable at assembly.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

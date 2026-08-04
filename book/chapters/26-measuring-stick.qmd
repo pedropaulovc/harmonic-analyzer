@@ -1,0 +1,43 @@
+---
+title: "The measuring stick"
+status: stub
+---
+
+# The measuring stick {#sec-measuring-stick}
+
+The gauge that sets the coefficients. Ten divisions, hand stamped.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `measuring-stick` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+The original's divisions are visibly uneven — the 0.4-to-0.5 gap is smaller than 0.5-to-0.6 — because it was hand made. Decide whether you are reproducing the artefact or making a correct gauge.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

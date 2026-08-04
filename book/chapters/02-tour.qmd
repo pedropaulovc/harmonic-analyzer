@@ -1,0 +1,56 @@
+---
+title: "A tour of the mechanism"
+status: stub
+---
+
+# A tour of the mechanism {#sec-tour}
+
+The signal path end to end, sub-assembly by sub-assembly, using the renders from the CAD model.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## The frame and what hangs off it
+
+TODO
+
+## The crank and drive train
+
+TODO
+
+## The cone gear set: one input, twenty speeds
+
+TODO
+
+## The cylinder gear set and its cams: rotation into oscillation
+
+TODO
+
+## A channel: rocker arm, amplitude bar, spring, lever
+
+TODO
+
+## The summing lever: twenty springs onto one knife edge
+
+TODO
+
+## The magnifier: a few millimetres into a few centimetres
+
+TODO
+
+## The pen and the paper drive
+
+TODO
+
+## The whole signal path in one diagram
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `docs/images/*.png`
+- `cad/scripts/build_*_assembly.py`
+

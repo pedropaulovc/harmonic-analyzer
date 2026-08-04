@@ -1,0 +1,45 @@
+---
+title: "What the machine does"
+status: stub
+---
+
+# What the machine does {#sec-what-it-does}
+
+The minimum mathematics needed to build this machine on purpose. The full treatment is in @sec-mathematics.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Adding sine waves: synthesis
+
+TODO
+
+## Pulling them apart: analysis, and why it is the same machine
+
+TODO
+
+## How twenty frequencies come out of one crank
+
+TODO
+
+## How a coefficient becomes a bar position
+
+TODO
+
+## How twenty motions become one number
+
+TODO
+
+## What 'twenty elements' costs you in accuracy
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/config/` Fourier parameters
+- `check:math` gate in `dodo.py`
+- Michelson & Stratton 1898
+

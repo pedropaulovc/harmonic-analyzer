@@ -1,0 +1,39 @@
+---
+title: "Further reading"
+status: stub
+---
+
+# Further reading {#sec-further-reading}
+
+Where to go next.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## On this machine
+
+TODO
+
+## On Fourier methods
+
+TODO
+
+## On machining
+
+TODO
+
+## On gear cutting
+
+TODO
+
+## The open-source model and how to contribute
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `references/`
+

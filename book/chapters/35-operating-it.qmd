@@ -1,0 +1,52 @@
+---
+title: "Operating it"
+status: stub
+---
+
+# Operating it {#sec-operating}
+
+Setting up a calculation and reading the answer.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Setting the amplitude bars with the measuring stick
+
+TODO
+
+## Sine setup versus cosine setup
+
+TODO
+
+## Choosing the translational gearing: 0.5, 1 or 2 periods
+
+TODO
+
+## Loading paper
+
+TODO
+
+## Turning the crank: synthesis
+
+TODO
+
+## Turning the crank: analysis, and reading every two turns
+
+TODO
+
+## Worked example: a square wave
+
+TODO
+
+## Worked example: analysing a function you supply
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `references/engineerguy-youtube/(44) Operation …vtt`
+- `check:math` (the analytical cross-check)
+

@@ -1,0 +1,47 @@
+---
+title: "Suppliers and sources"
+status: stub
+---
+
+# Suppliers and sources {#sec-suppliers}
+
+Where the material and tooling came from. Regional, and it dates fast.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Stock: brass, steel, cast iron
+
+TODO
+
+## Cutting tools and cutter blanks
+
+TODO
+
+## Dividing head and accessories
+
+TODO
+
+## Springs
+
+TODO
+
+## Chain and sprockets
+
+TODO
+
+## Measuring equipment
+
+TODO
+
+## Outsourcing: wire-EDM and inspection
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `research/4-manufacturing-procurement/`
+

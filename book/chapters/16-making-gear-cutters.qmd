@@ -1,0 +1,57 @@
+---
+title: "Making your own gear cutters"
+status: stub
+---
+
+# Making your own gear cutters {#sec-cutters}
+
+Off-the-shelf involute cutters for this machine's gear train (DP 49.82) **do not exist**. You make them. This is the long pole of the whole project.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Why no cutter exists: the diametral pitch and tooth counts involved
+
+TODO
+
+## The options: buy (you can't), outsource (wire-EDM), or make
+
+TODO
+
+## The Eureka method, step by step
+
+TODO
+
+## Making the button tool
+
+TODO
+
+## Generating the form
+
+TODO
+
+## Hardening and tempering
+
+TODO
+
+## Testing a cutter on scrap before you trust it
+
+TODO
+
+## How many cutters this machine actually needs
+
+TODO
+
+::: {.callout-tip}
+## Now make
+One form cutter, tested on a brass disc, tooth form checked against the drawing before any real gear blank is touched.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` ch. 12
+- `docs/machining-dfm.md` (go/no-go: cutters resolved as self-made)
+

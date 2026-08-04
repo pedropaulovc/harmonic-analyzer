@@ -1,0 +1,52 @@
+---
+title: "Alignment and calibration"
+status: stub
+---
+
+# Alignment and calibration {#sec-calibration}
+
+Machining it right is half the job. This is the other half, and it may take longer.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Squaring and levelling the frame
+
+TODO
+
+## Phasing the twenty cams to a common datum
+
+TODO
+
+## Aligning the cylinder gears by their notches
+
+TODO
+
+## Setting sines versus cosines with the alignment pinion
+
+TODO
+
+## Balancing the summing lever: counter-spring tension
+
+TODO
+
+## Zeroing: all bars at the pivot should draw a flat line
+
+TODO
+
+## Setting the magnification
+
+TODO
+
+## Checking one channel at a time
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `verify:kinematics`
+- `docs/motion-policy.md`
+

@@ -1,0 +1,45 @@
+---
+title: "Materials and stock"
+status: stub
+---
+
+# Materials and stock {#sec-materials}
+
+What the original was made of, what to make yours from, and the full shopping list.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Brass: the gears, bushings, platen — and which alloy
+
+TODO
+
+## Steel: shafts, rocker arms, fasteners
+
+TODO
+
+## Cast iron: the three cast parts, and the cast-or-fabricate decision
+
+TODO
+
+## The harder yellow metal in the original's tip gears — and why that matters
+
+TODO
+
+## The complete stock list with sizes and quantities
+
+TODO
+
+## Buying: minimum lengths, offcut economics, what to over-order
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/config/parts/*.yaml` (material per part)
+- `docs/machining-dfm.md` (casting substitutions)
+- `research/1-research-documentation/029-material-selection-for-components.md`
+

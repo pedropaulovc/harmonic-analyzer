@@ -1,0 +1,48 @@
+---
+title: "Finishing"
+status: stub
+---
+
+# Finishing {#sec-finishing}
+
+The original is a hundred years old and looks it. Decide what you are reproducing: the machine as built, or the machine as it survives.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Draw filing
+
+TODO
+
+## Stoning and deburring
+
+TODO
+
+## Polishing brass, and whether to lacquer it
+
+TODO
+
+## Blacking steel
+
+TODO
+
+## Matching the original's finishes: the matte-black connecting rods, the chrome-like amplitude bars, the black-stained crank handle
+
+TODO
+
+## What to finish before assembly and what after
+
+TODO
+
+::: {.callout-tip}
+## Now make
+Finish the `crank-handle` and one `connecting-rod` — one polished, one deliberately rough, as the original's are.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `cad/config/parts/*.yaml` (appearance per part)
+

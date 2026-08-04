@@ -1,0 +1,48 @@
+---
+title: "Hole patterns and tapping"
+status: stub
+---
+
+# Hole patterns and tapping {#sec-holes}
+
+Position matters more than size for most of the holes in this machine.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Laying out a pattern, and the DRO alternative
+
+TODO
+
+## Position tolerance: what it means when you drill
+
+TODO
+
+## Tapping: the only real threads in the machine are 4× 9/16-12
+
+TODO
+
+## Blind holes and tap drill depth
+
+TODO
+
+## Breaking out on a thin floor
+
+TODO
+
+## The 20-hole spring pattern in the summing lever at 7.0565 mm pitch
+
+TODO
+
+::: {.callout-tip}
+## Now make
+`rocker-arm-support` foot holes (4× 9/16-12, tap drill Ø12.30).
+:::
+
+---
+
+**Sources for this chapter**
+
+- `docs/machining-dfm.md` (`rocker-arm-support`, `summing-lever`)
+

@@ -1,0 +1,36 @@
+---
+title: "Bill of materials"
+status: stub
+---
+
+# Bill of materials {#sec-bom}
+
+Every part, quantity, material and stock size. Generated from the model — do not hand-edit.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## How to regenerate this table
+
+TODO
+
+## Parts by sub-assembly
+
+TODO
+
+## Purchased items
+
+TODO
+
+## Stock summary: what to actually buy
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/config/parts/*.yaml`
+- `book/scripts/collect_figures.py`
+

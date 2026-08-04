@@ -1,0 +1,48 @@
+---
+title: "Parting off to a length tolerance"
+status: stub
+---
+
+# Parting off to a length tolerance {#sec-parting}
+
+The chapter that decides whether your twenty channels line up. Bushing length sets the channel pitch, and the error accumulates nineteen times.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parting tools and why they dig in
+
+TODO
+
+## Parting to a length, not just parting off
+
+TODO
+
+## The collet stop: the whole trick
+
+TODO
+
+## Measuring a stack, not a part
+
+TODO
+
+## Accumulated error across nineteen bushings
+
+TODO
+
+## Recovering from an undersize part
+
+TODO
+
+::: {.callout-tip}
+## Now make
+The full sets: 19× `pivot-bushing` at 4.5565 mm and 19× `lever-bushing` at 4.0565 mm. **Do not mix the sets.**
+:::
+
+---
+
+**Sources for this chapter**
+
+- `docs/machining-dfm.md` (pivot/lever bushing rows)
+

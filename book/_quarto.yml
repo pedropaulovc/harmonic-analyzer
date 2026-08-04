@@ -1,0 +1,115 @@
+project:
+  type: book
+  output-dir: _book
+
+book:
+  title: "Albert Michelson's Harmonic Analyzer"
+  subtitle: "A Project for Hobby Machinists"
+  author: "Pedro Paulo Vezza Campos"
+  date: today
+  search: true
+  repo-url: https://github.com/pedropaulovc/harmonic-analyzer
+  repo-actions: [issue]
+  downloads: [pdf, epub]
+  sidebar:
+    style: docked
+
+  chapters:
+    - index.qmd
+
+    - part: "Front matter"
+      chapters:
+        - front/preface.qmd
+        - front/how-to-use.qmd
+        - front/safety.qmd
+
+    - part: "Part I — The machine"
+      chapters:
+        - chapters/01-what-the-machine-does.qmd
+        - chapters/02-tour.qmd
+        - chapters/03-design-decisions.qmd
+        - chapters/04-plan-of-attack.qmd
+
+    - part: "Part II — The shop"
+      chapters:
+        - chapters/05-machines-and-tooling.qmd
+        - chapters/06-measuring.qmd
+        - chapters/07-materials-and-stock.qmd
+        - chapters/08-workholding.qmd
+
+    - part: "Part III — Skills"
+      chapters:
+        - chapters/09-turning.qmd
+        - chapters/10-drilling-boring-reaming.qmd
+        - chapters/11-parting-to-length.qmd
+        - chapters/12-slender-work.qmd
+        - chapters/13-milling.qmd
+        - chapters/14-hole-patterns-and-tapping.qmd
+        - chapters/15-indexing.qmd
+        - chapters/16-making-gear-cutters.qmd
+        - chapters/17-cutting-gears.qmd
+        - chapters/18-soldering.qmd
+        - chapters/19-finishing.qmd
+
+    - part: "Part IV — Making the parts"
+      chapters:
+        - chapters/20-frame.qmd
+        - chapters/21-crank-and-drive-train.qmd
+        - chapters/22-cone-gear-set.qmd
+        - chapters/23-cylinder-gear-set.qmd
+        - chapters/24-alignment-pinion.qmd
+        - chapters/25-a-channel-twenty-times.qmd
+        - chapters/26-measuring-stick.qmd
+        - chapters/27-summing-lever.qmd
+        - chapters/28-magnifier.qmd
+        - chapters/29-pen-mechanism.qmd
+        - chapters/30-paper-drive.qmd
+        - chapters/31-springs.qmd
+        - chapters/32-fasteners.qmd
+
+    - part: "Part V — Assembly, calibration, operation"
+      chapters:
+        - chapters/33-assembly.qmd
+        - chapters/34-calibration.qmd
+        - chapters/35-operating-it.qmd
+        - chapters/36-troubleshooting.qmd
+
+  appendices:
+    - appendices/a-bill-of-materials.qmd
+    - appendices/b-drawing-index.qmd
+    - appendices/c-gear-tables.qmd
+    - appendices/d-fits-and-tolerances.qmd
+    - appendices/e-suppliers.qmd
+    - appendices/f-mathematics.qmd
+    - appendices/g-further-reading.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    theme: cosmo
+    toc-depth: 3
+    code-copy: true
+  pdf:
+    documentclass: scrbook
+    papersize: letter
+    geometry:
+      - inner=3cm
+      - outer=2.5cm
+      - top=2.5cm
+      - bottom=2.5cm
+    fig-pos: "H"
+    colorlinks: true
+    keep-tex: false
+  epub:
+    cover-image: figures/hand/cover-placeholder.png
+
+# Cross-reference labels tuned for a shop manual.
+crossref:
+  fig-title: "Figure"
+  tbl-title: "Table"
+  custom:
+    - kind: float
+      reference-prefix: "Setup"
+      key: setup
+      latex-env: setup

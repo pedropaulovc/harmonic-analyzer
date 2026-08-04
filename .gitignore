@@ -414,3 +414,37 @@ comparisons/bench/out/
 
 # meshprobe inspection-session state (local tool cache, never versioned)
 .meshprobe/
+
+# ---------------------------------------------------------------------------
+# Publishing areas (book / web / kickstarter / logbook / ai-story)
+# ---------------------------------------------------------------------------
+
+# Quarto book: rendered output, its cache, and the figures copied out of
+# cad/out by book/scripts/collect_figures.py. The CAD renders are build
+# artefacts (see cad/out/ above) — the book references them by a stable path,
+# it does not version them. figures/hand/ IS tracked.
+book/_book/
+book/.quarto/
+book/figures/generated/
+book/*.pdf
+book/*.epub
+
+# Vite/three.js simulator: dependencies, build output, and the GLB it loads
+# (exported by `doit export` into cad/out/gltf/, copied to web/public/).
+web/node_modules/
+web/dist/
+web/.vite/
+web/public/models/
+
+# Campaign binaries: renders, video cuts and page exports are regenerated from
+# the model or uploaded to Kickstarter — the inventory in
+# kickstarter/assets/README.md is what's tracked, not the assets themselves.
+kickstarter/assets/**/*.png
+kickstarter/assets/**/*.jpg
+kickstarter/assets/**/*.jpeg
+kickstarter/assets/**/*.mp4
+kickstarter/assets/**/*.mov
+
+# Logbook photographs are large and often personal; keep the write-ups tracked
+# and store the raw media outside the repo (link it from the entry).
+logbook/media/

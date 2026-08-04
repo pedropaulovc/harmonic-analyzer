@@ -1,0 +1,49 @@
+---
+title: "Measuring"
+status: stub
+---
+
+# Measuring {#sec-measuring}
+
+Every tolerance in this book means something specific at the bench. This chapter is how you check it.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## The measuring kit for this project
+
+TODO
+
+## Reading a micrometer honestly (and what your own repeatability is)
+
+TODO
+
+## Bore measurement: the hard one
+
+TODO
+
+## Indicating: runout, concentricity, and what the drawings actually call for
+
+TODO
+
+## Gauge blocks and when they earn their space
+
+TODO
+
+## What each fit in this machine means: the 0.15 mm bushing clearance, the 0.1 mm/side cam-strap clearance
+
+TODO
+
+## Inspecting a gear you just cut
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `docs/tolerance-policy.md`
+- `docs/tolerance-gdt-assessment.md`
+- `references/machinerys-handbook/`
+

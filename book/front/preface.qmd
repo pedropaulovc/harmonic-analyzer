@@ -1,0 +1,40 @@
+---
+title: "Preface"
+status: stub
+---
+
+# Preface {#sec-preface}
+
+Why this machine, why this book, and what it is not.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Finding the machine
+
+TODO
+
+## Why nobody has published a plan
+
+TODO
+
+## What this book is not — it is not the 2014 visual tour, and it is not a kit
+
+TODO
+
+## Who I am and why that helps: a software engineer learning machining in public
+
+TODO
+
+## Credit where it is due
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `kickstarter/campaign/positioning.md`
+- `README.md`
+

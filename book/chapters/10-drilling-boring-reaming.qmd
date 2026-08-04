@@ -1,0 +1,48 @@
+---
+title: "Drilling, boring and reaming"
+status: stub
+---
+
+# Drilling, boring and reaming {#sec-boring}
+
+Getting a hole where you want it, at the size you want.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Centre drilling and why it is not optional here
+
+TODO
+
+## Drilling on size versus drilling undersize
+
+TODO
+
+## Boring: when a drill will not do
+
+TODO
+
+## Reaming to a fit
+
+TODO
+
+## The 0.15 mm running clearance used throughout this machine
+
+TODO
+
+## Measuring what you just made
+
+TODO
+
+::: {.callout-tip}
+## Now make
+One `pivot-bushing`: Ø10.0 OD, Ø6.5 through bore running on a Ø6.35 shaft.
+:::
+
+---
+
+**Sources for this chapter**
+
+- `docs/tolerance-gdt-assessment.md`
+

@@ -1,0 +1,49 @@
+---
+title: "Frame and base"
+status: stub
+---
+
+# Frame and base {#sec-frame}
+
+Everything else hangs off this. Build it first, and build it square.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `harmonic-base` | TODO | TODO | TODO |
+| `tube-frame` | TODO | TODO | TODO |
+| `top-frame` | TODO | TODO | TODO |
+| `support-bar` | TODO | TODO | TODO |
+| `rocker-arm-support` | TODO | TODO | TODO |
+| `foot-screw` | TODO | TODO | TODO |
+| `frame-side-screw` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+The rocker-arm support is modelled as a cast iron casting with 6.35 mm shell walls and R12.7-relieved internal corners; cutting it from bar is a benign substitution. Its four 9/16-12 tapped feet are the only real threads in the machine.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+

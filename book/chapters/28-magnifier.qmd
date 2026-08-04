@@ -1,0 +1,51 @@
+---
+title: "The magnifier"
+status: stub
+---
+
+# The magnifier {#sec-magnifier}
+
+A few millimetres of summing-lever travel become a few centimetres of pen travel: ×4 at the lever, ×5 at the wheel.
+
+::: {.callout-note appearance="simple"}
+**TODO** — stub. Nothing here has been written yet.
+:::
+
+## Parts in this chapter
+
+| part | qty | material | stock |
+|---|---|---|---|
+| `magnifying-lever` | TODO | TODO | TODO |
+| `magnifying-wheel` | TODO | TODO | TODO |
+| `magnifying-bracket` | TODO | TODO | TODO |
+| `magnifying-clamp` | TODO | TODO | TODO |
+| `magnifying-vertical-rod` | TODO | TODO | TODO |
+| `lever-wire` | TODO | TODO | TODO |
+| `wheel-axle` | TODO | TODO | TODO |
+| `wheel-bar` | TODO | TODO | TODO |
+| `pivot-ball-mount` | TODO | TODO | TODO |
+
+: {tbl-colwidths="[40,10,25,25]"}
+
+## What will fight you
+
+The wheel is two coaxial wheels, 100 mm and 20 mm, so the ratio is fixed at 5. The lever's magnification is set by sliding the vertical rod, so it is continuously variable up to 4.
+
+## Making each part
+
+TODO — one section per part, following `_templates/part-chapter.qmd`:
+drawing, stock, setups, operations, inspection, what went wrong.
+
+## Checking the sub-assembly
+
+TODO
+
+---
+
+**Sources for this chapter**
+
+- `cad/scripts/build_*.py` (geometry — the source of truth)
+- `cad/config/parts/*.yaml` (material, appearance, registry)
+- `docs/machining-dfm.md` (setups, hazards, routing)
+- `logbook/entries/` (what actually happened)
+
