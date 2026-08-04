@@ -48,6 +48,25 @@ The **minimum merge gate below applies to changes under `cad/`**; a
 prose-only or `web/`-only PR is gated by its own area's rules (and, for `web/`,
 a green `npm run build`).
 
+### Tracking — the board sequences, the files hold status
+
+Work is tracked in GitHub issues, grouped by milestone (one per deliverable) and
+sequenced on the [publishing project board](https://github.com/users/pedropaulovc/projects/1).
+The board carries **only** what a file cannot: cross-area dependencies (its
+`Blocked by` field) and target dates.
+
+**Status of record stays in the repo**, because two sources drift and the files
+are the ones the book renders from:
+
+| status | source of truth |
+|---|---|
+| chapter progress (`stub` → `drafted` → `verified`) | the `.qmd` frontmatter + `book/outline.md` |
+| curriculum module progress, competency | `logbook/curriculum/*.md` + `logbook/progress.md` |
+| hours, parts made, scrap | `logbook/entries/` |
+
+Do not copy any of those into a board field, and do not update a board field
+instead of the file.
+
 ## Clone with submodules
 
 This repo has submodules (e.g. `references`). Always clone recursively so they
