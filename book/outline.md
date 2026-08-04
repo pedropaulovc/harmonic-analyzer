@@ -25,7 +25,7 @@ cut) · `verified` (part made following exactly this text).
 
 | # | chapter | contains | status |
 |---|---|---|---|
-| — | Preface | Why this machine, why now, what this book is not. Credit to Hammack/Kranz/Carpenter and the engineerguy series. | stub |
+| — | Preface | Why this machine, why now, what this book is not. Credit to Hammack/Kranz/Carpenter and the engineerguy series: the machine is thoroughly *documented*, it has just never been written down as something buildable. Where the machine ends up: donated to Matemateca at IME-USP for use with school students. | stub |
 | — | How to use this book | The three routes through it: read it, build one sub-assembly, build the whole machine. Conventions, units, symbols. | stub |
 | — | Safety | Machine-specific hazards, not a generic list: slitting saws, small-diameter work, indexing with the spindle live, spring tension at assembly. | stub |
 

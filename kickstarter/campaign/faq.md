@@ -10,6 +10,14 @@ This book tells you how to make one. It is an independent project, not
 affiliated with or endorsed by them, and it cites their work throughout. Go
 read theirs; it's free.
 
+**What happens to the machine you build?**
+It goes to [Matemateca](https://matemateca.ime.usp.br/index_ingles.html), the
+mathematics outreach collection at the University of São Paulo's Institute of
+Mathematics and Statistics. They use objects to teach mathematics to the public
+and to school groups, and this one will be used with middle and high schoolers.
+I don't keep it. That is also why the build targets a machine that survives
+being operated by teenagers rather than one that looks good in a photograph.
+
 **Can I buy a finished machine, or a kit?**
 No. Building one analyzer is this project. Building them to order is a
 different business, and pretending otherwise is how campaigns fail.

@@ -2,8 +2,8 @@
 
 <p align="center">
   <em>A machine that adds twenty sine waves together using gears, cams, springs
-  and levers. Built in 1898, never documented. This repository is the plan for
-  building another one.</em>
+  and levers. Michelson built it in 1898. This repository is the plan for
+  building another one, and that one is going to a maths museum.</em>
 </p>
 
 <p align="center">
@@ -27,13 +27,47 @@ operation backwards, doing Fourier analysis, which Michelson himself declined to
 explain on the grounds that it "involves so much mathematics that I shall not
 undertake it here."
 
-One of these machines survives in a glass case at the University of Illinois.
-Nobody appears to have ever published a plan for building another, in print or
-online.
+One of these machines survives in a glass case at the University of Illinois,
+and it is very well documented. Bill Hammack, Steve Kranz and Bruce Carpenter
+photographed it, took it apart on camera, and published both a book and a
+[four-part video series](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30)
+explaining exactly how it works. If you want to understand the machine, go read
+theirs first. It is free.
+
+What none of that gives you is a way to make one. No dimensioned drawings, no
+tolerances, no stock list, no setups, no process. A beautifully explained
+machine that nobody has written down how to build.
 
 So: 102 parts modelled in SolidWorks, generated from Python, verified on every
-build and checked against photographs of the real machine. Plus a book being
-written to turn all of that into chips on a shop floor.
+build and checked against those same photographs. Plus a book being written to
+turn all of that into chips on a shop floor.
+
+## Where it ends up
+
+The finished machine is being donated to
+[Matemateca](https://matemateca.ime.usp.br/index_ingles.html), the mathematics
+outreach collection at the Institute of Mathematics and Statistics of the
+University of São Paulo. They put mathematical objects in front of the public
+and in front of students, and they will use this one with middle and high
+schoolers. The professor who runs the collection is on board.
+
+It slots into a gap they already have. The collection includes a harmonograph,
+Chladni plates, a piece on the harmonic series, one on sampling, and one on
+gears, plus an adding machine and a slide rule. What it does not have is the
+thing that ties the harmonics half and the analog-computing half together: a
+machine that decomposes a curve into its frequencies while you watch.
+
+There is also a line on their donations page that reads, in hindsight, like a
+description of this project:
+
+> As there is immense difficulty in finding a professional who can bring object
+> theory to practice, the value becomes very variable for each idea. The
+> simpler, the lower its cost, which makes it difficult to produce more complex
+> parts.
+
+That destination sets the engineering bar. The machine has to work, not
+photograph well. A fourteen-year-old gets to turn the crank, and the pen has to
+draw the right curve when they do.
 
 ## Where it is now
 

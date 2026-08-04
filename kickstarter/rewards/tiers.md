@@ -13,7 +13,9 @@
    on the page.
 3. **No reward may require machining by me at scale.** One analyzer is the
    project. Twenty is a factory. This rules out machined parts as rewards —
-   with one deliberate exception below, capped hard.
+   with one deliberate exception below, capped hard. Note that the machine
+   itself is already spoken for: it is being donated to Matemateca at IME-USP,
+   so "the analyzer" was never available as a reward at any price.
 4. **The CAD files, drawings and simulator stay free and MIT-licensed
    regardless of funding.** They are already public; making them a reward would
    be dishonest and would kill the goodwill the campaign runs on.

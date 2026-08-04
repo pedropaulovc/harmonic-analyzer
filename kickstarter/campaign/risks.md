@@ -52,6 +52,29 @@ Print and shipping quotes are not yet in hand; see
 [`../rewards/fulfilment.md`](../rewards/fulfilment.md). No physical reward goes
 on the page without a confirmed unit cost and per-zone shipping.
 
+## The donation
+
+The finished machine is going to [Matemateca](https://matemateca.ime.usp.br/index_ingles.html)
+at IME-USP, and the professor who runs the collection is enthusiastic about it.
+
+Two things follow, and neither is optional.
+
+**Get it in writing before their name appears on a commercial page.** A warm
+email from an academic is not an institution consenting to appear in a
+crowdfunding campaign, and a university's name on a page that takes money
+carries an implication of endorsement that nobody has agreed to. Ask for
+explicit written confirmation covering: that they accept the donation, that
+their name and a link may appear on the campaign page, and how they want to be
+described. If they would rather not appear until the machine is delivered,
+that is a completely reasonable answer and the campaign works without it.
+
+**The donation is a public promise, so it constrains the build.** A museum piece
+operated by school groups has to tolerate handling that a builder's shelf model
+never would: the amplitude bars get slid by teenagers, the crank gets turned
+hard, and the wires that drive the pen can fly off the magnifying wheel if the
+setup is done carelessly. That is a real design input, not a sentiment. Where it
+conflicts with period fidelity, say which one won and why.
+
 ## Intellectual property {#ip}
 
 **The machine is public domain.** Michelson and Stratton published in 1898;

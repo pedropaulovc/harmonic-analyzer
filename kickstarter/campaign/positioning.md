@@ -4,8 +4,9 @@
 
 > **A 19th-century mechanical computer, reverse-engineered into a shop manual.**
 > Michelson's harmonic analyzer adds twenty sine waves with gears and springs.
-> Nobody has published how to build one. This book does — every part, every
-> setup, every cut.
+> It has been beautifully explained and never once written down as something you
+> could build. This book is that: every part, every setup, every cut. The
+> machine it produces goes to a university maths museum.
 
 ## The audience, in priority order
 
@@ -23,9 +24,36 @@
 
 ## Why this project and not another
 
-- **The machine is famous and undocumented.** The 2014 book is a *visual tour* —
-  gorgeous photographs, no dimensions, no drawings, no process. There is no
-  build plan anywhere, in print or online.
+- **The machine is famous, thoroughly explained, and still unbuildable.** Do not
+  claim it is undocumented; that is both false and unfair to the people who
+  documented it. The 2014 book and the video series explain the mechanism about
+  as well as it can be explained. What they are is a *visual tour*: gorgeous
+  photographs, a handful of scattered dimensions, no drawings, no tolerances, no
+  process. The gap is the shop floor, not the understanding.
+- **It has a destination, and that destination is arranged.** The finished
+  machine goes to [Matemateca](https://matemateca.ime.usp.br/index_ingles.html),
+  the mathematics outreach collection at IME-USP, for use with middle and high
+  school students. The professor who runs the collection is on board. Backers
+  are not funding a hobby; they are funding a working Fourier machine for a
+  public maths collection, and the builder does not keep it.
+
+  This is the strongest single asset on the page. Lead with it.
+
+  Three specifics make it land, and all three are checkable:
+  1. It fills a real gap in their collection. They already have a harmonograph,
+     Chladni plates, a harmonic-series piece, a sampling piece, gears, an adding
+     machine and a slide rule. They do not have anything that decomposes a curve
+     into its frequencies mechanically.
+  2. Their own donations page says complex pieces are the ones they struggle to
+     produce, because it is hard to find someone who can turn the theory into an
+     object. A 102-part working analyzer is the far end of that scale.
+  3. It makes the book's audience and the machine's audience different people,
+     which is unusual and good: machinists fund it, schoolchildren use it.
+
+  **Before their name goes on a public commercial page, get written
+  confirmation.** An enthusiastic email from a professor is not the same as an
+  institution agreeing to appear in a crowdfunding campaign. See
+  [`risks.md`](risks.md).
 - **The hard half is already done and public.** A complete parametric CAD model
   with 102 parts, verified assemblies, and a photo-comparison gallery scoring
   it against the surviving machine. Backers can look at it before they pledge.
