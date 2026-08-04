@@ -4,9 +4,9 @@
 
 > **A 19th-century mechanical computer, reverse-engineered into a shop manual.**
 > Michelson's harmonic analyzer adds twenty sine waves with gears and springs.
-> It has been beautifully explained and never once written down as something you
-> could build. This book is that: every part, every setup, every cut. The
-> machine it produces goes to a university maths museum.
+> It has been beautifully explained, but nobody has written down how to build
+> one. This book is that: every part, every setup, every cut. The machine it
+> produces goes to a university maths museum.
 
 ## The audience, in priority order
 

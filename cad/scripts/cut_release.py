@@ -875,11 +875,11 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"this bundle with `cad/comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- isometric preview renders "
         f"({facts['pngs']} images)\n"
-        + (f"- `cad/comparisons/` -- this model overlaid on Michelson's ch30 photos "
+        + (f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
            f"({facts['comparisons']['pairs']} pairs"
            + (f", mean RMS score {facts['comparisons']['mean_score']}"
               if facts['comparisons'].get('mean_score') is not None else "")
-           + "; open `cad/comparisons/index.html`)"
+           + "; open `comparisons/index.html`)"
            + (" **[STALE -- rendered from an OLDER geometry export/manifest; "
               "do not treat the visual fit as authoritative for this release]**"
               if facts['comparisons'].get('stale') else "")

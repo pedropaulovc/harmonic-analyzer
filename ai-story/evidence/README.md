@@ -52,11 +52,16 @@ jq -r '[.name, ((.end_time[0:19]+"Z"|fromdateiso8601)
 # how many parts, assemblies, drawings.
 # NOTE: do NOT count `build_*.py` — that file set also contains the 8 assembly
 # scripts and the probe/motion-study scripts, which is how "115 parts" (wrong)
-# got into an earlier draft of the README. The build graph is authoritative,
-# and listing it needs no SolidWorks seat:
-uv run python -m doit list --all | rg -c '^part:'       # 102
-uv run python -m doit list --all | rg -c '^assembly:'   # 8
-uv run python -m doit list --all | rg -c '^drawing:'    # 95
+# got into an earlier draft of the README and the repo description (corrected
+# across 8 files in PR #464, "repo: scaffold the five publishing deliverables").
+# The build graph is authoritative, and listing it needs no SolidWorks seat.
+# Capture ONE listing and count that: a pipeline hides doit's exit status, so a
+# run that dies after partial output still prints a plausible number.
+set -euo pipefail
+tasks="$(uv run python -m doit list --all)"
+printf '%s\n' "$tasks" | rg -c '^part:'       # 102
+printf '%s\n' "$tasks" | rg -c '^assembly:'   # 8
+printf '%s\n' "$tasks" | rg -c '^drawing:'    # 95
 ```
 
 ## Not evidence

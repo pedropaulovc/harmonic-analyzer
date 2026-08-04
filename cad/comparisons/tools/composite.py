@@ -108,7 +108,7 @@ def record_composite_align(pair: dict) -> None:
 
 
 def prepare_reference(pair: dict, max_px: int = 1600, out: Path | None = None) -> Path:
-    """Copy the pair's source reference into ref/<id>.png (crop/rotate/cap).
+    """Copy the pair's source reference into ref/<id>.jpg (crop/rotate/cap).
 
     ``out`` overrides the destination (bench cad/comparisons/bench redirects refs
     out of the shipping cad/comparisons/ref/ tree cut_release ships wholesale).

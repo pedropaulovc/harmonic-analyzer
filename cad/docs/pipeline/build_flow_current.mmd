@@ -11,7 +11,7 @@ flowchart TD
         MCP["SolidworksMCP-python<br/>PyWin32Adapter (COM bridge)"]
     end
 
-    DOIT{{"③ dodo.py — doit entrypoint<br/>serial only, content-hash DAG<br/>(cad/out/.doit.db)"}}
+    DOIT{{"③ dodo.py — doit entrypoint<br/>content-hash DAG; COM serialized by the seat lock,<br/>check:* fan out under -n N<br/>(cad/out/.doit.db)"}}
     SRC --> DOIT
     ENV --> DOIT
     MCP -.COM calls.-> SW

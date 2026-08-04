@@ -16,7 +16,7 @@ a rigid-group drag reports as one edit, not N.
 
 SolidWorks-free: pure text analysis of the build scripts. Run:
 
-    python cad/comparisons/tools/map_deltas.py --pair harmonic_analyzer--ch30-p003-img01
+    uv run cad/comparisons/tools/map_deltas.py --pair harmonic_analyzer--ch30-p003-img01
 """
 from __future__ import annotations
 

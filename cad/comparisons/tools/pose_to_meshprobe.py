@@ -9,7 +9,7 @@ GLB, so a pose fitted in Blender can be re-inspected head-less in meshprobe.
 
     uv run cad/comparisons/tools/pose_to_meshprobe.py               # every manifest pair
     uv run cad/comparisons/tools/pose_to_meshprobe.py --pair p002   # id substring filter
-    uv run cad/comparisons/tools/pose_to_meshprobe.py findings/ch30-p003_deltas.json
+    uv run cad/comparisons/tools/pose_to_meshprobe.py cad/comparisons/findings/ch30-p003_deltas.json
     uv run cad/comparisons/tools/pose_to_meshprobe.py --format json # machine-readable params
 
 Coordinate frames — pose_studio/blender_worker is the source of truth:

@@ -1,5 +1,5 @@
 flowchart TD
-    DOIT{{"dodo.py — single command: doit -n N<br/>default task = build · cad/out/.doit.db"}}
+    DOIT{{"dodo.py — single command: uv run python -m doit -n N<br/>default task = build · cad/out/.doit.db"}}
 
     subgraph COM["🔒 SolidWorks Zone — one COM seat, serialized at RUNTIME by a cross-process file lock (_com_seat); edges are REAL deps"]
         direction TB
