@@ -448,3 +448,8 @@ kickstarter/assets/**/*.mov
 # Logbook photographs are large and often personal; keep the write-ups tracked
 # and store the raw media outside the repo (link it from the entry).
 logbook/media/
+
+# Local agent-session transcripts kept as a backup. Its own git repo, so a bare
+# `git add -A` picks it up as a gitlink; it is machine-local and may contain
+# paths and personal detail, so it never belongs in this repo.
+agent-sessions-backup/

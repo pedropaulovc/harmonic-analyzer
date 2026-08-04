@@ -29,7 +29,7 @@ _Last updated: 2026-08-03 (scaffold created; no machining started)._
 |---|---:|---:|---:|---|
 | — | | | | |
 
-`0 / ~115` part types started.
+`0 / 102` part types started (`uv run python -m doit list --all | rg -c '^part:'`).
 
 ## Blocked on
 

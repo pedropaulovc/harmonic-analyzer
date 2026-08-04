@@ -116,5 +116,5 @@ problem.
 - Physical accuracy of spring dynamics. This is a kinematic toy, and it should
   say so.
 - Mobile-first. It should not break on a phone, but the target is a laptop.
-- A CAD viewer. Nobody needs a tree of 115 parts. The STEP files are one click
+- A CAD viewer. Nobody needs a tree of 102 parts. The STEP files are one click
   away for anyone who does.

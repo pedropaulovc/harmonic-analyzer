@@ -27,7 +27,7 @@ TODO
 
 TODO
 
-## The 0.15 mm running clearance used throughout this machine
+## The 0.15 mm diametral running clearance used throughout this machine
 
 TODO
 

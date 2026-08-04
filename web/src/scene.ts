@@ -75,6 +75,19 @@ export async function loadMachine(scene: THREE.Scene): Promise<Machine> {
       nodes.sort(
         (a, b) => instanceIndex(a.name, binding.pattern) - instanceIndex(b.name, binding.pattern),
       )
+      // A short or gappy set is survivable (each node is driven by the channel
+      // number in its own name) but it means the export lost components, so say
+      // so rather than animating a quietly incomplete machine.
+      const indices = nodes.map((n) => instanceIndex(n.name, binding.pattern))
+      const gaps = Array.from({ length: kin.CHANNELS }, (_, i) => i + 1).filter(
+        (k) => !indices.includes(k),
+      )
+      if (gaps.length > 0) {
+        console.warn(
+          `[machine] ${binding.id}: resolved ${nodes.length}/${kin.CHANNELS}; ` +
+            `missing channel(s) ${gaps.join(', ')}`,
+        )
+      }
     }
     if (nodes.length === 0) {
       missing.push(`${binding.id} (${binding.pattern})`)
@@ -127,13 +140,18 @@ export async function loadMachine(scene: THREE.Scene): Promise<Machine> {
         case 'rockerArms':
         case 'connectingRods':
         case 'channelLevers':
-          joint.nodes.forEach((_, i) => {
-            const k = i + 1
+          joint.nodes.forEach((node, i) => {
+            // Channel number comes from the NODE NAME, never from the array
+            // position: if an export is missing `cylinder-gear-3`, position 2
+            // holds gear 4, and driving it at the 3rd harmonic would put the
+            // wrong frequency on the wrong gear — silently, and plausibly.
+            const k = instanceIndex(node.name, joint.binding.pattern)
+            if (k < 1 || k > kin.CHANNELS) return
             const scale = joint.binding.motion === 'rotate' ? 1 : 0.008
             const v =
               joint.binding.id === 'cylinderGears'
                 ? kin.channelAngle(turns, k)
-                : kin.rockerDisplacement(turns, k) * scale * ((amplitudes[i] ?? 0) / 10)
+                : kin.rockerDisplacement(turns, k) * scale * ((amplitudes[k - 1] ?? 0) / 10)
             drive(joint, i, v)
           })
           break

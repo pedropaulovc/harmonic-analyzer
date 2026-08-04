@@ -8,6 +8,7 @@ const loading = document.querySelector<HTMLElement>('#loading')!
 const panel = document.querySelector<HTMLElement>('#panel')!
 const title = document.querySelector<HTMLElement>('#chapter-title')!
 const bodyEl = document.querySelector<HTMLElement>('#chapter-body')!
+const chapters = document.querySelector<HTMLElement>('#chapters')!
 const crank = document.querySelector<HTMLInputElement>('#crank')!
 const readout = document.querySelector<HTMLOutputElement>('#readout')!
 const play = document.querySelector<HTMLButtonElement>('#play')!
@@ -18,6 +19,19 @@ let current: Chapter = CHAPTERS[0]!
 let turns = 0
 let running = false
 
+/** Every chapter is reachable — otherwise narration.ts is unreachable data. */
+function buildChapterNav() {
+  for (const c of CHAPTERS) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'chapter-tab'
+    b.textContent = c.title
+    b.dataset.id = c.id
+    b.addEventListener('click', () => showChapter(c))
+    chapters.append(b)
+  }
+}
+
 function showChapter(c: Chapter) {
   current = c
   title.textContent = c.title
@@ -26,6 +40,11 @@ function showChapter(c: Chapter) {
   crank.max = String(c.turns[1])
   turns = c.turns[0]
   crank.value = String(turns)
+  running = false
+  play.textContent = 'Play'
+  for (const tab of chapters.querySelectorAll<HTMLButtonElement>('.chapter-tab')) {
+    tab.setAttribute('aria-current', String(tab.dataset.id === c.id))
+  }
   clearTrace()
 }
 
@@ -84,6 +103,7 @@ async function start() {
   viewer.resize()
   trace.width = trace.clientWidth
   trace.height = trace.clientHeight
+  buildChapterNav()
   showChapter(current)
   tick()
   try {

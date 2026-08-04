@@ -24,6 +24,7 @@ import hashlib
 import json
 import shutil
 import sys
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -50,6 +51,31 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def prune(dest_dir: Path, kept: Iterable[str], *, dry_run: bool) -> int:
+    """Delete figures the CAD build no longer produces.
+
+    Without this, a render deleted or renamed in `cad/out` leaves its old copy
+    behind: the manifest stops listing it, but a chapter that still references
+    the path renders happily against stale geometry — the exact failure the
+    export stage already guards against by pruning the comparison gallery when a
+    pair leaves the manifest. A figure that is not in this run's output is not a
+    figure of the current model.
+    """
+    if not dest_dir.exists():
+        return 0
+    keep = set(kept)
+    removed = 0
+    for stale in sorted(p for p in dest_dir.iterdir() if p.is_file()):
+        if stale.name in keep:
+            continue
+        print(f"!! stale figure {'(would remove)' if dry_run else 'removed'}: "
+              f"{stale.relative_to(FIGURES)}")
+        if not dry_run:
+            stale.unlink()
+        removed += 1
+    return removed
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", action="store_true",
@@ -63,7 +89,7 @@ def main() -> int:
         return 1
 
     entries: list[dict] = []
-    copied = missing = 0
+    copied = missing = pruned = 0
 
     for src_dir, pattern, dest_name in SOURCES:
         dest_dir = FIGURES / dest_name
@@ -73,10 +99,12 @@ def main() -> int:
             continue
         if not args.check:
             dest_dir.mkdir(parents=True, exist_ok=True)
+        kept: set[str] = set()
         for src in sorted(src_dir.glob(pattern)):
             dest = dest_dir / src.name
             if not args.check:
                 shutil.copy2(src, dest)
+            kept.add(src.name)
             entries.append({
                 "figure": f"figures/generated/{dest_name}/{src.name}",
                 "source": str(src.relative_to(REPO)).replace("\\", "/"),
@@ -84,6 +112,7 @@ def main() -> int:
                 "sha256": sha256(src),
             })
             copied += 1
+        pruned += prune(dest_dir, kept, dry_run=args.check)
 
     if args.check:
         print(f"-- {copied} figure(s) available, {missing} source dir(s) missing")
@@ -99,7 +128,8 @@ def main() -> int:
     (FIGURES / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
-    print(f"   OK  {copied} figure(s) -> {FIGURES.relative_to(REPO)}")
+    print(f"   OK  {copied} figure(s) -> {FIGURES.relative_to(REPO)}"
+          + (f", {pruned} stale removed" if pruned else ""))
     if missing:
         print(f"!! {missing} source dir(s) missing — the book will render with gaps")
     return 0

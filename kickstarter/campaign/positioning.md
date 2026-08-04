@@ -27,7 +27,7 @@
   gorgeous photographs, no dimensions, no drawings, no process. There is no
   build plan anywhere, in print or online.
 - **The hard half is already done and public.** A complete parametric CAD model
-  with ~115 parts, verified assemblies, and a photo-comparison gallery scoring
+  with 102 parts, verified assemblies, and a photo-comparison gallery scoring
   it against the surviving machine. Backers can look at it before they pledge.
 - **It is a genuine skills ladder.** Facing a bar → turning bushings to a length
   tolerance → boring → indexed gear cutting with self-made form cutters. A
@@ -60,7 +60,8 @@ machining tradition exists. The bridge — *here is how you actually cut a
 
 ## Proof points to lead with (all verifiable today)
 
-- ~115 part scripts, 8 sub-assemblies, one top assembly.
+- 102 parts, 8 sub-assemblies, 95 curated manufacturing drawings. (Counted from
+  the build graph: `uv run python -m doit list --all`, needs no SolidWorks seat.)
 - Every dimension traced to a source (book page, photograph, or derivation) with
   a confidence level — `cad/config/dimensions.yaml`.
 - Assemblies gated on degrees of freedom, interference and mass properties on

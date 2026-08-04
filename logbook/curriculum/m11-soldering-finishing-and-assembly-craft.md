@@ -17,6 +17,9 @@ hours_actual: 0
 ## Prerequisites
 
 - m03
+- m10 — the "now make" is soldering the cone gear set to its shaft, so the
+  gears have to exist first. (The soft/silver-solder *practice* can be done any
+  time after m03; only the real joint waits on m10.)
 
 ## References
 

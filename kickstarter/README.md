@@ -19,11 +19,12 @@ machinist with a lathe and a mill can build one too.
 
 ## The honest position
 
-Kickstarter's own data says the campaigns that fund are the ones that look
-finished before they launch. This project's advantage is that a large,
+A campaign that looks finished before it launches is a much easier sell than a
+promise. (Widely repeated as campaign advice — **find a citable source before
+this line goes anywhere public.**) This project's advantage is that a large,
 verifiable chunk of the work is *already done and public*:
 
-- ~115 parts modelled in SolidWorks, generated from Python scripts, with a
+- 102 parts modelled in SolidWorks, generated from Python scripts, with a
   build pipeline that gates every assembly on DOF, interference and mass
   properties (see the root [README](../README.md)).
 - A photo-vs-CAD comparison gallery scoring the model against Hammack, Kranz

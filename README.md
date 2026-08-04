@@ -28,7 +28,7 @@ mathematics that I shall not undertake it here."
 One survives, in a glass case at the University of Illinois. There has never
 been a plan for building another.
 
-**This repository is that plan.** ~115 parts modelled in SolidWorks — generated
+**This repository is that plan.** 102 parts modelled in SolidWorks — generated
 from Python, verified on every build, checked against photographs of the real
 machine — and a book being written to turn them into chips on a shop floor.
 

@@ -19,10 +19,14 @@ interest here: an agent writing about how useful agents were.
 4. **No invented metrics.** Not "roughly 10,000 lines", not "about 80%". Count
    it or omit it. `git log`, `gh pr list`, `memory/usage.jsonl` and the
    telemetry captures are right there.
-5. **Anonymise nothing that's already public**, and publish nothing that isn't.
-   The repo is public; `agent-sessions-backup/` and any local transcripts are
-   not, and may contain paths, keys or personal detail. Quote from them only
-   after the user has reviewed the quote.
+5. **Public ≠ republishable.** Two separate gates, both required. *Is it
+   already public?* — the repo is; `agent-sessions-backup/` and local
+   transcripts are not, and may carry paths, keys or personal detail. *Is it
+   appropriate to republish?* — a public file can still contain someone's name,
+   email, address or an offhand remark they never expected collected into a
+   book. Omit or anonymise personal data by default, including data that is
+   technically public, and quote from anything non-public only after the user
+   has reviewed the specific quote.
 6. **The user's voice, not the agent's.** First person singular, and it's the
    user's first person. Draft; don't ventriloquise conclusions they haven't
    reached. Run drafts through `/humanizer`.

@@ -30,7 +30,9 @@ hours_actual: 0
 - Drilling on the lathe vs the mill
 - Boring bar selection, deflection, spring passes
 - Reaming allowance, speed and why you never reverse a reamer
-- The 0.15 mm running clearance used throughout this machine (Ø6.5 bore on a Ø6.35 shaft)
+- The 0.15 mm **diametral** running clearance used throughout this machine
+  (Ø6.5 bore on a Ø6.35 shaft — 0.075 mm per side). Get this distinction right
+  before you bore anything; halving it is a seized fit and doubling it is slop.
 
 ## Now make — the real part this unlocks
 

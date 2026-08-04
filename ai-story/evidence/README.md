@@ -39,11 +39,24 @@ git log --format='%h %s' | rg -i 'revert|remove|retire|replace|kill|drop'
 # memory files that record a wrong claim
 rg -l -i 'was wrong|turned out|actually|does not|myth|folklore' memory/
 
-# the slowest operations on record (calibrates every perf claim)
-rg '"name"' cad/out/reports/telemetry/traces.jsonl | head
+# the slowest operations on record (calibrates every perf claim).
+# NOTE: records are unordered, so they must be SORTED by duration — `head` on
+# the raw file just gives you the first spans written, not the slowest ones.
+# Timestamps are ISO-8601 strings with a fractional part, and jq's
+# fromdateiso8601 rejects the fraction, so truncate to whole seconds (fine for
+# ranking slow ops; use the raw strings if you need sub-second precision).
+jq -r '[.name, ((.end_time[0:19]+"Z"|fromdateiso8601)
+              - (.start_time[0:19]+"Z"|fromdateiso8601))] | @tsv' \
+  cad/out/reports/telemetry/traces.jsonl | sort -k2 -gr | head -20
 
-# how many parts, assemblies, gates
-ls cad/scripts/build_*.py | wc -l
+# how many parts, assemblies, drawings.
+# NOTE: do NOT count `build_*.py` — that file set also contains the 8 assembly
+# scripts and the probe/motion-study scripts, which is how "115 parts" (wrong)
+# got into an earlier draft of the README. The build graph is authoritative,
+# and listing it needs no SolidWorks seat:
+uv run python -m doit list --all | rg -c '^part:'       # 102
+uv run python -m doit list --all | rg -c '^assembly:'   # 8
+uv run python -m doit list --all | rg -c '^drawing:'    # 95
 ```
 
 ## Not evidence

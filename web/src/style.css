@@ -51,6 +51,20 @@ code {
 }
 
 #panel h1 { font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); margin: 0 0 0.75rem; }
+#chapters { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.75rem; }
+
+.chapter-tab {
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: #ffffff14;
+  color: var(--dim);
+  border-radius: 4px;
+}
+
+.chapter-tab[aria-current='true'] { background: var(--accent); color: #1a1300; }
+
 #chapter-title { font-size: 1.35rem; font-weight: 600; margin: 0 0 0.35rem; }
 #chapter-body { margin: 0 0 1rem; color: #c9cddb; }
 
