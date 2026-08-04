@@ -1,23 +1,24 @@
 # The book
 
-**_Albert Michelson's Harmonic Analyzer: A Project for Hobby Machinists_** —
-step-by-step machining instructions for building a working 20-element harmonic
+**_Albert Michelson's Harmonic Analyzer: A Project for Hobby Machinists_**.
+Step-by-step machining instructions for building a working 20-element harmonic
 analyzer on a manual mill and lathe.
 
-This is the project's main deliverable. Everything else exists to support it:
-the [CAD model](../cad) supplies the geometry, the
-[logbook](../logbook/README.md) supplies the process (I learn each operation
-before writing it up), the [simulator](../web/README.md) shows readers what
-they're building, and the [Kickstarter](../kickstarter/README.md) funds it.
+This is the project's main deliverable, and everything else exists to support
+it. The [CAD model](../cad) supplies the geometry. The
+[logbook](../logbook/README.md) supplies the process, since I learn each
+operation before writing it up. The [simulator](../web/README.md) shows readers
+what they are building, and the [Kickstarter](../kickstarter/README.md) pays for
+it.
 
 ## Status
 
-Outline drafted, chapters stubbed, **no finished prose**. See
-[`outline.md`](outline.md) for the full plan and per-chapter status.
+Outline drafted, chapters stubbed, no finished prose yet. The plan and the
+per-chapter status live in [`outline.md`](outline.md).
 
 ## Build it
 
-Authored in [Quarto](https://quarto.org) — Markdown in, print PDF + HTML +
+Authored in [Quarto](https://quarto.org): Markdown in, print PDF plus HTML plus
 EPUB out.
 
 ```powershell
@@ -32,9 +33,11 @@ quarto preview book                # live-reload HTML while writing
 ```
 
 `collect_figures.py` copies renders and drawing sheets out of `cad/out/` into
-`book/figures/generated/` (gitignored) and writes a manifest, so a chapter
-references a stable path and the render itself stays a build artefact. Run
-`doit build` first if `cad/out/` is empty or stale.
+`book/figures/generated/` (gitignored) and writes a manifest. A chapter can then
+reference a stable path while the render itself stays a build artefact. It also
+deletes figures the build no longer produces, so a renamed render cannot leave a
+stale copy behind for a chapter to keep pointing at. Run `doit build` first if
+`cad/out/` is empty or stale.
 
 ## Layout
 
@@ -56,12 +59,12 @@ book/
 
 ## The rule that matters
 
-**Nothing goes in this book that hasn't been done.** A chapter describing an
-operation is written after that operation has been performed and logged in
+Nothing goes in this book that hasn't been done. A chapter describing an
+operation gets written after that operation has been performed and logged in
 [`logbook/`](../logbook/README.md), with the real feeds, speeds, setups,
-measurements and mistakes. A plausible-sounding process that was never cut is
-the one thing that would make this book worthless.
+measurements and mistakes. A plausible-sounding process that was never actually
+cut is the one thing that would make the whole book worthless.
 
-Chapters may be *drafted* ahead from the CAD model — see the `status:` field in
-each chapter's frontmatter — but a chapter is not `verified` until the part
-exists on the bench.
+Chapters can be *drafted* ahead from the CAD model, which is what the `status:`
+field in each chapter's frontmatter tracks. But a chapter is not `verified`
+until the part exists on the bench.
