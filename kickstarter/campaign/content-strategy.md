@@ -160,7 +160,8 @@ Begin with three short videos made from work that already needs to happen:
 Review the pilot before buying another camera or accepting a rigid publication
 schedule. Track:
 
-- email signups and Kickstarter followers attributable to each item;
+- email signups and tagged-link visits attributable to each item;
+- the total Kickstarter pre-launch follower count once that page is live;
 - comments and questions from machinists, educators and likely readers;
 - useful technical feedback;
 - approaches from relevant creators or publications;
