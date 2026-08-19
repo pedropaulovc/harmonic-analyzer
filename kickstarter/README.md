@@ -10,6 +10,7 @@ hobby machinist with a lathe and a mill can build one too.
 |---|---|
 | Who this is for, and the one-sentence pitch | [`campaign/positioning.md`](campaign/positioning.md) |
 | The campaign page, section by section | [`campaign/page-outline.md`](campaign/page-outline.md) |
+| How progress becomes blog, video, email and outreach | [`campaign/content-strategy.md`](campaign/content-strategy.md) |
 | Reward tiers and what each one costs to fulfil | [`rewards/tiers.md`](rewards/tiers.md) |
 | Funding goal, built up from real line items | [`campaign/budget.md`](campaign/budget.md) |
 | Risks & Challenges (Kickstarter requires this section) | [`campaign/risks.md`](campaign/risks.md) |
@@ -30,7 +31,7 @@ verifiable chunk of the work is already done and already public:
 - A photo-vs-CAD comparison gallery scoring the model against Hammack, Kranz and
   Carpenter's photographs of the surviving University of Illinois machine.
 - A per-part manufacturability pass
-  ([`cad/docs/machining-dfm.md`](../docs/machining-dfm.md)) that already names the
+  ([`cad/docs/machining-dfm.md`](../cad/docs/machining-dfm.md)) that already names the
   three parts carrying the whole risk.
 
 The campaign should lead with that evidence rather than with a promise.
