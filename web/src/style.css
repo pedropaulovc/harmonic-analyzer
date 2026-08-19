@@ -18,7 +18,17 @@ body {
 
 #app { position: relative; }
 
-#stage { display: block; width: 100%; height: 100%; }
+#stage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+#stage:active { cursor: grabbing; }
+
+#loading[hidden] { display: none; }
 
 #loading {
   position: absolute;
