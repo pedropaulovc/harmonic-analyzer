@@ -6,6 +6,10 @@
 
 ## Phase A — before launch (audience first, campaign second)
 
+The publishing cadence and capture workflow are defined in
+[`content-strategy.md`](content-strategy.md). Capture work as it happens, but
+publish only when there is a useful result or lesson.
+
 | week | milestone | gate |
 |---|---|---|
 | A-12 | Landing page live, email capture running | — |
