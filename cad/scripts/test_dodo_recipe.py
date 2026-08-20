@@ -8,6 +8,7 @@ import contextlib
 import importlib.util
 import inspect
 import os
+import re
 import time
 from pathlib import Path
 
@@ -698,11 +699,14 @@ def test_task_span_carries_its_pipeline_stage_resource():
     assert dodo._stage_name("nothing recognisable") == "harmonic-analyzer"
 
     source = inspect.getsource(dodo)
-    task_spans = [line for line in source.splitlines() if 'span(f"task {label}"' in line]
+    task_spans = list(
+        re.finditer(r'with _telemetry\.span\(\s*f"task \{label\}"', source)
+    )
     assert len(task_spans) == 4, "every task span must be accounted for"
-    for line in task_spans:
-        start = source.index(line)
-        assert "service=_stage_name(label)" in source[start:start + 400], line
+    for match in task_spans:
+        assert (
+            "service=_stage_name(label)" in source[match.start() : match.start() + 400]
+        )
 
 
 def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():
