@@ -80,12 +80,34 @@ def test_logs_split_into_severity_levels(capture):
     assert {"DEBUG", "INFO", "SUCCESS", "WARN", "ERROR"} <= seen
 
 
-def test_console_verbosity_defaults_to_warning_and_accepts_env(monkeypatch):
-    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
-    assert _telemetry._console_level() == logging.WARNING
+def test_console_verbosity_configures_handler_and_spans(monkeypatch):
+    logger = logging.getLogger(_telemetry._LOGGER_NAME)
+    monkeypatch.setattr(_telemetry, "_resolve_otlp_endpoint", lambda: None)
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+    original = os.environ.get("HARMONIC_VERBOSITY")
 
-    monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
-    assert _telemetry._console_level() == _telemetry.SUCCESS
+    def console_handlers():
+        return [handler for handler in logger.handlers if isinstance(handler, logging.StreamHandler)]
+
+    try:
+        os.environ.pop("HARMONIC_VERBOSITY", None)
+        _telemetry.configure(force=True)
+        (handler,) = console_handlers()
+        assert handler.level == logging.WARNING
+        assert _telemetry._span_processors == []
+
+        os.environ["HARMONIC_VERBOSITY"] = "success"
+        _telemetry.configure(force=True)
+        (handler,) = console_handlers()
+        assert handler.level == _telemetry.SUCCESS
+        assert _telemetry._span_processors == []
+    finally:
+        if original is None:
+            os.environ.pop("HARMONIC_VERBOSITY", None)
+        else:
+            os.environ["HARMONIC_VERBOSITY"] = original
+        monkeypatch.undo()
+        _telemetry.configure(force=True)
 
 
 def test_span_records_exception_and_sets_error_status(capture):

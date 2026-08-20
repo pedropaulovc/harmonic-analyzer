@@ -700,13 +700,15 @@ def test_task_span_carries_its_pipeline_stage_resource():
 
     source = inspect.getsource(dodo)
     task_spans = list(
-        re.finditer(r'with _telemetry\.span\(\s*f"task \{label\}"', source)
+        re.finditer(
+            r'with _telemetry\.span\(\s*f"task \{label\}"(?P<args>.*?)\)\s+as\b',
+            source,
+            flags=re.DOTALL,
+        )
     )
     assert len(task_spans) == 4, "every task span must be accounted for"
     for match in task_spans:
-        assert (
-            "service=_stage_name(label)" in source[match.start() : match.start() + 400]
-        )
+        assert "service=_stage_name(label)" in match.group("args")
 
 
 def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():

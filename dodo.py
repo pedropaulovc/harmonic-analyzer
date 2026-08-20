@@ -334,7 +334,10 @@ def _seat_part_order() -> list[str]:
     """``part_stems()`` permuted deterministically per seat (see the block above)."""
     seed = _build_order_seed()
     return sorted(
-        part_stems(), key=lambda s: hashlib.md5(f"{seed}\0{s}".encode()).hexdigest()
+        part_stems(),
+        key=lambda s: hashlib.md5(
+            f"{seed}\0{s}".encode(), usedforsecurity=False
+        ).hexdigest(),
     )
 
 
