@@ -59,13 +59,46 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert "add_native_hole_callout(" in source
 
 
-def test_outboard_lug_datum_uses_deterministic_visible_edge() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    resolver = source.index("def _visible_outboard_lug_edge")
-    assert "visible_view_entities(view, 1" in source[resolver : resolver + 1200]
-    datum_call = source.index('label="outboard lug face"')
-    assert "edge_entity=lug_edge" in source[datum_call - 180 : datum_call]
-    assert 'entity_type="SILHOUETTE"' not in source[resolver:datum_call]
+def test_outboard_lug_edge_resolver_filters_visible_geometry(monkeypatch) -> None:
+    wrong_x = object()
+    wrong_orientation = object()
+    expected = object()
+    endpoints = {
+        wrong_x: (0.002, 0.0048, 0.007, 0.002, 0.0252, 0.007),
+        wrong_orientation: (0.003, 0.0252, -0.007, 0.003, 0.0252, 0.007),
+        expected: (0.003, 0.0048, 0.007, 0.003, 0.0252, 0.007),
+    }
+
+    class FakeSpan:
+        def __init__(self) -> None:
+            self.attributes = {}
+
+        def set_attribute(self, key, value) -> None:
+            self.attributes[key] = value
+
+    span = FakeSpan()
+    monkeypatch.setattr(
+        drawing._telemetry.trace, "get_current_span", lambda context=None: span
+    )
+    resolver = drawing._visible_outboard_lug_edge.__wrapped__
+    monkeypatch.setattr(
+        drawing,
+        "visible_view_entities",
+        lambda view, entity_kind, *, label: [
+            wrong_x,
+            wrong_orientation,
+            expected,
+        ],
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(
+        drawing,
+        "_edge_endpoint_key",
+        lambda adapter, edge: endpoints[edge],
+    )
+
+    assert resolver(object(), object()) is expected
+    assert span.attributes["matched"] == 1
 
 
 def test_notes_cover_the_ball_seat_and_the_boss_relief() -> None:
