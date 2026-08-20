@@ -23,9 +23,10 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _edge_endpoint_key,
     add_datum_feature,
     add_feature_control_frame,
     add_native_hole_callout,
@@ -36,6 +37,7 @@ from _drawing_common import (
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from fulcrum_keeper_spec import (
@@ -88,6 +90,31 @@ def _front_x(model_x_mm: float) -> float:
 def _front_y(model_y_mm: float) -> float:
     """Sheet Y of a model-Y point in the front view (2:1, bbox-centred)."""
     return FRONT_CENTER[1] + (model_y_mm - _Y_MID) * SHEET_SCALE[0] / 1000.0
+
+
+@_telemetry.traced("drawing.pick_lug_edge")
+def _visible_outboard_lug_edge(adapter: Any, view: Any) -> Any:
+    """Return the deterministic front-view edge at the lug's outboard face."""
+    target_x = LUG_HALF_T / 1000.0
+    candidates: list[tuple[tuple[float, ...], Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label="fulcrum front edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        endpoints = _edge_endpoint_key(adapter, edge)
+        if endpoints is None:
+            continue
+        x0, y0, z0, x1, y1, z1 = endpoints
+        if abs(x0 - target_x) > 1e-6 or abs(x1 - target_x) > 1e-6:
+            continue
+        if abs(y1 - y0) < 0.005 or abs(z1 - z0) > 1e-6:
+            continue
+        geometry = tuple(sorted((endpoints[:3], endpoints[3:])))
+        candidates.append((geometry[0] + geometry[1], edge))
+
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("matched", len(candidates))
+    if not candidates:
+        raise RuntimeError("front view has no vertical edge at the lug outboard face")
+    return min(candidates, key=lambda candidate: candidate[0])[1]
 
 
 # Handy picks derived from the layout above.
@@ -176,28 +203,20 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="keeper seating face",
     )
-    # Datum B is a VERTICAL silhouette edge -- maximally sensitive to the
-    # view's outline-vs-geometry x asymmetry (live-probed 2026-08-03: the
-    # lug edge sat +0.75 mm sheet right of the bbox-centred nominal while
-    # the outline centre matched the request exactly). Scan a short
-    # deterministic x ladder around the nominal; first hit wins.
-    datum_b_error: Exception | None = None
-    for dx in (0.0, 0.0005, 0.001, -0.0005, -0.001, 0.0015, -0.0015):
-        try:
-            add_datum_feature(
-                adapter,
-                front,
-                edge_xy=(LUG_FACE_X + dx, _front_y(12.0)),
-                symbol_xy=(LUG_FACE_X + dx + 0.014, _front_y(12.0)),
-                datum="B",
-                label="outboard lug face",
-            )
-            datum_b_error = None
-            break
-        except RuntimeError as exc:
-            datum_b_error = exc
-    if datum_b_error is not None:
-        raise datum_b_error
+    # Datum B is attached to the actual vertical model edge at x=+3 mm.  It is
+    # not a silhouette edge: the front-view outline scanner returns only the
+    # horizontal crown/foot transitions, while the locating edge is a visible
+    # model edge.  Resolve it by model-space endpoints so view projection drift
+    # cannot move the annotation to another edge.
+    lug_edge = _visible_outboard_lug_edge(adapter, front)
+    add_datum_feature(
+        adapter,
+        front,
+        edge_entity=lug_edge,
+        symbol_xy=(LUG_FACE_X + 0.014, _front_y(12.0)),
+        datum="B",
+        label="outboard lug face",
+    )
     add_feature_control_frame(
         adapter,
         front,

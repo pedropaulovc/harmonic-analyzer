@@ -15,9 +15,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/fulcrum-keeper.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/fulcrum-keeper.pdf")
     assert drawing.PNG.as_posix().endswith("/png/fulcrum-keeper_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["fulcrum_keeper"].script == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["fulcrum_keeper"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -61,6 +59,15 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert "add_native_hole_callout(" in source
 
 
+def test_outboard_lug_datum_uses_deterministic_visible_edge() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    resolver = source.index("def _visible_outboard_lug_edge")
+    assert "visible_view_entities(view, 1" in source[resolver : resolver + 1200]
+    datum_call = source.index('label="outboard lug face"')
+    assert "edge_entity=lug_edge" in source[datum_call - 180 : datum_call]
+    assert 'entity_type="SILHOUETTE"' not in source[resolver:datum_call]
+
+
 def test_notes_cover_the_ball_seat_and_the_boss_relief() -> None:
     notes = fulcrum_keeper_spec.DRAWING_NOTES
     assert "BLACK OXIDE" in notes
@@ -79,9 +86,7 @@ def test_ball_is_a_separate_pressed_body() -> None:
     assert 'name_last_feature(adapter, "Ball")' in source
     # And the wizard screw hole must land while the part is one body (its
     # placement-face scan reads GetBodies2()[0]).
-    assert source.index('name="FootScrewHole"') < source.index(
-        '"revolve ball"'
-    )
+    assert source.index('name="FootScrewHole"') < source.index('"revolve ball"')
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
