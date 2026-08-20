@@ -250,7 +250,7 @@ def _com_seat(label: str):
             except Timeout:
                 polls += 1
                 other = _read_seat_holder()
-                _telemetry.warn(
+                _telemetry.debug(
                     f"[com.seat] {label} waiting for the SolidWorks seat"
                     + (f" (held by {other})" if other else "")
                 )

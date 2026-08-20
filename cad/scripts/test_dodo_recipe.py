@@ -501,7 +501,7 @@ def test_com_seat_wait_gets_its_own_top_level_span(tmp_path, monkeypatch):
         return acquire(*args, **kwargs)
 
     spans: list[tuple[str, dict]] = []
-    warnings: list[str] = []
+    debug_messages: list[str] = []
 
     @contextlib.contextmanager
     def record_span(name, **attrs):
@@ -517,14 +517,14 @@ def test_com_seat_wait_gets_its_own_top_level_span(tmp_path, monkeypatch):
 
     monkeypatch.setattr(dodo._COM_LOCK, "acquire", acquire_after_one_timeout)
     monkeypatch.setattr(dodo._telemetry, "span", record_span)
-    monkeypatch.setattr(dodo._telemetry, "warn", warnings.append)
+    monkeypatch.setattr(dodo._telemetry, "debug", debug_messages.append)
 
     with dodo._com_seat("part:x"):
         assert spans == [("com.seat.wait part:x", {"label": "part:x", "polls": 1,
                                                    "service": "build-infra"})],             "the wait must be timed by its own build-infra span, before the seat is held"
 
     assert attempts == 2
-    assert warnings == ["[com.seat] part:x waiting for the SolidWorks seat"]
+    assert debug_messages == ["[com.seat] part:x waiting for the SolidWorks seat"]
 
 
 class _FakeClock:
