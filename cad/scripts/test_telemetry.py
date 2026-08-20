@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -48,7 +49,9 @@ def capture():
 
     spans = InMemorySpanExporter()
     processor = SimpleSpanProcessor(spans)
-    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(processor)
+    cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
+        processor
+    )
     # Auxiliary per-resource providers (build-infra) are built lazily from
     # ``_span_processors``, so register there too -- and drop any already built -- or
     # a test would see nothing from spans emitted under another resource.
@@ -56,7 +59,9 @@ def capture():
     _telemetry._aux_providers.clear()
 
     logs = InMemoryLogRecordExporter()
-    cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(SimpleLogRecordProcessor(logs))
+    cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(
+        SimpleLogRecordProcessor(logs)
+    )
     yield spans, logs
 
     _telemetry._span_processors.remove(processor)
@@ -73,6 +78,14 @@ def test_logs_split_into_severity_levels(capture):
 
     seen = {r.log_record.severity_text for r in logs.get_finished_logs()}
     assert {"DEBUG", "INFO", "SUCCESS", "WARN", "ERROR"} <= seen
+
+
+def test_console_verbosity_defaults_to_warning_and_accepts_env(monkeypatch):
+    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
+    assert _telemetry._console_level() == logging.WARNING
+
+    monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
+    assert _telemetry._console_level() == _telemetry.SUCCESS
 
 
 def test_span_records_exception_and_sets_error_status(capture):
@@ -179,13 +192,17 @@ def test_build_session_standalone_opens_root(capture, monkeypatch):
         assert root is not None
         with _telemetry.span("op"):
             pass
-    rootspan = [s for s in spans.get_finished_spans() if s.name == "build.cone_gear"][-1]
+    rootspan = [s for s in spans.get_finished_spans() if s.name == "build.cone_gear"][
+        -1
+    ]
     op = [s for s in spans.get_finished_spans() if s.name == "op"][-1]
     assert rootspan.attributes["label"] == "cone_gear"
     assert op.parent.span_id == rootspan.context.span_id
 
 
-def test_build_session_continues_injected_parent_without_duplicate(capture, monkeypatch):
+def test_build_session_continues_injected_parent_without_duplicate(
+    capture, monkeypatch
+):
     """Under the doit spine (a parent TRACEPARENT is injected) build_session
     yields None and the operation spans attach straight to the injected trace --
     no second pipeline.part.build layer duplicating the doit task span."""
@@ -243,12 +260,16 @@ def test_build_infra_spans_carry_their_own_resource(capture):
     normally and rides the same exporters."""
     spans, _ = capture
     with _telemetry.span("task part:cone_gear"):
-        with _telemetry.span("com.seat.wait part:cone_gear",
-                             service=_telemetry.BUILD_INFRA_SERVICE) as seat:
+        with _telemetry.span(
+            "com.seat.wait part:cone_gear", service=_telemetry.BUILD_INFRA_SERVICE
+        ) as seat:
             seat_trace = seat.get_span_context().trace_id
 
     finished = {s.name: s for s in spans.get_finished_spans()}
-    task, wait = finished["task part:cone_gear"], finished["com.seat.wait part:cone_gear"]
+    task, wait = (
+        finished["task part:cone_gear"],
+        finished["com.seat.wait part:cone_gear"],
+    )
     assert wait.resource.attributes["service.name"] == "build-infra"
     assert task.resource.attributes["service.name"] == _telemetry._service_name
     assert wait.resource.attributes["service.namespace"] == "harmonic-analyzer"
@@ -266,7 +287,9 @@ def test_process_startup_is_billed_to_the_parent_trace(capture, monkeypatch):
     spans, _ = capture
     now = time.time_ns()
     monkeypatch.setattr(_telemetry, "_startup_recorded", False)
-    monkeypatch.setattr(_telemetry, "_IMPORT_NS", now - int(1.5e9))  # imported 1.5 s ago
+    monkeypatch.setattr(
+        _telemetry, "_IMPORT_NS", now - int(1.5e9)
+    )  # imported 1.5 s ago
     monkeypatch.setenv(_telemetry.SPAWN_ENV, str(now - int(4.0e9)))  # spawned 4 s ago
 
     with _telemetry.span("task part:cone_gear"):
@@ -305,7 +328,10 @@ def test_otlp_export_is_batched_off_the_critical_path():
     export on the COM seat; console + file capture stay SIMPLE (live console, and a
     .jsonl that cannot lose a record to a queue). Flushing is what makes the batch
     trade safe -- ``shutdown()`` covers both signals and runs on both exit paths."""
-    span_proc, log_proc = _telemetry._otlp_span_processor(), _telemetry._otlp_log_processor()
+    span_proc, log_proc = (
+        _telemetry._otlp_span_processor(),
+        _telemetry._otlp_log_processor(),
+    )
     try:
         assert type(span_proc).__name__ == "BatchSpanProcessor"
         assert type(log_proc).__name__ == "BatchLogRecordProcessor"
@@ -314,8 +340,11 @@ def test_otlp_export_is_batched_off_the_critical_path():
             if processor is not None:
                 processor.shutdown()
 
-    simple = [p for p in _telemetry._span_processors
-              if type(p).__name__ == "SimpleSpanProcessor"]
+    simple = [
+        p
+        for p in _telemetry._span_processors
+        if type(p).__name__ == "SimpleSpanProcessor"
+    ]
     assert simple, "console/file capture must stay on Simple processors"
 
 
@@ -335,8 +364,12 @@ def test_default_otlp_endpoint_is_a_literal_address_never_localhost(monkeypatch)
     monkeypatch.setattr(_telemetry, "_endpoint_listening", v6_only)
     assert _telemetry._resolve_otlp_endpoint() == "http://[::1]:18890"
 
-    monkeypatch.setattr(_telemetry, "_endpoint_listening", lambda e, timeout=0.15: False)
-    assert _telemetry._resolve_otlp_endpoint() is None, "nothing listening: export nowhere"
+    monkeypatch.setattr(
+        _telemetry, "_endpoint_listening", lambda e, timeout=0.15: False
+    )
+    assert _telemetry._resolve_otlp_endpoint() is None, (
+        "nothing listening: export nowhere"
+    )
 
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
     assert _telemetry._resolve_otlp_endpoint() == "http://collector:4318", "env wins"
@@ -372,15 +405,22 @@ def test_sequential_root_spans_do_not_nest(capture):
         pass
 
     finished = {s.name: s for s in spans.get_finished_spans()}
-    wait, task = finished["com.seat.wait part:cone_gear"], finished["task part:cone_gear"]
-    assert task.parent is None and wait.parent is None, "the wait must not parent the task"
+    wait, task = (
+        finished["com.seat.wait part:cone_gear"],
+        finished["task part:cone_gear"],
+    )
+    assert task.parent is None and wait.parent is None, (
+        "the wait must not parent the task"
+    )
     assert (wait.end_time - wait.start_time) / 1e9 >= 0.2
     # The ordering is the real invariant, and it is deterministic. An upper bound on
     # the task span's own duration would only measure how busy the host is -- a
     # descheduled process would fail it while the topology was perfectly correct
     # (codex #424).
     assert task.start_time >= wait.end_time, "the task must start once the seat is held"
-    assert wait.end_time <= task.start_time, "no overlap: the wait cannot leak into work"
+    assert wait.end_time <= task.start_time, (
+        "no overlap: the wait cannot leak into work"
+    )
 
 
 def test_export_save_as_is_visible_during_long_com_call(capture, tmp_path):
@@ -424,14 +464,16 @@ def test_set_service_relabels_resource_fallback_only():
         # default -> stage: fallback takes effect and the LIVE resource swaps.
         _telemetry.set_service("assembly-build")
         exp = InMemorySpanExporter()
-        cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(
-            SimpleSpanProcessor(exp)
-        )
+        cast(
+            SdkTracerProvider, _telemetry.trace.get_tracer_provider()
+        ).add_span_processor(SimpleSpanProcessor(exp))
         with _telemetry.span("op"):
             pass
         (sp,) = [s for s in exp.get_finished_spans() if s.name == "op"]
         assert sp.resource.attributes["service.name"] == "assembly-build"
-        assert sp.resource.attributes["service.namespace"] == _telemetry._SERVICE_NAMESPACE
+        assert (
+            sp.resource.attributes["service.namespace"] == _telemetry._SERVICE_NAMESPACE
+        )
         # fallback-only: a non-forced call does NOT override an already-set label.
         _telemetry.set_service("part-build")
         assert _telemetry._service_name == "assembly-build"
@@ -475,8 +517,15 @@ def test_concurrent_appends_never_splice_a_record(tmp_path):
 
     procs = [
         subprocess.Popen(
-            [sys.executable, str(script), scripts_dir, str(target),
-             str(w), str(per_worker), str(pad)],
+            [
+                sys.executable,
+                str(script),
+                scripts_dir,
+                str(target),
+                str(w),
+                str(per_worker),
+                str(pad),
+            ],
         )
         for w in range(workers)
     ]
@@ -544,8 +593,7 @@ f.close()
 
 
 @pytest.mark.skipif(
-    os.environ.get("HARMONIC_TELEMETRY_RACE_REPRO") != "1"
-    or sys.platform != "win32",
+    os.environ.get("HARMONIC_TELEMETRY_RACE_REPRO") != "1" or sys.platform != "win32",
     reason=(
         "opt-in AND Windows-only: asserts a RACE reproduces, so it cannot gate "
         "check:telemetry. Run with HARMONIC_TELEMETRY_RACE_REPRO=1 on Windows. "
@@ -595,8 +643,14 @@ def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
 
     procs = [
         subprocess.Popen(
-            [sys.executable, str(script), str(target),
-             str(w), str(per_worker), str(pad)],
+            [
+                sys.executable,
+                str(script),
+                str(target),
+                str(w),
+                str(per_worker),
+                str(pad),
+            ],
         )
         for w in range(workers)
     ]
@@ -652,6 +706,7 @@ def test_a_failing_append_never_propagates_into_pipeline_work(tmp_path, monkeypa
     """An I/O error during capture drops the record; it does not fail the build."""
     writer = _telemetry._AtomicJsonlWriter(tmp_path / "traces.jsonl")
     try:
+
         def explode(_payload: bytes) -> int:
             raise OSError("disk full")
 
@@ -774,8 +829,11 @@ def test_shutdown_is_silent_when_nothing_was_dropped(tmp_path, capsys):
     assert "dropped" not in capsys.readouterr().err
 
 
-def test_jsonl_stream_falls_back_when_the_atomic_path_is_unavailable(tmp_path, monkeypatch):
+def test_jsonl_stream_falls_back_when_the_atomic_path_is_unavailable(
+    tmp_path, monkeypatch
+):
     """Capture must never go dark: an unusable atomic writer degrades to buffered."""
+
     def boom(_path):
         raise RuntimeError("no win32 extensions here")
 

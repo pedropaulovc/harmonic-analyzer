@@ -141,7 +141,28 @@ _service_name = _resolve_service_name()
 # that is what the Aspire container publishes; the IPv6 loopback is kept as a
 # fallback so a v6-only dashboard still gets export rather than silence.
 _OTLP_PORT = 18890
-_DEFAULT_OTLP_ENDPOINTS = (f"http://127.0.0.1:{_OTLP_PORT}", f"http://[::1]:{_OTLP_PORT}")
+_DEFAULT_OTLP_ENDPOINTS = (
+    f"http://127.0.0.1:{_OTLP_PORT}",
+    f"http://[::1]:{_OTLP_PORT}",
+)
+# Human-facing console verbosity. Structured file/OTLP capture remains complete;
+# this setting only controls stderr logs and compact span boundaries. Set
+# ``HARMONIC_VERBOSITY`` to ``debug``, ``info``, ``success``, ``warning``,
+# ``error``, or ``critical``. The default is ``warning``.
+_VERBOSITY_LEVELS = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "success": SUCCESS,
+    "warning": logging.WARNING,
+    "warn": logging.WARNING,
+    "error": logging.ERROR,
+    "critical": logging.CRITICAL,
+}
+
+
+def _console_level() -> int:
+    raw = os.environ.get("HARMONIC_VERBOSITY", "warning")
+    return _VERBOSITY_LEVELS.get(raw.strip().lower(), logging.WARNING)
 
 
 def _endpoint_listening(endpoint: str, timeout: float = 0.15) -> bool:
@@ -176,6 +197,7 @@ def _resolve_otlp_endpoint() -> str | None:
     if env is not None:
         return env or None
     return next((e for e in _DEFAULT_OTLP_ENDPOINTS if _endpoint_listening(e)), None)
+
 
 _T0 = time.perf_counter()
 _LAST_TICK = _T0
@@ -224,9 +246,12 @@ class _ActivityFilter(logging.Filter):
             _touch_activity(f"log {str(record.msg)[:80]}")
         return True
 
+
 # Span nesting depth for the compact console tracer, so the boundary lines
 # indent into a tree and a missing parent is visible at a glance.
-_depth: contextvars.ContextVar[int] = contextvars.ContextVar("_telemetry_depth", default=0)
+_depth: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "_telemetry_depth", default=0
+)
 
 _configured = False
 # Span processors of the CURRENT configuration, shared with every auxiliary provider
@@ -260,7 +285,11 @@ def _compact_span(span: ReadableSpan) -> str:
     """One depth-indented line per finished span: ``⟩ name 1.23s OK [attrs]``."""
     depth_raw = (span.attributes or {}).get("harmonic.depth", 0)
     depth = int(depth_raw) if isinstance(depth_raw, (int, float, str)) else 0
-    dur = (span.end_time - span.start_time) / 1e9 if span.end_time and span.start_time else 0.0
+    dur = (
+        (span.end_time - span.start_time) / 1e9
+        if span.end_time and span.start_time
+        else 0.0
+    )
     status = span.status.status_code.name if span.status else "UNSET"
     mark = {"OK": "OK", "ERROR": "xx", "UNSET": "--"}.get(status, status)
     indent = "  " * depth
@@ -583,6 +612,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
             _logs_internal._LOGGER_PROVIDER_SET_ONCE._done = False  # type: ignore[attr-defined]
 
     want_console = console
+    console_level = _console_level()
 
     # Resolve the OTLP target ONCE (probes the Aspire default if no env is set)
     # and pin it into the environment so the OTLP exporters read it AND every
@@ -606,7 +636,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     # console stream and traces.jsonl handle.
     global _span_processors
     _span_processors = []
-    if want_console:
+    # Span boundaries are deliberately debug-only: spans have no severity field,
+    # so warning-and-above console modes suppress the whole compact trace tree
+    # while structured span capture remains complete.
+    if want_console and console_level <= logging.DEBUG:
         _span_processors.append(
             SimpleSpanProcessor(
                 ConsoleSpanExporter(
@@ -667,11 +700,13 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     pylog.propagate = False
     # Bridge into OTel's logs SDK: carries SeverityNumber + the active span's
     # trace/span id onto every record, so logs and traces correlate.
-    pylog.addHandler(LoggingHandler(level=logging.DEBUG, logger_provider=logger_provider))
+    pylog.addHandler(
+        LoggingHandler(level=logging.DEBUG, logger_provider=logger_provider)
+    )
     if want_console:
         stream = logging.StreamHandler(stream=_LiveStderr())
         stream.setFormatter(_FriendlyFormatter())
-        stream.setLevel(logging.DEBUG)
+        stream.setLevel(console_level)
         pylog.addHandler(stream)
 
 
@@ -704,7 +739,7 @@ def _provider_for_service(service: str):
                     "service.namespace": _SERVICE_NAMESPACE,
                     "service.version": os.environ.get("HARMONIC_VERSION", "dev"),
                 }
-            )
+            ),
         )
         for processor in _span_processors:
             provider.add_span_processor(processor)
@@ -750,6 +785,7 @@ def set_service(name: str, *, force: bool = False) -> None:
 # OTel + printed to the console) at its level. ``progress`` and ``success``    #
 # keep the names the build scripts read most naturally.                        #
 # --------------------------------------------------------------------------- #
+
 
 def _extra(fields: Mapping[str, Any]) -> dict[str, Any] | None:
     """Flatten caller fields into log-record attributes (OTel attribute values
@@ -803,8 +839,9 @@ def event(name: str, **attributes: Any) -> None:
             span.add_event(name, attributes=_extra(attributes) or {})
 
 
-def _enter_span(name: str, attributes: Mapping[str, Any] | None,
-                service: str | None = None) -> tuple[Span, Any, int]:
+def _enter_span(
+    name: str, attributes: Mapping[str, Any] | None, service: str | None = None
+) -> tuple[Span, Any, int]:
     _touch_activity(f"span-start {name}")
     tracer = get_tracer(service=service)
     depth = _depth.get()
@@ -832,7 +869,9 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
     if exc is not None:
         span.record_exception(exc)
         span.set_status(Status(StatusCode.ERROR, str(exc)))
-        error(f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}")
+        error(
+            f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
+        )
     elif cast(ReadableSpan, span).status.status_code is StatusCode.UNSET:
         # get_current_span() is typed Span (mutable, has set_status); only
         # ReadableSpan exposes .status -- the live SDK span is both.
@@ -841,8 +880,9 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
 
 
 @contextlib.contextmanager
-def span(name: str, /, *, service: str | None = None,
-         **attributes: Any) -> Generator[Span, None, None]:
+def span(
+    name: str, /, *, service: str | None = None, **attributes: Any
+) -> Generator[Span, None, None]:
     """Span context manager that leaves no gaps.
 
     On a clean exit the span status is set OK; on an exception it records the
@@ -901,23 +941,28 @@ def traced(name: str, *, label_param: str | None = None):
             return {}
 
         if inspect.iscoroutinefunction(fn):
+
             @functools.wraps(fn)
             async def awrap(*args, **kwargs):
                 async with aspan(name, **_attrs(args, kwargs)):
                     return await fn(*args, **kwargs)
+
             return awrap
 
         @functools.wraps(fn)
         def wrap(*args, **kwargs):
             with span(name, **_attrs(args, kwargs)):
                 return fn(*args, **kwargs)
+
         return wrap
 
     return deco
 
 
 @contextlib.contextmanager
-def build_session(label: str, /, **attributes: Any) -> Generator[Span | None, None, None]:
+def build_session(
+    label: str, /, **attributes: Any
+) -> Generator[Span | None, None, None]:
     """Root context for a build *process* (``_common.run_build``).
 
     Under the doit spine a parent trace context is injected (``TRACEPARENT``), so
@@ -986,14 +1031,22 @@ def record_process_startup() -> None:
         tracer = get_tracer()
         depth = _depth.get()
         parent = tracer.start_span(
-            "proc.startup", start_time=spawn_ns,
-            attributes={"harmonic.depth": depth, "pid": os.getpid()})
+            "proc.startup",
+            start_time=spawn_ns,
+            attributes={"harmonic.depth": depth, "pid": os.getpid()},
+        )
         parent.set_status(Status(StatusCode.OK))
         child_ctx = trace.set_span_in_context(parent)
-        for name, start, end in (("proc.launch", spawn_ns, _IMPORT_NS),
-                                 ("proc.import", _IMPORT_NS, now)):
-            child = tracer.start_span(name, context=child_ctx, start_time=start,
-                                      attributes={"harmonic.depth": depth + 1})
+        for name, start, end in (
+            ("proc.launch", spawn_ns, _IMPORT_NS),
+            ("proc.import", _IMPORT_NS, now),
+        ):
+            child = tracer.start_span(
+                name,
+                context=child_ctx,
+                start_time=start,
+                attributes={"harmonic.depth": depth + 1},
+            )
             child.set_status(Status(StatusCode.OK))
             child.end(end_time=end)
         parent.end(end_time=now)
