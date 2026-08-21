@@ -1616,7 +1616,7 @@ def test_drawing_revision_must_match_current_release():
         ("Revision",),
         required=("Revision",),
     )
-    with pytest.raises(RuntimeError, match="Revision .* current release"):
+    with pytest.raises(RuntimeError, match=r"Revision .* current release"):
         drawing_common.read_required_properties(
             Model("v1"),
             ("Revision",),

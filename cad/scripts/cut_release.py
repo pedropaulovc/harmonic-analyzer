@@ -39,8 +39,10 @@ What it does, in order:
      ``<top>-<version>-logs.zip`` when there are several (a lone log goes up
      as-is). ``--no-publish`` runs everything EXCEPT this step (no git tag/push,
      no gh) and just reports the assets it would have uploaded.
-  7. On a successful publish, advance ``release.yaml`` to the next revision and
-     warn the release agent to commit and merge that tracked version bump.
+  7. Before publication, validate and stage the ``release.yaml`` next-revision
+     update. On successful publication, install it atomically and warn the release
+     agent to commit and merge that tracked version bump. A failed post-publication
+     install reports the published version and required manual ``next_revision``.
 
 Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
 a concurrent build_all/verify deadlocks):
@@ -55,11 +57,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 import zipfile
@@ -188,8 +192,35 @@ def require_configured_revision(version: str) -> None:
         )
 
 
-def advance_configured_revision(version: str) -> str:
-    """Advance the tracked next-release revision after a published release."""
+class _PreparedRevisionAdvance:
+    """A validated next-revision write held until the release is published."""
+
+    def __init__(self, source: Path, temporary: Path, next_version: str) -> None:
+        self.source = source
+        self.temporary: Path | None = temporary
+        self.next_version = next_version
+
+    def commit(self) -> str:
+        """Atomically install the prepared revision file."""
+        assert self.temporary is not None
+        os.replace(self.temporary, self.source)
+        self.temporary = None
+        return self.next_version
+
+    def discard(self) -> None:
+        """Remove an uncommitted prepared revision file."""
+        if self.temporary is None:
+            return
+        try:
+            self.temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        finally:
+            self.temporary = None
+
+
+def prepare_configured_revision_advance(version: str) -> _PreparedRevisionAdvance:
+    """Validate and stage the next revision before publishing the release."""
     require_configured_revision(version)
     next_version = f"v{int(version[1:]) + 1}"
     source = RELEASE_VERSION_FILE
@@ -202,8 +233,37 @@ def advance_configured_revision(version: str) -> str:
     )
     if count != 1:
         raise RuntimeError(f"could not advance next_revision in {source}")
-    source.write_text(updated, encoding="utf-8")
-    return next_version
+
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=source.parent,
+            prefix=f".{source.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as target:
+            temporary = Path(target.name)
+            target.write(updated)
+            target.flush()
+            os.fsync(target.fileno())
+    except OSError as exc:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"could not prepare next_revision update in {source}: {exc}"
+        ) from exc
+    return _PreparedRevisionAdvance(source, temporary, next_version)
+
+
+def advance_configured_revision(version: str) -> str:
+    """Advance the tracked next-release revision after a published release."""
+    prepared = prepare_configured_revision_advance(version)
+    try:
+        return prepared.commit()
+    finally:
+        prepared.discard()
 
 
 def previous_tag(version: str) -> str | None:
@@ -1244,8 +1304,28 @@ def main() -> int:
                 report_no_publish(version, zip_path, facts, log_path)
                 url = None
             else:
-                url = publish(version, zip_path, facts, opts.draft, log_path)
-                next_revision = advance_configured_revision(version)
+                prepared = prepare_configured_revision_advance(version)
+                try:
+                    url = publish(version, zip_path, facts, opts.draft, log_path)
+                except Exception:
+                    prepared.discard()
+                    raise
+                try:
+                    next_revision = prepared.commit()
+                except Exception as exc:
+                    prepared.discard()
+                    message = (
+                        f"release {version} was published at {url}, but could not "
+                        f"advance {RELEASE_VERSION_FILE}; manually set "
+                        f"next_revision: {prepared.next_version} and commit/merge "
+                        "that version bump before cutting the next release"
+                    )
+                    _telemetry.error(message)
+                    rel.record_exception(exc)
+                    rel.set_status(
+                        _telemetry.Status(_telemetry.StatusCode.ERROR, message)
+                    )
+                    raise RuntimeError(message) from exc
                 _telemetry.warn(
                     f"VERSION BUMP REQUIRED: {RELEASE_VERSION_FILE} now contains "
                     f"{next_revision}; commit and merge this version bump before "
