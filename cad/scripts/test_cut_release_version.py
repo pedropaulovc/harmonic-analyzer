@@ -35,6 +35,49 @@ def test_default_version_starts_at_v1_without_compact_tags(
     assert cut_release.resolve_version(None) == "v1"
 
 
+def test_release_requires_configured_cad_revision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+
+    cut_release.require_configured_revision("v22")
+    with pytest.raises(SystemExit, match="does not match configured CAD Revision"):
+        cut_release.require_configured_revision("v23")
+
+
+def test_published_release_advances_tracked_revision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "release.yaml"
+    source.write_text("next_revision: v22\n", encoding="utf-8")
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+
+    assert cut_release.advance_configured_revision("v22") == "v23"
+    assert source.read_text(encoding="utf-8") == "next_revision: v23\n"
+
+
+def test_revision_advance_is_staged_before_publish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "release.yaml"
+    source.write_text("next_revision: v22\n", encoding="utf-8")
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", source)
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+
+    prepared = cut_release.prepare_configured_revision_advance("v22")
+    try:
+        assert prepared.next_version == "v23"
+        assert prepared.temporary is not None
+        assert prepared.temporary.exists()
+        assert source.read_text(encoding="utf-8") == "next_revision: v22\n"
+        assert prepared.commit() == "v23"
+    finally:
+        prepared.discard()
+
+    assert source.read_text(encoding="utf-8") == "next_revision: v23\n"
+
+
 def test_explicit_compact_version_is_accepted() -> None:
     assert cut_release.resolve_version("v42") == "v42"
 

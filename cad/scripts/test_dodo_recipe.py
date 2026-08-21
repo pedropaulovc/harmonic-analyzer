@@ -4,10 +4,12 @@
 compared against the value saved on the last SUCCESSFUL run -- never from doit's
 injected ``changed`` arg, which is corrupted after an intervening failed task.
 """
+
 import contextlib
 import importlib.util
 import inspect
 import os
+import re
 import time
 from pathlib import Path
 
@@ -16,7 +18,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def _load_dodo():
     spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
-    assert spec is not None and spec.loader is not None, f"could not locate dodo.py under {REPO_ROOT}"
+    assert spec is not None and spec.loader is not None, (
+        f"could not locate dodo.py under {REPO_ROOT}"
+    )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -111,9 +115,26 @@ def test_assembly_drawing_depends_on_actual_assembly_execution():
     dodo = _load_dodo()
     token = dodo._assembly_execution_token("pen")
     assembly = next(task for task in dodo.task_assembly() if task["name"] == "pen")
-    drawing = next(task for task in dodo.task_drawing() if task["name"] == "pen_assembly")
+    drawing = next(
+        task for task in dodo.task_drawing() if task["name"] == "pen_assembly"
+    )
     assert token in assembly["targets"]
     assert token in drawing["file_dep"]
+
+
+def test_release_revision_source_invalidates_native_and_drawing_tasks():
+    dodo = _load_dodo()
+    revision_source = str(dodo.RELEASE_VERSION_FILE)
+
+    part = next(task for task in dodo.task_part() if task["name"] == "platen_guide")
+    assembly = next(task for task in dodo.task_assembly() if task["name"] == "pen")
+    drawing = next(
+        task for task in dodo.task_drawing() if task["name"] == "platen_guide"
+    )
+
+    assert revision_source in part["file_dep"]
+    assert revision_source in assembly["file_dep"]
+    assert revision_source in drawing["file_dep"]
 
 
 def test_execution_identity_is_stable_for_same_artifact(tmp_path, monkeypatch):
@@ -168,7 +189,9 @@ def test_verify_gates_depend_on_exact_assembly_identities():
     for stem in dodo.ASSEMBLY_ORDER:
         assert dodo._assembly_execution_token(stem) in soundness[stem]["file_dep"]
 
-    kinematics = next(task for task in dodo.task_verify() if task["name"] == "kinematics")
+    kinematics = next(
+        task for task in dodo.task_verify() if task["name"] == "kinematics"
+    )
     for stem in ("pen", "magnifier", "paper_drive"):
         assert dodo._assembly_execution_token(stem) in kinematics["file_dep"]
 
@@ -200,20 +223,27 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
     restores = []
     stores = []
 
-    monkeypatch.setattr(dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")])
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
     monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(
-        dodo._cache, "restore",
+        dodo._cache,
+        "restore",
         lambda key, outputs, label: restores.append((key, outputs, label)) or True,
     )
     monkeypatch.setattr(
-        dodo._cache, "store",
+        dodo._cache,
+        "store",
         lambda key, outputs, label: stores.append((key, outputs, label)) or "stored",
     )
     monkeypatch.setattr(
-        dodo, "_exec",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("cache HIT built drawing")),
+        dodo,
+        "_exec",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("cache HIT built drawing")
+        ),
     )
 
     dodo._cached_drawing_action("platen_guide")
@@ -230,12 +260,17 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     builds = []
     stores = []
 
-    monkeypatch.setattr(dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")])
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
     monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(
-        dodo._cache, "restore",
-        lambda key, outputs, label: restores.append((key, outputs, label)) or next(outcomes),
+        dodo._cache,
+        "restore",
+        lambda key, outputs, label: (
+            restores.append((key, outputs, label)) or next(outcomes)
+        ),
     )
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
     monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
@@ -246,7 +281,8 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
 
     monkeypatch.setattr(dodo, "_exec_com", build)
     monkeypatch.setattr(
-        dodo._cache, "store",
+        dodo._cache,
+        "store",
         lambda key, outputs, label: stores.append((key, outputs, label)) or "stored",
     )
 
@@ -277,8 +313,12 @@ def test_content_checker_digest_ignores_yaml_noise(tmp_path):
     cfg.write_text("rack_backlash_mm: 0.30\nseat_clearance_mm: 1.5\n")
     base = digest(str(cfg))
 
-    cfg.write_text("# provenance: retargeted\nrack_backlash_mm: 0.300\nseat_clearance_mm: 1.5\n  \n")
-    assert digest(str(cfg)) == base, "comment/whitespace/0.30->0.300 reflow must be inert"
+    cfg.write_text(
+        "# provenance: retargeted\nrack_backlash_mm: 0.300\nseat_clearance_mm: 1.5\n  \n"
+    )
+    assert digest(str(cfg)) == base, (
+        "comment/whitespace/0.30->0.300 reflow must be inert"
+    )
 
     cfg.write_text("rack_backlash_mm: 0.31\nseat_clearance_mm: 1.5\n")
     assert digest(str(cfg)) != base, "a real value change must invalidate"
@@ -342,13 +382,17 @@ def test_content_checker_check_modified_ignores_comment(tmp_path):
     os.utime(str(cfg), (state[0] + 10, state[0] + 10))
     st = os.stat(str(cfg))
     assert st.st_mtime != state[0] and st.st_size != state[1]
-    assert checker.check_modified(str(cfg), st, state) is False, "comment edit must be inert"
+    assert checker.check_modified(str(cfg), st, state) is False, (
+        "comment edit must be inert"
+    )
 
     # real value change with a distinct mtime -> modified
     cfg.write_text("k: 2\n")
     os.utime(str(cfg), (state[0] + 20, state[0] + 20))
     st = os.stat(str(cfg))
-    assert checker.check_modified(str(cfg), st, state) is True, "value change must invalidate"
+    assert checker.check_modified(str(cfg), st, state) is True, (
+        "value change must invalidate"
+    )
 
 
 class _FakeStat:
@@ -365,7 +409,9 @@ def test_artefact_digest_is_recipe_not_bytes():
     dodo = _load_dodo()
     stem = dodo.part_stems()[0]
     art = dodo._sldprt(stem)
-    recipe = dodo._digest_files(dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem))
+    recipe = dodo._digest_files(
+        dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)
+    )
     assert dodo.ContentChecker._digest(art) == recipe
     # Deterministic across calls (memoized), and independent of the bytes on disk:
     # the artefact need not even exist for the digest to resolve.
@@ -386,22 +432,31 @@ def test_verify_gate_logic_off_build_closure_is_a_file_dep():
 
     asm_closure = set()
     for a in bg.ASSEMBLY_ORDER:
-        asm_closure |= {os.path.basename(m) for m in bg.module_deps_of(bg.script_for(a))}
+        asm_closure |= {
+            os.path.basename(m) for m in bg.module_deps_of(bg.script_for(a))
+        }
 
     def _orphan_helpers(script):
-        helpers = {os.path.basename(m) for m in bg.module_deps_of(script)
-                   if os.path.basename(m).startswith("_")}
+        helpers = {
+            os.path.basename(m)
+            for m in bg.module_deps_of(script)
+            if os.path.basename(m).startswith("_")
+        }
         return helpers - asm_closure  # gate-logic helpers riding no .SLDASM digest
 
     verify_orphans = _orphan_helpers(bg.SCRIPTS_DIR / "verify.py")
     assert "_assembly_postbuild.py" in verify_orphans, verify_orphans  # the known case
     for t in dodo.task_verify():
         deps = {os.path.basename(d) for d in t["file_dep"]}
-        assert verify_orphans <= deps, f"verify:{t['name']} missing gate-logic deps: {verify_orphans - deps}"
+        assert verify_orphans <= deps, (
+            f"verify:{t['name']} missing gate-logic deps: {verify_orphans - deps}"
+        )
 
     pf_orphans = _orphan_helpers(bg.SCRIPTS_DIR / "preflight_release.py")
     pf_deps = {os.path.basename(d) for d in dodo.task_preflight()["file_dep"]}
-    assert pf_orphans <= pf_deps, f"preflight missing gate-logic deps: {pf_orphans - pf_deps}"
+    assert pf_orphans <= pf_deps, (
+        f"preflight missing gate-logic deps: {pf_orphans - pf_deps}"
+    )
 
 
 def test_artefact_digest_immune_to_byte_churn():
@@ -418,8 +473,9 @@ def test_artefact_digest_immune_to_byte_churn():
 
     # Save churn: mtime + size differ, stored digest == recipe digest -> inert.
     churned = (10.0, 999_999, recipe)
-    assert checker.check_modified(art, _FakeStat(churned[0] + 1234), churned) is False, \
-        "byte churn with an unchanged recipe must NOT mark the artefact modified"
+    assert (
+        checker.check_modified(art, _FakeStat(churned[0] + 1234), churned) is False
+    ), "byte churn with an unchanged recipe must NOT mark the artefact modified"
 
     # A stored byte md5 (pre-migration / real input change) differs from the recipe
     # digest -> modified, so the one rebuild that re-stamps the ledger still happens.
@@ -428,6 +484,7 @@ def test_artefact_digest_immune_to_byte_churn():
 
 
 # --- Per-seat part order (cold-build divergence so two machines split the work).
+
 
 def test_seat_part_order_is_a_permutation(monkeypatch):
     """_seat_part_order reorders but never drops/duplicates a part -- the spine must
@@ -465,6 +522,7 @@ def test_seat_part_order_diverges_across_seats(monkeypatch):
 
 # --- COM seat lock (replaced the spine): serialize the single SW seat at runtime.
 
+
 def test_com_seat_acquires_sets_env_and_releases(tmp_path, monkeypatch):
     """``_com_seat`` acquires the machine-global file lock, marks the seat held via
     HARMONIC_COM_SEAT (inherited by the COM subprocess -> _common's tripwire), and
@@ -500,7 +558,7 @@ def test_com_seat_wait_gets_its_own_top_level_span(tmp_path, monkeypatch):
         return acquire(*args, **kwargs)
 
     spans: list[tuple[str, dict]] = []
-    warnings: list[str] = []
+    debug_messages: list[str] = []
 
     @contextlib.contextmanager
     def record_span(name, **attrs):
@@ -512,18 +570,24 @@ def test_com_seat_wait_gets_its_own_top_level_span(tmp_path, monkeypatch):
                 entry[1][key] = value
 
         yield _Span()
-        assert dodo._COM_LOCK.is_locked, "the wait span must close once the seat is held"
+        assert dodo._COM_LOCK.is_locked, (
+            "the wait span must close once the seat is held"
+        )
 
     monkeypatch.setattr(dodo._COM_LOCK, "acquire", acquire_after_one_timeout)
     monkeypatch.setattr(dodo._telemetry, "span", record_span)
-    monkeypatch.setattr(dodo._telemetry, "warn", warnings.append)
+    monkeypatch.setattr(dodo._telemetry, "debug", debug_messages.append)
 
     with dodo._com_seat("part:x"):
-        assert spans == [("com.seat.wait part:x", {"label": "part:x", "polls": 1,
-                                                   "service": "build-infra"})],             "the wait must be timed by its own build-infra span, before the seat is held"
+        assert spans == [
+            (
+                "com.seat.wait part:x",
+                {"label": "part:x", "polls": 1, "service": "build-infra"},
+            )
+        ], "the wait must be timed by its own build-infra span, before the seat is held"
 
     assert attempts == 2
-    assert warnings == ["[com.seat] part:x waiting for the SolidWorks seat"]
+    assert debug_messages == ["[com.seat] part:x waiting for the SolidWorks seat"]
 
 
 class _FakeClock:
@@ -550,16 +614,20 @@ def test_com_seat_hands_back_its_wait_and_logs_total_elapsed(tmp_path, monkeypat
     monkeypatch.setattr(dodo, "time", _FakeClock(100.0, 145.0, 150.5))
 
     infos: list[tuple[str, dict]] = []
-    monkeypatch.setattr(dodo._telemetry, "info",
-                        lambda message, **fields: infos.append((message, fields)))
+    monkeypatch.setattr(
+        dodo._telemetry,
+        "info",
+        lambda message, **fields: infos.append((message, fields)),
+    )
 
     with dodo._com_seat("part:x") as waited:
         assert waited == 45.0
         assert not infos, "the total is only known at release"
 
     (message, fields) = infos[-1]
-    assert message == ("[com.seat] part:x released after 50.5s total "
-                       "(waited 45.0s, held 5.5s)")
+    assert message == (
+        "[com.seat] part:x released after 50.5s total (waited 45.0s, held 5.5s)"
+    )
     assert fields == {"wait_s": 45.0, "held_s": 5.5, "elapsed_s": 50.5}
 
 
@@ -574,7 +642,9 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     outcomes = iter((False, False))  # probe MISS, re-probe under the seat MISS
 
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
-    monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"])
+    monkeypatch.setattr(
+        dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"]
+    )
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
     monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
@@ -607,11 +677,17 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     dodo._cached_part_action("pen_rod", script)
 
     # The seat wait span is _com_seat's, so it is not in this list.
-    assert opened == ["cache.probe part:pen_rod", "cache.reprobe part:pen_rod",
-                      "task part:pen_rod", "cache.store part:pen_rod"]
+    assert opened == [
+        "cache.probe part:pen_rod",
+        "cache.reprobe part:pen_rod",
+        "task part:pen_rod",
+        "cache.store part:pen_rod",
+    ]
 
 
-def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(tmp_path, monkeypatch):
+def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(
+    tmp_path, monkeypatch
+):
     """With autostart ON, the first COM build brings SolidWorks up via a TOP-LEVEL
     ``sw.ensure_ready`` span positioned AFTER the under-seat re-probe and BEFORE the
     ``task`` span -- never nested inside it, so the task span stays pure build-work
@@ -623,7 +699,9 @@ def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(tmp_path, m
     outcomes = iter((False, False))  # probe MISS, re-probe MISS -> builds
 
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
-    monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"])
+    monkeypatch.setattr(
+        dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"]
+    )
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
     monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
@@ -662,8 +740,13 @@ def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(tmp_path, m
 
     dodo._cached_part_action("pen_rod", script)
 
-    assert opened == ["cache.probe part:pen_rod", "cache.reprobe part:pen_rod",
-                      "sw.ensure_ready", "task part:pen_rod", "cache.store part:pen_rod"]
+    assert opened == [
+        "cache.probe part:pen_rod",
+        "cache.reprobe part:pen_rod",
+        "sw.ensure_ready",
+        "task part:pen_rod",
+        "cache.store part:pen_rod",
+    ]
 
 
 def test_sw_ensure_once_runs_once_and_respects_the_opt_out(monkeypatch):
@@ -698,11 +781,16 @@ def test_task_span_carries_its_pipeline_stage_resource():
     assert dodo._stage_name("nothing recognisable") == "harmonic-analyzer"
 
     source = inspect.getsource(dodo)
-    task_spans = [line for line in source.splitlines() if 'span(f"task {label}"' in line]
+    task_spans = list(
+        re.finditer(
+            r'with _telemetry\.span\(\s*f"task \{label\}"(?P<args>.*?)\)\s+as\b',
+            source,
+            flags=re.DOTALL,
+        )
+    )
     assert len(task_spans) == 4, "every task span must be accounted for"
-    for line in task_spans:
-        start = source.index(line)
-        assert "service=_stage_name(label)" in source[start:start + 400], line
+    for match in task_spans:
+        assert "service=_stage_name(label)" in match.group("args")
 
 
 def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():
@@ -765,9 +853,14 @@ def test_release_is_gated_on_every_gate_and_staged_drawing():
     """Release has real edges to every gate and drawing artifact it stages."""
     dodo = _load_dodo()
     deps = set(dodo.task_release()["task_dep"])
-    expected = {"export", "preflight", "verify:soundness", "verify:kinematics",
-                *(f"check:{c}" for c in dodo._CHECK_NAMES),
-                *(f"drawing:{s}" for s in dodo._drawing_order())}
+    expected = {
+        "export",
+        "preflight",
+        "verify:soundness",
+        "verify:kinematics",
+        *(f"check:{c}" for c in dodo._CHECK_NAMES),
+        *(f"drawing:{s}" for s in dodo._drawing_order()),
+    }
     assert expected <= deps, expected - deps
 
 
@@ -831,6 +924,7 @@ def test_assembly_artefact_digest_folds_in_refs():
     got = dodo.ContentChecker._digest(dodo._sldasm(asm))
 
     import hashlib
+
     h = hashlib.md5()
     h.update(dodo._digest_files(dodo._recipe_files(asm)).encode())
     for ref in dodo.references_of(asm):
@@ -876,12 +970,16 @@ def test_digest_files_is_location_independent(tmp_path):
         a = dodo._digest_files(files_a)
         tag = dodo._rel_tag(files_a[0])
         assert tag == "cad/scripts/build_x_assembly.py", tag
-        assert ":" not in tag and not tag.startswith("/"), f"tag not repo-relative: {tag}"
+        assert ":" not in tag and not tag.startswith("/"), (
+            f"tag not repo-relative: {tag}"
+        )
         setattr(dodo, "REPO_ROOT", tmp_path / "B")
         b = dodo._digest_files(files_b)
     finally:
         setattr(dodo, "REPO_ROOT", orig)
-    assert a == b, "recipe digest must be identical across checkout roots (cross-machine cache key)"
+    assert a == b, (
+        "recipe digest must be identical across checkout roots (cross-machine cache key)"
+    )
 
 
 def _rel(paths, root):
@@ -909,24 +1007,37 @@ def test_config_deps_are_fine_grained():
     # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
     # (NOT machine/channels.yaml, where active_count lives) + its own registry row
     # + title_block.yaml (every part stamps the title-block tolerance properties
-    # from _common.part_properties -> _config.title_block).
+    # from _common.part_properties -> _config.title_block) + release.yaml for the
+    # global CAD Revision.
     cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
     assert _rel(cone, cfg) == {
-        "machine/gear_train.yaml", "parts/cone-gear.yaml", "parts/_defaults.yaml",
+        "machine/gear_train.yaml",
+        "parts/cone-gear.yaml",
+        "parts/_defaults.yaml",
         "title_block.yaml",
+        "release.yaml",
     }, _rel(cone, cfg)
     assert set(cone) <= whole
 
     # Editing ONE part's registry row rebuilds only that part: a leaf screw depends
-    # on its own row + shared defaults (+ the universal title_block.yaml), nothing else.
-    screw = dodo._config_deps(scripts / "build_fillister_screw.py", "fillister_screw", "part")
+    # on its own row + shared defaults + title_block.yaml + release.yaml, nothing
+    # else.
+    screw = dodo._config_deps(
+        scripts / "build_fillister_screw.py", "fillister_screw", "part"
+    )
     assert _rel(screw, cfg) == {
-        "parts/fillister-screw.yaml", "parts/_defaults.yaml", "title_block.yaml",
+        "parts/fillister-screw.yaml",
+        "parts/_defaults.yaml",
+        "title_block.yaml",
+        "release.yaml",
     }
 
     # No part depends on dimensions.yaml.
     for stem in dodo.part_stems():
-        deps = {Path(p).name for p in dodo._config_deps(scripts / f"build_{stem}.py", stem, "part")}
+        deps = {
+            Path(p).name
+            for p in dodo._config_deps(scripts / f"build_{stem}.py", stem, "part")
+        }
         assert "dimensions.yaml" not in deps, stem
 
     # A non-stamping assembly needs NO parts row (part-row edits propagate via the
@@ -942,8 +1053,10 @@ def test_config_deps_are_fine_grained():
     # tolerances.yaml (fit classes) stays out of frame.
     assert "tolerances.yaml" not in frame_recipe, frame_recipe
     assert "title_block.yaml" in frame_recipe, frame_recipe
+    assert "release.yaml" in frame_recipe, frame_recipe
     channel_recipe = _rel(dodo._recipe_files("channel"), cfg)
     assert "parts/channel-spring-installed.yaml" in channel_recipe, channel_recipe
+    assert "release.yaml" in channel_recipe, channel_recipe
     assert "title_block.yaml" in channel_recipe, channel_recipe
     # The part TEMPLATE narrows identically: channel GENERATES its stretch
     # springs in-script via NewPart (which instantiates the template), so the
@@ -971,8 +1084,10 @@ def test_config_deps_are_fine_grained():
         assert "harmonic-analyzer.prtdot" not in names, stem
     # ... and every normal part task carries it directly (NewPart instantiates it).
     a_stem = next(iter(dodo.part_stems()))
-    part_names = {Path(p).name.lower()
-                  for p in dodo._part_file_deps(scripts / f"build_{a_stem}.py", a_stem)}
+    part_names = {
+        Path(p).name.lower()
+        for p in dodo._part_file_deps(scripts / f"build_{a_stem}.py", a_stem)
+    }
     assert "harmonic-analyzer.prtdot" in part_names, part_names
 
 
@@ -987,7 +1102,9 @@ def test_config_deps_recipe_digest_skips_unread_yaml():
     drive = _rel(dodo._recipe_files("drive_train"), cfg)
     frame = _rel(dodo._recipe_files("frame"), cfg)
     assert "machine/channels.yaml" in drive, drive
-    assert "machine/channels.yaml" not in frame, "frame must not FULL on an active_count edit"
+    assert "machine/channels.yaml" not in frame, (
+        "frame must not FULL on an active_count edit"
+    )
 
 
 def test_recipe_digest_ignores_yaml_comments(tmp_path):
@@ -1004,12 +1121,18 @@ def test_recipe_digest_ignores_yaml_comments(tmp_path):
     base = dodo._digest_files(files)
 
     yaml_cfg.write_text("# placement note\nstation_pitch_mm: 10\nrows: 3\n  \n")
-    assert dodo._digest_files(files) == base, "yaml comment/whitespace in recipe must be inert"
+    assert dodo._digest_files(files) == base, (
+        "yaml comment/whitespace in recipe must be inert"
+    )
 
     yaml_cfg.write_text("station_pitch_mm: 11\nrows: 3\n")
-    assert dodo._digest_files(files) != base, "real placement-value change must FULL-rebuild"
+    assert dodo._digest_files(files) != base, (
+        "real placement-value change must FULL-rebuild"
+    )
 
-    yaml_cfg.write_text("station_pitch_mm: 10\nrows: 3\n")  # restore yaml -> back to base
+    yaml_cfg.write_text(
+        "station_pitch_mm: 10\nrows: 3\n"
+    )  # restore yaml -> back to base
     assert dodo._digest_files(files) == base
     script.write_text("v1\n")
     assert dodo._digest_files(files) != base, "assembly-script change must FULL-rebuild"
@@ -1058,8 +1181,9 @@ def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
     assert Path(full_dep) == (tmp_path / ".submodule.digest").resolve()
     assert Path(asm_dep) == (tmp_path / ".submodule-assembly.digest").resolve()
     assert Path(part_dep) == (tmp_path / ".submodule-part.digest").resolve()
-    assert len({full_dep, asm_dep, part_dep}) == 3, \
+    assert len({full_dep, asm_dep, part_dep}) == 3, (
         "part / assembly / drawing must track SEPARATE sidecars"
+    )
 
     stem = dodo.part_stems()[0]
     part_deps = dodo._part_file_deps(dodo.SCRIPTS_DIR / f"build_{stem}.py", stem)
@@ -1068,22 +1192,28 @@ def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
     assert asm_dep not in part_deps, "a part must NOT fold the assembly-slice digest"
 
     asm = dodo.ASSEMBLY_ORDER[0]
-    assert asm_dep in dodo._recipe_files(asm), "assembly recipe must fold the assembly slice"
+    assert asm_dep in dodo._recipe_files(asm), (
+        "assembly recipe must fold the assembly slice"
+    )
     assert asm_dep in dodo._assembly_file_deps(asm), "assembly file_dep must include it"
-    assert full_dep not in dodo._assembly_file_deps(asm), \
+    assert full_dep not in dodo._assembly_file_deps(asm), (
         "an assembly must NOT fold the whole-tree (drawing-inclusive) digest"
+    )
 
     drawing_stems = dodo._drawing_order()
     if drawing_stems:
         d_task = next(t for t in dodo.task_drawing() if t["name"] == drawing_stems[0])
-        assert full_dep in d_task["file_dep"], "a drawing task must fold the whole-tree digest"
+        assert full_dep in d_task["file_dep"], (
+            "a drawing task must fold the whole-tree digest"
+        )
 
     # check:* tasks never touch COM -> no submodule sidecar may enter their dep set,
     # or an offline gate would spuriously re-run on a submodule bump.
     for task in dodo.task_check():
         deps = task["file_dep"]
-        assert not ({full_dep, asm_dep, part_dep} & set(deps)), \
+        assert not ({full_dep, asm_dep, part_dep} & set(deps)), (
             f"check:{task['name']} must not depend on the submodule"
+        )
 
 
 def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
@@ -1099,17 +1229,17 @@ def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
     script = dodo.SCRIPTS_DIR / f"build_{stem}.py"
 
     def key():
-        _reset_submodule_memo(dodo)        # re-read the tree on each call
+        _reset_submodule_memo(dodo)  # re-read the tree on each call
         return dodo._cache_key(dodo._part_file_deps(script, stem), f"part:{stem}")
 
     k1 = key()
     assert key() == k1, "recompute with no change must be stable (idempotent)"
 
-    (src / "adapters.py").write_text("def mate(): return 2\n")   # dirty edit
+    (src / "adapters.py").write_text("def mate(): return 2\n")  # dirty edit
     k2 = key()
     assert k2 != k1, "a part-relevant submodule edit must bust the part cache key"
 
-    (src / "planes.py").write_text("PLANE = 3\n")               # new source file
+    (src / "planes.py").write_text("PLANE = 3\n")  # new source file
     k3 = key()
     assert k3 != k2, "an added part-relevant submodule source file must bust it too"
 
@@ -1138,7 +1268,7 @@ def test_assembly_only_submodule_change_spares_parts(tmp_path):
         return dodo._cache_key(dodo._assembly_file_deps(asm), f"assembly:{asm}")
 
     p1, a1 = part_key(), asm_key()
-    excluded.write_text("def add_mate(): return 2\n")            # assembly-only edit
+    excluded.write_text("def add_mate(): return 2\n")  # assembly-only edit
     p2, a2 = part_key(), asm_key()
 
     assert p2 == p1, "an assembly-only submodule edit must NOT bust the part key"
@@ -1161,8 +1291,9 @@ def test_part_digest_excludes_assembly_level_modules():
     assert excl(src / "tools" / "modeling.py") is True
     assert excl(src / "adapters" / "base.py") is True
     assert excl(src / "adapters" / "com_variant.py") is True
-    assert dodo._submodule_part_digest() != dodo._submodule_digest(), \
+    assert dodo._submodule_part_digest() != dodo._submodule_digest(), (
         "part slice must exclude real content, else the split is a no-op"
+    )
 
 
 def test_assembly_digest_excludes_only_drawing():
@@ -1176,10 +1307,12 @@ def test_assembly_digest_excludes_only_drawing():
     assert excl(src / "adapters" / "solidworks" / "assembly.py") is True
     assert excl(src / "adapters" / "solidworks" / "motion.py") is True
     assert excl(src / "adapters" / "base.py") is True
-    assert dodo._submodule_assembly_digest() != dodo._submodule_digest(), \
+    assert dodo._submodule_assembly_digest() != dodo._submodule_digest(), (
         "assembly slice must exclude drawing.py, else the split is a no-op"
-    assert dodo._submodule_assembly_digest() != dodo._submodule_part_digest(), \
+    )
+    assert dodo._submodule_assembly_digest() != dodo._submodule_part_digest(), (
         "assembly slice keeps assembly/motion the part slice drops -> must differ"
+    )
 
 
 def test_drawing_only_submodule_change_spares_parts_and_assemblies(tmp_path):
@@ -1188,7 +1321,9 @@ def test_drawing_only_submodule_change_spares_parts_and_assemblies(tmp_path):
     (few) drawing tasks, never the ~100 parts or ~8 assemblies."""
     dodo = _load_dodo()
     src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapters.py").write_text("def mate(): return 1\n")  # a shared, in-all-tiers file
+    (src / "adapters.py").write_text(
+        "def mate(): return 1\n"
+    )  # a shared, in-all-tiers file
     drawing = src / "adapters" / "solidworks" / "drawing.py"
     drawing.parent.mkdir(parents=True, exist_ok=True)
     drawing.write_text("def new_view(): return 1\n")
@@ -1210,7 +1345,7 @@ def test_drawing_only_submodule_change_spares_parts_and_assemblies(tmp_path):
         return dodo._submodule_digest()
 
     p1, a1, d1 = part_key(), asm_key(), full_digest()
-    drawing.write_text("def new_view(): return 2\n")             # drawing-only edit
+    drawing.write_text("def new_view(): return 2\n")  # drawing-only edit
     p2, a2, d2 = part_key(), asm_key(), full_digest()
 
     assert p2 == p1, "a drawing.py edit must NOT bust the part key"
@@ -1263,8 +1398,9 @@ def test_submodule_digest_is_location_independent(tmp_path):
             dodo.REPO_ROOT, dodo.SUBMODULE_SRC = orig_repo, orig_src
             dodo._SUBMODULE_DIGEST = None
 
-    assert digest_under(tmp_path / "A") == digest_under(tmp_path / "B"), \
+    assert digest_under(tmp_path / "A") == digest_under(tmp_path / "B"), (
         "identical submodule content must hash equally across checkout roots"
+    )
 
 
 def test_recipe_gate_tracks_sources_imported_by_its_tests():
@@ -1335,15 +1471,18 @@ def test_retry_waits_out_a_cold_start_instead_of_spending_an_attempt(monkeypatch
     monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: True)
     monkeypatch.setattr(dodo, "_com_retry_backoff", lambda: (0,))
     monkeypatch.setattr(
-        dodo, "_run_subprocess",
+        dodo,
+        "_run_subprocess",
         lambda *_a, **_kw: (calls.append("run"), 86 if len(calls) == 1 else 0)[1],
     )
     monkeypatch.setattr(
-        dodo._sw_lifecycle, "force_recover",
+        dodo._sw_lifecycle,
+        "force_recover",
         lambda: (calls.append("recover"), "starting")[1],
     )
     monkeypatch.setattr(
-        dodo._sw_lifecycle, "wait_until_ready",
+        dodo._sw_lifecycle,
+        "wait_until_ready",
         lambda: (calls.append("wait"), "connected")[1],
     )
 
@@ -1360,15 +1499,18 @@ def test_retry_does_not_wait_when_recovery_came_back_connected(monkeypatch):
     monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: True)
     monkeypatch.setattr(dodo, "_com_retry_backoff", lambda: (0,))
     monkeypatch.setattr(
-        dodo, "_run_subprocess",
+        dodo,
+        "_run_subprocess",
         lambda *_a, **_kw: (calls.append("run"), 86 if len(calls) == 1 else 0)[1],
     )
     monkeypatch.setattr(
-        dodo._sw_lifecycle, "force_recover",
+        dodo._sw_lifecycle,
+        "force_recover",
         lambda: (calls.append("recover"), "connected")[1],
     )
     monkeypatch.setattr(
-        dodo._sw_lifecycle, "wait_until_ready",
+        dodo._sw_lifecycle,
+        "wait_until_ready",
         lambda: calls.append("wait"),
     )
 
@@ -1424,16 +1566,19 @@ def test_a_state_probe_failure_cannot_abort_the_retry_path(monkeypatch):
     monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: True)
     monkeypatch.setattr(dodo, "_com_retry_backoff", lambda: (0,))
     monkeypatch.setattr(
-        dodo, "_run_subprocess",
+        dodo,
+        "_run_subprocess",
         lambda *_a, **_kw: (calls.append("run"), 86 if len(calls) == 1 else 0)[1],
     )
     monkeypatch.setattr(
-        dodo._sw_lifecycle, "force_recover",
+        dodo._sw_lifecycle,
+        "force_recover",
         lambda: (calls.append("recover"), "error")[1],
     )
     monkeypatch.setattr(dodo._sw_lifecycle, "is_connected", boom)
     monkeypatch.setattr(
-        dodo._sw_lifecycle, "wait_until_ready",
+        dodo._sw_lifecycle,
+        "wait_until_ready",
         lambda: (calls.append("wait"), "error")[1],
     )
 
@@ -1459,7 +1604,8 @@ def test_abandoning_the_grace_is_recorded_on_the_span(monkeypatch):
     monkeypatch.setattr(lifecycle, "_wait", blow_up)
     monkeypatch.setattr(lifecycle, "_state_value", lambda _r: "starting")
     monkeypatch.setattr(
-        lifecycle._telemetry, "event",
+        lifecycle._telemetry,
+        "event",
         lambda name, **kw: events.append((name, kw)),
     )
 

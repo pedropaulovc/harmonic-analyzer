@@ -457,7 +457,6 @@ async def build(adapter) -> dict[str, str]:
             # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
             # (a longer number overflows the DWG. NO. title-block cell).
             "Number": "MHA-A04",
-            "Revision": "A",
             "Revision Description": "Initial release",
             "Material": "SEE COMPONENT DRAWINGS",
             "Material Specification": "SEE COMPONENT DRAWINGS",

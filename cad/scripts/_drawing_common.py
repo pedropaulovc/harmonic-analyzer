@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Iterable, Literal, Sequence
 
 
+import _config
 import _telemetry
 from _common import _early_bound
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
@@ -1266,6 +1267,7 @@ TITLE_BLOCK_TOLERANCE_PROPERTIES = (
     "TOL_HOLE_MINUS",
     "TOL_HOLE_PLUS",
 )
+TITLE_BLOCK_REVISION_PROPERTY = "Revision"
 
 
 def read_required_properties(
@@ -1275,6 +1277,13 @@ def read_required_properties(
     missing = [name for name in required if not properties.get(name)]
     if missing:
         raise RuntimeError(f"source part properties are missing: {missing}")
+    revision = properties.get(TITLE_BLOCK_REVISION_PROPERTY)
+    if revision is not None:
+        expected = _config.release_revision()
+        if revision != expected:
+            raise RuntimeError(
+                f"source model Revision {revision!r} != current release {expected!r}"
+            )
     return properties
 
 
@@ -4514,8 +4523,9 @@ async def finalize_drawing(
         )
 
     # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
-    # real view after all views exist, validate the linked model's title-block
-    # tolerance properties, and hold every sheet to the same ASME B contract.
+    # real view after all views exist, validate the linked model's tolerance and
+    # current-release Revision properties, and hold every sheet to the same ASME B
+    # contract.
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -4589,8 +4599,11 @@ async def finalize_drawing(
         )
         read_required_properties(
             linked_model,
-            TITLE_BLOCK_TOLERANCE_PROPERTIES,
-            required=TITLE_BLOCK_TOLERANCE_PROPERTIES,
+            (*TITLE_BLOCK_TOLERANCE_PROPERTIES, TITLE_BLOCK_REVISION_PROPERTY),
+            required=(
+                *TITLE_BLOCK_TOLERANCE_PROPERTIES,
+                TITLE_BLOCK_REVISION_PROPERTY,
+            ),
         )
 
     # The title block's UNIT cell links $PRP:"UNIT_DISPLAY" (a DRAWING-doc

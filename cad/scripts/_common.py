@@ -147,6 +147,7 @@ async def ensure_fully_defined(
     them without breaking regeneration. Everything else anchors points to the
     origin with semantic relations/dims.
     """
+
     async def _state() -> str | None:
         res = await adapter.check_sketch_fully_defined()
         if res.is_success and res.data:
@@ -176,9 +177,7 @@ async def ensure_fully_defined(
             if fix_entities
             else ""
         )
-        raise RuntimeError(
-            f"{label}: sketch not fully defined (state={state!r}){hint}"
-        )
+        raise RuntimeError(f"{label}: sketch not fully defined (state={state!r}){hint}")
 
     # Whitelisted equation-curve path: escalate one entity at a time
     # (fixing everything at once makes the driving dimensions redundant
@@ -242,7 +241,9 @@ async def anchor_point_to_origin(
     if y == 0.0:
         check(
             f"horizontal_points {label} -> origin",
-            await adapter.add_sketch_constraint(point_ref, "origin", "horizontal_points"),
+            await adapter.add_sketch_constraint(
+                point_ref, "origin", "horizontal_points"
+            ),
         )
         await dimension_between(
             adapter, point_ref, "origin", "horizontal_distance", abs(x), label
@@ -285,20 +286,26 @@ async def anchor_point_to_point(
             f"vertical_points {label}",
             await adapter.add_sketch_constraint(ref1, ref2, "vertical_points"),
         )
-        await dimension_between(adapter, ref1, ref2, "vertical_distance", abs(dy), label)
+        await dimension_between(
+            adapter, ref1, ref2, "vertical_distance", abs(dy), label
+        )
         return
     if dy == 0.0:
         check(
             f"horizontal_points {label}",
             await adapter.add_sketch_constraint(ref1, ref2, "horizontal_points"),
         )
-        await dimension_between(adapter, ref1, ref2, "horizontal_distance", abs(dx), label)
+        await dimension_between(
+            adapter, ref1, ref2, "horizontal_distance", abs(dx), label
+        )
         return
     await dimension_between(adapter, ref1, ref2, "horizontal_distance", abs(dx), label)
     await dimension_between(adapter, ref1, ref2, "vertical_distance", abs(dy), label)
 
 
-def _record_point_to_point_cursor(rec: "Callable[[], None]", dx: float, dy: float) -> None:
+def _record_point_to_point_cursor(
+    rec: "Callable[[], None]", dx: float, dy: float
+) -> None:
     """Drive ``rec`` once per dim :func:`anchor_point_to_point` emits for offset
     ``(dx, dy)`` -- one on an axis-aligned segment, two (horizontal then
     vertical) in general -- keeping a cursor record aligned with its emission."""
@@ -560,7 +567,9 @@ async def define_centered_rectangle(
             None,
         )
         if horizontal is None or vertical is None:
-            raise RuntimeError(f"{label}: native center rectangle has no orthogonal edge pair")
+            raise RuntimeError(
+                f"{label}: native center rectangle has no orthogonal edge pair"
+            )
         await dimension_between(
             adapter,
             f"{horizontal[0]}.start",
@@ -769,7 +778,9 @@ async def define_rectilinear_chain(
     """
     n = len(lines)
     if n != len(points):
-        raise ValueError(f"{label}: need a closed chain (lines {n} != points {len(points)})")
+        raise ValueError(
+            f"{label}: need a closed chain (lines {n} != points {len(points)})"
+        )
     rec = _dim_cursor(dims, names, drives)
     directions: list[str] = []
     for i, line in enumerate(lines):
@@ -788,7 +799,9 @@ async def define_rectilinear_chain(
             f"{label} {direction} {line}",
             await adapter.add_sketch_constraint(line, None, direction),
         )
-    last = {d: max(i for i, d2 in enumerate(directions) if d2 == d) for d in set(directions)}
+    last = {
+        d: max(i for i, d2 in enumerate(directions) if d2 == d) for d in set(directions)
+    }
     for i, (line, direction) in enumerate(zip(lines, directions, strict=True)):
         if last[direction] == i:
             continue  # the closure equation supplies this span
@@ -890,18 +903,6 @@ def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
     _telemetry.success(f"sketch AddToDB = {enabled}")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 @_telemetry.traced("check.volume", label_param="label")
 async def volume_check(adapter: Any, label: str, expected: float, tol: float) -> float:
     """Assert the part volume (mm^3) and return it."""
@@ -916,10 +917,6 @@ async def volume_check(adapter: Any, label: str, expected: float, tol: float) ->
         )
     _telemetry.success(f"{label}: volume {volume:.1f} mm^3 (analytic {expected:.1f})")
     return volume
-
-
-
-
 
 
 @_telemetry.traced("feature.extrude")
@@ -960,11 +957,16 @@ def extrude_at_offset(
         0,  # T2
         depth / 1000.0,  # D1
         0.0,  # D2
-        False, False,  # Dchk1/2
-        False, False,  # Ddir1/2
-        0.0, 0.0,  # Dang1/2
-        False, False,  # OffsetReverse1/2
-        False, False,  # TranslateSurface1/2
+        False,
+        False,  # Dchk1/2
+        False,
+        False,  # Ddir1/2
+        0.0,
+        0.0,  # Dang1/2
+        False,
+        False,  # OffsetReverse1/2
+        False,
+        False,  # TranslateSurface1/2
         merge_result,  # Merge
         False,  # UseFeatScope
         True,  # UseAutoSelect
@@ -986,19 +988,23 @@ def extrude_at_offset(
 # swconst R2026x) -- shared with export_models.py so a build-time part STL and
 # the render-cache STL are byte-identical: a fine BINARY mesh in MILLIMETRES,
 # left at the model origin. stl_bbox_mm parses exactly this.
-PREF_STL_QUALITY = 78          # swSTLQuality -> 2 = fine
-PREF_STL_UNITS = 211           # swExportStlUnits -> 0 = swMM
-TOGGLE_STL_BINARY = 69         # swSTLBinaryFormat
-TOGGLE_STL_ONE_FILE = 72       # swSTLComponentsIntoOneFile
-TOGGLE_STL_NO_TRANSLATE = 71   # swSTLDontTranslateToPositive: keep model origin
-TOGGLE_STL_SHOW_INFO = 70      # swSTLShowInfoOnSave: the per-file "Save <name>.STL?" modal
+PREF_STL_QUALITY = 78  # swSTLQuality -> 2 = fine
+PREF_STL_UNITS = 211  # swExportStlUnits -> 0 = swMM
+TOGGLE_STL_BINARY = 69  # swSTLBinaryFormat
+TOGGLE_STL_ONE_FILE = 72  # swSTLComponentsIntoOneFile
+TOGGLE_STL_NO_TRANSLATE = 71  # swSTLDontTranslateToPositive: keep model origin
+TOGGLE_STL_SHOW_INFO = 70  # swSTLShowInfoOnSave: the per-file "Save <name>.STL?" modal
 
 _STL_INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STL_UNITS: 0}
 # SHOW_INFO -> False: every part build now exports an STL, so leaving the modal on
 # would block an unattended `doit` run on the first export (cut_release.py disables
 # it for the same reason; codex review #12).
-_STL_TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True,
-                TOGGLE_STL_NO_TRANSLATE: True, TOGGLE_STL_SHOW_INFO: False}
+_STL_TOGGLES = {
+    TOGGLE_STL_BINARY: True,
+    TOGGLE_STL_ONE_FILE: True,
+    TOGGLE_STL_NO_TRANSLATE: True,
+    TOGGLE_STL_SHOW_INFO: False,
+}
 
 
 @_telemetry.traced("export.stl")
@@ -1030,7 +1036,9 @@ async def export_part_stl(adapter: Any, out_path: Path) -> None:
             out_path.unlink()
         rc = adapter._attempt(lambda: adapter.currentModel.SaveAs3(str(out_path), 0, 0))
         if not out_path.exists():
-            raise RuntimeError(f"STL export produced no file (SaveAs3 rc={rc!r}): {out_path}")
+            raise RuntimeError(
+                f"STL export produced no file (SaveAs3 rc={rc!r}): {out_path}"
+            )
         _telemetry.success(
             f"export STL -> {out_path.name} ({out_path.stat().st_size / 1e6:.1f} MB)"
         )
@@ -1064,7 +1072,10 @@ async def save_part_and_images(
     # summary Title, not its same-named custom property. Keep both identities
     # sourced from part_properties so a registry title override cannot split.
     apply_summary_info(adapter, title=properties["Title"])
-    check(f"re-save with properties -> {part_path}", await adapter.save_file(str(part_path)))
+    check(
+        f"re-save with properties -> {part_path}",
+        await adapter.save_file(str(part_path)),
+    )
 
     stl_path = (OUT_STL / f"{part_name}.STL").resolve()
     await export_part_stl(adapter, stl_path)
@@ -1103,7 +1114,9 @@ def active_configuration_name(adapter: Any, model: Any = None) -> str:
     """Return the active configuration name without switching or rebuilding."""
     model = model or adapter.currentModel
     manager = _read_member(model, "ConfigurationManager")
-    active = _read_member(manager, "ActiveConfiguration") if manager is not None else None
+    active = (
+        _read_member(manager, "ActiveConfiguration") if manager is not None else None
+    )
     return str(_read_member(active, "Name") or "") if active is not None else ""
 
 
@@ -1123,11 +1136,17 @@ def _git_sha() -> str:
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            cwd=str(CAD_ROOT), capture_output=True, text=True, check=True,
+            cwd=str(CAD_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         dirty = subprocess.run(
             ["git", "status", "--porcelain"],
-            cwd=str(CAD_ROOT), capture_output=True, text=True, check=True,
+            cwd=str(CAD_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         return f"{sha}{'-dirty' if dirty else ''}"
     except Exception:  # noqa: BLE001 -- not in a git checkout / no git
@@ -1135,18 +1154,19 @@ def _git_sha() -> str:
 
 
 def part_properties(part_name: str) -> dict[str, str]:
-    """SolidWorks custom properties for ``part_name`` from the parts.yaml registry.
+    """SolidWorks custom properties for ``part_name`` from the parts registry.
 
-    Pulls Number/Revision/Material/Tolerance Class/Fit Class/Process/Confidence
-    from ``cad/config/parts.yaml`` (merged over its defaults) and stamps a
-    reproducible Generator (git sha). ``title`` may override the internal
-    artifact name for a clearer manufacturing identity; parts absent from the
-    registry get the minimal set (Title + Generator) and are flagged by the
-    verify.py tolerance audit.
+    ``Revision`` is the next compact release number from ``release.yaml``;
+    per-part registry revisions are retained only as historical source data and
+    never override the release identity stamped into shipped CAD.
     """
     import _config
 
-    props: dict[str, str] = {"Title": part_name, "Generator": f"harmonic-analyzer @ {_git_sha()}"}
+    props: dict[str, str] = {
+        "Title": part_name,
+        "Revision": _config.release_revision(),
+        "Generator": f"harmonic-analyzer @ {_git_sha()}",
+    }
     # Title-block general tolerances (title_block.yaml) — read by the drawing
     # template's title block via $PRPSHEET, so EVERY part carries them,
     # registered in the parts registry or not.
@@ -1170,9 +1190,12 @@ def part_properties(part_name: str) -> dict[str, str]:
         return props
     props["Title"] = str(reg.get("title") or part_name)
     field_map = {
-        "Number": "number", "Revision": "revision", "Material": "material",
-        "Tolerance Class": "tolerance_class", "Fit Class": "fit_class",
-        "Process": "process", "Confidence": "confidence",
+        "Number": "number",
+        "Material": "material",
+        "Tolerance Class": "tolerance_class",
+        "Fit Class": "fit_class",
+        "Process": "process",
+        "Confidence": "confidence",
     }
     for prop, key in field_map.items():
         if key in reg and reg[key] is not None:
@@ -1184,13 +1207,15 @@ def part_properties(part_name: str) -> dict[str, str]:
 # Properties > DimXpert), ids extracted from swconst.tlb R2026x. Values from
 # title_block.yaml — the same numbers the TOL_* custom properties display in
 # the drawing title block.
-_PREF_DIMXPERT_METHOD = 637      # swPartDimXpertToleranceMethod -> 0 = BlockTolerance
-_PREF_TOL1_DECIMALS = 405        # swPartDimXpertLengthUnitTol1Decimals (get-only, see below)
-_PREF_TOL2_DECIMALS = 406        # swPartDimXpertLengthUnitTol2Decimals (get-only, see below)
-_PREF_TOL1_VALUE = 123           # swPartDimXpertLengthUnitTol1Value (meters)
-_PREF_TOL2_VALUE = 124           # swPartDimXpertLengthUnitTol2Value (meters)
-_PREF_ANGULAR_VALUE = 126        # swPartDimXpertAngularUnitTolValue (radians; get-only, see below)
-_PREF_OPT_NONE = 0               # swDetailingNoOptionSpecified
+_PREF_DIMXPERT_METHOD = 637  # swPartDimXpertToleranceMethod -> 0 = BlockTolerance
+_PREF_TOL1_DECIMALS = 405  # swPartDimXpertLengthUnitTol1Decimals (get-only, see below)
+_PREF_TOL2_DECIMALS = 406  # swPartDimXpertLengthUnitTol2Decimals (get-only, see below)
+_PREF_TOL1_VALUE = 123  # swPartDimXpertLengthUnitTol1Value (meters)
+_PREF_TOL2_VALUE = 124  # swPartDimXpertLengthUnitTol2Value (meters)
+_PREF_ANGULAR_VALUE = (
+    126  # swPartDimXpertAngularUnitTolValue (radians; get-only, see below)
+)
+_PREF_OPT_NONE = 0  # swDetailingNoOptionSpecified
 _METERS_PER_INCH = 0.0254
 
 
@@ -1222,15 +1247,29 @@ def apply_block_tolerances(adapter: Any) -> None:
     lin3 = float(_config.title_block("linear_3pl")["value_in"]) * _METERS_PER_INCH
     ang = math.radians(float(_config.title_block("angular")["value_deg"]))
     sets = [
-        ("DimXpert method=block", ext.SetUserPreferenceInteger,
-         _PREF_DIMXPERT_METHOD, 0),
-        ("DimXpert tol1 (.xx) value", ext.SetUserPreferenceDouble,
-         _PREF_TOL1_VALUE, lin2),
-        ("DimXpert tol2 (.xxx) value", ext.SetUserPreferenceDouble,
-         _PREF_TOL2_VALUE, lin3),
+        (
+            "DimXpert method=block",
+            ext.SetUserPreferenceInteger,
+            _PREF_DIMXPERT_METHOD,
+            0,
+        ),
+        (
+            "DimXpert tol1 (.xx) value",
+            ext.SetUserPreferenceDouble,
+            _PREF_TOL1_VALUE,
+            lin2,
+        ),
+        (
+            "DimXpert tol2 (.xxx) value",
+            ext.SetUserPreferenceDouble,
+            _PREF_TOL2_VALUE,
+            lin3,
+        ),
     ]
     for label, setter, pref, value in sets:
-        if not adapter._attempt(lambda: setter(pref, _PREF_OPT_NONE, value), default=False):
+        if not adapter._attempt(
+            lambda: setter(pref, _PREF_OPT_NONE, value), default=False
+        ):
             raise RuntimeError(f"{label} write rejected (pref {pref})")
     _telemetry.success("DimXpert block tolerances stamped")
     drift = []
@@ -1246,18 +1285,23 @@ def apply_block_tolerances(adapter: Any) -> None:
             "DimXpert block-tolerance drift on get-only prefs -- the seat's default "
             "part template must carry these (open the default .prtdot, set Document "
             "Properties > DimXpert accordingly, save), else this seat would publish "
-            f"metadata-drifted parts into the shared cache: {'; '.join(drift)}")
+            f"metadata-drifted parts into the shared cache: {'; '.join(drift)}"
+        )
 
 
-def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
+def apply_custom_properties(
+    adapter: Any, props: dict[str, str], *, model: Any | None = None
+) -> None:
     """Write file-level custom properties via the CustomPropertyManager, verified.
 
     The PyWin32 adapter exposes no property writer, so this drives raw COM
     (``IModelDocExtension.CustomPropertyManager("").Add3`` with replace), then
     reads each value back through ``GetCustomInfoValue`` and raises on mismatch
     — same fail-fast posture as the build's other gates. Empty values are skipped.
+    ``model`` defaults to the active document; callers that repair a specific
+    assembly may pass the explicit target document.
     """
-    model = adapter.currentModel
+    model = adapter.currentModel if model is None else model
     ext = _read_member(model, "Extension")
     mgr = adapter._attempt(lambda: ext.CustomPropertyManager(""), default=None)
     if mgr is None:
@@ -1272,9 +1316,13 @@ def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
             lambda n=name, v=text: mgr.Add3(n, _SW_CUSTOM_TEXT, v, _SW_PROP_REPLACE),
             default=None,
         )
-        back = str(adapter._attempt(lambda n=name: model.GetCustomInfoValue("", n), default=""))
+        back = str(
+            adapter._attempt(lambda n=name: model.GetCustomInfoValue("", n), default="")
+        )
         if back != text:
-            raise RuntimeError(f"custom property {name!r} readback {back!r} != {text!r}")
+            raise RuntimeError(
+                f"custom property {name!r} readback {back!r} != {text!r}"
+            )
         written.append(name)
     log(f"custom properties [{len(written)}]: {', '.join(written)}")
 
@@ -1301,14 +1349,21 @@ def _pin_default_part_template(adapter: Any) -> None:
     sw = adapter.swApp
     ok = adapter._attempt(
         lambda: sw.SetUserPreferenceStringValue(
-            _PREF_DEFAULT_PART_TEMPLATE, str(PART_TEMPLATE)),
-        default=False)
-    got = str(adapter._attempt(
-        lambda: sw.GetUserPreferenceStringValue(_PREF_DEFAULT_PART_TEMPLATE),
-        default="") or "")
+            _PREF_DEFAULT_PART_TEMPLATE, str(PART_TEMPLATE)
+        ),
+        default=False,
+    )
+    got = str(
+        adapter._attempt(
+            lambda: sw.GetUserPreferenceStringValue(_PREF_DEFAULT_PART_TEMPLATE),
+            default="",
+        )
+        or ""
+    )
     if not ok or not got or Path(got).resolve() != PART_TEMPLATE.resolve():
         raise RuntimeError(
-            f"failed to pin default part template: set={ok} readback={got!r}")
+            f"failed to pin default part template: set={ok} readback={got!r}"
+        )
     _telemetry.success(f"default part template pinned -> {PART_TEMPLATE.name}")
 
 
@@ -1332,7 +1387,9 @@ def apply_summary_info(adapter: Any, *, title: str) -> None:
         model.SetSummaryInfo(field, value)
         if model.SummaryInfo(field) != value:
             raise RuntimeError(f"summary field {field} did not persist ({value!r})")
-    _telemetry.success(f"summary info stamped (Title={title!r}, Author={PROJECT_AUTHOR!r})")
+    _telemetry.success(
+        f"summary info stamped (Title={title!r}, Author={PROJECT_AUTHOR!r})"
+    )
 
 
 @_telemetry.traced("appearance.material", label_param="material")
@@ -1392,7 +1449,9 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
         raise RuntimeError(f"colour readback mismatch: set {rgb}, got {back}")
     n_bodies = 0
     try:
-        part_h = _early_bound(doc, "IPartDoc")  # IPartDoc for GetBodies2; keep `doc` for MaterialPropertyValues
+        part_h = _early_bound(
+            doc, "IPartDoc"
+        )  # IPartDoc for GetBodies2; keep `doc` for MaterialPropertyValues
         bodies = part_h.GetBodies2(0, True) or []  # solid bodies
         for body in bodies:
             body.MaterialPropertyValues2 = values
@@ -1400,8 +1459,6 @@ async def apply_color(adapter: Any, rgb: tuple[float, float, float]) -> None:
     except Exception as exc:
         log(f"body colour skipped ({exc})")
     log(f"colour override {tuple(round(v, 3) for v in back)} ({n_bodies} bodies)")
-
-
 
 
 @_telemetry.traced("check.measure", label_param="label")
@@ -1482,7 +1539,8 @@ async def bbox_extent_check(
         body = _early_bound(body, "IBody2")
         res = adapter._attempt(
             lambda: body.GetExtremePoint(direction[0], direction[1], direction[2]),
-            default=None)
+            default=None,
+        )
         if not res or len(res) < 4:
             raise RuntimeError(f"bbox {label}: GetExtremePoint failed")
         return res[1 + index] * 1000.0
@@ -1500,7 +1558,9 @@ async def bbox_extent_check(
         raise RuntimeError(
             f"bbox {label}: {axis}-extent={extent:.4f} outside {expected} +/- {tol}"
         )
-    _telemetry.success(f"bbox {label}: {axis}-extent={extent:.4f} (expected {expected:g})")
+    _telemetry.success(
+        f"bbox {label}: {axis}-extent={extent:.4f} (expected {expected:g})"
+    )
 
 
 async def report_mass_properties(adapter: Any) -> None:
@@ -1704,9 +1764,7 @@ def _display_dimensions(feat: Any, owner: str | None = None):
     arg-taking ``GetNextDisplayDimension`` / ``GetDimension2`` need no flag, and
     the zero-arg ``GetFirstDisplayDimension`` resolves to its value via
     ``_read_member``."""
-    feat = _early_bound(
-        feat,
-        "IFeature")
+    feat = _early_bound(feat, "IFeature")
     disp = _read_member(feat, "GetFirstDisplayDimension")
     for _ in range(1000):
         if not disp:
@@ -1747,7 +1805,9 @@ def dump_dimensions(adapter: Any, feature_name: str) -> list[dict[str, Any]]:
     return rows
 
 
-def name_dimensions(adapter: Any, feature_name: str, names: list[str | None]) -> list[str]:
+def name_dimensions(
+    adapter: Any, feature_name: str, names: list[str | None]
+) -> list[str]:
     """Rename a feature's display dimensions, in creation order, to ``names``.
 
     ``names[i]`` renames the i-th dimension (``None`` leaves one untouched).
@@ -1831,12 +1891,6 @@ async def force_rebuild(adapter: Any) -> None:
     check("rebuild", await adapter.rebuild_model())
 
 
-
-
-
-
-
-
 # ---------------------------------------------------------------------------
 # Mate family: semantic kinematic joints + driving dimensions.
 #
@@ -1854,12 +1908,6 @@ async def force_rebuild(adapter: Any) -> None:
 # ---------------------------------------------------------------------------
 
 _MATE_TOL_MM = 0.5
-
-
-
-
-
-
 
 
 async def name_bore_axis(
@@ -1923,40 +1971,6 @@ async def name_bore_axis(
     ).name
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # swFeatureError_e: the codes GetWhatsWrong returns. >1 (warning=False) is a
 # hard rebuild fault; code 1 with the warning flag is informational.
 _FEATURE_ERROR = {
@@ -1969,16 +1983,6 @@ _FEATURE_ERROR = {
     6: "sketch-nosolution",
     7: "sketch-overdefined-dangling",
 }
-
-
-
-
-
-
-
-
-
-
 
 
 def set_isometric_view(adapter: Any) -> None:
@@ -2069,7 +2073,8 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             raise RuntimeError(
                 "COM build launched under doit without holding the SolidWorks seat "
                 "(HARMONIC_COM_SEAT unset) -- a COM task is missing _com_seat(); "
-                "see dodo.py._com_seat")
+                "see dodo.py._com_seat"
+            )
         # Crash/hang protection for the whole COM session (see _watchdog.py):
         # a new sldexitapp.exe (SolidWorks' crash-report dialog) or 15 min of
         # telemetry silence hard-exits this process so the doit parent can fail
@@ -2082,7 +2087,9 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             _telemetry.success("connected")
             # Re-runnable: a previous (possibly failed) build leaves documents
             # open, and saving over an open path fails.
-            adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+            adapter._attempt(
+                lambda: adapter.swApp.CloseAllDocuments(True), default=None
+            )
             _telemetry.success("CloseAllDocuments (clean session)")
             _pin_default_part_template(adapter)
         try:
@@ -2128,7 +2135,9 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             # ERROR via the subprocess exit code.
             if root is not None:
                 root.record_exception(exc)
-                root.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
+                root.set_status(
+                    _telemetry.Status(_telemetry.StatusCode.ERROR, str(exc))
+                )
             _telemetry.error(f"build {script} failed: {exc}", exc_info=True)
             rc = 1
         else:

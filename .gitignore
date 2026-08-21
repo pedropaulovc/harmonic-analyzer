@@ -402,6 +402,7 @@ cad/comparisons/bench/out/
 # Per-machine build-cache role (off|ro|rw) read by cad/scripts/_artifact_cache.py
 .harmonic-remote-cache-mode
 
+
 # playwright-cli skill scratch (machine-local browser session state)
 .playwright-cli/
 

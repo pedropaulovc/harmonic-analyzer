@@ -71,6 +71,7 @@ async def build_fastener_sheet(
             "End View Note",
         ),
         required=(
+            "Revision",
             "Number",
             "Material Specification",
             "Finish",
@@ -132,7 +133,9 @@ async def build_fastener_sheet(
     if recipe.end_center_mark == "required" and not auto_center_marks(
         adapter, end, holes=True, size=0.0025
     ):
-        raise RuntimeError(f"failed to add ASME center mark to {property_view} end view")
+        raise RuntimeError(
+            f"failed to add ASME center mark to {property_view} end view"
+        )
 
     end_annotations = curate_view_dimensions(
         adapter, end, keep=recipe.end_keep, view_label="head-end"

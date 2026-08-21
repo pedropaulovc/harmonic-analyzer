@@ -15,9 +15,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/fulcrum-keeper.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/fulcrum-keeper.pdf")
     assert drawing.PNG.as_posix().endswith("/png/fulcrum-keeper_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["fulcrum_keeper"].script == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["fulcrum_keeper"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -61,6 +59,48 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert "add_native_hole_callout(" in source
 
 
+def test_outboard_lug_edge_resolver_filters_visible_geometry(monkeypatch) -> None:
+    wrong_x = object()
+    wrong_orientation = object()
+    expected = object()
+    endpoints = {
+        wrong_x: (0.002, 0.0048, 0.007, 0.002, 0.0252, 0.007),
+        wrong_orientation: (0.003, 0.0252, -0.007, 0.003, 0.0252, 0.007),
+        expected: (0.003, 0.0048, 0.007, 0.003, 0.0252, 0.007),
+    }
+
+    class FakeSpan:
+        def __init__(self) -> None:
+            self.attributes = {}
+
+        def set_attribute(self, key, value) -> None:
+            self.attributes[key] = value
+
+    span = FakeSpan()
+    monkeypatch.setattr(
+        drawing._telemetry.trace, "get_current_span", lambda context=None: span
+    )
+    resolver = drawing._visible_outboard_lug_edge.__wrapped__
+    monkeypatch.setattr(
+        drawing,
+        "visible_view_entities",
+        lambda view, entity_kind, *, label: [
+            wrong_x,
+            wrong_orientation,
+            expected,
+        ],
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(
+        drawing,
+        "_edge_endpoint_key",
+        lambda adapter, edge: endpoints[edge],
+    )
+
+    assert resolver(object(), object()) is expected
+    assert span.attributes["matched"] == 1
+
+
 def test_notes_cover_the_ball_seat_and_the_boss_relief() -> None:
     notes = fulcrum_keeper_spec.DRAWING_NOTES
     assert "BLACK OXIDE" in notes
@@ -79,9 +119,7 @@ def test_ball_is_a_separate_pressed_body() -> None:
     assert 'name_last_feature(adapter, "Ball")' in source
     # And the wizard screw hole must land while the part is one body (its
     # placement-face scan reads GetBodies2()[0]).
-    assert source.index('name="FootScrewHole"') < source.index(
-        '"revolve ball"'
-    )
+    assert source.index('name="FootScrewHole"') < source.index('"revolve ball"')
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

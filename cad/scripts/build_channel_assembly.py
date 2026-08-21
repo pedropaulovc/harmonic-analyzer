@@ -188,11 +188,13 @@ from solidworks_mcp.adapters.base import (
     CreateAxisParameters,
 )
 from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
+
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
 # OD-62.2 re-anchor that moved ECCENTRICITY to 3.06, mislocating the ring 2.02 mm
 # south of the lobe -> the Ø30.8 bore dug into the Ø30.6 cam (20 x 171.67 mm^3).
 from connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
+
 # rocker pin (imported, NOT copied -- the part and the assembly must agree on
 # the link length or the J2 revolute drags the ring off the cam). Solved for
 # the LEVEL rest pose: plumb rod from the level arm's pin down to the lobe-up
@@ -201,6 +203,7 @@ from connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
 # notes edit full-rebuild this assembly (codex #354).
 from rocker_arm_spec import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
 from rocker_arm_spec import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
+
 # in the strap (bottom-arc y + 5.3, ch14 fan photo), NOT mid-depth like the pivot
 from rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-depth
 # at the pivot. Same imported-not-copied rule as CAM_ECC, and for the same
@@ -285,7 +288,9 @@ BAR_TOP_PIN_DROP = 6.35
 # clears it with 20x margin; the lift cascades through the lever tilt into the
 # spring eye, and the plate-threading loop margin (~0.11 mm) bounds it -- 0.02
 # keeps that margin clear, 0.1 broke it.
-BAR_CONTACT_GAP = _config.fit("cam_follower_contact", "contact_gap_mm")  # cad/config/tolerances.yaml
+BAR_CONTACT_GAP = _config.fit(
+    "cam_follower_contact", "contact_gap_mm"
+)  # cad/config/tolerances.yaml
 
 # --- lever bank -------------------------------------------------------------
 FULCRUM = (199.9, 1061.4)  # lever fulcrum shaft axis (x, y); machine frame
@@ -386,9 +391,7 @@ def z_station(j: int) -> float:
     return Z0 + PITCH * j
 
 
-def _verify_pattern_z(
-    adapter, prefix: str, expected: list[float], label: str
-) -> None:
+def _verify_pattern_z(adapter, prefix: str, expected: list[float], label: str) -> None:
     """Assert a patterned family's instances sit on the expected Z planes.
 
     A LocalLinearPattern's direction sense is taken from the reference entity;
@@ -404,9 +407,7 @@ def _verify_pattern_z(
     )
     want = sorted(expected)
     if len(got) != len(want):
-        raise RuntimeError(
-            f"{label}: {len(got)} instances, expected {len(want)}"
-        )
+        raise RuntimeError(f"{label}: {len(got)} instances, expected {len(want)}")
     for g, w in zip(got, want):
         if abs(g - w) > 0.05:
             raise RuntimeError(
@@ -427,7 +428,11 @@ def _instance_at_z(adapter, prefix: str, z_mm: float) -> str:
 
 
 async def _pattern_bank(
-    adapter, seed: str, prefix: str, axis_name: str, gap_planes: list[float],
+    adapter,
+    seed: str,
+    prefix: str,
+    axis_name: str,
+    gap_planes: list[float],
 ) -> None:
     """Replicate a seated bank seed down the spine by a LocalLinearPattern.
 
@@ -457,8 +462,11 @@ async def _pattern_bank(
             f"linear-pattern {prefix} x{count}{tag}",
             await adapter.pattern_components_linear(
                 ComponentLinearPatternParameters(
-                    components=[seed], count=count, spacing=PITCH,
-                    direction_name=axis_name, flip_direction=flip,
+                    components=[seed],
+                    count=count,
+                    spacing=PITCH,
+                    direction_name=axis_name,
+                    flip_direction=flip,
                 )
             ),
         )
@@ -476,7 +484,11 @@ async def _pattern_bank(
 # Both rocker-pivot and lever-fulcrum shafts ride O6.35 bores.
 SHAFT_R = 6.35 / 2.0
 # Off-pivot bore locals (mm, part frame) used by the spin drivers + world_point.
-ROCKER_ROD_BORE_LOCAL = [ARM_ROD_HOLE_X, ARM_ROD_PIN_LOCAL_Y, 0.0]  # rocker Axis2 (rod pin)
+ROCKER_ROD_BORE_LOCAL = [
+    ARM_ROD_HOLE_X,
+    ARM_ROD_PIN_LOCAL_Y,
+    0.0,
+]  # rocker Axis2 (rod pin)
 ROD_STRAP_BORE_LOCAL = [0.0, 0.0, 0.0]  # rod Axis1 (cam ring centre = origin)
 ROD_PIN_BORE_LOCAL = [0.0, ROD_C2C, 0.0]  # rod Axis2 (rocker pin = swing pivot)
 LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
@@ -492,7 +504,11 @@ CHAIN_PARTS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
 # Every part a slice mate can reference, for owner classification (anything
 # else -- root planes -- maps to "ROOT" in mates_with_owners).
 _CWM_PREFIXES = set(CHAIN_PARTS) | {
-    "pivot-bushing", "pivot-shaft", "fulcrum-shaft", "lever-bushing"}
+    "pivot-bushing",
+    "pivot-shaft",
+    "fulcrum-shaft",
+    "lever-bushing",
+}
 
 
 def _copied_chain_instances(adapter: Any, j: int) -> dict[str, str]:
@@ -531,13 +547,15 @@ def _copied_chain_instances(adapter: Any, j: int) -> dict[str, str]:
                 raise RuntimeError(
                     f"ch{j:02d} copy: expected instance {name!r} is absent -- the"
                     f" copy did not create its {part}, or channel instances are no"
-                    " longer numbered one-per-channel in channel order")
+                    " longer numbered one-per-channel in channel order"
+                )
             extra = f"{part}-{j + 2}"
             if asm.GetComponentByName(extra) is not None:
                 raise RuntimeError(
                     f"ch{j:02d} copy: unexpected instance {extra!r} already exists"
                     f" -- the copy created more than one {part}, or the"
-                    " one-instance-per-channel numbering rule has broken")
+                    " one-instance-per-channel numbering rule has broken"
+                )
             comps[part] = name
         csp.set_attribute("components", len(comps))
         csp.set_attribute("lookups", 2 * len(CHAIN_PARTS))
@@ -562,14 +580,20 @@ async def _debug_png(adapter: Any, tag: str) -> None:
     if not _CWM_DEBUG:
         return
     from _common import OUT_PNG
+
     out = OUT_PNG / "cwm-debug"
     out.mkdir(parents=True, exist_ok=True)
     for view in ("front", "isometric"):
         path = (out / f"{tag}_{view}.png").resolve()
-        await adapter.export_image({
-            "file_path": str(path), "format_type": "png",
-            "width": 1600, "height": 1000, "view_orientation": view,
-        })
+        await adapter.export_image(
+            {
+                "file_path": str(path),
+                "format_type": "png",
+                "width": 1600,
+                "height": 1000,
+                "view_orientation": view,
+            }
+        )
         log(f"  DEBUG png -> {path}")
 
 
@@ -595,28 +619,38 @@ async def _locate_to_datum(adapter, name: str) -> None:
     blocks in build().)
     """
     o = _org(adapter, name)
-    pairs = (("Right Plane", "Right Plane", o[0], "x"),
-             ("Top Plane", "Top Plane", o[1], "y"),
-             ("Front Plane", "Front Plane", o[2], "z"))
+    pairs = (
+        ("Right Plane", "Right Plane", o[0], "x"),
+        ("Top Plane", "Top Plane", o[1], "y"),
+        ("Front Plane", "Front Plane", o[2], "z"),
+    )
     for part_plane, asm_plane, coord, axis in pairs:
         part_ref = named_ref(f"{part_plane}@{name}", "PLANE")
         asm_ref = named_ref(asm_plane, "PLANE")
         if abs(coord) < 1e-6:
             await coincident_mate(
-                adapter, part_ref, asm_ref,
+                adapter,
+                part_ref,
+                asm_ref,
                 label=f"{name} datum {axis}=0 ({part_plane}<->{asm_plane})",
                 verify=(name, o),
             )
             continue
         await distance_driver(
-            adapter, part_ref, asm_ref, coord,
+            adapter,
+            part_ref,
+            asm_ref,
+            coord,
             label=f"{name} datum {axis} d={abs(coord):.2f}",
             verify=(name, o),
         )
 
 
 async def _seat_bushing_on_shaft(
-    adapter, name: str, shaft_od_pt: list[float], shaft_xy: tuple[float, float],
+    adapter,
+    name: str,
+    shaft_od_pt: list[float],
+    shaft_xy: tuple[float, float],
     od_r: float,
 ) -> None:
     """Seat a spacer bushing on the shaft it rides -- the semantic, contact-
@@ -640,17 +674,23 @@ async def _seat_bushing_on_shaft(
         adapter,
         bore_axis_ref(shaft_od_pt),
         bore_axis_ref([shaft_xy[0] + od_r, shaft_xy[1], o[2]]),
-        label=f"{name} concentric on shaft", verify=(name, o),
+        label=f"{name} concentric on shaft",
+        verify=(name, o),
     )
     await distance_driver(
         adapter,
-        named_ref(f"Front Plane@{name}", "PLANE"), named_ref("Front Plane", "PLANE"),
-        o[2], label=f"{name} axial z d={abs(o[2]):.2f}", verify=(name, o),
+        named_ref(f"Front Plane@{name}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        o[2],
+        label=f"{name} axial z d={abs(o[2]):.2f}",
+        verify=(name, o),
     )
     await parallel_mate(
         adapter,
-        named_ref(f"Top Plane@{name}", "PLANE"), named_ref("Top Plane", "PLANE"),
-        label=f"{name} anti-spin", verify=(name, o),
+        named_ref(f"Top Plane@{name}", "PLANE"),
+        named_ref("Top Plane", "PLANE"),
+        label=f"{name} anti-spin",
+        verify=(name, o),
     )
 
 
@@ -703,8 +743,14 @@ def _arc_geometry() -> dict[str, float]:
     rel = ARM_ARC_CENTER_LOCAL_Y - ARM_PIVOT_LOCAL_Y
     acx = ox + rel * math.sin(t)
     acy = oy + rel * math.cos(t)
-    return {"arm_tilt": arm_tilt, "rod_tilt": rod_tilt,
-            "pin_x": px, "pin_y": py, "acx": acx, "acy": acy}
+    return {
+        "arm_tilt": arm_tilt,
+        "rod_tilt": rod_tilt,
+        "pin_x": px,
+        "pin_y": py,
+        "acx": acx,
+        "acy": acy,
+    }
 
 
 _ARC = _arc_geometry()
@@ -716,7 +762,8 @@ if abs(_ARC["arm_tilt"]) > 0.02 or abs(_ARC["rod_tilt"]) > 0.02:
     raise RuntimeError(
         "neutral pose no longer level: arm_tilt=%.4f deg, rod_tilt=%.4f deg "
         "-- re-solve ROD_HOLE_X (build_rocker_arm) and CENTER_DISTANCE "
-        "(build_connecting_rod) against RING_CENTER" % (_ARC["arm_tilt"], _ARC["rod_tilt"])
+        "(build_connecting_rod) against RING_CENTER"
+        % (_ARC["arm_tilt"], _ARC["rod_tilt"])
     )
 
 
@@ -769,7 +816,7 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
         "pin_x": _ARC["pin_x"],
         "pin_y": _ARC["pin_y"],
         "bar_tilt": -math.degrees(beta),
-        "bar_bottom": fy,                # foot-axis Y
+        "bar_bottom": fy,  # foot-axis Y
         "bar_origin_x": fx + (BAR_WIDTH / 2.0) * math.cos(beta),
         "bar_origin_y": fy - (BAR_WIDTH / 2.0) * math.sin(beta),
         "contact_y": contact_y,
@@ -784,7 +831,9 @@ def _bisect(f, lo: float, hi: float, tol: float = 1e-10, iters: int = 80) -> flo
     if flo == 0.0:
         return lo
     if flo * fhi > 0.0:
-        raise RuntimeError(f"bar-tilt root not bracketed: f({lo})={flo:.3f}, f({hi})={fhi:.3f}")
+        raise RuntimeError(
+            f"bar-tilt root not bracketed: f({lo})={flo:.3f}, f({hi})={fhi:.3f}"
+        )
     for _ in range(iters):
         mid = 0.5 * (lo + hi)
         fmid = f(mid)
@@ -850,17 +899,27 @@ async def _revolute(
     kind = axial[0]
     if kind == "datum":
         await distance_driver(
-            adapter, part_plane, named_ref("Front Plane", "PLANE"), tgt[2],
-            label=f"{label} axial d={abs(tgt[2]):.2f}", verify=(comp, tgt),
+            adapter,
+            part_plane,
+            named_ref("Front Plane", "PLANE"),
+            tgt[2],
+            label=f"{label} axial d={abs(tgt[2]):.2f}",
+            verify=(comp, tgt),
         )
     elif kind == "coincident":
         await coincident_mate(
-            adapter, part_plane, named_ref(f"Front Plane@{axial[1]}", "PLANE"),
-            label=f"{label} axial coincident mid-plane <- {axial[1]}", verify=(comp, tgt),
+            adapter,
+            part_plane,
+            named_ref(f"Front Plane@{axial[1]}", "PLANE"),
+            label=f"{label} axial coincident mid-plane <- {axial[1]}",
+            verify=(comp, tgt),
         )
     elif kind == "distance":
         await distance_driver(
-            adapter, part_plane, named_ref(f"Front Plane@{axial[1]}", "PLANE"), axial[2],
+            adapter,
+            part_plane,
+            named_ref(f"Front Plane@{axial[1]}", "PLANE"),
+            axial[2],
             label=f"{label} axial d={abs(axial[2]):.2f} <- neighbor {axial[1]}",
             verify=(comp, tgt),
         )
@@ -951,9 +1010,9 @@ def _assert_hook_fastener(eye_y: float) -> None:
     # got past the centre-only check and showed as 20 top-level interferences).
     eye_ring_bottom = PLATE_EYE_Y - (SPRING_LOOP_R + wire_r)
     ring_above_plate = eye_ring_bottom - PLATE_TOP_Y
-    shank_poke = shank_top - PLATE_TOP_Y         # shank fills the bore + protrudes
-    seat_drop = plate_bottom - shank_base        # shank base reaches the bore mouth
-    bore_clear = PLATE_HOLE_DIA / 2.0 - hook_r   # shank O1.4 in O2.0 bore
+    shank_poke = shank_top - PLATE_TOP_Y  # shank fills the bore + protrudes
+    seat_drop = plate_bottom - shank_base  # shank base reaches the bore mouth
+    bore_clear = PLATE_HOLE_DIA / 2.0 - hook_r  # shank O1.4 in O2.0 bore
     ring_clear = (SPRING_LOOP_R - wire_r) - hook_r  # eye inner radius vs arm wire
     body = (eye_y - PLATE_EYE_Y) - SPRING_TOP_LEAD - SPRING_BOTTOM_LEAD
     if eye_above_plate < 0.5 or ring_above_plate < 0.3:
@@ -1008,9 +1067,12 @@ def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, Any]:
     dy = eye_y - PLATE_EYE_Y
     gap = math.hypot(dx, dy)
     return {
-        "hole_y": hole_y, "eye_y": eye_y, "gap": gap,
+        "hole_y": hole_y,
+        "eye_y": eye_y,
+        "gap": gap,
         "body": gap - SPRING_TOP_LEAD - SPRING_BOTTOM_LEAD,
-        "ux": dx / gap, "uy": dy / gap,
+        "ux": dx / gap,
+        "uy": dy / gap,
         "theta": math.degrees(math.atan2(-dx, dy)),
     }
 
@@ -1034,7 +1096,12 @@ async def build(adapter) -> dict[str, str]:
     )
     log(
         "  bar contact %.3f, bar bottom %.3f, bar pin y %.3f, lever tilt %.3f deg"
-        % (state["contact_y"], state["bar_bottom"], state["bar_pin_y"], state["lever_tilt"])
+        % (
+            state["contact_y"],
+            state["bar_bottom"],
+            state["bar_pin_y"],
+            state["lever_tilt"],
+        )
     )
     log(
         "amplitude preset: a_j stations (mm) = %s"
@@ -1090,8 +1157,10 @@ async def build(adapter) -> dict[str, str]:
             name = f"channel-spring-installed-stretch{len(variant_by_body):02d}"
             variant_by_body[key] = name
         spec["part"] = name
-    log(f"spring variants: base {SPRING_BASE_BODY:.2f} + {len(variant_by_body)} "
-        f"stretched bodies {sorted(variant_by_body)}")
+    log(
+        f"spring variants: base {SPRING_BASE_BODY:.2f} + {len(variant_by_body)} "
+        f"stretched bodies {sorted(variant_by_body)}"
+    )
     for key, name in variant_by_body.items():
         # Always rebuild: a skip-if-exists short-circuit could reuse a stale
         # stretchNN body of a different length after amplitudes/spring lengths
@@ -1100,8 +1169,13 @@ async def build(adapter) -> dict[str, str]:
         # wipes them, and this rebuilds them fresh).
         log(f"  building {name} body={key:.2f} (no views)")
         await build_spring(
-            adapter, name, key,
-            leads=(SPRING_BOTTOM_LEAD, SPRING_TOP_LEAD), views=[], eye_axes=True)
+            adapter,
+            name,
+            key,
+            leads=(SPRING_BOTTOM_LEAD, SPRING_TOP_LEAD),
+            views=[],
+            eye_axes=True,
+        )
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
@@ -1116,13 +1190,22 @@ async def build(adapter) -> dict[str, str]:
     # fixed. The shaft axes (machine frame, crank at -X) anchor the
     # rocker/lever concentrics.
     await place_component(
-        adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z], [0.0, 0.0, 0.0],
-        IDENTITY, ground=False, label="pivot-shaft (rocker, seed)",
+        adapter,
+        "pivot-shaft",
+        [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="pivot-shaft (rocker, seed)",
     )
     fulcrum = await place_component(
-        adapter, "fulcrum-shaft", [FULCRUM[0], FULCRUM[1], FULCRUM_SHAFT_Z],
+        adapter,
+        "fulcrum-shaft",
+        [FULCRUM[0], FULCRUM[1], FULCRUM_SHAFT_Z],
         [0.0, 0.0, 0.0],
-        IDENTITY, ground=False, label="fulcrum-shaft (lever bank)",
+        IDENTITY,
+        ground=False,
+        label="fulcrum-shaft (lever bank)",
     )
     await _locate_to_datum(adapter, fulcrum)
     pivot_w = (PIVOT[0], PIVOT[1])  # (72.9, 253.8) machine world
@@ -1137,9 +1220,12 @@ async def build(adapter) -> dict[str, str]:
     # y 228.6).
     for mount_z in (AFRAME_MOUNT_Z, SUPPORT_Z):
         mount = await place_component(
-            adapter, "pivot-ball-mount",
+            adapter,
+            "pivot-ball-mount",
             [PIVOT[0], SUPPORT_APEX_Y, mount_z],
-            [0.0, 0.0, 0.0], IDENTITY, ground=False,
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
             label=f"ball-mount rocker z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
@@ -1157,16 +1243,25 @@ async def build(adapter) -> dict[str, str]:
         (-1.0, [0.0, 90.0, 0.0], ROT_Y_POS90),
     ):
         await place_component(
-            adapter, "fulcrum-keeper",
+            adapter,
+            "fulcrum-keeper",
             [FULCRUM[0], RAIL_TOP_Y, FULCRUM_SHAFT_Z + sign * KEEPER_Z_OFF],
-            euler, rows, ground=True,
+            euler,
+            rows,
+            ground=True,
             label=f"fulcrum-keeper z{sign * KEEPER_Z_OFF:+.0f}",
         )
         screw = await place_component(
-            adapter, "frame-side-screw",
-            [FULCRUM[0], RAIL_TOP_Y + KEEPER_SCREW_SEAT_H,
-             FULCRUM_SHAFT_Z + sign * KEEPER_SCREW_Z_OFF],
-            [0.0, 0.0, 0.0], IDENTITY, ground=False,
+            adapter,
+            "frame-side-screw",
+            [
+                FULCRUM[0],
+                RAIL_TOP_Y + KEEPER_SCREW_SEAT_H,
+                FULCRUM_SHAFT_Z + sign * KEEPER_SCREW_Z_OFF,
+            ],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
             label=f"keeper foot screw z{sign * KEEPER_SCREW_Z_OFF:+.0f}",
         )
         await _locate_to_datum(adapter, screw)
@@ -1205,8 +1300,12 @@ async def build(adapter) -> dict[str, str]:
             ("lever-bushing", fulc_w, fulc_od, LEVER_BUSHING_OD / 2.0),
         ):
             seed = await place_component(
-                adapter, part, [xy[0], xy[1], z_top_gap],
-                [0.0, 0.0, 0.0], IDENTITY, ground=False,
+                adapter,
+                part,
+                [xy[0], xy[1], z_top_gap],
+                [0.0, 0.0, 0.0],
+                IDENTITY,
+                ground=False,
                 label=f"{part} seed gap {CHANNELS - 2:02d}/{CHANNELS - 1:02d}",
             )
             await _seat_bushing_on_shaft(adapter, seed, od_pt, xy, od_r)
@@ -1271,30 +1370,42 @@ async def build(adapter) -> dict[str, str]:
         lever_rows = compose_rows(rot_z_rows(st["lever_tilt"]), ROT_Y_180)
 
         rocker = await place_component(
-            adapter, "rocker-arm",
+            adapter,
+            "rocker-arm",
             [PIVOT[0] - arm_origin_dx, PIVOT[1] - arm_origin_dy, z_mid],
-            euler_from_rows(arm_rows), arm_rows,
-            ground=False, label=f"rocker-arm ch{j:02d}",
+            euler_from_rows(arm_rows),
+            arm_rows,
+            ground=False,
+            label=f"rocker-arm ch{j:02d}",
         )
         rod = await place_component(
-            adapter, "connecting-rod",
+            adapter,
+            "connecting-rod",
             [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
-            euler_from_rows(rod_rows), rod_rows,
-            ground=False, label=f"connecting-rod ch{j:02d}",
+            euler_from_rows(rod_rows),
+            rod_rows,
+            ground=False,
+            label=f"connecting-rod ch{j:02d}",
         )
         # Origin places the foot axis at (PIVOT[0] + a_j, bar_bottom) on the
         # machine +X lifting side; the swing keeps the foot on the arc.
         bar = await place_component(
-            adapter, "amplitude-bar",
+            adapter,
+            "amplitude-bar",
             [st["bar_origin_x"], st["bar_origin_y"], z_mid - BAR_WIDTH / 2.0],
-            [st["bar_tilt"], -90.0, 0.0], bar_rows,
-            ground=False, label=f"amplitude-bar ch{j:02d} a={amplitudes[j]:.2f}",
+            [st["bar_tilt"], -90.0, 0.0],
+            bar_rows,
+            ground=False,
+            label=f"amplitude-bar ch{j:02d} a={amplitudes[j]:.2f}",
         )
         lever = await place_component(
-            adapter, "channel-lever",
+            adapter,
+            "channel-lever",
             [FULCRUM[0], FULCRUM[1], z_mid],
-            euler_from_rows(lever_rows), lever_rows,
-            ground=False, label=f"channel-lever ch{j:02d}",
+            euler_from_rows(lever_rows),
+            lever_rows,
+            ground=False,
+            label=f"channel-lever ch{j:02d}",
         )
 
         # J1 rocker revolute (shaft OD ↔ pivot bore). Axial Z chains off the
@@ -1302,14 +1413,20 @@ async def build(adapter) -> dict[str, str]:
         # channel 0 which is the single global Z anchor (#110 neighbour idiom,
         # request #4). The spin is a freed DOF: recorded, not authored, so the
         # rocker swings about its pivot (request #3).
-        axial = (("distance", pivot_bushing_by_gap[j], PITCH / 2.0)
-                 if j >= 1 else ("datum",))
+        axial = (
+            ("distance", pivot_bushing_by_gap[j], PITCH / 2.0) if j >= 1 else ("datum",)
+        )
         await _revolute(
-            adapter, rocker,
-            bore_axis_ref(pivot_od), named_ref(f"Axis1@{rocker}", "AXIS"),
-            concentric=True, off_axis_name="Axis2",
-            off_axis_local=ROCKER_ROD_BORE_LOCAL, pivot_xy=pivot_w,
-            label=f"J1 rocker ch{j:02d}", axial=axial,
+            adapter,
+            rocker,
+            bore_axis_ref(pivot_od),
+            named_ref(f"Axis1@{rocker}", "AXIS"),
+            concentric=True,
+            off_axis_name="Axis2",
+            off_axis_local=ROCKER_ROD_BORE_LOCAL,
+            pivot_xy=pivot_w,
+            label=f"J1 rocker ch{j:02d}",
+            axial=axial,
             free_spin=f"rocker_angle_{j:02d}",
         )
         free_dof_keys.append(f"rocker_angle_{j:02d}")
@@ -1328,18 +1445,25 @@ async def build(adapter) -> dict[str, str]:
         rod_ring = world_point(adapter, rod, ROD_STRAP_BORE_LOCAL)
         rod_pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
         await coincident_mate(
-            adapter, named_ref(f"Axis2@{rocker}", "AXIS"), named_ref(f"Axis2@{rod}", "AXIS"),
-            label=f"J2 rod ch{j:02d} coaxial pin <- {rocker}", verify=(rod, rod_tgt),
+            adapter,
+            named_ref(f"Axis2@{rocker}", "AXIS"),
+            named_ref(f"Axis2@{rod}", "AXIS"),
+            label=f"J2 rod ch{j:02d} coaxial pin <- {rocker}",
+            verify=(rod, rod_tgt),
         )
         await distance_driver(
-            adapter, named_ref(f"Front Plane@{rod}", "PLANE"), named_ref(f"Front Plane@{rocker}", "PLANE"),
+            adapter,
+            named_ref(f"Front Plane@{rod}", "PLANE"),
+            named_ref(f"Front Plane@{rocker}", "PLANE"),
             rod_tgt[2] - z_mid,
             label=f"J2 rod ch{j:02d} axial d={abs(rod_tgt[2] - z_mid):.2f} <- {rocker}",
             verify=(rod, rod_tgt),
         )
         await spin_driver(
-            adapter, named_ref(f"Axis1@{rod}", "AXIS"),
-            (rod_pin[0], rod_pin[1]), (rod_ring[0], rod_ring[1]),
+            adapter,
+            named_ref(f"Axis1@{rod}", "AXIS"),
+            (rod_pin[0], rod_pin[1]),
+            (rod_ring[0], rod_ring[1]),
             label=f"J2 rod ch{j:02d} swing -> ring {rod_ring[0]:.1f},{rod_ring[1]:.1f}",
             verify=(rod, rod_tgt),
             free_dof_key=f"rod_swing_{j:02d}",
@@ -1353,11 +1477,16 @@ async def build(adapter) -> dict[str, str]:
         # coupling below (like the magnifier wheel's yoke -- coupled, not
         # separately freed): swing the rocker and the bar + lever follow.
         await _revolute(
-            adapter, lever,
-            bore_axis_ref(fulc_od), named_ref(f"Axis1@{lever}", "AXIS"),
-            concentric=True, off_axis_name="Axis2",
-            off_axis_local=LEVER_BAR_PIN_BORE_LOCAL, pivot_xy=fulc_w,
-            label=f"J4 lever ch{j:02d}", axial=("coincident", rocker),
+            adapter,
+            lever,
+            bore_axis_ref(fulc_od),
+            named_ref(f"Axis1@{lever}", "AXIS"),
+            concentric=True,
+            off_axis_name="Axis2",
+            off_axis_local=LEVER_BAR_PIN_BORE_LOCAL,
+            pivot_xy=fulc_w,
+            label=f"J4 lever ch{j:02d}",
+            axial=("coincident", rocker),
             pin_spin=False,
         )
         # J3 bar — the amplitude-setting joint (p0). A real revolute hinges the
@@ -1380,8 +1509,10 @@ async def build(adapter) -> dict[str, str]:
         amplitude = foot[0] - pivot_w[0]  # foot X relative to the rocker pivot
         await coincident_mate(
             adapter,
-            named_ref(f"Axis2@{lever}", "AXIS"), named_ref(f"Axis1@{bar}", "AXIS"),
-            label=f"J3 bar ch{j:02d} radial (top-pin hinge)", verify=(bar, bar_tgt),
+            named_ref(f"Axis2@{lever}", "AXIS"),
+            named_ref(f"Axis1@{bar}", "AXIS"),
+            label=f"J3 bar ch{j:02d} radial (top-pin hinge)",
+            verify=(bar, bar_tgt),
         )
         # Axial seat: the bar straddles the rocker symmetrically, so its named
         # MidWidth plane (local x = BarWidth/2) lands on the channel mid-plane.
@@ -1389,7 +1520,8 @@ async def build(adapter) -> dict[str, str]:
         # "bar mid-plane on the rocker mid-plane" contact -- not a bare distance.
         await coincident_mate(
             adapter,
-            named_ref(f"MidWidth@{bar}", "PLANE"), named_ref(f"Front Plane@{rocker}", "PLANE"),
+            named_ref(f"MidWidth@{bar}", "PLANE"),
+            named_ref(f"Front Plane@{rocker}", "PLANE"),
             label=f"J3 bar ch{j:02d} axial coincident mid-plane <- {rocker}",
             verify=(bar, bar_tgt),
         )
@@ -1401,7 +1533,8 @@ async def build(adapter) -> dict[str, str]:
         # axial.
         await distance_driver(
             adapter,
-            named_ref(f"Axis2@{bar}", "AXIS"), named_ref("Right Plane", "PLANE"),
+            named_ref(f"Axis2@{bar}", "AXIS"),
+            named_ref("Right Plane", "PLANE"),
             foot[0],  # SIGNED: distance_driver abs()es the mate value but needs
             # the sign to seed the seat side (which side of Right Plane the foot
             # is on) so the recorded spec carries the correct flip for replay
@@ -1429,7 +1562,8 @@ async def build(adapter) -> dict[str, str]:
         arc_c = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
         foot_r = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
         want_r = math.hypot(
-            (PIVOT[0] + amplitudes[j]) - _ARC["acx"], st["bar_bottom"] - _ARC["acy"])
+            (PIVOT[0] + amplitudes[j]) - _ARC["acx"], st["bar_bottom"] - _ARC["acy"]
+        )
         if abs(foot_r - want_r) > 1e-3:
             raise RuntimeError(
                 f"ch{j:02d}: measured foot->arc-centre radius {foot_r:.4f} != "
@@ -1437,13 +1571,18 @@ async def build(adapter) -> dict[str, str]:
             )
         await distance_driver(
             adapter,
-            named_ref(f"Axis2@{bar}", "AXIS"), named_ref(f"Axis3@{rocker}", "AXIS"),
+            named_ref(f"Axis2@{bar}", "AXIS"),
+            named_ref(f"Axis3@{rocker}", "AXIS"),
             foot_r,
             label=f"J5 bar-foot on rocker arc ch{j:02d} r={foot_r:.2f}",
             verify=(bar, bar_tgt),
         )
-        return {"rocker-arm": rocker, "connecting-rod": rod,
-                "amplitude-bar": bar, "channel-lever": lever}
+        return {
+            "rocker-arm": rocker,
+            "connecting-rod": rod,
+            "amplitude-bar": bar,
+            "channel-lever": lever,
+        }
 
     def _slice_slots(seed_comps: dict[str, str]) -> dict[str, Any]:
         """Measure the seed slice's CopyWithMates2 slot layout: the array
@@ -1457,45 +1596,56 @@ async def build(adapter) -> dict[str, str]:
         re-value a live copied dim to 0.0 (the _cwm contract), so drift here
         must fail the build, not mis-place a channel."""
         slice_instances = set(seed_comps.values())
-        rows = [r for r in mates_with_owners(adapter, _CWM_PREFIXES)
-                if r["instances"] & slice_instances]
+        rows = [
+            r
+            for r in mates_with_owners(adapter, _CWM_PREFIXES)
+            if r["instances"] & slice_instances
+        ]
         if len(rows) != SLICE_MATES:
             raise RuntimeError(
                 f"seed slice carries {len(rows)} mates, expected {SLICE_MATES}"
                 " -- the mate scheme changed; re-derive SLICE_MATES/"
-                f"SLICE_EXTERNAL: {[r['name'] for r in rows]}")
+                f"SLICE_EXTERNAL: {[r['name'] for r in rows]}"
+            )
         ext = external_mate_rows(rows, slice_instances)
         if len(ext) != SLICE_EXTERNAL:
             raise RuntimeError(
                 f"seed slice exposes {len(ext)} external mates, expected"
-                f" {SLICE_EXTERNAL}: {[r['name'] for r in ext]}")
-        dims = [(i, r) for i, r in enumerate(ext)
-                if r["type"] == "MateDistanceDim"]
+                f" {SLICE_EXTERNAL}: {[r['name'] for r in ext]}"
+            )
+        dims = [(i, r) for i, r in enumerate(ext) if r["type"] == "MateDistanceDim"]
         if len(dims) != 1:
             raise RuntimeError(
                 "seed slice must expose exactly ONE external dim (the J1a"
-                f" rocker axial); got {[(i, r['name']) for i, r in dims]}")
+                f" rocker axial); got {[(i, r['name']) for i, r in dims]}"
+            )
         slot, dim = dims[0]
         if dim["owners"] != frozenset({"rocker-arm", "pivot-bushing"}):
             raise RuntimeError(
                 f"external dim {dim['name']!r} is not the J1a rocker->bushing"
-                f" axial (owners {sorted(dim['owners'])})")
+                f" axial (owners {sorted(dim['owners'])})"
+            )
         if abs(dim["mm"] - PITCH / 2.0) > 0.01:
             raise RuntimeError(
                 f"J1a seed value {dim['mm']:.3f} mm != PITCH/2"
-                f" {PITCH / 2.0:.3f} -- the axial anchor moved")
+                f" {PITCH / 2.0:.3f} -- the axial anchor moved"
+            )
         # The seed's J1a side is CARRIED to each copy (flips[dim_slot]) via the
         # Repeat=false + own-bushing idiom, so any seed side is honoured; the
         # authored neighbour idiom (#110) produces flip=False. No always-positive
         # ladder is needed anymore (see the copy site + _cwm.py module doc).
-        arrays = {p: list(component_transform(adapter, n))
-                  for p, n in seed_comps.items()}
-        mate_counts = {p: component_mate_count(adapter, n)
-                       for p, n in seed_comps.items()}
+        arrays = {
+            p: list(component_transform(adapter, n)) for p, n in seed_comps.items()
+        }
+        mate_counts = {
+            p: component_mate_count(adapter, n) for p, n in seed_comps.items()
+        }
         # The seed's drive targets (all Z-independent), for the transient
         # drivers that land each copy on the design pose.
         return {
-            "n": len(rows), "dim_slot": slot, "dim_flip": bool(dim["flip"]),
+            "n": len(rows),
+            "dim_slot": slot,
+            "dim_flip": bool(dim["flip"]),
             "rod_axial_flip": component_distance_mate_flip(
                 adapter,
                 seed_comps["connecting-rod"],
@@ -1504,13 +1654,15 @@ async def build(adapter) -> dict[str, str]:
             "arrays": arrays,
             "mate_counts": mate_counts,
             "rocker_off": world_point(
-                adapter, seed_comps["rocker-arm"], ROCKER_ROD_BORE_LOCAL),
+                adapter, seed_comps["rocker-arm"], ROCKER_ROD_BORE_LOCAL
+            ),
             "rod_ring": world_point(
-                adapter, seed_comps["connecting-rod"], ROD_STRAP_BORE_LOCAL),
+                adapter, seed_comps["connecting-rod"], ROD_STRAP_BORE_LOCAL
+            ),
             "rod_pin": world_point(
-                adapter, seed_comps["connecting-rod"], ROD_PIN_BORE_LOCAL),
-            "foot": world_point(
-                adapter, seed_comps["amplitude-bar"], BAR_FOOT_LOCAL),
+                adapter, seed_comps["connecting-rod"], ROD_PIN_BORE_LOCAL
+            ),
+            "foot": world_point(adapter, seed_comps["amplitude-bar"], BAR_FOOT_LOCAL),
         }
 
     # Per-channel chain, seed-and-replicate (PR #220 -> production). Channel 0
@@ -1555,12 +1707,19 @@ async def build(adapter) -> dict[str, str]:
         repeat[dim_slot] = False
         new_ents: list = [None] * n_slice
         new_ents[dim_slot] = resolve_entity(
-            adapter, named_ref(f"Front Plane@{own_bushing}", "PLANE"))
+            adapter, named_ref(f"Front Plane@{own_bushing}", "PLANE")
+        )
         flips = [False] * n_slice
         flips[dim_slot] = slice_info["dim_flip"]
         copy_with_mates(
-            adapter, [seed_comps[p] for p in CHAIN_PARTS], n_slice, values,
-            flips=flips, repeat=repeat, new_entities=new_ents)
+            adapter,
+            [seed_comps[p] for p in CHAIN_PARTS],
+            n_slice,
+            values,
+            flips=flips,
+            repeat=repeat,
+            new_entities=new_ents,
+        )
         comps = _copied_chain_instances(adapter, j)
         ensure_component_distance_mate_flip(
             adapter,
@@ -1588,9 +1747,16 @@ async def build(adapter) -> dict[str, str]:
             target = list(seed_arrays[part])
             target[11] += dz_m
             targets[part] = target
-        copied.append({"j": j, "seed_j": seed_j, "comps": comps,
-                       "targets": targets, "slice_info": slice_info,
-                       "own_bushing": own_bushing})
+        copied.append(
+            {
+                "j": j,
+                "seed_j": seed_j,
+                "comps": comps,
+                "targets": targets,
+                "slice_info": slice_info,
+                "own_bushing": own_bushing,
+            }
+        )
 
     # Copy every free chain first, then settle their solver-state attractors in
     # one post-copy phase. Driving each copy immediately made every later
@@ -1601,8 +1767,7 @@ async def build(adapter) -> dict[str, str]:
     def _put_all_copies() -> None:
         for rec in copied:
             for part in CHAIN_PARTS:
-                put_component_pose(
-                    adapter, rec["comps"][part], rec["targets"][part])
+                put_component_pose(adapter, rec["comps"][part], rec["targets"][part])
 
     for rec in copied:
         j = rec["j"]
@@ -1627,20 +1792,27 @@ async def build(adapter) -> dict[str, str]:
                 drives: list[str] = []
                 _put_all_copies()
                 mate = await spin_driver(
-                    adapter, component_named_ref(rocker_c, "Axis2"),
-                    pivot_w, (off[0], off[1]),
-                    label=(f"J1 rocker ch{j:02d} spin ->"
-                           f" {off[0]:.1f},{off[1]:.1f}"),
-                    verify=(rocker_c, _tgt_mm("rocker-arm")))
+                    adapter,
+                    component_named_ref(rocker_c, "Axis2"),
+                    pivot_w,
+                    (off[0], off[1]),
+                    label=(f"J1 rocker ch{j:02d} spin -> {off[0]:.1f},{off[1]:.1f}"),
+                    verify=(rocker_c, _tgt_mm("rocker-arm")),
+                )
                 drives.append(mate["name"])
                 _put_all_copies()
                 mate = await distance_driver(
-                    adapter, component_named_ref(bar_c, "Axis2"),
-                    named_ref("Right Plane", "PLANE"), foot[0],
-                    label=(f"J3 bar ch{j:02d} AMPLITUDE drive"
-                           f" foot-X={foot[0]:.2f} (amp"
-                           f" {amplitudes[j]:+.1f})"),
-                    verify=(bar_c, _tgt_mm("amplitude-bar")))
+                    adapter,
+                    component_named_ref(bar_c, "Axis2"),
+                    named_ref("Right Plane", "PLANE"),
+                    foot[0],
+                    label=(
+                        f"J3 bar ch{j:02d} AMPLITUDE drive"
+                        f" foot-X={foot[0]:.2f} (amp"
+                        f" {amplitudes[j]:+.1f})"
+                    ),
+                    verify=(bar_c, _tgt_mm("amplitude-bar")),
+                )
                 drives.append(mate["name"])
                 _put_all_copies()
                 if _CWM_DEBUG and j == copied[0]["j"]:
@@ -1655,11 +1827,15 @@ async def build(adapter) -> dict[str, str]:
                             f"{component_mate_dump(adapter, comps[part])}"
                         )
                 mate = await spin_driver(
-                    adapter, component_named_ref(rod_c, "Axis1"),
-                    (pin[0], pin[1]), (ring[0], ring[1]),
-                    label=(f"J2 rod ch{j:02d} swing -> ring"
-                           f" {ring[0]:.1f},{ring[1]:.1f}"),
-                    verify=(rod_c, _tgt_mm("connecting-rod")))
+                    adapter,
+                    component_named_ref(rod_c, "Axis1"),
+                    (pin[0], pin[1]),
+                    (ring[0], ring[1]),
+                    label=(
+                        f"J2 rod ch{j:02d} swing -> ring {ring[0]:.1f},{ring[1]:.1f}"
+                    ),
+                    verify=(rod_c, _tgt_mm("connecting-rod")),
+                )
                 drives.append(mate["name"])
                 for name in reversed(drives):
                     delete_assembly_feature(adapter, name)
@@ -1668,17 +1844,21 @@ async def build(adapter) -> dict[str, str]:
                 for part in CHAIN_PARTS:
                     a = component_transform(adapter, comps[part])
                     t = targets[part]
-                    log(f"  DEBUG ch{j:02d} {comps[part]} at-drive-fail pose:"
+                    log(
+                        f"  DEBUG ch{j:02d} {comps[part]} at-drive-fail pose:"
                         f" ({a[9] * 1000:.2f}, {a[10] * 1000:.2f},"
                         f" {a[11] * 1000:.2f})"
                         f" xrow ({a[0]:+.3f},{a[1]:+.3f},{a[2]:+.3f}) target"
                         f" ({t[9] * 1000:.2f}, {t[10] * 1000:.2f},"
-                        f" {t[11] * 1000:.2f})")
+                        f" {t[11] * 1000:.2f})"
+                    )
                 await _debug_png(adapter, f"drive-fail-ch{j:02d}")
             raise
-        log(f"ch{j:02d} <- CopyWithMates2 of ch{seed_j:02d}"
+        log(
+            f"ch{j:02d} <- CopyWithMates2 of ch{seed_j:02d}"
             f" (J1a PITCH/2 {PITCH / 2.0:.2f} mm <- own bushing"
-            f" {rec['own_bushing']}, driven to pose + freed)")
+            f" {rec['own_bushing']}, driven to pose + freed)"
+        )
 
     # End-state validation of the replicated channels: ONE closing solve, then
     # prove each copy from the model (the CopyWithMates2 return value LIES):
@@ -1701,17 +1881,22 @@ async def build(adapter) -> dict[str, str]:
             for rec in copied:
                 seed_comps = seed_by_amp[round(amplitudes[rec["j"]], 6)][1]
                 for part in CHAIN_PARTS:
-                    log(f"  DEBUG mates seed {seed_comps[part]}: "
-                        f"{component_mate_dump(adapter, seed_comps[part])}")
-                    log(f"  DEBUG mates copy {rec['comps'][part]}: "
-                        f"{component_mate_dump(adapter, rec['comps'][part])}")
+                    log(
+                        f"  DEBUG mates seed {seed_comps[part]}: "
+                        f"{component_mate_dump(adapter, seed_comps[part])}"
+                    )
+                    log(
+                        f"  DEBUG mates copy {rec['comps'][part]}: "
+                        f"{component_mate_dump(adapter, rec['comps'][part])}"
+                    )
         for rec in copied:
             seed_counts = slots_by_seed[rec["seed_j"]]["mate_counts"]
             for part in CHAIN_PARTS:
                 name = rec["comps"][part]
                 a = rec["targets"][part]
                 assert_component_placed(
-                    adapter, name,
+                    adapter,
+                    name,
                     [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0],
                     [list(a[0:3]), list(a[3:6]), list(a[6:9])],
                 )
@@ -1719,14 +1904,16 @@ async def build(adapter) -> dict[str, str]:
                 if got != seed_counts[part]:
                     raise RuntimeError(
                         f"ch{rec['j']:02d} {name}: {got} mates, seed has"
-                        f" {seed_counts[part]} -- the copy dropped mates")
+                        f" {seed_counts[part]} -- the copy dropped mates"
+                    )
                 status = component_constrained_status(adapter, name)
                 if status != UNDER_CONSTRAINED:
                     raise RuntimeError(
                         f"ch{rec['j']:02d} {name}: constrained status"
                         f" {status}, expected under-constrained"
                         f" ({UNDER_CONSTRAINED}) -- a copied mate is"
-                        " unsolvable or over-defining")
+                        " unsolvable or over-defining"
+                    )
         for rec in copied:
             j = rec["j"]
             rocker = rec["comps"]["rocker-arm"]
@@ -1741,19 +1928,27 @@ async def build(adapter) -> dict[str, str]:
             tgt = _org(adapter, rocker)
             off = world_point(adapter, rocker, ROCKER_ROD_BORE_LOCAL)
             await spin_driver(
-                adapter, component_named_ref(rocker, "Axis2"), pivot_w,
+                adapter,
+                component_named_ref(rocker, "Axis2"),
+                pivot_w,
                 (off[0], off[1]),
                 label=f"J1 rocker ch{j:02d} spin -> {off[0]:.1f},{off[1]:.1f}",
-                verify=(rocker, tgt), free_dof_key=f"rocker_angle_{j:02d}")
+                verify=(rocker, tgt),
+                free_dof_key=f"rocker_angle_{j:02d}",
+            )
             free_dof_keys.append(f"rocker_angle_{j:02d}")
             tgt = _org(adapter, rod)
             ring = world_point(adapter, rod, ROD_STRAP_BORE_LOCAL)
             pin = world_point(adapter, rod, ROD_PIN_BORE_LOCAL)
             await spin_driver(
-                adapter, component_named_ref(rod, "Axis1"),
-                (pin[0], pin[1]), (ring[0], ring[1]),
+                adapter,
+                component_named_ref(rod, "Axis1"),
+                (pin[0], pin[1]),
+                (ring[0], ring[1]),
                 label=f"J2 rod ch{j:02d} swing -> ring {ring[0]:.1f},{ring[1]:.1f}",
-                verify=(rod, tgt), free_dof_key=f"rod_swing_{j:02d}")
+                verify=(rod, tgt),
+                free_dof_key=f"rod_swing_{j:02d}",
+            )
             free_dof_keys.append(f"rod_swing_{j:02d}")
             tgt = _org(adapter, bar)
             foot = world_point(adapter, bar, BAR_FOOT_LOCAL)
@@ -1763,9 +1958,13 @@ async def build(adapter) -> dict[str, str]:
                 component_named_ref(bar, "Axis2"),
                 named_ref("Right Plane", "PLANE"),
                 foot[0],
-                label=(f"J3 bar ch{j:02d} AMPLITUDE drive foot-X={foot[0]:.2f}"
-                       f" (amp {amplitude:+.1f})"),
-                verify=(bar, tgt), free_dof_key=f"bar_amplitude_{j:02d}")
+                label=(
+                    f"J3 bar ch{j:02d} AMPLITUDE drive foot-X={foot[0]:.2f}"
+                    f" (amp {amplitude:+.1f})"
+                ),
+                verify=(bar, tgt),
+                free_dof_key=f"bar_amplitude_{j:02d}",
+            )
             free_dof_keys.append(f"bar_amplitude_{j:02d}")
 
     for j in range(CHANNELS):
@@ -1788,16 +1987,24 @@ async def build(adapter) -> dict[str, str]:
         # ANY theta (first row tilt-independent). The tilt is baked in here, so
         # the grounded pose holds for every amplitude preset. theta=0 vertical.
         spring_rows = [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]]
-        grounded_specs.append({
-            "part": spec["part"],
-            "position": [hole_x_0 + SPRING_BOTTOM_LEAD * ux,
-                         PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy, z_mid],
-            "rotation": [0.0, 0.0, 0.0],
-            "rows": spring_rows,
-            "kind": "spring", "theta": spec["theta"],
-            "label": (f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
-                      f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"),
-        })
+        grounded_specs.append(
+            {
+                "part": spec["part"],
+                "position": [
+                    hole_x_0 + SPRING_BOTTOM_LEAD * ux,
+                    PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy,
+                    z_mid,
+                ],
+                "rotation": [0.0, 0.0, 0.0],
+                "rows": spring_rows,
+                "kind": "spring",
+                "theta": spec["theta"],
+                "label": (
+                    f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
+                    f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"
+                ),
+            }
+        )
 
         # Spring-hook fastener (ground; cosmetic) -- the SEPARATE little open J-hook
         # that connects this channel's spring to the plate (the spring no longer
@@ -1808,14 +2015,19 @@ async def build(adapter) -> dict[str, str]:
         # local +X; Ry(180) (the machine-frame z-plane turn) points that arm to
         # machine -X, back toward the eye one arm-offset away. The eye-axis tilt
         # (<=1.1 deg even at full amplitude) is well inside the bore/ring clearance.
-        grounded_specs.append({
-            "part": "spring-hook",
-            "position": [hole_x_0 + HOOK_ARM_OFFSET_X,
-                         PLATE_EYE_Y - HOOK_ARM_HEIGHT, z_mid],
-            "rotation": [0.0, 180.0, 0.0],
-            "rows": ROT_Y_180,
-            "label": f"spring-hook ch{j:02d} bore-seat",
-        })
+        grounded_specs.append(
+            {
+                "part": "spring-hook",
+                "position": [
+                    hole_x_0 + HOOK_ARM_OFFSET_X,
+                    PLATE_EYE_Y - HOOK_ARM_HEIGHT,
+                    z_mid,
+                ],
+                "rotation": [0.0, 180.0, 0.0],
+                "rows": ROT_Y_180,
+                "label": f"spring-hook ch{j:02d} bore-seat",
+            }
+        )
 
     # Insert the cosmetic bank (springs + spring-hooks; the bushings were
     # patterned before the loop) in ONE AddComponents3 + ONE FixComponent
@@ -1862,9 +2074,15 @@ async def build(adapter) -> dict[str, str]:
             "was dropped or double-counted"
         )
     assert_free_dof_necessity(
-        adapter, len(free_dof_keys),
-        required_stems=("rocker-arm", "connecting-rod", "amplitude-bar",
-                        "channel-lever"))
+        adapter,
+        len(free_dof_keys),
+        required_stems=(
+            "rocker-arm",
+            "connecting-rod",
+            "amplitude-bar",
+            "channel-lever",
+        ),
+    )
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Title-block identity for the assembly drawing (draw_channel_assembly.py):
@@ -1878,7 +2096,6 @@ async def build(adapter) -> dict[str, str]:
             # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
             # (a longer number overflows the DWG. NO. title-block cell).
             "Number": "MHA-A02",
-            "Revision": "A",
             "Revision Description": "Initial release",
             "Material": "SEE COMPONENT DRAWINGS",
             "Material Specification": "SEE COMPONENT DRAWINGS",

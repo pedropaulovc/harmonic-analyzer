@@ -121,8 +121,10 @@ def _assert_counter_spring_hang() -> None:
     gap = ring_inner_top - rod_top
     if not 0.0 < gap < 0.5:
         raise RuntimeError(f"counter-spring ring/rod air gap {gap:.3f} not in (0, 0.5)")
-    log(f"counter-spring hang: ring inner top {ring_inner_top:.2f}, rod top"
-        f" {rod_top:.2f}, air gap {gap:.2f}")
+    log(
+        f"counter-spring hang: ring inner top {ring_inner_top:.2f}, rod top"
+        f" {rod_top:.2f}, air gap {gap:.2f}"
+    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -139,31 +141,56 @@ async def build(adapter) -> dict[str, str]:
     # bore is much larger than the hex, so only the trunnion's top vertex line
     # (the knife edge) nears the upper inner wall. The named "knife axis" is that
     # contact ridge line; the lever's Axis3 (hex ridge) mates coincident to it.
-    km = await place_component(adapter, "knife-mount",
-                               [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z + HEX_Z_MID],
-                               [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (front)")
-    await place_component(adapter, "knife-mount",
-                          [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z - HEX_Z_MID],
-                          [0.0, 0.0, 0.0], IDENTITY, label="knife-mount (back)")
+    km = await place_component(
+        adapter,
+        "knife-mount",
+        [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z + HEX_Z_MID],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="knife-mount (front)",
+    )
+    await place_component(
+        adapter,
+        "knife-mount",
+        [KNIFE[0], KNIFE_CONTACT_Y, SUMMING_Z - HEX_Z_MID],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="knife-mount (back)",
+    )
     # Knife-hanger studs, one per mount on the mount centrelines: each threads
     # 12 into the mount's 1/2-13 top tap (seat 999.45) and rises through the
     # casting's integral crossbar (band 999.7..1036.2, O13.49 close clearance);
     # the integral washer + hex nut seat on the casting top face 1036.2 and
     # carry the hang (stud spans y 987.45..1057.1).
-    await place_component(adapter, "knife-hanger-stud",
-                          [KNIFE[0], HANGER_STUD_Y, SUMMING_Z + HEX_Z_MID],
-                          [0.0, 0.0, 0.0], IDENTITY, label="knife-hanger-stud (front)")
-    await place_component(adapter, "knife-hanger-stud",
-                          [KNIFE[0], HANGER_STUD_Y, SUMMING_Z - HEX_Z_MID],
-                          [0.0, 0.0, 0.0], IDENTITY, label="knife-hanger-stud (back)")
+    await place_component(
+        adapter,
+        "knife-hanger-stud",
+        [KNIFE[0], HANGER_STUD_Y, SUMMING_Z + HEX_Z_MID],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="knife-hanger-stud (front)",
+    )
+    await place_component(
+        adapter,
+        "knife-hanger-stud",
+        [KNIFE[0], HANGER_STUD_Y, SUMMING_Z - HEX_Z_MID],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        label="knife-hanger-stud (back)",
+    )
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,
     # leaving the rock DOF -- the sub's freed operational DOF (its drive spec
     # recorded into the DOF manifest, never authored). This is the part the
     # counter spring + channel springs drive in the M6 Motion study.
-    sl = await place_component(adapter, "summing-lever",
-                               [KNIFE[0], KNIFE[1], SUMMING_Z],
-                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    sl = await place_component(
+        adapter,
+        "summing-lever",
+        [KNIFE[0], KNIFE[1], SUMMING_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
     sl_o = component_origin(adapter, sl)
     # summing-lever axes (creation order): Axis1 = pivot (cylinder centre),
     # Axis2 = anchor, Axis3 = knife ridge (hex top vertex). The lever rocks on
@@ -171,27 +198,41 @@ async def build(adapter) -> dict[str, str]:
     # ("knife axis" = Axis1@knife-mount). Same pose as the cylinder-centre mate
     # (ridge is 5.13 above the centre, both collinear along Z), but the freed
     # rock DOF is now about the knife edge, per the bearing-support design.
-    await coincident_mate(adapter, named_ref(f"Axis3@{sl}", "AXIS"),
-                          named_ref(f"Axis1@{km}", "AXIS"),
-                          label="summing-lever knife pivot", verify=(sl, sl_o))
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis3@{sl}", "AXIS"),
+        named_ref(f"Axis1@{km}", "AXIS"),
+        label="summing-lever knife pivot",
+        verify=(sl, sl_o),
+    )
     # Axial Z-slide pinned by a Front-plane distance (value 0: the lever sits on
     # the assembly Front plane). Then the rock (Rz about the knife line) is the
     # suppressible snapshot driver -- an ANGLE between Right planes, NOT the
     # off-axis spin_driver: the boss "spin ref" sits directly -X of the pivot
     # (Δy=0), so its distance-to-Top is degenerate and over-defines, whereas the
     # angle is well-conditioned and (inserted on-solution) holds without a flip.
-    await distance_driver(adapter, named_ref(f"Front Plane@{sl}", "PLANE"),
-                          named_ref("Front Plane", "PLANE"), abs(sl_o[2]),
-                          label="summing-lever axial", verify=(sl, sl_o))
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{sl}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        abs(sl_o[2]),
+        label="summing-lever axial",
+        verify=(sl, sl_o),
+    )
     # The rock about the knife line is the sub's FREED operational DOF: its
     # drive spec (an ANGLE between Right planes -- the boss "spin ref"
     # distance-to-Top is degenerate here, see above) is recorded into the DOF
     # manifest, never authored -- drag the lever and it rocks on the knife
     # edge, per the magnifier lever_rock idiom.
-    await angle_driver(adapter, named_ref(f"Right Plane@{sl}", "PLANE"),
-                       named_ref("Right Plane", "PLANE"), 0.0,
-                       label="summing-lever rock PARK driver (freed in default build)",
-                       verify=(sl, sl_o), free_dof_key="lever_rock")
+    await angle_driver(
+        adapter,
+        named_ref(f"Right Plane@{sl}", "PLANE"),
+        named_ref("Right Plane", "PLANE"),
+        0.0,
+        label="summing-lever rock PARK driver (freed in default build)",
+        verify=(sl, sl_o),
+        free_dof_key="lever_rock",
+    )
     # Boss hook: rigidly rides the lever (locked), carrying the counter spring.
     # Keyed to the lever's anchor axis (Axis2, the summation-anchor eye the
     # counter spring hangs from at machine ~(-91, 979.7)) rather than the pivot
@@ -200,27 +241,42 @@ async def build(adapter) -> dict[str, str]:
     # Ry(180): the boss-hook is a planar-XY wire form modeled with its open jaw
     # toward local +X; turned about Y it faces the machine crank side (-X),
     # hanging the counter-spring over the lever's anchor eye at ~(-91, 979.7).
-    bh = await place_component(adapter, "boss-hook", list(BOSS_HOOK_POS),
-                               [0.0, 180.0, 0.0], ROT_Y_180, ground=False)
-    await lock_mate(adapter, named_ref(f"Axis1@{bh}", "AXIS"),
-                    named_ref(f"Axis2@{sl}", "AXIS"), label="boss-hook keyed")
+    bh = await place_component(
+        adapter,
+        "boss-hook",
+        list(BOSS_HOOK_POS),
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Axis1@{bh}", "AXIS"),
+        named_ref(f"Axis2@{sl}", "AXIS"),
+        label="boss-hook keyed",
+    )
     # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
     # (bottom) and the gooseneck pin (top) nail-through-ring style.
-    await place_component(adapter, "counter-spring", list(SPRING_POS),
-                          [0.0, 90.0, 0.0], ROT_Y_POS90)
+    await place_component(
+        adapter, "counter-spring", list(SPRING_POS), [0.0, 90.0, 0.0], ROT_Y_POS90
+    )
     # Ry(180), like the boss-hook: the gooseneck's overhang arm reaches from
     # the east column toward the machine centre. The post is held in the
     # top-frame casting's rail-hub bore by its 1/4-20 set screw
     # (frame.SLDASM) -- there is no separate clamp part.
-    await place_component(adapter, "gooseneck", [COLUMN_X, 1210.0, SUMMING_Z],
-                          [0.0, 180.0, 0.0], ROT_Y_180)
+    await place_component(
+        adapter,
+        "gooseneck",
+        [COLUMN_X, 1210.0, SUMMING_Z],
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+    )
 
     # Certify the AS-BUILT model. Necessity only: the freed lever rock is
     # genuinely free; the lock-mated boss-hook MUST read under-constrained
     # WITH it -- a grounded/fixed regression would freeze the counter-spring
     # anchor while the lever still swings.
-    assert_free_dof_necessity(
-        adapter, 1, required_stems=("summing-lever", "boss-hook"))
+    assert_free_dof_necessity(adapter, 1, required_stems=("summing-lever", "boss-hook"))
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Title-block identity for the assembly drawing (draw_summing_assembly.py):
@@ -234,7 +290,6 @@ async def build(adapter) -> dict[str, str]:
             # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
             # (a longer number overflows the DWG. NO. title-block cell).
             "Number": "MHA-A07",
-            "Revision": "A",
             "Revision Description": "Initial release",
             "Material": "SEE COMPONENT DRAWINGS",
             "Material Specification": "SEE COMPONENT DRAWINGS",

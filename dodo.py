@@ -43,6 +43,8 @@ Run through uv (SolidWorks already open for the COM tasks)::
 
     uv run python -m doit                       # = `build`: every part + assembly + every gate
     uv run python -m doit -n 4                  # same, fanning out the SolidWorks-free checks
+    uv run python build.py --verbosity warning -n 4  # concise console output
+
     uv run python -m doit build_bare            # quick: parts + assemblies only, no gates
     uv run python -m doit assembly:paper_drive  # just that assembly + its stale prereqs
     uv run python -m doit part:summing_lever    # just that part
@@ -123,6 +125,7 @@ from _drawing_registry import (  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
+RELEASE_VERSION_FILE = (CONFIG_DIR / "release.yaml").resolve()
 # The repo-owned part template (see _common.PART_TEMPLATE -- path duplicated
 # deliberately; importing _buildgraph from _common would drag graph tooling
 # into every part's dep closure). A runtime input of every part build.
@@ -135,6 +138,7 @@ PART_TEMPLATE = REPO_ROOT / "cad" / "templates" / "harmonic-analyzer.PRTDOT"
 # ``_submodule_dep``) so a submodule bump -- committed pin OR a dirty local edit --
 # busts the cache key and forces a rebuild (issue #144).
 SUBMODULE_SRC = REPO_ROOT / "SolidworksMCP-python" / "src" / "solidworks_mcp"
+
 
 # --- COM seat: serialize SolidWorks at RUNTIME with a cross-process file lock.
 #
@@ -236,8 +240,9 @@ def _com_seat(label: str):
     _COM_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     holder = f"{label} pid={os.getpid()}"
     entered = time.monotonic()
-    with _telemetry.span(f"com.seat.wait {label}", label=label,
-                        service=_telemetry.BUILD_INFRA_SERVICE) as wait_span:
+    with _telemetry.span(
+        f"com.seat.wait {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as wait_span:
         polls = 0
         while True:
             try:
@@ -246,8 +251,10 @@ def _com_seat(label: str):
             except Timeout:
                 polls += 1
                 other = _read_seat_holder()
-                _telemetry.warn(f"[com.seat] {label} waiting for the SolidWorks seat"
-                                + (f" (held by {other})" if other else ""))
+                _telemetry.debug(
+                    f"[com.seat] {label} waiting for the SolidWorks seat"
+                    + (f" (held by {other})" if other else "")
+                )
         acquired = time.monotonic()
         waited = acquired - entered
         wait_span.set_attribute("polls", polls)
@@ -270,8 +277,10 @@ def _com_seat(label: str):
         _telemetry.info(
             f"[com.seat] {label} released after {released - entered:.1f}s total "
             f"(waited {waited:.1f}s, held {released - acquired:.1f}s)",
-            wait_s=round(waited, 2), held_s=round(released - acquired, 2),
-            elapsed_s=round(released - entered, 2))
+            wait_s=round(waited, 2),
+            held_s=round(released - acquired, 2),
+            elapsed_s=round(released - entered, 2),
+        )
 
 
 def _tag_seat_wait(span, waited: float | None) -> None:
@@ -281,6 +290,7 @@ def _tag_seat_wait(span, waited: float | None) -> None:
     gate, or a test stubbing ``_com_seat``)."""
     if waited is not None:
         span.set_attribute("seat_wait_s", round(waited, 2))
+
 
 # Drawing tasks declare only their source model as CAD input, while their code
 # recipe follows the exporter's complete repo-local import closure and the full
@@ -324,8 +334,12 @@ def _build_order_seed() -> str:
 def _seat_part_order() -> list[str]:
     """``part_stems()`` permuted deterministically per seat (see the block above)."""
     seed = _build_order_seed()
-    return sorted(part_stems(),
-                  key=lambda s: hashlib.md5(f"{seed}\0{s}".encode()).hexdigest())
+    return sorted(
+        part_stems(),
+        key=lambda s: hashlib.md5(
+            f"{seed}\0{s}".encode(), usedforsecurity=False
+        ).hexdigest(),
+    )
 
 
 # --- Comment/whitespace-insensitive content hashing for cad/config/*.yaml.
@@ -602,9 +616,16 @@ def _run_subprocess(cmd: list[str], label: str, log_stem: str | None = None) -> 
         fh.write(f">>  {label}: {' '.join(cmd)}\n")
         fh.flush()
         proc = subprocess.Popen(
-            cmd, cwd=str(REPO_ROOT), env=env, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-            errors="replace", bufsize=1)
+            cmd,
+            cwd=str(REPO_ROOT),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+        )
         assert proc.stdout is not None
         for line in proc.stdout:
             sys.stdout.write(line)
@@ -629,7 +650,11 @@ _WATCHDOG_EXIT_CODES = frozenset({86, 87})
 
 def _sw_autostart_enabled() -> bool:
     return os.environ.get("HARMONIC_SW_AUTOSTART", "1").strip().lower() not in (
-        "0", "false", "no", "off")
+        "0",
+        "false",
+        "no",
+        "off",
+    )
 
 
 def _com_retry_backoff() -> tuple[int, ...]:
@@ -695,7 +720,10 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         _telemetry.warn(
             f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy; backoff "
             f"{delay}s then force-recover + retry {attempt + 1}/{last}",
-            exit_code=rc, attempt=attempt + 1, backoff_s=delay)
+            exit_code=rc,
+            attempt=attempt + 1,
+            backoff_s=delay,
+        )
         time.sleep(delay)
         state = _sw_lifecycle.force_recover()
         # A recovery that ends anywhere but CONNECTED means SolidWorks is still
@@ -712,14 +740,18 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
             _telemetry.warn(
                 f"[sw] {label}: recovery ended state={state}, not connected; "
                 "waiting for the cold start rather than spending a retry on it",
-                state=state, attempt=attempt + 1)
-            _telemetry.event("sw.cold_start_wait", label=label, state=state,
-                             attempt=attempt + 1)
+                state=state,
+                attempt=attempt + 1,
+            )
+            _telemetry.event(
+                "sw.cold_start_wait", label=label, state=state, attempt=attempt + 1
+            )
             _sw_lifecycle.wait_until_ready()
 
 
-def _run(cmd: list[str], label: str, log_stem: str | None = None,
-         com: bool = False) -> None:
+def _run(
+    cmd: list[str], label: str, log_stem: str | None = None, com: bool = False
+) -> None:
     """Open a ``task <label>`` span and run the subprocess inside it (see
     :func:`_exec`). One span per task action, NAMED for the doit task
     (``task part:cone_gear``) so the trace reads as the task itself; the build
@@ -732,11 +764,12 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None,
     ``com.seat.wait <label>`` span -- so ``task <label>`` starts once the seat is held
     and its duration is the task's own work. SolidWorks-free tasks (the ``check:*``
     gates) pass ``com=False`` and never take the lock, so they fan out under ``-n``."""
-    with (_com_seat(label) if com else contextlib.nullcontext()) as waited:
+    with _com_seat(label) if com else contextlib.nullcontext() as waited:
         if com:
             _sw_ensure_once()  # top-level sibling of the task span (once/worker)
-        with _telemetry.span(f"task {label}", label=label, cmd=" ".join(cmd),
-                             service=_stage_name(label)) as sp:
+        with _telemetry.span(
+            f"task {label}", label=label, cmd=" ".join(cmd), service=_stage_name(label)
+        ) as sp:
             _tag_seat_wait(sp, waited)
             # COM tasks get reactive SolidWorks recovery; SW-free tasks
             # (check:* gates) run the plain fail-loud _exec.
@@ -840,6 +873,7 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)
 
+
 # --- Stamp files: the verify:/check: gates produce no CAD artefact, so a stamp
 # under cad/out/reports/ is their doit ``target``. That makes each gate
 # incremental (re-runs only when a file_dep changes) and individually
@@ -865,10 +899,21 @@ PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-_VERIFY_NAMES = ("soundness", "kinematics")   # need SW (spine); subsystems retired
+_VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
 # Offline checks REQUIRED on every build/release (fast, high-value):
-_CHECK_NAMES = ("math", "config", "graph", "nameplate", "recipe", "cache", "telemetry",
-                "watchdog", "freshness", "flagonly", "partiso")
+_CHECK_NAMES = (
+    "math",
+    "config",
+    "graph",
+    "nameplate",
+    "recipe",
+    "cache",
+    "telemetry",
+    "watchdog",
+    "freshness",
+    "flagonly",
+    "partiso",
+)
 # Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
 # depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
 # through a mock SolidWorks to pin span SHAPE (~20-30 s, ~20x the other offline
@@ -1012,13 +1057,17 @@ _SUBMODULE_PART_DEP_PATH: str | None = None
 # NOTE: adding drawing.py here shifts every PART and ASSEMBLY recipe/cache key once
 # (a one-time migration); the build self-heals over one run, or ``doit reset-dep``
 # migrates the ``.doit.db`` in place without a rebuild.
-_ASSEMBLY_DIGEST_EXCLUDE_FILES = frozenset({
-    "adapters/solidworks/drawing.py",
-})
-_PART_DIGEST_EXCLUDE_FILES = _ASSEMBLY_DIGEST_EXCLUDE_FILES | frozenset({
-    "adapters/solidworks/assembly.py",
-    "adapters/solidworks/motion.py",
-})
+_ASSEMBLY_DIGEST_EXCLUDE_FILES = frozenset(
+    {
+        "adapters/solidworks/drawing.py",
+    }
+)
+_PART_DIGEST_EXCLUDE_FILES = _ASSEMBLY_DIGEST_EXCLUDE_FILES | frozenset(
+    {
+        "adapters/solidworks/assembly.py",
+        "adapters/solidworks/motion.py",
+    }
+)
 
 
 def _submodule_src_files() -> list[Path]:
@@ -1086,7 +1135,9 @@ def _submodule_assembly_digest() -> str:
     leaves this digest -- and thus every assembly's recipe -- unchanged."""
     global _SUBMODULE_ASSEMBLY_DIGEST
     if _SUBMODULE_ASSEMBLY_DIGEST is None:
-        files = [f for f in _submodule_src_files() if _is_assembly_relevant_submodule_file(f)]
+        files = [
+            f for f in _submodule_src_files() if _is_assembly_relevant_submodule_file(f)
+        ]
         _SUBMODULE_ASSEMBLY_DIGEST = _digest_submodule_files(files)
     return _SUBMODULE_ASSEMBLY_DIGEST
 
@@ -1098,7 +1149,9 @@ def _submodule_part_digest() -> str:
     -- unchanged, instead of rebuilding all ~100 parts."""
     global _SUBMODULE_PART_DIGEST
     if _SUBMODULE_PART_DIGEST is None:
-        files = [f for f in _submodule_src_files() if _is_part_relevant_submodule_file(f)]
+        files = [
+            f for f in _submodule_src_files() if _is_part_relevant_submodule_file(f)
+        ]
         _SUBMODULE_PART_DIGEST = _digest_submodule_files(files)
     return _SUBMODULE_PART_DIGEST
 
@@ -1127,7 +1180,8 @@ def _submodule_dep() -> str:
     global _SUBMODULE_DEP_PATH
     if _SUBMODULE_DEP_PATH is None:
         _SUBMODULE_DEP_PATH = _write_digest_sidecar(
-            _SUBMODULE_DIGEST_FILE, _submodule_digest())
+            _SUBMODULE_DIGEST_FILE, _submodule_digest()
+        )
     return _SUBMODULE_DEP_PATH
 
 
@@ -1141,7 +1195,8 @@ def _submodule_assembly_dep() -> str:
     global _SUBMODULE_ASSEMBLY_DEP_PATH
     if _SUBMODULE_ASSEMBLY_DEP_PATH is None:
         _SUBMODULE_ASSEMBLY_DEP_PATH = _write_digest_sidecar(
-            _SUBMODULE_ASSEMBLY_DIGEST_FILE, _submodule_assembly_digest())
+            _SUBMODULE_ASSEMBLY_DIGEST_FILE, _submodule_assembly_digest()
+        )
     return _SUBMODULE_ASSEMBLY_DEP_PATH
 
 
@@ -1154,7 +1209,8 @@ def _submodule_part_dep() -> str:
     global _SUBMODULE_PART_DEP_PATH
     if _SUBMODULE_PART_DEP_PATH is None:
         _SUBMODULE_PART_DEP_PATH = _write_digest_sidecar(
-            _SUBMODULE_PART_DIGEST_FILE, _submodule_part_digest())
+            _SUBMODULE_PART_DIGEST_FILE, _submodule_part_digest()
+        )
     return _SUBMODULE_PART_DEP_PATH
 
 
@@ -1236,13 +1292,15 @@ def _drawing_file_deps(stem: str) -> list[str]:
         # idempotency; its execution token catches a same-recipe rebuild with
         # new PIDs so the drawing cannot restore against a foreign identity.
         source_deps: tuple[str, ...] = (
-            _sldasm(spec.part), _assembly_execution_token(spec.part)
+            _sldasm(spec.part),
+            _assembly_execution_token(spec.part),
         )
     else:
         source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
     return sorted(
         {
             str(script),
+            str(RELEASE_VERSION_FILE),
             *source_deps,
             *runtime,
             *(str(path.resolve()) for path in spec.assets),
@@ -1266,8 +1324,9 @@ def _cached_drawing_action(stem: str) -> None:
     label = f"drawing:{stem}"
     cmd = [sys.executable, str(spec.script.resolve()), spec.artifact_stem]
     outputs = _drawing_cache_outputs(stem)
-    with _telemetry.span(f"cache.probe {label}", label=label,
-                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
+    with _telemetry.span(
+        f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as probe:
         key = _cache_key(_drawing_file_deps(stem), label)
         if _cache.restore(key, outputs, label):
             probe.set_attribute("cache", "hit")
@@ -1275,23 +1334,30 @@ def _cached_drawing_action(stem: str) -> None:
         probe.set_attribute("cache", "miss")
 
     with _com_seat(label) as waited:
-        with _telemetry.span(f"cache.reprobe {label}", label=label,
-                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
+        with _telemetry.span(
+            f"cache.reprobe {label}",
+            label=label,
+            service=_telemetry.BUILD_INFRA_SERVICE,
+        ) as reprobe:
             if _cache.restore(key, outputs, label):
                 reprobe.set_attribute("cache", "hit-after-wait")
                 return
             reprobe.set_attribute("cache", "miss")
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
-        with _telemetry.span(f"task {label}", label=label,
-                             service=_stage_name(label)) as sp:
+        with _telemetry.span(
+            f"task {label}", label=label, service=_stage_name(label)
+        ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _exec_com(cmd, label, log_stem=f"drawing-{stem}")
 
-    with _telemetry.span(f"cache.store {label}", label=label,
-                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
-        store.set_attribute("cache", _cache.store(key, _drawing_cache_outputs(stem), label))
+    with _telemetry.span(
+        f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as store:
+        store.set_attribute(
+            "cache", _cache.store(key, _drawing_cache_outputs(stem), label)
+        )
 
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
@@ -1301,10 +1367,15 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
     # get-only prefs ride it). Folding it in makes a template edit rebuild
     # every part AND shift the remote-cache key, so no seat can publish
     # template-drifted parts under a stale key.
-    return [str(script.resolve()), *_helper_deps(script),
-            *_config_deps(script, stem, "part"), *data_deps_of(script),
-            str(PART_TEMPLATE.resolve()),
-            _submodule_part_dep()]
+    return [
+        str(script.resolve()),
+        str(RELEASE_VERSION_FILE),
+        *_helper_deps(script),
+        *_config_deps(script, stem, "part"),
+        *data_deps_of(script),
+        str(PART_TEMPLATE.resolve()),
+        _submodule_part_dep(),
+    ]
 
 
 def _assembly_file_deps(stem: str) -> list[str]:
@@ -1319,7 +1390,8 @@ def _assembly_file_deps(stem: str) -> list[str]:
     refs = references_of(stem)
     ref_targets = [_sldasm(r) if r in ASSEMBLY_ORDER else _sldprt(r) for r in refs]
     ref_identities = [
-        _assembly_execution_token(r) if r in ASSEMBLY_ORDER
+        _assembly_execution_token(r)
+        if r in ASSEMBLY_ORDER
         else _part_execution_token(r)
         for r in refs
     ]
@@ -1345,8 +1417,9 @@ def _cached_part_action(stem: str, script: Path) -> None:
     console."""
     label = f"part:{stem}"
     outputs = _part_cache_outputs(stem)
-    with _telemetry.span(f"cache.probe {label}", label=label,
-                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
+    with _telemetry.span(
+        f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as probe:
         key = _cache_key(_part_file_deps(script, stem), label)
         if _cache.restore(key, outputs, label):
             probe.set_attribute("cache", "hit")
@@ -1360,8 +1433,11 @@ def _cached_part_action(stem: str, script: Path) -> None:
         # (the fleet cache-split win; fable/codex review). Its OWN phase span, never
         # inside the task span: it is another network round-trip, and on a hit it is a
         # full download -- which would otherwise make the "work" span pure transfer.
-        with _telemetry.span(f"cache.reprobe {label}", label=label,
-                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
+        with _telemetry.span(
+            f"cache.reprobe {label}",
+            label=label,
+            service=_telemetry.BUILD_INFRA_SERVICE,
+        ) as reprobe:
             if _cache.restore(key, outputs, label):
                 reprobe.set_attribute("cache", "hit-after-wait")
                 _stamp_part_execution(stem)
@@ -1369,8 +1445,9 @@ def _cached_part_action(stem: str, script: Path) -> None:
             reprobe.set_attribute("cache", "miss")
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
-        with _telemetry.span(f"task {label}", label=label,
-                             service=_stage_name(label)) as sp:
+        with _telemetry.span(
+            f"task {label}", label=label, service=_stage_name(label)
+        ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
@@ -1378,8 +1455,9 @@ def _cached_part_action(stem: str, script: Path) -> None:
 
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
     # not hold the seat the next task is waiting for.
-    with _telemetry.span(f"cache.store {label}", label=label,
-                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
+    with _telemetry.span(
+        f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as store:
         store.set_attribute("cache", _cache.store(key, outputs, label))
 
 
@@ -1405,11 +1483,18 @@ def _recipe_files(stem: str) -> list[str]:
     # their referenced parts' recipe digests (a template edit re-stamps the
     # parts -> shifted artefact digests -> REFRESH), and a direct fold would
     # escalate that refresh to a spurious ~500 s FULL rebuild.
-    template = ([str(PART_TEMPLATE.resolve())]
-                if stamps_part_properties(asm_script) else [])
-    return [str(asm_script.resolve()), *hooks, *_helper_deps(asm_script),
-            *_config_deps(asm_script, stem, "assembly"), *template,
-            _submodule_assembly_dep()]
+    template = (
+        [str(PART_TEMPLATE.resolve())] if stamps_part_properties(asm_script) else []
+    )
+    return [
+        str(asm_script.resolve()),
+        str(RELEASE_VERSION_FILE),
+        *hooks,
+        *_helper_deps(asm_script),
+        *_config_deps(asm_script, stem, "assembly"),
+        *template,
+        _submodule_assembly_dep(),
+    ]
 
 
 def _recipe_sidecar(stem: str) -> Path:
@@ -1553,12 +1638,13 @@ class _RecipeTracker:
         self.digest = self._calc()
         task.value_savers.append(lambda: {"_recipe_digest": self.digest})
         last = values.get("_recipe_digest")
-        _RECIPE_CHANGED[self.stem] = (last is None or last != self.digest)
-        return (last is not None and last == self.digest)
+        _RECIPE_CHANGED[self.stem] = last is None or last != self.digest
+        return last is not None and last == self.digest
 
 
-def _assembly_run_mode(stem: str, target_missing: bool,
-                       recipe_changed: bool) -> tuple[str, str]:
+def _assembly_run_mode(
+    stem: str, target_missing: bool, recipe_changed: bool
+) -> tuple[str, str]:
     """Choose FULL/REFRESH without sending known contacts to the generic gate."""
     if target_missing:
         return "full", "target missing"
@@ -1603,8 +1689,9 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # tags by absolute path (machine-local) -- so recompute it here, exactly as the
     # success tail does, to keep the next run's FULL/REFRESH decision correct.
     cache_outputs = _assembly_cache_outputs(stem)
-    with _telemetry.span(f"cache.probe {label}", label=label,
-                             service=_telemetry.BUILD_INFRA_SERVICE) as probe:
+    with _telemetry.span(
+        f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as probe:
         cache_key = _cache_key(_assembly_file_deps(stem), label)
         if _cache.restore(cache_key, cache_outputs, label):
             probe.set_attribute("cache", "hit")
@@ -1618,8 +1705,11 @@ def build_or_refresh(stem, dependencies, changed, targets):
         # while we blocked for the seat (fable/codex review) -> restore, don't
         # rebuild. Its own phase span (see the part action), so a hit-after-wait is
         # reported as the download it is rather than as build work.
-        with _telemetry.span(f"cache.reprobe {label}", label=label,
-                             service=_telemetry.BUILD_INFRA_SERVICE) as reprobe:
+        with _telemetry.span(
+            f"cache.reprobe {label}",
+            label=label,
+            service=_telemetry.BUILD_INFRA_SERVICE,
+        ) as reprobe:
             if _cache.restore(cache_key, cache_outputs, label):
                 reprobe.set_attribute("cache", "hit-after-wait")
                 _stamp_assembly_execution(stem)
@@ -1630,8 +1720,9 @@ def build_or_refresh(stem, dependencies, changed, targets):
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
         # The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks operate on
         # the just-built model without another COM task interleaving.
-        with _telemetry.span(f"task {label}", label=label,
-                             service=_stage_name(label)) as sp:
+        with _telemetry.span(
+            f"task {label}", label=label, service=_stage_name(label)
+        ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
 
@@ -1640,22 +1731,31 @@ def build_or_refresh(stem, dependencies, changed, targets):
                 last = sidecar.read_text(encoding="utf-8").strip()
             except OSError:
                 last = None
-            recipe_changed = (last is None or last != digest)  # missing sidecar = FULL
+            recipe_changed = last is None or last != digest  # missing sidecar = FULL
 
             asm_script = SCRIPTS_DIR / f"build_{stem}_assembly.py"
             hooks = [SCRIPTS_DIR / h for h in POST_ASSEMBLY.get(stem, ())]
             if target_missing or recipe_changed:
                 why = "target missing" if target_missing else "recipe changed"
                 sp.set_attribute("mode", "full")
-                _exec_com([sys.executable, str(asm_script)], f"FULL build {stem} ({why})",
-                          log_stem=f"assembly-{stem}")
+                _exec_com(
+                    [sys.executable, str(asm_script)],
+                    f"FULL build {stem} ({why})",
+                    log_stem=f"assembly-{stem}",
+                )
                 for hook in hooks:
-                    _exec_com([sys.executable, str(hook)], f"hook {hook.name}",
-                              log_stem=f"hook-{stem}-{hook.stem}")
+                    _exec_com(
+                        [sys.executable, str(hook)],
+                        f"hook {hook.name}",
+                        log_stem=f"hook-{stem}-{hook.stem}",
+                    )
             else:
                 sp.set_attribute("mode", "refresh")
-                _exec_com([sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
-                          f"REFRESH {stem}", log_stem=f"assembly-{stem}")
+                _exec_com(
+                    [sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
+                    f"REFRESH {stem}",
+                    log_stem=f"assembly-{stem}",
+                )
             # _exec raised if the build failed, so we only get here on success: record
             # this build's recipe digest for the next run's FULL/REFRESH decision.
             _stamp_assembly_execution(stem)
@@ -1667,9 +1767,12 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # glob-discovered and DID NOT EXIST yet on a clean builder when cache_outputs
     # was first computed, so the early list would publish an incomplete archive
     # (codex review). They exist now.
-    with _telemetry.span(f"cache.store {label}", label=label,
-                         service=_telemetry.BUILD_INFRA_SERVICE) as store:
-        store.set_attribute("cache", _cache.store(cache_key, _assembly_cache_outputs(stem), label))
+    with _telemetry.span(
+        f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as store:
+        store.set_attribute(
+            "cache", _cache.store(cache_key, _assembly_cache_outputs(stem), label)
+        )
 
 
 def _close_sw_documents() -> None:
@@ -1822,6 +1925,7 @@ def task_verify():
     success. The ``verify:`` prefix marks them as SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
+
     def _dof_json(stem: str) -> str:
         sldasm = Path(_sldasm(stem))
         return str(sldasm.parent / f".{sldasm.stem}.dof.json")
@@ -1990,14 +2094,26 @@ def task_check():
         *(str(path.resolve()) for path in SCRIPTS_DIR.glob("*.py")),
         *(str(path.resolve()) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
     }
-    recipe_test_deps = sorted({
-        *(str(path.resolve()) for path in recipe_tests),
-        *(dep for path in recipe_tests for dep in module_deps_of(path)),
-        *scanned_by_binding_gate,
-        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()),
-        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "pose_manifest.py").resolve()),
-        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py").resolve()),
-    })
+    recipe_test_deps = sorted(
+        {
+            *(str(path.resolve()) for path in recipe_tests),
+            *(dep for path in recipe_tests for dep in module_deps_of(path)),
+            *scanned_by_binding_gate,
+            str(
+                (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
+            ),
+            str(
+                (
+                    REPO_ROOT / "cad" / "comparisons" / "tools" / "pose_manifest.py"
+                ).resolve()
+            ),
+            str(
+                (
+                    REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py"
+                ).resolve()
+            ),
+        }
+    )
     specs = {
         "math": {
             # truth_model reads harmonics/phases/amplitudes/magnification from
@@ -2008,36 +2124,45 @@ def task_check():
             # *_spec.py single-source modules) invalidate the stamp too (codex
             # review #353: a FOOT_WIDTH edit in arbor_pedestal_spec.py must
             # re-run the gate, not leave its stamp valid).
-            "file_dep": [str(VERIFY_PY),
-                         *sorted({
-                             str(Path(dep).resolve())
-                             for module in (
-                                 "truth_model.py",
-                                 "build_drive_train_assembly.py",
-                                 "build_cone_pivot_post.py",
-                                 "build_cone_pivot_screw.py",
-                                 "build_swing_stop_screw.py",
-                                 "build_cone_swing_platform.py",
-                                 "build_cone_lock_knob.py",
-                                 "build_cone_tip_block.py",
-                                 "build_cone_tip_bushing.py",
-                                 "build_cone_tip_adjuster.py",
-                                 "build_cone_tip_pinch_screw.py",
-                                 "build_arbor_pedestal.py",
-                                 "build_harmonic_base.py",
-                             )
-                             for dep in (
-                                 SCRIPTS_DIR / module,
-                                 *module_deps_of(SCRIPTS_DIR / module),
-                             )
-                         }),
-                         config_py, *_CONFIG_YAMLS],
+            "file_dep": [
+                str(VERIFY_PY),
+                *sorted(
+                    {
+                        str(Path(dep).resolve())
+                        for module in (
+                            "truth_model.py",
+                            "build_drive_train_assembly.py",
+                            "build_cone_pivot_post.py",
+                            "build_cone_pivot_screw.py",
+                            "build_swing_stop_screw.py",
+                            "build_cone_swing_platform.py",
+                            "build_cone_lock_knob.py",
+                            "build_cone_tip_block.py",
+                            "build_cone_tip_bushing.py",
+                            "build_cone_tip_adjuster.py",
+                            "build_cone_tip_pinch_screw.py",
+                            "build_arbor_pedestal.py",
+                            "build_harmonic_base.py",
+                        )
+                        for dep in (
+                            SCRIPTS_DIR / module,
+                            *module_deps_of(SCRIPTS_DIR / module),
+                        )
+                    }
+                ),
+                config_py,
+                *_CONFIG_YAMLS,
+            ],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "math"],
         },
         "config": {
-            "file_dep": [str(VERIFY_PY),
-                         str((SCRIPTS_DIR / "gen_dimensions.py").resolve()),
-                         config_py, *_CONFIG_YAMLS, *part_script_deps],
+            "file_dep": [
+                str(VERIFY_PY),
+                str((SCRIPTS_DIR / "gen_dimensions.py").resolve()),
+                config_py,
+                *_CONFIG_YAMLS,
+                *part_script_deps,
+            ],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
         },
         "graph": {
@@ -2045,18 +2170,25 @@ def task_check():
             # added there (without an entry in _buildgraph) must invalidate this
             # stamp -- else the "fails loud" coverage test silently never re-runs
             # and the perf benefit is lost (codex review #193).
-            "file_dep": [str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                         str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
-                         config_py],
+            "file_dep": [
+                str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
+                config_py,
+            ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_buildgraph.py")],
         },
         "nameplate": {
             # Guards the vendored engraving DXF the nameplate build imports; the
             # DXF is now the source of truth (the re-traced coordinate loops are
             # retired), so the gate depends on the file + its integrity test.
-            "file_dep": [str((SCRIPTS_DIR / "test_nameplate_geometry.py").resolve()),
-                         str((REPO_ROOT / "cad" / "references"
-                              / "nameplate-engraving.dxf").resolve())],
+            "file_dep": [
+                str((SCRIPTS_DIR / "test_nameplate_geometry.py").resolve()),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "references" / "nameplate-engraving.dxf"
+                    ).resolve()
+                ),
+            ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_nameplate_geometry.py")],
         },
         "recipe": {
@@ -2065,17 +2197,21 @@ def task_check():
             # YAML documents it loads -- without these deps a finish/material
             # edit would leave the stamp valid and the guard silently stale
             # (codex review #361).
-            "file_dep": [str((REPO_ROOT / "dodo.py").resolve()),
-                         *recipe_test_deps,
-                         *_CONFIG_YAMLS,
-                         str(PROJECT_DRWDOT.resolve())],
+            "file_dep": [
+                str((REPO_ROOT / "dodo.py").resolve()),
+                *recipe_test_deps,
+                *_CONFIG_YAMLS,
+                str(PROJECT_DRWDOT.resolve()),
+            ],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
         },
         "cache": {
             # The artefact-cache provenance/observability unit tests (issue #73):
             # key derivation, event log, store-skip-on-hit drift. Pure python.
-            "file_dep": [str((SCRIPTS_DIR / "_artifact_cache.py").resolve()),
-                         str((SCRIPTS_DIR / "test_artifact_cache.py").resolve())],
+            "file_dep": [
+                str((SCRIPTS_DIR / "_artifact_cache.py").resolve()),
+                str((SCRIPTS_DIR / "test_artifact_cache.py").resolve()),
+            ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_artifact_cache.py")],
         },
         "telemetry": {
@@ -2084,14 +2220,18 @@ def task_check():
             # neutral-export aggregate/event shape. Pure python, so it runs as an
             # offline gate -- without this the spine or release observability could
             # regress while the required checks stay green.
-            "file_dep": [str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                         str((SCRIPTS_DIR / "cut_release.py").resolve()),
-                         str((SCRIPTS_DIR / "export_models.py").resolve()),
-                         str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
-                         str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve())],
-            "cmd": [*pytest_cmd,
-                    str(SCRIPTS_DIR / "test_telemetry.py"),
-                    str(SCRIPTS_DIR / "test_cut_release_telemetry.py")],
+            "file_dep": [
+                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                str((SCRIPTS_DIR / "cut_release.py").resolve()),
+                str((SCRIPTS_DIR / "export_models.py").resolve()),
+                str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
+                str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve()),
+            ],
+            "cmd": [
+                *pytest_cmd,
+                str(SCRIPTS_DIR / "test_telemetry.py"),
+                str(SCRIPTS_DIR / "test_cut_release_telemetry.py"),
+            ],
         },
         "watchdog": {
             # The COM crash/hang watchdog (_watchdog.py): a NEW sldexitapp.exe
@@ -2102,10 +2242,12 @@ def task_check():
             # _common.py is a dep because the gate also pins the INTEGRATION
             # (run_build arms/disarms the watchdog): an edit that drops those
             # calls must re-run this gate, not reuse the old stamp (codex #344).
-            "file_dep": [str((SCRIPTS_DIR / "_watchdog.py").resolve()),
-                         str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                         str((SCRIPTS_DIR / "_common.py").resolve()),
-                         str((SCRIPTS_DIR / "test_watchdog.py").resolve())],
+            "file_dep": [
+                str((SCRIPTS_DIR / "_watchdog.py").resolve()),
+                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                str((SCRIPTS_DIR / "_common.py").resolve()),
+                str((SCRIPTS_DIR / "test_watchdog.py").resolve()),
+            ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],
         },
         "verify_telemetry": {
@@ -2115,10 +2257,12 @@ def task_check():
             # collapsed, and the slow gates (over-constrained / gear-ratios /
             # component-count / open) keep their child spans -- no gate regresses
             # back into one opaque 80-90 s span. Pure python (no SolidWorks).
-            "file_dep": [str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                         str((SCRIPTS_DIR / "_assembly.py").resolve()),
-                         str((SCRIPTS_DIR / "verify.py").resolve()),
-                         str((SCRIPTS_DIR / "test_verify_telemetry.py").resolve())],
+            "file_dep": [
+                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+                str((SCRIPTS_DIR / "_assembly.py").resolve()),
+                str((SCRIPTS_DIR / "verify.py").resolve()),
+                str((SCRIPTS_DIR / "test_verify_telemetry.py").resolve()),
+            ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_telemetry.py")],
         },
         "freshness": {
@@ -2126,18 +2270,22 @@ def task_check():
             # + ContentChecker to refuse scoring a stale tree (the gap that let a
             # never-rebuilt 8-component frame trip component-count). Pure python ->
             # offline gate, so the guard can't regress while required checks stay green.
-            "file_dep": [str(VERIFY_PY),
-                         str((REPO_ROOT / "dodo.py").resolve()),
-                         str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                         str((SCRIPTS_DIR / "test_verify_freshness.py").resolve())],
+            "file_dep": [
+                str(VERIFY_PY),
+                str((REPO_ROOT / "dodo.py").resolve()),
+                str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                str((SCRIPTS_DIR / "test_verify_freshness.py").resolve()),
+            ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_freshness.py")],
         },
         "flagonly": {
             # The targeted late-binding flag helper (_flag_only, issue #87) -- pure
             # dispatch glue. Was merged WITHOUT a check task, so it never ran in CI;
             # wired here so a regression in _common._flag_only fails an offline gate.
-            "file_dep": [str((SCRIPTS_DIR / "_common.py").resolve()),
-                         str((SCRIPTS_DIR / "test_flag_only.py").resolve())],
+            "file_dep": [
+                str((SCRIPTS_DIR / "_common.py").resolve()),
+                str((SCRIPTS_DIR / "test_flag_only.py").resolve()),
+            ],
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
         },
         "partiso": {
@@ -2154,17 +2302,26 @@ def task_check():
             # import is always in this set -- a part/assembly script (caught) or a helper
             # already in its closure (caught) -- so it is self-healing. Pure python ->
             # offline.
-            "file_dep": sorted({
-                str((REPO_ROOT / "dodo.py").resolve()),
-                str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
-                *part_script_deps,
-                *(dep for p in part_scripts() for dep in module_deps_of(p)),
-                *(str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
-                  for s in ASSEMBLY_ORDER),
-                *(dep for s in ASSEMBLY_ORDER
-                  for dep in module_deps_of(SCRIPTS_DIR / f"build_{s}_assembly.py")),
-            }),
+            "file_dep": sorted(
+                {
+                    str((REPO_ROOT / "dodo.py").resolve()),
+                    str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                    str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
+                    *part_script_deps,
+                    *(dep for p in part_scripts() for dep in module_deps_of(p)),
+                    *(
+                        str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
+                        for s in ASSEMBLY_ORDER
+                    ),
+                    *(
+                        dep
+                        for s in ASSEMBLY_ORDER
+                        for dep in module_deps_of(
+                            SCRIPTS_DIR / f"build_{s}_assembly.py"
+                        )
+                    ),
+                }
+            ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
         },
     }
@@ -2173,8 +2330,9 @@ def task_check():
     # in the default paths -- exactly the gap Codex caught on freshness/flagonly. Keep
     # the two in lockstep.
     _all_check_names = set(_CHECK_NAMES) | set(_OPTIONAL_CHECK_NAMES)
-    assert set(specs) == _all_check_names, \
+    assert set(specs) == _all_check_names, (
         f"check specs vs check-names drift: {set(specs) ^ _all_check_names}"
+    )
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
         yield {
@@ -2208,12 +2366,19 @@ def task_export():
         str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve()),
         str((REPORTS / "release-neutral.json").resolve()),
     ]
-    deps = ([_sldprt(s) for s in part_stems()]
-            + [_sldasm(s) for s in ASSEMBLY_ORDER])
+    deps = [_sldprt(s) for s in part_stems()] + [_sldasm(s) for s in ASSEMBLY_ORDER]
     comparison_tools = [
         str((REPO_ROOT / "cad" / "comparisons" / "manifest.json").resolve()),
-        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py").resolve()),
-        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "blender_worker.py").resolve()),
+        str(
+            (
+                REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py"
+            ).resolve()
+        ),
+        str(
+            (
+                REPO_ROOT / "cad" / "comparisons" / "tools" / "blender_worker.py"
+            ).resolve()
+        ),
         str((REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()),
         str((REPO_ROOT / "cad" / "comparisons" / "tools" / "gallery.py").resolve()),
     ]
@@ -2230,8 +2395,17 @@ def task_export():
         # file_dep) and the verify gates, so the natives are current and their recipe
         # digests are safe to RECORD as the export-freshness cache (a bare standalone
         # run must not -- see export_models.main). com=True: holds the COM seat.
-        "actions": [(_run, [[sys.executable, str(EXPORT_PY), "--record-digests"],
-                            "export", "export", True])],
+        "actions": [
+            (
+                _run,
+                [
+                    [sys.executable, str(EXPORT_PY), "--record-digests"],
+                    "export",
+                    "export",
+                    True,
+                ],
+            )
+        ],
         "verbosity": 2,
     }
 
@@ -2248,9 +2422,14 @@ def task_preflight():
     `cad/out/reports/preflight.ok`.
     """
     stamp = str(REPORTS / "preflight.ok")
-    deps = [str(PREFLIGHT_PY), str(VERIFY_PY),
-            str((SCRIPTS_DIR / "_assembly.py").resolve()), str(POSTBUILD_PY),
-            _sldasm("drive_train"), _sldasm("channel")]
+    deps = [
+        str(PREFLIGHT_PY),
+        str(VERIFY_PY),
+        str((SCRIPTS_DIR / "_assembly.py").resolve()),
+        str(POSTBUILD_PY),
+        _sldasm("drive_train"),
+        _sldasm("channel"),
+    ]
     return {
         "file_dep": deps,
         "targets": [stamp],
@@ -2259,8 +2438,12 @@ def task_preflight():
         # Always run (like export/release), so a stale stamp can never let
         # release skip the proof.
         "uptodate": [False],
-        "actions": [(_run_stamped, [[sys.executable, str(PREFLIGHT_PY)],
-                                    "release preflight", stamp, True])],
+        "actions": [
+            (
+                _run_stamped,
+                [[sys.executable, str(PREFLIGHT_PY)], "release preflight", stamp, True],
+            )
+        ],
         "clean": True,
         "verbosity": 2,
     }
@@ -2291,9 +2474,13 @@ def task_release():
     a missing/stale drawing.
     """
     return {
-        "task_dep": ["export", "preflight", *(f"drawing:{s}" for s in _drawing_order()),
-                     *(f"verify:{s}" for s in _VERIFY_NAMES),
-                     *(f"check:{c}" for c in _CHECK_NAMES)],
+        "task_dep": [
+            "export",
+            "preflight",
+            *(f"drawing:{s}" for s in _drawing_order()),
+            *(f"verify:{s}" for s in _VERIFY_NAMES),
+            *(f"check:{c}" for c in _CHECK_NAMES),
+        ],
         "uptodate": [False],
         "pos_arg": "relargs",
         "actions": [(_run_release,)],
@@ -2367,17 +2554,21 @@ def _cache_status(statusargs):
     filters = [a for a in args if a not in ("miss", "all")]
 
     cfg = _cache.config_summary()
-    _telemetry.info(f"[cache_status] mode={cfg['mode']} epoch={cfg['epoch']} salt={cfg['salt']} "
-                    f"account={cfg['account']} container={cfg['container']}")
+    _telemetry.info(
+        f"[cache_status] mode={cfg['mode']} epoch={cfg['epoch']} salt={cfg['salt']} "
+        f"account={cfg['account']} container={cfg['container']}"
+    )
     if not _cache.enabled():
-        _telemetry.warn("[cache_status] cache disabled (mode=off) -- keys computed, backend NOT probed")
+        _telemetry.warn(
+            "[cache_status] cache disabled (mode=off) -- keys computed, backend NOT probed"
+        )
 
     hits = misses = unknown = 0
     for label, deps in _cache_rows():
         if filters and not any(f in label.lower() for f in filters):
             continue
         key, inputs = _cache.key_inputs(deps, ContentChecker._digest)
-        present = _cache.probe(key)        # True / False / None (disabled|unreachable)
+        present = _cache.probe(key)  # True / False / None (disabled|unreachable)
         if present is True:
             mark, hits = "HIT ", hits + 1
         elif present is False:
@@ -2394,7 +2585,10 @@ def _cache_status(statusargs):
             previous = dict(_cache.last_stored_inputs(label))
             current = dict(inputs)
             for rel in sorted(previous.keys() | current.keys()):
-                before, after = previous.get(rel, "<absent>"), current.get(rel, "<absent>")
+                before, after = (
+                    previous.get(rel, "<absent>"),
+                    current.get(rel, "<absent>"),
+                )
                 if before != after:
                     _telemetry.debug(f"         {before} -> {after}  {rel}")
         if show_all or present is False:

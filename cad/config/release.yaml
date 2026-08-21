@@ -1,0 +1,3 @@
+# Next compact release number. CAD Revision properties and drawing title blocks use this value.
+# cut_release.py advances it after publishing a release; commit and merge that bump.
+next_revision: v32
