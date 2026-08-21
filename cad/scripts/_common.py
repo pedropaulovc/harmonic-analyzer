@@ -1289,15 +1289,19 @@ def apply_block_tolerances(adapter: Any) -> None:
         )
 
 
-def apply_custom_properties(adapter: Any, props: dict[str, str]) -> None:
+def apply_custom_properties(
+    adapter: Any, props: dict[str, str], *, model: Any | None = None
+) -> None:
     """Write file-level custom properties via the CustomPropertyManager, verified.
 
     The PyWin32 adapter exposes no property writer, so this drives raw COM
     (``IModelDocExtension.CustomPropertyManager("").Add3`` with replace), then
     reads each value back through ``GetCustomInfoValue`` and raises on mismatch
     — same fail-fast posture as the build's other gates. Empty values are skipped.
+    ``model`` defaults to the active document; callers that repair a specific
+    assembly may pass the explicit target document.
     """
-    model = adapter.currentModel
+    model = adapter.currentModel if model is None else model
     ext = _read_member(model, "Extension")
     mgr = adapter._attempt(lambda: ext.CustomPropertyManager(""), default=None)
     if mgr is None:

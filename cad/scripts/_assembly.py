@@ -28,6 +28,7 @@ from _common import (
     _git_sha,
     _early_bound,
     _read_member,
+    apply_custom_properties,
     active_configuration_name,
     check,
     log,
@@ -53,6 +54,27 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
         "TOL_HOLE_MINUS": str(_config.title_block("drilled_hole")["display_minus"]),
         "TOL_HOLE_PLUS": str(_config.title_block("drilled_hole")["display_plus"]),
     }
+
+
+@_telemetry.traced("assembly.ensure_revision")
+def _ensure_assembly_revision(adapter: Any, model: Any = None) -> bool:
+    """Restamp an existing assembly with the current release Revision if stale."""
+    target = adapter.currentModel if model is None else model
+    expected = _config.release_revision()
+    current = str(
+        adapter._attempt(lambda: target.GetCustomInfoValue("", "Revision"), default="")
+        or ""
+    )
+    if current == expected:
+        return False
+    apply_custom_properties(adapter, {"Revision": expected}, model=target)
+    _telemetry.event(
+        "assembly.revision_restamped",
+        previous=current,
+        revision=expected,
+    )
+    log(f"assembly Revision {current!r} -> {expected}")
+    return True
 
 
 # The sprockets the chain seats on (the mounted T24 + crank T12 removables).
@@ -2809,6 +2831,7 @@ def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
     ``SaveAs3``'s integer return is unreliable across late-bound COM, so success
     is gated on this call producing a new, non-empty target file.
     """
+    _ensure_assembly_revision(adapter)
     options = 1 | 2 | 8
     model = adapter.currentModel
     if asm_path.exists():
@@ -3189,7 +3212,7 @@ def save_assembly_in_place(
     geometry_changed: bool,
     *,
     model: Any = None,
-) -> None:
+) -> bool:
     """Save ``<asm_name>.SLDASM`` in place with a silent ``ModelDoc2.Save3``.
 
     For an assembly OPENED from its own path (a refresh or a config-hook reopen)
@@ -3224,25 +3247,25 @@ def save_assembly_in_place(
     ``repro_inplace_save.py`` (ret=True, err=0, warn=0, the active config persists
     on reopen).
 
-    ``geometry_changed`` gates the bump. Every in-place ``Save3`` rewrites fresh
-    save metadata -> a new md5, and the parent's doit dep is this file's md5, so an
-    unconditional save of an UNCHANGED assembly spuriously invalidates the parent
-    and cascades a no-op reconciliation refresh up the tree (see
-    ``_massprops_sidecar``). When the resolved-geometry fingerprint is unchanged we
-    therefore skip the save outright, leaving the ``.SLDASM`` byte-identical so the
-    parent stays valid. When it changed we force the rewrite even if SolidWorks
-    reports the doc clean (a reload of changed PART geometry leaves the assembly's
-    own data -- component refs + mates + transforms -- untouched, so ``GetSaveFlag``
-    can read false): ``SetSaveFlag`` + ``Save3`` push the new geometry's md5 to the
-    parent (codex review #5).
+    ``geometry_changed`` or a stale Revision gates the bump. Every in-place
+    ``Save3`` rewrites fresh save metadata -> a new md5, and the parent's doit dep
+    is this file's md5. When neither changed, the save is skipped so a no-op
+    refresh leaves the ``.SLDASM`` byte-identical. When either changed, we force
+    the rewrite even if SolidWorks reports the doc clean: ``SetSaveFlag`` +
+    ``Save3`` push the new geometry or metadata md5 to the parent.
     """
     asm = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
+    revision_changed = _ensure_assembly_revision(adapter, asm)
+    must_save = geometry_changed or revision_changed
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
-    if not geometry_changed:
-        # No-op refresh: resolved geometry identical to the last save. Do NOT
-        # rewrite -- a fresh md5 here would invalidate the parent for nothing.
-        log(f"{sldasm.name}: geometry unchanged -- .SLDASM left intact (no md5 bump)")
-        return
+    if not must_save:
+        # No-op refresh: resolved geometry and Revision are identical to the last
+        # save. Do NOT rewrite -- a fresh md5 here would invalidate the parent.
+        log(
+            f"{sldasm.name}: geometry and Revision unchanged -- .SLDASM left "
+            "intact (no md5 bump)"
+        )
+        return False
 
     # This is the shared last-mile chokepoint for refreshes, config hooks, and
     # verify --auto-repair. The caller may already have deep-rebuilt and then run
@@ -3270,6 +3293,7 @@ def save_assembly_in_place(
             f"(ret={ret}, err={err}, warn={warn})"
         )
     log(f"saved {sldasm.name} via Save3(Silent) (ret={ret}, err={err}, warn={warn})")
+    return True
 
 
 async def refresh_assembly(
@@ -3428,7 +3452,7 @@ async def refresh_assembly(
             set_isometric_view(
                 adapter
             )  # opens isometric; only when we actually re-save
-        save_assembly_in_place(adapter, asm_name, geometry_changed)
+        saved = save_assembly_in_place(adapter, asm_name, geometry_changed)
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(digest + "\n", encoding="utf-8")
 
@@ -3439,6 +3463,6 @@ async def refresh_assembly(
     # memory, so a fresh open would report needs-rebuild. Only when we actually
     # re-saved -- a no-op reload left the (already-reconciled) artifact untouched
     # and byte-stable, and reopening it would needlessly bump the parent's md5.
-    if geometry_changed:
+    if saved:
         await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
     return artefacts

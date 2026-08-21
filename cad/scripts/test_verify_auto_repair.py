@@ -109,7 +109,10 @@ def test_auto_repair_repairs_child_assembly_fault(monkeypatch, tmp_path) -> None
     )
     component = SimpleNamespace(Name2="child-1", GetModelDoc2=lambda: child)
     adapter.currentModel.GetComponents = lambda _top_only: [component]
-    reads = {id(adapter.currentModel): [[], []], id(child): [[("ChildMate", 48, False)], []]}
+    reads = {
+        id(adapter.currentModel): [[], []],
+        id(child): [[("ChildMate", 48, False)], []],
+    }
 
     def faults(_adapter, model):
         return reads[id(model)].pop(0)
@@ -172,16 +175,39 @@ def test_in_place_save_checks_solve_state_at_the_save_chokepoint() -> None:
     rebuild = source.index("rebuild_if_needed_before_save(adapter, asm_name, asm)")
     save = source.index("asm.Save3(options, 0, 0)")
     assert rebuild < source.index("asm.GetSaveFlag()") < save
+    assert "_ensure_assembly_revision(adapter, asm)" in source
+    assert "must_save = geometry_changed or revision_changed" in source
     assert "final_rebuild_before_save(adapter, asm_name, asm)" not in source
+
+
+def test_in_place_save_restamps_stale_revision(monkeypatch) -> None:
+    import _assembly
+
+    expected = _assembly._config.release_revision()
+    stale = f"v{int(expected[1:]) - 1}"
+    model = SimpleNamespace(
+        GetCustomInfoValue=lambda _configuration, name: (
+            stale if name == "Revision" else ""
+        )
+    )
+    adapter = _Adapter()
+    writes = []
+    monkeypatch.setattr(
+        _assembly,
+        "apply_custom_properties",
+        lambda _adapter, props, *, model=None: writes.append((props, model)),
+    )
+    assert _assembly._ensure_assembly_revision(adapter, model) is True
+    assert writes == [({"Revision": expected}, model)]
 
 
 def test_fresh_build_checks_solve_state_after_gates_and_view_setup() -> None:
     source = inspect.getsource(save_assembly_and_images)
     assert source.count("final_rebuild_before_save(adapter, asm_name)") == 1
     assert source.count("rebuild_if_needed_before_save(adapter, asm_name)") == 1
-    assert source.index("rebuild_if_needed_before_save(adapter, asm_name)") < source.index(
-        "_save_new_assembly_as_copy(adapter, asm_path)"
-    )
+    assert source.index(
+        "rebuild_if_needed_before_save(adapter, asm_name)"
+    ) < source.index("_save_new_assembly_as_copy(adapter, asm_path)")
 
 
 def test_refresh_dof_gate_uses_saved_manifest(tmp_path, monkeypatch) -> None:
@@ -217,9 +243,7 @@ def test_refresh_dof_gate_can_reuse_an_already_resolved_model(
     )
     adapter = _Adapter()
     adapter.currentModel.GetComponents = lambda _top_only: [component]
-    adapter.currentModel.ForceRebuild3 = (
-        lambda _top_only: rebuilds.append(True) or True
-    )
+    adapter.currentModel.ForceRebuild3 = lambda _top_only: rebuilds.append(True) or True
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
     (tmp_path / ".free.dof.json").write_text(
         json.dumps({"stem": "free", "specs": [{"verify": ["crank-1", []]}]}),
@@ -273,9 +297,7 @@ def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) ->
     ]
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
     (tmp_path / ".channel.dof.json").write_text(
-        json.dumps(
-            {"stem": "channel", "specs": [{"verify": ["rocker-arm-1", []]}]}
-        ),
+        json.dumps({"stem": "channel", "specs": [{"verify": ["rocker-arm-1", []]}]}),
         encoding="utf-8",
     )
     with pytest.raises(RuntimeError, match="structural-bracket-1"):
