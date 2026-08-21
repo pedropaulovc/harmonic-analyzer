@@ -30,6 +30,7 @@ from _buildgraph import (  # noqa: E402
     stamps_title_block_properties,
 )
 from _assembly import assembly_title_properties  # noqa: E402
+from _common import part_properties  # noqa: E402
 
 
 def _helper_names(stem_script: str) -> set[str]:
@@ -51,7 +52,8 @@ def test_references_is_inverse_of_dependents():
         legacy = set(dependents_of(s))
         if direct and "harmonic_analyzer" not in direct:
             assert legacy == direct | {"harmonic_analyzer"}, (
-                f"{s}: legacy {legacy} != direct {direct} + transitive top")
+                f"{s}: legacy {legacy} != direct {direct} + transitive top"
+            )
         else:
             assert legacy == direct, f"{s}: legacy {legacy} != direct {direct}"
 
@@ -63,8 +65,9 @@ def test_output_subs_reference_their_parts_only():
         assert refs, f"{stem} should reference its parts"
         parts = set(part_stems())
         assert set(refs) <= parts, f"{stem} references non-parts: {set(refs) - parts}"
-        assert not (set(refs) & set(ASSEMBLY_ORDER)), \
+        assert not (set(refs) & set(ASSEMBLY_ORDER)), (
             f"{stem} must not reference a sub-assembly"
+        )
 
 
 def test_top_references_subassemblies_and_loose_parts():
@@ -74,8 +77,15 @@ def test_top_references_subassemblies_and_loose_parts():
     T24), not here -- at the top level its leaf name would collide with the
     T12/T24 instances nested in drive-train / paper-drive."""
     refs = set(references_of("harmonic_analyzer"))
-    subs = {"frame", "drive_train", "channel", "summing", "magnifier", "pen",
-            "paper_drive"}
+    subs = {
+        "frame",
+        "drive_train",
+        "channel",
+        "summing",
+        "magnifier",
+        "pen",
+        "paper_drive",
+    }
     loose = {"measuring_stick"}
     assert refs == subs | loose, refs
 
@@ -103,7 +113,9 @@ def test_module_deps_are_transitive():
     import (so parts.yaml-driven custom properties stay correctly tracked)."""
     links = _helper_names("build_chain_inner_link.py")
     assert {"_chain_link", "_chain", "_common"} <= links, links
-    assert "_config" in _helper_names("build_lever_bushing.py"), "lazy _config edge lost"
+    assert "_config" in _helper_names("build_lever_bushing.py"), (
+        "lazy _config edge lost"
+    )
 
 
 def test_closure_follows_reused_build_scripts():
@@ -119,7 +131,9 @@ def test_closure_follows_reused_build_scripts():
 def test_specialized_helper_blast_radius_is_narrow():
     """_gear reaches only its real importers, not the fleet."""
     gear_users = [s for s in part_stems() if "_gear" in _helper_names(f"build_{s}.py")]
-    feat_users = [s for s in part_stems() if "_features" in _helper_names(f"build_{s}.py")]
+    feat_users = [
+        s for s in part_stems() if "_features" in _helper_names(f"build_{s}.py")
+    ]
     assert 0 < len(gear_users) < len(part_stems()), gear_users
     # spring/screw/nameplate feature builders reach only their handful of parts
     # (their direct importers + any part that reuses one of those build scripts)
@@ -167,7 +181,9 @@ def test_config_files_no_part_reads_dimensions():
     script (only the offline DIMENSIONS gate touches it), so the fine-grained
     dependency must never list it -- editing dimensions.yaml rebuilds nothing."""
     for stem in part_stems():
-        assert "dimensions.yaml" not in config_files_of(SCRIPTS_DIR / f"build_{stem}.py"), stem
+        assert "dimensions.yaml" not in config_files_of(
+            SCRIPTS_DIR / f"build_{stem}.py"
+        ), stem
     for stem in ASSEMBLY_ORDER:
         assert "dimensions.yaml" not in config_files_of(script_for(stem)), stem
 
@@ -180,7 +196,9 @@ def test_config_files_track_real_reads():
     (amplitudes/cone_teeth); every part needs the parts registry via _common."""
     cone = config_files_of(SCRIPTS_DIR / "build_cone_gear.py")
     assert "machine/gear_train.yaml" in cone
-    assert "machine/channels.yaml" not in cone, "gear must NOT depend on active_count's file"
+    assert "machine/channels.yaml" not in cone, (
+        "gear must NOT depend on active_count's file"
+    )
     assert "parts/*" in cone, "stamps its own properties -> parts registry token"
     assert "channels.yaml" in config_files_of(script_for("drive_train"))
     assert "channels.yaml" in config_files_of(script_for("channel"))
@@ -203,13 +221,13 @@ def test_config_files_conservative_on_unknown_use():
     under-invalidate). Note machine()/parts() with a dynamic arg are NOT errors:
     they widen to the whole family (machine/* | parts/*), still conservative."""
     raise_cases = [
-        "import _config\nx = _config.frobnicate()\n",            # unmapped accessor
+        "import _config\nx = _config.frobnicate()\n",  # unmapped accessor
         "import _config\nd = 'machine'\nx = _config._doc(d)\n",  # dynamic doc arg
-        "import _config\nx = _config.provenance(name)\n",        # dynamic provenance
-        "import _config\nf = _config._doc\n",                    # family accessor, not a literal call
-        "import _config\nx = _config._doc('nope')\n",            # literal but unknown doc
+        "import _config\nx = _config.provenance(name)\n",  # dynamic provenance
+        "import _config\nf = _config._doc\n",  # family accessor, not a literal call
+        "import _config\nx = _config._doc('nope')\n",  # literal but unknown doc
         "import _config\nx = _config.machine('no_such_sub')\n",  # unknown machine subsystem
-        "from _config import machine\nx = machine()\n",          # bare-name import (untracked)
+        "from _config import machine\nx = machine()\n",  # bare-name import (untracked)
     ]
     for src in raise_cases:
         try:
@@ -221,16 +239,35 @@ def test_config_files_conservative_on_unknown_use():
 
 def test_config_files_resolve_known_forms():
     """The classifiable forms resolve to exactly the right file token(s)."""
-    assert _tokens("import _config\nx = _config.machine('gear_train', 'k')\n") == frozenset({"machine/gear_train.yaml"})
-    assert _tokens("import _config\nx = _config.active_count()\n") == frozenset({"machine/channels.yaml"})
-    assert _tokens("import _config\nx = _config.fit('g', 'k')\n") == frozenset({"tolerances.yaml"})
-    assert _tokens("import _config\nx = _config.channels()\n") == frozenset({"channels.yaml"})
-    assert _tokens("import _config\nx = _config._doc('tolerances')\n") == frozenset({"tolerances.yaml"})
+    assert _tokens(
+        "import _config\nx = _config.machine('gear_train', 'k')\n"
+    ) == frozenset({"machine/gear_train.yaml"})
+    assert _tokens("import _config\nx = _config.active_count()\n") == frozenset(
+        {"machine/channels.yaml"}
+    )
+    assert _tokens("import _config\nx = _config.fit('g', 'k')\n") == frozenset(
+        {"tolerances.yaml"}
+    )
+    assert _tokens("import _config\nx = _config.release_revision()\n") == frozenset(
+        {"release.yaml"}
+    )
+    assert _tokens("import _config\nx = _config.channels()\n") == frozenset(
+        {"channels.yaml"}
+    )
+    assert _tokens("import _config\nx = _config._doc('tolerances')\n") == frozenset(
+        {"tolerances.yaml"}
+    )
     # a dynamic machine/parts arg widens to the whole family (conservative, not an error).
-    assert _tokens("import _config\nx = _config.machine(sub, 'k')\n") == frozenset({"machine/*"})
-    assert _tokens("import _config\nx = _config.parts(name)\n") == frozenset({"parts/*"})
+    assert _tokens("import _config\nx = _config.machine(sub, 'k')\n") == frozenset(
+        {"machine/*"}
+    )
+    assert _tokens("import _config\nx = _config.parts(name)\n") == frozenset(
+        {"parts/*"}
+    )
     # an aliased module import is still tracked.
-    assert _tokens("import _config as cfg\nx = cfg.machine('output')\n") == frozenset({"machine/output.yaml"})
+    assert _tokens("import _config as cfg\nx = cfg.machine('output')\n") == frozenset(
+        {"machine/output.yaml"}
+    )
     # no _config use at all -> empty read-set (no config dependency).
     assert _tokens("WIDTH = 3.0\n") == frozenset()
 
@@ -245,13 +282,18 @@ def test_config_accessor_coverage():
     import _config
 
     accessors = {
-        name for mod in (_config,)
+        name
+        for mod in (_config,)
         for name, fn in inspect.getmembers(mod, inspect.isfunction)
-        if fn.__module__ == mod.__name__ and not name.startswith("__") and name != "_load"
+        if fn.__module__ == mod.__name__
+        and not name.startswith("__")
+        and name != "_load"
     }
     classified = set(bg._FIXED_ACCESSOR_TOKENS) | set(bg._FAMILY_ACCESSORS)
     missing = accessors - classified
-    assert not missing, f"unclassified config accessors (map them in _buildgraph): {missing}"
+    assert not missing, (
+        f"unclassified config accessors (map them in _buildgraph): {missing}"
+    )
 
 
 def test_pen_assembly_free_of_pen_driver_closure():
@@ -288,12 +330,12 @@ def test_module_deps_follow_non_helper_siblings():
 def test_part_and_title_property_stampers_are_distinct():
     """Assembly identity must not masquerade as in-script part generation."""
     title_stampers = {
-        stem for stem in ASSEMBLY_ORDER
+        stem
+        for stem in ASSEMBLY_ORDER
         if stamps_title_block_properties(script_for(stem))
     }
     part_stampers = {
-        stem for stem in ASSEMBLY_ORDER
-        if stamps_part_properties(script_for(stem))
+        stem for stem in ASSEMBLY_ORDER if stamps_part_properties(script_for(stem))
     }
     assert title_stampers == set(ASSEMBLY_ORDER)
     assert part_stampers == {"channel"}
@@ -307,6 +349,7 @@ def test_assembly_title_properties_never_read_part_registry_fields():
     props = assembly_title_properties("frame")
     assert set(props) == {
         "Title",
+        "Revision",
         "Generator",
         "TOL_LIN_XX",
         "TOL_LIN_XXX",
@@ -316,7 +359,16 @@ def test_assembly_title_properties_never_read_part_registry_fields():
         "TOL_HOLE_PLUS",
     }
     assert props["Title"] == "frame"
+    import _config
+
+    assert props["Revision"] == _config.release_revision()
     assert props["Generator"].startswith("harmonic-analyzer @ ")
+
+
+def test_part_properties_use_release_revision():
+    import _config
+
+    assert part_properties("platen-guide")["Revision"] == _config.release_revision()
 
 
 def _run() -> int:

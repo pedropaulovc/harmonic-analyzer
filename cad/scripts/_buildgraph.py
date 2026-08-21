@@ -35,8 +35,16 @@ _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECAS
 # six subs, so it is last. doit derives ordering from file_dep, but this tuple
 # still enumerates the assembly tasks. The former monolithic ``output`` is split
 # by function into summing -> magnifier -> pen (the value chain) + paper-drive.
-ASSEMBLY_ORDER = ("frame", "drive_train", "channel", "summing", "magnifier", "pen",
-                  "paper_drive", "harmonic_analyzer")
+ASSEMBLY_ORDER = (
+    "frame",
+    "drive_train",
+    "channel",
+    "summing",
+    "magnifier",
+    "pen",
+    "paper_drive",
+    "harmonic_analyzer",
+)
 
 # Scripts that match build_*.py but produce no .SLDPRT part in the SolidWorks
 # queue -- excluded from the part list: motion/diagnostic deliverables that
@@ -68,8 +76,11 @@ def part_scripts() -> list[Path]:
     scripts and the orchestrator."""
     out = []
     for path in sorted(SCRIPTS_DIR.glob("build_*.py")):
-        if (path.name in NON_PART_SCRIPTS or path.name in _POST_SCRIPT_NAMES
-                or path.name.endswith("_assembly.py")):
+        if (
+            path.name in NON_PART_SCRIPTS
+            or path.name in _POST_SCRIPT_NAMES
+            or path.name.endswith("_assembly.py")
+        ):
             continue
         out.append(path)
     return out
@@ -163,8 +174,13 @@ def _local_modules() -> dict[str, Path]:
     detection) -- a build it kills produces NO artefact at all, so its content can
     never change saved CAD bytes either (codex #344).
     """
-    skip = {"_buildgraph.py", "_extract.py", "_rewrite_imports.py", "_telemetry.py",
-            "_watchdog.py"}
+    skip = {
+        "_buildgraph.py",
+        "_extract.py",
+        "_rewrite_imports.py",
+        "_telemetry.py",
+        "_watchdog.py",
+    }
     out: dict[str, Path] = {}
     for p in sorted(SCRIPTS_DIR.glob("*.py")):
         if p.name not in skip and not p.name.startswith("test_"):
@@ -265,22 +281,6 @@ def data_deps_of(script: Path) -> list[str]:
 # The two largest data files are SPLIT into per-concern files (see _config.py,
 # which re-aggregates them transparently), so the dependency can be per-subsystem
 # / per-part rather than per-file:
-#     cad/config/machine/<subsystem>.yaml   (+ _base.yaml = units)
-#     cad/config/parts/<dashed-name>.yaml   (+ _defaults.yaml)
-# A gear part that reads only machine("gear_train", ...) no longer rebuilds when
-# machine channels.active_count changes (that lives in machine/channels.yaml), and
-# editing ONE part's registry row rebuilds only that one part.
-#
-# CORRECTNESS FIRST -- this must never UNDER-invalidate (a missed dep = a silent
-# stale-geometry build, far worse than an over-rebuild). The read-set is derived
-# by STATIC analysis of every ``_config.<accessor>(...)`` call across a script's
-# transitive import closure (``module_deps_of`` -- the same closure doit already
-# tracks for .py edits). It is conservative by construction: ANY config access it
-# cannot classify -- an unmapped accessor, an unresolvable ``provenance``/``_doc``
-# doc argument, a ``from _config import ...`` (whose bare names we don't follow),
-# or an unparseable source -- collapses the whole script to the ``"**"`` token
-# (depends on every config file). So the only way to be wrong is to OVER-rebuild.
-#
 # ``config_files_of`` returns config-relative TOKENS: a concrete path
 # (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/cone-gear.yaml"``)
 # or one of four dynamic tokens -- ``"machine/*"`` (whole machine family, for a
@@ -302,6 +302,7 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
     "active_count": frozenset({"machine/channels.yaml"}),
     "active_channels": frozenset({"channels.yaml", "machine/channels.yaml"}),
     "fit": frozenset({"tolerances.yaml"}),
+    "release_revision": frozenset({"release.yaml"}),
     # title_block is read only by _common.part_properties (the TOL_* stamping),
     # so it emits a DYNAMIC token dodo narrows per task exactly like "parts/*":
     # parts (and stamping assemblies) -> title_block.yaml; a non-stamping
@@ -317,7 +318,8 @@ _FIXED_ACCESSOR_TOKENS: dict[str, frozenset[str]] = {
 #   parts(<dashed-name>)      -> parts/<name>.yaml+_defaults (dynamic -> parts/*)
 #   provenance/_doc(<doc>)    -> that doc's file family      (dynamic -> "**")
 _FAMILY_ACCESSORS: frozenset[str] = frozenset(
-    {"machine", "parts", "provenance", "_doc"})
+    {"machine", "parts", "provenance", "_doc"}
+)
 
 
 class _UnknownConfigUse(Exception):
@@ -335,14 +337,22 @@ def _top_level_docs() -> frozenset[str]:
 def _machine_subsystems() -> frozenset[str]:
     """Machine subsystem stems (``machine/<sub>.yaml`` minus the units _base)."""
     d = CONFIG_DIR / "machine"
-    return frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_base") if d.is_dir() else frozenset()
+    return (
+        frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_base")
+        if d.is_dir()
+        else frozenset()
+    )
 
 
 @functools.lru_cache(maxsize=1)
 def _part_registry_names() -> frozenset[str]:
     """Per-part registry stems (``parts/<dashed-name>.yaml`` minus _defaults)."""
     d = CONFIG_DIR / "parts"
-    return frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_defaults") if d.is_dir() else frozenset()
+    return (
+        frozenset(p.stem for p in d.glob("*.yaml") if p.stem != "_defaults")
+        if d.is_dir()
+        else frozenset()
+    )
 
 
 def _doc_family_tokens(doc: str) -> frozenset[str] | None:
@@ -363,16 +373,16 @@ def _family_tokens(accessor: str, arg: str | None) -> frozenset[str]:
     string, or None when there is no positional arg OR it is non-literal."""
     if accessor == "machine":
         if arg is None:
-            return frozenset({"machine/*"})           # dynamic subsystem -> whole family
+            return frozenset({"machine/*"})  # dynamic subsystem -> whole family
         if arg in _machine_subsystems():
             return frozenset({f"machine/{arg}.yaml"})
-        raise _UnknownConfigUse                        # unknown subsystem
+        raise _UnknownConfigUse  # unknown subsystem
     if accessor == "parts":
         if arg is None:
-            return frozenset({"parts/*"})             # dynamic part name (the _common path)
+            return frozenset({"parts/*"})  # dynamic part name (the _common path)
         if arg in _part_registry_names():
             return frozenset({f"parts/{arg}.yaml", "parts/_defaults.yaml"})
-        raise _UnknownConfigUse                        # unknown registry row
+        raise _UnknownConfigUse  # unknown registry row
     # provenance / _doc: a non-literal doc name is unresolvable -> whole config.
     if arg is None:
         raise _UnknownConfigUse
@@ -435,17 +445,23 @@ def _config_tokens_in_source(path: Path) -> frozenset[str]:
     # used in any OTHER position trips the fallback below.
     resolved_family: set[int] = set()
     for node in ast.walk(tree):
-        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id in aliases
-                and node.func.attr in _FAMILY_ACCESSORS):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id in aliases
+            and node.func.attr in _FAMILY_ACCESSORS
+        ):
             tokens |= _family_tokens(node.func.attr, _literal_first_arg(node))
             resolved_family.add(id(node.func))
 
     # Every `<alias>.<attr>` access must be a classified accessor.
     for node in ast.walk(tree):
-        if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
-                and node.value.id in aliases):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in aliases
+        ):
             attr = node.attr
             if attr in _FIXED_ACCESSOR_TOKENS:
                 tokens |= _FIXED_ACCESSOR_TOKENS[attr]
@@ -553,8 +569,8 @@ def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
     local_names = frozenset(mods)
     # Per module: each top-level function's call names, plus import resolution.
     func_calls: dict[tuple[str, str], tuple[set[str], set[tuple[str, str]]]] = {}
-    imp_name: dict[str, dict[str, tuple[str, str]]] = {}   # stem -> name -> (mod, orig)
-    imp_alias: dict[str, dict[str, str]] = {}              # stem -> alias -> mod
+    imp_name: dict[str, dict[str, tuple[str, str]]] = {}  # stem -> name -> (mod, orig)
+    imp_alias: dict[str, dict[str, str]] = {}  # stem -> alias -> mod
     for stem, path in mods.items():
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -563,7 +579,11 @@ def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
         n2q: dict[str, tuple[str, str]] = {}
         a2m: dict[str, str] = {}
         for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module in local_names:
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.level == 0
+                and node.module in local_names
+            ):
                 for a in node.names:
                     n2q[a.asname or a.name] = (node.module, a.name)
             elif isinstance(node, ast.Import):

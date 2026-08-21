@@ -42,8 +42,8 @@ flowchart TD
 
     EXPORT --> COMMIT["⑨ git commit + push<br/>(lint/test first)"]
 
-    COMMIT --> REL["⑩ cut_release.py<br/>[vX.Y.Z | --bump patch/minor/major]"]
-    REL --> PRE{"Preflight:<br/>tag free · tree clean ·<br/>TOP .SLDASM built ·<br/>boxes fresh + unit=mm"}
+    COMMIT --> REL["⑩ cut_release.py<br/>[next vNN; CAD Revision=vNN]"]
+    REL --> PRE{"Preflight:<br/>tag free · tree clean ·<br/>CAD Revision matches tag ·<br/>TOP .SLDASM built · boxes fresh + unit=mm"}
     PRE -->|fail| FAILR["✗ SystemExit"]
 
     PRE -->|pass| PNG["⑩a Pack-and-Go +<br/>re-export STEP/STL/PNG<br/>into stage/"]
@@ -58,9 +58,10 @@ flowchart TD
     BUNDLE["⑩c make_archive"]
     BUNDLE -.->|ASSET| ABUN[("cad/out/release/<br/>harmonic-analyzer-&lt;ver&gt;.zip<br/>= solidworks + step + stl +<br/>boxes + png + diff")]
 
-    ABUN --> TAG["⑩d git tag -a vX.Y.Z<br/>git push origin vX.Y.Z"]
-    TAG --> GH["🚀 ⑩e gh release create vX.Y.Z"]
-    GH -.->|ASSETS| AGH[("GitHub Release vX.Y.Z<br/>bundle.zip + diff PNGs<br/>notes: commit SHA · SW rev ·<br/>inventory · changed-parts gallery")]
+    ABUN --> TAG["⑩d git tag -a vNN<br/>git push origin vNN"]
+    TAG --> GH["🚀 ⑩e gh release create vNN"]
+    GH -.->|ASSETS| AGH[("GitHub Release vNN<br/>bundle.zip + diff PNGs<br/>notes: commit SHA · SW rev ·<br/>inventory · changed-parts gallery")]
+    GH --> BUMP["⑩f advance release.yaml<br/>to next vNN<br/>commit + merge required"]
 
     classDef gate fill:#fff3cd,stroke:#d39e00,color:#000;
     classDef fail fill:#f8d7da,stroke:#c00,color:#000;
@@ -71,4 +72,4 @@ flowchart TD
     class FAIL1,FAIL2,FAILV,FAILR fail;
     class SKIP gate;
     class APART,AASM,AEXP,APNG,ADIFF,ABUN,AGH asset;
-    class REL,TAG,GH,BUNDLE,PNG,DIFF rel;
+    class REL,TAG,GH,BUNDLE,PNG,DIFF,BUMP rel;

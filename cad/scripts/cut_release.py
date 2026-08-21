@@ -13,7 +13,8 @@ matching GitHub release so a consumer can open the model without rebuilding.
 What it does, in order:
 
   1. Resolve the version (``vNN``): explicit positional, or increment the latest
-     compact release tag (``v21`` -> ``v22``).
+     compact release tag (``v31`` -> ``v32``), and require
+     ``cad/config/release.yaml`` to reserve that same CAD Revision.
   2. Pre-flight: tag must not already exist; the committed tree must be clean
      (``--allow-dirty`` to override); harmonic-analyzer.SLDASM must be built.
   3. SolidWorks (COM): open harmonic-analyzer.SLDASM and run Pack-and-Go flattened.
@@ -38,6 +39,8 @@ What it does, in order:
      ``<top>-<version>-logs.zip`` when there are several (a lone log goes up
      as-is). ``--no-publish`` runs everything EXCEPT this step (no git tag/push,
      no gh) and just reports the assets it would have uploaded.
+  7. On a successful publish, advance ``release.yaml`` to the next revision and
+     warn the release agent to commit and merge that tracked version bump.
 
 Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
 a concurrent build_all/verify deadlocks):
@@ -64,6 +67,7 @@ from pathlib import Path
 from typing import Any
 
 from _common import CAD_ROOT, OUT_SLDASM, log
+import _config
 from _drawing_registry import DRAWINGS
 from export_models import stage_release_neutral
 
@@ -95,9 +99,17 @@ DRAWING_OUTPUTS = {drawing.name: drawing.outputs for drawing in DRAWINGS}
 # truth) and ATTRIBUTION.md (CC BY credits for the shipped reference imagery) ride
 # along so the downloaded bundle is standalone + compliant.
 COMPARISONS_DIR = CAD_ROOT / "comparisons"
-_GALLERY_STAGE = ("ref", "render", "composite", "scores.json", "index.html",
-                  "manifest.json", "ATTRIBUTION.md")
+_GALLERY_STAGE = (
+    "ref",
+    "render",
+    "composite",
+    "scores.json",
+    "index.html",
+    "manifest.json",
+    "ATTRIBUTION.md",
+)
 _VERSION_RE = re.compile(r"^v([1-9]\d*)$")
+RELEASE_VERSION_FILE = (CAD_ROOT / "config" / "release.yaml").resolve()
 
 # SolidWorks COM type library (SldWorks); the version pins the same revision the
 # pywin32 gen_py module exposes (...x0x34x0) so comtypes generates matching stubs.
@@ -107,13 +119,16 @@ SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
 SW_DOC_DRAWING = 3  # swDocumentTypes_e.swDocDRAWING
 SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
 
+
 # --------------------------------------------------------------------------- #
 # git / gh helpers (plain subprocess -- no SolidWorks involvement)
 # --------------------------------------------------------------------------- #
 def _git(*args: str, check_rc: bool = True) -> str:
     proc = subprocess.run(
-        ["git", *args], cwd=str(REPO_ROOT),
-        capture_output=True, text=True,
+        ["git", *args],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
     )
     if check_rc and proc.returncode:
         raise RuntimeError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
@@ -122,8 +137,10 @@ def _git(*args: str, check_rc: bool = True) -> str:
 
 def _gh(*args: str) -> str:
     proc = subprocess.run(
-        ["gh", *args], cwd=str(REPO_ROOT),
-        capture_output=True, text=True,
+        ["gh", *args],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
     )
     if proc.returncode:
         raise RuntimeError(f"gh {' '.join(args)} failed: {proc.stderr.strip()}")
@@ -151,6 +168,42 @@ def resolve_version(explicit: str | None) -> str:
     if not tags:
         return "v1"
     return f"v{tags[-1] + 1}"
+
+
+def configured_revision() -> str:
+    """Return the tracked CAD revision reserved for the next release."""
+    value = _config.release_revision()
+    if not _VERSION_RE.fullmatch(value):
+        raise RuntimeError(f"invalid configured CAD revision: {value!r}")
+    return value
+
+
+def require_configured_revision(version: str) -> None:
+    """Ensure the release tag matches the revision stamped into native CAD."""
+    expected = configured_revision()
+    if expected != version:
+        raise SystemExit(
+            f"!!  release {version} does not match configured CAD Revision {expected}; "
+            "update cad/config/release.yaml and rebuild the CAD before cutting it"
+        )
+
+
+def advance_configured_revision(version: str) -> str:
+    """Advance the tracked next-release revision after a published release."""
+    require_configured_revision(version)
+    next_version = f"v{int(version[1:]) + 1}"
+    source = RELEASE_VERSION_FILE
+    text = source.read_text(encoding="utf-8")
+    updated, count = re.subn(
+        r"(?m)^(\s*next_revision:\s*)v[1-9]\d*(\s*)$",
+        rf"\g<1>{next_version}\g<2>",
+        text,
+        count=1,
+    )
+    if count != 1:
+        raise RuntimeError(f"could not advance next_revision in {source}")
+    source.write_text(updated, encoding="utf-8")
+    return next_version
 
 
 def previous_tag(version: str) -> str | None:
@@ -189,11 +242,24 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
     # brute-force Hausdorff per changed mesh) and the per-view render take
     # minutes, so capturing-and-swallowing left the release looking hung.
     proc = subprocess.Popen(
-        ["uv", "run", str(RENDER_DIFF),
-         "--old-release", prev_tag, "--new-local", str(stage),
-         "--out", str(diff_dir), "--summary-json", str(summary)],
-        cwd=str(REPO_ROOT), stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, text=True, bufsize=1,
+        [
+            "uv",
+            "run",
+            str(RENDER_DIFF),
+            "--old-release",
+            prev_tag,
+            "--new-local",
+            str(stage),
+            "--out",
+            str(diff_dir),
+            "--summary-json",
+            str(summary),
+        ],
+        cwd=str(REPO_ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
     )
     tail: list[str] = []
     assert proc.stdout is not None
@@ -205,12 +271,15 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
             del tail[0]
     if proc.wait() != 0 or not summary.exists():
         raise RuntimeError(
-            f"diff render FAILED (release blocked): {' / '.join(tail)[-400:]}")
+            f"diff render FAILED (release blocked): {' / '.join(tail)[-400:]}"
+        )
     data = json.loads(summary.read_text(encoding="utf-8"))
     data["prev"] = prev_tag
     data["image_paths"] = [diff_dir / n for n in data.get("images", [])]
-    log(f"diff render: {len(data.get('changed_parts', []))} changed parts, "
-        f"{len(data['image_paths'])} views")
+    log(
+        f"diff render: {len(data.get('changed_parts', []))} changed parts, "
+        f"{len(data['image_paths'])} views"
+    )
     return data
 
 
@@ -241,16 +310,20 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
         # set + a parseable scores.json covering every pair; anything short is
         # treated exactly like "not produced" (all regenerable, never fatal).
         manifest = json.loads(
-            (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8"))
+            (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8")
+        )
         ids = [p["id"] for p in manifest["pairs"]]
         required = [COMPARISONS_DIR / "index.html", scores_file]
         for pid in ids:
-            required += [COMPARISONS_DIR / "render" / f"{pid}.jpg",
-                         COMPARISONS_DIR / "composite" / f"{pid}_cad.jpg",
-                         COMPARISONS_DIR / "composite" / f"{pid}_blend.jpg",
-                         COMPARISONS_DIR / "ref" / f"{pid}.jpg"]
-        missing = [str(p.relative_to(COMPARISONS_DIR)) for p in required
-                   if not p.exists()]
+            required += [
+                COMPARISONS_DIR / "render" / f"{pid}.jpg",
+                COMPARISONS_DIR / "composite" / f"{pid}_cad.jpg",
+                COMPARISONS_DIR / "composite" / f"{pid}_blend.jpg",
+                COMPARISONS_DIR / "ref" / f"{pid}.jpg",
+            ]
+        missing = [
+            str(p.relative_to(COMPARISONS_DIR)) for p in required if not p.exists()
+        ]
         scores: dict[str, Any] = {}
         if scores_file.exists():
             try:
@@ -264,9 +337,12 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
                 f"produce it (needs Blender on the export seat); {len(missing)} "
                 f"missing, e.g. {', '.join(missing[:4])}. Shipping bundle without "
                 "it. Produce it with `doit export` on a Blender seat, or "
-                "`uv run cad/comparisons/tools/render_offline.py`.")
-            _telemetry.event("comparisons.skipped",
-                             reason=f"incomplete: {', '.join(missing[:8])}"[:200])
+                "`uv run cad/comparisons/tools/render_offline.py`."
+            )
+            _telemetry.event(
+                "comparisons.skipped",
+                reason=f"incomplete: {', '.join(missing[:8])}"[:200],
+            )
             sp.set_attribute("staged", False)
             return None
 
@@ -277,12 +353,14 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
         # the release notes, see release_notes).
         stale = scores_file.stat().st_mtime < max(
             SCENE_JSON.stat().st_mtime,
-            (COMPARISONS_DIR / "manifest.json").stat().st_mtime)
+            (COMPARISONS_DIR / "manifest.json").stat().st_mtime,
+        )
         if stale:
             _telemetry.warn(
                 "comparison gallery is OLDER than the exported scene graph or the "
                 "manifest -- it may not reflect this release's geometry/poses "
-                "(export ran without Blender?). Shipping the existing gallery.")
+                "(export ran without Blender?). Shipping the existing gallery."
+            )
             sp.set_attribute("stale", True)
 
         dst = stage / "comparisons"
@@ -308,15 +386,18 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
         }
         sp.set_attribute("staged", True)
         sp.set_attribute("pairs", facts["pairs"])
-        log(f"comparison gallery: staged {facts['pairs']} pairs"
+        log(
+            f"comparison gallery: staged {facts['pairs']} pairs"
             + (f" (mean RMS score {facts['mean_score']})" if vals else "")
             + f", {staged} files"
-            + (" [STALE vs geometry]" if stale else ""))
+            + (" [STALE vs geometry]" if stale else "")
+        )
         return facts
 
 
 def preflight(version: str, allow_dirty: bool) -> None:
     """Fail fast before touching SolidWorks or creating anything."""
+    require_configured_revision(version)
     if _git("tag", "--list", version):
         raise SystemExit(f"!!  tag {version} already exists -- pick another version")
 
@@ -326,27 +407,28 @@ def preflight(version: str, allow_dirty: bool) -> None:
     if dirty and not allow_dirty:
         raise SystemExit(
             "!!  working tree has uncommitted changes -- commit first (or "
-            f"--allow-dirty):\n{dirty}")
+            f"--allow-dirty):\n{dirty}"
+        )
 
     top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
     if not top.exists():
-        raise SystemExit(
-            f"!!  {top} not built -- run doit first")
+        raise SystemExit(f"!!  {top} not built -- run doit first")
 
     # The bundle ships the render-cache scene graph; it must exist, be in the
     # post-normalization millimetre units (so it pairs with the mm STLs), and be
     # no older than the assembly it describes.
     if not SCENE_JSON.exists():
-        raise SystemExit(
-            f"!!  {SCENE_JSON} missing -- run export_models.py first")
+        raise SystemExit(f"!!  {SCENE_JSON} missing -- run export_models.py first")
     scene = json.loads(SCENE_JSON.read_text(encoding="utf-8"))
     if scene.get("unit") != "mm":
         raise SystemExit(
             f"!!  {SCENE_JSON.name} unit={scene.get('unit')!r}, expected 'mm' -- "
-            "re-run export_models.py (post mm-normalization)")
+            "re-run export_models.py (post mm-normalization)"
+        )
     if SCENE_JSON.stat().st_mtime < top.stat().st_mtime:
         raise SystemExit(
-            f"!!  {SCENE_JSON.name} older than {top.name} -- re-run export_models.py")
+            f"!!  {SCENE_JSON.name} older than {top.name} -- re-run export_models.py"
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -377,7 +459,8 @@ def _close_active_documents(sw: Any) -> None:
             raise RuntimeError(
                 f"active document has an empty title ({title!r}) -- refusing "
                 f"CloseDoc(''), which silently no-ops on assemblies and would "
-                f"leave the document resident")
+                f"leave the document resident"
+            )
         sw.CloseDoc(title)
 
 
@@ -411,14 +494,17 @@ def attach_solidworks() -> tuple[Any, str]:
     import comtypes.client
 
     mod = comtypes.client.GetModule((comtypes.GUID(SW_TYPELIB), *SW_TYPELIB_VER))
-    sw = comtypes.client.GetActiveObject("SldWorks.Application", interface=mod.ISldWorks)
+    sw = comtypes.client.GetActiveObject(
+        "SldWorks.Application", interface=mod.ISldWorks
+    )
     revision = sw.RevisionNumber()
     log(f"attached to SolidWorks, revision {revision}")
     return sw, revision
 
 
-def _pack_and_go_document(sw: Any, source: Path, doc_type: int,
-                          zip_path: Path) -> tuple[Path, ...]:
+def _pack_and_go_document(
+    sw: Any, source: Path, doc_type: int, zip_path: Path
+) -> tuple[Path, ...]:
     """Pack-and-Go ``source`` and all references into a flat zip.
 
     Pack-and-Go bundles a document with every file it references; SetSaveToName2
@@ -482,9 +568,7 @@ def _pack_and_go_document(sw: Any, source: Path, doc_type: int,
 def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
     """Pack-and-Go the top assembly into ``zip_path``."""
     top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
-    documents = _pack_and_go_document(
-        sw, top, SW_DOC_ASSEMBLY, zip_path
-    )
+    documents = _pack_and_go_document(sw, top, SW_DOC_ASSEMBLY, zip_path)
 
     return {
         "zip": zip_path,
@@ -538,8 +622,9 @@ def _git_provenance(version: str) -> dict[str, Any]:
     }
 
 
-def write_provenance(stage: Path, version: str, revision: str,
-                     facts: dict[str, Any]) -> dict[str, Any]:
+def write_provenance(
+    stage: Path, version: str, revision: str, facts: dict[str, Any]
+) -> dict[str, Any]:
     """Write ``SHA256SUMS.txt`` + ``PROVENANCE.json`` into the stage so they ride
     inside the release zip. The manifest hashes every *other* shipped file (the two
     provenance files exclude themselves -- self-reference is impossible); the JSON
@@ -558,8 +643,10 @@ def write_provenance(stage: Path, version: str, revision: str,
             "solidworks_revision": revision,
             "python": platform.python_version(),
             "platform": platform.platform(),
-            "builder": (f'{_git("config", "--get", "user.name", check_rc=False)} '
-                        f'<{_git("config", "--get", "user.email", check_rc=False)}>'),
+            "builder": (
+                f"{_git('config', '--get', 'user.name', check_rc=False)} "
+                f"<{_git('config', '--get', 'user.email', check_rc=False)}>"
+            ),
             "entrypoint": "doit release",
         },
         "model": {
@@ -575,8 +662,9 @@ def write_provenance(stage: Path, version: str, revision: str,
     # SHA256SUMS over every staged file except the two provenance files themselves.
     manifest = stage / "SHA256SUMS.txt"
     prov_json = stage / "PROVENANCE.json"
-    files = sorted(p for p in stage.rglob("*")
-                   if p.is_file() and p not in (manifest, prov_json))
+    files = sorted(
+        p for p in stage.rglob("*") if p.is_file() and p not in (manifest, prov_json)
+    )
     lines = [f"{_sha256(p)}  {p.relative_to(stage).as_posix()}" for p in files]
     manifest.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -587,9 +675,11 @@ def write_provenance(stage: Path, version: str, revision: str,
         "algorithm": "sha256",
     }
     prov_json.write_text(json.dumps(prov, indent=2) + "\n", encoding="utf-8")
-    log(f"provenance: commit {prov['git']['commit_short']} "
+    log(
+        f"provenance: commit {prov['git']['commit_short']} "
         f"(tree {'clean' if prov['git']['tree_clean'] else 'DIRTY'}), "
-        f"{prov['integrity']['file_count']} files hashed")
+        f"{prov['integrity']['file_count']} files hashed"
+    )
     return prov
 
 
@@ -687,7 +777,8 @@ def _merge_pack_and_go_zip(
                 known_sources[key] = original
             members.append(source.name)
         missing = sorted(
-            path.name for key, path in archive_sources.items()
+            path.name
+            for key, path in archive_sources.items()
             if key not in {name.casefold() for name in members}
         )
         if missing:
@@ -746,8 +837,9 @@ def package_drawings(
     return staged
 
 
-def bundle(sw: Any, revision: str, version: str,
-           prev_tag: str | None = None) -> tuple[Path, dict[str, Any]]:
+def bundle(
+    sw: Any, revision: str, version: str, prev_tag: str | None = None
+) -> tuple[Path, dict[str, Any]]:
     """Assemble the single release zip: Pack-and-Go + cached neutral STEP/STL/PNG.
 
     One ``harmonic-analyzer-<version>.zip`` with everything a consumer needs:
@@ -810,10 +902,12 @@ def bundle(sw: Any, revision: str, version: str,
     if not zip_path.exists() or zip_path.stat().st_size == 0:
         raise RuntimeError(f"release bundle not produced at {zip_path}")
     facts["size_mb"] = zip_path.stat().st_size / 1e6
-    log(f"release bundle: {zip_path.name} ({facts['size_mb']:.1f} MB) -- "
+    log(
+        f"release bundle: {zip_path.name} ({facts['size_mb']:.1f} MB) -- "
         f"solidworks/ + {facts['parts']} part STEP+STL + {facts['assemblies']} "
         f"assembly glTF (+{facts['config_meshes']} per-config STLs) + "
-        f"{facts['pngs']} PNGs + boxes/")
+        f"{facts['pngs']} PNGs + boxes/"
+    )
     return zip_path, facts
 
 
@@ -832,25 +926,32 @@ def _diff_section(version: str, diff: dict[str, Any] | None) -> str:
         return ""
     changed = diff.get("changed_parts", [])
     if not changed:
-        return (f"\n## Changed parts vs {diff['prev']}\n\n"
-                f"No part geometry changed since `{diff['prev']}`.\n")
-    base = (f"https://github.com/{_repo_slug()}/releases/download/{version}")
+        return (
+            f"\n## Changed parts vs {diff['prev']}\n\n"
+            f"No part geometry changed since `{diff['prev']}`.\n"
+        )
+    base = f"https://github.com/{_repo_slug()}/releases/download/{version}"
     parts = ", ".join(f"`{p}`" for p in changed)
     imgs = "".join(
         f'<img src="{base}/{name}" width="420" alt="diff {name}">\n'
-        for name in diff.get("images", [])[:2])
+        for name in diff.get("images", [])[:2]
+    )
     extra = diff.get("images", [])[2:]
-    more = ("".join(f'<img src="{base}/{n}" width="420">\n' for n in extra))
+    more = "".join(f'<img src="{base}/{n}" width="420">\n' for n in extra)
     return (
         f"\n## Changed parts vs {diff['prev']}\n\n"
         f"**{len(changed)} part(s)** changed geometry "
         f"(red = changed, confirmed by Hausdorff distance; tessellation/byte "
         f"noise excluded): {parts}\n\n"
         f"{imgs}"
-        + (f"<details><summary>more views</summary>\n\n{more}</details>\n"
-           if extra else "")
+        + (
+            f"<details><summary>more views</summary>\n\n{more}</details>\n"
+            if extra
+            else ""
+        )
         + "\n_Generated by `cad/comparisons/tools/render_diff.py`; renders also ship "
-        "in the bundle under `diff/`._\n")
+        "in the bundle under `diff/`._\n"
+    )
 
 
 def release_notes(version: str, facts: dict[str, Any]) -> str:
@@ -875,25 +976,42 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"this bundle with `cad/comparisons/tools/render_offline.py` (no SolidWorks)\n"
         f"- `png/` -- isometric preview renders "
         f"({facts['pngs']} images)\n"
-        + (f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
-           f"({facts['comparisons']['pairs']} pairs"
-           + (f", mean RMS score {facts['comparisons']['mean_score']}"
-              if facts['comparisons'].get('mean_score') is not None else "")
-           + "; open `comparisons/index.html`)"
-           + (" **[STALE -- rendered from an OLDER geometry export/manifest; "
-              "do not treat the visual fit as authoritative for this release]**"
-              if facts['comparisons'].get('stale') else "")
-           + "\n"
-           if facts.get("comparisons") else "")
-        + (f"- `diff/` -- changed-parts diff renders vs "
-           f"{facts['diff']['prev']} (see below)\n" if facts.get("diff") else "")
+        + (
+            f"- `comparisons/` -- this model overlaid on Michelson's ch30 photos "
+            f"({facts['comparisons']['pairs']} pairs"
+            + (
+                f", mean RMS score {facts['comparisons']['mean_score']}"
+                if facts["comparisons"].get("mean_score") is not None
+                else ""
+            )
+            + "; open `comparisons/index.html`)"
+            + (
+                " **[STALE -- rendered from an OLDER geometry export/manifest; "
+                "do not treat the visual fit as authoritative for this release]**"
+                if facts["comparisons"].get("stale")
+                else ""
+            )
+            + "\n"
+            if facts.get("comparisons")
+            else ""
+        )
+        + (
+            f"- `diff/` -- changed-parts diff renders vs "
+            f"{facts['diff']['prev']} (see below)\n"
+            if facts.get("diff")
+            else ""
+        )
         + f"- Size: {facts['size_mb']:.1f} MB\n"
         + _diff_section(version, facts.get("diff"))
         + "\n**Provenance**\n"
         + _provenance_section(facts)
-        + (f"\n**Logs**: `{facts['logs_asset']}` -- the per-task build logs "
-           f"(parts, assemblies, verify/check gates) plus the full release log -- "
-           f"is attached as a separate asset.\n" if facts.get("logs_asset") else "")
+        + (
+            f"\n**Logs**: `{facts['logs_asset']}` -- the per-task build logs "
+            f"(parts, assemblies, verify/check gates) plus the full release log -- "
+            f"is attached as a separate asset.\n"
+            if facts.get("logs_asset")
+            else ""
+        )
     )
 
 
@@ -905,8 +1023,11 @@ def _provenance_section(facts: dict[str, Any]) -> str:
     integ = prov.get("integrity", {})
     commit = git.get("commit", "")
     remote = git.get("remote", "")
-    link = (f"[`{git.get('commit_short', sha_fallback(commit))}`]"
-            f"({remote}/commit/{commit})" if commit else f"`{sha_fallback(commit)}`")
+    link = (
+        f"[`{git.get('commit_short', sha_fallback(commit))}`]({remote}/commit/{commit})"
+        if commit
+        else f"`{sha_fallback(commit)}`"
+    )
     tree = "clean" if git.get("tree_clean") else "**DIRTY** (see PROVENANCE.json)"
     return (
         f"- Source commit: {link} ({git.get('describe', '?')}), "
@@ -948,13 +1069,16 @@ def _logs_asset(version: str, log_path: Path | None) -> Path | None:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for lg in logs:
             zf.write(lg, lg.name)
-    log(f"logs: {len(logs)} files -> {zip_path.name} "
-        f"({zip_path.stat().st_size / 1e3:.0f} KB)")
+    log(
+        f"logs: {len(logs)} files -> {zip_path.name} "
+        f"({zip_path.stat().st_size / 1e3:.0f} KB)"
+    )
     return zip_path
 
 
-def _gh_assets(version: str, zip_path: Path, facts: dict[str, Any],
-               log_path: Path | None) -> list[str]:
+def _gh_assets(
+    version: str, zip_path: Path, facts: dict[str, Any], log_path: Path | None
+) -> list[str]:
     """Asset paths for the release: the CAD bundle, the diff PNGs (embedded in the
     notes by deterministic download URL), and the LOGS asset. Records the logs
     asset name in ``facts`` so release_notes can reference it. Building the logs
@@ -970,8 +1094,13 @@ def _gh_assets(version: str, zip_path: Path, facts: dict[str, Any],
     return assets
 
 
-def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool,
-            log_path: Path | None = None) -> str:
+def publish(
+    version: str,
+    zip_path: Path,
+    facts: dict[str, Any],
+    draft: bool,
+    log_path: Path | None = None,
+) -> str:
     """Annotated tag -> push -> gh release + asset upload. Returns release URL."""
     log(f"tagging {version} at HEAD")
     _git("tag", "-a", version, "-m", f"Release {version}")
@@ -979,9 +1108,14 @@ def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool,
 
     assets = _gh_assets(version, zip_path, facts, log_path)
     args = [
-        "release", "create", version, *assets,
-        "--title", f"harmonic-analyzer {version}",
-        "--notes", release_notes(version, facts),
+        "release",
+        "create",
+        version,
+        *assets,
+        "--title",
+        f"harmonic-analyzer {version}",
+        "--notes",
+        release_notes(version, facts),
     ]
     if draft:
         args.append("--draft")
@@ -990,8 +1124,9 @@ def publish(version: str, zip_path: Path, facts: dict[str, Any], draft: bool,
     return url
 
 
-def report_no_publish(version: str, zip_path: Path, facts: dict[str, Any],
-                      log_path: Path | None = None) -> None:
+def report_no_publish(
+    version: str, zip_path: Path, facts: dict[str, Any], log_path: Path | None = None
+) -> None:
     """``--no-publish``: build the assets (incl. the logs zip) and REPORT them.
     No git tag/push, no gh -- nothing leaves the machine. Used to dry-run a real
     release (e.g. validate the bundle + logs zip) without publishing."""
@@ -1052,14 +1187,23 @@ def _start_release_log(version: str) -> tuple[Path, Any]:
 # --------------------------------------------------------------------------- #
 def main() -> int:
     ap = argparse.ArgumentParser(description="Cut a tagged harmonic-analyzer release.")
-    ap.add_argument("version", nargs="?", help="release tag vNN (default: next compact tag)")
-    ap.add_argument("--allow-dirty", action="store_true",
-                    help="tag even with uncommitted (tracked) changes")
-    ap.add_argument("--draft", action="store_true",
-                    help="create the GitHub release as a draft")
-    ap.add_argument("--no-publish", action="store_true",
-                    help="build the bundle + logs zip but do NOT tag/push/gh "
-                         "(dry run -- nothing leaves the machine)")
+    ap.add_argument(
+        "version", nargs="?", help="release tag vNN (default: next compact tag)"
+    )
+    ap.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="tag even with uncommitted (tracked) changes",
+    )
+    ap.add_argument(
+        "--draft", action="store_true", help="create the GitHub release as a draft"
+    )
+    ap.add_argument(
+        "--no-publish",
+        action="store_true",
+        help="build the bundle + logs zip but do NOT tag/push/gh "
+        "(dry run -- nothing leaves the machine)",
+    )
     opts = ap.parse_args()
 
     version = resolve_version(opts.version)
@@ -1101,12 +1245,20 @@ def main() -> int:
                 url = None
             else:
                 url = publish(version, zip_path, facts, opts.draft, log_path)
+                next_revision = advance_configured_revision(version)
+                _telemetry.warn(
+                    f"VERSION BUMP REQUIRED: {RELEASE_VERSION_FILE} now contains "
+                    f"{next_revision}; commit and merge this version bump before "
+                    "cutting the next release"
+                )
             _telemetry.success(f"Done in {time.perf_counter() - started:.1f}s.")
             _telemetry.info(f"version: {version}")
-            _telemetry.info(f"bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
-                            f"{facts['parts']} parts x STEP+STL + {facts['assemblies']} "
-                            f"assembly glTF (+{facts['config_meshes']} "
-                            f"per-config) + {facts['pngs']} PNGs + boxes/")
+            _telemetry.info(
+                f"bundle:  {zip_path} ({facts['size_mb']:.1f} MB) -- solidworks/ + "
+                f"{facts['parts']} parts x STEP+STL + {facts['assemblies']} "
+                f"assembly glTF (+{facts['config_meshes']} "
+                f"per-config) + {facts['pngs']} PNGs + boxes/"
+            )
             _telemetry.info(f"log:     {log_path}")
             if facts.get("logs_asset"):
                 _telemetry.info(f"logs:    {RELEASE_DIR / facts['logs_asset']}")

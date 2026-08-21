@@ -11,15 +11,20 @@ data lives in YAML.
         teeth = ch["cone_teeth"]
     backlash = fit("gear_mesh", "rack_backlash_mm")
 """
+
 from __future__ import annotations
 
 import functools
+import re
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+
+
+_RELEASE_VERSION_RE = re.compile(r"^v([1-9]\d*)$")
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -54,6 +59,14 @@ def _doc(name: str) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"config file missing: {path}")
     return _load(path)
+
+
+def release_revision() -> str:
+    """Return the next compact release revision stamped into CAD metadata."""
+    value = str(_doc("release")["next_revision"]).strip()
+    if not _RELEASE_VERSION_RE.fullmatch(value):
+        raise ValueError(f"invalid next_revision in release.yaml: {value!r}")
+    return value
 
 
 def channels() -> list[dict[str, Any]]:

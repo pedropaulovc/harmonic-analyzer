@@ -38,13 +38,13 @@ from _common import (
 def assembly_title_properties(assembly_name: str) -> dict[str, str]:
     """Return title-block properties for an assembly document.
 
-    Assembly drawings need their own identity and general-tolerance cells, but
-    they do not own a row in the part registry.  Keeping this path separate from
-    ``_common.part_properties`` prevents assembly-title stamping from being
-    mistaken for in-script part generation by the build graph.
+    Assembly drawings use the tracked next release revision, not a per-part
+    registry row, so native assemblies and their linked title blocks stay in
+    lockstep with leaf parts.
     """
     return {
         "Title": assembly_name,
+        "Revision": _config.release_revision(),
         "Generator": f"harmonic-analyzer @ {_git_sha()}",
         "TOL_LIN_XX": str(_config.title_block("linear_2pl")["display"]),
         "TOL_LIN_XXX": str(_config.title_block("linear_3pl")["display"]),

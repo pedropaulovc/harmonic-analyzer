@@ -189,6 +189,10 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
+- The tracked `cad/config/release.yaml` value is the Revision on every
+  `.SLDPRT`, `.SLDASM`, and linked drawing title block. `cut_release.py`
+  advances it after a successful publish and leaves a tracked merge bump;
+  the release agent MUST commit and merge that bump before the next release.
 
 ## The COM seat lock (do not break this)
 

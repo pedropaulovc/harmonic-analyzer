@@ -122,9 +122,9 @@ from build_pen_rod import WIRE_HOLE_Y as ROD_WIRE_HOLE_Y  # noqa: E402
 assert math.isclose(
     PEN_WIRE_BOTTOM[1], PEN_ROD_POS[1] + ROD_WIRE_HOLE_Y, abs_tol=1e-9
 ), "pen-wire bottom drifted from the pen-rod wire hole"
-assert math.isclose(
-    PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9
-), "pen-wire top drifted from the wheel-axis tangent height"
+assert math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9), (
+    "pen-wire top drifted from the wheel-axis tangent height"
+)
 
 # --- M6.10 fastener ----------------------------------------------------------
 # Pen-hanger screw from BEHIND the bar (the wheel rim passes 1.0 in front
@@ -154,45 +154,83 @@ async def build(adapter) -> dict[str, str]:
     hanger = await place_component(
         adapter, "pen-hanger", list(HANGER_POS), [0.0, 0.0, 0.0], IDENTITY
     )
-    await place_component(adapter, "pen-v-block", list(VBLOCK_POS),
-                          [0.0, 180.0, 0.0], ROT_Y_180)
-    pen_rod = await place_component(adapter, "pen-rod", list(PEN_ROD_POS),
-                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    await place_component(
+        adapter, "pen-v-block", list(VBLOCK_POS), [0.0, 180.0, 0.0], ROT_Y_180
+    )
+    pen_rod = await place_component(
+        adapter, "pen-rod", list(PEN_ROD_POS), [0.0, 0.0, 0.0], IDENTITY, ground=False
+    )
     rod_o = component_origin(adapter, pen_rod)
-    await distance_driver(adapter, named_ref(f"Axis1@{pen_rod}", "AXIS"),
-                          named_ref("Front Plane", "PLANE"), rod_o[2],
-                          label="pen-rod slide depth", verify=(pen_rod, rod_o))
-    await distance_driver(adapter, named_ref(f"Axis1@{pen_rod}", "AXIS"),
-                          named_ref("Right Plane", "PLANE"), rod_o[0],
-                          label="pen-rod slide across", verify=(pen_rod, rod_o))
-    await angle_driver(adapter, named_ref(f"Front Plane@{pen_rod}", "PLANE"),
-                       named_ref("Front Plane", "PLANE"), 0.0,
-                       label="pen-rod spin snapshot", verify=(pen_rod, rod_o))
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis1@{pen_rod}", "AXIS"),
+        named_ref("Front Plane", "PLANE"),
+        rod_o[2],
+        label="pen-rod slide depth",
+        verify=(pen_rod, rod_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis1@{pen_rod}", "AXIS"),
+        named_ref("Right Plane", "PLANE"),
+        rod_o[0],
+        label="pen-rod slide across",
+        verify=(pen_rod, rod_o),
+    )
+    await angle_driver(
+        adapter,
+        named_ref(f"Front Plane@{pen_rod}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        0.0,
+        label="pen-rod spin snapshot",
+        verify=(pen_rod, rod_o),
+    )
     # The Y-travel is the sub's FREED operational DOF (the pen up/down the
     # magnifying wheel's wire drives in the real device): its drive spec is
     # recorded into the DOF manifest, never authored -- drag the rod and the
     # marker + pen-wire slide with it.
     await distance_driver(
-        adapter, named_ref(f"Top Plane@{pen_rod}", "PLANE"),
-        named_ref("Top Plane", "PLANE"), rod_o[1],
+        adapter,
+        named_ref(f"Top Plane@{pen_rod}", "PLANE"),
+        named_ref("Top Plane", "PLANE"),
+        rod_o[1],
         label="pen-rod travel PARK driver (freed in default build)",
-        verify=(pen_rod, rod_o), free_dof_key="pen_travel")
-    pen_marker = await place_component(adapter, "pen-marker",
-                                       [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
-                                       [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{pen_marker}", "PLANE"),
-                    named_ref(f"Front Plane@{pen_rod}", "PLANE"),
-                    label="pen-marker locked to rod")
+        verify=(pen_rod, rod_o),
+        free_dof_key="pen_travel",
+    )
+    pen_marker = await place_component(
+        adapter,
+        "pen-marker",
+        [MARKER_X, MARKER_TIP_Y, PEN_Z_MID],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{pen_marker}", "PLANE"),
+        named_ref(f"Front Plane@{pen_rod}", "PLANE"),
+        label="pen-marker locked to rod",
+    )
 
     # Amplification wire 2: the straight rest-pose run hanging off the wheel
     # rim's 3 o'clock tangent down to the rod's wire hole level, 1.7 in front
     # of the rod face (the tie-off is implied -- module docstring). Locked to
     # the rod so it rides the pen travel with the marker.
-    pen_wire = await place_component(adapter, "pen-wire", list(PEN_WIRE_BOTTOM),
-                                     [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{pen_wire}", "PLANE"),
-                    named_ref(f"Front Plane@{pen_rod}", "PLANE"),
-                    label="pen-wire locked to rod")
+    pen_wire = await place_component(
+        adapter,
+        "pen-wire",
+        list(PEN_WIRE_BOTTOM),
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{pen_wire}", "PLANE"),
+        named_ref(f"Front Plane@{pen_rod}", "PLANE"),
+        label="pen-wire locked to rod",
+    )
 
     # Kinematic pen driver (plan F5): re-drives the Y-travel mate from a
     # CrankDeg global through the chained Fourier sum, so the pose reproduces
@@ -240,9 +278,7 @@ async def build(adapter) -> dict[str, str]:
         label="pen set-screw anti-spin",
         verify=(set_screw, list(SET_SCREW_POS)),
     )
-    assert_component_placed(
-        adapter, set_screw, list(SET_SCREW_POS), ROT_Y_180
-    )
+    assert_component_placed(adapter, set_screw, list(SET_SCREW_POS), ROT_Y_180)
 
     hanger_screw = await place_component(
         adapter,
@@ -274,16 +310,15 @@ async def build(adapter) -> dict[str, str]:
         label="hanger screw anti-spin",
         verify=(hanger_screw, list(HANGER_SCREW_POS)),
     )
-    assert_component_placed(
-        adapter, hanger_screw, list(HANGER_SCREW_POS), IDENTITY
-    )
+    assert_component_placed(adapter, hanger_screw, list(HANGER_SCREW_POS), IDENTITY)
 
     # Certify the AS-BUILT model. Necessity only: the freed pen travel is
     # genuinely free; the lock-mated marker + pen-wire MUST read
     # under-constrained WITH the rod -- with the neutral preset the motion
     # sweep reads got == want == 0 even if a rider were disconnected.
     assert_free_dof_necessity(
-        adapter, 1, required_stems=("pen-rod", "pen-marker", "pen-wire"))
+        adapter, 1, required_stems=("pen-rod", "pen-marker", "pen-wire")
+    )
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Title-block identity for the assembly drawing (draw_pen_assembly.py):
@@ -297,7 +332,6 @@ async def build(adapter) -> dict[str, str]:
             # MHA-A## = assembly drawing ids, beside the parts' MHA-### range
             # (a longer number overflows the DWG. NO. title-block cell).
             "Number": "MHA-A01",
-            "Revision": "A",
             "Revision Description": "Initial release",
             "Material": "SEE PARTS LIST",
             "Material Specification": "SEE PARTS LIST",

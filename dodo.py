@@ -125,6 +125,7 @@ from _drawing_registry import (  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
+RELEASE_VERSION_FILE = (CONFIG_DIR / "release.yaml").resolve()
 # The repo-owned part template (see _common.PART_TEMPLATE -- path duplicated
 # deliberately; importing _buildgraph from _common would drag graph tooling
 # into every part's dep closure). A runtime input of every part build.
@@ -1299,6 +1300,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
     return sorted(
         {
             str(script),
+            str(RELEASE_VERSION_FILE),
             *source_deps,
             *runtime,
             *(str(path.resolve()) for path in spec.assets),
@@ -1367,6 +1369,7 @@ def _part_file_deps(script: Path, stem: str) -> list[str]:
     # template-drifted parts under a stale key.
     return [
         str(script.resolve()),
+        str(RELEASE_VERSION_FILE),
         *_helper_deps(script),
         *_config_deps(script, stem, "part"),
         *data_deps_of(script),
@@ -1485,6 +1488,7 @@ def _recipe_files(stem: str) -> list[str]:
     )
     return [
         str(asm_script.resolve()),
+        str(RELEASE_VERSION_FILE),
         *hooks,
         *_helper_deps(asm_script),
         *_config_deps(asm_script, stem, "assembly"),

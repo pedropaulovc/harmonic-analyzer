@@ -34,7 +34,8 @@ async def build_simple_three_view_drawing(
 
     check("open assembly drawing source", await adapter.open_model(str(source)))
     # An assembly missing its title-block properties would render blank
-    # $PRPSHEET cells; finalize_drawing validates only the TOL_* set.
+    # $PRPSHEET cells; read_required_properties also enforces the current
+    # release Revision, and finalize_drawing repeats that check per sheet.
     read_required_properties(
         adapter.currentModel,
         (

@@ -157,10 +157,12 @@ from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # The lever is placed Ry(180) (local +x -> machine -x), so the knife lands at
 # LEVER_X0 - KNIFE_LOCAL_X.
-assert math.isclose(LEVER_X0 - KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), \
+assert math.isclose(LEVER_X0 - KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), (
     "magnifying-lever KnifeAxis x drifted from the summing knife line"
-assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), \
+)
+assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), (
     "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
+)
 CLAMP_X = 150.0  # sliding clamp default position (p.46/48 insets)
 from magnifying_clamp_geom import (  # noqa: E402
     BLOCK_DEPTH as CLAMP_DEPTH,
@@ -187,10 +189,9 @@ WHEEL_BAR_X0 = 109.0  # wheel-bar centre: span -8 .. +226 (29 past the west colu
 CLAMP_SCREW_X = (COLUMN_X + CLAMP_EAR_DX, COLUMN_X - CLAMP_EAR_DX)
 # The bar's clamp holes must land on those screw lines: the bar is placed at
 # IDENTITY, so book hole x = centre + local station.
-assert sorted(
-    round(WHEEL_BAR_X0 + lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X
-) == sorted(round(x, 6) for x in CLAMP_SCREW_X), \
-    "wheel-bar clamp holes drifted off the column clamp-screw lines"
+assert sorted(round(WHEEL_BAR_X0 + lx, 6) for lx in BAR_CLAMP_HOLE_LOCAL_X) == sorted(
+    round(x, 6) for x in CLAMP_SCREW_X
+), "wheel-bar clamp holes drifted off the column clamp-screw lines"
 from build_wheel_axle import FLANGE_LEN, STUD_LEN  # noqa: E402
 
 WHEEL_MID_Z = BAR_FRONT_Z - FLANGE_LEN - (STUD_LEN - 4.0) / 2.0  # -146.9:
@@ -302,9 +303,14 @@ async def build(adapter) -> dict[str, str]:
     # clamp screws (heads on the bar's front face, ch30 p002) close the stack
     # bar -> front arc -> back arc. Ry(+90): the arcs' local +X faces machine -Z.
     for arc in ("column-clamp-front", "column-clamp-back"):
-        await place_component(adapter, arc, [COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
-                              [0.0, 90.0, 0.0], ROT_Y_POS90,
-                              label=f"{arc} (wheel x{COLUMN_X:.0f})")
+        await place_component(
+            adapter,
+            arc,
+            [COLUMN_X, WHEEL_BAR_Y, COLUMN_Z],
+            [0.0, 90.0, 0.0],
+            ROT_Y_POS90,
+            label=f"{arc} (wheel x{COLUMN_X:.0f})",
+        )
     # One physically mated seed plus a native component pattern.  Seed at the
     # lower-X hole so PatternAxisX FORWARD lands the generated instance on the
     # second Hole Wizard station; both stations derive from the same bar
@@ -348,9 +354,14 @@ async def build(adapter) -> dict[str, str]:
     # The lever pivots about the summing bar's knife-edge ridge (see the
     # knife-pivot block above); the rock drive spec uses the Top-plane angle
     # (Y-normal, mirror-invariant -> no flip).
-    ml = await place_component(adapter, "magnifying-lever",
-                               [LEVER_X0, LEVER_ROD_Y, LEVER_ROD_Z],
-                               [0.0, 180.0, 0.0], ROT_Y_180, ground=False)
+    ml = await place_component(
+        adapter,
+        "magnifying-lever",
+        [LEVER_X0, LEVER_ROD_Y, LEVER_ROD_Z],
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+        ground=False,
+    )
     ml_o = component_origin(adapter, ml)
     # Knife-edge pivot: the lever's KnifeAxis (Axis2, local Z through the
     # summing knife-edge ridge) held by two axis-to-plane distances (the
@@ -362,31 +373,59 @@ async def build(adapter) -> dict[str, str]:
     # knife line, and the WIRE-1 yoke below turns the wheel with it. Same
     # mechanism as drive-train's crank spin. The bracket collar stays a loose
     # visual guide.
-    await distance_driver(adapter, named_ref(f"Axis2@{ml}", "AXIS"),
-                          named_ref("Right Plane", "PLANE"), abs(KNIFE[0]),
-                          label="mag-lever knife line across", verify=(ml, ml_o))
-    await distance_driver(adapter, named_ref(f"Axis2@{ml}", "AXIS"),
-                          named_ref("Top Plane", "PLANE"), KNIFE_CONTACT_Y,
-                          label="mag-lever knife line height", verify=(ml, ml_o))
-    await distance_driver(adapter, named_ref(f"Front Plane@{ml}", "PLANE"),
-                          named_ref("Front Plane", "PLANE"), abs(LEVER_ROD_Z),
-                          label="mag-lever depth", verify=(ml, ml_o))
-    await angle_driver(adapter, named_ref(f"Top Plane@{ml}", "PLANE"),
-                       named_ref("Top Plane", "PLANE"), 0.0,
-                       label="mag-lever rock PARK driver (freed in default build)",
-                       verify=(ml, ml_o), free_dof_key="lever_rock")
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis2@{ml}", "AXIS"),
+        named_ref("Right Plane", "PLANE"),
+        abs(KNIFE[0]),
+        label="mag-lever knife line across",
+        verify=(ml, ml_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Axis2@{ml}", "AXIS"),
+        named_ref("Top Plane", "PLANE"),
+        KNIFE_CONTACT_Y,
+        label="mag-lever knife line height",
+        verify=(ml, ml_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{ml}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        abs(LEVER_ROD_Z),
+        label="mag-lever depth",
+        verify=(ml, ml_o),
+    )
+    await angle_driver(
+        adapter,
+        named_ref(f"Top Plane@{ml}", "PLANE"),
+        named_ref("Top Plane", "PLANE"),
+        0.0,
+        label="mag-lever rock PARK driver (freed in default build)",
+        verify=(ml, ml_o),
+        free_dof_key="lever_rock",
+    )
     # Bracket: the fitting that AFFIXES the lever rod to the (rocking) summing
     # bar -- it rides the lever, not the frame, so it is LOCKED to the lever
     # like the clamp chain below (grounding it made the free lever rock clip
     # the collar: the rod sweeps ~0.7 mm at the collar over the ~1.6 deg rock,
     # far past the 0.1 radial slack). Its collar stays the rod's snug carrier
     # (Ø6.2 over Ø6), now exactly concentric at every rock angle.
-    bracket = await place_component(adapter, "magnifying-bracket",
-                                    [40.0, LEVER_ROD_Y, LEVER_ROD_Z],
-                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{bracket}", "PLANE"),
-                    named_ref(f"Front Plane@{ml}", "PLANE"),
-                    label="mag-bracket locked to lever")
+    bracket = await place_component(
+        adapter,
+        "magnifying-bracket",
+        [40.0, LEVER_ROD_Y, LEVER_ROD_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{bracket}", "PLANE"),
+        named_ref(f"Front Plane@{ml}", "PLANE"),
+        label="mag-bracket locked to lever",
+    )
     # The clamp + vertical rod + output fixture + thumb screw are clamped to the
     # lever at the set magnification radius (the thumb screw locks the clamp on
     # the rod): they ride the lever as one rigid body. The output fixture is
@@ -394,11 +433,20 @@ async def build(adapter) -> dict[str, str]:
     # lever rotates is what drives the magnifying wheel in the Motion study, so
     # these must move WITH the lever, not stay fixed. Lock each to the lever.
     # Ry(+90): the clamp's lever bore (local Z) turns onto the rod axis (X).
-    clamp = await place_component(adapter, "magnifying-clamp", list(CLAMP_POS),
-                                  [0.0, 90.0, 0.0], ROT_Y_POS90, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    named_ref(f"Front Plane@{ml}", "PLANE"),
-                    label="mag-clamp locked to lever")
+    clamp = await place_component(
+        adapter,
+        "magnifying-clamp",
+        list(CLAMP_POS),
+        [0.0, 90.0, 0.0],
+        ROT_Y_POS90,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{clamp}", "PLANE"),
+        named_ref(f"Front Plane@{ml}", "PLANE"),
+        label="mag-clamp locked to lever",
+    )
     # Backed-out thumb screw: shank tip tangent to the rod top (a seated
     # screw would overlap the rod it pinches -- see module docstring). Stack:
     # rod top +3.0 + under-head 11.0 + head 5.0 = head top y 998.7, kept
@@ -410,53 +458,101 @@ async def build(adapter) -> dict[str, str]:
     # its head features to the machine hand ([180, 0, -90] is the same
     # rotation's Euler form).
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
-    tscrew = await place_component(adapter, "thumb-screw",
-                                   [CLAMP_X, LEVER_ROD_Y + 3.0 + 11.0 + 5.0, LEVER_ROD_Z],
-                                   [180.0, 0.0, -90.0], _rz90_ry180, ground=False,
-                                   label="thumb-screw (clamp)")
-    await lock_mate(adapter, named_ref(f"Front Plane@{tscrew}", "PLANE"),
-                    named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    label="thumb-screw locked to clamp")
-    vrod = await place_component(adapter, "magnifying-vertical-rod",
-                                 [CLAMP_X, VROD_TOP_Y, VROD_Z],
-                                 [180.0, 0.0, -90.0], _rz90_ry180, ground=False)
-    await lock_mate(adapter, named_ref(f"Front Plane@{vrod}", "PLANE"),
-                    named_ref(f"Front Plane@{clamp}", "PLANE"),
-                    label="vertical-rod locked to clamp")
-    fixture = await place_component(adapter, "output-fixture",
-                                    [CLAMP_X, FIXTURE_Y0, VROD_Z],
-                                    [0.0, 0.0, 0.0], IDENTITY, ground=False)
+    tscrew = await place_component(
+        adapter,
+        "thumb-screw",
+        [CLAMP_X, LEVER_ROD_Y + 3.0 + 11.0 + 5.0, LEVER_ROD_Z],
+        [180.0, 0.0, -90.0],
+        _rz90_ry180,
+        ground=False,
+        label="thumb-screw (clamp)",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{tscrew}", "PLANE"),
+        named_ref(f"Front Plane@{clamp}", "PLANE"),
+        label="thumb-screw locked to clamp",
+    )
+    vrod = await place_component(
+        adapter,
+        "magnifying-vertical-rod",
+        [CLAMP_X, VROD_TOP_Y, VROD_Z],
+        [180.0, 0.0, -90.0],
+        _rz90_ry180,
+        ground=False,
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{vrod}", "PLANE"),
+        named_ref(f"Front Plane@{clamp}", "PLANE"),
+        label="vertical-rod locked to clamp",
+    )
+    fixture = await place_component(
+        adapter,
+        "output-fixture",
+        [CLAMP_X, FIXTURE_Y0, VROD_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
     # (the fixture is x-symmetric about its origin, so it stays at IDENTITY)
-    await lock_mate(adapter, named_ref(f"Front Plane@{fixture}", "PLANE"),
-                    named_ref(f"Front Plane@{vrod}", "PLANE"),
-                    label="output-fixture locked to vertical-rod")
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{fixture}", "PLANE"),
+        named_ref(f"Front Plane@{vrod}", "PLANE"),
+        label="output-fixture locked to vertical-rod",
+    )
 
     # --- magnifying wheel ----------------------------------------------------
     # Rx(-90): the axle's +Y axis points -Z (flange on the bar front face).
     # The axle is structure (fixed); the wheel spins on its stud (revolute).
-    ax = await place_component(adapter, "wheel-axle",
-                               [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
-                               [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    wh = await place_component(adapter, "magnifying-wheel",
-                               [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], [0.0, 0.0, 0.0],
-                               IDENTITY, ground=False)
+    ax = await place_component(
+        adapter,
+        "wheel-axle",
+        [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
+        [-90.0, 0.0, 0.0],
+        ROT_X_NEG90,
+    )
+    wh = await place_component(
+        adapter,
+        "magnifying-wheel",
+        [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
     wh_o = component_origin(adapter, wh)
     # Revolute: radial coincident (wheel axis Z || axle stud Z) + axial
     # distance(Front, |z|); the spin -- the old angle(Right, 0) rock snapshot --
     # is now pinned by the WIRE-1 yoke below, coupling it to the lever.
-    await coincident_mate(adapter, named_ref(f"Axis1@{wh}", "AXIS"),
-                          named_ref(f"Axis1@{ax}", "AXIS"),
-                          label="magnifying-wheel pivot", verify=(wh, wh_o))
-    await distance_driver(adapter, named_ref(f"Front Plane@{wh}", "PLANE"),
-                          named_ref("Front Plane", "PLANE"), abs(wh_o[2]),
-                          label="magnifying-wheel axial", verify=(wh, wh_o))
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{wh}", "AXIS"),
+        named_ref(f"Axis1@{ax}", "AXIS"),
+        label="magnifying-wheel pivot",
+        verify=(wh, wh_o),
+    )
+    await distance_driver(
+        adapter,
+        named_ref(f"Front Plane@{wh}", "PLANE"),
+        named_ref("Front Plane", "PLANE"),
+        abs(wh_o[2]),
+        label="magnifying-wheel axial",
+        verify=(wh, wh_o),
+    )
     # --- amplification wire 1 (fixture -> hub) -------------------------------
     # The straight rest-pose run: it hangs from the fixture's cross hole and
     # grazes the hub-groove tangent (the wrap is implied -- module docstring).
     # Locked to the output fixture so it rides the lever group, like the rest
     # of the clamped chain. Part origin = the HUB end, +Y toward the hook.
-    hw = await place_component(adapter, "lever-wire", list(HUB_WIRE_END),
-                               euler_from_rows(_HW_ROWS), _HW_ROWS, ground=False)
+    hw = await place_component(
+        adapter,
+        "lever-wire",
+        list(HUB_WIRE_END),
+        euler_from_rows(_HW_ROWS),
+        _HW_ROWS,
+        ground=False,
+    )
     hw_o = component_origin(adapter, hw)
     # The wire ARTICULATES instead of riding the lever group rigidly (a locked
     # wire's hub tip would sweep a ~10 mm lateral arc off the hub even over
@@ -467,13 +563,21 @@ async def build(adapter) -> dict[str, str]:
     # hub end hugs the groove; the tip only creeps along its own axis (the
     # unmodeled wrap's pay-in/pay-out). Ref POINTs select via GetCorresponding
     # -- they do not resolve through name@comp strings.
-    await coincident_mate(adapter, component_named_ref(hw, "HookPoint", "POINT"),
-                          component_named_ref(fixture, "HookAnchorPoint", "POINT"),
-                          label="lever-wire hook ball joint", verify=(hw, hw_o))
+    await coincident_mate(
+        adapter,
+        component_named_ref(hw, "HookPoint", "POINT"),
+        component_named_ref(fixture, "HookAnchorPoint", "POINT"),
+        label="lever-wire hook ball joint",
+        verify=(hw, hw_o),
+    )
     await distance_driver(
-        adapter, component_named_ref(hw, "Axis1", "AXIS"),
-        component_named_ref(wh, "Axis1", "AXIS"), _STANDOFF_R,
-        label="lever-wire hub stand-off tangency", verify=(hw, hw_o))
+        adapter,
+        component_named_ref(hw, "Axis1", "AXIS"),
+        component_named_ref(wh, "Axis1", "AXIS"),
+        _STANDOFF_R,
+        label="lever-wire hub stand-off tangency",
+        verify=(hw, hw_o),
+    )
     # The wire's two residual DOF (swing across the tangency family + spin
     # about its own axis) are freed operational DOF: each drive spec is
     # recorded into the DOF manifest, never authored. SWING pins the HUB-end
@@ -483,17 +587,26 @@ async def build(adapter) -> dict[str, str]:
     # Jacobian extremum that authored satisfied but pinned NOTHING;
     # closure-replay catch 2026-07-05).
     await distance_driver(
-        adapter, component_named_ref(hw, "HubPoint", "POINT"),
-        named_ref("Front Plane", "PLANE"), HUB_WIRE_END[2],  # SIGNED (hub z<0):
+        adapter,
+        component_named_ref(hw, "HubPoint", "POINT"),
+        named_ref("Front Plane", "PLANE"),
+        HUB_WIRE_END[2],  # SIGNED (hub z<0):
         # distance_driver abs()es the mate value but needs the sign to seed the
         # side; the recorded spec then carries the right flip so the transient
         # replay is flip-free (was abs() -> far-side error-47 add + recovery)
         label="lever-wire swing PARK driver (hub depth, freed in default build)",
-        verify=(hw, hw_o), free_dof_key="wire_swing")
-    await angle_driver(adapter, named_ref(f"Front Plane@{hw}", "PLANE"),
-                       named_ref("Right Plane", "PLANE"), _WIRE_SPIN_ANGLE,
-                       label="lever-wire spin PARK driver (freed in default build)",
-                       verify=(hw, hw_o), free_dof_key="wire_spin")
+        verify=(hw, hw_o),
+        free_dof_key="wire_swing",
+    )
+    await angle_driver(
+        adapter,
+        named_ref(f"Front Plane@{hw}", "PLANE"),
+        named_ref("Right Plane", "PLANE"),
+        _WIRE_SPIN_ANGLE,
+        label="lever-wire spin PARK driver (freed in default build)",
+        verify=(hw, hw_o),
+        free_dof_key="wire_spin",
+    )
 
     # WIRE-1 coupling (replaces the old wheel rock snapshot): the wheel's
     # WireYokePoint (hub pitch circle @ the wire tangency) held coincident to
@@ -507,11 +620,14 @@ async def build(adapter) -> dict[str, str]:
     # component_named_ref, not a name@comp string: a reference POINT does not
     # resolve through SelectByID2 string selection -- the GetCorresponding path
     # is how the Motion study selects its rim RefPoint too.
-    await coincident_mate(adapter, component_named_ref(wh, "WireYokePoint", "POINT"),
-                          named_ref(f"YokePlane@{hw}", "PLANE"),
-                          label="WIRE1 yoke fixture->wheel", verify=(wh, wh_o))
-    assert_component_placed(
-        adapter, wh, [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], IDENTITY)
+    await coincident_mate(
+        adapter,
+        component_named_ref(wh, "WireYokePoint", "POINT"),
+        named_ref(f"YokePlane@{hw}", "PLANE"),
+        label="WIRE1 yoke fixture->wheel",
+        verify=(wh, wh_o),
+    )
+    assert_component_placed(adapter, wh, [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], IDENTITY)
 
     # Certify the AS-BUILT model. THREE freed operational DOF: the lever's
     # knife rock + the wire's swing/spin (all recorded into the DOF manifest
@@ -520,9 +636,15 @@ async def build(adapter) -> dict[str, str]:
     # lock-mated bracket (a regression to grounded would re-create the collar
     # clipping this rework fixed).
     assert_free_dof_necessity(
-        adapter, 3,
-        required_stems=("magnifying-lever", "magnifying-wheel", "lever-wire",
-                        "magnifying-bracket"))
+        adapter,
+        3,
+        required_stems=(
+            "magnifying-lever",
+            "magnifying-wheel",
+            "lever-wire",
+            "magnifying-bracket",
+        ),
+    )
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Title-block identity for the assembly drawing (draw_magnifier_assembly.py):
@@ -536,7 +658,6 @@ async def build(adapter) -> dict[str, str]:
             # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
             # (a longer number overflows the DWG. NO. title-block cell).
             "Number": "MHA-A05",
-            "Revision": "A",
             "Revision Description": "Initial release",
             "Material": "SEE COMPONENT DRAWINGS",
             "Material Specification": "SEE COMPONENT DRAWINGS",

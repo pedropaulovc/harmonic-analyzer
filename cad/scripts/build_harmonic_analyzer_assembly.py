@@ -154,7 +154,6 @@ async def build(adapter) -> dict[str, str]:
             **assembly_title_properties(ASM_NAME),
             # MHA-A## = assembly-drawing ids (A08 = the top machine assembly).
             "Number": "MHA-A08",
-            "Revision": "A",
             "Revision Description": "Initial release",
             "Material": "SEE COMPONENT DRAWINGS",
             "Material Specification": "SEE COMPONENT DRAWINGS",

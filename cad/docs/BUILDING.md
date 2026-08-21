@@ -69,6 +69,10 @@ uv run python -m doit list --all
 uv run python -m doit clean
 ```
 
+`cad/config/release.yaml` reserves the Revision stamped into every native CAD
+file and linked drawing title block. A successful publish advances it to the
+next `vNN`; commit and merge that tracked version bump before the next release.
+
 ## Parallelism
 
 There is one SolidWorks STA seat, so COM work must stay serial — but the
