@@ -1,5 +1,9 @@
 # Plan: component patterns for repeated structure + operational-DOF refactor
 
+> **Archived plan.** This file preserves an earlier proposal. It is not current
+> status or implementation guidance. Current status and sequencing live in the
+> [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+
 Two changes to the assembly build scripts:
 
 1. Replace cloned grounded structure with SolidWorks linear component patterns.

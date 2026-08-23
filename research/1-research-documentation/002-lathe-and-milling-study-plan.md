@@ -1,5 +1,9 @@
 # Lathe and Milling Study Plan
 
+> **Archived plan.** This file preserves an earlier proposal. It is not current
+> status or implementation guidance. Current status and sequencing live in the
+> [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+
 ## System
 *Unknown time*
 
