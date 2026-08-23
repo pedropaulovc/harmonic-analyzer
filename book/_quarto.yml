@@ -101,8 +101,7 @@ format:
     fig-pos: "H"
     colorlinks: true
     keep-tex: false
-  epub:
-    cover-image: figures/hand/cover-placeholder.png
+  epub: default
 
 # Cross-reference labels tuned for a shop manual.
 crossref:
