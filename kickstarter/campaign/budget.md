@@ -18,7 +18,8 @@ things without which there is no book.
 | Stock: steel bar and plate (shafts, rocker arms, frame) | 20 rocker arms, long slender shafts | TBD | — |
 | Cast iron / castings or fabrication for the 3 cast parts | summing lever, rocker-arm support, connecting rods | TBD | `cad/docs/machining-dfm.md` |
 | Gear-cutter blanks + tool steel for self-made Eureka form cutters | off-the-shelf DP-49.82 cutters **do not exist** | TBD | `cad/docs/machining-dfm.md` |
-| Dividing head + tailstock | non-negotiable for 40 indexed gears | TBD | — |
+| Dividing head | required for the 40 indexed gears; delivered, installed and usable | acquired; cost TBD | [#465](https://github.com/pedropaulovc/harmonic-analyzer/issues/465) |
+| Dividing-head tailstock | supports long indexed work; acquisition state unverified | TBD | — |
 | Measuring: micrometers, bore gauges, indicators, gauge blocks | the book's tolerances are meaningless without inspection | TBD | `cad/docs/tolerance-gdt-assessment.md` |
 | Springs (20 + 1 counter spring), wound to spec | not off-the-shelf | TBD | — |
 | Editing + proofreading | a self-edited technical book reads like one | TBD | — |

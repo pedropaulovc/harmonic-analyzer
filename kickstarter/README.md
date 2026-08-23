@@ -1,6 +1,8 @@
 # Kickstarter: funding the book
 
-Status: pre-launch, nothing published. Everything here is a draft.
+Current Kickstarter workstream status and sequencing live in the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+All campaign copy in this directory remains draft until it is published.
 
 The campaign funds one thing. The time and material to machine a Michelson
 harmonic analyzer from scratch, and to write down every operation so that a

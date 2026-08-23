@@ -28,7 +28,7 @@ what exists, what's missing, and to what spec.
 | A7 | The signal diagram: crank → cones → cylinders+cams → rockers → bars → springs → summing → magnifier → pen | new, vector | **missing** |
 | A8 | Shop photographs: the mill, the lathe, the bench | photo | **missing** |
 | A9 | Machining footage: first chips, a gear being indexed, a bushing parted off | video | **missing — gates the launch** |
-| A10 | The book spread mock-up (real pages, not a template) | `book/` render | **missing** — blocked on two finished chapters |
+| A10 | The book spread mock-up (real pages, not a template) | `book/` render | **missing** — blocked on two `drafted` sample chapters |
 | A11 | Portrait / talking-head for the video | photo | **missing** |
 | A12 | Animated GIF of the simulator running | `web/` | **missing** |
 

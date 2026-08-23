@@ -1,5 +1,9 @@
 # Harmonic Analyzer Plan
 
+> **Archived transcript.** This captured plan is historical evidence, not the
+> current project status or schedule. See the
+> [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+
 ## System
 *Unknown time*
 

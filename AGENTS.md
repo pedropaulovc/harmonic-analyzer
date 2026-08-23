@@ -24,12 +24,17 @@ general guidance here; read it before working in that area.
 | area | what it is | needs SolidWorks | local AGENTS.md |
 |---|---|:---:|---|
 | `cad/`, `dodo.py`, `cad/comparisons/` | the CAD reconstruction and its build pipeline — **this file** | yes | — |
-| [`book/`](book/README.md) | *A Project for Hobby Machinists* (Quarto) — the main deliverable | no | [`book/AGENTS.md`](book/AGENTS.md) |
+| [`book/`](book/README.md) | *A Project for Hobby Machinists* (Quarto), the main machining and publication deliverable | no | [`book/AGENTS.md`](book/AGENTS.md) |
 | [`logbook/`](logbook/README.md) | machining curriculum + practice log; feeds the book | no | [`logbook/AGENTS.md`](logbook/AGENTS.md) |
 | [`kickstarter/`](kickstarter/README.md) | campaign planning | no | [`kickstarter/AGENTS.md`](kickstarter/AGENTS.md) |
 | [`web/`](web/README.md) | interactive simulator (Vite + three.js, driven by the exported GLB) | no | [`web/AGENTS.md`](web/AGENTS.md) |
 | [`ai-story/`](ai-story/README.md) | the write-up of building this with AI agents | no | [`ai-story/AGENTS.md`](ai-story/AGENTS.md) |
 | `research/`, `cad/docs/`, `memory/` | notes, design policies, findings | no | — |
+
+The portfolio has seven first-class workstreams: CAD, book, machining learning,
+physical manufacture, Kickstarter, website and AI story. Learning and
+manufacture share `logbook/` because the same bench entries are the evidence for
+both; manufacture is still a separate workstream on the project board.
 
 Three rules cut across all of them, because they are what the project's
 credibility rests on:
@@ -48,24 +53,39 @@ The **minimum merge gate below applies to changes under `cad/`**; a
 prose-only or `web/`-only PR is gated by its own area's rules (and, for `web/`,
 a green `npm run build`).
 
-### Tracking — the board sequences, the files hold status
+### Tracking: the board owns portfolio status; files own domain facts
 
-Work is tracked in GitHub issues, grouped by milestone (one per deliverable) and
-sequenced on the [publishing project board](https://github.com/users/pedropaulovc/projects/1).
-The board carries **only** what a file cannot: cross-area dependencies (its
-`Blocked by` field) and target dates.
+Work is tracked in GitHub issues, grouped by milestone and sequenced on the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+The project is authoritative for workstream status, priority, cross-workstream
+dependencies and target dates. Do not repeat labels such as `pre-launch`,
+`scaffold` or `in progress` in a README. Link to the project instead.
 
-**Status of record stays in the repo**, because two sources drift and the files
-are the ones the book renders from:
+Repository files remain authoritative for facts that belong next to the thing
+being measured:
 
-| status | source of truth |
+| detailed fact | source of truth |
 |---|---|
-| chapter progress (`stub` → `drafted` → `verified`) | the `.qmd` frontmatter + `book/outline.md` |
-| curriculum module progress, competency | `logbook/curriculum/*.md` + `logbook/progress.md` |
-| hours, parts made, scrap | `logbook/entries/` |
+| CAD geometry and configuration | `cad/config/` + `cad/scripts/build_*.py` |
+| released CAD state | GitHub release + `cad/config/release.yaml` |
+| chapter maturity (`stub` / `drafted` / `verified`) | each `.qmd` file's `status:` frontmatter |
+| curriculum maturity (`not started` / `in progress` / `competent` / `applied`) | each `logbook/curriculum/*.md` file's `status:` frontmatter |
+| observed machining, measurements, hours and failures | `logbook/entries/` |
+| parts made and scrap roll-up | `logbook/progress.md`, reconciled from the entries |
+| campaign assets, costs and copy maturity | the relevant file under `kickstarter/` |
+| website implementation coverage | `web/src/` + `web/DESIGN.md` |
+| AI-story structure, post maturity and evidence | `ai-story/outline.md` + `ai-story/posts/` + `ai-story/evidence/` |
+| installed shop equipment | `logbook/README.md` |
 
-Do not copy any of those into a board field, and do not update a board field
-instead of the file.
+When work changes a domain fact, update its repository source first. Then update
+the issue or project item and link the commit, entry or source file. A project
+item may summarize the next action, but it must not copy a chapter/module status,
+measurement, hour count, accepted quantity or scrap count into a board field.
+Summary files may present derived roll-ups only when they name the authoritative
+source.
+
+Historical plans stay unchanged as provenance, but their opening notice must say
+that they are not current status or schedule and must link to the project.
 
 ## Clone with submodules
 
