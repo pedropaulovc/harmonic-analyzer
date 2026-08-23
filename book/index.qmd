@@ -19,12 +19,13 @@ This book is that plan: every part, every setup, every cut, on a manual mill
 and a lathe.
 
 ::: {.callout-important}
-## Status: in progress
+## Verification policy
 
-This book is being written as the machine is built. Chapters are marked
-`stub`, `drafted` or `verified` — a chapter is only `verified` once the part
-has actually been made by following exactly the text you are reading. Nothing
-in this book is a process that was imagined rather than performed.
+Current Book workstream status and sequencing live in the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+Each chapter's `status:` frontmatter records its maturity. Chapters may be
+drafted from CAD, but a chapter is `verified` only after the part has been made
+by following its text.
 :::
 
 ## What comes with it

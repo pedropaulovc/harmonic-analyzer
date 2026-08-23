@@ -42,20 +42,20 @@ Machinist, Hacker News, Hackaday tip line, the model-engineering forums.
 
 ## Phase C — build and write
 
-Sequenced by the [curriculum](../../logbook/curriculum/README.md), because the
-skills gate the parts:
+Manufacturing order and skill gates live in the
+[skills matrix](../../logbook/SKILLS.md), the
+[curriculum dependency graph](../../logbook/curriculum/README.md#dependency-order)
+and the [bench progress record](../../logbook/progress.md). This campaign
+timeline does not copy their module-to-part mapping.
 
-| stage | parts | blocked on |
-|---|---|---|
-| 1 | Frame, base, simple brackets | M01–M05 (measurement → milling) |
-| 2 | Shafts, bushings, arbors | M02–M03 (turning, boring, parting to length) |
-| 3 | Rocker arms, connecting rods, amplitude bars | M04–M06 (profile milling, drilling) |
-| 4 | **Cone + cylinder gears** — the long pole | M07–M08 (indexing, gear cutting) |
-| 5 | Summing lever + knife edge | M09 + a fabrication decision |
-| 6 | Magnifier, pen, paper drive | M03–M06 |
-| 7 | Assembly, calibration, first output | everything |
+The two sample chapters in
+[#468](https://github.com/pedropaulovc/harmonic-analyzer/issues/468) deliberately
+need no gear work. They may be drafted from CAD before their parts are made.
+Verification still waits for the corresponding real shop entries.
 
-Manuscript chapters are written **as each stage completes**, not at the end.
+After launch, the physical build takes the next shop packet whose prerequisite
+modules and procurement decisions are complete. Book chapters are updated as
+the bench evidence lands.
 
 ## Phase D — publish and fulfil
 

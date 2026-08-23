@@ -42,7 +42,7 @@ Two parts, cut on different days, whose notches are within 0.5° of the same ang
 
 ## Notes
 
-**Blocked: no dividing head yet.** This is on the critical path for M10 and for the whole gear train — buy it early. The 0.4 mm slitting saw for the notch will grab if the feed stalls.
+The dividing head is delivered, installed and usable. M09 itself remains `not started`; equipment availability is not competency. The 0.4 mm slitting saw for the notch will grab if the feed stalls.
 
 ## Sessions
 

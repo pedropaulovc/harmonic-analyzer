@@ -9,10 +9,12 @@ machined rather than an artist's impression. The narration follows the pacing of
 the [engineerguy video series](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30),
 so anyone who watched those lands somewhere familiar.
 
-## Status
+## Implementation coverage
 
-Scaffold. It loads the model, resolves the joints, drives them from the real
-gear ratios, and draws the output trace. The narration chapters exist as
+Current Website workstream status and sequencing live in the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+The implementation loads the model, resolves the joints, drives them from the
+real gear ratios and draws the output trace. Narration chapters exist as
 structured data with placeholder copy. Camera moves and the amplitude-bar UI are
 not built yet. See [`DESIGN.md`](DESIGN.md).
 

@@ -6,6 +6,11 @@ Use terse, technical language whenever possible. Ask for clarifications whenever
 
 This project will be shared on GitHub as a didactic but advanced way to use large language models for learning.
 
+> **Historical initial plan.** The phases and dates below are preserved as
+> provenance. They are not current status or schedule. Current work and
+> sequencing live in the
+> [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+
 # Study and Implementation Plan: Recreating Albert Michelson's Harmonic Analyzer
 
 ## Phase 1: Research and Documentation (2 weeks)

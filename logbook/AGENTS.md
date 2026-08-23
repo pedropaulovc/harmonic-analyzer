@@ -39,3 +39,6 @@ course built around a machine.
 
 `not started` → `in progress` → `competent` (check passed) → `applied` (a real
 part made with it). Use exactly these.
+
+The `status:` frontmatter in each curriculum module is authoritative. Index and
+progress tables link to it rather than copying the value.

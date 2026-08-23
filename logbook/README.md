@@ -12,6 +12,10 @@ The primary goal is my own competence. The book is downstream: every chapter in
 taught me the operation, and every part chapter in Part IV from the entry where
 I actually cut the part. Nothing gets taught that hasn't been done.
 
+Current Learning and Manufacture workstream status and sequencing live in the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+Module maturity and bench results remain in this directory.
+
 ## Layout
 
 | path | what |
@@ -19,7 +23,7 @@ I actually cut the part. Nothing gets taught that hasn't been done.
 | [`curriculum/`](curriculum/README.md) | The course. Twelve modules, M00 to M11, each ending by cutting a real part of the analyzer. |
 | [`entries/`](entries/README.md) | Dated practice log. One entry per session: what I set out to do, what happened, what it cost. |
 | [`SKILLS.md`](SKILLS.md) | The matrix. Skill, module, parts it unlocks, book chapter it feeds. |
-| [`progress.md`](progress.md) | Where I am. Module status, hours, and what is blocking. |
+| [`progress.md`](progress.md) | Derived roll-ups of hours, parts made, scrap and current technical blockers. |
 
 ## How the course is built
 
@@ -55,7 +59,7 @@ All in [`references/`](../references/), which is a git submodule:
 |---|---|
 | Mill | PM-30MV (1 HP, R8, 4000 RPM) |
 | Lathe | JET BD-920N (9″ × 20″) |
-| Dividing head | not yet acquired, which blocks M09 and M10 |
+| Dividing head | Precision Matthews BS-0, delivered, installed and usable ([#465](https://github.com/pedropaulovc/harmonic-analyzer/issues/465)) |
 
 ## The honest note
 

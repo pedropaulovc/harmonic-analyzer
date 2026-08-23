@@ -4,17 +4,19 @@
 Step-by-step machining instructions for building a working 20-element harmonic
 analyzer on a manual mill and lathe.
 
-This is the project's main deliverable, and everything else exists to support
-it. The [CAD model](../cad) supplies the geometry. The
-[logbook](../logbook/README.md) supplies the process, since I learn each
-operation before writing it up. The [simulator](../web/README.md) shows readers
-what they are building, and the [Kickstarter](../kickstarter/README.md) pays for
-it.
+The book is the main machining and publication deliverable. The
+[CAD model](../cad) supplies the geometry, the
+[logbook](../logbook/README.md) supplies the process, the
+[website](../web/README.md) shows readers what they are building, and the
+[Kickstarter](../kickstarter/README.md) funds the work. The
+[AI story](../ai-story/README.md) is a separate, first-class workstream.
 
-## Status
+## Work status
 
-Outline drafted, chapters stubbed, no finished prose yet. The plan and the
-per-chapter status live in [`outline.md`](outline.md).
+Current Book workstream status and sequencing live in the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+Each chapter's `status:` frontmatter is authoritative for its own maturity.
+[`outline.md`](outline.md) owns scope and order, not status.
 
 ## Build it
 
@@ -45,7 +47,7 @@ stale copy behind for a chapter to keep pointing at. Run `doit build` first if
 book/
   _quarto.yml          project + book config (chapter order lives here)
   index.qmd            title page / front matter
-  outline.md           the plan: every chapter, what's in it, status
+  outline.md           the plan: every chapter, scope and reading order
   front/               preface, how to use this book, safety
   chapters/            the book, in reading order
   appendices/          BOM, drawing index, cutter tables, fits, suppliers
@@ -59,12 +61,10 @@ book/
 
 ## The rule that matters
 
-Nothing goes in this book that hasn't been done. A chapter describing an
-operation gets written after that operation has been performed and logged in
-[`logbook/`](../logbook/README.md), with the real feeds, speeds, setups,
-measurements and mistakes. A plausible-sounding process that was never actually
-cut is the one thing that would make the whole book worthless.
+Chapters may be drafted from CAD and cited references before the corresponding
+shop work. A draft must not present an unperformed feed, setup or measurement as
+observed fact; it marks that gap `TODO(cut it first)`.
 
-Chapters can be *drafted* ahead from the CAD model, which is what the `status:`
-field in each chapter's frontmatter tracks. But a chapter is not `verified`
-until the part exists on the bench.
+Real feeds, speeds, setups, measurements and mistakes come from
+[`logbook/`](../logbook/README.md). A chapter becomes `verified` only after the
+part has been made by following the text.

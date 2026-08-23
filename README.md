@@ -19,11 +19,16 @@
 </table>
 
 <p align="center">
-  <a href="kickstarter/README.md">Kickstarter</a> ·
+  <a href="cad/">CAD</a> ·
   <a href="book/README.md">The book</a> ·
-  <a href="logbook/README.md">Learning log</a> ·
-  <a href="web/README.md">Simulator</a> ·
+  <a href="logbook/README.md">Learning</a> ·
+  <a href="logbook/progress.md#parts-made">Manufacture</a> ·
+  <a href="kickstarter/README.md">Kickstarter</a> ·
+  <a href="web/README.md">Website</a> ·
   <a href="ai-story/README.md">Built with AI</a>
+</p>
+<p align="center">
+  Current work and sequencing: <a href="https://github.com/users/pedropaulovc/projects/1">Harmonic Analyzer project</a>.
 </p>
 
 ---
@@ -77,7 +82,7 @@ That destination sets the engineering bar. The machine has to work, not
 photograph well. A fourteen-year-old gets to turn the crank, and the pen has to
 draw the right curve when they do.
 
-## Where it is now
+## CAD model and drawing coverage
 
 | Frame | Drive train | Channels (×20) | Summing |
 |:---:|:---:|:---:|:---:|
@@ -105,15 +110,22 @@ of freedom, interference and mass properties before it is allowed to save. And
 the whole model gets scored against Hammack, Kranz and Carpenter's photographs
 of the surviving machine, pair by pair, on every export.
 
-## The five things being built
+## Workstreams
+
+Current portfolio status, priorities and sequencing live in the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+The repository files linked below hold the detailed engineering and publishing
+facts.
 
 | | |
 |---|---|
-| **[Kickstarter](kickstarter/README.md)** | Funding the build and the book. Pre-launch. |
-| **[The book](book/README.md)** | *A Project for Hobby Machinists*: every part, every setup, every cut, on a manual mill and lathe. The main deliverable. |
-| **[Learning log](logbook/README.md)** | I am a software engineer who has never cut metal. Twelve modules of lathe and mill work, each one ending by making a real part of the machine. The book gets written from this. |
-| **[Simulator](web/README.md)** | The machine in your browser, running on the exported CAD model, paced like the engineerguy videos. |
-| **[Built with AI](ai-story/README.md)** | An honest account of using LLM agents for all of this, failures included. |
+| **[CAD](cad/)** | The generated SolidWorks reconstruction, production drawings, verification and releases. |
+| **[The book](book/README.md)** | *A Project for Hobby Machinists*: every part, setup and cut on a manual mill and lathe. |
+| **[Learning](logbook/README.md)** | Twelve modules of lathe and mill work, each ending with a real analyzer part. |
+| **[Manufacture](logbook/progress.md#parts-made)** | The physical build: accepted quantities, scrap and the entries that record each shop session. |
+| **[Kickstarter](kickstarter/README.md)** | Campaign, budget, rewards, assets and fulfilment for funding the build and book. |
+| **[Website](web/README.md)** | The machine in a browser, driven by the exported CAD model. |
+| **[Built with AI](ai-story/README.md)** | An evidence-backed account of using LLM agents for the project, failures included. |
 
 ## The hard parts, which are already identified
 

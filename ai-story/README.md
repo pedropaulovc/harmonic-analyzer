@@ -1,12 +1,13 @@
 # How I used AI to build a 19th-century computer
 
-The fifth deliverable. An honest account of using LLM coding agents to
-reverse-engineer, model, verify and document a machine: what worked, what wasted
-weeks, and what I would not do again.
+This is a first-class project workstream: an evidence-backed account of using
+LLM coding agents to reverse-engineer, model, verify and document the machine.
+It covers what worked, what wasted weeks and what I would not do again.
 
-It could be published as a companion book, an appendix to the main book, or a
-blog series. Decide the format once the material exists rather than before,
-because the material will tell you which one it is.
+Current AI-story workstream status and sequencing live in the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+The publication format remains an editorial decision owned by
+[`outline.md`](outline.md): companion book, main-book appendix or blog series.
 
 ## Why this is worth writing
 
