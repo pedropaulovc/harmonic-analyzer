@@ -394,12 +394,14 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
     _telemetry.info(f"report -> {report_path}")
 
     problems = []
+    mass_problems = []
     if abs(report["volume_delta"]) > vol_tol:
-        problems.append(
+        mass_problems.append(
             f"volume delta {report['volume_delta']:+.4f} mm^3 (tol {vol_tol:.4f})")
     if abs(report["surface_delta"]) > surf_tol:
-        problems.append(
+        mass_problems.append(
             f"surface delta {report['surface_delta']:+.4f} mm^2 (tol {surf_tol:.4f})")
+    problems.extend(mass_problems)
     if len(areas) != len(v_faces):
         problems.append(f"face count {len(areas)} != vendor {len(v_faces)}")
     elif exact_multiset:
@@ -424,6 +426,57 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
     check(f"save -> {replica}", await adapter.save_file(str(replica.resolve())))
     artefacts = {"part": str(replica), "report": str(report_path)}
     artefacts.update(await export_views(adapter, f"{part_no}-replica"))
+
+    # Some vendor bodies carry an IMassProperty integration artifact: their
+    # stored mass numbers disagree with their OWN face-area sum (92865A585:
+    # mpsurf 1680.39 vs facesum 1679.83, and a matching +0.58 mm^3 phantom
+    # that survives a full feature re-execution on SW2026).  When ONLY the
+    # volume/surface gates fail and the vendor truth is self-inconsistent
+    # beyond the surface tolerance, arbitrate with tessellation: export
+    # both bodies to STL and compare trimesh volume/area, which is
+    # integrator-independent (the 92865A585 pair agrees to 1e-4 mm^3).
+    vendor_selfincons = abs(sum(v_faces) - v_surf)
+    if (mass_problems and len(mass_problems) == len(problems)
+            and vendor_selfincons > max(0.10, v_surf * 1e-4)):
+        _telemetry.warn(
+            f"{part_no}: vendor mass block self-inconsistent by "
+            f"{vendor_selfincons:.4f} mm^2 -- arbitrating via STL")
+        from _common import _early_bound, _read_member
+        import trimesh
+        rep_stl = OUT_DIR / f"{part_no}-replica.stl"
+        ven_stl = OUT_DIR / f"{part_no}-vendor.stl"
+        # export each from a FRESH open -- exporting the live session doc
+        # produced a truncated mesh (stale selection state)
+        close_all(adapter)
+        for src, dst in ((replica, rep_stl),
+                         (MCMASTER_DIR / f"{part_no}.SLDPRT", ven_stl)):
+            check(f"open for STL {src.name}",
+                  await adapter.open_model(str(src)))
+            m = _early_bound(adapter.currentModel, "IModelDoc2")
+            m.ClearSelection2(True)
+            if m.SaveAs3(str(dst), 0, 2) not in (0, True):
+                _telemetry.warn(f"STL export returned non-zero for {src.name}")
+            close_all(adapter)
+        mr = trimesh.load(str(rep_stl))
+        mv = trimesh.load(str(ven_stl))
+        stl_dv = float(mr.volume - mv.volume)
+        stl_da = float(mr.area - mv.area)
+        report["stl_volume_mm3"] = round(float(mr.volume), 4)
+        report["stl_vendor_volume_mm3"] = round(float(mv.volume), 4)
+        report["stl_volume_delta"] = round(stl_dv, 4)
+        report["stl_area_delta"] = round(stl_da, 4)
+        report["vendor_mass_selfinconsistency_mm2"] = round(vendor_selfincons, 4)
+        if abs(stl_dv) <= vol_tol and abs(stl_da) <= surf_tol:
+            report["face_gate"] += "+stl-arbitrated"
+            _telemetry.warn(
+                f"{part_no}: STL arbitration PASSED "
+                f"(dv {stl_dv:+.4f} mm^3, da {stl_da:+.4f} mm^2) -- "
+                f"vendor mass block overruled")
+            problems = [p for p in problems if p not in mass_problems]
+        else:
+            problems.append(
+                f"STL arbitration failed too: dv {stl_dv:+.4f}, da {stl_da:+.4f}")
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     if problems:
         raise RuntimeError(
