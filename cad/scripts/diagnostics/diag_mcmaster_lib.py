@@ -111,6 +111,36 @@ async def export_views(adapter, stem: str) -> dict[str, str]:
     return out
 
 
+from contextlib import contextmanager
+
+# swUserPreferenceToggle_e (values read from swconst.tlb on this install)
+_SW_SKETCH_AUTOMATIC_RELATIONS = 9
+_SW_SKETCH_INFERENCE = 249
+
+
+@contextmanager
+def no_sketch_inference(adapter):
+    """Disable sketch inference + automatic relations for the duration.
+
+    SolidWorks inference snapping is PIXEL-based (view-dependent): it
+    silently re-solved a scripted arc by snapping its centre to a
+    centreline midpoint and an endpoint to a horizontal alignment, at
+    distances that depend on the current zoom.  Scripted geometry must
+    never depend on the view, so profile sketching runs with both
+    toggles off.  (AddToDB also suppresses snapping but leaves contours
+    the boss revolve rejects.)"""
+    app = adapter.swApp
+    prev = [bool(app.GetUserPreferenceToggle(t))
+            for t in (_SW_SKETCH_AUTOMATIC_RELATIONS, _SW_SKETCH_INFERENCE)]
+    app.SetUserPreferenceToggle(_SW_SKETCH_AUTOMATIC_RELATIONS, False)
+    app.SetUserPreferenceToggle(_SW_SKETCH_INFERENCE, False)
+    try:
+        yield
+    finally:
+        app.SetUserPreferenceToggle(_SW_SKETCH_AUTOMATIC_RELATIONS, prev[0])
+        app.SetUserPreferenceToggle(_SW_SKETCH_INFERENCE, prev[1])
+
+
 def offset_plane(adapter, name: str, offset_mm: float, base: str = "Top Plane"):
     """Reference plane parallel to ``base`` at (signed) offset_mm."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
