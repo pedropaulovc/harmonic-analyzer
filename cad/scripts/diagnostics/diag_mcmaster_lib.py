@@ -88,14 +88,14 @@ def bodies(adapter) -> list:
 
 
 def face_areas(adapter) -> list[float]:
-    bl = bodies(adapter)
-    if len(bl) != 1:
-        raise RuntimeError(f"replica has {len(bl)} bodies, expected 1")
-    body = _early_bound(bl[0], "IBody2")
+    # Multi-body parts are legitimate (91247A720 ships raised grade marks
+    # as separate bodies); the face-count gate catches unmerged splits.
     areas = []
-    for f in body.GetFaces() or []:
-        f = _early_bound(f, "IFace2")
-        areas.append(round(float(_read_member(f, "GetArea")) * 1e6, 4))
+    for b in bodies(adapter):
+        body = _early_bound(b, "IBody2")
+        for f in body.GetFaces() or []:
+            f = _early_bound(f, "IFace2")
+            areas.append(round(float(_read_member(f, "GetArea")) * 1e6, 4))
     return sorted(areas)
 
 
