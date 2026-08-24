@@ -17,7 +17,7 @@ protrusion); the open LOCK NOTCH cuts straight into the west edge. The
 four plan corners are rounded, echoing the hardware each sits beside
 (pivot screw head at the north end, the green column at the south-east,
 the lock knob washer at the south-west). A Ø6.756 pivot hole clears the stock
-Ø6.35 shoulder. A Ø10.50 × 0.25-deep top relief reduces only the local bearing
+Ø6.35 shoulder. A Ø10.55 x 0.25-deep top relief reduces only the local bearing
 thickness to 6.10, preserving 0.25 running axial clearance without lowering the
 plate or its mounted hardware.
 
@@ -86,6 +86,7 @@ from cone_swing_platform_spec import (
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_BEARING_THICKNESS,
+    PIVOT_HEAD_RADIAL_CLEARANCE,
     PLATE_LENGTH_TOLERANCE_MM,
     PLAN_VIEW_NOTE,
     POST_MOUNT_THREAD,

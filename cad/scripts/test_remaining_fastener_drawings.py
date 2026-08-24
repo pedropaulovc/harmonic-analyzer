@@ -230,7 +230,9 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 24.0)
     assert (spec.SHOULDER_DIA - spec.THREAD_MAJOR_DIA) / 2.0 >= 0.75
     assert spec.PIVOT_BEARING_THICKNESS == platform.PIVOT_BEARING_THICKNESS
-    assert platform.PIVOT_BEARING_RELIEF_DIAMETER - spec.HEAD_DIA >= 0.5
+    assert (
+        platform.PIVOT_BEARING_RELIEF_DIAMETER - spec.HEAD_DIA
+    ) / 2.0 >= platform.PIVOT_HEAD_RADIAL_CLEARANCE
     assert platform.PIVOT_HOLE_DIA > spec.SHOULDER_DIA
     assert spec.THREAD_TAIL_LEN >= spec.THREAD_MAJOR_DIA
     assert base.PIVOT_SEAT_SPEC.kind == "tapped"

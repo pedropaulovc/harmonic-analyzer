@@ -563,6 +563,7 @@ from build_cone_swing_platform import (  # noqa: E402
     PLATE_T as PLAT_T,
     PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
     PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
+    PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
     PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
     SLOT_E_X as PLAT_SLOT_E_X,
     SLOT_E_Z as PLAT_SLOT_E_Z,
@@ -947,8 +948,8 @@ if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
     raise AssertionError("platform pivot hole does not clear the screw shoulder")
 if abs(PSCREW_SHOULDER_LEN - PLAT_PIVOT_BEARING_T - 0.25) > 1e-9:
     raise AssertionError("pivot screw no longer provides 0.25 axial plate clearance")
-if PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA < 0.5:
-    raise AssertionError("platform pivot relief does not clear the screw head")
+if (PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA) / 2.0 < PLAT_PIVOT_HEAD_RADIAL_CLEARANCE:
+    raise AssertionError("platform pivot relief lacks required radial head clearance")
 if BASE_PIVOT_SEAT_SPEC.kind != "tapped":
     raise AssertionError("base pivot seat is not tapped")
 if BASE_PIVOT_SEAT_SPEC.size != PSCREW_THREAD:

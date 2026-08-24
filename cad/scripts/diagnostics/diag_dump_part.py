@@ -92,7 +92,9 @@ def _g(obj, name, default=None):
         v = _read_member(obj, name)
     except Exception:  # noqa: BLE001
         return default
-    return default if v is None else v
+    # _read_member returns the bound method when a zero-argument invocation is
+    # rejected. A method object is a failed accessor here, never harvested data.
+    return default if v is None or callable(v) else v
 
 
 def _mm(v):
