@@ -1,9 +1,9 @@
 r"""Reproduction script: cone platform pivot screw (item 2, p.18 "pivot").
 
-The slotted shoulder screw the swing platform rotates on.  Its ground shoulder
-is 0.25 mm longer than the plate thickness, so tightening the threaded tail
-against the base leaves running axial clearance instead of clamping the plate.
-The distinct #10-24 UNC-2A tail engages the base's blind UNC-2B seat.
+The stock slotted shoulder screw the swing platform rotates on.  Its 6.35 mm
+ground shoulder spans the platform's 6.10 mm local pivot-bearing thickness and
+leaves 0.25 mm running axial clearance instead of clamping the plate.  The
+distinct #10-24 UNC-2A tail engages the base's blind UNC-2B seat.
 
 Stacked extrudes from the under-head datum (origin, Top plane): head up,
 shoulder and thread tail down; one rectangular cut across the head top forms
@@ -67,7 +67,7 @@ from cone_pivot_screw_spec import (
 
 PART_NAME = "cone-pivot-screw"
 SPEC = fastener(PART_NAME)
-MATERIAL = SPEC.material  # bright steel screw (v4 stills)
+MATERIAL = SPEC.material  # polished-steel SolidWorks visual stand-in
 
 _DRAWING_REQUIRED_PROPERTIES = (
     "Number",

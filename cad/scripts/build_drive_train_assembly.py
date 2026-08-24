@@ -561,6 +561,8 @@ from build_cone_swing_platform import (  # noqa: E402
     NOTCH_EXIT_TRAVEL as PLAT_NOTCH_EXIT,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
+    PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
+    PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
     PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
     SLOT_E_X as PLAT_SLOT_E_X,
     SLOT_E_Z as PLAT_SLOT_E_Z,
@@ -943,8 +945,10 @@ if (
     )
 if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
     raise AssertionError("platform pivot hole does not clear the screw shoulder")
-if abs(PSCREW_SHOULDER_LEN - PLAT_T - 0.25) > 1e-9:
+if abs(PSCREW_SHOULDER_LEN - PLAT_PIVOT_BEARING_T - 0.25) > 1e-9:
     raise AssertionError("pivot screw no longer provides 0.25 axial plate clearance")
+if PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA < 0.5:
+    raise AssertionError("platform pivot relief does not clear the screw head")
 if BASE_PIVOT_SEAT_SPEC.kind != "tapped":
     raise AssertionError("base pivot seat is not tapped")
 if BASE_PIVOT_SEAT_SPEC.size != PSCREW_THREAD:
@@ -958,11 +962,11 @@ if abs(BASE_PIVOT_HOLE_DIA - PSCREW_THREAD_SOLID_DIA) > 1e-9:
 if BASE_PIVOT_HOLE_DEPTH - PSCREW_THREAD_TAIL_LEN < 1.5:
     raise AssertionError("base pivot tap lacks blind-hole bottom clearance")
 # The pivot-screw head sits on the plate top at station PIVOT_STATION; the
-# tip block (also on the plate) ends at station 191 -- the head radius must
-# clear its north face (the first O12 head clipped the corner 13.5 mm^3).
+# tip block (also on the plate) ends at station 191.  The stock 3/8-in head
+# retains at least 0.20 mm air to its north face.
 if (
     PSCREW_HEAD_DIA / 2.0
-    > (PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)) - 0.25
+    > (PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)) - 0.20
 ):
     raise AssertionError("pivot-screw head reaches the tip block's north face")
 

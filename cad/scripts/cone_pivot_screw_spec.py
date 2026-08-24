@@ -1,9 +1,9 @@
 r"""Pure-data dimensional contract shared by the cone pivot screw and drawing.
 
-The screw is a made, slotted shoulder screw.  Its ground shoulder carries the
-6.35 mm swing plate with deliberate axial clearance; a distinct #10-24 UNC-2A
-tail engages the matching blind UNC-2B base seat.  The catalog owns the thread,
-overall under-head length, and shoulder diameter.
+The modeled screw represents McMaster-Carr 91829A560, a stock slotted 18-8
+stainless precision shoulder screw.  Its 6.35 mm shoulder carries the locally
+relieved swing-platform bearing with deliberate axial clearance; a distinct
+#10-24 UNC-2A tail engages the matching blind UNC-2B base seat.
 """
 
 from __future__ import annotations
@@ -12,19 +12,21 @@ from _fastener_catalog import fastener
 from _gtol_spec import CylinderFace
 from _holes import TAP_DRILL_MM, THREAD_MAJOR_MM
 from _surface_finish import GROUND_UM, SurfaceFinishControl
+from cone_swing_platform_spec import PIVOT_BEARING_THICKNESS
 
 
 _SPEC = fastener("cone-pivot-screw")
 
-HEAD_DIA = 9.5
-HEAD_T = 3.0
+SUPPLIER = "McMaster-Carr"
+SUPPLIER_PART_NUMBER = "91829A560"
+HEAD_DIA = 9.525
+HEAD_T = 4.7625
 SLOT_W = 1.6
 SLOT_D = 1.2
 
-PLATFORM_THICKNESS = 6.35
 AXIAL_CLEARANCE = 0.25
 SHOULDER_DIA = _SPEC.model_diameter_mm
-SHOULDER_LEN = PLATFORM_THICKNESS + AXIAL_CLEARANCE
+SHOULDER_LEN = 6.35
 UNDERHEAD_LEN = _SPEC.length_mm
 THREAD_TAIL_LEN = UNDERHEAD_LEN - SHOULDER_LEN
 THREAD = _SPEC.thread
@@ -49,6 +51,8 @@ SURFACE_FINISHES = (
     ),
 )
 
+if abs(SHOULDER_LEN - PIVOT_BEARING_THICKNESS - AXIAL_CLEARANCE) > 1e-9:
+    raise ValueError("cone pivot shoulder no longer provides its axial clearance")
 if THREAD_TAIL_LEN < THREAD_MAJOR_DIA:
     raise ValueError(
         "cone pivot thread engagement must be at least one nominal diameter"
@@ -80,6 +84,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_NOTES = "\n".join(
     (
+        f"PURCHASED {SUPPLIER} {SUPPLIER_PART_NUMBER}; DIMENSIONS SHOWN ARE "
+        "INSPECTION REFERENCE.",
         f"{THREAD_DESIGNATION} PER ASME B1.1-2024; DATUM A IS THE AXIS "
         "DERIVED FROM THE EXTERNAL THREAD PITCH CYLINDER.",
         f"{MIN_FULL_FORM:.2f} MIN FULL-FORM THREAD WITHIN DIMENSIONED THREAD LENGTH.",

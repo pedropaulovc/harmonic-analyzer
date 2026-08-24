@@ -104,6 +104,7 @@ def test_catalog_thread_and_dimension_callout_are_not_invented(case: Case) -> No
     assert spec.THREAD_DESIGNATION in spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS == {}
     if case.part_name == "cone-pivot-screw":
+        assert catalog.material == "AISI 304"
         assert spec.SHOULDER_DIA == catalog.model_diameter_mm
         assert spec.UNDERHEAD_LEN == catalog.length_mm
         assert part.SHOULDER_DIA == spec.SHOULDER_DIA
@@ -212,14 +213,24 @@ def test_cone_pivot_defines_shoulder_clearance_and_thread_engagement() -> None:
     drive = importlib.import_module("build_drive_train_assembly")
     platform = importlib.import_module("build_cone_swing_platform")
 
-    assert spec.SHOULDER_LEN == spec.PLATFORM_THICKNESS + spec.AXIAL_CLEARANCE
+    assert (
+        spec.SHOULDER_LEN
+        == spec.PIVOT_BEARING_THICKNESS + spec.AXIAL_CLEARANCE
+    )
+    assert spec.SUPPLIER_PART_NUMBER == "91829A560"
     assert spec.SHOULDER_DIA == pytest.approx(6.35)
+    assert spec.SHOULDER_LEN == pytest.approx(6.35)
+    assert spec.UNDERHEAD_LEN == pytest.approx(15.875)
+    assert spec.THREAD_TAIL_LEN == pytest.approx(9.525)
+    assert spec.HEAD_DIA == pytest.approx(9.525)
+    assert spec.HEAD_T == pytest.approx(4.7625)
     assert spec.THREAD == "#10-24"
     assert spec.THREAD_MAJOR_DIA == pytest.approx(4.826)
     assert spec.THREAD_SOLID_DIA == pytest.approx(3.797)
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 24.0)
     assert (spec.SHOULDER_DIA - spec.THREAD_MAJOR_DIA) / 2.0 >= 0.75
-    assert spec.PLATFORM_THICKNESS == platform.PLATE_T
+    assert spec.PIVOT_BEARING_THICKNESS == platform.PIVOT_BEARING_THICKNESS
+    assert platform.PIVOT_BEARING_RELIEF_DIAMETER - spec.HEAD_DIA >= 0.5
     assert platform.PIVOT_HOLE_DIA > spec.SHOULDER_DIA
     assert spec.THREAD_TAIL_LEN >= spec.THREAD_MAJOR_DIA
     assert base.PIVOT_SEAT_SPEC.kind == "tapped"
