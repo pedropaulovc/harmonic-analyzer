@@ -44,47 +44,38 @@ from diag_mcmaster_lib import (  # noqa: E402
     vendor_truth,
 )
 
-# swFeatureFilletOptions_e
-FILLET_ASYMMETRIC = 16384
-FILLET_UNIFORM = 2
-FILLET_PROPAGATE = 1
-# swFeatureFilletType_e.swFeatureFilletType_Simple / profile Circular
-FILLET_SIMPLE = 0
-FILLET_PROFILE_CIRCULAR = 0  # elliptical when asymmetric
+async def _asymmetric_fillet(adapter, edge_points_mm, r1_mm: float,
+                             r2_mm: float, conic_rho: float,
+                             feature_name: str, reverse: bool = False):
+    """Constant asymmetric conic fillet: author a plain symmetric fillet
+    through the adapter's proven path, then EDIT its definition via
+    ISimpleFilletFeatureData2 (the same API the dump reads).
 
+    Direct FeatureFillet3 authoring proved non-deterministic on this
+    build -- runs with identical arguments produced different leg
+    orientations (the positional call partially inherits SolidWorks
+    session defaults), so the replica goes create-then-modify instead."""
+    from _common import _early_bound, _feature_by_name
 
-def _asymmetric_fillet(adapter, edge_points_mm, r1_mm: float, r2_mm: float,
-                       feature_name: str):
-    """Constant asymmetric (elliptical) fillet on the edges at the given
-    points -- FeatureFillet3, which the adapter's symmetric add_fillet
-    cannot express."""
-    from solidworks_mcp.adapters.solidworks.features import (
-        _flag_feature_methods,
-        _select_by_point,
-    )
-
-    model = adapter.currentModel
-    model.ClearSelection2(True)
-    for i, pt in enumerate(edge_points_mm):
-        if not _select_by_point(adapter, "EDGE", list(pt), 0, i > 0):
-            raise RuntimeError(f"cannot select fillet edge at {pt}")
-    fm = _flag_feature_methods(
-        model.FeatureManager, "IFeatureManager", "FeatureFillet3")
-    with _telemetry.span("feature.asymmetric_fillet", label=feature_name):
-        feat = fm.FeatureFillet3(
-            FILLET_ASYMMETRIC | FILLET_UNIFORM | FILLET_PROPAGATE,
-            r1_mm / 1000.0,
-            r2_mm / 1000.0,
-            0.0,  # Rho
-            FILLET_SIMPLE,
-            0,    # OverflowType default
-            FILLET_PROFILE_CIRCULAR,
-            None, None, None, None, None, None, None,
-        )
-    model.ClearSelection2(True)
-    if feat is None:
-        raise RuntimeError(f"FeatureFillet3 returned None for {feature_name}")
+    check(f"fillet base {feature_name}", await adapter.add_fillet(
+        r1_mm, [list(p) for p in edge_points_mm]))
     name_last_feature(adapter, feature_name)
+    model = adapter.currentModel
+    feat = _feature_by_name(adapter, feature_name)
+    data = _early_bound(feat.GetDefinition(), "ISimpleFilletFeatureData2")
+    if not data.AccessSelections(model, None):
+        raise RuntimeError(f"AccessSelections failed for {feature_name}")
+    data.AsymmetricFillet = True
+    data.DefaultRadius = r1_mm / 1000.0
+    data.DefaultDistance = r2_mm / 1000.0
+    data.ConicTypeForCrossSectionProfile = 1  # swFeatureFilletConicRho
+    data.DefaultConicRhoOrRadius = conic_rho
+    if reverse:
+        # Indexed property (WhichFaceList) -- flips Direction 1/2 for the
+        # feature's face list; single-edge features use list 0.
+        data.SetReverseFaceNormal(0, True)
+    if not feat.ModifyDefinition(data, model, None):
+        raise RuntimeError(f"ModifyDefinition failed for {feature_name}")
     return feat
 
 
@@ -99,6 +90,7 @@ W_ID = 13.4874  # ID@Sketch1 (diametric)
 W_T = 2.4765    # Thickness Range@Sketch2
 W_F1 = 0.34671  # D1@Fillet1 (radial leg)
 W_F2 = 0.173355  # D2@Fillet1 (axial leg)
+W_RHO = 0.65    # Fillet1 conic rho (conic_type=1 in the harvest)
 
 
 async def build_90126A211(adapter, truth):
@@ -107,19 +99,37 @@ async def build_90126A211(adapter, truth):
     await define_circle(adapter, 0.0, 0.0, W_ID / 2.0, "washer ID")
     check("exit_sketch annulus", await adapter.exit_sketch())
     name_last_feature(adapter, "AnnulusProfile")
-    extrude_at_offset(adapter, W_T, -W_T / 2.0)
+    # MIDPLANE extrude like the vendor (end_cond 6) -- not blind from an
+    # offset plane: a blind extrude's start-face edges orient opposite the
+    # end-face ones, which flipped the asymmetric fillet's Direction 1 on
+    # the bottom rim (the vendor needs no per-edge reverse, and with the
+    # midplane body neither do we).
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+    check("extrude washer", await adapter.create_extrusion(
+        ExtrusionParameters(depth=W_T, both_directions=True)))
     name_last_feature(adapter, "WasherBody")
     v = math.pi * ((W_OD / 2.0) ** 2 - (W_ID / 2.0) ** 2) * W_T
     await volume_check(adapter, "washer annulus", v, 0.005 * v)
 
-    # The four rim edges: OD and ID, top and bottom.
+    # The four rim edges in one feature, like the vendor's Fillet1 (read
+    # off the model: asymmetric=true, D1 0.34671 / D2 0.173355, conic-rho
+    # profile rho=0.65; leg layout from the vendor faces: LONG leg radial
+    # across the flats, SHORT leg axial down the cylinders).
+    # The vendor's single Fillet1 reads no per-edge reverse, but on OUR
+    # body the bottom edges' Direction 1 lands on the cylinder instead of
+    # the flat (midplane vs blind extrude made no difference), and every
+    # reverse knob probed inert (swFeatureFilletReverseFace1Dir,
+    # SetReverseFaceNormal).  So: one feature per edge, with the D1/D2
+    # values swapped on the bottom pair -- geometrically identical to the
+    # vendor's one feature.
     h = W_T / 2.0
-    _asymmetric_fillet(adapter, [
-        (W_OD / 2.0, h, 0.0),
-        (W_OD / 2.0, -h, 0.0),
-        (W_ID / 2.0, h, 0.0),
-        (W_ID / 2.0, -h, 0.0),
-    ], W_F1, W_F2, "RimFillet")
+    for label, pt, r1, r2 in (
+        ("RimFilletODTop", (W_OD / 2.0, h, 0.0), W_F2, W_F1),
+        ("RimFilletODBot", (W_OD / 2.0, -h, 0.0), W_F1, W_F2),
+        ("RimFilletIDTop", (W_ID / 2.0, h, 0.0), W_F1, W_F2),
+        ("RimFilletIDBot", (W_ID / 2.0, -h, 0.0), W_F2, W_F1),
+    ):
+        await _asymmetric_fillet(adapter, [pt], r1, r2, W_RHO, label)
 
     # Replica frame: extrude axis = model Y, vendor frame: axis = Z.
     adapter._mcm_com_map = lambda v: [v[0], v[2], v[1]]

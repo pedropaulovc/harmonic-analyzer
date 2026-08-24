@@ -307,7 +307,9 @@ def _feature_data(feat, type_name):
                           ("revolutions", "Revolution"),
                           ("clockwise", "Clockwise"),
                           ("reverse", "ReverseDirection"),
-                          ("start_angle_deg", "StartAngle")):
+                          ("start_angle_deg", "StartingAngle"),
+                          ("defined_by", "DefinedBy"),
+                          ("variable_pitch", "VariablePitch")):
             v = _g(d, prop)
             if v is None:
                 continue
