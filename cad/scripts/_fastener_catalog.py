@@ -102,9 +102,10 @@ FASTENERS: dict[str, FastenerSpec] = {
         "cone-lock-knob", "1/4-20", 6.35, 6.35,
         HeadStyle.KNURLED_THUMB, DriveStyle.KNURLED,
     ),
-    "cone-pivot-screw": _steel(
-        "cone-pivot-screw", "#10-24", 14.60, 6.35,
+    "cone-pivot-screw": FastenerSpec(
+        "cone-pivot-screw", "#10-24", 15.875, 6.35,
         HeadStyle.SHOULDER, DriveStyle.SLOT,
+        "AISI 304", Finish.POLISHED,
     ),
     "cone-tip-adjuster": _steel(
         "cone-tip-adjuster", "5/16-18", 14.0, 6.2,

@@ -16,9 +16,10 @@ run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
 protrusion); the open LOCK NOTCH cuts straight into the west edge. The
 four plan corners are rounded, echoing the hardware each sits beside
 (pivot screw head at the north end, the green column at the south-east,
-the lock knob washer at the south-west). A O6.5 pivot hole takes the
-slotted pivot screw (clearance over its O6.35 shoulder -- the plate
-rotates ON the screw).
+the lock knob washer at the south-west). A Ø6.756 pivot hole clears the stock
+Ø6.35 shoulder. A Ø10.50 × 0.25-deep top relief reduces only the local bearing
+thickness to 6.10, preserving 0.25 running axial clearance without lowering the
+plate or its mounted hardware.
 
 The shortened envelope and paired 1/4-20 post mounts are the direct platform
 cascade from ``cone-pivot-post-v2.SLDPRT``.  Its 42.011 mm casting foot is
@@ -60,6 +61,7 @@ from _common import (
     force_rebuild,
     name_bore_axis,
     name_last_feature,
+    name_dimensions,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -81,6 +83,9 @@ from cone_swing_platform_spec import (
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PLATE_THICKNESS,
+    PIVOT_BEARING_RELIEF_DEPTH,
+    PIVOT_BEARING_RELIEF_DIAMETER,
+    PIVOT_BEARING_THICKNESS,
     PLATE_LENGTH_TOLERANCE_MM,
     PLAN_VIEW_NOTE,
     POST_MOUNT_THREAD,
@@ -107,6 +112,10 @@ PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 # side of the sketch plane); must exceed 2x any extent crossed
+if abs(PLATE_T - PIVOT_BEARING_RELIEF_DEPTH - PIVOT_BEARING_THICKNESS) > 1e-9:
+    raise AssertionError(
+        "pivot bearing relief no longer leaves its specified thickness"
+    )
 
 INCLINE_DEG = 12.5182  # cone-axis plan incline (the assembly's ROT_Y_INCLINE)
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
@@ -274,6 +283,12 @@ async def build(adapter) -> dict[str, str]:
     # is an INCH document and the equation manager reads BARE numbers in
     # document units (an unsuffixed 214 = 214 in).
     await set_global(adapter, "PlateT", f"{PLATE_T}mm")
+    await set_global(
+        adapter, "PivotBearingReliefDia", f"{PIVOT_BEARING_RELIEF_DIAMETER}mm"
+    )
+    await set_global(
+        adapter, "PivotBearingReliefDepth", f"{PIVOT_BEARING_RELIEF_DEPTH}mm"
+    )
     await set_global(adapter, "HalfWidthN", f"{HALF_WIDTH_N}mm")
     await set_global(adapter, "WestHalfN", f"{WEST_HALF_N}mm")
     await set_global(adapter, "EastHalfS", f"{EAST_HALF_S}mm")
@@ -340,6 +355,41 @@ async def build(adapter) -> dict[str, str]:
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = await volume_check(adapter, "pivot hole", volume - v_hole, 0.01 * v_hole)
+
+    # The stock 1/4-in shoulder is exactly as long as the nominal plate is
+    # thick. A shallow top relief preserves the established 0.25 mm running
+    # clearance without lowering the plate or any hardware mounted on it.
+    check("create_plane PivotBearingTop", await adapter.create_plane(
+        CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=PLATE_T)
+    ))
+    name_last_feature(adapter, "PivotBearingTop")
+    bearing_relief = SketchDims()
+    check("create_sketch pivot bearing relief",
+          await adapter.create_sketch("PivotBearingTop"))
+    await define_circle(
+        adapter, 0.0, 0.0, PIVOT_BEARING_RELIEF_DIAMETER / 2.0,
+        "pivot bearing relief", dims=bearing_relief,
+        names=("PivotBearingReliefCx", "PivotBearingReliefCz",
+               "PivotBearingReliefDia"),
+        drives=(None, None, '"PivotBearingReliefDia"'),
+    )
+    await ensure_fully_defined(adapter, "pivot bearing relief sketch")
+    check("exit_sketch pivot bearing relief", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotBearingReliefProfile")
+    drive_jobs += bearing_relief.apply(adapter, "PivotBearingReliefProfile")
+    check("cut pivot bearing relief", await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=PIVOT_BEARING_RELIEF_DEPTH)
+    ))
+    name_last_feature(adapter, "PivotBearingRelief")
+    relief_depth_dim = name_dimensions(
+        adapter, "PivotBearingRelief", ["PivotBearingReliefDepth"])
+    drive_jobs += [(relief_depth_dim[0], '"PivotBearingReliefDepth"')]
+    v_relief = math.pi * (
+        (PIVOT_BEARING_RELIEF_DIAMETER / 2.0) ** 2
+        - (pivot_dia / 2.0) ** 2
+    ) * PIVOT_BEARING_RELIEF_DEPTH
+    volume = await volume_check(
+        adapter, "pivot bearing relief", volume - v_relief, 0.01 * v_relief)
 
     # The v2 casting's two Fillister-head attachment bores land on matching
     # native 1/4-20 UNC-2B through taps in the platform.  One Hole Wizard
@@ -563,17 +613,18 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(
         adapter,
         (
-            # Unnamed offset planes created inside name_bore_axis. Removing
-            # CrankGearReliefPlane shifts these generated ordinals down by one.
-            ("Plane1", "PLANE"),
+            # Unnamed offset planes created inside name_bore_axis. The named
+            # PivotBearingTop plane occupies the first generated plane ordinal.
+            ("PivotBearingTop", "PLANE"),
             ("Plane2", "PLANE"),
+            ("Plane3", "PLANE"),
             ("CrankAxisVert", "PLANE"),
             ("CrankAxisHigh", "PLANE"),
             ("CrankAxisSeat", "PLANE"),
-            ("Plane6", "PLANE"),
             ("Plane7", "PLANE"),
             ("Plane8", "PLANE"),
             ("Plane9", "PLANE"),
+            ("Plane10", "PLANE"),
             ("PlateTop", "PLANE"),
             (swing_axis, "AXIS"),
             (anchor_axis, "AXIS"),

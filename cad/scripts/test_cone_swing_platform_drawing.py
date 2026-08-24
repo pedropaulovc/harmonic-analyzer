@@ -60,6 +60,8 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "CRANK-GEAR SWEPT OD CLEARS THE LOWER BROAD FACE" in notes
     assert "KEEP THE PLATE FULL THICKNESS" in notes
     assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
+    assert "TOP RELIEF DIA 10.50 X 0.25 DEEP" in notes
+    assert "LOCAL BEARING THICKNESS 6.10 +/-0.05" in notes
     assert "HOLD EACH BROAD FACE FLAT WITHIN 0.10 AND THE TWO PARALLEL WITHIN 0.10" in notes
     assert "AS MODELLED" not in notes
     assert "SEE PLAN" not in notes
@@ -100,6 +102,13 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     assert math.isclose(part.POST_LOCAL_Z, -192.17368694563453, abs_tol=1e-12)
     assert part.POST_MAIN_DIA == 42.011
     assert part.POST_FOOT_CONTAINMENT >= 0.25
+    assert part.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
+    assert part.PIVOT_BEARING_RELIEF_DEPTH == pytest.approx(0.25)
+    assert part.PIVOT_BEARING_THICKNESS == pytest.approx(6.10)
+    assert (
+        part.PLATE_T - part.PIVOT_BEARING_THICKNESS
+        == pytest.approx(part.PIVOT_BEARING_RELIEF_DEPTH)
+    )
 
     half = part.POST_MOUNT_HALF_PITCH
     west_x, west_z = part.POST_MOUNT_WEST_XZ
@@ -116,6 +125,8 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PostMountHoles"' in source
     assert 'name_last_feature(adapter, "CrankGearRelief")' not in source
+    assert 'name_last_feature(adapter, "PivotBearingRelief")' in source
+    assert '("PivotBearingTop", "PLANE")' in source
     assert 'name_last_feature(adapter, axis_name)' in source
     assert '("post mount west", POST_MOUNT_WEST_XZ)' in source
     assert '("post mount east", POST_MOUNT_EAST_XZ)' in source
