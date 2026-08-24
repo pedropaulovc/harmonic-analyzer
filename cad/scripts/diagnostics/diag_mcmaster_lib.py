@@ -201,6 +201,31 @@ def split_at_plane(adapter, plane_name: str, feature_name: str) -> list[dict]:
     return out
 
 
+def combine_bodies_add(adapter, feature_name: str):
+    """Vendor-style Combine1 (SWBODYADD): union every body into one.
+
+    Passes the bodies directly as ToolVar with MainBody=None, per the
+    documented direct-call form for the ADD operation."""
+    import pythoncom
+    from win32com.client import VARIANT
+    from _common import name_last_feature
+
+    model = adapter.currentModel
+    all_bodies = bodies(adapter)
+    if len(all_bodies) < 2:
+        raise RuntimeError(f"combine needs >=2 bodies, have {len(all_bodies)}")
+    model.ClearSelection2(True)
+    feat = model.FeatureManager.InsertCombineFeature(
+        15903,  # swBodyOperationType_e.SWBODYADD
+        None,
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, list(all_bodies)),
+    )
+    if feat is None:
+        raise RuntimeError("InsertCombineFeature returned None")
+    name_last_feature(adapter, feature_name)
+    return feat
+
+
 def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
                      feature_name: str, tangency: tuple[int, int] = (1, 1)):
     """The decoded vendor Cut-Sweep: obsolete ``InsertCutSwept5`` with the
