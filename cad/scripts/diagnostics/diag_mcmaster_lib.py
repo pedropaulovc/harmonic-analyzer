@@ -29,6 +29,7 @@ never saved or modified, and replica artefacts go only under the gitignored
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -51,6 +52,16 @@ SW_BODY_ADD = 15903  # swBodyOperationType_e.SWBODYADD
 
 FACE_MULTISET_LIMIT = 60  # above this, gate count + top-K instead of multiset
 FACE_TOP_K = 30
+
+
+def _rev_frustum(h: float, r1: float, r2: float) -> float:
+    """Volume of a revolved cone frustum (full cone when one radius is 0)."""
+    return math.pi / 3.0 * h * (r1 * r1 + r1 * r2 + r2 * r2)
+
+
+def _spherical_cap_volume(r_rim: float, h: float) -> float:
+    """Volume of a spherical cap of rim radius r_rim and height h."""
+    return math.pi * h * (3.0 * r_rim * r_rim + h * h) / 6.0
 
 
 def vendor_truth(part_no: str) -> dict:
@@ -199,31 +210,6 @@ def split_at_plane(adapter, plane_name: str, feature_name: str) -> list[dict]:
         box = [float(x) * 1000.0 for x in (b2.GetBodyBox() or [])]
         out.append({"name": str(_read_member(b2, "Name")), "box_mm": box})
     return out
-
-
-def combine_bodies_add(adapter, feature_name: str):
-    """Vendor-style Combine1 (SWBODYADD): union every body into one.
-
-    Passes the bodies directly as ToolVar with MainBody=None, per the
-    documented direct-call form for the ADD operation."""
-    import pythoncom
-    from win32com.client import VARIANT
-    from _common import name_last_feature
-
-    model = adapter.currentModel
-    all_bodies = bodies(adapter)
-    if len(all_bodies) < 2:
-        raise RuntimeError(f"combine needs >=2 bodies, have {len(all_bodies)}")
-    model.ClearSelection2(True)
-    feat = model.FeatureManager.InsertCombineFeature(
-        15903,  # swBodyOperationType_e.SWBODYADD
-        None,
-        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, list(all_bodies)),
-    )
-    if feat is None:
-        raise RuntimeError("InsertCombineFeature returned None")
-    name_last_feature(adapter, feature_name)
-    return feat
 
 
 def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
@@ -466,7 +452,6 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
         _telemetry.warn(
             f"{part_no}: vendor mass block self-inconsistent by "
             f"{vendor_selfincons:.4f} mm^2 -- arbitrating via STL")
-        from _common import _early_bound, _read_member
         import trimesh
         rep_stl = OUT_DIR / f"{part_no}-replica.stl"
         ven_stl = OUT_DIR / f"{part_no}-vendor.stl"
@@ -530,3 +515,26 @@ async def render_vendor(adapter, part_no: str) -> dict[str, str]:
            for k, p in (await export_views(adapter, f"{part_no}-vendor")).items()}
     await close_all(adapter)
     return out
+
+
+async def run_replica(adapter, part_no: str, builder) -> dict[str, str]:
+    """One part end to end: create -> build -> gate/save -> render pair."""
+    truth = vendor_truth(part_no)
+    artefacts: dict[str, str] = {}
+    with _telemetry.span("replica.build", label=part_no):
+        check(f"create_part {part_no}", await adapter.create_part())
+        await builder(adapter, truth)
+        artefacts.update(await gate_and_save(adapter, part_no, truth))
+        await close_all(adapter)
+        artefacts.update(await render_vendor(adapter, part_no))
+    return artefacts
+
+
+def replica_main(part_no: str, builder) -> int:
+    """`__main__` body for a single-part replica script."""
+    from _common import run_build
+
+    async def build(adapter) -> dict[str, str]:
+        return await run_replica(adapter, part_no, builder)
+
+    return run_build(build)
