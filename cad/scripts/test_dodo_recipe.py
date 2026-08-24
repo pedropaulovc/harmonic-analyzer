@@ -800,7 +800,7 @@ def test_external_logs_follow_warning_default_and_explicit_verbosity(monkeypatch
     monkeypatch.setenv("HARMONIC_VERBOSITY", "debug")
     assert dodo._external_console_level() == "DEBUG"
     monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
-    assert dodo._external_console_level() == "INFO"
+    assert dodo._external_console_level() == "SUCCESS"
 
 
 def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():

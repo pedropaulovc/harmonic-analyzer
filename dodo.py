@@ -605,7 +605,7 @@ def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
 _EXTERNAL_LOG_LEVELS = {
     "debug": "DEBUG",
     "info": "INFO",
-    "success": "INFO",
+    "success": "SUCCESS",
     "warning": "WARNING",
     "warn": "WARNING",
     "error": "ERROR",
