@@ -204,7 +204,7 @@ def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
             0,      # TwistCtrlOption: swTwistControlFollowPath
             False,  # KeepTangency
             False,  # BAdvancedSmoothing
-            0, 0,   # Start/EndMatchingType: swTangencyNone
+            1, 1,   # Start/EndMatchingType (vendor Start/EndTangencyType=1)
             False, 0.0, 0.0, 0,  # thin body
             10,     # PathAlign: swMinimumTwist (vendor PathAlignmentType)
             scoped,          # UseFeatScope
@@ -218,6 +218,51 @@ def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
     model.ClearSelection2(True)
     if swept is None:
         raise RuntimeError(f"InsertCutSwept5 returned None for {feature_name}")
+    name_last_feature(adapter, feature_name)
+    return swept
+
+
+def thread_sweep_cut_modern(adapter, profile: str, path: str,
+                            feature_name: str):
+    """Modern sweep-cut authoring: CreateDefinition(swFmSweepCut) with the
+    vendor's exact read-back option values, then CreateFeature.  The
+    obsolete InsertCutSwept5 under-removes ~0.4% of the groove volume vs
+    the vendor's feature (measured on 91829A560 AND 94025A150); this path
+    reproduces the vendor's authoring route.  (It failed on 91829A560 only
+    for the BODY-SCOPED case -- single-body parts can use it.)"""
+    from solidworks_mcp.adapters.solidworks.features import (
+        _select_named_feature,
+    )
+    from _common import name_last_feature
+
+    SW_FM_SWEEP_CUT = 18  # swFeatureNameID_e.swFmSweepCut
+    model = adapter.currentModel
+    fm = model.FeatureManager
+    data = _early_bound(fm.CreateDefinition(SW_FM_SWEEP_CUT),
+                        "ISweepFeatureData")
+    model.ClearSelection2(True)
+    if not _select_named_feature(adapter, profile, 1, False):
+        raise RuntimeError(f"cannot select sweep profile {profile!r} (mark 1)")
+    if not _select_named_feature(adapter, path, 4, True):
+        raise RuntimeError(f"cannot select sweep path {path!r} (mark 4)")
+    # Vendor Cut-Sweep option set (read off their feature data).
+    data.AlignWithEndFaces = True
+    data.TwistControlType = 0       # swTwistControlFollowPath
+    data.PathAlignmentType = 10     # swMinimumTwist
+    data.Direction = -1
+    data.MergeSmoothFaces = True
+    data.MaintainTangency = False
+    data.AdvancedSmoothing = False
+    data.StartTangencyType = 1
+    data.EndTangencyType = 1
+    data.AutoSelect = True
+    with _telemetry.span("feature.thread_sweep_cut_modern",
+                         label=feature_name):
+        swept = fm.CreateFeature(data)
+    model.ClearSelection2(True)
+    if swept is None:
+        raise RuntimeError(f"CreateFeature (sweep cut) returned None for "
+                           f"{feature_name}")
     name_last_feature(adapter, feature_name)
     return swept
 
