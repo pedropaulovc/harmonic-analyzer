@@ -317,9 +317,13 @@ async def build(adapter) -> dict[str, str]:
     # InsertHelix consumes the ACTIVE sketch.  Ascending from the tip toward
     # the head; start azimuth +X so the start lies on the Front plane where
     # the cutter is drawn (the flipped offset plane maps ang pi/2 -> +X).
+    # Clockwised=False IS the vendor's right-hand thread in this frame:
+    # their tip plane carries normal -z with reverse=True, ours +y with
+    # reverse=False, so the clockwise flag inverts (proven on 93075A194,
+    # where True left a mirror thread reading +0.0575 mm^3 at every phase).
     model.InsertHelix(
         False,  # Reversed
-        True,   # Clockwised (right-hand thread, matching the vendor)
+        False,  # Clockwised (inverted frame -- see note above)
         False, False,  # Tapered / Outward
         0,  # swHelixDefinedByPitchAndRevolution
         0.0,  # Height (derived)

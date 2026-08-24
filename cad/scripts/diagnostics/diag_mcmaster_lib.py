@@ -202,7 +202,7 @@ def split_at_plane(adapter, plane_name: str, feature_name: str) -> list[dict]:
 
 
 def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
-                     feature_name: str):
+                     feature_name: str, tangency: tuple[int, int] = (1, 1)):
     """The decoded vendor Cut-Sweep: obsolete ``InsertCutSwept5`` with the
     profile at mark 1, the helix at mark 4 and (optionally) an explicit
     SOLIDBODY scope -- the modern CreateDefinition path fails body-scoped
@@ -234,7 +234,7 @@ def thread_sweep_cut(adapter, profile: str, path: str, body_name: str | None,
             0,      # TwistCtrlOption: swTwistControlFollowPath
             False,  # KeepTangency
             False,  # BAdvancedSmoothing
-            1, 1,   # Start/EndMatchingType (vendor Start/EndTangencyType=1)
+            *tangency,  # Start/EndMatchingType (per-part vendor value)
             False, 0.0, 0.0, 0,  # thin body
             10,     # PathAlign: swMinimumTwist (vendor PathAlignmentType)
             scoped,          # UseFeatScope
