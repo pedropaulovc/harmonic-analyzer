@@ -602,6 +602,22 @@ def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         raise RuntimeError(f"{label} failed (exit {rc})")
 
 
+_EXTERNAL_LOG_LEVELS = {
+    "debug": "DEBUG",
+    "info": "INFO",
+    "success": "INFO",
+    "warning": "WARNING",
+    "warn": "WARNING",
+    "error": "ERROR",
+    "critical": "CRITICAL",
+}
+
+
+def _external_console_level() -> str:
+    raw = os.environ.get("HARMONIC_VERBOSITY", "warning").strip().lower()
+    return _EXTERNAL_LOG_LEVELS.get(raw, "WARNING")
+
+
 def _run_subprocess(cmd: list[str], label: str, log_stem: str | None = None) -> int:
     """Run the subprocess (span-less) and return its exit code (the raise-on-failure
     part is :func:`_exec`; the COM-retry wrapper :func:`_exec_com` needs the raw code
@@ -609,6 +625,9 @@ def _run_subprocess(cmd: list[str], label: str, log_stem: str | None = None) -> 
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
+    # The MCP adapter uses Loguru directly. Keep its console sink aligned with
+    # the build's warning-by-default policy while preserving an explicit override.
+    env.setdefault("LOGURU_LEVEL", _external_console_level())
     if log_stem is None:
         return subprocess.run(cmd, cwd=str(REPO_ROOT), env=env).returncode
     LOGS.mkdir(parents=True, exist_ok=True)

@@ -17,6 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _artifact_cache as cache  # noqa: E402
+import _telemetry  # noqa: E402
 
 
 # --------------------------------------------------------------------------- #
@@ -98,13 +99,15 @@ def test_key_inputs_sorted_with_missing_marker(tmp_path):
     assert key == cache.cache_key([present, missing], _digest_one)
 
 
-def test_debug_logs_provenance_without_changing_key(tmp_path, monkeypatch, capsys):
+def test_debug_logs_provenance_without_changing_key(tmp_path, monkeypatch):
+    records: list[str] = []
+    monkeypatch.setattr(_telemetry, "info", lambda message, **_: records.append(message))
     monkeypatch.setenv("HARMONIC_CACHE_DEBUG", "1")
     a = _make_dep(tmp_path, "a.txt", "alpha")
     key = cache.cache_key([a], _digest_one, label="part:x")
-    err = capsys.readouterr().err
-    assert "key provenance part:x" in err
-    assert "a.txt" in err and key in err
+    logged = "\n".join(records)
+    assert "key provenance part:x" in logged
+    assert "a.txt" in logged and key in logged
     # Same inputs, debug off -> identical key (logging is side-effect only).
     monkeypatch.delenv("HARMONIC_CACHE_DEBUG")
     assert cache.cache_key([a], _digest_one) == key
@@ -146,10 +149,18 @@ def test_store_retains_last_published_input_provenance(tmp_path, fake):
     assert cache.last_stored_inputs("part:x") == [("input.py", "VALUE = 1\n")]
 
 
-def test_restore_miss_logs_event(tmp_path, fake):
+def test_restore_miss_logs_event_at_debug(tmp_path, fake, monkeypatch):
+    records: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        _telemetry, "debug", lambda message, **_: records.append(("debug", message))
+    )
+    monkeypatch.setattr(
+        _telemetry, "warn", lambda message, **_: records.append(("warning", message))
+    )
     dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
     key = cache.cache_key([dep], _digest_one, label="part:x")
     assert cache.restore(key, [], "part:x") is False
+    assert records == [("debug", f"[cache] miss  part:x ({key[:12]}) -> building locally")]
     events = _events(tmp_path)
     assert [e["event"] for e in events] == ["restore_miss"]
     assert events[0]["inputs"] == [{"path": "input.py", "digest": "VALUE = 1\n"}]

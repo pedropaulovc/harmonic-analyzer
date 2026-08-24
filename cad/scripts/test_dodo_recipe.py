@@ -793,6 +793,16 @@ def test_task_span_carries_its_pipeline_stage_resource():
         assert "service=_stage_name(label)" in match.group("args")
 
 
+def test_external_logs_follow_warning_default_and_explicit_verbosity(monkeypatch):
+    dodo = _load_dodo()
+    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
+    assert dodo._external_console_level() == "WARNING"
+    monkeypatch.setenv("HARMONIC_VERBOSITY", "debug")
+    assert dodo._external_console_level() == "DEBUG"
+    monkeypatch.setenv("HARMONIC_VERBOSITY", "success")
+    assert dodo._external_console_level() == "INFO"
+
+
 def test_tag_seat_wait_labels_the_task_span_only_when_a_seat_was_taken():
     """``check:*`` gates take no seat (``_run`` yields None from nullcontext), so the
     task span must not grow a meaningless ``seat_wait_s=0``."""
