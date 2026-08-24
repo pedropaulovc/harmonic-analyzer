@@ -602,9 +602,10 @@ scripts that `from _common import log, check` are instrumented unchanged.
   **span event** on the current span — not (only) a standalone log record. It shows
   *when within the span* it happened and carries structured attrs, and is a no-op
   when no span is recording (so a caller never guards). Keep a `warn`/`error` LOG
-  for anything a human scanning the console must see (a cache miss is BOTH: a `warn`
-  log so it stands out, and a `cache.miss` event so the trace shows it right before
-  the build it triggered). Use a plain log for narration that isn't tied to one
+  for anything a human scanning the console must see. A routine cache miss is a
+  `debug` log plus a `cache.miss` event, so warning-level builds stay concise while
+  the trace still shows it right before the build it triggered. Use a plain log for
+  narration that isn't tied to one
   span's lifetime.
 - **Spans, no gaps.** Wrap work in `with _telemetry.span("name", **attrs):` — it
   sets status OK on clean exit and, on an exception, records it + sets ERROR before
@@ -714,10 +715,9 @@ scripts that `from _common import log, check` are instrumented unchanged.
 - **Cache decisions stay on the phase spans.** A HIT/MISS/STORE is a `cache.*` **span
   event** + a `cache` attribute on the phase span that made the decision (`hit`/`miss`
   on `cache.probe`, `hit-after-wait`/`miss` on `task`), so a miss and the build it
-  triggered are backtraceable from the signals, not just the console. A
-  miss/drift/soft-error is a `warn` (`!!`), not routine `info` — it is the signal for
-  "why did this rebuild?". (`_artifact_cache.py`; still also appended to
-  `cache.jsonl`.)
+  triggered are backtraceable from the signals, not just the console. A routine
+  miss is `debug`; drift and soft errors remain `warn` (`!!`). Every outcome is still
+  appended to `cache.jsonl`. (`_artifact_cache.py`.)
 - **Cross-process trace continuity.** `dodo._exec` (the span-less core `_run` and
   the cached part/assembly actions both call) injects W3C trace context
   (`TRACEPARENT`) into each subprocess env via `_telemetry.inject_env`; the build

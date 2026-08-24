@@ -158,11 +158,14 @@ def _log(msg: str) -> None:
     _telemetry.info(f"[cache] {msg}")
 
 
+def _debug_log(msg: str) -> None:
+    import _telemetry
+
+    _telemetry.debug(f"[cache] {msg}")
+
+
 def _warn(msg: str) -> None:
-    """A cache MISS / drift / soft error is a WARNING, not routine info: it is the
-    signal a debugger looks for when asking 'why did this rebuild?' -- it should
-    stand out at ``!!`` severity (and in the OTel logs at WARNING) rather than blend
-    into the ``--`` progress stream."""
+    """Cache drift and soft errors remain warnings; routine misses do not."""
     import _telemetry
 
     _telemetry.warn(f"[cache] {msg}")
@@ -526,10 +529,10 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
             return False
         blob = backend.get(key)
         if blob is None:
-            # A MISS is why a COM build is about to run -- surface it at WARNING so
-            # it stands out when backtracing an unexpected rebuild, and drop a span
-            # event so the trace shows the miss right before the build it triggered.
-            _warn(f"miss  {label} ({key[:12]}) -> building locally")
+            # A miss is routine on changed inputs. Keep it at DEBUG so the default
+            # warning-level build stays concise; the span event and cache.jsonl retain
+            # full diagnostics for backtracing why the local build ran.
+            _debug_log(f"miss  {label} ({key[:12]}) -> building locally")
             _event("cache.miss", label, key)
             _record("restore_miss", label, key)
             return False
