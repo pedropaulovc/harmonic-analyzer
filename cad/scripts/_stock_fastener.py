@@ -11,6 +11,8 @@ import _telemetry
 from _fastener_catalog import fastener
 from _common import (
     _early_bound,
+    _flag,
+    _read_member,
     apply_color,
     apply_custom_properties,
     apply_material,
@@ -207,26 +209,58 @@ def _component_body_names(
 
 
 def _blank_recipe_references(adapter: Any) -> None:
-    """Hide construction geometry that diagnostic recipes leave displayable."""
+    """Hide every shown construction feature left by a diagnostic recipe."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
+    hide_types = {
+        "ProfileFeature": "SKETCH",
+        "Helix": "REFERENCECURVES",
+        "RefPlane": "PLANE",
+        "RefAxis": "AXIS",
+    }
     model = adapter.currentModel
-    for name, kind in (("ThreadHelix", "HELIX"), ("PatternAxis", "AXIS")):
-        model.ClearSelection2(True)
-        selected = model.Extension.SelectByID2(
-            name,
-            kind,
-            0,
-            0,
-            0,
-            False,
-            0,
-            null_callout(),
-            0,
-        )
-        if selected:
-            model.BlankRefGeom()
-    model.ClearSelection2(True)
+    hidden: list[str] = []
+    feature = _read_member(model, "FirstFeature")
+    for _ in range(5000):
+        if not feature:
+            break
+        _flag(feature, "IFeature")
+        kind = str(_read_member(feature, "GetTypeName2"))
+        name = str(_read_member(feature, "Name"))
+        select_type = hide_types.get(kind)
+        if select_type and name != "Origin" and _read_member(feature, "Visible") == 2:
+            model.ClearSelection2(True)
+            selected = model.Extension.SelectByID2(
+                name,
+                select_type,
+                0,
+                0,
+                0,
+                False,
+                0,
+                null_callout(),
+                0,
+            )
+            if not selected:
+                raise RuntimeError(
+                    f"cannot select shown stock reference {name!r} as {select_type}"
+                )
+            if kind == "ProfileFeature":
+                model.BlankSketch()
+            else:
+                model.BlankRefGeom()
+            model.ClearSelection2(True)
+            if _read_member(feature, "Visible") == 2:
+                raise RuntimeError(
+                    f"stock reference {name!r} [{kind}] remained visible"
+                )
+            hidden.append(f"{name} [{kind}]")
+        feature = _read_member(feature, "GetNextFeature")
+    _telemetry.event(
+        "fastener.stock.references_hidden",
+        count=len(hidden),
+        references=", ".join(hidden),
+    )
 
 
 def _select_bodies(model: Any, bodies: tuple[Any, ...], sku: str) -> None:
