@@ -14,10 +14,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/cone-tip-block.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/cone-tip-block.pdf")
     assert drawing.PNG.as_posix().endswith("/png/cone-tip-block_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["cone_tip_block"].script
-        == Path(drawing.__file__).resolve()
-    )
+    assert DRAWINGS_BY_NAME["cone_tip_block"].script == Path(drawing.__file__).resolve()
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -45,10 +42,8 @@ def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
     assert "JournalBore" not in source
     assert "BoreDiaDim" not in source
     assert 'name_last_feature(adapter, "ShaftPassage")' in source
-    assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA == 2.0
-    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == (
-        "THRU - CLEARANCE PASSAGE"
-    )
+    assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA == 3.9751
+    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == ("THRU - CLEARANCE PASSAGE")
     assert "BlockHt" not in drawing.DIMENSION_CALLOUTS
     assert "A SHAFT-BEARING SURFACE" in cone_tip_block_spec.DRAWING_NOTES
 
@@ -78,21 +73,15 @@ def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     assert part.PINCH_CLEARANCE_SPEC.size == "#4"
     assert part.PINCH_CLEARANCE_SPEC.fit == "normal"
     assert part.PINCH_CLEARANCE_SPEC.end == "blind"
-    assert part.PINCH_CLEARANCE_SPEC.depth_mm == (
-        part.BLOCK_X - part.SLIT_W
-    ) / 2.0
-    assert (
-        part.PINCH_CLEARANCE_DIA
-        == cone_tip_block_spec.PINCH_CLEARANCE_DIA
-        == 3.264
-    )
+    assert part.PINCH_CLEARANCE_SPEC.depth_mm == (part.BLOCK_X - part.SLIT_W) / 2.0
+    assert part.PINCH_CLEARANCE_DIA == cone_tip_block_spec.PINCH_CLEARANCE_DIA == 3.264
 
 
 def test_datum_and_position_controls_are_present() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'datum="A"' in source
     assert 'datum="B"' in source
-    assert 'symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024)' in source
+    assert "symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024)" in source
     assert source.count("position_tolerance_m=0.001") == 2
     assert 'symbol_xy=TOP_KEEP["Depth"]' in source
     assert 'datum="C"' in source
