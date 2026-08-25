@@ -703,6 +703,7 @@ from build_slotted_screw import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
 )
+
 BSCREW_THREAD = "#8-32"
 
 from build_foot_screw import (  # noqa: E402
@@ -749,6 +750,7 @@ from cone_gear_shaft_spec import (  # noqa: E402
     SECTIONS as SHAFT_SECTIONS,
 )
 
+
 def _require_tapped_thread(label: str, screw_thread: str, hole_spec) -> None:
     """Require a native tapped Hole Wizard seat for the exact screw thread."""
     if hole_spec.kind != "tapped" or hole_spec.size != screw_thread:
@@ -768,6 +770,7 @@ def _require_clearance_size(label: str, screw_thread: str, hole_spec) -> None:
             f"{label}: {screw_thread} screw does not match "
             f"{hole_spec.kind} hole {hole_spec.size}"
         )
+
 
 TIP_BLOCK_STATION = T006_NORTH_FACE + BUSH_LEN + BUSH_LEN / 2.0 + TIP_BLOCK_Z / 2.0
 PIVOT_STATION = TIP_BLOCK_STATION + 11.0

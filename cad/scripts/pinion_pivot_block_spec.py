@@ -47,8 +47,7 @@ LIFT_BORE_RISE = 1.769918302299855  # v2 post raises the drive axis, steepening
 # 0.575-mm thin-side wall. The block retains >1.8 mm above the reamed bore.
 SCREW_HALF_SPACING = 13.5  # hold-down hole centres out past the bores: 0.6 web
 # to the bore wall, 0.9 rim to the block end
-SCREW_HOLE_DIA = 4.216  # #19 drill; mirrors _holes.NUMBER_DRILL_MM["#19"]
-# (the offline test asserts they match) -- drawing view math only
+SCREW_HOLE_DIA = 4.978  # #8 normal clearance; drawing view math only
 
 # Derived spans (equations of the primitives above).
 BLOCK_TOP_Y = BLOCK_HEIGHT - BORE_UP  # +4.0: block top above the pivot axis
@@ -96,8 +95,8 @@ DRAWING_NOTES = "\n".join(
         "BORES AND HOLD-DOWN HOLES SYMMETRIC ABOUT THE BLOCK MID-PLANE.",
         "PIVOT AND LIFT BORES: 1/4 IN REAM THRU;",
         "RUNNING FIT ON THE <MOD-DIAM>6.35 TORQUE SHAFT / LIFT ROD.",
-        "HOLD-DOWN HOLES: #19 DRILL THRU, 2 PLACES,",
-        "MATCHING THE MACHINE BED SCREW SEATS.",
+        "HOLD-DOWN HOLES: #8 NORMAL CLEARANCE Ø4.978 THRU, 2 PLACES,",
+        "OVER MATCHING #8-32 MACHINE BED SCREW SEATS.",
         "2 BLOCKS REQUIRED; MACHINE IN ONE SETUP FOR MATCHED BORE HEIGHTS.",
         "FINISH: BLACK OXIDE AFTER MACHINING.",
     )

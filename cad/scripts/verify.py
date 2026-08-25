@@ -55,6 +55,7 @@ NOT YET WIRED (tracked, not silently skipped):
     output proof, by contrast, IS wired: ``--suite kinematics`` drives the pen
     kinematically off the CrankDeg global (no train rotation needed).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -145,7 +146,12 @@ _MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 3
 # Generous vs the 5.25e-05 mm the de-risk probe achieved -- this is a fidelity
 # gate on the equation chain + doc-unit handling, not a numeric-precision race.
 _MOTION_TOL_MM = 1e-2
-_MOVING_CHANNEL_STEMS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
+_MOVING_CHANNEL_STEMS = (
+    "rocker-arm",
+    "connecting-rod",
+    "amplitude-bar",
+    "channel-lever",
+)
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
 _CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
@@ -178,25 +184,31 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # (164, 77 pre-PR8 -> 81) and stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
-    "frame": (16, 21),          # measured 18 (9 structure + 4 lag-screw hold-downs
+    "frame": (16, 21),  # measured 18 (9 structure + 4 lag-screw hold-downs
     # + 4 #10-24 frame-side screws + 1 gooseneck set screw — 2026-08-02 top-frame
     # rederive; plain capped column stubs, NO column nuts)
     "drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
-    "channel": (8 * _N_CH + 6 - 6, 8 * _N_CH + 6 + 6),  # N=20 -> (160,172), expected 166
+    "channel": (
+        8 * _N_CH + 6 - 6,
+        8 * _N_CH + 6 + 6,
+    ),  # N=20 -> (160,172), expected 166
     # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
     # keepers +2 keeper foot screws nets +2)
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
-    "summing": (7, 9),          # ch 18-19, measured 8 (knife-stay removed: never in
+    "summing": (7, 9),  # ch 18-19, measured 8 (knife-stay removed: never in
     # the real device; 2026-08-02 rederive: -top-crossbar -gooseneck-clamp
     # +2 knife-hanger-studs nets zero)
-    "magnifier": (11, 13),      # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
-    "pen": (7, 9),              # ch 24, measured 8 (+pen-wire, 2026-07-04)
+    "magnifier": (11, 13),  # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
+    "pen": (7, 9),  # ch 24, measured 8 (+pen-wire, 2026-07-04)
     "paper-drive": (112, 120),  # ch 22-23-25, expected 116 (54 placed + 62-link
     # chain; the paper-drive rework replaced the two rails + pinion-bar topology
     # with one bar + two-piece clamps + the hanging-platen furniture and its
     # 22 lock-mated fillister screws; the 2026-07-23 refit resolves 62 links)
-    "harmonic-analyzer": (7, 9),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
+    "harmonic-analyzer": (
+        7,
+        9,
+    ),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
 }
 
 # Tolerance audit (Part D / handoff §14.2 Gate E): every built part must carry
@@ -206,8 +218,15 @@ REPORTS_DIR = SCRIPTS_DIR.parent / "out" / "reports"
 _PART_NAME_RE = re.compile(r'^PART_NAME\s*=\s*["\']([a-z0-9-]+)["\']', re.MULTILINE)
 _REQUIRED_PART_FIELDS = ("material", "tolerance_class", "process")
 _AUDIT_COLUMNS = (
-    "part", "number", "material", "tolerance_class", "fit_class",
-    "process", "confidence", "status", "issues",
+    "part",
+    "number",
+    "material",
+    "tolerance_class",
+    "fit_class",
+    "process",
+    "confidence",
+    "status",
+    "issues",
 )
 
 
@@ -286,7 +305,9 @@ def _expected_channel_ratios() -> list[tuple[int, int]]:
     compare against.
     """
     cyl = int(_config.machine("gear_train", "fundamental_cone_teeth"))
-    return sorted(_canon_ratio(ch["cone_teeth"], cyl) for ch in _config.active_channels())
+    return sorted(
+        _canon_ratio(ch["cone_teeth"], cyl) for ch in _config.active_channels()
+    )
 
 
 def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
@@ -311,15 +332,21 @@ def assert_no_over_constrained(adapter: Any, *, resolve: bool = True) -> None:
             with _telemetry.span("over.rebuild"):
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
         with _telemetry.span("over.scan") as ssp:
-            asm_h = _early_bound(asm, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
-            components = adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
+            asm_h = _early_bound(
+                asm, "IAssemblyDoc"
+            )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
+            components = (
+                adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
+            )
             over = []
             for comp in components:
                 # Wrap once as IComponent2 so GetConstrainedStatus invokes its
                 # known DISPID; Name2 remains a property read.
                 comp = _early_bound(comp, "IComponent2")
                 status = int(
-                    adapter._attempt(lambda c=comp: c.GetConstrainedStatus(), default=-1)
+                    adapter._attempt(
+                        lambda c=comp: c.GetConstrainedStatus(), default=-1
+                    )
                 )
                 if status == OVER_CONSTRAINED:
                     over.append(str(_read_member(comp, "Name2")))
@@ -360,13 +387,16 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
         # gate validates. Without this, paper-drive's lone rack-pinion is neither
         # crank nor channel and trips the comparison as a spurious (0,0) mesh.
         rotational = [
-            link for link in links
+            link
+            for link in links
             if round(link["numerator"]) > 0 and round(link["denominator"]) > 0
         ]
         gsp.set_attribute("gear_mates", len(rotational))
         if not rotational:
             if name == GEAR_OWNER:
-                raise RuntimeError(f"{GEAR_OWNER} has no gear mates -- the drive train is broken")
+                raise RuntimeError(
+                    f"{GEAR_OWNER} has no gear mates -- the drive train is broken"
+                )
             if name == "paper-drive":
                 # A missing/suppressed 12T:120T feed mesh must fail loud, not
                 # take the harmless no-gears path below (codex #196).
@@ -394,7 +424,9 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
                 channel_links.append(ratio)
 
         problems = []
-        crank_num, crank_den = (int(v) for v in _config.machine("gear_train", "crank_drive_ratio"))
+        crank_num, crank_den = (
+            int(v) for v in _config.machine("gear_train", "crank_drive_ratio")
+        )
         crank_expected = _canon_ratio(crank_num, crank_den)
         if name == "paper-drive":
             # The single paper-feed reduction mesh (12T third gear : 120T disc);
@@ -452,7 +484,8 @@ def assert_channel_independence(adapter: Any) -> None:
         raise RuntimeError(
             f"channel moving parts are not {CHANNELS} independent instances: {wrong} "
             f"(a count != {CHANNELS} means a channel was dropped/duplicated, or the "
-            f"moving parts were collapsed into a component pattern)")
+            f"moving parts were collapsed into a component pattern)"
+        )
     _telemetry.success(
         f"{CHANNELS} independent instances of each moving stem "
         f"{_MOVING_CHANNEL_STEMS} (not pattern slaves)"
@@ -506,13 +539,15 @@ def _producers(name: str) -> list[tuple[str, list[str], str]]:
             continue
         visited.add(stem)
         if is_assembly(stem):
-            out.append((f"assembly:{stem}",
-                        dodo._assembly_file_deps(stem), dodo._sldasm(stem)))
+            out.append(
+                (f"assembly:{stem}", dodo._assembly_file_deps(stem), dodo._sldasm(stem))
+            )
             stack.extend(references_of(stem))
         else:
             script = SCRIPTS_DIR / f"build_{stem}.py"
-            out.append((f"part:{stem}",
-                        dodo._part_file_deps(script, stem), dodo._sldprt(stem)))
+            out.append(
+                (f"part:{stem}", dodo._part_file_deps(script, stem), dodo._sldprt(stem))
+            )
     return out
 
 
@@ -572,11 +607,13 @@ def _assert_fresh(name: str, report: Report) -> bool:
         return True
     if not stale:
         return True
-    report.failed.append((
-        f"{name}:fresh-inputs",
-        f"stale on-disk artefact -- run `doit assembly:{name.replace('-', '_')}` "
-        f"(or HARMONIC_VERIFY_ALLOW_STALE=1): " + "; ".join(stale),
-    ))
+    report.failed.append(
+        (
+            f"{name}:fresh-inputs",
+            f"stale on-disk artefact -- run `doit assembly:{name.replace('-', '_')}` "
+            f"(or HARMONIC_VERIFY_ALLOW_STALE=1): " + "; ".join(stale),
+        )
+    )
     _telemetry.error(f"{name}: STALE artefact, NOT verified -- {'; '.join(stale)}")
     return False
 
@@ -617,8 +654,12 @@ def _expected_free_dof(name: str) -> int:
 # (assert_free_dof_necessity required_stems): the aggregate count check alone
 # cannot distinguish which DOF is free.
 _REQUIRED_FREE_STEMS = {
-    "drive-train": ("crankshaft", "cone-swing-platform",
-                    "pinion-bracket", "pinion-lift-rod"),
+    "drive-train": (
+        "crankshaft",
+        "cone-swing-platform",
+        "pinion-bracket",
+        "pinion-lift-rod",
+    ),
     # Rocker swing + rod follow + bar amplitude, plus the channel lever which
     # must read under-constrained WITH the chain (closed by the J5 foot-on-arc
     # coupling off the rocker -- a frozen lever means the coupling died).
@@ -628,8 +669,12 @@ _REQUIRED_FREE_STEMS = {
     # and so must the lock-mated bracket (it AFFIXES the rod to the rocking
     # summing bar; a regression to grounded re-creates the collar clipping,
     # codex #201).
-    "magnifier": ("magnifying-lever", "magnifying-wheel", "lever-wire",
-                  "magnifying-bracket"),
+    "magnifier": (
+        "magnifying-lever",
+        "magnifying-wheel",
+        "lever-wire",
+        "magnifying-bracket",
+    ),
     # One freed DOF (the crank T12 spin). paper-drive is handled by INSTANCE, not
     # this stem (see _required_free_instances) -- three transgear-removable siblings
     # share the stem, so a stem check passes even if T12 is pinned and T24/T18 is
@@ -644,6 +689,7 @@ _REQUIRED_FREE_STEMS = {
     # got == want == 0 even if the marker were disconnected (codex #201).
     "pen": ("pen-rod", "pen-marker", "pen-wire"),
 }
+
 
 def _required_free_instances(name: str) -> tuple[str, ...]:
     """Exact component instances that must read under-constrained, sourced from
@@ -691,10 +737,14 @@ def _fault_name(value: Any) -> str:
 def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
     """Return non-warning faults from the active assembly and child assemblies."""
     top = adapter.currentModel
-    top_asm = _early_bound(top, "IAssemblyDoc")  # IAssemblyDoc for GetComponents; keep `top` for the `model is top` identity compare
+    top_asm = _early_bound(
+        top, "IAssemblyDoc"
+    )  # IAssemblyDoc for GetComponents; keep `top` for the `model is top` identity compare
     targets: list[tuple[str, Any]] = [("top", top)]
     seen: set[str] = set()
-    components = adapter._attempt(lambda: top_asm.GetComponents(False), default=None) or []
+    components = (
+        adapter._attempt(lambda: top_asm.GetComponents(False), default=None) or []
+    )
     for component in components:
         component = _early_bound(component, "IComponent2")
         instance = str(_read_member(component, "Name2") or "?")
@@ -705,7 +755,9 @@ def _deep_mate_faults(adapter: Any) -> list[tuple[str, Any, str, int]]:
             continue
         if int(adapter._attempt(lambda m=model: m.GetType(), default=0) or 0) != 2:
             continue  # swDocASSEMBLY only; parts cannot own a MateGroup
-        key = str(adapter._attempt(lambda m=model: m.GetPathName(), default="") or instance)
+        key = str(
+            adapter._attempt(lambda m=model: m.GetPathName(), default="") or instance
+        )
         if key in seen:
             continue
         seen.add(key)
@@ -736,9 +788,7 @@ def _activate_document(adapter: Any, model: Any, label: str) -> Any:
         raise RuntimeError(f"{label}: ActivateDoc3({title!r}) failed")
     activated, errors = result
     if activated is None or int(errors) != 0:
-        raise RuntimeError(
-            f"{label}: ActivateDoc3({title!r}) failed (errors={errors})"
-        )
+        raise RuntimeError(f"{label}: ActivateDoc3({title!r}) failed (errors={errors})")
     activated = _early_bound(activated, "IModelDoc2")
     adapter.currentModel = activated
     return activated
@@ -755,7 +805,11 @@ def _repair_cache_dangles(adapter: Any, name: str) -> Any:
     before = [fault for fault in faults if fault[3] == DANGLING_ENTITY_NOT_FOUND]
     if not before:
         return None
-    ineligible = [f"{label}:{mate} [{code}]" for label, _doc, mate, code in faults if code != DANGLING_ENTITY_NOT_FOUND]
+    ineligible = [
+        f"{label}:{mate} [{code}]"
+        for label, _doc, mate, code in faults
+        if code != DANGLING_ENTITY_NOT_FOUND
+    ]
     if ineligible:
         raise RuntimeError(
             f"{name}: refusing AutoMateRepair because non-48 faults coexist: "
@@ -777,14 +831,10 @@ def _repair_cache_dangles(adapter: Any, name: str) -> Any:
                 active = _activate_document(adapter, model, stem)
                 repaired_docs[key] = (stem, active)
                 repaired += repair_dangling_mates(adapter, active)
-                adapter._attempt(
-                    lambda m=active: m.ForceRebuild3(False), default=None
-                )
+                adapter._attempt(lambda m=active: m.ForceRebuild3(False), default=None)
         finally:
             _activate_document(adapter, top, name)
-        rebuilt = adapter._attempt(
-            lambda: top.ForceRebuild3(False), default=None
-        )
+        rebuilt = adapter._attempt(lambda: top.ForceRebuild3(False), default=None)
         remaining = [
             f"{label}:{mate} [{code}]"
             for label, _doc, mate, code in _deep_mate_faults(adapter)
@@ -796,9 +846,7 @@ def _repair_cache_dangles(adapter: Any, name: str) -> Any:
                 f"{name}: AutoMateRepair did not produce a clean assembly "
                 f"(reported repaired={repaired}, remaining={remaining})"
             )
-        _telemetry.event(
-            "verify.auto_repair.completed", asm=name, repaired=repaired
-        )
+        _telemetry.event("verify.auto_repair.completed", asm=name, repaired=repaired)
         _telemetry.warn(
             f"{name}: opt-in AutoMateRepair re-bound {repaired} mate(s); "
             "running the full soundness battery before saving locally"
@@ -969,16 +1017,21 @@ async def _verify_static_one(
                 lambda: _fail(
                     "free paper-drive but .paper-drive.dof.json records no crank_spin "
                     "instance -- stale/missing DOF manifest; refusing the weak stem "
-                    "fallback. Rebuild paper-drive to regenerate it."),
+                    "fallback. Rebuild paper-drive to regenerate it."
+                ),
             )
         else:
             stems = () if insts else _REQUIRED_FREE_STEMS.get(name, ())
             report.gate(
                 f"{name}:dof-free-necessity",
                 lambda: assert_free_dof_necessity(
-                    adapter, free_dof, resolve=False,
-                    required_stems=stems, required_instances=insts,
-                    allowed_stems=_ALLOWED_FREE_STEMS.get(name, ())),
+                    adapter,
+                    free_dof,
+                    resolve=False,
+                    required_stems=stems,
+                    required_instances=insts,
+                    allowed_stems=_ALLOWED_FREE_STEMS.get(name, ()),
+                ),
             )
     else:
         report.gate(
@@ -1147,31 +1200,41 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
         # discards it.
         travel = [s for s in load_dof_manifest(name) if s.get("key") == "pen_travel"]
         if len(travel) != 1:
-            report.failed.append((
-                f"motion:{name}:dof-manifest",
-                f"expected exactly 1 recorded pen_travel drive spec, found "
-                f"{len(travel)} -- rebuild pen",
-            ))
+            report.failed.append(
+                (
+                    f"motion:{name}:dof-manifest",
+                    f"expected exactly 1 recorded pen_travel drive spec, found "
+                    f"{len(travel)} -- rebuild pen",
+                )
+            )
             _telemetry.error(f"{name}: pen_travel drive spec missing/ambiguous")
             return
         (travel_mate,) = await author_dof_drives(adapter, travel)
         base_mm = abs(float(travel[0]["params"]["distance"]))
         param = adapter._attempt(
-            lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None)
+            lambda: adapter.currentModel.Parameter(f"D1@{travel_mate}"), default=None
+        )
         if param is None:
-            report.failed.append((
-                f"motion:{name}:pen-driver-install",
-                f"cannot read D1@{travel_mate} on the transient travel mate",
-            ))
+            report.failed.append(
+                (
+                    f"motion:{name}:pen-driver-install",
+                    f"cannot read D1@{travel_mate} on the transient travel mate",
+                )
+            )
             _telemetry.error(f"{name}: cannot read D1@{travel_mate}")
             return
         base_doc = float(_read_member(param, "Value"))  # IPS doc -> inches
         info = await pen_driver.install(
-            adapter, travel_mate, base_doc, base_doc / base_mm)
-        log(f"pen driver (transient): {info['links']}-link chain, scale "
-            f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg")
-        log(f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
-            f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---")
+            adapter, travel_mate, base_doc, base_doc / base_mm
+        )
+        log(
+            f"pen driver (transient): {info['links']}-link chain, scale "
+            f"{info['scale_mm_per_unit']:.4g} mm/unit, rest {info['rest_deg']:g} deg"
+        )
+        log(
+            f"--- motion: {name} pen-driver sweep (rest {pen_driver.rest_crank_deg():g} deg, "
+            f"stroke +-{pen_driver.stroke_half_mm():g} mm) ---"
+        )
         marker = _pen_marker_name(adapter)
 
         # Rest pose: at pen_rest_crank_deg the driver equation subtracts pen_y(rest),
@@ -1189,14 +1252,18 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
             sweep.append((theta, got, want))
             err = abs(got - want)
             emit = _telemetry.success if err <= _MOTION_TOL_MM else _telemetry.error
-            emit(f"CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
-                 f"want={want:+8.4f}  |err|={err:.2e}")
+            emit(
+                f"CrankDeg={theta:6.1f}  tipDisp={got:+8.4f}  "
+                f"want={want:+8.4f}  |err|={err:.2e}"
+            )
         worst = max((abs(g - w) for _, g, w in sweep), default=0.0)
 
         # Interference at the two poses furthest from the rest datum (the stroke
         # extremes the pen carriage is most likely to bind at).
-        far = sorted(_MOTION_SWEEP_DEG,
-                     key=lambda t: abs(pen_driver.expected_tip_disp_mm(math.radians(t))))[-2:]
+        far = sorted(
+            _MOTION_SWEEP_DEG,
+            key=lambda t: abs(pen_driver.expected_tip_disp_mm(math.radians(t))),
+        )[-2:]
         interference: list[tuple[float, str]] = []
         for theta in far:
             await pen_driver.set_crank_deg(adapter, theta)
@@ -1276,6 +1343,7 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     # _drive_and_measure authors a temporary crank driver, rebuilds, and asserts the
     # whole train follows -- raising on any broken coupling (belt / lock / rack-pinion).
     from build_kinematic_probe import _drive_and_measure  # noqa: E402
+
     try:
         await report.agate(f"{name}:crank-feed", lambda: _drive_and_measure(adapter))
     finally:
@@ -1319,8 +1387,11 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     specs = [s for s in load_dof_manifest(name) if s.get("key") == "lever_rock"]
     if len(specs) != 1:
         report.failed.append(
-            (f"chain:{name}:dof-manifest",
-             f"expected 1 lever_rock drive spec, got {len(specs)}"))
+            (
+                f"chain:{name}:dof-manifest",
+                f"expected 1 lever_rock drive spec, got {len(specs)}",
+            )
+        )
         return
 
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
@@ -1388,11 +1459,16 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         wheel_angles.append(w)
         worst_axis = max(worst_axis, abs(d_axis - r_expect))
         worst_hook = max(worst_hook, d_hook)
-        emit = (_telemetry.success
-                if abs(d_axis - r_expect) <= _CHAIN_AXIS_TOL_MM and d_hook <= _CHAIN_HOOK_TOL_MM
-                else _telemetry.error)
-        emit(f"lever {delta:+5.2f} deg  wheel {w - wheel0:+8.3f} deg  "
-             f"wire-axis d={d_axis:7.4f} (want {r_expect:g})  hook res={d_hook:.4f}")
+        emit = (
+            _telemetry.success
+            if abs(d_axis - r_expect) <= _CHAIN_AXIS_TOL_MM
+            and d_hook <= _CHAIN_HOOK_TOL_MM
+            else _telemetry.error
+        )
+        emit(
+            f"lever {delta:+5.2f} deg  wheel {w - wheel0:+8.3f} deg  "
+            f"wire-axis d={d_axis:7.4f} (want {r_expect:g})  hook res={d_hook:.4f}"
+        )
     wheel_span = max(wheel_angles) - min(wheel_angles)
 
     # Restore the recorded rest pose, measure the drift, then discard UNSAVED.
@@ -1464,7 +1540,10 @@ def verify_truth(report: Report) -> None:
         for i in range(1, 12):
             x = i * math.pi / 12.0
             a, b = truth_model.pen_y(x, sq), truth_model.pen_y(x + math.pi, sq)
-            _expect(abs(a + b) < 1e-9, f"square not antisymmetric at x={x:.3f}: {a:+.4f} vs {b:+.4f}")
+            _expect(
+                abs(a + b) < 1e-9,
+                f"square not antisymmetric at x={x:.3f}: {a:+.4f} vs {b:+.4f}",
+            )
 
     report.gate("truth:square-antisymmetric", _antisymmetric)
 
@@ -1482,7 +1561,10 @@ def verify_truth(report: Report) -> None:
     report.gate(
         "truth:zeros-flat-pen",
         lambda: _expect(
-            all(y == 0.0 for _, y in truth_model.pen_curve(truth_model.coefficients("zeros"))),
+            all(
+                y == 0.0
+                for _, y in truth_model.pen_curve(truth_model.coefficients("zeros"))
+            ),
             "zero coefficients must give a flat (zero) pen trace",
         ),
     )
@@ -1491,15 +1573,21 @@ def verify_truth(report: Report) -> None:
         # The output proof, per channel: setting only a_k=1 must make the pen trace
         # the single term magnify·cos(j_k·x + φ_k) -- the geometry's per-channel
         # sinusoid that Basic Motion is later asked to reproduce (handoff §10).
-        mag, js, ph = truth_model.magnify(), truth_model.harmonics(), truth_model.phases_rad()
+        mag, js, ph = (
+            truth_model.magnify(),
+            truth_model.harmonics(),
+            truth_model.phases_rad(),
+        )
         for k in range(len(js)):
             e_k = [1.0 if i == k else 0.0 for i in range(len(js))]
             for i in range(7):
                 x = i * truth_model.TWO_PI / 7.0
                 want = mag * math.cos(js[k] * x + ph[k])
                 got = truth_model.pen_y(x, e_k)
-                _expect(abs(got - want) < 1e-9,
-                        f"channel {k} (j={js[k]}) term wrong at x={x:.3f}: {got:+.4f} vs {want:+.4f}")
+                _expect(
+                    abs(got - want) < 1e-9,
+                    f"channel {k} (j={js[k]}) term wrong at x={x:.3f}: {got:+.4f} vs {want:+.4f}",
+                )
 
     report.gate("truth:single-channel-term", _single_channel_term)
 
@@ -1514,11 +1602,15 @@ def verify_truth(report: Report) -> None:
             x = i * truth_model.TWO_PI / 11.0
             whole = truth_model.pen_y(x, coeffs)
             parts = sum(
-                truth_model.pen_y(x, [c if t == k else 0.0 for t, c in enumerate(coeffs)])
+                truth_model.pen_y(
+                    x, [c if t == k else 0.0 for t, c in enumerate(coeffs)]
+                )
                 for k in range(len(js))
             )
-            _expect(abs(whole - parts) < 1e-9,
-                    f"superposition broken at x={x:.3f}: whole {whole:+.5f} != Σ parts {parts:+.5f}")
+            _expect(
+                abs(whole - parts) < 1e-9,
+                f"superposition broken at x={x:.3f}: whole {whole:+.5f} != Σ parts {parts:+.5f}",
+            )
 
     report.gate("truth:superposition", _superposition)
 
@@ -1526,8 +1618,10 @@ def verify_truth(report: Report) -> None:
         # The textbook target vector (all harmonics 1/j) must populate every one of
         # the 20 representable harmonics -- the machine's full bandwidth exercised.
         saw = truth_model.coefficients("sawtooth")
-        _expect(all(a > 0 for a in saw) and len(saw) == 20,
-                f"sawtooth must fill all 20 harmonics: {saw}")
+        _expect(
+            all(a > 0 for a in saw) and len(saw) == 20,
+            f"sawtooth must fill all 20 harmonics: {saw}",
+        )
 
     report.gate("truth:sawtooth-band-limited", _sawtooth_band_limited)
 
@@ -1586,6 +1680,7 @@ def verify_base_footprint(report: Report) -> None:
 
     def _mounts_on_plate() -> None:
         import build_arbor_pedestal as arbor_post
+        import build_cone_lock_knob as lock_knob
         import build_cone_pivot_screw as pscrew
         import build_cone_swing_platform as platform
         import build_drive_train_assembly as train
@@ -1600,17 +1695,42 @@ def verify_base_footprint(report: Report) -> None:
         # cone-pivot-post rides the PLATE, so it is plate-contained at
         # drive-train import, not base-swept here.)
         mounts = (
-            ("arbor-pedestal south", train.X_DRUM, -train.ARBOR_PEDESTAL_Z,
-             arbor_post.FOOT_WIDTH / 2.0, arbor_post.FOOT_DEPTH / 2.0),
-            ("arbor-pedestal north", train.X_DRUM, train.ARBOR_PEDESTAL_NORTH_Z,
-             arbor_post.FOOT_WIDTH / 2.0, arbor_post.FOOT_DEPTH / 2.0),
+            (
+                "arbor-pedestal south",
+                train.X_DRUM,
+                -train.ARBOR_PEDESTAL_Z,
+                arbor_post.FOOT_WIDTH / 2.0,
+                arbor_post.FOOT_DEPTH / 2.0,
+            ),
+            (
+                "arbor-pedestal north",
+                train.X_DRUM,
+                train.ARBOR_PEDESTAL_NORTH_Z,
+                arbor_post.FOOT_WIDTH / 2.0,
+                arbor_post.FOOT_DEPTH / 2.0,
+            ),
             # base-bolted statics; head/washer is each one's widest plan extent
-            ("cone-lock-knob", train.KNOB_X, train.KNOB_Z,
-             train.KNOB_WASHER_DIA / 2.0, train.KNOB_WASHER_DIA / 2.0),
-            ("cone-pivot-screw", pv[0], pv[2],
-             pscrew.HEAD_DIA / 2.0, pscrew.HEAD_DIA / 2.0),
-            ("swing-stop-screw", train.STOP_X, train.STOP_Z,
-             sscrew.HEAD_DIA / 2.0, sscrew.HEAD_DIA / 2.0),
+            (
+                "cone-lock-knob",
+                train.KNOB_X,
+                train.KNOB_Z,
+                lock_knob.WASHER_DIA / 2.0,
+                lock_knob.WASHER_DIA / 2.0,
+            ),
+            (
+                "cone-pivot-screw",
+                pv[0],
+                pv[2],
+                pscrew.HEAD_DIA / 2.0,
+                pscrew.HEAD_DIA / 2.0,
+            ),
+            (
+                "swing-stop-screw",
+                train.STOP_X,
+                train.STOP_Z,
+                sscrew.HEAD_DIA / 2.0,
+                sscrew.HEAD_DIA / 2.0,
+            ),
         )
         for label, cx, cz, hx, hz in mounts:
             _expect(
@@ -1654,15 +1774,20 @@ def verify_base_footprint(report: Report) -> None:
             # keeps HALF_WIDTH_N 12.
             ("plate", platform.WEST_HALF_N, platform.NORTH_OVERHANG),
             ("plate", -platform.HALF_WIDTH_N, platform.NORTH_OVERHANG),
-            ("plate", -platform.EAST_HALF_S,
-             platform.NORTH_OVERHANG - platform.PLATE_LEN),
-            ("plate", platform.WEST_HALF_S,
-             platform.NORTH_OVERHANG - platform.PLATE_LEN),
+            (
+                "plate",
+                -platform.EAST_HALF_S,
+                platform.NORTH_OVERHANG - platform.PLATE_LEN,
+            ),
+            (
+                "plate",
+                platform.WEST_HALF_S,
+                platform.NORTH_OVERHANG - platform.PLATE_LEN,
+            ),
         )
         poses = (
             ("engaged", math.radians(train.INCLINE_DEG)),
-            ("disengaged",
-             math.radians(train.INCLINE_DEG + train.DISENGAGE_DEG)),
+            ("disengaged", math.radians(train.INCLINE_DEG + train.DISENGAGE_DEG)),
         )
         for pose, ang in poses:
             cos_a, sin_a = math.cos(ang), math.sin(ang)
@@ -1706,35 +1831,85 @@ def verify_config_vs_dimensions(report: Report) -> None:
     """
     doc = gen_dimensions.load_doc()
 
-    def _check(label: str, heading: str, dim: str, fn: Callable[[list[str]], None]) -> None:
+    def _check(
+        label: str, heading: str, dim: str, fn: Callable[[list[str]], None]
+    ) -> None:
         def run() -> None:
             row = gen_dimensions.find_row(doc, heading, dim)
             if row is None:
                 raise RuntimeError(f"dimension row not found: {heading} / {dim}")
             fn(row)
+
         report.gate(label, run)
 
-    _check("dims:cone-DP", "Chapter 12", "Diametral pitch",
-           lambda r: _expect(_num(r"DP\s*(\d+(?:\.\d+)?)", r[1]) == _config.machine("gear_train", "diametral_pitch"),
-                             f"cone DP: dims {r[1]!r} != machine.yaml {_config.machine('gear_train','diametral_pitch')}"))
-    _check("dims:cylinder-teeth", "Chapter 13", "Tooth count",
-           lambda r: _expect(_num(r"(\d+)", r[1]) == _config.machine("gear_train", "cylinder_teeth"),
-                             f"cylinder teeth: dims {r[1]!r} != machine.yaml"))
-    _check("dims:pinion-teeth", "Chapter 25", "Tooth count",
-           lambda r: _expect(_num(r"(\d+)", r[1]) == _config.machine("alignment_pinion", "teeth"),
-                             f"alignment-pinion teeth: dims {r[1]!r} != machine.yaml"))
-    _check("dims:crank-reduction", "Chapter 12", "Crank→cone reduction",
-           lambda r: _expect(_num(r"(\d+):1", r[1]) == _crank_reduction(),
-                             f"crank reduction: dims {r[1]!r} != crank_drive_ratio {_config.machine('gear_train','crank_drive_ratio')}"))
-    _check("dims:cone-teeth-series", "Chapter 12", "Tooth counts",
-           lambda r: _expect("120" in r[1] and "step 6" in r[1] and _cone_series_ok(),
-                             f"cone tooth series: dims {r[1]!r} != channels.yaml 120-6*index"))
-    _check("dims:cone-incline", "Chapter 13", "Cone plan incline",
-           lambda r: _expect(abs(_num(r"(\d+\.\d+)", r[1]) - _config.machine("cone_incline", "derived_incline_deg")) < 1e-3,
-                             f"cone incline: dims {r[1]!r} != machine.yaml {_config.machine('cone_incline','derived_incline_deg')}"))
-    _check("dims:magnify", "Chapter 20", "Magnification",
-           lambda r: _expect(_num(r"(\d+)×", r[1]) == _config.machine("output", "magnify_factor"),
-                             f"magnify: dims {r[1]!r} != output.magnify_factor"))
+    _check(
+        "dims:cone-DP",
+        "Chapter 12",
+        "Diametral pitch",
+        lambda r: _expect(
+            _num(r"DP\s*(\d+(?:\.\d+)?)", r[1])
+            == _config.machine("gear_train", "diametral_pitch"),
+            f"cone DP: dims {r[1]!r} != machine.yaml {_config.machine('gear_train', 'diametral_pitch')}",
+        ),
+    )
+    _check(
+        "dims:cylinder-teeth",
+        "Chapter 13",
+        "Tooth count",
+        lambda r: _expect(
+            _num(r"(\d+)", r[1]) == _config.machine("gear_train", "cylinder_teeth"),
+            f"cylinder teeth: dims {r[1]!r} != machine.yaml",
+        ),
+    )
+    _check(
+        "dims:pinion-teeth",
+        "Chapter 25",
+        "Tooth count",
+        lambda r: _expect(
+            _num(r"(\d+)", r[1]) == _config.machine("alignment_pinion", "teeth"),
+            f"alignment-pinion teeth: dims {r[1]!r} != machine.yaml",
+        ),
+    )
+    _check(
+        "dims:crank-reduction",
+        "Chapter 12",
+        "Crank→cone reduction",
+        lambda r: _expect(
+            _num(r"(\d+):1", r[1]) == _crank_reduction(),
+            f"crank reduction: dims {r[1]!r} != crank_drive_ratio {_config.machine('gear_train', 'crank_drive_ratio')}",
+        ),
+    )
+    _check(
+        "dims:cone-teeth-series",
+        "Chapter 12",
+        "Tooth counts",
+        lambda r: _expect(
+            "120" in r[1] and "step 6" in r[1] and _cone_series_ok(),
+            f"cone tooth series: dims {r[1]!r} != channels.yaml 120-6*index",
+        ),
+    )
+    _check(
+        "dims:cone-incline",
+        "Chapter 13",
+        "Cone plan incline",
+        lambda r: _expect(
+            abs(
+                _num(r"(\d+\.\d+)", r[1])
+                - _config.machine("cone_incline", "derived_incline_deg")
+            )
+            < 1e-3,
+            f"cone incline: dims {r[1]!r} != machine.yaml {_config.machine('cone_incline', 'derived_incline_deg')}",
+        ),
+    )
+    _check(
+        "dims:magnify",
+        "Chapter 20",
+        "Magnification",
+        lambda r: _expect(
+            _num(r"(\d+)×", r[1]) == _config.machine("output", "magnify_factor"),
+            f"magnify: dims {r[1]!r} != output.magnify_factor",
+        ),
+    )
 
 
 def _crank_reduction() -> float:
@@ -1780,8 +1955,11 @@ def _audit_rows() -> tuple[list[dict[str, str]], dict[str, list[str]]]:
     fit_classes = set(tol.get("fits", {}))
 
     problems: dict[str, list[str]] = {
-        "missing_field": [], "unregistered_build": [], "orphan_registry": [],
-        "bad_tolerance_class": [], "bad_fit_class": [],
+        "missing_field": [],
+        "unregistered_build": [],
+        "orphan_registry": [],
+        "bad_tolerance_class": [],
+        "bad_fit_class": [],
     }
     rows: list[dict[str, str]] = []
     for part in sorted(declared | set(registry)):
@@ -1790,14 +1968,27 @@ def _audit_rows() -> tuple[list[dict[str, str]], dict[str, list[str]]]:
         if rec is None:
             issues.append("not in parts.yaml registry")
             problems["unregistered_build"].append(part)
-            rows.append({"part": part, "status": "FAIL", "issues": "; ".join(issues),
-                         **{c: "" for c in _AUDIT_COLUMNS if c not in ("part", "status", "issues")}})
+            rows.append(
+                {
+                    "part": part,
+                    "status": "FAIL",
+                    "issues": "; ".join(issues),
+                    **{
+                        c: ""
+                        for c in _AUDIT_COLUMNS
+                        if c not in ("part", "status", "issues")
+                    },
+                }
+            )
             continue
         if part not in declared:
             issues.append("registry entry has no build_*.py PART_NAME")
             problems["orphan_registry"].append(part)
         merged = {**_config.parts().get(part, {}), **{k: rec[k] for k in rec}}
-        confidence = merged.get("confidence", _config._doc("parts").get("defaults", {}).get("confidence", ""))
+        confidence = merged.get(
+            "confidence",
+            _config._doc("parts").get("defaults", {}).get("confidence", ""),
+        )
         for fieldname in _REQUIRED_PART_FIELDS:
             value = merged.get(fieldname)
             if value in (None, "", "None"):
@@ -1811,17 +2002,19 @@ def _audit_rows() -> tuple[list[dict[str, str]], dict[str, list[str]]]:
         if fclass and fclass not in fit_classes:
             issues.append(f"unknown fit_class {fclass!r}")
             problems["bad_fit_class"].append(f"{part}:{fclass}")
-        rows.append({
-            "part": part,
-            "number": str(merged.get("number", "")),
-            "material": str(merged.get("material", "")),
-            "tolerance_class": str(tclass or ""),
-            "fit_class": str(fclass or ""),
-            "process": str(merged.get("process", "")),
-            "confidence": str(confidence or ""),
-            "status": "FAIL" if issues else "OK",
-            "issues": "; ".join(issues),
-        })
+        rows.append(
+            {
+                "part": part,
+                "number": str(merged.get("number", "")),
+                "material": str(merged.get("material", "")),
+                "tolerance_class": str(tclass or ""),
+                "fit_class": str(fclass or ""),
+                "process": str(merged.get("process", "")),
+                "confidence": str(confidence or ""),
+                "status": "FAIL" if issues else "OK",
+                "issues": "; ".join(issues),
+            }
+        )
     return rows, problems
 
 
@@ -1842,8 +2035,9 @@ def verify_tolerance_audit(report: Report) -> None:
         writer.writeheader()
         writer.writerows(rows)  # type: ignore[arg-type]  # dict[str, str] is structurally compatible; DictWriter stubs use Literal key union
     n_fit = sum(1 for r in rows if r.get("fit_class"))
-    _telemetry.debug(f"tolerance audit -> {csv_path} ({len(rows)} parts, "
-                     f"{n_fit} with a fit class)")
+    _telemetry.debug(
+        f"tolerance audit -> {csv_path} ({len(rows)} parts, {n_fit} with a fit class)"
+    )
 
     report.gate(
         "audit:registry-matches-builds",
@@ -1893,16 +2087,23 @@ def verify_amplitude_preset(report: Report) -> None:
         if preset == "neutral":
             for ch in rows:
                 got = float(ch["amplitude_mm"])
-                _expect(abs(got) < 5e-4,
-                        f"channel {ch['index']}: neutral preset requires amplitude_mm 0, got {got}")
+                _expect(
+                    abs(got) < 5e-4,
+                    f"channel {ch['index']}: neutral preset requires amplitude_mm 0, got {got}",
+                )
             return
-        _expect(preset == "square", f"amplitude preset is {preset!r}, not 'square'/'neutral' (update this gate)")
+        _expect(
+            preset == "square",
+            f"amplitude preset is {preset!r}, not 'square'/'neutral' (update this gate)",
+        )
         for ch in rows:
             n = ch["harmonic_n"]
             want = fundamental / n if n % 2 == 1 else 0.0
             got = float(ch["amplitude_mm"])
-            _expect(abs(got - want) < 5e-4,
-                    f"channel {ch['index']} (n={n}): amplitude_mm {got} != 80/n law {want:.4f}")
+            _expect(
+                abs(got - want) < 5e-4,
+                f"channel {ch['index']} (n={n}): amplitude_mm {got} != 80/n law {want:.4f}",
+            )
 
     report.gate("amplitude:preset-law", _law)
     report.gate(
@@ -1919,8 +2120,10 @@ def verify_amplitude_preset(report: Report) -> None:
         # computed curve is guaranteed to be what the geometry is set to (F3 / handoff §10).
         a_yaml = _config.amplitudes()
         a_truth = truth_model.coefficients("config")
-        _expect(a_yaml == a_truth,
-                f"truth_model 'config' vector {a_truth} != channels.yaml {a_yaml}")
+        _expect(
+            a_yaml == a_truth,
+            f"truth_model 'config' vector {a_truth} != channels.yaml {a_yaml}",
+        )
 
     report.gate("amplitude:truth-reads-same-vector", _matches_truth)
 
@@ -1964,14 +2167,21 @@ def _print_summary(report: Report) -> None:
 def _built_assemblies() -> list[str]:
     # Skip SolidWorks lock files (``~$<name>.SLDASM``), the transient temp file SW
     # creates while a doc is open -- it is not a built assembly and won't open.
-    return sorted(p.stem for p in OUT_SLDASM.glob("*.SLDASM") if not p.name.startswith("~$"))
+    return sorted(
+        p.stem for p in OUT_SLDASM.glob("*.SLDASM") if not p.name.startswith("~$")
+    )
 
 
 def _parse_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("names", nargs="*", help="assembly stem(s); default = all built")
-    ap.add_argument("--suite", default="soundness",
-                    choices=["soundness", "kinematics", "math", "config"])
+    ap.add_argument(
+        "--suite",
+        default="soundness",
+        choices=["soundness", "kinematics", "math", "config"],
+    )
     ap.add_argument(
         "--auto-repair",
         action="store_true",
