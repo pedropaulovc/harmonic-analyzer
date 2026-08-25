@@ -365,6 +365,12 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
             ),
         },
         "harmonic-analyzer": {
+            frozenset(
+                (
+                    "frame-1/harmonic-base-1",
+                    "drive-train-1/cone-pivot-screw-1",
+                )
+            ): _annulus_limit(4.826, 3.797, 9.525),
             **_expected_numbered_pairs(
                 "drive-train-1/cone-lock-knob",
                 range(1, 2),
@@ -419,15 +425,8 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
         frozenset(("pinion-bracket-1", "pinion-cam-pin-1")),
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
     }
-    cone_pivot_pair = frozenset(
-        (
-            "frame-1/harmonic-base-1",
-            "drive-train-1/cone-pivot-screw-1",
-        )
-    )
     special_pairs = {
         "drive-train": cam_pairs,
-        "harmonic-analyzer": {cone_pivot_pair},
     }
     expected_counts = {
         "drive-train": 4,
@@ -439,7 +438,7 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
         "harmonic-analyzer": 12,
     }
 
-    assert sum(len(pairs) for pairs in threaded_by_assembly.values()) == 57
+    assert sum(len(pairs) for pairs in threaded_by_assembly.values()) == 58
     assert sum(expected_counts.values()) == 60
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
@@ -455,12 +454,6 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
     }
     assert len(cam_limits) == 1
     assert 0.40 < cam_limits.pop() < 0.45
-    assert (
-        _interference_contracts.allowed_interference_pairs("harmonic-analyzer")[
-            cone_pivot_pair
-        ]
-        == 0.10
-    )
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}
 

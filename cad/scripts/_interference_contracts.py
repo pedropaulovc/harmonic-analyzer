@@ -159,17 +159,16 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     ),
 }
 
-# The cone-platform pivot screw's modeled thread envelope intentionally equals
-# the harmonic-base tap-drill cylinder. SolidWorks reports a 0.06 mm^3 overlap
-# at that coincident threaded-seat boundary; keep the exact nested pair bounded
-# so any deeper engagement or neighboring clash still fails the gate.
+# The cone-platform pivot screw now carries its full McMaster #10-24 thread
+# envelope. Bound its exact nested tap engagement by the same conservative
+# smooth-annulus contract as every other migrated stock thread.
 _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
     frozenset(
         (
             "frame-1/harmonic-base-1",
             "drive-train-1/cone-pivot-screw-1",
         )
-    ): 0.10,
+    ): _smooth_annulus_limit_mm3(4.826, 3.797, 9.525),
     **_numbered_pairs(
         "drive-train-1/cone-lock-knob",
         range(1, 2),

@@ -121,6 +121,7 @@ import _telemetry  # noqa: E402  (observability spine: console logging + tracing
 from _drawing_registry import (  # noqa: E402
     DRAWINGS_BY_NAME,
     PROJECT_DRWDOT,
+    RETIRED_PURCHASED_DRAWING_ARTIFACT_STEMS,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -1885,6 +1886,24 @@ def _clean_drawing(stem: str) -> None:
         _force_remove(Path(target))
 
 
+def _retire_purchased_drawing_outputs() -> None:
+    """Delete generated prints retired by the supplier-part cutover."""
+    for stem in RETIRED_PURCHASED_DRAWING_ARTIFACT_STEMS:
+        _force_remove(CAD_OUT / "slddrw" / f"{stem}.SLDDRW")
+        _force_remove(CAD_OUT / "pdf" / f"{stem}.pdf")
+        _force_remove(CAD_OUT / "png" / f"{stem}_drawing.png")
+
+
+def task_retire_drawings():
+    """Remove obsolete custom-part prints left by older checkouts."""
+    return {
+        "actions": [_retire_purchased_drawing_outputs],
+        "clean": [_retire_purchased_drawing_outputs],
+        "uptodate": [False],
+        "verbosity": 2,
+    }
+
+
 def task_drawing():
     """Curated manufacturing drawings with identity-safe shared caching.
 
@@ -2494,6 +2513,7 @@ def task_release():
         "task_dep": [
             "export",
             "preflight",
+            "retire_drawings",
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
@@ -2521,7 +2541,8 @@ def task_build():
     return {
         "actions": None,
         "task_dep": (
-            [f"check:{s}" for s in _CHECK_NAMES]
+            ["retire_drawings"]
+            + [f"check:{s}" for s in _CHECK_NAMES]
             + [f"part:{s}" for s in _seat_part_order()]
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
             + [f"drawing:{s}" for s in _drawing_order()]
