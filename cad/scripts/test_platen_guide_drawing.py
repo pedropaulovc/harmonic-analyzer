@@ -117,6 +117,7 @@ def test_drawing_splits_front_and_rear_blind_tap_tables() -> None:
     assert '"*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M' in source
     assert source.count("insert_hole_table(") == 2
     assert 'starting_hole_tag="B"' in source
+    assert source.count("hole_entities=") == 2
     assert "for station in BLIND_X" in source
     assert "for station in THROUGH_X" in source
 
