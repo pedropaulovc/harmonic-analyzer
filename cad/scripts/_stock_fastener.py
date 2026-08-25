@@ -97,7 +97,7 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
 
 @dataclass(frozen=True, slots=True)
 class RigidTransform:
-    """Rigid body transform: millimetre positions and radian Euler rotations."""
+    """Rigid body transform in model XYZ axes, independent of COM argument order."""
 
     translation_mm: Vector3 = (0.0, 0.0, 0.0)
     rotation_radians: Vector3 = (0.0, 0.0, 0.0)
@@ -304,6 +304,12 @@ def _insert_rotation(
     _select_bodies(model, bodies, sku)
     ox, oy, oz = (value / 1000.0 for value in transform.rotation_origin_mm)
     rx, ry, rz = transform.rotation_radians
+    # Despite the API parameter names, Move/Copy Body's generated feature maps
+    # RotAngleX to a model-Z rotation and RotAngleZ to model X.  Preserve this
+    # class's conventional model-XYZ contract by swapping those two arguments.
+    # Live proof: a Y-axis fillister recipe rotated (-pi/2, 0, 0) must span Z;
+    # passing rx as RotAngleX instead made it span X and drove both clamp screws
+    # sideways through the magnifier wheel bar.
     manager = _early_bound(model.FeatureManager, "IFeatureManager")
     try:
         feature = manager.InsertMoveCopyBody2(
@@ -314,9 +320,9 @@ def _insert_rotation(
             ox,
             oy,
             oz,
-            rx,
-            ry,
             rz,
+            ry,
+            rx,
             False,
             1,
         )
