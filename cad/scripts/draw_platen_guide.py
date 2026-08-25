@@ -105,6 +105,39 @@ def _bottom_surface_edge(view: Any) -> Any:
     return edge
 
 
+def _hole_rim_entities(
+    view: Any, stations: tuple[float, ...], *, label: str
+) -> tuple[Any, ...]:
+    """Return the visible tap-drill rims at the requested model-X stations."""
+    candidates: list[tuple[float, float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=label):
+        edge = _early_bound(raw_edge, "IEdge")
+        raw_curve = edge.GetCurve()
+        if raw_curve is None:
+            continue
+        curve = _early_bound(raw_curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        parameters = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        candidates.append((parameters[0], parameters[6], edge))
+
+    rims: list[Any] = []
+    target_radius = THREAD_TAP_DRILL_MM / 2.0
+    for station in stations:
+        matches = [
+            edge
+            for x, radius, edge in candidates
+            if abs(x - station) <= 0.02 and abs(radius - target_radius) <= 0.02
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{label} station {station:g} mm has {len(matches)} visible "
+                f"tap-drill rims; expected 1"
+            )
+        rims.append(matches[0])
+    return tuple(rims)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -191,6 +224,9 @@ async def build(adapter: Any) -> dict[str, str]:
         if add_note(adapter, text, x, 0.265) is None:
             raise RuntimeError(f"failed to add platen-guide table label {text!r}")
 
+    front_hole_entities = _hole_rim_entities(front, BLIND_X, label="platen-guide front")
+    rear_hole_entities = _hole_rim_entities(back, THROUGH_X, label="platen-guide rear")
+
     insert_hole_table(
         adapter,
         front,
@@ -198,6 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_points=tuple(
             (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M) for station in BLIND_X
         ),
+        hole_entities=front_hole_entities,
         # X LOC = the station from the left face (datum C); Y LOC = the bar's
         # hole-line height above the bottom face, a constant 2.50.
         expected_locations_mm=tuple(
@@ -214,6 +251,7 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_points=tuple(
             (FRONT_LEFT_X_M + station / 1000.0, BACK_HOLE_Y_M) for station in THROUGH_X
         ),
+        hole_entities=rear_hole_entities,
         expected_locations_mm=tuple(
             (station, (BACK_HOLE_Y_M - BACK_BOTTOM_Y_M) * 1000.0)
             for station in THROUGH_X
