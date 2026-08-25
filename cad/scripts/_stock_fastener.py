@@ -189,6 +189,46 @@ def _current_named_bodies(
     return found
 
 
+def _component_body_names(
+    model: Any,
+    existing_names: frozenset[str],
+    expected_count: int,
+    sku: str,
+) -> tuple[str, ...]:
+    names = tuple(
+        item.name for item in _solid_bodies(model) if item.name not in existing_names
+    )
+    if len(names) != expected_count:
+        raise RuntimeError(
+            f"stock fastener SKU {sku!r} transformed body count mismatch: "
+            f"expected={expected_count}, found={len(names)}, names={names!r}"
+        )
+    return names
+
+
+def _blank_recipe_references(adapter: Any) -> None:
+    """Hide construction geometry that diagnostic recipes leave displayable."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    for name, kind in (("ThreadHelix", "HELIX"), ("PatternAxis", "AXIS")):
+        model.ClearSelection2(True)
+        selected = model.Extension.SelectByID2(
+            name,
+            kind,
+            0,
+            0,
+            0,
+            False,
+            0,
+            null_callout(),
+            0,
+        )
+        if selected:
+            model.BlankRefGeom()
+    model.ClearSelection2(True)
+
+
 def _select_bodies(model: Any, bodies: tuple[Any, ...], sku: str) -> None:
     if not bodies:
         raise RuntimeError(
@@ -295,6 +335,7 @@ def _transform_new_bodies(
     component_index: int,
     component: StockComponent,
     bodies: tuple[_NamedBody, ...],
+    existing_names: frozenset[str],
 ) -> None:
     transform = component.transform
     names = tuple(item.name for item in bodies)
@@ -302,6 +343,8 @@ def _transform_new_bodies(
 
     # InsertMoveCopyBody2 ignores translation whenever rotation is also supplied,
     # so a compound rigid transform must be represented by two separate features.
+    # A move feature can rename its result body; refresh the component body names
+    # before applying the second feature instead of trusting the consumed names.
     if any(transform.rotation_radians):
         _insert_rotation(
             model,
@@ -310,6 +353,7 @@ def _transform_new_bodies(
             f"{prefix}_Rotation",
             component.sku,
         )
+        names = _component_body_names(model, existing_names, len(bodies), component.sku)
     if any(transform.translation_mm):
         _insert_translation(
             model,
@@ -367,7 +411,14 @@ async def build_stock_fastener(
                 component=component_count,
                 bodies=len(new_bodies),
             ):
-                _transform_new_bodies(model, component_count, component, new_bodies)
+                _transform_new_bodies(
+                    model,
+                    component_count,
+                    component,
+                    new_bodies,
+                    frozenset(item.name for item in before),
+                )
+                _blank_recipe_references(adapter)
                 model.ClearSelection2(True)
     finally:
         if hasattr(adapter, "_mcm_com_map"):
