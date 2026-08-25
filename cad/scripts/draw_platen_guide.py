@@ -155,7 +155,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
-    expected_thread_instances = len(BLIND_X)
+    expected_thread_instances = len(THROUGH_X) + len(BLIND_X)
     if thread_instances != expected_thread_instances:
         raise RuntimeError(
             f"front view has {thread_seeds} cosmetic-thread seed(s) / "
