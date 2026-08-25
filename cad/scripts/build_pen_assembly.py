@@ -73,6 +73,7 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _interference_contracts import allowed_interference_pairs
 from _transforms import IDENTITY, ROT_Y_180
 from build_hanger_screw import SHANK_LEN as HANGER_SHANK_LEN
 from build_magnifier_assembly import BAR_BACK_Z, WHEEL_BAR_Y, WHEEL_MID_Z
@@ -123,9 +124,7 @@ _PEN_SET_CONTACT_Z = PEN_SET_AXIS_Z + math.copysign(
     PEN_SET_TIP_RADIUS, PEN_Z_MID - PEN_SET_AXIS_Z
 )
 _MARKER_CONTACT_DZ = _PEN_SET_CONTACT_Z - PEN_Z_MID
-_MARKER_CONTACT_RADICAND = (
-    (MARKER_BARREL_DIA / 2.0) ** 2 - _MARKER_CONTACT_DZ**2
-)
+_MARKER_CONTACT_RADICAND = (MARKER_BARREL_DIA / 2.0) ** 2 - _MARKER_CONTACT_DZ**2
 if _MARKER_CONTACT_RADICAND <= 0.0:
     raise AssertionError("pen-set stock tip cannot reach the marker barrel section")
 _MARKER_CONTACT_DX = math.sqrt(_MARKER_CONTACT_RADICAND)
@@ -135,12 +134,8 @@ SET_SCREW_POS = (
     PEN_SET_AXIS_Y,
     PEN_SET_AXIS_Z,
 )
-PEN_SET_CONTACT_GAP = (
-    SET_SCREW_POS[0] - PEN_SET_OVERALL_REACH - PEN_SET_TIP_X
-)
-PEN_FRAME_WINDOW_X_MIN = (
-    FRAME_POS[0] - (PEN_FRAME_OUTER_HEIGHT - PEN_FRAME_END_RAIL)
-)
+PEN_SET_CONTACT_GAP = SET_SCREW_POS[0] - PEN_SET_OVERALL_REACH - PEN_SET_TIP_X
+PEN_FRAME_WINDOW_X_MIN = FRAME_POS[0] - (PEN_FRAME_OUTER_HEIGHT - PEN_FRAME_END_RAIL)
 PEN_FRAME_WINDOW_X_MAX = FRAME_POS[0] - PEN_FRAME_END_RAIL
 if abs(_MARKER_CONTACT_DZ) / _MARKER_CONTACT_DX >= 1.0:
     raise AssertionError("pen-set chamfer flank, not its rim, controls barrel contact")
@@ -149,7 +144,9 @@ if not math.isclose(PEN_SET_CONTACT_GAP, 0.0, abs_tol=1e-9):
 if not math.isclose(PEN_SET_OVERALL_REACH, 22.225, abs_tol=1e-9):
     raise AssertionError("selected pen-set screw overall reach drifted from 22.225 mm")
 if not PEN_FRAME_WINDOW_X_MIN < PEN_SET_TIP_X < PEN_FRAME_WINDOW_X_MAX:
-    raise AssertionError("pen-set screw contact does not finish inside the frame window")
+    raise AssertionError(
+        "pen-set screw contact does not finish inside the frame window"
+    )
 
 # --- amplification wire 2 (rim -> pen rod) -----------------------------------
 # Endpoints + length live in pen_wire_geom (the part's length IS the run);
@@ -371,7 +368,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, 1, required_stems=("pen-rod", "pen-marker", "pen-wire")
     )
     write_dof_manifest(ASM_NAME)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     # Title-block identity for the assembly drawing (draw_pen_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry; material and

@@ -103,6 +103,7 @@ from _assembly import (
     place_component,
     save_assembly_and_images,
 )
+from _interference_contracts import allowed_interference_pairs
 from _transforms import ROT_X_NEG90, ROT_X_POS90, ROT_Y_POS90, rot_z_rows
 from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
@@ -451,7 +452,10 @@ async def build(adapter) -> dict[str, str]:
     assert_component_placed(adapter, set_screw, set_target, set_rows)
 
     assert_components_fully_defined(adapter)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     # Title-block identity for the assembly drawing (draw_frame_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

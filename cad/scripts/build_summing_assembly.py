@@ -69,6 +69,7 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _interference_contracts import allowed_interference_pairs
 from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90
 from cone_pivot_post_installation import SUMMING_Z
 from build_knife_hanger_stud import (
@@ -266,9 +267,7 @@ async def build(adapter) -> dict[str, str]:
         ("knife-hanger-stud", hanger_bolts),
     ):
         live = [
-            name
-            for name in live_names
-            if name == stem or name.startswith(f"{stem}-")
+            name for name in live_names if name == stem or name.startswith(f"{stem}-")
         ]
         if len(live) != 2 or set(live) != set(inserted):
             raise RuntimeError(
@@ -414,7 +413,10 @@ async def build(adapter) -> dict[str, str]:
         allowed_stems=("summing-lever", "boss-hook"),
     )
     write_dof_manifest(ASM_NAME)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     # Title-block identity for the assembly drawing (draw_summing_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

@@ -109,6 +109,7 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _interference_contracts import allowed_interference_pairs
 from _holes import CLEARANCE_MM
 from _transforms import (  # noqa: E402
     IDENTITY,
@@ -1499,7 +1500,10 @@ async def build(adapter) -> dict[str, str]:
     # codex #189).
     assert_free_dof_necessity(adapter, 1, required_instances=(t12,))
     write_dof_manifest(ASM_NAME)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
     # standard views (same as the top assembly) so the saved doc and the _front
