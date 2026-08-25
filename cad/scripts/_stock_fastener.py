@@ -18,6 +18,7 @@ from _common import (
     apply_material,
     check,
     force_rebuild,
+    name_last_feature,
     report_mass_properties,
     save_part_and_images,
 )
@@ -429,8 +430,14 @@ async def build_stock_fastener(
     components: Iterable[StockComponent],
     material: str,
     color: tuple[float, float, float] | None = None,
+    screw_axis_planes: tuple[str, str] | None = None,
 ) -> dict[str, str]:
-    """Create, author, transform, finish, and save one production stock part."""
+    """Create, normalize, finish, and save one production stock part.
+
+    ``screw_axis_planes`` restores the stable ``ScrewAxis`` mate contract for
+    assemblies whose normalized stock body axis is not represented by a
+    transformed recipe reference.
+    """
 
     check("create_part", await adapter.create_part())
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -484,6 +491,20 @@ async def build_stock_fastener(
 
     if component_count == 0:
         raise ValueError(f"stock fastener {part_name!r} has no components")
+    if screw_axis_planes is not None:
+        from solidworks_mcp.adapters.base import CreateAxisParameters
+
+        check(
+            f"create_axis ScrewAxis ({' ∩ '.join(screw_axis_planes)})",
+            await adapter.create_axis(
+                CreateAxisParameters(
+                    mode="two_planes",
+                    planes=list(screw_axis_planes),
+                )
+            ),
+        )
+        name_last_feature(adapter, "ScrewAxis")
+        _blank_recipe_references(adapter)
 
     await force_rebuild(adapter)
     await apply_material(adapter, material)
