@@ -220,42 +220,60 @@ def _blank_recipe_references(adapter: Any) -> None:
     }
     model = adapter.currentModel
     hidden: list[str] = []
-    feature = _read_member(model, "FirstFeature")
-    for _ in range(5000):
-        if not feature:
-            break
+    visited = 0
+
+    def walk_siblings(feature: Any, next_member: str):
+        nonlocal visited
+        while feature:
+            visited += 1
+            if visited > 5000:
+                raise RuntimeError("stock reference traversal exceeded 5000 features")
+            yield feature
+            child = _read_member(feature, "GetFirstSubFeature")
+            if child:
+                yield from walk_siblings(child, "GetNextSubFeature")
+            feature = _read_member(feature, next_member)
+
+    first = _read_member(model, "FirstFeature")
+    for feature in walk_siblings(first, "GetNextFeature"):
         _flag(feature, "IFeature")
         kind = str(_read_member(feature, "GetTypeName2"))
         name = str(_read_member(feature, "Name"))
         select_type = hide_types.get(kind)
-        if select_type and name != "Origin" and _read_member(feature, "Visible") == 2:
-            model.ClearSelection2(True)
-            selected = model.Extension.SelectByID2(
-                name,
-                select_type,
-                0,
-                0,
-                0,
-                False,
-                0,
-                null_callout(),
-                0,
+        if not select_type or name == "Origin" or _read_member(feature, "Visible") != 2:
+            continue
+
+        model.ClearSelection2(True)
+        selected = model.Extension.SelectByID2(
+            name,
+            select_type,
+            0,
+            0,
+            0,
+            False,
+            0,
+            null_callout(),
+            0,
+        )
+        if not selected:
+            raise RuntimeError(
+                f"cannot select shown stock reference {name!r} as {select_type}"
             )
-            if not selected:
-                raise RuntimeError(
-                    f"cannot select shown stock reference {name!r} as {select_type}"
-                )
-            if kind == "ProfileFeature":
-                model.BlankSketch()
-            else:
-                model.BlankRefGeom()
-            model.ClearSelection2(True)
-            if _read_member(feature, "Visible") == 2:
-                raise RuntimeError(
-                    f"stock reference {name!r} [{kind}] remained visible"
-                )
-            hidden.append(f"{name} [{kind}]")
-        feature = _read_member(feature, "GetNextFeature")
+        if kind == "ProfileFeature":
+            model.BlankSketch()
+        else:
+            model.BlankRefGeom()
+        model.ClearSelection2(True)
+        if _read_member(feature, "Visible") == 2:
+            raise RuntimeError(f"stock reference {name!r} [{kind}] remained visible")
+        hidden.append(f"{name} [{kind}]")
+
+    # Hiding a sketch does not hide dimensions that were explicitly shown by
+    # its diagnostic recipe. Clear the document-level feature-dimension display
+    # before capturing production renders.
+    model.HideFeatureDimensions()
+    model.ClearSelection2(True)
+
     _telemetry.event(
         "fastener.stock.references_hidden",
         count=len(hidden),
