@@ -1886,12 +1886,26 @@ def _clean_drawing(stem: str) -> None:
         _force_remove(Path(target))
 
 
+def _retired_purchased_drawing_outputs() -> tuple[Path, ...]:
+    """Return every generated print retired by the supplier-part cutover."""
+    return tuple(
+        path
+        for stem in RETIRED_PURCHASED_DRAWING_ARTIFACT_STEMS
+        for path in (
+            CAD_OUT / "slddrw" / f"{stem}.SLDDRW",
+            CAD_OUT / "pdf" / f"{stem}.pdf",
+            CAD_OUT / "png" / f"{stem}_drawing.png",
+        )
+    )
+
+
 def _retire_purchased_drawing_outputs() -> None:
-    """Delete generated prints retired by the supplier-part cutover."""
-    for stem in RETIRED_PURCHASED_DRAWING_ARTIFACT_STEMS:
-        _force_remove(CAD_OUT / "slddrw" / f"{stem}.SLDDRW")
-        _force_remove(CAD_OUT / "pdf" / f"{stem}.pdf")
-        _force_remove(CAD_OUT / "png" / f"{stem}_drawing.png")
+    for path in _retired_purchased_drawing_outputs():
+        _force_remove(path)
+
+
+def _retired_purchased_drawings_absent() -> bool:
+    return not any(path.exists() for path in _retired_purchased_drawing_outputs())
 
 
 def task_retire_drawings():
@@ -1899,7 +1913,7 @@ def task_retire_drawings():
     return {
         "actions": [_retire_purchased_drawing_outputs],
         "clean": [_retire_purchased_drawing_outputs],
-        "uptodate": [False],
+        "uptodate": [_retired_purchased_drawings_absent],
         "verbosity": 2,
     }
 
