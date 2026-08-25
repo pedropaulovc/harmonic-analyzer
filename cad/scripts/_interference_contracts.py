@@ -9,7 +9,7 @@ and maximum-volume contract.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 
 from pinion_bracket_geometry import PIN_BORE, PIN_SEAT
 from pinion_cam_pin_geometry import PIN_DIA
@@ -26,7 +26,7 @@ def _smooth_annulus_limit_mm3(
 
 def _numbered_pairs(
     first_stem: str,
-    numbers: range,
+    numbers: Iterable[int],
     second_stem: str,
     limit: float,
     *,
@@ -105,19 +105,21 @@ _PEN_ALLOWED_PAIRS = {
     ),
 }
 
+# Pattern instances are numbered by seed creation while the two backs and
+# guides are numbered by insertion order, so their suffixes cross or interleave.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "clamp-screw",
         range(1, 3),
         "column-clamp-back",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 9.0124),
+        second_number=2,
     ),
     **_numbered_pairs(
         "clamp-screw",
         range(3, 5),
         "column-clamp-back",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 9.0124),
-        second_number=2,
     ),
     **_numbered_pairs(
         "fillister-screw",
@@ -127,26 +129,26 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     ),
     **_numbered_pairs(
         "fillister-screw",
-        range(5, 10),
+        range(5, 15, 2),
         "platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 5.2678),
     ),
     **_numbered_pairs(
         "fillister-screw",
-        range(10, 15),
+        range(6, 15, 2),
         "platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 5.2678),
         second_number=2,
     ),
     **_numbered_pairs(
         "fillister-screw",
-        range(15, 19),
+        (15, 16, 18, 21),
         "platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 4.35),
     ),
     **_numbered_pairs(
         "fillister-screw",
-        range(19, 23),
+        (17, 19, 20, 22),
         "platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 4.35),
         second_number=2,
