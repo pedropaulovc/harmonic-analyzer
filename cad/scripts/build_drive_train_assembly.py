@@ -703,9 +703,8 @@ from pinion_spring_geometry import (  # noqa: E402
 from build_slotted_screw import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
+    THREAD as BSCREW_THREAD,
 )
-
-BSCREW_THREAD = "#8-32"
 
 from build_foot_screw import (  # noqa: E402
     HEAD_DIA as FSCREW_HEAD_DIA,
@@ -747,6 +746,7 @@ from build_cone_tip_pinch_screw import (  # noqa: E402
     THREAD as PINCH_THREAD,
 )
 from cone_gear_shaft_spec import (  # noqa: E402
+    ADJUSTER_EMBED as ADJ_EMBED,
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
 )
@@ -840,7 +840,6 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
 # the block; the top slit and 90280A108 pinch screw lock that setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
 BUSH_STATION = T006_NORTH_FACE
-ADJ_EMBED = 6.0
 ADJ_HEAD_STATION = TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_EMBED)
 _ADJ_CUP_RIM = ADJ_HEAD_STATION - ADJ_LEN
 _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
@@ -985,7 +984,10 @@ if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
     raise AssertionError("platform pivot hole does not clear the screw shoulder")
 if abs(PSCREW_SHOULDER_LEN - PLAT_PIVOT_BEARING_T - 0.25) > 1e-9:
     raise AssertionError("pivot screw no longer provides 0.25 axial plate clearance")
-if (PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA) / 2.0 < PLAT_PIVOT_HEAD_RADIAL_CLEARANCE:
+if (
+        (PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA) / 2.0 + 1e-9
+        < PLAT_PIVOT_HEAD_RADIAL_CLEARANCE
+):
     raise AssertionError("platform pivot relief lacks required radial head clearance")
 _require_tapped_thread("cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC)
 if BASE_PIVOT_HOLE_DEPTH - PSCREW_THREAD_TAIL_LEN < 1.5:

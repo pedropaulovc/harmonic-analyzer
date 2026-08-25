@@ -215,6 +215,11 @@ def _local_modules() -> dict[str, Path]:
             out[".".join(module_parts)] = path
     return out
 
+@functools.lru_cache(maxsize=None)
+def _module_by_path() -> dict[Path, str]:
+    """Reverse of :func:`_local_modules`, keyed by resolved path."""
+    return {path.resolve(): name for name, path in _local_modules().items()}
+
 
 @functools.lru_cache(maxsize=None)
 def _direct_local_imports(path: Path) -> frozenset[str]:
@@ -253,11 +258,7 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
                 found.add(parent)
             parent = parent.rpartition(".")[0]
 
-    resolved_path = path.resolve()
-    current_module = next(
-        (name for name, module_path in mods.items() if module_path.resolve() == resolved_path),
-        None,
-    )
+    current_module = _module_by_path().get(path.resolve())
     tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

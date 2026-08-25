@@ -61,6 +61,7 @@ from _assembly import (
     coincident_mate,
     component_names,
     component_origin,
+    component_transform,
     distance_driver,
     lock_mate,
     named_ref,
@@ -109,6 +110,20 @@ HANGER_WASHER_TOP_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS
 HANGER_STUD_Y = HANGER_WASHER_TOP_Y - UNDERHEAD_LEN
 KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP
 KNIFE_MOUNT_THREAD_ENGAGEMENT = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y
+
+
+def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
+    """Require the authored fastener axis to remain assembly +Y."""
+    axis = transform[3:6]
+    expected = (0.0, 1.0, 0.0)
+    drift = max(
+        abs(actual - target) for actual, target in zip(axis, expected, strict=True)
+    )
+    if drift > 1e-3:
+        raise RuntimeError(
+            f"{name}: local +Y fastener axis {axis} is not assembly +Y "
+            f"(drift {drift:.4f})"
+        )
 
 
 def _assert_knife_hanger_stack() -> None:
@@ -279,8 +294,12 @@ async def build(adapter) -> dict[str, str]:
     # remain coaxial with its bolt, on the crossbar, with zero axial gap at
     # the under-head face and the exact residual tap engagement.
     for washer, bolt in zip(hanger_washers, hanger_bolts, strict=True):
-        washer_o = component_origin(adapter, washer)
-        bolt_o = component_origin(adapter, bolt)
+        washer_transform = component_transform(adapter, washer)
+        bolt_transform = component_transform(adapter, bolt)
+        _assert_hanger_axis_positive_y(washer, washer_transform)
+        _assert_hanger_axis_positive_y(bolt, bolt_transform)
+        washer_o = [value * 1000.0 for value in washer_transform[9:12]]
+        bolt_o = [value * 1000.0 for value in bolt_transform[9:12]]
         radial_offset = max(
             abs(washer_o[0] - bolt_o[0]),
             abs(washer_o[2] - bolt_o[2]),

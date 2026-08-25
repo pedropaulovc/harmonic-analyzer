@@ -356,6 +356,7 @@ def test_module_deps_follow_dotted_package_recipe_chain(tmp_path, monkeypatch):
 
     monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
     bg._local_modules.cache_clear()
+    bg._module_by_path.cache_clear()
     bg._direct_local_imports.cache_clear()
     try:
         deps = {Path(dep) for dep in module_deps_of(wrapper)}
@@ -363,6 +364,7 @@ def test_module_deps_follow_dotted_package_recipe_chain(tmp_path, monkeypatch):
         # Do not leave cached temporary paths behind after monkeypatch restores
         # the production scripts root.
         bg._direct_local_imports.cache_clear()
+        bg._module_by_path.cache_clear()
         bg._local_modules.cache_clear()
 
     assert entry.resolve() in deps

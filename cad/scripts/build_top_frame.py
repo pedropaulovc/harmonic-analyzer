@@ -172,6 +172,11 @@ SPOTFACE_DIA = 9.0
 SPOTFACE_PLANE = abs(FRAME_FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4  # z -/+138.5
 SPOTFACE_FLOOR = SPOTFACE_PLANE - 0.9  # planar seat z -/+137.6
 SIDE_TAP_SPEC = HoleSpec("tapped", "#8-32", end="blind", depth_mm=14.0)
+SIDE_SCREW_XS = (-COLUMN_X, COLUMN_X)
+SIDE_SCREW_FACES = (
+    ("front", -1.0, True),
+    ("rear", 1.0, False),
+)
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
 KEEPER_TAP_SPEC = HoleSpec("tapped", "#8-32", end="blind", depth_mm=10.0)
@@ -885,7 +890,7 @@ async def build(adapter) -> dict[str, str]:
     # 9. Side-screw spot-faces: O9 x 0.9 flats on the curved boss z-faces
     #    (planar seats the tapped holes need).
     v_spot = _spotface_removal()
-    for side, sign, reverse in (("front", -1.0, True), ("rear", 1.0, False)):
+    for side, sign, reverse in SIDE_SCREW_FACES:
         spot_plane = check(
             f"create_plane spotface {side}",
             await adapter.create_plane(
@@ -902,13 +907,13 @@ async def build(adapter) -> dict[str, str]:
             await adapter.create_sketch(getattr(spot_plane, "name", spot_plane)),
         )
         ref_planes.append(str(getattr(spot_plane, "name", spot_plane)))
-        for k, sx in enumerate((-1.0, 1.0)):
+        for k, x in enumerate(SIDE_SCREW_XS):
             await define_circle(
                 adapter,
-                sx * COLUMN_X,
+                x,
                 0.0,
                 SPOTFACE_DIA / 2.0,
-                f"spotface {side} ({sx:+.0f})",
+                f"spotface {side} (x={x:+.0f})",
                 dims=spot,
                 names=(f"S{k}X", None, f"S{k}Dia"),
             )
@@ -926,7 +931,10 @@ async def build(adapter) -> dict[str, str]:
         )
         name_last_feature(adapter, f"SpotFace{side.capitalize()}")
         volume = await volume_check(
-            adapter, f"spotface {side}", volume - 2.0 * v_spot, 0.2 * v_spot + 15.0
+            adapter,
+            f"spotface {side}",
+            volume - len(SIDE_SCREW_XS) * v_spot,
+            0.2 * v_spot + 15.0,
         )
 
     # 10. Column bores (through the boss stacks).
@@ -1011,15 +1019,15 @@ async def build(adapter) -> dict[str, str]:
     #     idiom); opposed blind holes cannot share a feature across sides,
     #     the drill direction is per-feature.
     v_side_tap = _side_tap_removal()
-    for feat, z_face in (
-        ("SideTapsFront", -SPOTFACE_FLOOR),
-        ("SideTapsRear", SPOTFACE_FLOOR),
-    ):
-        normal = (0.0, 0.0, -1.0 if z_face < 0 else 1.0)
+    for side, sign, _reverse in SIDE_SCREW_FACES:
+        feat = f"SideTaps{side.capitalize()}"
+        z_face = sign * SPOTFACE_FLOOR
+        normal = (0.0, 0.0, sign)
+        tap_points = [[x, 0.0, z_face] for x in SIDE_SCREW_XS]
         wizard_holes(
             adapter,
             SIDE_TAP_SPEC,
-            [[-COLUMN_X, 0.0, z_face], [COLUMN_X, 0.0, z_face]],
+            tap_points,
             normal,
             f"side screw taps {feat}",
             name=feat,
@@ -1028,7 +1036,7 @@ async def build(adapter) -> dict[str, str]:
         volume = await volume_check(
             adapter,
             f"side taps {feat}",
-            volume - 2.0 * v_side_tap,
+            volume - len(tap_points) * v_side_tap,
             0.1 * v_side_tap + 15.0,
         )
 

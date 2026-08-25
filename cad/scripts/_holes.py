@@ -181,12 +181,12 @@ class HoleSpec:
         thread_class: Tap class (``"2B"`` default policy; the support's foot
             taps keep their as-built ``"1B"``). Ignored for non-taps.
         fit: Clearance fit (``"normal"`` default) -- clearance kind only.
-        overrides_mm: Post-initialize property overrides in mm, keyed by the
-            ``IWizardHoleFeatureData2`` property name (``"HoleDiameter"``,
-            ``"CounterBoreDiameter"``, ``"CounterBoreDepth"``, ...). Use ONLY
-            to preserve a photo-measured artefact dimension the standard table
-            would move (e.g. the base's Ø23 lag-head recess); leave empty to
-            take the true table dimension.
+        overrides_mm: Requested ``IWizardHoleFeatureData2`` property values in
+            mm (``"HoleDiameter"``, ``"CounterBoreDiameter"``,
+            ``"CounterBoreDepth"``, ...). A blind tap's ``"ThreadDepth"`` is
+            passed in HoleWizard5's supported Tap Thread Depth slot at feature
+            creation; other values are applied through ModifyDefinition. Use
+            ONLY to preserve a dimension the standard table would move.
     """
 
     kind: str
@@ -418,6 +418,7 @@ def wizard_holes(
     # 100% CPU with no dialog) -- keep the last-started phase visible.
     _telemetry.debug(f"hole wizard {label}: face selected, creating feature")
 
+    blind_thread_depth_mm: float | None = None
     if spec.end == "blind":
         # BLIND holes go through the legacy positional HoleWizard5:
         # InitializeHole(..., blind) is broken on this build -- it cuts a
@@ -432,7 +433,20 @@ def wizard_holes(
         dia = blind_cut_dia_mm(spec) / 1000.0
         ang = 2.0594885  # 118-degree drill point
         if hole_type == 4:
-            vals = [d, -1, -1, -1, -1, ang, 1, _ENDS["blind"], -1, -1, -1, -1]
+            blind_thread_depth_mm = spec.overrides_mm.get(
+                "ThreadDepth", spec.depth_mm
+            )
+            if not 0.0 < blind_thread_depth_mm <= spec.depth_mm:
+                raise ValueError(
+                    f"hole wizard {label}: blind tap thread depth "
+                    f"{blind_thread_depth_mm} mm must be positive and no deeper "
+                    f"than its {spec.depth_mm} mm hole"
+                )
+            thread_depth = blind_thread_depth_mm / 1000.0
+            vals = [
+                thread_depth, -1, -1, -1, -1, ang,
+                1, _ENDS["blind"], -1, -1, -1, -1,
+            ]
             tclass = spec.thread_class
         else:
             fit = _FITS[spec.fit] if spec.kind == "clearance" else -1
@@ -666,12 +680,16 @@ def wizard_holes(
                 pinned_mm=round(pinned_dia_mm, 4),
             )
     for k, v in spec.overrides_mm.items():
+        if k == "ThreadDepth" and blind_thread_depth_mm is not None:
+            # HoleWizard5 Value1 is the documented Tap Thread Depth input.
+            # Do not retry it through ModifyDefinition: that setter can reject
+            # the write, and the readback gate below verifies the create input.
+            continue
         edits.append((k, v / 1000.0))
         if k == "HoleDiameter":
             # the through-hole knob of a counterbore is ThruHoleDiameter;
             # HoleDiameter writes are ignored there (probe) -- set both
             edits.append(("ThruHoleDiameter", v / 1000.0))
-
     if edits:
         # Early-bound call: the params are DECLARED dispatches, so a plain
         # None marshals as a typed null -- a VARIANT wrapper here throws
@@ -712,6 +730,9 @@ def wizard_holes(
     # always trip on it. The populated knob for a thru hole is
     # ThruHoleDiameter (the same property the clearance drift check reads) --
     # fall back to it so the tripwire gates against the real table value.
+    # HoleDepth likewise reads 0.0 on the legacy blind path. Its documented
+    # HoleWizard5 Depth input remains spec.depth_mm, and callers verify the cut
+    # independently by volume. ThreadDepth is populated and is gated below.
     result = WizardHoleResult(
         name=str(feat.Name),
         hole_dia_mm=_dim("HoleDiameter") or _dim("ThruHoleDiameter"),
@@ -720,6 +741,14 @@ def wizard_holes(
         cbore_depth_mm=_dim("CounterBoreDepth"),
         placement_drive_jobs=placement_drive_jobs,
     )
+    if blind_thread_depth_mm is not None:
+        actual_thread_depth_mm = _dim("ThreadDepth")
+        if abs(actual_thread_depth_mm - blind_thread_depth_mm) > 0.005:
+            raise RuntimeError(
+                f"hole wizard {label}: thread depth "
+                f"{actual_thread_depth_mm:.3f} != requested "
+                f"{blind_thread_depth_mm:.3f} mm"
+            )
     if expect_dia_mm and abs(result.hole_dia_mm - expect_dia_mm) > 0.05:
         raise RuntimeError(
             f"hole wizard {label}: hole diameter {result.hole_dia_mm:.3f} != "

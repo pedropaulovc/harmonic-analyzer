@@ -110,7 +110,8 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     assert math.isclose(part.POST_LOCAL_Z, -192.17368694563453, abs_tol=1e-12)
     assert part.POST_MAIN_DIA == 42.011
     assert part.POST_FOOT_CONTAINMENT >= 0.25
-    assert part.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.55)
+    assert part.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
+    assert part.PIVOT_HEAD_RADIAL_CLEARANCE == pytest.approx((10.50 - 9.525) / 2.0)
     assert part.PIVOT_BEARING_RELIEF_DEPTH == pytest.approx(0.25)
     assert part.PIVOT_BEARING_THICKNESS == pytest.approx(6.10)
     assert part.PLATE_T - part.PIVOT_BEARING_THICKNESS == pytest.approx(

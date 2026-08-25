@@ -254,18 +254,22 @@ def _feature_data(feat, type_name):
                 _deg(v) if key.endswith("_deg") else v)
         for prop in ("ReverseDirection", "BothDirections", "Merge", "FlipSideToCut",
                      "NormalCut", "IsBaseExtrude", "IsBossFeature", "IsThinFeature",
-                     "CapEnds", "FromType", "FromOffsetDistance"):
+                     "ThinWallType", "CapEnds", "FromType", "FromOffsetDistance"):
             v = _g(d, prop)
             if v is None:
                 continue
             out[prop] = _mm(v) if prop == "FromOffsetDistance" else v
-        for key, meth, args in (("wall_mm", "GetWallThickness", (True,)),
-                                ("cap_mm", "CapThickness", ())):
+        for key, meth, args in (
+                ("wall_forward_mm", "GetWallThickness", (True,)),
+                ("wall_reverse_mm", "GetWallThickness", (False,)),
+                ("cap_mm", "CapThickness", ())):
             try:
                 v = getattr(d, meth)(*args) if args else _g(d, meth)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                _telemetry.debug(
+                    f"feature dump: {type_name}.{meth} unavailable: {exc}")
                 continue
-            if v:
+            if v is not None:
                 out[key] = _mm(v)
     elif type_name in ("RevolveBoss", "RevolveCut", "Revolve", "Revolution",
                        "RevCut"):

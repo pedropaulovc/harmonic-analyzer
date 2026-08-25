@@ -116,6 +116,7 @@ from rocker_arm_support_spec import (
     SUPPORT_WORLD_Z,
 )
 from build_gooseneck_set_screw import SHANK_LEN as GOOSENECK_SHANK_LEN
+from build_frame_side_screw import SHANK_LEN as SIDE_SCREW_SHANK_LEN
 from build_harmonic_base import LAG_COUNTERBORE_DEPTH
 from build_lag_screw import HEAD_H as LAG_HEAD_H
 from build_lag_screw import SHANK_LEN as LAG_SHANK_LEN
@@ -165,17 +166,20 @@ TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
 # bearing plane and the head ABOVE it (+Y), so the placement point is the
 # under-head seat and the rotation turns local +Y toward the head side. ---
 #
-# frame-side-screw: 4x #8-32 UNC x 12.7 slotted cheese-head screws pin the
-# casting's four corner bosses (Ø52.2 at x ±197, z ±112) against the columns,
+# frame-side-screw: 4x selected stock #8-32 UNC slotted cheese-head screws pin
+# the casting's four corner bosses (Ø52.2 at x ±197, z ±112) against the columns,
 # screwed from OUTSIDE the frame: front bosses from the front (head -Z), rear
 # bosses from the rear (head +Z), axes along Z at (x ±197, y TOP_FRAME_MID_Y).
 # The under-head plane seats on the boss spot-face (Ø9 x 0.5 into the boss
 # extreme z ±138.1) at z ±137.6; local +Y -> -Z for the front pair
 # (ROT_X_NEG90, euler [-90,0,0]) and +Y -> +Z for the rear pair (ROT_X_POS90,
-# euler [90,0,0]) point the 12.7 shank inboard: tips at z ±124.9, 0.2 clear
-# of the column surface z ±124.7 (tapped #8-32 boss holes live in the
-# top-frame part).
+# euler [90,0,0]) point the stock shank inboard. The selected SKU determines
+# the derived tip station and its clearance from the column surface.
 SIDE_SCREW_HEAD_Z = 137.6  # under-head seat station (spot-faced boss face)
+SIDE_SCREW_TIP_Z = SIDE_SCREW_HEAD_Z - SIDE_SCREW_SHANK_LEN
+SIDE_SCREW_COLUMN_CLEARANCE = SIDE_SCREW_TIP_Z - 124.7
+if SIDE_SCREW_COLUMN_CLEARANCE <= 0.0:
+    raise AssertionError("frame-side screw tip reaches the column surface")
 #
 # gooseneck-set-screw: 1x 1/4-20 UNC square-head set screw gripping the
 # gooseneck post through the casting's east-hub tapped rib hole, axis along X

@@ -14,6 +14,7 @@ PART_NAME = "slotted-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
+THREAD = "#8-32"
 SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA = FILLISTER_SIZES["90280A199"][:4]
 
 

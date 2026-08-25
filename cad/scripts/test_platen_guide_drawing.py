@@ -112,6 +112,20 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
     assert "screw_spec = HoleSpec(" in source
 
 
+def test_platen_guide_blind_taps_keep_drill_depth_and_engagement_distinct() -> None:
+    assert guide.LOCK_SCREW_HOLE_DEPTH == pytest.approx(
+        guide.LOCK_SCREW_THREAD_ENGAGEMENT + guide.LOCK_SCREW_BOTTOM_CLEARANCE
+    )
+    assert guide.SCREW_HOLE_DEPTH == pytest.approx(
+        guide.GUIDE_SCREW_THREAD_ENGAGEMENT
+        + guide.GUIDE_SCREW_BOTTOM_CLEARANCE
+    )
+    assert guide.LOCK_SCREW_BOTTOM_CLEARANCE > 0.0
+    assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE > 0.0
+    source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert source.count('overrides_mm={"ThreadDepth":') == 2
+
+
 def test_drawing_contract_imports_without_pywin32() -> None:
     script = """
 import builtins
