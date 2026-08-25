@@ -186,7 +186,11 @@ from build_platen_guide import (  # noqa: E402
     LOCK_STATION_X,
     SCREW_STATION_X as GUIDE_SCREW_STATION_X,
 )
-from build_guide_lock import HOLE_DIA as LOCK_HOLE_DIA, LOCK_THICK
+from build_guide_lock import (  # noqa: E402
+    HOLE_DIA as LOCK_HOLE_DIA,
+    LOCK_THICK,
+    LOCK_WIDTH,
+)
 from build_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
     CLIP_THICKNESS,
@@ -354,6 +358,7 @@ LOCK_SCREW_XY = tuple(
     (PLATE_X0 + x, gy + GUIDE_HEIGHT / 2.0) for gy in GUIDE_Y for x in GUIDE_LOCK_HOLE_X
 )
 
+
 def _assert_fastener_stacks() -> None:
     """Prove every selected stock screw has clearance and useful engagement."""
 
@@ -373,15 +378,21 @@ def _assert_fastener_stacks() -> None:
     # 90280A201 clamps: head seat -> remaining bar -> front clamp -> tapped
     # back clamp. The receiver is through, so its unused thickness is clearance,
     # never a blind bottom.
-    if (CLAMP_RECEIVER_SPEC.kind, CLAMP_RECEIVER_SPEC.size, CLAMP_RECEIVER_SPEC.end) != (
-        "tapped", "#8-32", "through_all"
-    ):
+    if (
+        CLAMP_RECEIVER_SPEC.kind,
+        CLAMP_RECEIVER_SPEC.size,
+        CLAMP_RECEIVER_SPEC.end,
+    ) != ("tapped", "#8-32", "through_all"):
         raise AssertionError("clamp receiver is not a through #8-32 tap")
     clamp_passage = BAR_DEPTH - CLAMP_CBORE_DEPTH + ARC_FRONT_DEPTH
     clamp_engagement = CLAMP_SCREW_LEN - clamp_passage
     nonnegative("clamp head recess", CLAMP_CBORE_DEPTH - CLAMP_SCREW_HEAD_H)
-    nonnegative("clamp head radial clearance", (CLAMP_CBORE_DIA - CLAMP_SCREW_HEAD_DIA) / 2.0)
-    nonnegative("clamp shank radial clearance", (CLAMP_HOLE_DIA - CLAMP_SCREW_DIA) / 2.0)
+    nonnegative(
+        "clamp head radial clearance", (CLAMP_CBORE_DIA - CLAMP_SCREW_HEAD_DIA) / 2.0
+    )
+    nonnegative(
+        "clamp shank radial clearance", (CLAMP_HOLE_DIA - CLAMP_SCREW_DIA) / 2.0
+    )
     valid_engagement("clamp #8-32 engagement", clamp_engagement, CLAMP_SCREW_DIA)
     nonnegative("clamp receiver tip clearance", ARC_BACK_DEPTH - clamp_engagement)
     if abs(CLAMP_CBORE_DEPTH - CLAMP_SCREW_HEAD_H - CLAMP_HEAD_RECESS) > 1e-9:
@@ -389,11 +400,16 @@ def _assert_fastener_stacks() -> None:
 
     # 90280A194 bracket screws pass the 4-mm bracket and stop 0.3 mm before the
     # front exit of the support bar's through #8-32 taps.
-    if (BAR_BRACKET_HOLE_SPEC.kind, BAR_BRACKET_HOLE_SPEC.size, BAR_BRACKET_HOLE_SPEC.end) != (
-        "tapped", "#8-32", "through_all"
-    ):
+    if (
+        BAR_BRACKET_HOLE_SPEC.kind,
+        BAR_BRACKET_HOLE_SPEC.size,
+        BAR_BRACKET_HOLE_SPEC.end,
+    ) != ("tapped", "#8-32", "through_all"):
         raise AssertionError("bracket receiver is not a through #8-32 tap")
-    if (BRACKET_CLEARANCE_SPEC.kind, BRACKET_CLEARANCE_SPEC.size) != ("clearance", "#8"):
+    if (BRACKET_CLEARANCE_SPEC.kind, BRACKET_CLEARANCE_SPEC.size) != (
+        "clearance",
+        "#8",
+    ):
         raise AssertionError("bracket passage is not #8 clearance")
     nonnegative(
         "bracket shank radial clearance",
@@ -406,14 +422,19 @@ def _assert_fastener_stacks() -> None:
     # 90114A511 guide screws: exact head recess, positive shank clearance,
     # 5.2678-mm engagement, and positive blind-bottom clearance.
     nonnegative("guide head recess", PLATEN_CBORE_DEPTH - FILLISTER_HEAD_H)
-    nonnegative("guide head radial clearance", (PLATEN_CBORE_DIA - FILLISTER_HEAD_DIA) / 2.0)
+    nonnegative(
+        "guide head radial clearance", (PLATEN_CBORE_DIA - FILLISTER_HEAD_DIA) / 2.0
+    )
     nonnegative(
         "guide shank radial clearance",
         (PLATEN_GUIDE_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0,
     )
     if abs(PLATEN_CBORE_DEPTH - FILLISTER_HEAD_H - PLATEN_HEAD_RECESS) > 1e-9:
         raise AssertionError("guide head is not recessed by the specified 0.2 mm")
-    if abs(GUIDE_SCREW_PASSAGE + GUIDE_SCREW_THREAD_ENGAGEMENT - FILLISTER_SHANK_LEN) > 1e-9:
+    if (
+        abs(GUIDE_SCREW_PASSAGE + GUIDE_SCREW_THREAD_ENGAGEMENT - FILLISTER_SHANK_LEN)
+        > 1e-9
+    ):
         raise AssertionError("guide screw stack does not consume the stock shank")
     valid_engagement(
         "guide #4-40 engagement", GUIDE_SCREW_THREAD_ENGAGEMENT, FILLISTER_SHANK_DIA
@@ -422,10 +443,17 @@ def _assert_fastener_stacks() -> None:
 
     # Lock screws are newly rederived from the real 2-mm plate and 6.35-mm
     # under-head length; the guide now receives the remaining 4.35 mm.
-    nonnegative("lock shank radial clearance", (LOCK_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0)
+    nonnegative(
+        "lock shank radial clearance", (LOCK_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0
+    )
     if abs(LOCK_SCREW_PASSAGE - LOCK_THICK) > 1e-9:
-        raise AssertionError("lock screw passage does not equal the real plate thickness")
-    if abs(LOCK_SCREW_PASSAGE + LOCK_SCREW_THREAD_ENGAGEMENT - FILLISTER_SHANK_LEN) > 1e-9:
+        raise AssertionError(
+            "lock screw passage does not equal the real plate thickness"
+        )
+    if (
+        abs(LOCK_SCREW_PASSAGE + LOCK_SCREW_THREAD_ENGAGEMENT - FILLISTER_SHANK_LEN)
+        > 1e-9
+    ):
         raise AssertionError("lock screw stack does not consume the stock shank")
     valid_engagement(
         "lock #4-40 engagement", LOCK_SCREW_THREAD_ENGAGEMENT, FILLISTER_SHANK_DIA
@@ -435,13 +463,21 @@ def _assert_fastener_stacks() -> None:
     # Clip bosses use exactly the non-threaded remainder of the shank; the
     # platen is through-tapped, gives 4.0 mm engagement, and the tip is flush.
     if (PLATEN_SOCKET_SPEC.kind, PLATEN_SOCKET_SPEC.size, PLATEN_SOCKET_SPEC.end) != (
-        "tapped", "#4-40", "through_all"
+        "tapped",
+        "#4-40",
+        "through_all",
     ):
         raise AssertionError("clip receiver is not a through #4-40 tap")
-    nonnegative("clip shank radial clearance", (CLIP_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0)
-    nonnegative("clip head seat radial margin", (SCREW_SEAT_DIA - FILLISTER_HEAD_DIA) / 2.0)
+    nonnegative(
+        "clip shank radial clearance", (CLIP_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0
+    )
+    nonnegative(
+        "clip head seat radial margin", (SCREW_SEAT_DIA - FILLISTER_HEAD_DIA) / 2.0
+    )
     if abs(CLIP_THICKNESS + SCREW_SEAT_BOSS_H - SCREW_SEAT_STACK) > 1e-9:
-        raise AssertionError("clip boss no longer provides the derived screw seat stack")
+        raise AssertionError(
+            "clip boss no longer provides the derived screw seat stack"
+        )
     valid_engagement(
         "clip #4-40 engagement", PLATEN_SOCKET_ENGAGEMENT, FILLISTER_SHANK_DIA
     )
@@ -455,12 +491,13 @@ def _assert_fastener_stacks() -> None:
     # The raised heads remain wholly outside the recording-paper side margins.
     paper_side_margin = (PLATE_WIDTH - PAPER_WIDTH) / 2.0
     left_head_extent = PLATEN_SOCKET_XY[0][0] + FILLISTER_HEAD_DIA / 2.0
-    right_head_extent = (
-        PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + FILLISTER_HEAD_DIA / 2.0
+    right_head_extent = PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + FILLISTER_HEAD_DIA / 2.0
+    nonnegative(
+        "left clip head-to-paper clearance", paper_side_margin - left_head_extent
     )
-    nonnegative("left clip head-to-paper clearance", paper_side_margin - left_head_extent)
-    nonnegative("right clip head-to-paper clearance", paper_side_margin - right_head_extent)
-
+    nonnegative(
+        "right clip head-to-paper clearance", paper_side_margin - right_head_extent
+    )
 
 
 def _assert_rack_mesh() -> None:
