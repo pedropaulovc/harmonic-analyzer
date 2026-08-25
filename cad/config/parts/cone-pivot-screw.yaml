@@ -1,9 +1,13 @@
 cone-pivot-screw:
+  title: Slotted 18-8 Stainless Steel Precision Shoulder Screw
   number: MHA-094
+  stock_name: Slotted 18-8 Stainless Steel Precision Shoulder Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91829A560]
   material: 18-8 stainless steel
-  material_specification: 18-8 stainless steel
+  material_specification: 18-8 stainless steel, McMaster-Carr 91829A560
   finish: plain
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "purchased precision shoulder screw"
+  process: purchased

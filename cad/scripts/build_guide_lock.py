@@ -55,6 +55,7 @@ from guide_lock_spec import (
     LOCK_THICK,
     LOCK_WIDTH,
 )
+from build_fillister_screw import SHANK_DIA as FILLISTER_SHANK_DIA
 
 PART_NAME = "guide-lock"
 MATERIAL = "Plain Carbon Steel"
@@ -68,15 +69,13 @@ MATERIAL = "Plain Carbon Steel"
 # still clear each other by 1.0 in y (2026-07-07 field report: a 12-tall plate
 # topped out AT the bar's bottom edge and retained nothing at the bottom
 # stations).
-# The fillister screws' O2.9 shanks pass through: #4 clearance, CLOSE fit
-# (Ø3.048, the wizard-table twin of the old Ø3.0 artefact dim; nearest UNC to
-# the ~Ø2.9 screw -- memory/fastener-policy-us-customary).
+# Stock 90114A511 shanks pass through the lock plates before threading into the
+# guide's rear-face #4-40 receivers. The #4 CLOSE clearance is the existing
+# placement interface and still leaves positive diametral clearance.
 HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
-# These #4 CLOSE clearance holes ride the DRILLED HOLES title-block row UOS
-# (+TOL_HOLE_PLUS/-0), like every drilled hole -- no per-feature callout. The
-# hard-zero minus keeps them from being cut under the screw; the +0.10 slop is
-# fine for a hand-cranked brass replica (title_block.yaml drilled_hole).
-
+HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
+if HOLE_DIA < FILLISTER_SHANK_DIA:
+    raise AssertionError("stock fillister shank does not clear the guide lock")
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -124,7 +123,7 @@ async def build(adapter) -> dict[str, str]:
     # Screw holes on the guide-side band: ONE native Hole Wizard #4 clearance
     # feature (2 through-all instances) drilled from the front face (z=0), while
     # the plate is still a plain prismatic slab. Positions are the guide layout.
-    hole_dia = blind_cut_dia_mm(HOLE_SPEC)
+    hole_dia = HOLE_DIA
     wizard_holes(
         adapter,
         HOLE_SPEC,

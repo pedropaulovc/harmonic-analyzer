@@ -311,15 +311,15 @@ sections:
         - derived
         - low
       - - Cone shaft length
-        - 208.1791869456 mm overall
-        - '~9.92'
-        - 'The legacy stack still ends 190 mm past its pivot-origin datum, but the final coupled layout moves the shaft front end to cone station −61.9068609979: post centre −39.90136099793, 42.011 axial body, plus 1.0 proud. Adding the 49.6068609979 stub delta to every downstream local station preserves every gear world station.'
+        - 205.1667369456 mm overall
+        - '~8.08'
+        - 'The final coupled layout puts the shaft front end at cone station −61.9068609979: post centre −39.90136099793, 42.011 axial body, plus 1.0 proud. Adding the 49.6068609979 stub delta preserves the journal and every gear-seat world station; only the terminal 1/32" endpoint is shortened 3.01245 mm to local station 205.1667369456 / machine station 143.2598759477 for exact contact with the McMaster 94025A150 cup apex.'
         - derived
         - high
       - - Cone shaft diameter
-        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø9.525 (3/8") to 170.6922184176; Ø6.35 (1/4") to 177.5922184176; Ø3.175 (1/8") to 184.4922184176; Ø0.79375 (1/32") to 208.1791869456'
+        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø9.525 (3/8") to 170.6922184176; Ø6.35 (1/4") to 177.5922184176; Ø3.175 (1/8") to 184.4922184176; Ø0.79375 (1/32") to 205.1667369456'
         - 12.2308/9.525/6.35/3.175/0.79375
-        - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. All downstream gear-seat diameters and world stations are unchanged; the 1/32" (0.79 mm) tip remains mechanically marginal — `build_cone_gear_shaft.py`.'
+        - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. All earlier section endpoints, gear seats, and world stations are unchanged; only the terminal 1/32" endpoint is shortened 3.01245 mm to machine station 143.2598759477, the McMaster 94025A150 conical cup apex at 6 mm thread engagement. The 20.6745185280 mm tip stub still spans the bushing; its 0.79 mm diameter remains mechanically marginal — `build_cone_gear_shaft.py`.'
         - legacy + derived
         - high
       - - Gear bores (configured `BoreDia`)
@@ -579,8 +579,8 @@ sections:
         - 'manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png); proportions from ch11 references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg and page002_img06.jpeg; exact feature dimensions harvested from cone-pivot-post-v2.SLDPRT'
         - 'med (86 mm height and proportions photo-derived; v2 feature dimensions exact)'
       - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
-        - 'black steel block 14 × 12 × 40.718 tall; north-face 5/16-18 UNC-2B blind tapped bore on the cone axis 33.368 above the plate top (abs y 90.518), 8 deep, carrying the cup-ended cone-tip-adjuster; 1.2-wide top slit down to 32.718 crossed by a #3-48 pinch joint at 38.918. The v2 post lowers this rider as a rigid coaxial cascade.'
-        - 'centre (−90.067, +85.281) = cone shaft station 141.272, standing ON the swing platform beside T006; the shaft tip remains in the adjuster''s blind cup.'
+        - 'black steel block 14 × 12 × 40.718 tall; north-face 5/16-18 UNC-2B blind tapped bore on the cone axis 33.368 above the plate top (abs y 90.518), 8 deep, carrying the cup-ended cone-tip-adjuster; 1.2-wide top slit down to 32.718 crossed at 38.918 by a #4-40 pinch joint with an Ø3.264 normal-clearance near jaw. The v2 post lowers this rider as a rigid coaxial cascade.'
+        - 'centre (−90.067, +85.281) = cone shaft station 141.272, standing ON the swing platform beside T006; at 6 mm adjuster engagement, the shaft tip contacts the McMaster 94025A150 conical cup apex at station 143.2598759477.'
         - ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry)
         - med (GT-anchored)
       - - '`cone-lock-knob` (clamps the swing plate engaged/disengaged)'
@@ -604,8 +604,8 @@ sections:
         - v4_t00471 / 7:49 (brass collar between the smallest gear and the tip block)
         - med (role high, dims low)
       - - '`cone-tip-adjuster` (axial end-play screw, partially hollow)'
-        - slotted steel screw Ø7.9 × 14, blind cup Ø2 × 6 in the far end, 1.5 × 1.5 driver slot across the head
-        - 'threaded into the tip block''s north counterbore, head proud 8 to station 155.272; its blind cup (mouth station 141.272, floor 147.272) holds the shaft''s tip end (146.272) — turning it takes up the cone stack''s axial end play so the 20 gears stay registered against the cylinder set; the block''s slit + pinch screw lock the setting'
+        - McMaster-Carr 94025A150 slotted 18-8 stainless 5/16-18 × 1/2 cup-tip set screw; vendor conical cup depth 1.98755 from the cup rim to its apex
+        - 'threaded 6 mm into the tip block''s north counterbore, placing the stock cup rim at station 141.2723259477 and its apex at 143.2598759477, exactly coincident with the shaft tip — turning it takes up the cone stack''s axial end play so the 20 gears stay registered against the cylinder set; the block''s slit + pinch screw lock the setting'
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
       - - '`cone-tip-pinch-screw` (locks the adjuster)'

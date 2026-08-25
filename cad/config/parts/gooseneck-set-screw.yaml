@@ -1,8 +1,12 @@
 gooseneck-set-screw:
+  title: Steel Square-Head Cup-Point Set Screw
   number: MHA-118
-  material: 12L14 (UNS G12144) per ASTM A108-24
-  material_specification: 12L14 (UNS G12144) per ASTM A108-24
-  finish: black oxide per MIL-DTL-13924, Class 1; oil sealed
+  stock_name: Steel Square-Head Cup-Point Set Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91410A538]
+  material: Plain Carbon Steel
+  material_specification: Steel, McMaster-Carr 91410A538
+  finish: as supplied
   quantity: 1
   tolerance_class: machined_block
-  process: "machined (steel), black oxide"
+  process: purchased

@@ -56,14 +56,14 @@ def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
 def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     notes = cone_tip_block_spec.DRAWING_NOTES
     assert "5/16-18" in notes  # the adjuster tapped hole
-    assert "#3-48" in notes  # the pinch tapped hole
+    assert "#4-40" in notes  # the pinch tapped hole
     assert "SLOT" in notes
     assert "CLEARANCE" in notes
     assert "OPPOSITE JAW" in notes
     assert "E IS +X PINCH-ENTRY FACE" in notes
     assert "SIMULTANEOUS REQUIREMENT" in notes
     assert "TOTAL MEDIAN-PLANE ZONE" in notes
-    assert "DIA 2.946 +0.10/-0.00" in notes
+    assert "DIA 3.264 +0.10/-0.00" in notes
     assert "MATERIAL" not in notes
     assert "OXIDE" not in notes
     assert "DATUM A" in notes
@@ -73,8 +73,19 @@ def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
     assert 'adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025' in source
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PinchClearance"' in part_source
-    assert '"clearance", "#3", end="blind"' in part_source
-    assert "depth_mm=(BLOCK_X - SLIT_W) / 2.0" in part_source
+    assert part.PINCH_THREAD == cone_tip_block_spec.PINCH_THREAD == "#4-40"
+    assert part.PINCH_CLEARANCE_SPEC.kind == "clearance"
+    assert part.PINCH_CLEARANCE_SPEC.size == "#4"
+    assert part.PINCH_CLEARANCE_SPEC.fit == "normal"
+    assert part.PINCH_CLEARANCE_SPEC.end == "blind"
+    assert part.PINCH_CLEARANCE_SPEC.depth_mm == (
+        part.BLOCK_X - part.SLIT_W
+    ) / 2.0
+    assert (
+        part.PINCH_CLEARANCE_DIA
+        == cone_tip_block_spec.PINCH_CLEARANCE_DIA
+        == 3.264
+    )
 
 
 def test_datum_and_position_controls_are_present() -> None:

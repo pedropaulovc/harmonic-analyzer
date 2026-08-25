@@ -327,7 +327,8 @@ expect(PD, "platen-paper-1", [p.PLATE_X0 + _paper_side, _paper_y, p.PLATE_FRONT_
 _fs = 0
 for x, y in p.CLIP_SCREW_XY:
     _fs += 1
-    expect(PD, f"fillister-screw-{_fs}", [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
+    expect(PD, f"fillister-screw-{_fs}",
+           [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS - p.SCREW_SEAT_BOSS_H],
            IDENTITY, f"clip screw {_fs}", **_SOLV)
 for x, y in p.GUIDE_SCREW_XY:
     _fs += 1

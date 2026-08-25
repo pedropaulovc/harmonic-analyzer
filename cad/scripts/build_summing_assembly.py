@@ -9,10 +9,11 @@ above by the boss-hook / counter-spring / gooseneck chain.
 
 * knife-mount x2 -- the bearing supports, one per hex trunnion, centred on
   ``SUMMING_Z`` and separated by ``+/-HEX_Z_MID``.
-* knife-hanger-stud x2 -- one per mount, on the mount centrelines: each
-  threads 12 into the mount's 1/2-13 top tap and rises through the casting's
-  integral-crossbar clearance hole; the integral washer + hex nut above the
-  casting top face carry the hang.
+* knife-hanger-washer x2 -- McMaster 90126A211 washers seated separately on
+  the casting top face, one at each mount centreline.
+* knife-hanger-stud x2 -- McMaster 91247A720 bolts under the stable legacy
+  stem: each passes through its washer and the casting's clearance hole, then
+  threads into the knife-mount's 1/2-13 top tap.
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study. The rock is the sub's single FREED operational DOF: its
@@ -58,6 +59,7 @@ from _assembly import (
     assert_free_dof_necessity,
     check_no_interference,
     coincident_mate,
+    component_names,
     component_origin,
     distance_driver,
     lock_mate,
@@ -69,6 +71,17 @@ from _assembly import (
 )
 from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90
 from cone_pivot_post_installation import SUMMING_Z
+from build_knife_hanger_stud import (
+    SHANK_DIA as BOLT_MAJOR_DIA,
+    UNDERHEAD_LEN,
+)
+from build_knife_hanger_washer import (
+    INNER_DIA as HANGER_WASHER_INNER_DIA,
+    OUTER_DIA as HANGER_WASHER_OUTER_DIA,
+    THICKNESS as HANGER_WASHER_THICKNESS,
+)
+from build_knife_mount import CASTING_UNDERSIDE_Y, MOUNT_GAP, STUD_TAP_DEPTH
+from build_top_frame import RING_HEIGHT as CROSSBAR_HEIGHT, STUD_HOLE_DIA
 
 ASM_NAME = "summing"
 
@@ -83,13 +96,66 @@ from summing_lever_spec import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
 KNIFE_CONTACT_Y = KNIFE[1] + HEX_H / 2.0  # knife-edge contact ridge line (984.834)
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
-# --- knife-hanger studs (one per knife-mount) --------------------------------
-# Part origin at the thread tip (bottom), axis +Y, inserted IDENTITY: each stud
-# threads 12.0 into the mount's 1/2-13 top tap (seat at CASTING_UNDERSIDE_Y -
-# MOUNT_GAP 0.25 = 999.45) and rises through the top-frame casting's integral-
-# crossbar O13.49 close-clearance hole, spanning y 987.45..1057.1.
-CASTING_UNDERSIDE_Y = 999.7  # top-frame casting underside (flush integral crossbar)
-HANGER_STUD_Y = CASTING_UNDERSIDE_Y - 0.25 - 12.0  # 987.45 (gap + engagement)
+# --- knife-hanger hardware (two bolts + two separate washers) ----------------
+# The top-frame crossbar and knife-mount exports own the surrounding stack.
+# Each washer's local origin is its mid-plane.  The 91247A720 wrapper preserves
+# the legacy bolt frame (thread tip at local Y=0, axis +Y), so seating its
+# under-head face on the washer top determines the bolt origin without an
+# independent stud-station assumption.
+CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + CROSSBAR_HEIGHT
+HANGER_WASHER_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS / 2.0
+HANGER_WASHER_TOP_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS
+HANGER_STUD_Y = HANGER_WASHER_TOP_Y - UNDERHEAD_LEN
+KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP
+KNIFE_MOUNT_THREAD_ENGAGEMENT = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y
+
+
+def _assert_knife_hanger_stack() -> None:
+    """Gate the purchased washer/bolt stack before any COM insertion."""
+    bolt_in_washer_clearance = HANGER_WASHER_INNER_DIA - BOLT_MAJOR_DIA
+    bolt_in_crossbar_clearance = STUD_HOLE_DIA - BOLT_MAJOR_DIA
+    washer_crossbar_seat = (HANGER_WASHER_OUTER_DIA - STUD_HOLE_DIA) / 2.0
+    if bolt_in_washer_clearance <= 0.0:
+        raise RuntimeError(
+            "knife-hanger washer ID does not clear the 91247A720 bolt: "
+            f"{bolt_in_washer_clearance:.4f} mm diametral clearance"
+        )
+    if bolt_in_crossbar_clearance <= 0.0:
+        raise RuntimeError(
+            "knife-hanger bolt does not clear the crossbar hole: "
+            f"{bolt_in_crossbar_clearance:.4f} mm diametral clearance"
+        )
+    if washer_crossbar_seat <= 0.0:
+        raise RuntimeError(
+            "knife-hanger washer OD does not seat beyond the crossbar hole: "
+            f"{washer_crossbar_seat:.4f} mm radial bearing width"
+        )
+
+    washer_lower_y = HANGER_WASHER_Y - HANGER_WASHER_THICKNESS / 2.0
+    washer_upper_y = HANGER_WASHER_Y + HANGER_WASHER_THICKNESS / 2.0
+    bolt_under_head_y = HANGER_STUD_Y + UNDERHEAD_LEN
+    if abs(washer_lower_y - CROSSBAR_TOP_Y) > 1e-9:
+        raise RuntimeError("knife-hanger washer lower face is not seated on crossbar")
+    if abs(bolt_under_head_y - washer_upper_y) > 1e-9:
+        raise RuntimeError("knife-hanger bolt under-head face is not seated on washer")
+    if not 0.0 < KNIFE_MOUNT_THREAD_ENGAGEMENT <= STUD_TAP_DEPTH:
+        raise RuntimeError(
+            "knife-hanger bolt misses the knife-mount tap envelope: "
+            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm engagement"
+        )
+    if abs(KNIFE_MOUNT_THREAD_ENGAGEMENT - 11.5735) > 1e-9:
+        raise RuntimeError(
+            "knife-hanger thread engagement drifted from 11.5735 mm: "
+            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm"
+        )
+    log(
+        "knife-hanger stack: washer "
+        f"{washer_lower_y:.4f}..{washer_upper_y:.4f}, bolt under-head "
+        f"{bolt_under_head_y:.4f}, engagement {KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f}; "
+        f"ID clearance {bolt_in_washer_clearance:.4f}, crossbar clearance "
+        f"{bolt_in_crossbar_clearance:.4f}, radial seat {washer_crossbar_seat:.4f} mm"
+    )
+
 
 # --- counter-spring chain (boss_hook_geom / counter_spring_spec) ------------
 # boss_hook_geom, NOT build_boss_hook: the part build's import closure carries
@@ -129,6 +195,7 @@ def _assert_counter_spring_hang() -> None:
 
 async def build(adapter) -> dict[str, str]:
     _assert_counter_spring_hang()
+    _assert_knife_hanger_stack()
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -157,27 +224,90 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label="knife-mount (back)",
     )
-    # Knife-hanger studs, one per mount on the mount centrelines: each threads
-    # 12 into the mount's 1/2-13 top tap (seat 999.45) and rises through the
-    # casting's integral crossbar (band 999.7..1036.2, O13.49 close clearance);
-    # the integral washer + hex nut seat on the casting top face 1036.2 and
-    # carry the hang (stud spans y 987.45..1057.1).
-    await place_component(
-        adapter,
-        "knife-hanger-stud",
-        [KNIFE[0], HANGER_STUD_Y, SUMMING_Z + HEX_Z_MID],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        label="knife-hanger-stud (front)",
-    )
-    await place_component(
-        adapter,
-        "knife-hanger-stud",
-        [KNIFE[0], HANGER_STUD_Y, SUMMING_Z - HEX_Z_MID],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        label="knife-hanger-stud (back)",
-    )
+    # Purchased knife-hanger hardware, one fixed washer + bolt pair on each
+    # mount centreline.  The washer lower face is exactly on the crossbar top;
+    # the 91247A720 under-head face is exactly on the washer upper face.  Both
+    # parts are independently fixed at the authored transform, so this
+    # structural stack contributes no operational DOF.
+    hanger_washers: list[str] = []
+    hanger_bolts: list[str] = []
+    for side, station_z in (
+        ("front", SUMMING_Z + HEX_Z_MID),
+        ("back", SUMMING_Z - HEX_Z_MID),
+    ):
+        hanger_washers.append(
+            await place_component(
+                adapter,
+                "knife-hanger-washer",
+                [KNIFE[0], HANGER_WASHER_Y, station_z],
+                [0.0, 0.0, 0.0],
+                IDENTITY,
+                ground=True,
+                label=f"knife-hanger-washer ({side})",
+            )
+        )
+        hanger_bolts.append(
+            await place_component(
+                adapter,
+                "knife-hanger-stud",
+                [KNIFE[0], HANGER_STUD_Y, station_z],
+                [0.0, 0.0, 0.0],
+                IDENTITY,
+                ground=True,
+                label=f"knife-hanger-stud ({side})",
+            )
+        )
+
+    # Count the live top-level instances, not just the placement requests:
+    # exactly two stock bolts and two separate washers must survive insertion.
+    live_names = component_names(adapter)
+    for stem, inserted in (
+        ("knife-hanger-washer", hanger_washers),
+        ("knife-hanger-stud", hanger_bolts),
+    ):
+        live = [
+            name
+            for name in live_names
+            if name == stem or name.startswith(f"{stem}-")
+        ]
+        if len(live) != 2 or set(live) != set(inserted):
+            raise RuntimeError(
+                f"{stem}: expected exactly two inserted instances, got {sorted(live)}"
+            )
+
+    # Read back both physical stacks.  This catches a per-instance station
+    # typo that the shared scalar derivation alone cannot: each washer must
+    # remain coaxial with its bolt, on the crossbar, with zero axial gap at
+    # the under-head face and the exact residual tap engagement.
+    for washer, bolt in zip(hanger_washers, hanger_bolts, strict=True):
+        washer_o = component_origin(adapter, washer)
+        bolt_o = component_origin(adapter, bolt)
+        radial_offset = max(
+            abs(washer_o[0] - bolt_o[0]),
+            abs(washer_o[2] - bolt_o[2]),
+        )
+        washer_lower_y = washer_o[1] - HANGER_WASHER_THICKNESS / 2.0
+        washer_upper_y = washer_o[1] + HANGER_WASHER_THICKNESS / 2.0
+        bolt_under_head_y = bolt_o[1] + UNDERHEAD_LEN
+        engagement = KNIFE_MOUNT_TOP_Y - bolt_o[1]
+        if radial_offset > 1e-6:
+            raise RuntimeError(
+                f"{bolt}: washer/bolt axes offset {radial_offset:.6f} mm"
+            )
+        if abs(washer_lower_y - CROSSBAR_TOP_Y) > 1e-6:
+            raise RuntimeError(
+                f"{washer}: lower face misses crossbar by "
+                f"{washer_lower_y - CROSSBAR_TOP_Y:.6f} mm"
+            )
+        if abs(bolt_under_head_y - washer_upper_y) > 1e-6:
+            raise RuntimeError(
+                f"{bolt}: under-head/washer gap "
+                f"{bolt_under_head_y - washer_upper_y:.6f} mm"
+            )
+        if abs(engagement - KNIFE_MOUNT_THREAD_ENGAGEMENT) > 1e-6:
+            raise RuntimeError(
+                f"{bolt}: knife-mount engagement drifted to {engagement:.6f} mm"
+            )
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,
     # leaving the rock DOF -- the sub's freed operational DOF (its drive spec
@@ -272,11 +402,17 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_180,
     )
 
-    # Certify the AS-BUILT model. Necessity only: the freed lever rock is
-    # genuinely free; the lock-mated boss-hook MUST read under-constrained
-    # WITH it -- a grounded/fixed regression would freeze the counter-spring
-    # anchor while the lever still swings.
-    assert_free_dof_necessity(adapter, 1, required_stems=("summing-lever", "boss-hook"))
+    # Certify the AS-BUILT model.  The lever rock remains the sole intended
+    # freed DOF; the exact allowed-stem set rejects any free washer, bolt, or
+    # other structural component.  The lock-mated boss-hook MUST read
+    # under-constrained WITH the lever -- a grounded/fixed regression would
+    # freeze the counter-spring anchor while the lever still swings.
+    assert_free_dof_necessity(
+        adapter,
+        1,
+        required_stems=("summing-lever", "boss-hook"),
+        allowed_stems=("summing-lever", "boss-hook"),
+    )
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Title-block identity for the assembly drawing (draw_summing_assembly.py):

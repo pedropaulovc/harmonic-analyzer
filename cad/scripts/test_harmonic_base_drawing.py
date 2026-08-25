@@ -16,9 +16,9 @@ from cone_pivot_post_installation import (
     POST_X_SHIFT,
     POST_Z_SHIFT,
 )
-from cone_lock_knob_spec import WASHER_DIA as KNOB_WASHER_DIA
+from build_cone_lock_knob import WASHER_DIA as KNOB_WASHER_DIA
 from _drawing_registry import DRAWINGS_BY_NAME
-from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
+from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
 
 
 def test_required_drawing_paths() -> None:

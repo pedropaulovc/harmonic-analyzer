@@ -46,7 +46,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import TAP_DRILL_MM, HoleSpec, wizard_holes
+from _holes import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec, wizard_holes
 from pen_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -68,11 +68,16 @@ TRIM_NEAR = 0.75  # local x = 0 edge pulled back: that rail faces the platen
 # (machine z = -143 - local x) and must clear the recording paper's front
 # face at -143.4 by the 0.25+ margin (M6.8 platen-paper)
 FRAME_DEPTH = 10.0  # Z
-# The set screw threads INTO the bottom rail, so its hole is a #4-40 tapped
-# Hole Wizard hole (tap drill Ø2.261; was a plain Ø3.0 cut) drilled up from the
-# bottom face. THROUGH_NEXT (not through-all) stops at the window cavity so the
-# top rail is spared, matching the old mid-plane cut -- fastener-policy memory.
-
+# The set screw threads INTO the bottom rail, so its hole is an exact #4-40
+# tapped Hole Wizard feature drilled up from the bottom face. THROUGH_NEXT
+# (not through-all) stops at the window cavity so the top rail is spared.
+SET_SCREW_TAP_SPEC = HoleSpec("tapped", "#4-40", end="through_next")
+SET_SCREW_RADIAL_WALL = min(
+    OUTER_WIDTH / 2.0 - TRIM_NEAR,
+    FRAME_DEPTH / 2.0,
+) - THREAD_MAJOR_MM[SET_SCREW_TAP_SPEC.size] / 2.0
+if SET_SCREW_RADIAL_WALL <= 0.0:
+    raise AssertionError("stock #4-40 thread breaks through the pen-frame rail")
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -160,7 +165,7 @@ async def build(adapter) -> dict[str, str]:
     # and the depth mid-plane in Z.
     screw_cut = wizard_holes(
         adapter,
-        HoleSpec("tapped", "#4-40", end="through_next"),
+        SET_SCREW_TAP_SPEC,
         [[OUTER_WIDTH / 2.0, 0.0, FRAME_DEPTH / 2.0]],
         (0.0, -1.0, 0.0),
         "set-screw tapped hole (#4-40)", name="ScrewHole",
@@ -173,7 +178,7 @@ async def build(adapter) -> dict[str, str]:
     # The tapped column pierces only the bottom rail (Y 0..RailEnd), so it
     # removes pi*r^2*RailEnd at the tap-drill diameter. Loose tol for the
     # rounding / mesh at the cut walls.
-    v_screw = math.pi * (TAP_DRILL_MM["#4-40"] / 2.0) ** 2 * RAIL_END
+    v_screw = math.pi * (TAP_DRILL_MM[SET_SCREW_TAP_SPEC.size] / 2.0) ** 2 * RAIL_END
     v_final = ring_expected - v_screw
     await volume_check(adapter, "screw hole", v_final, 15.0)
 

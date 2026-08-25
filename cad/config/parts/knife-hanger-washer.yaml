@@ -1,0 +1,13 @@
+knife-hanger-washer:
+  title: Knife-Hanger Washer
+  number: MHA-121
+  stock_name: Zinc-Plated Steel SAE Washer
+  supplier: McMaster-Carr
+  supplier_skus: [90126A211]
+  material: Plain Carbon Steel
+  material_specification: Steel, McMaster-Carr 90126A211
+  finish: zinc plated
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

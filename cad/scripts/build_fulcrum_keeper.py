@@ -5,7 +5,7 @@ bottom-left closeup; ch. 30 top view corners + eight-views p008): an upright
 round-topped lug sockets a bright Ø9.5 steel ball on the Ø6.35 shaft end
 (spherical end bearing, the clevis+ball "shaft END mount" of the dimensions
 table), and the foot is screwed down into the top-frame rail top face by one
-slotted #10-24 cheese-head frame-side screw (MHA-117) seated flush in a
+slotted #8-32 cheese-head frame-side screw (MHA-117) seated flush in a
 counterbore. Replaces the photo-refuted chrome baluster pair (the
 pivot-ball-mount stays rocker-only at the machine bottom).
 
@@ -63,18 +63,19 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _holes import HoleSpec, wizard_holes
+from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from build_frame_side_screw import HEAD_DIA as FRAME_SIDE_HEAD_DIA
+from build_frame_side_screw import HEAD_H as FRAME_SIDE_HEAD_H
+from build_frame_side_screw import SHANK_DIA as FRAME_SIDE_SHANK_DIA
 from fulcrum_keeper_spec import (
     BALL_DIA,
     BORE_DIA,
-    CBORE_DEPTH_MM,
     CBORE_DIA_MM,
     CROWN_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FOOT_H,
     FOOT_REACH,
-    HOLE_DIA_MM,
     ISOMETRIC_VIEW_NOTE,
     KEEPER_WIDTH,
     LUG_HALF_T,
@@ -93,18 +94,28 @@ LUG_T = 2.0 * LUG_HALF_T  # 6.0 lug thickness along X
 SOCKET_CUT_DEPTH = 10.0
 BORE_CUT_DEPTH = 12.0
 
-# The keeper's foot screw: #10 close-clearance drill with a cheese-head
-# counterbore (the MHA-117 head is Ø7 x 3; it seats flush). Table thru/cbore
-# values are overridden to the spec's pinned artefact dims.
+# The keeper's foot screw: #8 close-clearance drill with a cheese-head
+# counterbore. The Ø9.5 artefact recess stays, while its depth follows the exact
+# replacement head so the bearing face remains flush.
+CBORE_DEPTH_MM = FRAME_SIDE_HEAD_H
+SCREW_HOLE_DIA_MM = CLEARANCE_MM[("#8", "close")]
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",
-    "#10",
+    "#8",
     overrides_mm={
-        "HoleDiameter": HOLE_DIA_MM,
+        "HoleDiameter": SCREW_HOLE_DIA_MM,
         "CounterBoreDiameter": CBORE_DIA_MM,
         "CounterBoreDepth": CBORE_DEPTH_MM,
     },
 )
+if SCREW_HOLE_DIA_MM <= FRAME_SIDE_SHANK_DIA:
+    raise AssertionError("standard #8 keeper clearance binds on the stock screw")
+if CBORE_DIA_MM <= FRAME_SIDE_HEAD_DIA:
+    raise AssertionError("keeper counterbore does not clear the stock screw head")
+if CBORE_DEPTH_MM >= FOOT_H:
+    raise AssertionError("keeper counterbore leaves no foot material at its floor")
+if CBORE_DIA_MM >= KEEPER_WIDTH:
+    raise AssertionError("keeper counterbore breaks through the foot side walls")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -287,7 +298,8 @@ async def build(adapter) -> dict[str, str]:
         SCREW_HOLE_SPEC,
         [[SCREW_X, FOOT_H, 0.0]],
         (0.0, 1.0, 0.0),
-        "keeper foot screw hole (#10 cbore)",
+        "keeper foot screw hole (#8 cbore)",
+        expect_dia_mm=SCREW_HOLE_DIA_MM,
         name="FootScrewHole",
     )
     v_cb = math.pi * (screw_hole.cbore_dia_mm / 2.0) ** 2 * screw_hole.cbore_depth_mm

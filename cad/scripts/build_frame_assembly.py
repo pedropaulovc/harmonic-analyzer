@@ -79,6 +79,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -113,6 +114,10 @@ from rocker_arm_support_spec import (
     SUPPORT_WORLD_X,
     SUPPORT_WORLD_Z,
 )
+from build_gooseneck_set_screw import SHANK_LEN as GOOSENECK_SHANK_LEN
+from build_harmonic_base import LAG_COUNTERBORE_DEPTH
+from build_lag_screw import HEAD_H as LAG_HEAD_H
+from build_lag_screw import SHANK_LEN as LAG_SHANK_LEN
 
 ASM_NAME = "frame"
 
@@ -137,14 +142,18 @@ SUPPORT_ROWS = ROT_Y_POS90
 # holes above them) by concentric + seat mates -- see build(). The
 # stations are the foot's tapped pattern in the machine frame: local X +/-60.32,
 # Z +/-17.46 turned +90deg about Y -> machine x 72.9 -/+ 17.46 = 55.44/90.36,
-# z SUPPORT_Z +/-60.32 (these ARE the base HOLE_XZ machine positions). The screw is authored
-# head-down at IDENTITY, so the placement point is the station and y is the under-
-# head plane: machine y 6.5 (the base underside counterbore depth) sets the O22
-# head recessed in the base underside, the O12 shank rising through the base into
-# the O12.30 tapped foot hole. Placed on its exact machine transform (like the
-# support); constrained by concentric + seat + spin-pin mates (see build()).
+# z SUPPORT_Z +/-60.32 (these ARE the base HOLE_XZ machine positions). The screw
+# is authored head-down at IDENTITY, so its under-head plane follows the harmonic
+# base's exported underside counterbore depth. This keeps the stock head recessed
+# 0.5 mm while its shank rises through the base into the support's tapped foot.
 LAG_SCREW_XZ = SUPPORT_HOLD_DOWN_XZ
-LAG_SCREW_UNDER_HEAD_Y = 6.5
+LAG_SCREW_UNDER_HEAD_Y = LAG_COUNTERBORE_DEPTH
+LAG_HEAD_RECESS = LAG_COUNTERBORE_DEPTH - LAG_HEAD_H
+LAG_SUPPORT_ENGAGEMENT = LAG_SCREW_UNDER_HEAD_Y + LAG_SHANK_LEN - BASE_TOP_Y
+if not math.isclose(LAG_HEAD_RECESS, 0.5, abs_tol=1e-9):
+    raise AssertionError("lag-screw counterbore must recess the stock head by 0.5 mm")
+if LAG_SUPPORT_ENGAGEMENT <= 0.0:
+    raise AssertionError("lag-screw shank does not reach the rocker-support tap")
 
 TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
 # rails 38 wide x 36.5 tall, band y 999.7..1036.2; corner bosses rise to
@@ -155,7 +164,7 @@ TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
 # bearing plane and the head ABOVE it (+Y), so the placement point is the
 # under-head seat and the rotation turns local +Y toward the head side. ---
 #
-# frame-side-screw: 4x #10-24 UNC x 12.7 slotted cheese-head screws pin the
+# frame-side-screw: 4x #8-32 UNC x 12.7 slotted cheese-head screws pin the
 # casting's four corner bosses (Ø52.2 at x ±197, z ±112) against the columns,
 # screwed from OUTSIDE the frame: front bosses from the front (head -Z), rear
 # bosses from the rear (head +Z), axes along Z at (x ±197, y TOP_FRAME_MID_Y).
@@ -163,22 +172,19 @@ TOP_FRAME_MID_Y = 1017.95  # casting mid-plane: side rails 34.2 / front-rear
 # extreme z ±138.1) at z ±137.6; local +Y -> -Z for the front pair
 # (ROT_X_NEG90, euler [-90,0,0]) and +Y -> +Z for the rear pair (ROT_X_POS90,
 # euler [90,0,0]) point the 12.7 shank inboard: tips at z ±124.9, 0.2 clear
-# of the column surface z ±124.7 (tapped #10-24 boss holes live in the
+# of the column surface z ±124.7 (tapped #8-32 boss holes live in the
 # top-frame part).
 SIDE_SCREW_HEAD_Z = 137.6  # under-head seat station (spot-faced boss face)
 #
-# gooseneck-set-screw: 1x 1/4-20 UNC x 16 square-head set screw gripping the
+# gooseneck-set-screw: 1x 1/4-20 UNC square-head set screw gripping the
 # gooseneck post through the casting's east-hub tapped rib hole, axis along X
 # at (y TOP_FRAME_MID_Y, z 3.088 -- the hub/post centreline). Entered from the
 # east outer face x -214.1: local +Y -> -X (rot_z_rows(90), euler [0,0,90])
-# points the 16 shank inboard, tip at x -205.15 = 0.15 CLEAR (outboard) of the
-# Ø16 post surface at x -205 (post centre -197) -- the first build pinned the
-# tip at -204.85, 0.15 INSIDE the post (1.39 mm^3 top-level interference),
-# under-head plane at x -221.15 (bearing face 7.05 off the outer face,
-# the contract standoff), square head outboard to -227.15.
+# points the exact stock shank inboard while retaining its cup tip at x -205.15,
+# 0.15 clear (outboard) of the Ø16 post surface at x -205.
 GOOSENECK_HUB_Z = 3.088  # gooseneck bore centreline (unchanged position)
 SET_SCREW_TIP_X = -205.15  # 0.15 clear (outboard) of the Ø16 post surface -205
-SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - 16.0  # -221.15 under-head plane
+SET_SCREW_UNDER_HEAD_X = SET_SCREW_TIP_X - GOOSENECK_SHANK_LEN
 
 # Maker's nameplate (book ch. 26, pp. 70-71): the 100 x 55 brass plate lies FLAT
 # on the base top, decorated side up, on the EAST (+X) face -- read off the in-situ
@@ -392,7 +398,7 @@ async def build(adapter) -> dict[str, str]:
     )
     assert_component_placed(adapter, nameplate_name, NAMEPLATE_POS, NAMEPLATE_ROWS)
 
-    # Corner-boss side screws: one #10-24 cheese-head per boss, screwed from
+    # Corner-boss side screws: one #8-32 cheese-head per boss, screwed from
     # OUTSIDE the frame (front pair from -Z, rear pair from +Z), under-head
     # seat on the boss spot-face at z -/+137.6 (see SIDE_SCREW_HEAD_Z). Rigid
     # fasteners -> the frame's single-mate fix-all strategy: placed on their

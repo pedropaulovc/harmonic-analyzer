@@ -132,12 +132,11 @@ LEVER_ROD_Y = 979.7
 # machine front -- the old z -85 (M6.4, low) hung the wire hook 50 behind the
 # wheel plane, an ~8 deg lean the photo refutes. Window RE-SOLVED 2026-08-02
 # for the one-piece top-frame casting (front rail z -93..-131, band
-# y 999.7..1036.2): the thumb-screw head (Ø10) no longer pokes above the
-# casting underside 999.7 -- its top lands at 998.7 (>= 0.25 margin, actual
-# 1.0) after the #4-40 was shortened 12 -> 11 (see the tscrew placement
-# below), so the rail imposes NO depth bound at all (the z escape would need
-# the whole head band past the rail outer face -131, i.e. <= -136.25, far
-# beyond the rim-duck floor -128.31 -- infeasible). Surviving bounds: the
+# y 999.7..1036.2): the exact-stock thumb-screw reach, derived and asserted
+# below, keeps its outer head face beyond the required casting clearance, so
+# the rail imposes NO depth bound at all (the z escape would need the whole
+# head band past the rail outer face -131, far beyond the rim-duck floor
+# -128.31 -- infeasible). Surviving bounds: the
 # lever rod (Ø6) must clear the front column surface -124.7 by 0.25
 # (=> <= -127.95, actual surface gap 0.6) and the lever-wire's rim-duck
 # route caps the hook at ~-137.96 (=> >= -128.31). -128.3 stands unchanged.
@@ -152,7 +151,11 @@ LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 # (along Z) -- it does NOT spin in the bracket collar (a loose Ø6.2/Ø6 guide).
 # The ridge is the summing sub's knife line; assert the lever part's local
 # KnifeAxis lands exactly on it, so a knife move fails loud here.
-from magnifying_lever_geom import KNIFE_LOCAL_X, KNIFE_LOCAL_Y  # noqa: E402
+from magnifying_lever_geom import (  # noqa: E402
+    KNIFE_LOCAL_X,
+    KNIFE_LOCAL_Y,
+    ROD_DIA as LEVER_ROD_DIA,
+)
 from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # The lever is placed Ry(180) (local +x -> machine -x), so the knife lands at
@@ -162,6 +165,24 @@ assert math.isclose(LEVER_X0 - KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), (
 )
 assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), (
     "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
+)
+from build_thumb_screw import (  # noqa: E402
+    HEAD_STACK_LEN as THUMB_HEAD_STACK_LEN,
+    SHANK_LEN as THUMB_SHANK_LEN,
+)
+
+TOP_FRAME_RAIL_UNDERSIDE_Y = 999.7
+_MIN_THUMB_RAIL_CLEARANCE = 0.25
+THUMB_SCREW_TIP_Y = LEVER_ROD_Y + LEVER_ROD_DIA / 2.0
+THUMB_SCREW_OUTER_FACE_Y = (
+    THUMB_SCREW_TIP_Y + THUMB_SHANK_LEN + THUMB_HEAD_STACK_LEN
+)
+THUMB_SCREW_RAIL_CLEARANCE = (
+    TOP_FRAME_RAIL_UNDERSIDE_Y - THUMB_SCREW_OUTER_FACE_Y
+)
+assert THUMB_SCREW_RAIL_CLEARANCE >= _MIN_THUMB_RAIL_CLEARANCE, (
+    f"thumb-screw head clears the top-frame rail by only "
+    f"{THUMB_SCREW_RAIL_CLEARANCE:.4f} mm"
 )
 CLAMP_X = 150.0  # sliding clamp default position (p.46/48 insets)
 from magnifying_clamp_geom import (  # noqa: E402
@@ -447,21 +468,21 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{ml}", "PLANE"),
         label="mag-clamp locked to lever",
     )
-    # Backed-out thumb screw: shank tip tangent to the rod top (a seated
-    # screw would overlap the rod it pinches -- see module docstring). Stack:
-    # rod top +3.0 + under-head 11.0 + head 5.0 = head top y 998.7, kept
-    # >= 0.25 (actual 1.0) BELOW the top-frame casting underside 999.7 -- the
-    # #4-40 was shortened 12 -> 11 (2026-08-02, _fastener_catalog) exactly so
-    # the head clears the full-depth front rail (z -93..-131) in y; the clamp
-    # tap band (block top +7 down to bore top +3.1) stays fully engaged.
-    # Rz(-90) points the shank down the clamp bore; the extra Ry(180) turns
-    # its head features to the machine hand ([180, 0, -90] is the same
-    # rotation's Euler form).
+    # Backed-out thumb screw: the shank tip stays tangent to the rod top (a
+    # seated screw would overlap the rod it pinches -- see module docstring).
+    # Exact 91882A221 reach comes from the wrapper's stock shank and head-stack
+    # constants. The wrapper preserves its outer-head-face local origin, so the
+    # target below is that face after placing the tip at THUMB_SCREW_TIP_Y.
+    # THUMB_SCREW_RAIL_CLEARANCE proves the head clears the full-depth front
+    # rail while the clamp's #4-40 tap band (block top +7 down to bore top
+    # +3.1) stays fully engaged. Rz(-90) points the shank down the clamp bore;
+    # the extra Ry(180) turns its head features to the machine hand
+    # ([180, 0, -90] is the same rotation's Euler form).
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
     tscrew = await place_component(
         adapter,
         "thumb-screw",
-        [CLAMP_X, LEVER_ROD_Y + 3.0 + 11.0 + 5.0, LEVER_ROD_Z],
+        [CLAMP_X, THUMB_SCREW_OUTER_FACE_Y, LEVER_ROD_Z],
         [180.0, 0.0, -90.0],
         _rz90_ry180,
         ground=False,

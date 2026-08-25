@@ -8,9 +8,11 @@ from types import MappingProxyType
 from typing import Any
 
 import _telemetry
+from _fastener_catalog import fastener
 from _common import (
     _early_bound,
     apply_color,
+    apply_custom_properties,
     apply_material,
     check,
     force_rebuild,
@@ -378,5 +380,14 @@ async def build_stock_fastener(
     await apply_material(adapter, material)
     if color is not None:
         await apply_color(adapter, color)
+    stock = fastener(part_name)
+    apply_custom_properties(
+        adapter,
+        {
+            "Stock Name": stock.stock_name,
+            "Supplier": stock.supplier,
+            "Supplier SKUs": ", ".join(stock.skus),
+        },
+    )
     await report_mass_properties(adapter)
     return await save_part_and_images(adapter, part_name)

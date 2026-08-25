@@ -43,11 +43,10 @@ CLAMP_X = 150.0  # sliding clamp / vertical rod / fixture line
 # off the rod axis in -z by rod r 2.5 + wire r 0.4 + 0.25 = 3.15 (the front
 # face of the rod). So HOOK_Z = VROD_Z - 3.15 with VROD_Z = -134.8
 # (LEVER_ROD_Z -128.3 -- depth window RE-SOLVED 2026-08-02 for the one-piece
-# top-frame casting (front rail z -93..-131, band y 999.7..1036.2): the
-# thumb-screw head top now stays at 998.7, >= 0.25 (actual 1.0) below the
-# casting underside 999.7 (#4-40 shortened 12 -> 11), so the rail imposes NO
-# depth bound -- pushing the head band past the rail outer face -131 would
-# instead need <= -136.25, beyond the rim-duck floor. Remaining window: the
+# top-frame casting): build_magnifier_assembly derives and asserts the
+# thumb-screw rail clearance from the exact 91882A221 stock reach, so the rail
+# imposes NO depth bound. Pushing the head band past the rail outer face -131
+# would instead go beyond the rim-duck floor. Remaining window: the
 # front column surface -124.7 forces the rod deeper than -127.95, while the
 # wire's rim-duck feasibility caps the hook at ~-137.96 => rod >= -128.31).
 HOOK_Y = 915.05  # FIXTURE_Y0 915.7 - wire r 0.4 - 0.25 (under the collar bottom)
