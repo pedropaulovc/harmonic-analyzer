@@ -112,13 +112,21 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
     assert "screw_spec = HoleSpec(" in source
 
 
+def test_drawing_splits_front_and_rear_blind_tap_tables() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M' in source
+    assert source.count("insert_hole_table(") == 2
+    assert 'starting_hole_tag="B"' in source
+    assert "for station in BLIND_X" in source
+    assert "for station in THROUGH_X" in source
+
+
 def test_platen_guide_blind_taps_keep_drill_depth_and_engagement_distinct() -> None:
     assert guide.LOCK_SCREW_HOLE_DEPTH == pytest.approx(
         guide.LOCK_SCREW_THREAD_ENGAGEMENT + guide.LOCK_SCREW_BOTTOM_CLEARANCE
     )
     assert guide.SCREW_HOLE_DEPTH == pytest.approx(
-        guide.GUIDE_SCREW_THREAD_ENGAGEMENT
-        + guide.GUIDE_SCREW_BOTTOM_CLEARANCE
+        guide.GUIDE_SCREW_THREAD_ENGAGEMENT + guide.GUIDE_SCREW_BOTTOM_CLEARANCE
     )
     assert guide.LOCK_SCREW_BOTTOM_CLEARANCE > 0.0
     assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE > 0.0
