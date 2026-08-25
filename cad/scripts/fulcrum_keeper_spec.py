@@ -11,8 +11,8 @@ The keeper is the black shaft-end bracket of the top-lever fulcrum bank
 (book ch. 17 p. 40 bottom-left closeup; ch. 30 top view + p008): an upright
 round-topped lug sockets a bright steel ball on the fulcrum-shaft end, and
 the bracket's foot is screwed down into the top-frame rail top face with one
-slotted #10-24 cheese-head screw (frame-side-screw, MHA-117) in a
-counterbore. 2 required, one per shaft end (the second is the same part
+slotted #8-32 narrow-fillister screw (frame-side-screw, McMaster 90280A194) in
+a counterbore. 2 required, one per shaft end (the second is the same part
 flipped Ry180 by the assembly).
 
 Part frame: +X = along the shaft, OUTBOARD (toward the near shaft end);
@@ -38,12 +38,12 @@ CROWN_DIA = 14.0  # full-round lug top, concentric with the shaft axis
 BALL_DIA = 9.5  # bright steel ball pressed in the lug's through-socket
 BORE_DIA = 6.5  # shaft clearance bore through the ball (shaft is Ø6.35)
 
-# Screw hole: one #10 clearance drill + cheese-head counterbore in the pad
-# centre. The under-head plane sits at FOOT_H - CBORE_DEPTH.
+# Screw hole: one #8 close-clearance drill + counterbore in the pad centre.
+# The under-head plane sits at FOOT_H - CBORE_DEPTH.
 SCREW_X = -14.75  # pad centre: (-23 + -6.5) / 2
-HOLE_DIA_MM = 5.105  # #10 close-clearance drill (0.201 in)
-CBORE_DIA_MM = 9.5  # seats the MHA-117 slotted cheese head (Ø7 x 3), flush
-CBORE_DEPTH_MM = 3.0
+HOLE_DIA_MM = 4.572  # #8 close-clearance drill (0.180 in)
+CBORE_DIA_MM = 9.5  # retained artefact recess clears the Ø6.858 stock head
+CBORE_DEPTH_MM = 3.9624  # exact McMaster 90280A194 head height
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. The ball/socket/bore stack and the wizard screw hole ship as
@@ -64,9 +64,9 @@ DRAWING_NOTES = "\n".join(
         "   AXIS 25.20 ABOVE THE FOOT SEAT; PRESS A Ø9.50 STEEL",
         "   BALL FLUSH-CENTERED (PROUD 1.75 EACH FACE); REAM THE",
         "   BALL Ø6.50 THRU FOR THE Ø6.35 FULCRUM-SHAFT END.",
-        "3. SCREW HOLE PER CALLOUT: FOR THE #10-24 SLOTTED",
-        "   CHEESE-HEAD FRAME-SIDE SCREW (MHA-117); HEAD SEATS",
-        "   FLUSH IN THE CBORE.",
+        "3. SCREW HOLE PER CALLOUT: FOR THE #8-32 SLOTTED",
+        "NARROW-FILLISTER SCREW (McMASTER 90280A194); HEAD SEATS",
+        "FLUSH IN THE CBORE.",
         "4. UNDERSIDE OUTBOARD OF THE PAD RELIEVED TO 4.80:",
         "   CLEARS THE TOP-FRAME CORNER-BOSS LAND (4.5 PROUD).",
         "5. 2 REQUIRED, ONE PER FULCRUM-SHAFT END (SECOND IS",

@@ -75,13 +75,13 @@ def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
     assert "UNDERSIDE BOSS DIA30 X 8.00" in notes
     assert "DRILL + TAP 1/4-20 UNC-2B THRU RIB TO BORE" in notes_flat
     assert "16X16X2 SPOT POCKET" in notes
-    assert "4X DRILL + TAP #10-24 UNC-2B X 14.00 DEEP" in notes
+    assert "4X DRILL + TAP #8-32 UNC-2B X 14.00 DEEP" in notes
     assert "DIA9.00 X 0.90 SPOT-FACE EACH" in notes
     assert (
         "2X <MOD-DIAM>13.49 (1/2 CLOSE) HANGER-STUD HOLES THRU THE CROSSBAR AT"
         " Z -83.97 / +90.15; POSITION <MOD-DIAM>0.20 A|B|C" in notes_flat
     )
-    assert "2X DRILL + TAP #10-24 UNC-2B X 10.00 DEEP INTO THE WEST RAIL TOP" in notes
+    assert "2X DRILL + TAP #8-32 UNC-2B X 10.00 DEEP INTO THE WEST RAIL TOP" in notes
     assert "FULCRUM-KEEPER FEET" in notes
     assert "ALL BORES Ra 1.6" in notes
     assert "TOP ENDS BROKEN C1.00 X 45 DEG" in notes

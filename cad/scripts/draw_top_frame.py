@@ -9,7 +9,7 @@ The finished envelope is 446.2 x 276.2 x 47.3 over the corner bosses, with a
 window, a 36.5-tall webbed ring band, four Ø52.2 corner bosses bored Ø25.5 to
 clamp the columns, a Ø17 gooseneck bore through the east-rail hub, and an
 integral crossbar carrying two Ø13.49 hanger-stud holes.  The side-facing
-tapped holes (#10-24 side screws and keeper feet, 1/4-20 set screw) stay in
+tapped holes (#8-32 side screws and keeper feet, 1/4-20 set screw) stay in
 the notes.  The sheet runs 1:2; the front elevation drops to 1:4.
 
 Run with SolidWorks open::
