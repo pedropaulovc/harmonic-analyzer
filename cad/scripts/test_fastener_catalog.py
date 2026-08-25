@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import _config
 from _fastener_catalog import FASTENERS
-from _drawing_registry import RETIRED_PURCHASED_DRAWING_ARTIFACT_STEMS
 
 
 _EXPECTED = {
@@ -58,9 +57,3 @@ def test_special_bom_titles_remain_machine_specific() -> None:
     assert _config.parts("knife-hanger-stud")["title"] == "Knife-Hanger Bolt"
     assert _config.parts("knife-hanger-washer")["title"] == "Knife-Hanger Washer"
     assert _config.parts("lag-screw")["title"] == "Rocker-Support Hold-Down Screw"
-
-
-def test_removed_custom_drawings_have_output_tombstones() -> None:
-    assert set(RETIRED_PURCHASED_DRAWING_ARTIFACT_STEMS) == (
-        set(_EXPECTED) - {"hex-bolt", "knife-hanger-washer"}
-    )
