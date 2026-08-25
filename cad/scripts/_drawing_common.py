@@ -2449,6 +2449,7 @@ def insert_hole_table(
     anchor_xy: tuple[float, float],
     basic_locations: bool = True,
     label: str,
+    starting_hole_tag: str = "A",
 ) -> Any:
     """Insert the model-associated TAG/X LOC/Y LOC/SIZE hole table on ``view``.
 
@@ -2460,8 +2461,9 @@ def insert_hole_table(
     whose plan corners are broken (filleted/chamfered) has NO corner vertex to
     anchor: ``datum_axes=(x_axis_edge, y_axis_edge)`` instead selects the two
     datum edges (marks 4/8), and SolidWorks anchors the table origin at their
-    VIRTUAL intersection -- the theoretical sharp corner.  The table lands
-    with its top-left corner at ``anchor_xy`` and is validated before
+    VIRTUAL intersection -- the theoretical sharp corner.  ``starting_hole_tag``
+    lets multiple tables on one sheet use distinct tag families.  The table
+    lands with its top-left corner at ``anchor_xy`` and is validated before
     returning.
     """
     draw = adapter.currentModel
@@ -2523,7 +2525,7 @@ def insert_hole_table(
         anchor_xy[0],
         anchor_xy[1],
         1,  # swBOMConfigurationAnchor_TopLeft
-        "A",
+        starting_hole_tag,
         str(hole_table_template(adapter)),
         1,  # swHoleTableTagOrder_XY
         1,  # swHoleTable_AlphaNumericTags

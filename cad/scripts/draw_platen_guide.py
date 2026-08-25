@@ -39,6 +39,7 @@ from build_platen_guide import GUIDE_LENGTH
 from build_platen_guide import HOLE_X as THROUGH_X
 from build_platen_guide import SCREW_STATION_X as BLIND_X
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
     remove_notes_matching,
@@ -64,12 +65,15 @@ FRONT_LEFT_X_M = FRONT_VIEW_X_M - GUIDE_LENGTH / 2000.0
 FRONT_VIEW_Y_M = 0.110
 FRONT_HOLE_Y_M = 0.1111
 FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
+BACK_VIEW_Y_M = 0.180
+BACK_HOLE_Y_M = BACK_VIEW_Y_M + (FRONT_HOLE_Y_M - FRONT_VIEW_Y_M)
+BACK_BOTTOM_Y_M = BACK_HOLE_Y_M - 0.0025
 # Put datum B's symbol midway between the A3/A4 hole axes, clear of both.
 DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (BLIND_X[2] + BLIND_X[3]) / 2000.0
-# 0.020: the table's left edge lands ~0.3 mm right of its anchor (measured). The
-# bound is the 12.7 mm zone margin (~0.0127) the audit checks, which the
-# re-centred frame rule now matches (~0.0126); 0.020 keeps the edge clear of both.
+# The separate front and rear tables fit above their matching face views.
+# 0.020 also clears the 12.7 mm zone margin enforced by the sheet audit.
 HOLE_TABLE_X_M = 0.020
+REAR_HOLE_TABLE_X_M = 0.205
 HOLE_TABLE_Y_M = 0.258
 THREAD_DESIGNATION = "#4-40 UNC-2B"
 THREAD_MAJOR_DIA_MM = 2.845
@@ -141,17 +145,14 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(
         adapter, str(SOURCE), "*Front", FRONT_VIEW_X_M, FRONT_VIEW_Y_M, scale=(1, 1)
     )
+    back = place_view(
+        adapter, str(SOURCE), "*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M, scale=(1, 1)
+    )
     right = place_view(adapter, str(SOURCE), "*Right", 0.370, 0.110, scale=(1, 1))
-    # The guide drawn isometrically at the 1:1 sheet scale fills most of the
-    # so this view's outline nearly fills the sheet's upper half: at y=0.210 its
-    # top ran 11.2 mm into the 12.7 mm zone band. Dropped to 0.196 (~2.8 mm of
-    # top clearance). It cannot shrink instead -- a view at a scale other than
-    # the sheet's must be labelled, and the only note helpers are property-linked
-    # (this part declares no "Isometric View Note"); nor move left (the hole
-    # table ends at x=0.159) or right (its box already reaches x~0.410 against
-    # the 0.4191 margin).
-    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.285, 0.196, scale=(1, 1))
-    for view in (front, right, iso):
+    # The lock screws now enter blind receivers from the rear.  A rear
+    # orthographic view replaces the decorative isometric so both entry faces
+    # remain directly inspectable and selectable by their native hole tables.
+    for view in (front, back, right):
         set_hidden_lines_removed(adapter, view)
 
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
@@ -180,26 +181,50 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
+    if not auto_center_marks(adapter, back, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to rear view")
 
-    stations = tuple(sorted((*THROUGH_X, *BLIND_X)))
+    for text, x in (
+        ("PLATEN-SIDE #4-40 TAPS", HOLE_TABLE_X_M),
+        ("LOCK-PLATE-SIDE #4-40 TAPS", REAR_HOLE_TABLE_X_M),
+    ):
+        if add_note(adapter, text, x, 0.265) is None:
+            raise RuntimeError(f"failed to add platen-guide table label {text!r}")
+
     insert_hole_table(
         adapter,
         front,
         datum_xy=(FRONT_LEFT_X_M, FRONT_BOTTOM_Y_M),
         hole_points=tuple(
-            (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M) for station in stations
+            (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M) for station in BLIND_X
         ),
         # X LOC = the station from the left face (datum C); Y LOC = the bar's
         # hole-line height above the bottom face, a constant 2.50.
         expected_locations_mm=tuple(
-            (
-                station,
-                (FRONT_HOLE_Y_M - FRONT_BOTTOM_Y_M) * 1000.0,
-            )
-            for station in stations
+            (station, (FRONT_HOLE_Y_M - FRONT_BOTTOM_Y_M) * 1000.0)
+            for station in BLIND_X
         ),
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
-        label="platen-guide",
+        label="platen-guide front",
+    )
+    insert_hole_table(
+        adapter,
+        back,
+        datum_xy=(FRONT_LEFT_X_M + GUIDE_LENGTH / 1000.0, BACK_BOTTOM_Y_M),
+        hole_points=tuple(
+            (
+                FRONT_LEFT_X_M + (GUIDE_LENGTH - station) / 1000.0,
+                BACK_HOLE_Y_M,
+            )
+            for station in THROUGH_X
+        ),
+        expected_locations_mm=tuple(
+            (station, (BACK_HOLE_Y_M - BACK_BOTTOM_Y_M) * 1000.0)
+            for station in THROUGH_X
+        ),
+        anchor_xy=(REAR_HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
+        starting_hole_tag="B",
+        label="platen-guide rear",
     )
 
     # Native datum reference frame and feature controls replace former notes 5-7.
