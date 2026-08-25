@@ -33,23 +33,23 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _common import run_build  # noqa: E402
-from diag_mcmaster_lib import run_replica  # noqa: E402
-from diag_build_90114A511 import build_90114A511  # noqa: E402
-from diag_build_90126A211 import build_90126A211  # noqa: E402
-from diag_build_90280A108 import build_90280A108  # noqa: E402
-from diag_build_90280A194 import build_90280A194  # noqa: E402
-from diag_build_90280A196 import build_90280A196  # noqa: E402
-from diag_build_90280A199 import build_90280A199  # noqa: E402
-from diag_build_90280A201 import build_90280A201  # noqa: E402
-from diag_build_91247A720 import build_91247A720  # noqa: E402
-from diag_build_91410A538 import build_91410A538  # noqa: E402
-from diag_build_91783A722 import build_91783A722  # noqa: E402
-from diag_build_91882A221 import build_91882A221  # noqa: E402
-from diag_build_91882A412 import build_91882A412  # noqa: E402
-from diag_build_92865A585 import build_92865A585  # noqa: E402
-from diag_build_93075A194 import build_93075A194  # noqa: E402
-from diag_build_94025A150 import build_94025A150  # noqa: E402
-from diag_build_99607A213 import build_99607A213  # noqa: E402
+from diagnostics.diag_mcmaster_lib import run_replica  # noqa: E402
+from diagnostics.diag_build_90114A511 import build_90114A511  # noqa: E402
+from diagnostics.diag_build_90126A211 import build_90126A211  # noqa: E402
+from diagnostics.diag_build_90280A108 import build_90280A108  # noqa: E402
+from diagnostics.diag_build_90280A194 import build_90280A194  # noqa: E402
+from diagnostics.diag_build_90280A196 import build_90280A196  # noqa: E402
+from diagnostics.diag_build_90280A199 import build_90280A199  # noqa: E402
+from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
+from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
+from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
+from diagnostics.diag_build_91783A722 import build_91783A722  # noqa: E402
+from diagnostics.diag_build_91882A221 import build_91882A221  # noqa: E402
+from diagnostics.diag_build_91882A412 import build_91882A412  # noqa: E402
+from diagnostics.diag_build_92865A585 import build_92865A585  # noqa: E402
+from diagnostics.diag_build_93075A194 import build_93075A194  # noqa: E402
+from diagnostics.diag_build_94025A150 import build_94025A150  # noqa: E402
+from diagnostics.diag_build_99607A213 import build_99607A213  # noqa: E402
 
 REGISTRY = {
     "90126A211": build_90126A211,

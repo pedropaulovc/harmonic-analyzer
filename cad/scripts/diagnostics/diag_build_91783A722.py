@@ -35,7 +35,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     _spherical_cap_volume,
     insert_helix,
@@ -52,9 +52,9 @@ RH_PITCH = 25.4 / 56.0     # stored 0.453571
 RH_THREAD_LEN = 38.1       # Minimum Thread Length@Sketch1
 
 
-async def build_91783A722(adapter, truth):
+async def build_91783A722(adapter, truth=None):
     from _common import add_line_chain
-    from diag_mcmaster_lib import no_sketch_inference, split_at_plane
+    from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import RevolveParameters
 
     major_r, head_r = RH_MAJOR_R, RH_HEAD_R

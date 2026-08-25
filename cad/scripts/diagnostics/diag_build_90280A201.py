@@ -15,11 +15,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from diag_mcmaster_fillister import build_fillister  # noqa: E402
-from diag_mcmaster_lib import replica_main  # noqa: E402
+from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
+from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 
 
-async def build_90280A201(adapter, truth):
+async def build_90280A201(adapter, truth=None):
     await build_fillister(adapter, "90280A201")
 
 

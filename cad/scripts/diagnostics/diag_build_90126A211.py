@@ -25,7 +25,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import replica_main  # noqa: E402
+from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 
 
 async def _asymmetric_fillet(adapter, edge_points_mm, r1_mm: float,
@@ -71,7 +71,7 @@ W_F2 = 0.173355  # D2@Fillet1 (axial leg)
 W_RHO = 0.65    # Fillet1 conic rho (conic_type=1 in the harvest)
 
 
-async def build_90126A211(adapter, truth):
+async def build_90126A211(adapter, truth=None):
     check("create_sketch annulus", await adapter.create_sketch("Top"))
     await define_circle(adapter, 0.0, 0.0, W_OD / 2.0, "washer OD")
     await define_circle(adapter, 0.0, 0.0, W_ID / 2.0, "washer ID")

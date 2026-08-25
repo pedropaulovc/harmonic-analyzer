@@ -28,7 +28,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     bodies,
     insert_helix,
@@ -64,7 +64,7 @@ SS_CUT_ROOT_W = 0.176389  # P/8
 SS_CUT_CY = SS_HALF + SS_PITCH + 7.0 * SS_PITCH / 16.0  # 7P/16 past the raised start
 
 
-async def build_94025A150(adapter, truth):
+async def build_94025A150(adapter, truth=None):
     from _common import add_line_chain
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 

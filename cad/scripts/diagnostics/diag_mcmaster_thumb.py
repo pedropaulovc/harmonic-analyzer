@@ -31,7 +31,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     bodies,
     insert_helix,
@@ -51,7 +51,7 @@ THUMB_SPECS = {
 
 async def build_thumb_screw(adapter, part_no: str):
     from _common import (add_line_chain, _early_bound, _read_member)
-    from diag_mcmaster_lib import (combine_union, mass_properties,
+    from diagnostics.diag_mcmaster_lib import (combine_union, mass_properties,
                                    no_sketch_inference, split_at_plane)
     from solidworks_mcp.adapters.base import (CircularPatternParameters,
                                               CreateAxisParameters,
