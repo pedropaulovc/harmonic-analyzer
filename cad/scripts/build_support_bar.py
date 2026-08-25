@@ -49,6 +49,7 @@ from _common import (
     volume_check,
 )
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from build_clamp_screw import HEAD_H as CLAMP_HEAD_H
 
 PART_NAME = "support-bar"
 MATERIAL = "Plain Carbon Steel"
@@ -59,11 +60,13 @@ BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
 
 COLUMN_X = 197.0  # frame column line (frame assembly)
 CLAMP_SCREW_DX = 17.5  # clamp screws flank each column
-# The O3.9 clamp-screw shanks pass through #8 clearance holes. Their Ø8 heads
-# are recessed 0.2 below the bar front: the right-shifted platen now travels
-# across the east clamp screw line, so proud heads would block its slide.
+# The stock 90280A201 #8-32 clamp screws pass through #8 clearance holes.
+# Their 3.9624-mm heads are recessed exactly 0.2 below the bar front: the
+# right-shifted platen travels across the east clamp line, so proud heads
+# would block its slide.
+CLAMP_HEAD_RECESS = 0.2
 CLAMP_CBORE_DIA = 8.5
-CLAMP_CBORE_DEPTH = 2.7
+CLAMP_CBORE_DEPTH = CLAMP_HEAD_H + CLAMP_HEAD_RECESS
 CLAMP_HOLE_DIA = 4.978
 CLAMP_HOLE_SPEC = HoleSpec(
     "counterbore_fillister",

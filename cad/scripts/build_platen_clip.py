@@ -9,9 +9,9 @@ Each free half of the spring rail bows shallowly away from the platen and
 returns to the sheet plane at its rounded paper-contact end.
 
 The model is one merged brass body with no added end flange or independent
-motion.  The two existing #4 clearance holes lie only in the 4 mm flat rail.
-The 0.8 mm sheet thickness and 1.5 mm arch rise retain the photo-proportioned
-values from the earlier interpretation while correcting its topology.
+motion. The two #4 clearance holes lie only in the 4 mm flat rail. Integral
+outer-face screw seats consume the stock shank's excess length without
+thickening the 0.8 mm spring sheet or changing its 1.5 mm arch rise.
 
 Used twice in paper-drive.SLDASM.  Length is local +X, total width is local +Y,
 and the flat rail's outward face is local z = 0.  The assembly turns the holder
@@ -49,7 +49,8 @@ from _common import (
     volume_check,
 )
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
-from fillister_screw_spec import HEAD_DIA as CLIP_SCREW_HEAD_DIA
+from build_fillister_screw import HEAD_DIA, SHANK_DIA, SHANK_LEN
+from build_platen import PLATE_THICKNESS, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
@@ -60,11 +61,17 @@ CLIP_LENGTH = (
 CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
 SHEET_T = 0.8  # photo-backed brass sheet thickness
 CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
+# Stock 90114A511 has a 6.35-mm shank; the full 4-mm platen receiver leaves
+# a 2.35-mm under-head stack. Raise only the two flat-rail screw stations.
+SCREW_SEAT_STACK = SHANK_LEN - SOCKET_THREAD_ENGAGEMENT
+SCREW_SEAT_BOSS_H = SCREW_SEAT_STACK - CLIP_THICKNESS
+SCREW_SEAT_RADIAL_MARGIN = 0.2
+SCREW_SEAT_DIA = HEAD_DIA + 2.0 * SCREW_SEAT_RADIAL_MARGIN
 
 SCREW_RAIL_WIDTH = 4.0
 CLIP_SCREW_HEAD_CLEARANCE = 0.05
 NOTCH_WIDTH = (
-    CLIP_SCREW_HEAD_DIA / 2.0
+    SCREW_SEAT_DIA / 2.0
     - SCREW_RAIL_WIDTH / 2.0
     + CLIP_SCREW_HEAD_CLEARANCE
 )
@@ -75,9 +82,8 @@ NOTCH_LENGTH = (CLIP_LENGTH - CENTER_BRIDGE_LENGTH) / 2.0
 SPRING_END_RADIUS = SPRING_RAIL_WIDTH / 2.0
 ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equations
 
-# The brass fillister clip screws retain their existing lengthwise stations.
-# Their transverse station is explicit because the holes belong to the flat
-# rail; the adjacent notch clears each Ø5.5 head before the spring bows outward.
+# The brass fillister screws retain their lengthwise stations in the flat
+# rail. The adjacent notch clears the stock seats as well as the heads.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
 HOLE_Y = SCREW_RAIL_WIDTH / 2.0
 HOLE_DIA = CLEARANCE_MM[("#4", "normal")]
@@ -107,6 +113,7 @@ MODEL_FEATURES = (
     "CenterBridge",
     "SpringArch",
     "RoundedSpringEnds",
+    "ScrewSeats",
     "ScrewHoles",
 )
 BOSS_DRIVES = {
@@ -114,6 +121,7 @@ BOSS_DRIVES = {
     "CenterBridge": ('"SheetT"',),
     "SpringArch": ('"SpringRailW"', '"SpringRailY0"'),
     "RoundedSpringEnds": ('"SheetT"',),
+    "ScrewSeats": ('"ScrewSeatBossH"',),
 }
 
 
@@ -125,8 +133,9 @@ V_SPRING_CORE = (
 # Each full end circle overlaps one half-circle of the flat tangent run, leaving
 # exactly two outer half-circles of additional material.
 V_ROUNDED_ENDS = math.pi * SPRING_END_RADIUS**2 * SHEET_T
-V_HOLES = 2.0 * math.pi * (HOLE_DIA / 2.0) ** 2 * SHEET_T
-V_FINAL = V_FLAT_RAIL + V_CENTER_BRIDGE + V_SPRING_CORE + V_ROUNDED_ENDS - V_HOLES
+V_SCREW_SEATS = 2.0 * math.pi * (SCREW_SEAT_DIA / 2.0) ** 2 * SCREW_SEAT_BOSS_H
+V_HOLES = 2.0 * math.pi * (HOLE_DIA / 2.0) ** 2 * SCREW_SEAT_STACK
+V_FINAL = V_FLAT_RAIL + V_CENTER_BRIDGE + V_SPRING_CORE + V_ROUNDED_ENDS + V_SCREW_SEATS - V_HOLES
 
 if not math.isclose(
     SCREW_RAIL_WIDTH + NOTCH_WIDTH + SPRING_RAIL_WIDTH,
@@ -141,11 +150,11 @@ if not math.isclose(
 if HOLE_Y - HOLE_DIA / 2.0 <= 0.0 or HOLE_Y + HOLE_DIA / 2.0 >= SCREW_RAIL_WIDTH:
     raise AssertionError("platen clip screw holes must stay wholly inside the flat rail")
 if not math.isclose(
-    SPRING_RAIL_Y0 - (HOLE_Y + CLIP_SCREW_HEAD_DIA / 2.0),
+    SPRING_RAIL_Y0 - (HOLE_Y + SCREW_SEAT_DIA / 2.0),
     CLIP_SCREW_HEAD_CLEARANCE,
     abs_tol=1e-9,
 ):
-    raise AssertionError("platen clip notch must clear the fillister screw heads")
+    raise AssertionError("platen clip notch must clear the stock screw seats")
 if _ARCH_RUN <= 0.0 or ARCH_RISE <= 0.0:
     raise AssertionError("platen clip spring arches need positive run and rise")
 
@@ -167,6 +176,15 @@ async def _rect(
     await ensure_fully_defined(adapter, label)
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     name_last_feature(adapter, name)
+
+if SCREW_SEAT_BOSS_H <= 0.0:
+    raise AssertionError("stock fillister screw no longer requires a clip seat boss")
+if abs(SCREW_SEAT_STACK + SOCKET_THREAD_ENGAGEMENT - SHANK_LEN) > 1e-9:
+    raise AssertionError("clip/platen stack no longer finishes at the screw tip")
+if abs(SOCKET_THREAD_ENGAGEMENT - PLATE_THICKNESS) > 1e-9:
+    raise AssertionError("clip screw receiver no longer uses full platen thickness")
+if HOLE_DIA < SHANK_DIA:
+    raise AssertionError("stock fillister shank does not clear the clip")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -194,6 +212,8 @@ async def build(adapter) -> dict[str, str]:
         "ArchRun",
         '(("ClipLength" - "CenterBridgeL") / 2 - 2 * "SpringEndR") / 2',
     )
+    await set_global(adapter, "ScrewSeatDia", f"{SCREW_SEAT_DIA}mm")
+    await set_global(adapter, "ScrewSeatBossH", f"{SCREW_SEAT_BOSS_H}mm")
     await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
     await set_global(adapter, "HoleY", '"ScrewRailW" / 2')
     await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
@@ -385,14 +405,47 @@ async def build(adapter) -> dict[str, str]:
     volume += V_ROUNDED_ENDS
     await volume_check(adapter, "rounded spring ends", volume, 0.005 * volume)
 
-    # One native Hole Wizard #4 clearance feature, two points, both wholly in
-    # the flat rail.  No opening or hole crosses the spring lane.
+    # Integral bosses on the flat rail's OUTER face (local -Z). The widened
+    # notch leaves clearance to the spring lane throughout each seat's depth.
+    seats = SketchDims()
+    check("create_sketch screw seats", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, HOLE_INSET, HOLE_Y, SCREW_SEAT_DIA / 2.0,
+        "left screw seat", dims=seats,
+        names=("LeftSeatX", "LeftSeatY", "LeftSeatDia"),
+        drives=('"HoleInset"', '"HoleY"', '"ScrewSeatDia"'),
+    )
+    await define_circle(
+        adapter, CLIP_LENGTH - HOLE_INSET, HOLE_Y, SCREW_SEAT_DIA / 2.0,
+        "right screw seat", dims=seats,
+        names=("RightSeatX", "RightSeatY", "RightSeatDia"),
+        drives=('"HoleFarX"', '"HoleY"', '"ScrewSeatDia"'),
+    )
+    await ensure_fully_defined(adapter, "screw seat sketch")
+    check("exit_sketch screw seats", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewSeatProfile")
+    drive_jobs += seats.apply(adapter, "ScrewSeatProfile")
+    check(
+        "extrude screw seats",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=SCREW_SEAT_BOSS_H, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "ScrewSeats")
+    seat_dims = name_dimensions(adapter, "ScrewSeats", ["SeatDepth"])
+    drive_jobs += [(seat_dims[0], BOSS_DRIVES["ScrewSeats"][0])]
+    volume += V_SCREW_SEATS
+    await volume_check(adapter, "clip with screw seats", volume, 0.005 * V_FLAT_RAIL)
+
+    # End screw holes: ONE native Hole Wizard #4 clearance feature (2 points)
+    # from the bosses' outer faces at local -Z. The cut passes through each
+    # boss plus the base strip before the shank enters the platen receiver.
     hole_cut = wizard_holes(
         adapter,
         HoleSpec("clearance", "#4"),
         [
-            [HOLE_INSET, HOLE_Y, 0.0],
-            [CLIP_LENGTH - HOLE_INSET, HOLE_Y, 0.0],
+            [HOLE_INSET, HOLE_Y, -SCREW_SEAT_BOSS_H],
+            [CLIP_LENGTH - HOLE_INSET, HOLE_Y, -SCREW_SEAT_BOSS_H],
         ],
         (0.0, 0.0, -1.0),
         "flat-rail screw holes (#4 clearance)",

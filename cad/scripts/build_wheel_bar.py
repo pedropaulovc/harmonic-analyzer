@@ -23,12 +23,11 @@ Holes (all along local Z, the machine front-back axis):
   column +197 - centre +109; ears at +-17.5,
   _clamp_arc.EAR_HOLE_Z): heads on the bar's front face, threading into
   the back arc -- exactly the support-bar stack.
-* 1x O3.8 pen-hanger screw hole at local (-114.5, 0) (machine
-  (-5.5, 575.7) = local + 109)
-  taking the pen-hanger screw from behind the bar. The hole sits in the
-  5-wide strap/bar overlap at the free end (0.6 edge wall to the end
-  face -- thin but photo-consistent: the bar end runs "just past" the
-  hanger).
+* 1x #8 close-clearance pen-hanger screw hole at local (-114.5, 0)
+  (machine (-5.5, 575.7) = local + 109), taking the screw from behind
+  the bar. The centre is 2.5 from the free end; the standard Ø4.572
+  clearance leaves 0.214 mm of real end wall, checked below rather than
+  weakening the selected fastener or its standard fit.
 
 Run (SolidWorks already open)::
 
@@ -55,7 +54,8 @@ from _common import (
     set_global,
     volume_check,
 )
-from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
+from _holes import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm, wizard_holes
+from build_hanger_screw import SHANK_DIA as HANGER_SCREW_DIA
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -69,9 +69,7 @@ from wheel_bar_geom import (
     CLAMP_HOLE_FIT,
     CLAMP_HOLE_SIZE,
     CLAMP_HOLE_X,
-    PEN_HANGER_HOLE_DIA,
     PEN_HANGER_HOLE_FIT,
-    PEN_HANGER_HOLE_SIZE,
     SCREW_HOLE_X,
 )
 from wheel_bar_spec import (
@@ -83,14 +81,24 @@ from wheel_bar_spec import (
 PART_NAME = "wheel-bar"
 MATERIAL = "Plain Carbon Steel"
 
-# Bar section + hole stations live in wheel_bar_geom (imported above).
-# Pen-hanger screw passes through: #6 clearance, CLOSE fit (Ø3.912, the wizard
-# twin of the old Ø3.8 artefact dim; nearest UNC to the screw).
+# Bar section + hole stations live in wheel_bar_geom (imported above). The
+# selected hanger screw is #8-32, so the bar uses the exact #8 close-clearance
+# Hole Wizard size.
+PEN_HANGER_HOLE_SIZE = "#8"
+PEN_HANGER_HOLE_DIA = CLEARANCE_MM[(PEN_HANGER_HOLE_SIZE, PEN_HANGER_HOLE_FIT)]
 SCREW_HOLE_SPEC = HoleSpec(
     "clearance", PEN_HANGER_HOLE_SIZE, fit=PEN_HANGER_HOLE_FIT
 )
-# The Ø3.9 clamp-screw shanks pass through: #8 clearance (support-bar idiom).
+# The clamp-screw shanks pass through #8 normal-clearance holes.
 CLAMP_HOLE_SPEC = HoleSpec("clearance", CLAMP_HOLE_SIZE, fit=CLAMP_HOLE_FIT)
+PEN_HANGER_DIAMETRAL_CLEARANCE = PEN_HANGER_HOLE_DIA - HANGER_SCREW_DIA
+if PEN_HANGER_DIAMETRAL_CLEARANCE <= 0.0:
+    raise AssertionError("standard #8 hanger clearance binds on the stock screw")
+PEN_HANGER_END_WALL = (
+    BAR_LENGTH / 2.0 - abs(SCREW_HOLE_X) - PEN_HANGER_HOLE_DIA / 2.0
+)
+if PEN_HANGER_END_WALL <= 0.0:
+    raise AssertionError("standard #8 hanger clearance breaks through the bar end")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -142,8 +150,8 @@ async def build(adapter) -> dict[str, str]:
 
     # All bores drilled through along Z from the bar FRONT face (local
     # z = -BAR_DEPTH/2, the heads' side), while the bar is a plain prism:
-    # ONE pen-hanger #6 clearance hole + ONE 2-instance #8 clearance clamp
-    # feature (the support-bar stack: heads on the bar front face, shanks
+    # ONE pen-hanger #8 close-clearance hole + ONE 2-instance #8 normal-clearance
+    # clamp feature (the support-bar stack: heads on the bar front face, shanks
     # through the bar + front arc, threading into the back arc). Positions are
     # the photo layout.
     front_z = -BAR_DEPTH / 2.0
@@ -152,7 +160,7 @@ async def build(adapter) -> dict[str, str]:
     screw_cut = wizard_holes(
         adapter, SCREW_HOLE_SPEC,
         [[SCREW_HOLE_X, 0.0, front_z]],
-        (0.0, 0.0, -1.0), "pen-hanger screw hole (#6 clearance)", name="ScrewHole",
+        (0.0, 0.0, -1.0), "pen-hanger screw hole (#8 clearance)", name="ScrewHole",
         expect_dia_mm=PEN_HANGER_HOLE_DIA,
         placement_dims=[(("ScrewHoleCx", '-"ScrewHoleX"'), (None, None))],
     )

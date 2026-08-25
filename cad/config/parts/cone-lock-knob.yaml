@@ -1,9 +1,13 @@
 cone-lock-knob:
+  title: Steel Raised Knurled-Head Thumb Screw
   number: MHA-093
+  stock_name: Steel Raised Knurled-Head Thumb Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91882A412]
   material: Plain Carbon Steel
-  material_specification: AISI 12L14 free-machining steel bar
-  finish: turned and polished, chrome plated
+  material_specification: Steel, McMaster-Carr 91882A412
+  finish: as supplied
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel, chrome plated)"
+  process: purchased

@@ -84,9 +84,20 @@ from cone_pivot_post_installation import (
     POST_X_SHIFT,
     POST_Z_SHIFT,
 )
-from cone_pivot_screw_spec import (
+from build_cone_pivot_screw import (
     THREAD as PIVOT_THREAD,
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
+)
+from build_cone_lock_knob import (
+    COLLAR_DIA as LOCK_COLLAR_DIA,
+    STUD_LEN as LOCK_STUD_LEN,
+    THREAD as LOCK_THREAD,
+)
+from build_cone_swing_platform import PLATE_T, swing_hardware_geometry
+from build_swing_stop_screw import (
+    EMBED_LEN as STOP_EMBED_LEN,
+    SHANK_DIA as STOP_SHANK_DIA,
+    THREAD as STOP_THREAD,
 )
 from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 
@@ -105,10 +116,11 @@ IN = 25.4
 # base unrotated at the origin).  The support contract transforms its unchanged
 # four-hole foot pattern through the +90-degree installation and the v2 rear
 # shift.  Base, support, and frame therefore cannot carry three drifting copies.
-HOLE_DIA = 13.0  # 9/16 lag-screw shank O12 clearance
+HOLE_DIA = 13.0  # Ø12.7 stock lag-screw shank clearance
 HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
-CBORE_DIA = 23.0  # lag head O22, recessed
-CBORE_DEPTH = 6.5  # lag head 22 x 6 recessed 0.5
+CBORE_DIA = 23.0  # Ø20.6502 stock lag head clearance
+LAG_COUNTERBORE_DEPTH = 9.517  # 9.017 stock head height + 0.5 recess
+CBORE_DEPTH = LAG_COUNTERBORE_DEPTH
 CBORE_XZ = HOLE_XZ  # all four heads counterbored
 
 # Edge finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes).
@@ -160,49 +172,41 @@ SERIAL_DXF = REFERENCES_DIR / "base-serial.dxf"
 SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph area)
 RIM_OVERLAP = 1.0  # the ring starts this far below the pad top so it merges
 
-# Cone swing hardware, blind from the TOP face. MACHINE-handed part coords,
-# and since #151 the drive-train derivation is machine-handed too, so the
-# assembly asserts agreement DIRECTLY: pivot = cone_station(PIVOT_STATION).x
-# (build_cone_pivot_screw), stop = disengaged east plate edge - shank radius
-# (build_swing_stop_screw). (Pre-#151 the drive-train derived in the mirrored
-# frame and these holes matched its NEGATED x -- the sign was interference-
-# gate proven: holes at the wrong x left both screws in solid base, 190.0 +
-# 75.4 mm^3, exactly the two embedded shank volumes.)
+# Cone swing hardware, blind from the TOP face. MACHINE-handed part coords.
+# The platform recipe owns the shared lock/stop contact calculation; the base
+# supplies its installed pivot station and exact purchased-hardware diameters.
 _FORMER_PIVOT_SCREW_XZ = (-89.16663981674521, 60.60437088764276)
 PIVOT_SCREW_XZ = (
     _FORMER_PIVOT_SCREW_XZ[0] + POST_X_SHIFT,
     _FORMER_PIVOT_SCREW_XZ[1] + POST_Z_SHIFT,
 )
-# pivot seat: blind #10-24 UNC-2B tap.  The screw's ground shoulder stops on
-# the base top; only its distinct threaded tail enters this seat.
-_FORMER_STOP_SCREW_XZ = (-141.14905420183916, -33.08089452405298)
-STOP_SCREW_XZ = (
-    _FORMER_STOP_SCREW_XZ[0] + POST_X_SHIFT,
-    _FORMER_STOP_SCREW_XZ[1] + POST_Z_SHIFT,
+SWING_HARDWARE_GEOMETRY = swing_hardware_geometry(
+    PIVOT_SCREW_XZ,
+    lock_collar_dia=LOCK_COLLAR_DIA,
+    stop_shank_dia=STOP_SHANK_DIA,
 )
-# Past the DISENGAGED east taper edge, one O3.15 stop-shank radius outward.
-# The v2-post cascade lengthened/widened the platform to 266 / east-half 24,
-# which changes BOTH contributors in the drive-train derivation: the shallower
-# west taper and outward lock seat shorten notch exit travel to 1.977850,
-# hence disengage to 3.871203 deg, while the contact line at local z -105 has
-# east half-width 17.052632.  The exact formula is reproduced by the offline
-# base drawing test and guards the engaged-pose clearance.
-# Disengage swing sweeps the plate EAST (machine -x); the first
-# derivation sat 19 inside the engaged plate -- interference-gate proven.
-# stop seat: #20 drill (O4.089, wizard) -- stop-screw O3.15 shank clearance
+LOCK_KNOB_XZ = SWING_HARDWARE_GEOMETRY.lock_xz
+STOP_SCREW_XZ = SWING_HARDWARE_GEOMETRY.stop_xz
+
+# Blind #10-24 UNC-2B pivot tap: only the distinct threaded tail enters.
 PIVOT_THREAD_BOTTOM_CLEARANCE = 2.0
 PIVOT_HOLE_DEPTH = PIVOT_THREAD_ENGAGEMENT + PIVOT_THREAD_BOTTOM_CLEARANCE
-STOP_SCREW_HOLE_DEPTH = 6.0
+
+# The lock stud passes through the 6.35-mm platform and uses the extra stock
+# length in a real 1/4-20 base seat, with 0.25 mm below the installed tip.
+LOCK_STUD_ENGAGEMENT = LOCK_STUD_LEN - PLATE_T
+LOCK_STUD_BOTTOM_CLEARANCE = 0.25
+LOCK_SCREW_HOLE_DEPTH = LOCK_STUD_ENGAGEMENT + LOCK_STUD_BOTTOM_CLEARANCE
+LOCK_SCREW_DRILL_DEPTH = 4.0
+
+# The stock stop wrapper retains exactly 6 mm embedded in its #8-32 seat.
+STOP_SCREW_HOLE_DEPTH = STOP_EMBED_LEN
 STOP_SCREW_DRILL_DEPTH = 9.0
 
-# Alignment-pinion rig hold-downs (PR7 items 2/11/12), blind from the TOP face
-# like the swing hardware and in the SAME machine-handed convention: four
-# Ø4.2 holes under the two pivot blocks' bright slotted screws
-# (build_pinion_pivot_block SCREW_* stations: block x -5.863 +/- 13.5 (2026-09
-# short-strap rig, the blocks right under the drum), hole
-# z = block z0 + depth/2 -- asserted directly at drive-train import) and two
-# Ø3.2 holes under the black foot screws (build_foot_screw): the spring foot
-# and the arbor-pedestal flange.
+# Alignment-pinion rig hold-downs, blind from the TOP face in the same
+# machine-handed convention: four #8-32 seats under the two pivot blocks
+# (2026-09 short-strap rig, the blocks right under the drum) and three #4-40
+# seats under the spring foot and both arbor-pedestal flanges.
 _FORMER_BLOCK_SCREW_XZ = (
     (-13.669764612476252, -98.0),  # front block, east screw
     (13.33023538752375, -98.0),  # front block, west screw
@@ -212,9 +216,9 @@ _FORMER_BLOCK_SCREW_XZ = (
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
 )
-# block seats: #8-32 tap drill -- the slotted screws thread into the base
-BLOCK_SCREW_HOLE_DEPTH = 3.5  # 22 shank - 18.75 block = 3.25 buried + 0.25 air
-BLOCK_SCREW_DRILL_DEPTH = 7.0
+# Stock 25.4-mm slotted screws penetrate 6.65 mm below each 18.75-mm block.
+BLOCK_SCREW_HOLE_DEPTH = 6.9  # stock engagement + 0.25 bottom clearance
+BLOCK_SCREW_DRILL_DEPTH = 10.0
 _FORMER_FOOT_SCREW_XZ = (
     (13.179270253802283, 70.95),  # spring foot: 28 reach keeps its screw head
     # clear of the unchanged rocker-arm-support casting after the rig recenter
@@ -225,8 +229,8 @@ _FORMER_FOOT_SCREW_XZ = (
 FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
-# foot seats: #4-40 tap drill -- the foot screws thread into the base
-FOOT_SCREW_HOLE_DEPTH = 7.7  # 8.0 shank under the 0.8 spring strip + air
+# The stock 9.525-mm foot screw penetrates 8.725 mm below the 0.8-mm spring.
+FOOT_SCREW_HOLE_DEPTH = 8.975  # stock engagement + 0.25 bottom clearance
 FOOT_SCREW_DRILL_DEPTH = 11.0
 
 # Maker's nameplate seats (2026-09-02 ch26 p.71 re-derive: four brass slotted
@@ -241,10 +245,9 @@ FOOT_SCREW_DRILL_DEPTH = 11.0
 # deck (its back face at STACK_HEIGHT, gap 0 -- asserted below), so each
 # screw axis runs -Y straight from the plate's front face into the deck.
 NAMEPLATE_SCREW_XZ = nameplate_spec.MOUNT_HOLE_XZ
-# nameplate seats: #4-40 tap drill -- the shared brass fillister-screw (4.0
-# shank, Ø2.0 modelled minor) threads in through the 1.5 plate: 2.5 buried +
-# 3.5 spare in a 6.0 thread, drill 3.0 deeper for the tap's runout (the
-# STOP seat's 6.0/9.0 split).
+# The stock brass fillister's 6.35-mm shank passes through the 1.5-mm plate,
+# engaging 4.85 mm of the existing 6.0-mm #4-40 thread. The drill extends
+# 3.0 mm deeper for the tap's runout.
 NAMEPLATE_SCREW_HOLE_DEPTH = 6.0
 NAMEPLATE_SCREW_DRILL_DEPTH = 9.0
 if abs(nameplate_spec.MOUNT_BACK_Y - STACK_HEIGHT) > 1e-9:
@@ -276,10 +279,9 @@ if NAMEPLATE_RIM_CLEARANCE < 1.0:
         f"only {NAMEPLATE_RIM_CLEARANCE:.2f} (need >= 1.0)"
     )
 
-# The four seat specs, hoisted to module level so the drive-train assembly can
-# import the TRUE wizard cut diameters for its clearance assertions (the old
-# hand-authored *_HOLE_DIA constants are derived from the specs now -- one
-# chokepoint, no drift).
+# Native tapped seats. Physical thread compatibility is carried by each named
+# HoleSpec designation; tap-drill diameters remain manufacturing geometry and
+# are not compared to purchased fasteners' major-diameter solids.
 PIVOT_SEAT_SPEC = HoleSpec(
     "tapped",
     PIVOT_THREAD,
@@ -287,11 +289,20 @@ PIVOT_SEAT_SPEC = HoleSpec(
     depth_mm=PIVOT_HOLE_DEPTH,
     thread_class="2B",
 )
+LOCK_SEAT_SPEC = HoleSpec(
+    "tapped",
+    LOCK_THREAD,
+    end="blind",
+    depth_mm=LOCK_SCREW_DRILL_DEPTH,
+    thread_class="2B",
+    overrides_mm={"ThreadDepth": LOCK_SCREW_HOLE_DEPTH},
+)
 STOP_SEAT_SPEC = HoleSpec(
     "tapped",
-    "#8-32",
+    STOP_THREAD,
     end="blind",
     depth_mm=STOP_SCREW_DRILL_DEPTH,
+    thread_class="2B",
     overrides_mm={"ThreadDepth": STOP_SCREW_HOLE_DEPTH},
 )
 BLOCK_SEAT_SPEC = HoleSpec(
@@ -299,6 +310,7 @@ BLOCK_SEAT_SPEC = HoleSpec(
     "#8-32",
     end="blind",
     depth_mm=BLOCK_SCREW_DRILL_DEPTH,
+    thread_class="2B",
     overrides_mm={"ThreadDepth": BLOCK_SCREW_HOLE_DEPTH},
 )
 FOOT_SEAT_SPEC = HoleSpec(
@@ -306,6 +318,7 @@ FOOT_SEAT_SPEC = HoleSpec(
     "#4-40",
     end="blind",
     depth_mm=FOOT_SCREW_DRILL_DEPTH,
+    thread_class="2B",
     overrides_mm={"ThreadDepth": FOOT_SCREW_HOLE_DEPTH},
 )
 NAMEPLATE_SEAT_SPEC = HoleSpec(
@@ -313,13 +326,15 @@ NAMEPLATE_SEAT_SPEC = HoleSpec(
     "#4-40",
     end="blind",
     depth_mm=NAMEPLATE_SCREW_DRILL_DEPTH,
+    thread_class="2B",
     overrides_mm={"ThreadDepth": NAMEPLATE_SCREW_HOLE_DEPTH},
 )
-PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)  # 3.797 tap drill
-STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)  # #8-32 tap drill
-BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)  # #8-32 tap drill
-FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)  # #4-40 tap drill
-NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)  # #4-40 tap drill
+PIVOT_SCREW_HOLE_DIA = blind_cut_dia_mm(PIVOT_SEAT_SPEC)
+LOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(LOCK_SEAT_SPEC)
+STOP_SCREW_HOLE_DIA = blind_cut_dia_mm(STOP_SEAT_SPEC)
+BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)
+FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)
+NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)
 
 MM3_PER_IN3 = IN**3
 
@@ -575,21 +590,27 @@ async def build(adapter) -> dict[str, str]:
             f"fastener holes removed {pre_holes - after:.1f}, expected {v_holes:.1f}"
         )
 
-    # Cone swing hardware + alignment-pinion rig seats + nameplate seats: native
-    # Hole Wizard blind holes from the top face. The pivot, stop, block, foot
-    # and nameplate screws all thread into their matching tapped base seats; the
-    # platform itself swings on the pivot screw's shoulder. A wizard blind hole
-    # ends in a 118-degree drill point, so the analytic expectation is
-    # blind_hole_volume_mm3 (cylinder + point). The nameplate seats are cut
-    # from the same deck face the plate lies on (NAMEPLATE_SCREW_XZ derivation
-    # above) -- before the rim, which would otherwise be the +Y face at the
-    # pad outline and confuse the face walk.
+    # Cone swing hardware + alignment-pinion rig seats + nameplate seats:
+    # native Hole Wizard blind holes from the top face. The pivot, lock,
+    # stop, block, foot, and nameplate screws thread into their named tapped
+    # seats; the platform swings on the pivot screw's shoulder. A blind wizard
+    # hole ends in a 118-degree drill point, so the analytic expectation
+    # includes cylinder plus point. The nameplate seats are cut from the same
+    # deck face the plate lies on (NAMEPLATE_SCREW_XZ derivation above), before
+    # the rim would become the +Y face at the pad outline and confuse the
+    # face walk.
     for tag, spec, xz, label in (
         (
             "PivotSeat",
             PIVOT_SEAT_SPEC,
             (PIVOT_SCREW_XZ,),
             f"cone-pivot screw tapped seat ({PIVOT_THREAD} UNC-2B)",
+        ),
+        (
+            "LockSeat",
+            LOCK_SEAT_SPEC,
+            (LOCK_KNOB_XZ,),
+            f"cone-lock knob tapped seat ({LOCK_THREAD} UNC-2B)",
         ),
         (
             "StopSeat",

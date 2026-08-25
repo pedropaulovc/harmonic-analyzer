@@ -88,13 +88,11 @@ MATERIAL = "Gray Cast Iron"  # black japanned casting (t00393)
 #
 # STRAP_T: band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8.
 # Keeps the arbor's 7.5 engagement from the north face; the -Z flange carries
-# the screw. Foot-screw shank O2.9 pass-through (build_foot_screw, the flange
-# hold-down; its 8.0 shank reaches 3.0 into the base past this 5.0 flange):
-# #4 clearance NORMAL fit (Ø3.264 = 0.1285 in, the seat wizard-table value).
+# #4 normal-clearance pass-through for the exact Ø2.8448 x 9.525 stock
+# foot screw. Its 4.525-mm pedestal engagement enters the base past this
+# 5.0-mm flange.
 SCREW_HOLE_SPEC = HoleSpec("clearance", SCREW_THREAD)
-SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.264, the seat-proven cut (see the
-# spec's pin rationale); the post-create assert below keeps model, note and
-# drive-train assembly's foot-screw clearance assert (build_drive_train_assembly)
+SCREW_HOLE_DIA = SCREW_CLEARANCE_DIA  # 3.264, resolver-pinned normal fit
 SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
 
 BORE_RADIUS = BORE_DIA / 2.0

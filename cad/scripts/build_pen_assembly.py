@@ -87,11 +87,18 @@ from _assembly import (
     write_dof_manifest,
 )
 from _transforms import IDENTITY, euler_from_rows, rot_z_rows
+from build_hanger_screw import SHANK_LEN as HANGER_SHANK_LEN
+from build_magnifier_assembly import BAR_BACK_Z, WHEEL_BAR_Y, WHEEL_MID_Z
+from build_pen_hanger import STRAP_Z as HANGER_STRAP_Z
+from build_pen_set_screw import HEAD_STACK_LEN as PEN_SET_HEAD_STACK_LEN
+from build_pen_set_screw import SHANK_LEN as PEN_SET_SHANK_LEN
+from build_pen_set_screw import SHANK_DIA as PEN_SET_SHANK_DIA
+from build_pen_set_screw import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
+from magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
 
 ASM_NAME = "pen"
 
 # --- machine anchors ---------------------------------------------------------
-WHEEL_BAR_Y = 575.7  # the wheel-bar the pen-hanger clamps (magnifier.SLDASM)
 PAPER_FRONT_Z = -143.4  # recording paper front face (build_paper_drive_assembly:
 # platen front -142.9, the sheet planted 0.5 proud)
 CLEARANCE = 0.25  # interference-gate margin convention
@@ -134,7 +141,6 @@ from build_pen_frame import (  # noqa: E402
     RAIL_END,
     RAIL_SIDE,
 )
-from pen_set_screw_spec import KNOB_LENGTH, SHANK_LEN  # noqa: E402
 
 BLOCK_YAW_DEG = 45.0  # v4_t00603: the nib meets the paper at 45 degrees
 _C = math.cos(math.radians(BLOCK_YAW_DEG))
@@ -219,17 +225,21 @@ _FRAME_ORIGIN_LOCAL = (
 FRAME_POS = _block_to_machine(_FRAME_ORIGIN_LOCAL)
 FRAME_ROWS = [[_C, 0.0, _S], [0.0, 1.0, 0.0], [-_S, 0.0, _C]]  # yaw -45
 FRAME_ROT = euler_from_rows(FRAME_ROWS)
-# Thumb screw (build_pen_set_screw: axis +X from the knob's outer face at x 0,
-# knob 0..KNOB_LENGTH, shank to KNOB_LENGTH + SHANK_LEN): stood on end (+X ->
-# +Y) on the frame's screw axis, its tip CLEARANCE under the marker barrel.
+# Stock thumb screw: local +X runs from the outer head face through the
+# head/shoulder stack and shank. Turn +X upward on the frame's screw axis;
+# its flat tip is tangent to the underside of the centred marker barrel.
 SET_SCREW_ROWS = rot_z_rows(90.0)  # X -> +Y
 SET_SCREW_ROT = euler_from_rows(SET_SCREW_ROWS)
 _MARKER_BOTTOM_LOCAL_Y = MARKER_AXIS_LOCAL_Y - BARREL_DIA / 2.0
-_SCREW_TIP_LOCAL_Y = _MARKER_BOTTOM_LOCAL_Y - CLEARANCE
+_SCREW_TIP_LOCAL_Y = _MARKER_BOTTOM_LOCAL_Y
+PEN_SET_OVERALL_REACH = PEN_SET_HEAD_STACK_LEN + PEN_SET_SHANK_LEN
+PEN_SET_TIP_RADIUS = PEN_SET_SHANK_DIA / 2.0 - PEN_SET_TIP_CHAMFER
+if PEN_SET_TIP_RADIUS <= 0.0:
+    raise AssertionError("pen-set stock tip chamfer consumes its tip face")
 SET_SCREW_POS = _block_to_machine(
-    (FRAME_X_CENTER_LOCAL, _SCREW_TIP_LOCAL_Y - KNOB_LENGTH - SHANK_LEN, BLOCK_DEPTH / 2.0)
+    (FRAME_X_CENTER_LOCAL, _SCREW_TIP_LOCAL_Y - PEN_SET_OVERALL_REACH, BLOCK_DEPTH / 2.0)
 )
-assert _SCREW_TIP_LOCAL_Y - KNOB_LENGTH - SHANK_LEN + KNOB_LENGTH < _FRAME_ORIGIN_LOCAL[1], (
+assert _SCREW_TIP_LOCAL_Y - PEN_SET_SHANK_LEN < _FRAME_ORIGIN_LOCAL[1], (
     "the knob must stand below the stirrup's bottom rail"
 )
 
@@ -257,12 +267,19 @@ assert math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9
 )
 
 # --- M6.10 fastener ----------------------------------------------------------
-# Pen-hanger screw from BEHIND the bar (the wheel rim passes 1.0 in front
-# of the strap, so no front-side head fits): AF-7 head on the bar back
-# face (-129.9 -- the 9-deep support-bar stock seated on the clamp arc,
-# build_magnifier_assembly BAR_BACK_Z), O3.5 shank through the bar + strap
-# holes, tip 0.5 behind the strap front face (-141.9).
-HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, -129.9)
+# Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
+# wheel-bar back face; the exact stock shank passes through the 9 mm bar and
+# 3 mm strap, then retains clearance to the magnifying-wheel rim.
+HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, BAR_BACK_Z)
+HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
+HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
+WHEEL_RIM_BACK_Z = WHEEL_MID_Z + WHEEL_RIM_AXIAL / 2.0
+HANGER_THREAD_PROTRUSION = HANGER_STRAP_FRONT_Z - HANGER_SCREW_TIP_Z
+HANGER_TIP_TO_RIM = HANGER_SCREW_TIP_Z - WHEEL_RIM_BACK_Z
+if HANGER_THREAD_PROTRUSION <= 0.0:
+    raise AssertionError("stock hanger screw does not pass through the tapped strap")
+if HANGER_TIP_TO_RIM <= 0.0:
+    raise AssertionError("stock hanger screw tip reaches the magnifying-wheel rim")
 
 
 async def build(adapter) -> dict[str, str]:

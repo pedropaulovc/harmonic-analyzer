@@ -69,18 +69,44 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
     assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 0.79375))
     assert cone_gear_shaft_spec.FRONT_STUB == pytest.approx(61.9068609979)
+    assert cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
+        147.27232594770454
+    )
+    assert cone_gear_shaft_spec.ADJUSTER_EMBED == pytest.approx(6.0)
+    assert cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION == pytest.approx(
+        141.27232594770454
+    )
+    assert cone_gear_shaft_spec.MCM_94025A150_CUP_DEPTH == pytest.approx(1.98755)
+    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(
+        143.25987594770454
+    )
     assert cone_gear_shaft_spec.SHAFT_LENGTH == (
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
-    # The fixed journal/tip endpoints stay put while the three gear-seat
-    # shoulders follow the recentered stack along the shaft.
+    # The journal and all preceding gear-seat endpoints stay put; only the
+    # terminal 1/32-in endpoint follows the stock cup apex.
     stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
-    assert ends[1:] == pytest.approx(
+    assert ends[1:-1] == pytest.approx(
         tuple(
             old_end + stub_delta + cone_gear_shaft_spec.GEAR_AXIS_SHIFT
             for old_end in (154.2, 161.1, 168.0)
         )
-        + (cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION,)
+    )
+    assert ends[-1] == pytest.approx(
+        cone_gear_shaft_spec.FRONT_STUB + 143.25987594770454
+    )
+    # The shortened terminal stub still supports the entire 4 mm bushing.
+    assert cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
+        122.5853574197016
+    )
+    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(20.6745185280)
+    assert (
+        cone_gear_shaft_spec.TIP_STUB_START_STATION
+        <= cone_gear_shaft_spec.TIP_BUSHING_START_STATION
+    )
+    assert (
+        cone_gear_shaft_spec.TIP_BUSHING_END_STATION
+        <= cone_gear_shaft_spec.T006_TIP_STATION
     )
     # Every seat diameter carries the snug fit as a NATIVE model tolerance --
     # see test_section_fits_are_toleranced_on_the_model. Display precision stays

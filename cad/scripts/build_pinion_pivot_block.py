@@ -52,7 +52,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
-from _holes import NUMBER_DRILL_MM, HoleSpec, wizard_holes
+from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_block_spec import (
@@ -82,13 +82,11 @@ _SAVED_DRAWING_PROPERTIES = (
     "Isometric View Note",
 )
 
-# Slotted-screw shank pass-throughs (PR7: the p.69 close-up's two bright
-# hold-down heads per block): #19 drill (Ø4.216) -- the wizard twin of the old
-# Ø4.2, matching the base's own #19 slotted-screw seats (build_harmonic_base
-# BlockScrewHoles) exactly.
-SCREW_HOLE_SPEC = HoleSpec("drilled_number", "#19")
-SCREW_HOLE_DIA = NUMBER_DRILL_MM[SCREW_HOLE_SPEC.size]  # 4.216; re-exposed for
-# the drive-train assembly's block-screw clearance assert
+# Slotted-screw pass-throughs use the established normal #8 clearance fit for
+# the exact Ø4.1656 stock major diameter. The base receivers remain separate
+# native #8-32 tapped seats.
+SCREW_HOLE_SPEC = HoleSpec("clearance", "#8")
+SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -108,8 +106,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreHalfSpacing", f"{BORE_HALF_SPACING}mm")
     await set_global(adapter, "LiftBoreRise", f"{LIFT_BORE_RISE}mm")
     await set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
-    # (The old ScrewHoleDia/ScrewHalfSpacing knobs are gone: the two hold-down
-    # holes are now a native Hole Wizard #19 feature at literal stations.)
+    # Hole diameter is owned by the native #8 normal-clearance HoleSpec; only
+    # the two placement stations remain editable globals.
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -176,13 +174,11 @@ async def build(adapter) -> dict[str, str]:
     expected = area * BLOCK_DEPTH
     await volume_check(adapter, "block", expected, 0.005 * expected)
 
-    # Two vertical slotted-screw hold-down holes (PR7): ONE native Hole Wizard
-    # #19 feature (2 through-all instances) along Y at (x +-SCREW_HALF_SPACING,
-    # z mid-depth), drilled from the block bottom (y = -BORE_UP) while the block
-    # is still prismatic (the two Z-bores exit the front/back faces, leaving the
-    # bottom face a clean rectangle). Top-sketch (u,v)->(X,-Z), so the sketch v
-    # -BLOCK_DEPTH/2 is model z = +BLOCK_DEPTH/2 -- the mid-depth line.
-    screw_dia = NUMBER_DRILL_MM[SCREW_HOLE_SPEC.size]
+    # Two vertical slotted-screw hold-down holes: ONE native normal-fit #8
+    # clearance feature (2 through-all instances), drilled from the block
+    # bottom while the block is still prismatic. Top-sketch (u,v)->(X,-Z), so
+    # sketch v -BLOCK_DEPTH/2 is model z = +BLOCK_DEPTH/2.
+    screw_dia = SCREW_HOLE_DIA
     screw_cut = wizard_holes(
         adapter,
         SCREW_HOLE_SPEC,
@@ -191,7 +187,7 @@ async def build(adapter) -> dict[str, str]:
             [-SCREW_HALF_SPACING, -BORE_UP, BLOCK_DEPTH / 2.0],
         ],
         (0.0, -1.0, 0.0),
-        "hold-down screw holes (#19)",
+        "hold-down screw holes (#8 normal clearance)",
         name="ScrewHoles",
         placement_dims=[
             (("ScrewEastX", '"ScrewHalfSpacing"'), ("ScrewEastZ", '"BlockDepth" / 2')),

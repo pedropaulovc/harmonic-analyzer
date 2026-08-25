@@ -1,21 +1,21 @@
-r"""Purchased bracket screw: McMaster 90280A194 in the assembly local frame."""
+r"""Purchased knife-hanger washer: McMaster 90126A211."""
 
 from __future__ import annotations
 
 import sys
-from math import pi
 
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_90280A194 import build_90280A194
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from diagnostics.diag_build_90126A211 import W_ID, W_OD, W_T, build_90126A211
 
-PART_NAME = "bracket-screw"
+PART_NAME = "knife-hanger-washer"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, _PITCH = FILLISTER_SIZES["90280A194"]
+OUTER_DIA = W_OD
+INNER_DIA = W_ID
+THICKNESS = W_T
 
 
 async def build(adapter) -> dict[str, str]:
@@ -24,9 +24,9 @@ async def build(adapter) -> dict[str, str]:
         part_name=PART_NAME,
         components=(
             StockComponent(
-                sku="90280A194",
-                author=build_90280A194,
-                transform=RigidTransform(rotation_radians=(-pi / 2.0, 0.0, 0.0)),
+                sku="90126A211",
+                author=build_90126A211,
+                transform=RigidTransform(),
             ),
         ),
         material=MATERIAL,
