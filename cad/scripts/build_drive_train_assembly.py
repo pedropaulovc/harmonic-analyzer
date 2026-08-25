@@ -572,6 +572,7 @@ from build_cone_swing_platform import (  # noqa: E402
 )
 from build_cone_lock_knob import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
+    WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
     STUD_DIA as KNOB_STUD_DIA,
     STUD_LEN as KNOB_STUD_LEN,
     THREAD as KNOB_THREAD,
