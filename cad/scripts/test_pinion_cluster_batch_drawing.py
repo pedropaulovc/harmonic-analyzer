@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -214,7 +215,7 @@ def _annulus_limit(major_d: float, tap_d: float, length: float) -> float:
 
 def _expected_numbered_pairs(
     first_stem: str,
-    numbers: range,
+    numbers: Iterable[int],
     second_stem: str,
     major_d: float,
     tap_d: float,
@@ -303,6 +304,7 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
                 4.1656,
                 3.454,
                 9.0124,
+                second_number=2,
             ),
             **_expected_numbered_pairs(
                 "clamp-screw",
@@ -311,7 +313,6 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
                 4.1656,
                 3.454,
                 9.0124,
-                second_number=2,
             ),
             **_expected_numbered_pairs(
                 "fillister-screw",
@@ -323,7 +324,7 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
             ),
             **_expected_numbered_pairs(
                 "fillister-screw",
-                range(5, 10),
+                range(5, 15, 2),
                 "platen-guide",
                 2.8448,
                 2.261,
@@ -331,7 +332,7 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
             ),
             **_expected_numbered_pairs(
                 "fillister-screw",
-                range(10, 15),
+                range(6, 15, 2),
                 "platen-guide",
                 2.8448,
                 2.261,
@@ -340,7 +341,7 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
             ),
             **_expected_numbered_pairs(
                 "fillister-screw",
-                range(15, 19),
+                (15, 16, 18, 21),
                 "platen-guide",
                 2.8448,
                 2.261,
@@ -348,7 +349,7 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
             ),
             **_expected_numbered_pairs(
                 "fillister-screw",
-                range(19, 23),
+                (17, 19, 20, 22),
                 "platen-guide",
                 2.8448,
                 2.261,
