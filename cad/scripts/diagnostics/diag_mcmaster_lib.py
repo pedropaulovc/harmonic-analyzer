@@ -423,7 +423,8 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
                 f"face area max delta {worst:.4f} (tol {face_tol:.4f})")
     else:
         face_tol = max(0.06, max(v_faces) * 1e-3)
-        worst = max(abs(a - b) for a, b in zip(top_k, v_top_k))
+        worst = max(
+            abs(a - b) for a, b in zip(top_k, v_top_k, strict=True))
         if worst > face_tol:
             problems.append(
                 f"top-{FACE_TOP_K} face area max delta {worst:.4f} "
@@ -457,7 +458,7 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
         ven_stl = OUT_DIR / f"{part_no}-vendor.stl"
         # export each from a FRESH open -- exporting the live session doc
         # produced a truncated mesh (stale selection state)
-        close_all(adapter)
+        await close_all(adapter)
         for src, dst in ((replica, rep_stl),
                          (MCMASTER_DIR / f"{part_no}.SLDPRT", ven_stl)):
             check(f"open for STL {src.name}",
@@ -466,7 +467,7 @@ async def gate_and_save(adapter, part_no: str, truth: dict) -> dict:
             m.ClearSelection2(True)
             if m.SaveAs3(str(dst), 0, 2) not in (0, True):
                 _telemetry.warn(f"STL export returned non-zero for {src.name}")
-            close_all(adapter)
+            await close_all(adapter)
         mr = trimesh.load(str(rep_stl))
         mv = trimesh.load(str(ven_stl))
         stl_dv = float(mr.volume - mv.volume)

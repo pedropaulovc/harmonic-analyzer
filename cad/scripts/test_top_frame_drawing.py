@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import build_top_frame as part
@@ -13,6 +14,7 @@ from cone_pivot_post_installation import (
     SUMMING_Z,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _holes import TAP_DRILL_MM
 
 
 def test_required_drawing_paths() -> None:
@@ -161,6 +163,67 @@ def test_ring_envelope_and_hole_stations_are_single_sourced() -> None:
     assert abs(drawing.BOSS_BAND - 47.3) < 1e-9
     assert abs(part.BOSS_ABOVE - 4.5) < 1e-9
     assert abs(part.BOSS_BELOW - 6.3) < 1e-9
+
+
+def _reference_side_station_removals(tap_drill_dia: float) -> tuple[float, float]:
+    """Fine-grid reference for one spot-face plus its non-overlapping tap."""
+    spot_step = 0.002
+    spot_radius = part.SPOTFACE_DIA / 2.0
+    boss_radius = part.BOSS_DIA / 2.0
+    spot = 0.0
+    d = -spot_radius
+    while d < spot_radius:
+        dd = d + 0.5 * spot_step
+        chord = 2.0 * math.sqrt(max(0.0, spot_radius**2 - dd**2))
+        boss_surface = abs(part.FRONT_COLUMN_Z) + math.sqrt(
+            max(0.0, boss_radius**2 - dd**2)
+        )
+        depth = max(
+            0.0,
+            min(boss_surface, part.SPOTFACE_PLANE) - part.SPOTFACE_FLOOR,
+        )
+        spot += chord * depth * spot_step
+        d += spot_step
+
+    tap_step = 0.001
+    tap_radius = tap_drill_dia / 2.0
+    bore_radius = part.BORE_DIA / 2.0
+    tap = 0.0
+    d = -tap_radius
+    while d < tap_radius:
+        dd = d + 0.5 * tap_step
+        chord = 2.0 * math.sqrt(max(0.0, tap_radius**2 - dd**2))
+        bore_surface = abs(part.FRONT_COLUMN_Z) + math.sqrt(
+            max(0.0, bore_radius**2 - dd**2)
+        )
+        tap += chord * max(0.0, part.SPOTFACE_FLOOR - bore_surface) * tap_step
+        d += tap_step
+    return spot, tap
+
+
+def test_side_screw_volume_gate_tracks_the_four_generated_stations() -> None:
+    screws_per_face = len(part.SIDE_SCREW_XS)
+    screw_count = screws_per_face * len(part.SIDE_SCREW_FACES)
+    assert screw_count == 4
+
+    expected_spot, expected_tap = _reference_side_station_removals(
+        TAP_DRILL_MM[part.SIDE_TAP_SPEC.size]
+    )
+    actual_spot = part._spotface_removal()
+    actual_tap = part._side_tap_removal()
+    assert math.isclose(actual_spot, expected_spot, abs_tol=0.001)
+    assert math.isclose(actual_tap, expected_tap, abs_tol=0.005)
+    assert math.isclose(
+        screw_count * (actual_spot + actual_tap),
+        screw_count * (expected_spot + expected_tap),
+        abs_tol=0.025,
+    )
+
+    # The prior #10-24 arithmetic misses enough material across either
+    # two-hole face to trip the actual per-feature volume gate.
+    _, prior_tap = _reference_side_station_removals(TAP_DRILL_MM["#10-24"])
+    tap_gate_tolerance = 0.1 * actual_tap + 15.0
+    assert screws_per_face * abs(prior_tap - actual_tap) > tap_gate_tolerance
 
 
 def test_view_scales_are_explicit() -> None:

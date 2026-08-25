@@ -151,8 +151,7 @@ async def build_99607A213(adapter, truth=None):
         if arc is None:
             raise RuntimeError("flare arc failed")
         model = _early_bound(adapter.currentModel, "IModelDoc2")
-        for la, aa in (("GetStartPoint2", "GetStartPoint2"),
-                       ("GetEndPoint2", "GetEndPoint2")):
+        for la in ("GetStartPoint2", "GetEndPoint2"):
             lp = _early_bound(getattr(_early_bound(line, "ISketchLine"),
                                       la)(), "ISketchPoint")
             best, best_d = None, 1e9

@@ -49,6 +49,10 @@ def test_linked_notes_specify_the_bores_and_stock() -> None:
     notes = wheel_bar_spec.DRAWING_NOTES
     assert "#8 NORMAL CLEARANCE Ø4.978" in notes
     assert "#8 CLOSE CLEARANCE Ø4.572" in notes
+    assert (
+        "HOLE STATIONS FROM THE LEFT END: PEN-HANGER #8 CLOSE AT 2.5; "
+        "COLUMN-CLAMP #8 NORMAL PAIR AT 187.5 AND 222.5."
+    ) in notes
     assert wheel_bar_spec.CLAMP_HOLE_DIA == 4.978
     assert wheel_bar_spec.PEN_HANGER_HOLE_DIA == 4.572
     assert part.blind_cut_dia_mm(part.CLAMP_HOLE_SPEC) == wheel_bar_spec.CLAMP_HOLE_DIA
