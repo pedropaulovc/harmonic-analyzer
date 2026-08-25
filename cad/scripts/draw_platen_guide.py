@@ -210,13 +210,9 @@ async def build(adapter: Any) -> dict[str, str]:
     insert_hole_table(
         adapter,
         back,
-        datum_xy=(FRONT_LEFT_X_M + GUIDE_LENGTH / 1000.0, BACK_BOTTOM_Y_M),
+        datum_xy=(FRONT_LEFT_X_M, BACK_BOTTOM_Y_M),
         hole_points=tuple(
-            (
-                FRONT_LEFT_X_M + (GUIDE_LENGTH - station) / 1000.0,
-                BACK_HOLE_Y_M,
-            )
-            for station in THROUGH_X
+            (FRONT_LEFT_X_M + station / 1000.0, BACK_HOLE_Y_M) for station in THROUGH_X
         ),
         expected_locations_mm=tuple(
             (station, (BACK_HOLE_Y_M - BACK_BOTTOM_Y_M) * 1000.0)
