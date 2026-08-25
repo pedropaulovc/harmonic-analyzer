@@ -235,6 +235,50 @@ def _expected_numbered_pairs(
     }
 
 
+def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
+    paper_drive = _interference_contracts.allowed_interference_pairs("paper-drive")
+    clamp_receivers = {1: 2, 2: 2, 3: 1, 4: 1}
+    for screw_number, back_number in clamp_receivers.items():
+        pair = frozenset(
+            (f"clamp-screw-{screw_number}", f"column-clamp-back-{back_number}")
+        )
+        assert paper_drive[pair] == pytest.approx(42.217366426182714)
+
+    guide_receivers_and_limits = {
+        5: (1, 13.56562270743475),
+        6: (2, 13.56562270743475),
+        7: (1, 13.56562270743475),
+        8: (2, 13.56562270743475),
+        9: (1, 13.56562270743475),
+        10: (2, 13.56562270743475),
+        11: (1, 13.56562270743475),
+        12: (2, 13.56562270743475),
+        13: (1, 13.56562270743475),
+        14: (2, 13.56562270743475),
+        15: (1, 11.20210690940073),
+        16: (1, 11.20210690940073),
+        17: (2, 11.20210690940073),
+        18: (1, 11.20210690940073),
+        19: (2, 11.20210690940073),
+        20: (2, 11.20210690940073),
+        21: (1, 11.20210690940073),
+        22: (2, 11.20210690940073),
+    }
+    for screw_number, (guide_number, limit) in guide_receivers_and_limits.items():
+        pair = frozenset(
+            (f"fillister-screw-{screw_number}", f"platen-guide-{guide_number}")
+        )
+        assert paper_drive[pair] == pytest.approx(limit)
+
+    summing = _interference_contracts.allowed_interference_pairs("summing")
+    assert summing == pytest.approx(
+        {
+            frozenset(("knife-hanger-stud-1", "knife-mount-1")): 456.48979768633853,
+            frozenset(("knife-hanger-stud-2", "knife-mount-2")): 456.48979768633853,
+        }
+    )
+
+
 def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
     threaded_by_assembly = {
         "drive-train": {
@@ -285,7 +329,7 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
             "knife-mount",
             12.7,
             10.716,
-            11.5735,
+            11.3735,
             second_number=None,
         ),
         "pen": {

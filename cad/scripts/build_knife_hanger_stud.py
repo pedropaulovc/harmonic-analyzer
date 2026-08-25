@@ -13,6 +13,7 @@ from diagnostics.diag_build_91247A720 import (
     GB_LEN,
     GB_MAJOR_R,
     GB_UNDERSIDE,
+    GB_WASHER_T,
     build_91247A720,
 )
 
@@ -24,7 +25,7 @@ HEAD_AF = GB_HW
 HEAD_H = GB_HH
 SHANK_DIA = 2.0 * GB_MAJOR_R
 SHANK_LEN = GB_LEN
-UNDERHEAD_LEN = GB_LEN
+UNDERHEAD_LEN = GB_LEN - GB_WASHER_T
 
 
 async def build(adapter) -> dict[str, str]:
