@@ -35,7 +35,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
     offset_plane,
@@ -52,10 +52,10 @@ GB_MTL = 31.75
 GB_UNDERSIDE = 21.43125    # (L + HH)/2 - HH
 
 
-async def build_91247A720(adapter, truth):
+async def build_91247A720(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)
-    from diag_mcmaster_lib import (mass_properties, no_sketch_inference,
+    from diagnostics.diag_mcmaster_lib import (mass_properties, no_sketch_inference,
                                    split_at_plane)
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 

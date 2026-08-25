@@ -32,7 +32,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
     offset_plane,
@@ -48,10 +48,10 @@ SQ_CUP_RIM_R = 1.739789   # Sketch2 solved rim; 45/59 deg from its dims
 SQ_CHAMFER_DEG = 75.0     # head chamfer cones (Sketch3 D1/D2)
 
 
-async def build_91410A538(adapter, truth):
+async def build_91410A538(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)
-    from diag_mcmaster_lib import no_sketch_inference, split_at_plane
+    from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import RevolveParameters
 
     major_r = SQ_MAJOR_R

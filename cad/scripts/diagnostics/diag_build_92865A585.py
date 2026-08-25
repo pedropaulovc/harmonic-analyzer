@@ -29,7 +29,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
     offset_plane,
@@ -45,10 +45,10 @@ G5_PITCH = 25.4 / 18.0     # stored 1.411111
 G5_UNDERSIDE = 13.2953125   # (L + HH)/2 - HH: vendor origin is mid-overall
 
 
-async def build_92865A585(adapter, truth):
+async def build_92865A585(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)
-    from diag_mcmaster_lib import no_sketch_inference, split_at_plane
+    from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     major_r = G5_MAJOR_R
@@ -128,7 +128,7 @@ async def build_92865A585(adapter, truth):
     if feat is None:
         raise RuntimeError("corner trim cut failed")
     name_last_feature(adapter, "CornerTrim")
-    from diag_mcmaster_lib import mass_properties
+    from diagnostics.diag_mcmaster_lib import mass_properties
     v_after_trim = mass_properties(adapter)["volume_mm3"]
 
     # --- Grade 5 dashes: one stadium slot cut per 120-deg position.

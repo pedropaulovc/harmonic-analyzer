@@ -38,7 +38,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
     offset_plane,
@@ -55,10 +55,10 @@ TS_HEAD_R = 7.540625 / 2.0
 TS_HEAD_H = 3.175
 
 
-async def build_99607A213(adapter, truth):
+async def build_99607A213(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)
-    from diag_mcmaster_lib import (mass_properties, no_sketch_inference,
+    from diagnostics.diag_mcmaster_lib import (mass_properties, no_sketch_inference,
                                    split_at_plane)
     from solidworks_mcp.adapters.base import (CircularPatternParameters,
                                               CreateAxisParameters,

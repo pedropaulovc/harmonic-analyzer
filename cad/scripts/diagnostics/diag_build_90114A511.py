@@ -31,7 +31,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     _spherical_cap_volume,
     insert_helix,
@@ -49,9 +49,9 @@ BF_SLOT_W = 0.9906   # Slot Width@Sketch1
 BF_SLOT_D = 1.2192   # Slot Depth@Sketch1
 
 
-async def build_90114A511(adapter, truth):
+async def build_90114A511(adapter, truth=None):
     from _common import add_line_chain
-    from diag_mcmaster_lib import no_sketch_inference, split_at_plane
+    from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     major_r, head_r = BF_MAJOR_R, BF_HEAD_R

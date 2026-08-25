@@ -217,15 +217,13 @@ def _offset_plane(adapter, name: str, offset_mm: float):
     return name
 
 
-async def build(adapter) -> dict[str, str]:
+async def build_91829A560(adapter, truth=None):
     import pythoncom
     from win32com.client import VARIANT
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
     from _common import extrude_at_offset, name_last_feature
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    check("create_part", await adapter.create_part())
     model = adapter.currentModel
 
     # --- base solid ----------------------------------------------------------
@@ -447,6 +445,12 @@ async def build(adapter) -> dict[str, str]:
     if comb is None:
         raise RuntimeError("InsertCombineFeature (union) failed")
     name_last_feature(adapter, "ThreadedUnion")
+
+
+async def build(adapter) -> dict[str, str]:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    check("create_part", await adapter.create_part())
+    await build_91829A560(adapter)
 
     # --- vendor ground-truth gates --------------------------------------------
     props = _mass_properties(adapter)

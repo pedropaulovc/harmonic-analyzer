@@ -34,7 +34,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     insert_helix,
     offset_plane,
@@ -50,10 +50,10 @@ HX_PITCH = 0.79375
 HX_UNDERSIDE = 4.953    # vendor origin sits mid-shank
 
 
-async def build_93075A194(adapter, truth):
+async def build_93075A194(adapter, truth=None):
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)
-    from diag_mcmaster_lib import no_sketch_inference, split_at_plane
+    from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     major_r = HX_MAJOR_R

@@ -36,7 +36,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     _spherical_cap_volume,
     insert_helix,
@@ -56,7 +56,7 @@ FILLISTER_SIZES = {
 async def build_fillister(adapter, part_no: str):
     from _common import add_line_chain
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
-    from diag_mcmaster_lib import no_sketch_inference, split_at_plane
+    from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
 
     major_d, length, hh, hd, pitch = FILLISTER_SIZES[part_no]
     major_r = major_d / 2.0
