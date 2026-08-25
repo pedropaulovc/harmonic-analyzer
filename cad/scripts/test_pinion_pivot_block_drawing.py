@@ -63,7 +63,7 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 
 def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
     notes = pinion_pivot_block_spec.DRAWING_NOTES
-    assert "#19 DRILL THRU" in notes
+    assert "#8 NORMAL CLEARANCE Ø4.978 THRU" in notes
     assert "1/4 IN REAM THRU" in notes
     assert "1/4 IN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     # General tolerances live in the title block ONLY -- a second general
@@ -110,18 +110,18 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
     # The hold-down holes are a native Hole Wizard feature: their size comes
-    # from the drill standard, so no ScrewHoles dimension may be hand-marked.
+    # from the clearance standard, so no ScrewHoles dimension may be hand-marked.
     assert not any("Screw" in feature for feature in block.DRAWING_DIMENSIONS)
     source = Path(block.__file__).read_text(encoding="utf-8")
-    assert 'HoleSpec("drilled_number", "#19")' in source
+    assert 'HoleSpec("clearance", "#8")' in source
 
 
-def test_spec_screw_diameter_matches_the_number_drill_table() -> None:
-    # The spec hardcodes the #19 drill diameter (it must stay COM-free); this
-    # pins it to the drill table the build actually cuts with.
-    from _holes import NUMBER_DRILL_MM
+def test_spec_screw_diameter_matches_the_clearance_table() -> None:
+    # The spec stays COM-free and records the #8 normal-clearance diameter used
+    # for drawing layout; pin it to the table the part build actually cuts with.
+    from _holes import CLEARANCE_MM
 
-    assert pinion_pivot_block_spec.SCREW_HOLE_DIA == NUMBER_DRILL_MM["#19"]
+    assert pinion_pivot_block_spec.SCREW_HOLE_DIA == CLEARANCE_MM[("#8", "normal")]
     assert block.SCREW_HOLE_DIA == pinion_pivot_block_spec.SCREW_HOLE_DIA
 
 

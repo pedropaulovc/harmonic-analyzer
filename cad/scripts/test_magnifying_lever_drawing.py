@@ -15,8 +15,7 @@ def test_required_drawing_paths() -> None:
     assert drawing.PDF.as_posix().endswith("/pdf/magnifying-lever.pdf")
     assert drawing.PNG.as_posix().endswith("/png/magnifying-lever_drawing.png")
     assert (
-        DRAWINGS_BY_NAME["magnifying_lever"].script
-        == Path(drawing.__file__).resolve()
+        DRAWINGS_BY_NAME["magnifying_lever"].script == Path(drawing.__file__).resolve()
     )
 
 
@@ -40,10 +39,14 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
     assert (geom.ROD_DIA, geom.ROD_LENGTH) == (6.0, 165.0)
     assert hasattr(geom, "KNIFE_LOCAL_X") and hasattr(geom, "KNIFE_LOCAL_Y")
-    assembly = Path(part.__file__).with_name("build_magnifier_assembly.py").read_text(
-        encoding="utf-8"
+    assembly = (
+        Path(part.__file__)
+        .with_name("build_magnifier_assembly.py")
+        .read_text(encoding="utf-8")
     )
-    assert "from magnifying_lever_geom import KNIFE_LOCAL_X, KNIFE_LOCAL_Y" in assembly
+    assert "from magnifying_lever_geom import (" in assembly
+    assert "KNIFE_LOCAL_X," in assembly
+    assert "KNIFE_LOCAL_Y," in assembly
 
 
 def test_linked_notes_specify_round_brass_stock_and_domed_ends() -> None:

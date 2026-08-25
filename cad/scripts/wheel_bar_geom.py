@@ -22,9 +22,9 @@ CLAMP_HOLE_X = (70.5, 105.5)  # clamp-screw holes flanking the column line at +8
 # Native Hole Wizard clearance contracts.  Keep the exact cut diameters beside
 # the stations so the part and its note-based drawing cannot disagree about
 # which clearance fit a machinist must drill.
-PEN_HANGER_HOLE_SIZE = "#6"
+PEN_HANGER_HOLE_SIZE = "#8"
 PEN_HANGER_HOLE_FIT = "close"
-PEN_HANGER_HOLE_DIA = 3.912
+PEN_HANGER_HOLE_DIA = 4.572
 CLAMP_HOLE_SIZE = "#8"
 CLAMP_HOLE_FIT = "normal"
 CLAMP_HOLE_DIA = 4.978
