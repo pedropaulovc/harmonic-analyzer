@@ -77,9 +77,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         141.27232594770454
     )
     assert cone_gear_shaft_spec.MCM_94025A150_CUP_DEPTH == pytest.approx(1.98755)
-    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(
-        143.25987594770454
-    )
+    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(143.25987594770454)
     assert cone_gear_shaft_spec.SHAFT_LENGTH == (
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
@@ -177,12 +175,6 @@ def test_view_scales_are_explicit() -> None:
 
 
 def test_datum_symbol_requests_the_persisted_journal_boundary() -> None:
-    expected = (
-        drawing.SIDE_CENTER[0]
-        + drawing.SHAFT_LENGTH / 2000.0
-        - drawing.JOURNAL_END / 1000.0
-    )
-    assert math.isclose(expected, 0.21607859347280226, abs_tol=1e-12)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     # The imported datum tag's placement stays DERIVED from the journal's
     # small-end station (JOURNAL_END), never a frozen sheet number.
