@@ -20,29 +20,6 @@ TEMPLATES_DIR = CAD_ROOT / "templates"
 # embeds its own sheet format, so there is no separate .slddrt.
 PROJECT_DRWDOT = TEMPLATES_DIR / "harmonic-analyzer.DRWDOT"
 
-# These purchased-part drawings were removed when their custom geometry was
-# replaced by supplier recipes. Keep explicit tombstones so one build cleans
-# exports created by older checkouts instead of leaving misleading prints.
-RETIRED_PURCHASED_DRAWING_ARTIFACT_STEMS = (
-    "bracket-screw",
-    "clamp-screw",
-    "cone-lock-knob",
-    "cone-pivot-screw",
-    "cone-tip-adjuster",
-    "cone-tip-pinch-screw",
-    "fillister-screw",
-    "foot-screw",
-    "frame-side-screw",
-    "gooseneck-set-screw",
-    "hanger-screw",
-    "knife-hanger-stud",
-    "lag-screw",
-    "pen-set-screw",
-    "slotted-screw",
-    "swing-stop-screw",
-    "thumb-screw",
-)
-
 
 @dataclass(frozen=True)
 class DrawingSpec:
