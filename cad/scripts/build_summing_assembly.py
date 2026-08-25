@@ -159,9 +159,9 @@ def _assert_knife_hanger_stack() -> None:
             "knife-hanger bolt misses the knife-mount tap envelope: "
             f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm engagement"
         )
-    if abs(KNIFE_MOUNT_THREAD_ENGAGEMENT - 11.5735) > 1e-9:
+    if abs(KNIFE_MOUNT_THREAD_ENGAGEMENT - 11.3735) > 1e-9:
         raise RuntimeError(
-            "knife-hanger thread engagement drifted from 11.5735 mm: "
+            "knife-hanger thread engagement drifted from 11.3735 mm: "
             f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm"
         )
     log(

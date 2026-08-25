@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import pytest
 
+from build_knife_hanger_stud import UNDERHEAD_LEN
 from build_summing_assembly import _assert_hanger_axis_positive_y
+from diagnostics.diag_build_91247A720 import GB_LEN, GB_WASHER_T
 
 
 def _transform(rotation_rows: list[list[float]]) -> list[float]:
@@ -16,6 +18,10 @@ def _transform(rotation_rows: list[list[float]]) -> list[float]:
         0.0,
         0.0,
     ]
+
+
+def test_hanger_bolt_seating_length_excludes_integral_washer_face() -> None:
+    assert GB_LEN - UNDERHEAD_LEN == pytest.approx(GB_WASHER_T)
 
 
 def test_hanger_axis_validation_accepts_authored_positive_y_axis() -> None:

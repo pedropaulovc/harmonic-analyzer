@@ -50,6 +50,7 @@ GB_HH = 7.9375
 GB_PITCH = 25.4 / 13.0     # stored 1.953846
 GB_MTL = 31.75
 GB_UNDERSIDE = 21.43125    # (L + HH)/2 - HH
+GB_WASHER_T = 0.2
 
 
 async def build_91247A720(adapter, truth=None):
@@ -72,7 +73,7 @@ async def build_91247A720(adapter, truth=None):
     tip_flat_r = pitch * 2.5                 # 4.884615 (D1@Sketch2)
     trim_r = GB_HW * 0.925 / 2.0             # 8.81062
     washer_r = flat_r                        # Sketch5 circle 9.525
-    washer_t = 0.2
+    washer_t = GB_WASHER_T
 
     # --- shank with tip chamfer (Revolve1 + Chamfer1) -----------------------
     check("create_sketch shank", await adapter.create_sketch("Front"))

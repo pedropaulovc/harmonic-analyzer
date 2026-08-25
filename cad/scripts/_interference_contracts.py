@@ -92,7 +92,7 @@ _SUMMING_ALLOWED_PAIRS = _numbered_pairs(
     "knife-hanger-stud",
     range(1, 3),
     "knife-mount",
-    _smooth_annulus_limit_mm3(12.7, 10.716, 11.5735),
+    _smooth_annulus_limit_mm3(12.7, 10.716, 11.3735),
     second_number=None,
 )
 
