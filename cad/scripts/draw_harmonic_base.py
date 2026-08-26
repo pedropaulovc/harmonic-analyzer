@@ -453,9 +453,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
-        # The cone-pivot seat is now the fourth Hole Wizard tapped group; all
-        # four imported generic notes are replaced by the native hole table.
-        expected_redundant_notes=4,
+        # Pivot, lock, stop, block, and foot seats are five Hole Wizard tapped
+        # groups; their imported generic notes are replaced by the native table.
+        expected_redundant_notes=5,
     )
 
 

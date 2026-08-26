@@ -105,7 +105,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "6.53 BLIND HOLE" not in source
     assert "underside-only counterbore rims are visible" in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert "expected_redundant_notes=4" in source
+    assert "expected_redundant_notes=5" in source
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
