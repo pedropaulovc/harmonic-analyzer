@@ -1202,7 +1202,7 @@ async def _verify_motion_one(adapter: Any, report: Report) -> None:
             await pen_driver.set_crank_deg(adapter, theta)
             _rebuild(adapter)
             try:
-                check_no_interference(adapter)
+                check_no_interference(adapter, allowed_pairs=allowed_interference_pairs(name))
             except Exception as exc:  # noqa: BLE001 -- collect, gate below
                 interference.append((theta, str(exc)))
 

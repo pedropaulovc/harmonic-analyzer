@@ -2588,7 +2588,7 @@ async def build(adapter) -> dict[str, str]:
     adj_axial = sum((adj_o[k] - tb_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
-        named_ref(f"Axis1@{tip_adjuster}", "AXIS"),
+        named_ref(f"ScrewAxis@{tip_adjuster}", "AXIS"),
         named_ref(f"Axis1@{tip_block}", "AXIS"),
         label="adjuster in the block counterbore",
         verify=(tip_adjuster, adj_o),
@@ -2614,7 +2614,7 @@ async def build(adapter) -> dict[str, str]:
     pin_o = _org(adapter, pinch_screw)
     await coincident_mate(
         adapter,
-        named_ref(f"Axis1@{pinch_screw}", "AXIS"),
+        named_ref(f"ScrewAxis@{pinch_screw}", "AXIS"),
         named_ref(f"Axis2@{tip_block}", "AXIS"),
         label="pinch screw in the cross-bore",
         verify=(pinch_screw, pin_o),
