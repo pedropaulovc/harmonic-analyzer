@@ -40,12 +40,12 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "LOCK NOTCH" in notes
     assert "PIVOT HOLE SIZE PER PLAN-VIEW CALLOUT" in notes
     assert "HOLD THE AXIS PERPENDICULAR TO THE" in notes
-    assert "27.50 +/-0.10 WEST AND 175.00 +/-0.10 SOUTH" in notes
+    assert "33.00 +/-0.10 WEST AND 205.808 +/-0.10 SOUTH" in notes
     assert "2X 1/4-20 UNC-2B THRU" in notes
     assert "192.174 +/-0.10 SOUTH OF PIVOT" in notes
     assert "26.887" in notes
     assert "12.5182 +/-0.10 DEG NORTH OF WEST" in notes
-    assert "8.23 +/-0.10 DEG NORTH" in notes
+    assert "9.11 +/-0.10 DEG NORTH" in notes
     assert "FULL-R CLOSED END (R4.000 REF)" in notes
     assert "VIRTUAL-SHARP INTERSECTIONS" in notes
     assert "PIVOT-HOLE AXIS" in notes
@@ -56,7 +56,7 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "DATUM" not in notes
     assert "FCF" not in notes
     assert "OPEN THROUGH EDGE" in notes
-    assert "NE R10.00, NW R8.00, SW R10.00, SE R12.00" in notes
+    assert "NE R10.00, NW R8.00, SW R5.00, SE R12.00" in notes
     assert "CRANK-GEAR SWEPT OD CLEARS THE LOWER BROAD FACE" in notes
     assert "KEEP THE PLATE FULL THICKNESS" in notes
     assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
