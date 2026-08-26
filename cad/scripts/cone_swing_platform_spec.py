@@ -22,9 +22,7 @@ PLATE_LENGTH_TOLERANCE_MM = 0.25
 # The recentered DP25.731 gear is smaller than the intermediate DP24.74 gear;
 # its complete swept OD now clears the platform top, so the obsolete scallop is
 # removed and the plate remains full thickness beneath the mesh.
-CRANK_GEAR_PLATFORM_CLEARANCE = (
-    POST_CONE_BORE_HEIGHT - CRANK_GEAR_OUTSIDE_DIA / 2.0
-)
+CRANK_GEAR_PLATFORM_CLEARANCE = POST_CONE_BORE_HEIGHT - CRANK_GEAR_OUTSIDE_DIA / 2.0
 if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
     raise AssertionError("recentered crank gear has under 0.5 mm platform air")
 
@@ -58,10 +56,10 @@ DRAWING_NOTES = "\n".join(
         "   PAIR CENTROID ON CONE AXIS, 192.174 +/-0.10 SOUTH OF PIVOT; 26.887",
         "   +/-0.10 PITCH ON A LINE 12.5182 +/-0.10 DEG NORTH OF WEST.",
         "5. LOCK NOTCH 8.000 +0.100/0 WIDE; FULL-R CLOSED END (R4.000 REF).",
-        "   CLOSED-END CENTRE 27.50 +/-0.10 WEST AND 175.00 +/-0.10 SOUTH",
-        "   OF PIVOT; AXIS 8.23 +/-0.10 DEG NORTH OF WEST. RUN PARALLEL SIDES",
+        "   CLOSED-END CENTRE 33.00 +/-0.10 WEST AND 205.808 +/-0.10 SOUTH",
+        "   OF PIVOT; AXIS 9.11 +/-0.10 DEG NORTH OF WEST. RUN PARALLEL SIDES",
         "   FROM END TANGENCIES THROUGH THE WEST PROFILE; OPEN THROUGH EDGE.",
-        "6. PLAN CORNER RADII: NE R10.00, NW R8.00, SW R10.00, SE R12.00.",
+        "6. PLAN CORNER RADII: NE R10.00, NW R8.00, SW R5.00, SE R12.00.",
         "   HOLD EACH OF THE 2X LONG STRAIGHT PLAN EDGES STRAIGHT WITHIN 0.25.",
         f"7. CRANK-GEAR SWEPT OD CLEARS THE LOWER BROAD FACE BY "
         f"{CRANK_GEAR_PLATFORM_CLEARANCE:.3f} REF;",
