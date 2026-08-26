@@ -1,175 +1,141 @@
-"""Authoritative physical specification for every threaded fastener.
+"""Purchased fastener identities used by the production CAD fleet.
 
-Fasteners remain ordinary, deterministic SOLIDWORKS parts.  Assembly scripts
-insert and mate one seed component through the public COM API, then use native
-local linear/circular component-pattern features where the hole layout repeats.
-Keeping identity here prevents material, thread, head, and finish choices from
-drifting between the part builder and its assembly placements.
+The part stems are stable machine/BOM identities.  ``stock_name`` and ``skus``
+identify the McMaster-Carr hardware represented by each generated SLDPRT;
+``material`` is the SOLIDWORKS library material used for production rendering
+and mass properties.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
-
-
-class HeadStyle(StrEnum):
-    FILLISTER = "fillister"
-    HEX = "hex"
-    # Integral washer + hex + turned collar/tip stack (knife-hanger stud).
-    HEX_STACK = "hex-stack"
-    KNURLED_THUMB = "knurled-thumb"
-    ROUND = "round"
-    SET_SCREW = "set-screw"
-    SHOULDER = "shoulder"
-    SQUARE = "square"
-
-
-class DriveStyle(StrEnum):
-    EXTERNAL_HEX = "external-hex"
-    EXTERNAL_SQUARE = "external-square"
-    KNURLED = "knurled"
-    SLOT = "slot"
-
-
-class Finish(StrEnum):
-    BLACK = "black"
-    BRASS = "brass"
-    POLISHED = "polished"
 
 
 @dataclass(frozen=True, slots=True)
-class FastenerSpec:
+class PurchasedFastenerSpec:
     part_name: str
-    thread: str
-    length_mm: float
-    model_diameter_mm: float
-    head: HeadStyle
-    drive: DriveStyle
+    stock_name: str
+    skus: tuple[str, ...]
     material: str
-    finish: Finish
+    supplier: str = "McMaster-Carr"
 
 
-def _steel(
+def _stock(
     part_name: str,
-    thread: str,
-    length_mm: float,
-    model_diameter_mm: float,
-    head: HeadStyle,
-    drive: DriveStyle,
-    finish: Finish = Finish.POLISHED,
-) -> FastenerSpec:
-    return FastenerSpec(
-        part_name,
-        thread,
-        length_mm,
-        model_diameter_mm,
-        head,
-        drive,
-        "Plain Carbon Steel",
-        finish,
-    )
+    stock_name: str,
+    *skus: str,
+    material: str = "Plain Carbon Steel",
+) -> PurchasedFastenerSpec:
+    return PurchasedFastenerSpec(part_name, stock_name, skus, material)
 
 
-def _brass(
-    part_name: str,
-    thread: str,
-    length_mm: float,
-    model_diameter_mm: float,
-    head: HeadStyle,
-    drive: DriveStyle,
-) -> FastenerSpec:
-    return FastenerSpec(
-        part_name,
-        thread,
-        length_mm,
-        model_diameter_mm,
-        head,
-        drive,
-        "Brass",
-        Finish.BRASS,
-    )
-
-
-FASTENERS: dict[str, FastenerSpec] = {
-    "bracket-screw": _steel(
-        "bracket-screw", "#8-32", 12.0, 3.15, HeadStyle.FILLISTER, DriveStyle.SLOT
+FASTENERS: dict[str, PurchasedFastenerSpec] = {
+    "bracket-screw": _stock(
+        "bracket-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A194",
     ),
-    "clamp-screw": _steel(
-        "clamp-screw", "#8-32", 28.0, 3.15, HeadStyle.FILLISTER, DriveStyle.SLOT
+    "clamp-screw": _stock(
+        "clamp-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A201",
     ),
-    "cone-lock-knob": _steel(
-        "cone-lock-knob", "1/4-20", 6.35, 6.35,
-        HeadStyle.KNURLED_THUMB, DriveStyle.KNURLED,
+    "cone-lock-knob": _stock(
+        "cone-lock-knob",
+        "Steel Raised Knurled-Head Thumb Screw",
+        "91882A412",
     ),
-    "cone-pivot-screw": _steel(
-        "cone-pivot-screw", "#10-24", 14.60, 6.35,
-        HeadStyle.SHOULDER, DriveStyle.SLOT,
+    "cone-pivot-screw": _stock(
+        "cone-pivot-screw",
+        "Slotted 18-8 Stainless Steel Precision Shoulder Screw",
+        "91829A560",
+        material="AISI 304",
     ),
-    "cone-tip-adjuster": _steel(
-        "cone-tip-adjuster", "5/16-18", 14.0, 6.2,
-        HeadStyle.SET_SCREW, DriveStyle.SLOT, Finish.BLACK,
+    "cone-tip-adjuster": _stock(
+        "cone-tip-adjuster",
+        "18-8 Stainless Steel Slotted Cup-Tip Set Screw",
+        "94025A150",
+        material="AISI 304",
     ),
-    "cone-tip-pinch-screw": _steel(
-        "cone-tip-pinch-screw", "#3-48", 8.0, 1.7,
-        HeadStyle.FILLISTER, DriveStyle.SLOT,
+    "cone-tip-pinch-screw": _stock(
+        "cone-tip-pinch-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A108",
     ),
-    "fillister-screw": _brass(
-        "fillister-screw", "#4-40", 4.0, 2.0,
-        HeadStyle.FILLISTER, DriveStyle.SLOT,
+    "fillister-screw": _stock(
+        "fillister-screw",
+        "Brass Fillister Head Slotted Screw",
+        "90114A511",
+        material="Brass",
     ),
-    "foot-screw": _steel(
-        "foot-screw", "#4-40", 8.0, 2.0,
-        HeadStyle.FILLISTER, DriveStyle.SLOT, Finish.BLACK,
+    "foot-screw": _stock(
+        "foot-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A108",
     ),
-    "frame-side-screw": _steel(
-        "frame-side-screw", "#10-24", 12.7, 3.45,
-        HeadStyle.FILLISTER, DriveStyle.SLOT,
+    "frame-side-screw": _stock(
+        "frame-side-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A194",
     ),
-    "gooseneck-set-screw": _steel(
-        "gooseneck-set-screw", "1/4-20", 16.0, 4.7,
-        HeadStyle.SQUARE, DriveStyle.EXTERNAL_SQUARE, Finish.BLACK,
+    "gooseneck-set-screw": _stock(
+        "gooseneck-set-screw",
+        "Steel Square-Head Cup-Point Set Screw",
+        "91410A538",
     ),
-    "hanger-screw": _steel(
-        "hanger-screw", "#6-32", 11.5, 2.4,
-        HeadStyle.HEX, DriveStyle.EXTERNAL_HEX, Finish.BLACK,
+    "hanger-screw": _stock(
+        "hanger-screw",
+        "Low-Strength Zinc-Plated Steel Hex Head Screw",
+        "93075A194",
     ),
-    "hex-bolt": _steel(
-        "hex-bolt", "5/16-18", 32.0, 7.8,
-        HeadStyle.HEX, DriveStyle.EXTERNAL_HEX, Finish.BLACK,
+    "hex-bolt": _stock(
+        "hex-bolt",
+        "Medium-Strength Grade 5 Steel Hex Head Screw",
+        "92865A585",
     ),
-    "knife-hanger-stud": _steel(
-        "knife-hanger-stud", "1/2-13", 48.75, 12.7,
-        HeadStyle.HEX_STACK, DriveStyle.EXTERNAL_HEX,
+    "knife-hanger-stud": _stock(
+        "knife-hanger-stud",
+        "Medium-Strength Grade 5 Steel Hex Head Screw",
+        "91247A720",
     ),
-    "lag-screw": _steel(
-        "lag-screw", "9/16-12", 63.0, 12.0,
-        HeadStyle.ROUND, DriveStyle.SLOT, Finish.BLACK,
+    "knife-hanger-washer": _stock(
+        "knife-hanger-washer",
+        "Zinc-Plated Steel SAE Washer",
+        "90126A211",
     ),
-    "pen-set-screw": _brass(
-        "pen-set-screw", "#4-40", 15.0, 2.0,
-        HeadStyle.KNURLED_THUMB, DriveStyle.KNURLED,
+    "lag-screw": _stock(
+        "lag-screw",
+        "18-8 Stainless Steel Round Head Slotted Screw",
+        "91783A722",
+        material="AISI 304",
     ),
-    "slotted-screw": _steel(
-        "slotted-screw", "#8-32", 22.0, 3.15,
-        HeadStyle.FILLISTER, DriveStyle.SLOT,
+    "pen-set-screw": _stock(
+        "pen-set-screw",
+        "Stainless Steel Flared-Collar Knurled-Head Thumb Screw",
+        "99607A213",
+        material="AISI 304",
     ),
-    "swing-stop-screw": _steel(
-        "swing-stop-screw", "#8-32", 14.0, 3.15,
-        HeadStyle.FILLISTER, DriveStyle.SLOT,
+    "slotted-screw": _stock(
+        "slotted-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A199",
     ),
-    # 11 (was 12): the head top must hold >= 0.25 below the one-piece
-    # top-frame casting underside y 999.7 (build_magnifier_assembly tscrew).
-    "thumb-screw": _brass(
-        "thumb-screw", "#4-40", 11.0, 2.0,
-        HeadStyle.KNURLED_THUMB, DriveStyle.KNURLED,
+    "swing-stop-screw": _stock(
+        "swing-stop-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A196",
+    ),
+    "thumb-screw": _stock(
+        "thumb-screw",
+        "Steel Raised Knurled-Head Thumb Screw",
+        "91882A221",
     ),
 }
 
 
-def fastener(part_name: str) -> FastenerSpec:
-    """Return one fastener specification, failing loud on an unregistered part."""
+def fastener(part_name: str) -> PurchasedFastenerSpec:
+    """Return one purchased fastener identity, failing loud if unregistered."""
     try:
         return FASTENERS[part_name]
     except KeyError as exc:
-        raise KeyError(f"threaded fastener is not registered: {part_name}") from exc
+        raise KeyError(f"purchased fastener is not registered: {part_name}") from exc

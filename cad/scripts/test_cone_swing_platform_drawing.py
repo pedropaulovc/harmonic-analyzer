@@ -40,12 +40,12 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "LOCK NOTCH" in notes
     assert "PIVOT HOLE SIZE PER PLAN-VIEW CALLOUT" in notes
     assert "HOLD THE AXIS PERPENDICULAR TO THE" in notes
-    assert "27.50 +/-0.10 WEST AND 175.00 +/-0.10 SOUTH" in notes
+    assert "33.00 +/-0.10 WEST AND 205.808 +/-0.10 SOUTH" in notes
     assert "2X 1/4-20 UNC-2B THRU" in notes
     assert "192.174 +/-0.10 SOUTH OF PIVOT" in notes
     assert "26.887" in notes
     assert "12.5182 +/-0.10 DEG NORTH OF WEST" in notes
-    assert "8.23 +/-0.10 DEG NORTH" in notes
+    assert "9.11 +/-0.10 DEG NORTH" in notes
     assert "FULL-R CLOSED END (R4.000 REF)" in notes
     assert "VIRTUAL-SHARP INTERSECTIONS" in notes
     assert "PIVOT-HOLE AXIS" in notes
@@ -56,11 +56,21 @@ def test_notes_describe_pivot_notch_and_wedge() -> None:
     assert "DATUM" not in notes
     assert "FCF" not in notes
     assert "OPEN THROUGH EDGE" in notes
-    assert "NE R10.00, NW R8.00, SW R10.00, SE R12.00" in notes
+    assert "NE R10.00, NW R8.00, SW R5.00, SE R12.00" in notes
     assert "CRANK-GEAR SWEPT OD CLEARS THE LOWER BROAD FACE" in notes
     assert "KEEP THE PLATE FULL THICKNESS" in notes
     assert "FINISHED THICKNESS 6.35 +/-0.10" in notes
-    assert "HOLD EACH BROAD FACE FLAT WITHIN 0.10 AND THE TWO PARALLEL WITHIN 0.10" in notes
+    assert (
+        f"TOP RELIEF DIA {part.PIVOT_BEARING_RELIEF_DIAMETER:.2f} X "
+        f"{part.PIVOT_BEARING_RELIEF_DEPTH:.2f} DEEP"
+    ) in notes
+    assert (
+        f"LOCAL BEARING THICKNESS {part.PIVOT_BEARING_THICKNESS:.2f} +/-0.05"
+    ) in notes
+    assert (
+        "HOLD EACH BROAD FACE FLAT WITHIN 0.10 AND THE TWO PARALLEL WITHIN 0.10"
+        in notes
+    )
     assert "AS MODELLED" not in notes
     assert "SEE PLAN" not in notes
     assert "X.XX" not in notes
@@ -94,12 +104,20 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     assert part.PLATE_SOUTH_Z == pytest.approx(-216.3541869456341)
     assert part.WEST_HALF_N == 8.0
     assert part.EAST_HALF_S == 24.0
-    assert part.SLOT_E_X == 27.5
+    assert part.SLOT_E_X == 33.0
     assert part.POST_STATION == -39.90136099793
     assert part.PIVOT_STATION == 152.27232594770453
     assert math.isclose(part.POST_LOCAL_Z, -192.17368694563453, abs_tol=1e-12)
+    assert part.SLOT_E_Z < part.POST_LOCAL_Z
     assert part.POST_MAIN_DIA == 42.011
     assert part.POST_FOOT_CONTAINMENT >= 0.25
+    assert part.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
+    assert part.PIVOT_HEAD_RADIAL_CLEARANCE == pytest.approx((10.50 - 9.525) / 2.0)
+    assert part.PIVOT_BEARING_RELIEF_DEPTH == pytest.approx(0.25)
+    assert part.PIVOT_BEARING_THICKNESS == pytest.approx(6.10)
+    assert part.PLATE_T - part.PIVOT_BEARING_THICKNESS == pytest.approx(
+        part.PIVOT_BEARING_RELIEF_DEPTH
+    )
 
     half = part.POST_MOUNT_HALF_PITCH
     west_x, west_z = part.POST_MOUNT_WEST_XZ
@@ -116,7 +134,9 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'name="PostMountHoles"' in source
     assert 'name_last_feature(adapter, "CrankGearRelief")' not in source
-    assert 'name_last_feature(adapter, axis_name)' in source
+    assert 'name_last_feature(adapter, "PivotBearingRelief")' in source
+    assert '("PivotBearingTop", "PLANE")' in source
+    assert "name_last_feature(adapter, axis_name)" in source
     assert '("post mount west", POST_MOUNT_WEST_XZ)' in source
     assert '("post mount east", POST_MOUNT_EAST_XZ)' in source
 
@@ -139,10 +159,7 @@ def test_rederived_plate_layout_stays_inside_the_sheet_zones() -> None:
     assert "callout_xy=(0.175, 0.225)" in source
     assert '"Manufacturing Notes", 0.016, 0.100, char_height=0.0025' in source
     assert cone_swing_platform_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
-    assert (
-        cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE
-        == "ISOMETRIC VIEW SCALE 1:3"
-    )
+    assert cone_swing_platform_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
     assert cone_swing_platform_spec.END_VIEW_NOTE == "END VIEW SCALE 1:2"
 
 
@@ -154,9 +171,10 @@ def test_part_stamps_make_critical_properties() -> None:
 
     config = _config.parts("cone-swing-platform")
     assert config["material"] == config["material_specification"]
-    assert "astm a830/a830m gr 1018 hr steel plate" in str(
-        config["material_specification"]
-    ).lower()
+    assert (
+        "astm a830/a830m gr 1018 hr steel plate"
+        in str(config["material_specification"]).lower()
+    )
     assert "5/16 in minimum stock" in str(config["material_specification"]).lower()
     finish = str(config["finish"]).lower()
     assert "mil-dtl-13924 class 1" in finish

@@ -20,7 +20,7 @@ the M6.8 mirror layer is gone).
 * fulcrum-keeper x2 + frame-side-screw x2 (the black shaft-END brackets on
   the top-frame west rail top face -- ch17 p.40 bottom-left / ch30 p008;
   ball centres (199.9, 1061.4, 3.088 +- 88.75), foot screws down into the
-  rail's tapped #10-24 holes at z 3.088 +- 74.0; replaces the photo-refuted
+  rail's tapped #8-32 holes at z 3.088 +- 74.0; replaces the photo-refuted
   chrome baluster lever pair, 2026-08-02)
 * rocker-arm x20, pivot-bushing x19, connecting-rod x20,
   amplitude-bar x20, channel-lever x20, lever-bushing x19,
@@ -183,6 +183,10 @@ from cone_pivot_post_installation import (
     DRUM_X,
     MECHANISM_Z_SHIFT,
 )
+from build_fulcrum_keeper import (
+    CBORE_DEPTH_MM as KEEPER_CBORE_DEPTH,
+    FOOT_H as KEEPER_FOOT_H,
+)
 from solidworks_mcp.adapters.base import (
     ComponentLinearPatternParameters,
     CreateAxisParameters,
@@ -328,10 +332,10 @@ KEEPER_BALL_TO_END = 2.25
 KEEPER_Z_OFF = FULCRUM_SHAFT_HALF - KEEPER_BALL_TO_END  # 88.75 off centre
 # Foot screws (frame-side-screw MHA-117): the keeper pad centre is 14.75
 # inboard of its ball centre -> z = FULCRUM_SHAFT_Z +- 74.0. The under-head
-# plane is the foot top (8.0) minus the 3.0 counterbore = rail top + 5.0;
-# they thread the top-frame's tapped #10-24 holes (build_top_frame.py).
+# plane is derived from the keeper foot and its exact flush counterbore; the
+# screws thread the top-frame's tapped #8-32 holes (build_top_frame.py).
 KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF - 14.75  # 74.0
-KEEPER_SCREW_SEAT_H = 5.0
+KEEPER_SCREW_SEAT_H = KEEPER_FOOT_H - KEEPER_CBORE_DEPTH
 
 # --- spring (channel_spring_installed_spec) ---------------------------------
 from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402

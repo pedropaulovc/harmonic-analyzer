@@ -1,8 +1,12 @@
 cone-tip-adjuster:
+  title: 18-8 Stainless Steel Slotted Cup-Tip Set Screw
   number: MHA-097
-  material: AISI 12L14 free-machining steel
-  material_specification: AISI 12L14 free-machining steel
-  finish: black oxide
+  stock_name: 18-8 Stainless Steel Slotted Cup-Tip Set Screw
+  supplier: McMaster-Carr
+  supplier_skus: [94025A150]
+  material: 18-8 stainless steel
+  material_specification: 18-8 stainless steel, McMaster-Carr 94025A150
+  finish: plain
   quantity: 1
   tolerance_class: machined_block
-  process: "machined (steel), black oxide"
+  process: purchased

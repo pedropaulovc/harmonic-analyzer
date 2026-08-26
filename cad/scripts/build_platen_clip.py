@@ -2,10 +2,10 @@ r"""Reproduction script: platen paper clip strip (book ch. 22, p. 55).
 
 One of the two thin BRIGHT BRASS strips hugging the platen front's extreme
 left/right edges, running from the TOP edge down ~112 (ch22 front photo);
-the recording paper slides under them and a screw holds each end. Used
-twice in the assembly (vertical, so the assembly rotates the +X-authored
-strip 90 about Z). Natural brass -- no paint (they read bright against the
-blackened platen; the old PANEL_BLACK made them invisible).
+the recording paper slides under them and a screw holds each end. Integral
+outer-face seats consume the exact stock screw length while leaving the
+strip's 1.2-mm spring section unchanged. Used twice in the assembly (vertical,
+so the assembly rotates the +X-authored strip 90 about Z). Natural brass.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 22" — ch30-p002 Pose Studio fit,
 scaled 0.8988 in the visible plane (low).
@@ -29,6 +29,7 @@ from _common import (
     apply_material,
     check,
     define_rectilinear_chain,
+    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -40,6 +41,8 @@ from _common import (
     volume_check,
 )
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from build_fillister_screw import HEAD_DIA, SHANK_DIA, SHANK_LEN
+from build_platen import PLATE_THICKNESS, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
@@ -47,10 +50,26 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 CLIP_LENGTH = 112.35  # ch30-p002 Pose Studio: 125 * 0.8988
 CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
 CLIP_THICKNESS = 1.2  # DIMENSIONS.md ch22: thin spring strip (low)
-# End screws: the brass fillister clip screws (Ø2.9 shank) pass THROUGH, so
-# each end hole is a #4 clearance Hole Wizard hole (normal fit Ø3.251; was a
-# plain Ø3.0 cut) -- memory/fastener-policy-us-customary.
+# Stock 90114A511 screws need 4.0 mm of #4-40 platen engagement. Two integral
+# outer-face seat bosses make the remaining under-head stack exactly 2.35 mm,
+# so the 6.35-mm shank ends flush at the platen back instead of protruding
+# into the moving support-bar/clamp envelope.
+SCREW_SEAT_STACK = SHANK_LEN - SOCKET_THREAD_ENGAGEMENT
+SCREW_SEAT_BOSS_H = SCREW_SEAT_STACK - CLIP_THICKNESS
+SCREW_SEAT_RADIAL_MARGIN = 0.2
+SCREW_SEAT_DIA = HEAD_DIA + 2.0 * SCREW_SEAT_RADIAL_MARGIN
+SCREW_HOLE_DIA = CLEARANCE_MM[("#4", "normal")]
+# End screws pass through #4 normal-clearance holes in both bosses and strip.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
+
+if SCREW_SEAT_BOSS_H <= 0.0:
+    raise AssertionError("stock fillister screw no longer requires a clip seat boss")
+if abs(SCREW_SEAT_STACK + SOCKET_THREAD_ENGAGEMENT - SHANK_LEN) > 1e-9:
+    raise AssertionError("clip/platen stack no longer finishes at the screw tip")
+if abs(SOCKET_THREAD_ENGAGEMENT - PLATE_THICKNESS) > 1e-9:
+    raise AssertionError("clip screw receiver no longer uses full platen thickness")
+if SCREW_HOLE_DIA < SHANK_DIA:
+    raise AssertionError("stock fillister shank does not clear the clip")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -68,6 +87,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ClipLength", f"{CLIP_LENGTH}mm")
     await set_global(adapter, "ClipWidth", f"{CLIP_WIDTH}mm")
     await set_global(adapter, "ClipThickness", f"{CLIP_THICKNESS}mm")
+    await set_global(adapter, "ScrewSeatDia", f"{SCREW_SEAT_DIA}mm")
+    await set_global(adapter, "ScrewSeatBossH", f"{SCREW_SEAT_BOSS_H}mm")
     await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
     await set_global(adapter, "HoleY", '"ClipWidth" / 2')
     await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
@@ -107,16 +128,48 @@ async def build(adapter) -> dict[str, str]:
     v_strip = CLIP_LENGTH * CLIP_WIDTH * CLIP_THICKNESS
     await volume_check(adapter, "clip strip", v_strip, 0.005 * v_strip)
 
+    # Integral screw-seat bosses on the OUTER face (local -Z). They are part of
+    # the clip, not separate spacers, so component count and pattern topology
+    # remain unchanged. The seat diameter exceeds the stock head by 0.2 radial.
+    seats = SketchDims()
+    check("create_sketch screw seats", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, HOLE_INSET, CLIP_WIDTH / 2.0, SCREW_SEAT_DIA / 2.0,
+        "left screw seat", dims=seats,
+        names=("LeftSeatX", "LeftSeatY", "LeftSeatDia"),
+        drives=('"HoleInset"', '"HoleY"', '"ScrewSeatDia"'),
+    )
+    await define_circle(
+        adapter, CLIP_LENGTH - HOLE_INSET, CLIP_WIDTH / 2.0, SCREW_SEAT_DIA / 2.0,
+        "right screw seat", dims=seats,
+        names=("RightSeatX", "RightSeatY", "RightSeatDia"),
+        drives=('"HoleFarX"', '"HoleY"', '"ScrewSeatDia"'),
+    )
+    await ensure_fully_defined(adapter, "screw seat sketch")
+    check("exit_sketch screw seats", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewSeatProfile")
+    drive_jobs += seats.apply(adapter, "ScrewSeatProfile")
+    check(
+        "extrude screw seats",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=SCREW_SEAT_BOSS_H, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "ScrewSeats")
+    v_seats = 2.0 * math.pi * (SCREW_SEAT_DIA / 2.0) ** 2 * SCREW_SEAT_BOSS_H
+    v_with_seats = v_strip + v_seats
+    await volume_check(adapter, "clip with screw seats", v_with_seats, 0.005 * v_strip)
+
     # End screw holes: ONE native Hole Wizard #4 clearance feature (2 points)
-    # from the front face (local z 0, outward normal -Z). Left hole at the near
-    # inset; right hole at length minus inset.
-    hole_dia = CLEARANCE_MM[("#4", "normal")]
+    # from the bosses' outer faces at local -Z. The cut passes through each
+    # boss plus the base strip before the shank enters the platen receiver.
+    hole_dia = SCREW_HOLE_DIA
     hole_cut = wizard_holes(
         adapter,
         HoleSpec("clearance", "#4"),
         [
-            [HOLE_INSET, CLIP_WIDTH / 2.0, 0.0],
-            [CLIP_LENGTH - HOLE_INSET, CLIP_WIDTH / 2.0, 0.0],
+            [HOLE_INSET, CLIP_WIDTH / 2.0, -SCREW_SEAT_BOSS_H],
+            [CLIP_LENGTH - HOLE_INSET, CLIP_WIDTH / 2.0, -SCREW_SEAT_BOSS_H],
         ],
         (0.0, 0.0, -1.0),
         "end screw holes (#4 clearance)", name="ScrewHoles",
@@ -126,8 +179,13 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     drive_jobs += hole_cut.placement_drive_jobs
-    v_holes = 2.0 * math.pi * (hole_dia / 2.0) ** 2 * CLIP_THICKNESS
-    v_final = v_strip - v_holes
+    v_holes = (
+        2.0
+        * math.pi
+        * (hole_dia / 2.0) ** 2
+        * (CLIP_THICKNESS + SCREW_SEAT_BOSS_H)
+    )
+    v_final = v_with_seats - v_holes
     await volume_check(adapter, "clip with holes", v_final, 0.005 * v_strip)
 
     # Apply the deferred drive equations after the model + a rebuild exists, then

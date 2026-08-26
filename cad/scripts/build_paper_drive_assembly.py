@@ -109,6 +109,8 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _interference_contracts import allowed_interference_pairs
+from _holes import CLEARANCE_MM
 from _transforms import (  # noqa: E402
     IDENTITY,
     ROT_X_NEG90,
@@ -128,15 +130,24 @@ ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 from build_support_bar import (  # noqa: E402
     BAR_DEPTH,
     BAR_HEIGHT,
+    BRACKET_HOLE_SPEC as BAR_BRACKET_HOLE_SPEC,
     BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (machine -X holes)
     BRACKET_STUD_X,
     CLAMP_CBORE_DEPTH,
+    CLAMP_CBORE_DIA,
+    CLAMP_HEAD_RECESS,
+    CLAMP_HOLE_DIA,
     CLAMP_HOLE_X,
 )
 from column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
+from build_column_clamp_back import (  # noqa: E402
+    DEPTH as ARC_BACK_DEPTH,
+    HOLE_SPEC as CLAMP_RECEIVER_SPEC,
+)
 from build_transgear_bracket import (  # noqa: E402
     PLATE_THICK as BRACKET_THICK,
     SCREW_HOLE_DX as BRACKET_SCREW_DX,
+    SCREW_HOLE_SPEC as BRACKET_CLEARANCE_SPEC,
 )
 
 COLUMN_X = 197.0
@@ -150,27 +161,62 @@ BAR_Z = (BAR_FRONT_Z + BAR_BACK_Z) / 2.0  # -134.4 bar centre
 # --- platen (hangs on the bar) ----------------------------------------------
 from build_platen import (  # noqa: E402
     CBORE_DEPTH as PLATEN_CBORE_DEPTH,
+    CBORE_DIA as PLATEN_CBORE_DIA,
+    GUIDE_HOLE_DIA as PLATEN_GUIDE_HOLE_DIA,
     GUIDE_HOLE_X as PLATEN_GUIDE_HOLE_X,
     GUIDE_HOLE_Y as PLATEN_GUIDE_HOLE_Y,
+    HEAD_RECESS as PLATEN_HEAD_RECESS,
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
+    SOCKET_SPEC as PLATEN_SOCKET_SPEC,
+    SOCKET_THREAD_ENGAGEMENT as PLATEN_SOCKET_ENGAGEMENT,
     SOCKET_XY as PLATEN_SOCKET_XY,
 )
 from build_platen_guide import (  # noqa: E402
     GUIDE_DEPTH,
     GUIDE_HEIGHT,
     GUIDE_LENGTH,
+    GUIDE_SCREW_BOTTOM_CLEARANCE,
+    GUIDE_SCREW_PASSAGE,
+    GUIDE_SCREW_THREAD_ENGAGEMENT,
     HOLE_X as GUIDE_LOCK_HOLE_X,
+    LOCK_SCREW_BOTTOM_CLEARANCE,
+    LOCK_SCREW_PASSAGE,
+    LOCK_SCREW_THREAD_ENGAGEMENT,
     LOCK_STATION_X,
     SCREW_STATION_X as GUIDE_SCREW_STATION_X,
 )
-from build_guide_lock import LOCK_WIDTH  # noqa: E402
+from build_guide_lock import (  # noqa: E402
+    HOLE_DIA as LOCK_HOLE_DIA,
+    LOCK_THICK,
+    LOCK_WIDTH,
+)
 from build_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
     CLIP_THICKNESS,
     CLIP_WIDTH,
     HOLE_INSET as CLIP_HOLE_INSET,
+    SCREW_HOLE_DIA as CLIP_HOLE_DIA,
+    SCREW_SEAT_BOSS_H,
+    SCREW_SEAT_DIA,
+    SCREW_SEAT_STACK,
+)
+from build_bracket_screw import (  # noqa: E402
+    SHANK_DIA as BRACKET_SCREW_DIA,
+    SHANK_LEN as BRACKET_SCREW_LEN,
+)
+from build_clamp_screw import (  # noqa: E402
+    HEAD_DIA as CLAMP_SCREW_HEAD_DIA,
+    HEAD_H as CLAMP_SCREW_HEAD_H,
+    SHANK_DIA as CLAMP_SCREW_DIA,
+    SHANK_LEN as CLAMP_SCREW_LEN,
+)
+from build_fillister_screw import (  # noqa: E402
+    HEAD_DIA as FILLISTER_HEAD_DIA,
+    HEAD_H as FILLISTER_HEAD_H,
+    SHANK_DIA as FILLISTER_SHANK_DIA,
+    SHANK_LEN as FILLISTER_SHANK_LEN,
 )
 from build_platen_rack import (  # noqa: E402
     ADDENDUM as RACK_ADDENDUM,
@@ -292,17 +338,16 @@ NET_RACK_TRAVEL_PER_CRANK_REV = (
 SPARE_GEAR_POS = (160.0, 53.2, -15.0)  # machine +X (west) of the platen
 
 # --- fasteners ----------------------------------------------------------------
-# Platen-clip screws: through the clips' end holes into the platen's edge
-# sockets (machine coords = platen-local + plate origin).
+# Platen-clip screws: through the clips' integral outer seats and #4 clearance
+# holes into full-thickness #4-40 through receivers in the platen.
 CLIP_SCREW_XY = tuple((PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET_XY)
 # The clips run from the platen's top edge down; their end holes (inset
 # CLIP_HOLE_INSET) must land exactly on the platen's edge sockets.
-_CLIP_Y0_LOCAL = PLATE_HEIGHT - CLIP_LENGTH  # 15
+_CLIP_Y0_LOCAL = PLATE_HEIGHT - CLIP_LENGTH
 assert PLATEN_SOCKET_XY[0][1] == _CLIP_Y0_LOCAL + CLIP_HOLE_INSET
 assert PLATEN_SOCKET_XY[1][1] == PLATE_HEIGHT - CLIP_HOLE_INSET
-# Guide screws: 2 rows of 5, heads counterbored 0.2 sub-flush of the platen
-# front (ch22 front photo shows the slotted heads; the paper lies flat over
-# them), shanks threading 2.4 into the rails' blind holes.
+# Guide screws: 2 rows of 5, heads exactly 0.2 sub-flush of the platen front
+# and shanks engaged 5.2678 mm in blind #4-40 guide receivers.
 assert GUIDE_SCREW_STATION_X == PLATEN_GUIDE_HOLE_X
 GUIDE_SCREW_XY = tuple(
     (PLATE_X0 + x, PLATE_Y0 + y)
@@ -313,6 +358,147 @@ GUIDE_SCREW_XY = tuple(
 LOCK_SCREW_XY = tuple(
     (PLATE_X0 + x, gy + GUIDE_HEIGHT / 2.0) for gy in GUIDE_Y for x in GUIDE_LOCK_HOLE_X
 )
+
+
+def _assert_fastener_stacks() -> None:
+    """Prove every selected stock screw has clearance and useful engagement."""
+
+    def nonnegative(label: str, value: float) -> float:
+        if value < -1e-9:
+            raise AssertionError(f"{label} is negative ({value:.6f} mm)")
+        return value
+
+    def valid_engagement(label: str, engagement: float, major_dia: float) -> None:
+        nonnegative(label, engagement)
+        if engagement + 1e-9 < major_dia:
+            raise AssertionError(
+                f"{label} {engagement:.4f} mm is less than one screw diameter "
+                f"({major_dia:.4f} mm)"
+            )
+
+    # 90280A201 clamps: head seat -> remaining bar -> front clamp -> tapped
+    # back clamp. The receiver is through, so its unused thickness is clearance,
+    # never a blind bottom.
+    if (
+        CLAMP_RECEIVER_SPEC.kind,
+        CLAMP_RECEIVER_SPEC.size,
+        CLAMP_RECEIVER_SPEC.end,
+    ) != ("tapped", "#8-32", "through_all"):
+        raise AssertionError("clamp receiver is not a through #8-32 tap")
+    clamp_passage = BAR_DEPTH - CLAMP_CBORE_DEPTH + ARC_FRONT_DEPTH
+    clamp_engagement = CLAMP_SCREW_LEN - clamp_passage
+    nonnegative("clamp head recess", CLAMP_CBORE_DEPTH - CLAMP_SCREW_HEAD_H)
+    nonnegative(
+        "clamp head radial clearance", (CLAMP_CBORE_DIA - CLAMP_SCREW_HEAD_DIA) / 2.0
+    )
+    nonnegative(
+        "clamp shank radial clearance", (CLAMP_HOLE_DIA - CLAMP_SCREW_DIA) / 2.0
+    )
+    valid_engagement("clamp #8-32 engagement", clamp_engagement, CLAMP_SCREW_DIA)
+    nonnegative("clamp receiver tip clearance", ARC_BACK_DEPTH - clamp_engagement)
+    if abs(CLAMP_CBORE_DEPTH - CLAMP_SCREW_HEAD_H - CLAMP_HEAD_RECESS) > 1e-9:
+        raise AssertionError("clamp head is not recessed by the specified 0.2 mm")
+
+    # 90280A194 bracket screws pass the 4-mm bracket and stop 0.3 mm before the
+    # front exit of the support bar's through #8-32 taps.
+    if (
+        BAR_BRACKET_HOLE_SPEC.kind,
+        BAR_BRACKET_HOLE_SPEC.size,
+        BAR_BRACKET_HOLE_SPEC.end,
+    ) != ("tapped", "#8-32", "through_all"):
+        raise AssertionError("bracket receiver is not a through #8-32 tap")
+    if (BRACKET_CLEARANCE_SPEC.kind, BRACKET_CLEARANCE_SPEC.size) != (
+        "clearance",
+        "#8",
+    ):
+        raise AssertionError("bracket passage is not #8 clearance")
+    nonnegative(
+        "bracket shank radial clearance",
+        (CLEARANCE_MM[("#8", "normal")] - BRACKET_SCREW_DIA) / 2.0,
+    )
+    bracket_engagement = BRACKET_SCREW_LEN - BRACKET_THICK
+    valid_engagement("bracket #8-32 engagement", bracket_engagement, BRACKET_SCREW_DIA)
+    nonnegative("bracket screw front-face clearance", BAR_DEPTH - bracket_engagement)
+
+    # 90114A511 guide screws: exact head recess, positive shank clearance,
+    # 5.2678-mm engagement, and positive blind-bottom clearance.
+    nonnegative("guide head recess", PLATEN_CBORE_DEPTH - FILLISTER_HEAD_H)
+    nonnegative(
+        "guide head radial clearance", (PLATEN_CBORE_DIA - FILLISTER_HEAD_DIA) / 2.0
+    )
+    nonnegative(
+        "guide shank radial clearance",
+        (PLATEN_GUIDE_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0,
+    )
+    if abs(PLATEN_CBORE_DEPTH - FILLISTER_HEAD_H - PLATEN_HEAD_RECESS) > 1e-9:
+        raise AssertionError("guide head is not recessed by the specified 0.2 mm")
+    if (
+        abs(GUIDE_SCREW_PASSAGE + GUIDE_SCREW_THREAD_ENGAGEMENT - FILLISTER_SHANK_LEN)
+        > 1e-9
+    ):
+        raise AssertionError("guide screw stack does not consume the stock shank")
+    valid_engagement(
+        "guide #4-40 engagement", GUIDE_SCREW_THREAD_ENGAGEMENT, FILLISTER_SHANK_DIA
+    )
+    nonnegative("guide screw blind-bottom clearance", GUIDE_SCREW_BOTTOM_CLEARANCE)
+
+    # Lock screws are newly rederived from the real 2-mm plate and 6.35-mm
+    # under-head length; the guide now receives the remaining 4.35 mm.
+    nonnegative(
+        "lock shank radial clearance", (LOCK_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0
+    )
+    if abs(LOCK_SCREW_PASSAGE - LOCK_THICK) > 1e-9:
+        raise AssertionError(
+            "lock screw passage does not equal the real plate thickness"
+        )
+    if (
+        abs(LOCK_SCREW_PASSAGE + LOCK_SCREW_THREAD_ENGAGEMENT - FILLISTER_SHANK_LEN)
+        > 1e-9
+    ):
+        raise AssertionError("lock screw stack does not consume the stock shank")
+    valid_engagement(
+        "lock #4-40 engagement", LOCK_SCREW_THREAD_ENGAGEMENT, FILLISTER_SHANK_DIA
+    )
+    nonnegative("lock screw blind-bottom clearance", LOCK_SCREW_BOTTOM_CLEARANCE)
+
+    # Clip bosses use exactly the non-threaded remainder of the shank; the
+    # platen is through-tapped, gives 4.0 mm engagement, and the tip is flush.
+    if (PLATEN_SOCKET_SPEC.kind, PLATEN_SOCKET_SPEC.size, PLATEN_SOCKET_SPEC.end) != (
+        "tapped",
+        "#4-40",
+        "through_all",
+    ):
+        raise AssertionError("clip receiver is not a through #4-40 tap")
+    nonnegative(
+        "clip shank radial clearance", (CLIP_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0
+    )
+    nonnegative(
+        "clip head seat radial margin", (SCREW_SEAT_DIA - FILLISTER_HEAD_DIA) / 2.0
+    )
+    if abs(CLIP_THICKNESS + SCREW_SEAT_BOSS_H - SCREW_SEAT_STACK) > 1e-9:
+        raise AssertionError(
+            "clip boss no longer provides the derived screw seat stack"
+        )
+    valid_engagement(
+        "clip #4-40 engagement", PLATEN_SOCKET_ENGAGEMENT, FILLISTER_SHANK_DIA
+    )
+    clip_tip_clearance = (
+        SCREW_SEAT_STACK + PLATEN_SOCKET_ENGAGEMENT - FILLISTER_SHANK_LEN
+    )
+    nonnegative("clip screw rear protrusion clearance", clip_tip_clearance)
+    if abs(clip_tip_clearance) > 1e-9:
+        raise AssertionError("clip screw tip is not flush with the platen back")
+
+    # The raised heads remain wholly outside the recording-paper side margins.
+    paper_side_margin = (PLATE_WIDTH - PAPER_WIDTH) / 2.0
+    left_head_extent = PLATEN_SOCKET_XY[0][0] + FILLISTER_HEAD_DIA / 2.0
+    right_head_extent = PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + FILLISTER_HEAD_DIA / 2.0
+    nonnegative(
+        "left clip head-to-paper clearance", paper_side_margin - left_head_extent
+    )
+    nonnegative(
+        "right clip head-to-paper clearance", paper_side_margin - right_head_extent
+    )
 
 
 def _assert_rack_mesh() -> None:
@@ -681,6 +867,7 @@ async def _sprocket_revolute(adapter, name: str, label: str) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
+    _assert_fastener_stacks()
     _assert_rack_mesh()
     _assert_gear_mesh()
     _assert_knob_shaft_clearance()
@@ -905,7 +1092,10 @@ async def build(adapter) -> dict[str, str]:
     # The platen owns the feed DOF, so each seed stays lock-mated to that moving
     # body. Native X patterns replicate the regular grids and remain driven by
     # their seeds as the platen travels.
-    clip_targets = [[x, y, PLATE_FRONT_Z - CLIP_THICKNESS] for x, y in CLIP_SCREW_XY]
+    clip_targets = [
+        [x, y, PLATE_FRONT_Z - CLIP_THICKNESS - SCREW_SEAT_BOSS_H]
+        for x, y in CLIP_SCREW_XY
+    ]
     clip_max_x = max(target[0] for target in clip_targets)
     clip_seed_target = min(
         (target for target in clip_targets if target[0] == clip_max_x),
@@ -994,8 +1184,9 @@ async def build(adapter) -> dict[str, str]:
         "platen guide-screw grid",
     )
 
-    # Two seeds at the right-hand station reproduce at the left-hand station.
-    lock_targets = [[x, y, LOCK_Z0 + 2.0] for x, y in LOCK_SCREW_XY]
+    # Two seeds at the right-hand station reproduce at the left-hand station;
+    # under-head planes sit on the real 2-mm lock back faces.
+    lock_targets = [[x, y, LOCK_Z0 + LOCK_THICK] for x, y in LOCK_SCREW_XY]
     lock_min_y = min(target[1] for target in lock_targets)
     plate_mid_x = PLATE_X0 + PLATE_WIDTH / 2.0
     lock_seed_targets = [
@@ -1309,7 +1500,10 @@ async def build(adapter) -> dict[str, str]:
     # codex #189).
     assert_free_dof_necessity(adapter, 1, required_instances=(t12,))
     write_dof_manifest(ASM_NAME)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     # Machine coords put the output/paper side at -Z, so SolidWorks' native Front
     # renders the machine BACK (chain and transgear cluster mirrored). Re-base the
     # standard views (same as the top assembly) so the saved doc and the _front

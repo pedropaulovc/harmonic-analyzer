@@ -1,9 +1,13 @@
 thumb-screw:
+  title: Steel Raised Knurled-Head Thumb Screw
   number: MHA-075
-  material: UNS C36000 per ASTM B16/B16M-24
-  material_specification: UNS C36000 per ASTM B16/B16M-24
-  finish: uncoated, bright
+  stock_name: Steel Raised Knurled-Head Thumb Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91882A221]
+  material: Plain Carbon Steel
+  material_specification: Steel, McMaster-Carr 91882A221
+  finish: as supplied
   quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (brass)"
+  process: purchased

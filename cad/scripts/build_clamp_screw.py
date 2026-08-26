@@ -1,59 +1,35 @@
-r"""Reproduction script: column-clamp screw (book ch. 21/22, ch30; 6 used:
-4 on the platen support bar, 2 on the magnifying wheel-bar).
-
-The long slotted machine screw closing each two-piece column clamp: 2 per
-clamp, heads on the bar's FRONT face flanking the column (ch30 p002),
-shank through the bar (9) and the front arc (17.9), threading into
-the back arc (O4.0 ear holes). Plain cylindrical head; slot and thread not
-modeled (documented simplification, same as fillister-screw).
-
-Layout: axis along Z, authored in final orientation (pointing machine +Z):
-under-head face on the Front plane at z = 0, head -2.5..0, shank 0..+28.
-
-Run (SolidWorks already open)::
-
-    uv run python cad\scripts\build_clamp_screw.py
-"""
+r"""Purchased clamp screw: McMaster 90280A201 in the assembly local frame."""
 
 from __future__ import annotations
 
 import sys
+from math import pi
 
-from _fastener_catalog import fastener
-from _flat_screw import build_flat_screw
 from _common import run_build
-from clamp_screw_spec import (
-    DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    END_VIEW_NOTE,
-    HEAD_DIA,
-    HEAD_H,
-    SHANK_DIA,
-    SHANK_LEN,
-    SLOT_D,
-    SLOT_W,
-)
+from _fastener_catalog import fastener
+from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from diagnostics.diag_build_90280A201 import build_90280A201
+from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 PART_NAME = "clamp-screw"
 SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material
+
+SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, _PITCH = FILLISTER_SIZES["90280A201"]
 
 
 async def build(adapter) -> dict[str, str]:
-    return await build_flat_screw(
+    return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        material=SPEC.material,
-        head_dia=HEAD_DIA,
-        head_h=HEAD_H,
-        shank_dia=SHANK_DIA,
-        shank_len=SHANK_LEN,
-        slot_width=SLOT_W,
-        slot_depth=SLOT_D,
-        mark_dimensions=DRAWING_DIMENSIONS,
-        drawing_properties={
-            "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
-        },
+        components=(
+            StockComponent(
+                sku="90280A201",
+                author=build_90280A201,
+                transform=RigidTransform(rotation_radians=(-pi / 2.0, 0.0, 0.0)),
+            ),
+        ),
+        material=MATERIAL,
     )
 
 

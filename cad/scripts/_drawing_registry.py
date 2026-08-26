@@ -136,12 +136,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_cylinder_gear_shaft.py",
     ),
     DrawingSpec(
-        name="cone_lock_knob",
-        part="cone_lock_knob",
-        artifact_stem="cone-lock-knob",
-        script_name="draw_cone_lock_knob.py",
-    ),
-    DrawingSpec(
         name="pinion_arbor",
         part="pinion_arbor",
         artifact_stem="pinion-arbor",
@@ -448,12 +442,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_cone_pivot_post.py",
     ),
     DrawingSpec(
-        name="cone_tip_adjuster",
-        part="cone_tip_adjuster",
-        artifact_stem="cone-tip-adjuster",
-        script_name="draw_cone_tip_adjuster.py",
-    ),
-    DrawingSpec(
         name="cone_tip_block",
         part="cone_tip_block",
         artifact_stem="cone-tip-block",
@@ -500,96 +488,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="cone_swing_platform",
         artifact_stem="cone-swing-platform",
         script_name="draw_cone_swing_platform.py",
-    ),
-    DrawingSpec(
-        name="fillister_screw",
-        part="fillister_screw",
-        artifact_stem="fillister-screw",
-        script_name="draw_fillister_screw.py",
-    ),
-    DrawingSpec(
-        name="foot_screw",
-        part="foot_screw",
-        artifact_stem="foot-screw",
-        script_name="draw_foot_screw.py",
-    ),
-    DrawingSpec(
-        name="bracket_screw",
-        part="bracket_screw",
-        artifact_stem="bracket-screw",
-        script_name="draw_bracket_screw.py",
-    ),
-    DrawingSpec(
-        name="clamp_screw",
-        part="clamp_screw",
-        artifact_stem="clamp-screw",
-        script_name="draw_clamp_screw.py",
-    ),
-    DrawingSpec(
-        name="slotted_screw",
-        part="slotted_screw",
-        artifact_stem="slotted-screw",
-        script_name="draw_slotted_screw.py",
-    ),
-    DrawingSpec(
-        name="lag_screw",
-        part="lag_screw",
-        artifact_stem="lag-screw",
-        script_name="draw_lag_screw.py",
-    ),
-    DrawingSpec(
-        name="cone_pivot_screw",
-        part="cone_pivot_screw",
-        artifact_stem="cone-pivot-screw",
-        script_name="draw_cone_pivot_screw.py",
-    ),
-    DrawingSpec(
-        name="cone_tip_pinch_screw",
-        part="cone_tip_pinch_screw",
-        artifact_stem="cone-tip-pinch-screw",
-        script_name="draw_cone_tip_pinch_screw.py",
-    ),
-    DrawingSpec(
-        name="hanger_screw",
-        part="hanger_screw",
-        artifact_stem="hanger-screw",
-        script_name="draw_hanger_screw.py",
-    ),
-    DrawingSpec(
-        name="pen_set_screw",
-        part="pen_set_screw",
-        artifact_stem="pen-set-screw",
-        script_name="draw_pen_set_screw.py",
-    ),
-    DrawingSpec(
-        name="swing_stop_screw",
-        part="swing_stop_screw",
-        artifact_stem="swing-stop-screw",
-        script_name="draw_swing_stop_screw.py",
-    ),
-    DrawingSpec(
-        name="thumb_screw",
-        part="thumb_screw",
-        artifact_stem="thumb-screw",
-        script_name="draw_thumb_screw.py",
-    ),
-    DrawingSpec(
-        name="frame_side_screw",
-        part="frame_side_screw",
-        artifact_stem="frame-side-screw",
-        script_name="draw_frame_side_screw.py",
-    ),
-    DrawingSpec(
-        name="gooseneck_set_screw",
-        part="gooseneck_set_screw",
-        artifact_stem="gooseneck-set-screw",
-        script_name="draw_gooseneck_set_screw.py",
-    ),
-    DrawingSpec(
-        name="knife_hanger_stud",
-        part="knife_hanger_stud",
-        artifact_stem="knife-hanger-stud",
-        script_name="draw_knife_hanger_stud.py",
     ),
     DrawingSpec(
         name="summing_assembly",
@@ -653,4 +551,3 @@ for _drawing in DRAWINGS:
             f"drawing {_drawing.name!r} has unknown source_kind "
             f"{_drawing.source_kind!r}"
         )
-

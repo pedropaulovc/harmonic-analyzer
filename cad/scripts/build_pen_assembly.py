@@ -73,12 +73,23 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _interference_contracts import allowed_interference_pairs
 from _transforms import IDENTITY, ROT_Y_180
+from build_hanger_screw import SHANK_LEN as HANGER_SHANK_LEN
+from build_magnifier_assembly import BAR_BACK_Z, WHEEL_BAR_Y, WHEEL_MID_Z
+from build_pen_frame import OUTER_HEIGHT as PEN_FRAME_OUTER_HEIGHT
+from build_pen_frame import RAIL_END as PEN_FRAME_END_RAIL
+from build_pen_hanger import STRAP_Z as HANGER_STRAP_Z
+from build_pen_set_screw import SHANK_DIA as PEN_SET_SHANK_DIA
+from build_pen_set_screw import TIP_CHAMFER as PEN_SET_TIP_CHAMFER
+from build_pen_set_screw import HEAD_STACK_LEN as PEN_SET_HEAD_STACK_LEN
+from build_pen_set_screw import SHANK_LEN as PEN_SET_SHANK_LEN
+from magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
+from pen_marker_spec import BARREL_DIA as MARKER_BARREL_DIA
 
 ASM_NAME = "pen"
 
 # --- machine anchors ---------------------------------------------------------
-WHEEL_BAR_Y = 575.7  # the wheel-bar the pen-hanger clamps (magnifier.SLDASM)
 
 # --- pen ---------------------------------------------------------------------
 PEN_ROD_X = 3.0
@@ -93,19 +104,49 @@ VBLOCK_POS = (24.0, 390.0, -143.5)
 MARKER_X = 13.0  # marker bore (local x 11)
 MARKER_TIP_Y = 368.0
 # Frame flat on the v-block top (y 408), long axis along X so its window
-# (machine x -7..+25, z -161..-147) spans the marker barrel (+9..+17,
-# z -155.5..-147.5) and the pen rod (+0.5..+5.5, z -154..-149). Mapping:
-# machine x = 29 - local y, machine y = 408 + local z, machine z =
-# -143 - local x; the ring's near rail is trimmed to local x 0.75
-# (build_pen_frame TRIM_NEAR) so its edge (z -143.75) clears the recording
-# paper's front face (-143.4) by 0.35. The screw hole (local x 11, z 5)
-# lands at machine (y 413, z -154), axis along X through the east end rail.
+# spans the marker barrel and pen rod. Mapping: machine x = 29 - local y,
+# machine y = 408 + local z, machine z = -143 - local x; the ring's near rail
+# is trimmed to local x 0.75 (build_pen_frame TRIM_NEAR) so its edge clears the
+# recording paper's front face.
 FRAME_POS = (29.0, 408.0, -143.0)
 FRAME_ROWS = [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-# Set screw turned Ry(180) so its own axis presses east (-X) through the
-# frame's east end-rail hole: knob x +33..+38, shank tip at x +18, 1 short
-# of the marker barrel's east face (+17).
-SET_SCREW_POS = (38.0, 413.0, -154.0)
+# The production screw's local origin remains its outer head face. Shift that
+# component frame outward just enough for the stock chamfered tip rim to touch
+# the marker barrel at zero gap. In the screw-axis X/Z section, the limiting
+# point is the tip-face/chamfer rim on the side nearest the marker centre.
+PEN_SET_AXIS_Y = 413.0
+PEN_SET_AXIS_Z = -154.0
+PEN_SET_OVERALL_REACH = PEN_SET_HEAD_STACK_LEN + PEN_SET_SHANK_LEN
+PEN_SET_TIP_RADIUS = PEN_SET_SHANK_DIA / 2.0 - PEN_SET_TIP_CHAMFER
+if PEN_SET_TIP_RADIUS <= 0.0:
+    raise AssertionError("pen-set stock tip chamfer consumes its tip face")
+_PEN_SET_CONTACT_Z = PEN_SET_AXIS_Z + math.copysign(
+    PEN_SET_TIP_RADIUS, PEN_Z_MID - PEN_SET_AXIS_Z
+)
+_MARKER_CONTACT_DZ = _PEN_SET_CONTACT_Z - PEN_Z_MID
+_MARKER_CONTACT_RADICAND = (MARKER_BARREL_DIA / 2.0) ** 2 - _MARKER_CONTACT_DZ**2
+if _MARKER_CONTACT_RADICAND <= 0.0:
+    raise AssertionError("pen-set stock tip cannot reach the marker barrel section")
+_MARKER_CONTACT_DX = math.sqrt(_MARKER_CONTACT_RADICAND)
+PEN_SET_TIP_X = MARKER_X + _MARKER_CONTACT_DX
+SET_SCREW_POS = (
+    PEN_SET_TIP_X + PEN_SET_OVERALL_REACH,
+    PEN_SET_AXIS_Y,
+    PEN_SET_AXIS_Z,
+)
+PEN_SET_CONTACT_GAP = SET_SCREW_POS[0] - PEN_SET_OVERALL_REACH - PEN_SET_TIP_X
+PEN_FRAME_WINDOW_X_MIN = FRAME_POS[0] - (PEN_FRAME_OUTER_HEIGHT - PEN_FRAME_END_RAIL)
+PEN_FRAME_WINDOW_X_MAX = FRAME_POS[0] - PEN_FRAME_END_RAIL
+if abs(_MARKER_CONTACT_DZ) / _MARKER_CONTACT_DX >= 1.0:
+    raise AssertionError("pen-set chamfer flank, not its rim, controls barrel contact")
+if not math.isclose(PEN_SET_CONTACT_GAP, 0.0, abs_tol=1e-9):
+    raise AssertionError("pen-set stock tip is not tangent to the marker barrel")
+if not math.isclose(PEN_SET_OVERALL_REACH, 22.225, abs_tol=1e-9):
+    raise AssertionError("selected pen-set screw overall reach drifted from 22.225 mm")
+if not PEN_FRAME_WINDOW_X_MIN < PEN_SET_TIP_X < PEN_FRAME_WINDOW_X_MAX:
+    raise AssertionError(
+        "pen-set screw contact does not finish inside the frame window"
+    )
 
 # --- amplification wire 2 (rim -> pen rod) -----------------------------------
 # Endpoints + length live in pen_wire_geom (the part's length IS the run);
@@ -127,12 +168,19 @@ assert math.isclose(PEN_WIRE_BOTTOM[1] + PEN_WIRE_LEN, WHEEL_BAR_Y, abs_tol=1e-9
 )
 
 # --- M6.10 fastener ----------------------------------------------------------
-# Pen-hanger screw from BEHIND the bar (the wheel rim passes 1.0 in front
-# of the strap, so no front-side head fits): AF-7 head on the bar back
-# face (-129.9 -- the 9-deep support-bar stock seated on the clamp arc,
-# build_magnifier_assembly BAR_BACK_Z), O3.5 shank through the bar + strap
-# holes, tip 0.5 behind the strap front face (-141.9).
-HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, -129.9)
+# Pen-hanger screw from BEHIND the bar. Its under-head frame follows the shared
+# wheel-bar back face; the exact stock shank passes through the 9 mm bar and
+# 3 mm strap, then retains clearance to the magnifying-wheel rim.
+HANGER_SCREW_POS = (-5.5, WHEEL_BAR_Y, BAR_BACK_Z)
+HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
+HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
+WHEEL_RIM_BACK_Z = WHEEL_MID_Z + WHEEL_RIM_AXIAL / 2.0
+HANGER_THREAD_PROTRUSION = HANGER_STRAP_FRONT_Z - HANGER_SCREW_TIP_Z
+HANGER_TIP_TO_RIM = HANGER_SCREW_TIP_Z - WHEEL_RIM_BACK_Z
+if HANGER_THREAD_PROTRUSION <= 0.0:
+    raise AssertionError("stock hanger screw does not pass through the tapped strap")
+if HANGER_TIP_TO_RIM <= 0.0:
+    raise AssertionError("stock hanger screw tip reaches the magnifying-wheel rim")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -320,7 +368,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, 1, required_stems=("pen-rod", "pen-marker", "pen-wire")
     )
     write_dof_manifest(ASM_NAME)
-    check_no_interference(adapter)
+    check_no_interference(
+        adapter,
+        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+    )
     # Title-block identity for the assembly drawing (draw_pen_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry; material and

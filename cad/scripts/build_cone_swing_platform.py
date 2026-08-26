@@ -16,9 +16,10 @@ run from the swing pivot to the cone-lock-knob is SOLID plate (no lobe
 protrusion); the open LOCK NOTCH cuts straight into the west edge. The
 four plan corners are rounded, echoing the hardware each sits beside
 (pivot screw head at the north end, the green column at the south-east,
-the lock knob washer at the south-west). A O6.5 pivot hole takes the
-slotted pivot screw (clearance over its O6.35 shoulder -- the plate
-rotates ON the screw).
+the lock-knob head at the south-west). A Ø6.756 pivot hole clears the stock
+Ø6.35 shoulder. A Ø10.50 x 0.25-deep top relief reduces only the local bearing
+thickness to 6.10, preserving 0.25 running axial clearance without lowering the
+plate or its mounted hardware.
 
 The shortened envelope and paired 1/4-20 post mounts are the direct platform
 cascade from ``cone-pivot-post-v2.SLDPRT``.  Its 42.011 mm casting foot is
@@ -44,6 +45,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 import sys
 
 from _common import (
@@ -60,6 +62,7 @@ from _common import (
     force_rebuild,
     name_bore_axis,
     name_last_feature,
+    name_dimensions,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -75,12 +78,17 @@ from _drawing_marks import (
 )
 from _holes import HoleSpec, blind_cut_dia_mm, wizard_holes
 from _visibility import blank_reference_geometry
+from build_cone_lock_knob import HEAD_DIA as LOCK_HEAD_DIA
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
     PLATE_THICKNESS,
+    PIVOT_BEARING_RELIEF_DEPTH,
+    PIVOT_BEARING_RELIEF_DIAMETER,
+    PIVOT_BEARING_THICKNESS,
+    PIVOT_HEAD_RADIAL_CLEARANCE,  # noqa: F401 -- public verify contract
     PLATE_LENGTH_TOLERANCE_MM,
     PLAN_VIEW_NOTE,
     POST_MOUNT_THREAD,
@@ -97,7 +105,7 @@ WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
 # clearance while retaining the close photo relationship in ch12 img09.
 EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
 WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
-# the pivot -> lock-knob line solid plate (covers the notch seat + washer)
+# the pivot -> lock-knob line solid plate (covers the notch seat + collar)
 NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
 # Clearance over the O6.35 pivot-screw shoulder: the plate swings ON the screw
 # (build_cone_pivot_screw). 1/4 clearance CLOSE fit (Ø6.756, the wizard twin of
@@ -107,6 +115,10 @@ PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total (both_directions splits it half per
 # side of the sketch plane); must exceed 2x any extent crossed
+if abs(PLATE_T - PIVOT_BEARING_RELIEF_DEPTH - PIVOT_BEARING_THICKNESS) > 1e-9:
+    raise AssertionError(
+        "pivot bearing relief no longer leaves its specified thickness"
+    )
 
 INCLINE_DEG = 12.5182  # cone-axis plan incline (the assembly's ROT_Y_INCLINE)
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
@@ -145,9 +157,9 @@ _POST_EAST_NORMAL_CLEAR = _POST_EAST_HALF / math.hypot(
 _POST_WEST_NORMAL_CLEAR = _POST_WEST_HALF / math.hypot(
     1.0, (WEST_HALF_S - WEST_HALF_N) / PLATE_LEN
 )
-POST_FOOT_CONTAINMENT = min(
-    _POST_SOUTH_CLEAR, _POST_EAST_NORMAL_CLEAR, _POST_WEST_NORMAL_CLEAR
-) - _POST_R
+POST_FOOT_CONTAINMENT = (
+    min(_POST_SOUTH_CLEAR, _POST_EAST_NORMAL_CLEAR, _POST_WEST_NORMAL_CLEAR) - _POST_R
+)
 if POST_FOOT_CONTAINMENT < 0.25:
     raise AssertionError(
         f"v2 post foot has only {POST_FOOT_CONTAINMENT:.3f} mm platform containment"
@@ -155,14 +167,11 @@ if POST_FOOT_CONTAINMENT < 0.25:
 if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
     raise AssertionError("v2 post mount taps fall outside the casting foot")
 
-# --- lock notch (the v4_t00411 clamp knob rides this) ------------------------
 # The open-ended lock notch cuts from the engaged stud seat straight out
-# through the plate's WEST edge (the mouth). The cone-lock-knob's stud (fixed
-# to the base) sits at the notch's closed end when engaged; on disengage the
-# plate swings until its edge passes the stud entirely -- v4_t00417 shows the
-# bolt standing PAST the plate edge. Screwed down with no plate under it, the
-# knob's washer drops past plate-top level and fences the mouth, locking the
-# plate DISENGAGED (tightened ON the plate it clamps ENGAGED).
+# through the plate's WEST edge. The cone-lock-knob stud is fixed to the base;
+# on disengage the plate swings until its edge passes the stud and collar.
+# Tightened with no plate under it, the collar fences the mouth and locks the
+# plate disengaged; tightened on the plate it clamps the engaged pose.
 # The notch runs along the swing arc's CHORD: at R~192 over ~3 deg to the
 # mouth the sagitta is ~0.07, absorbed by the O6.35-stud-in-8.0 clearance.
 #
@@ -170,12 +179,16 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 # (train._plate_local_to_machine), under which local +x maps to machine WEST
 # at the engaged pose -- every west-side feature below (the flare, the lock
 # notch) is authored at local +x, east-side features at local -x.
-SLOT_W = 8.0  # notch width: O6.35 stud + chord-vs-arc slack (see above)
-SLOT_E_X, SLOT_E_Z = 27.5, -175.0  # engaged stud centre (part-local frame).
-# An exact rotating-solid sweep against T114 proves this 3 mm outward move
-# clears the cone gear through a full tooth pitch while retaining the notch
-# seat on the west flare.
-SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)  # 192.079 about the swing pivot
+SLOT_W = 8.0  # Ø6.35 stud clearance plus chord-vs-arc slack
+# The stock O25.4 head must clear both the O42.011 post foot and the nearby
+# T120/64T gear row.  The northern solution beside the post clears the post but
+# overlaps both gears; use the southern solution and move the stud west until
+# the head retains the established 2 mm post gap with useful plate edge stock.
+SLOT_E_X = 33.0
+LOCK_HEAD_POST_CLEARANCE = 2.0
+_LOCK_POST_C2C = LOCK_HEAD_DIA / 2.0 + POST_MAIN_DIA / 2.0 + LOCK_HEAD_POST_CLEARANCE
+SLOT_E_Z = POST_LOCAL_Z - math.sqrt(_LOCK_POST_C2C**2 - SLOT_E_X**2)
+SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)
 # The plate swings toward disengage (big end away from the drum), so in PLATE
 # coords the fixed stud sweeps the INVERSE rotation: unit direction (-z, x)/R
 # at E -- outward toward the west edge (+x), slightly north (+z).
@@ -184,8 +197,10 @@ _SLOT_TX, _SLOT_TZ = -SLOT_E_Z / SLOT_R, SLOT_E_X / SLOT_R
 
 def _west_edge_x(z_local: float) -> float:
     """Authored x of the west taper edge at local z (linear 8 -> 37)."""
-    return WEST_HALF_N + (WEST_HALF_S - WEST_HALF_N) * (
-        NORTH_OVERHANG - z_local) / PLATE_LEN
+    return (
+        WEST_HALF_N
+        + (WEST_HALF_S - WEST_HALF_N) * (NORTH_OVERHANG - z_local) / PLATE_LEN
+    )
 
 
 def _chord_exit_travel(x0: float, z0: float) -> float:
@@ -195,22 +210,103 @@ def _chord_exit_travel(x0: float, z0: float) -> float:
     return (WEST_HALF_N + k * (NORTH_OVERHANG - z0) - x0) / (_SLOT_TX + k * _SLOT_TZ)
 
 
-# Stud travel (in plate coords) from the engaged seat to the mouth. Past this
-# the stud is OUT of the plate; the assembly derives the disengaged pose
-# (edge clear of the knob washer, DISENGAGE_DEG) from it.
+# Stud travel from the engaged seat to the mouth. Past this the stud is out of
+# the plate; the shared hardware calculation adds the exact collar radius to
+# derive the disengaged pose.
 NOTCH_EXIT_TRAVEL = _chord_exit_travel(SLOT_E_X, SLOT_E_Z)
 _MOUTH_OVERSHOOT = 4.0  # cut ends past the edge so the mouth opens clean
 _SLOT_OUT_X = SLOT_E_X + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TX
 _SLOT_OUT_Z = SLOT_E_Z + (NOTCH_EXIT_TRAVEL + _MOUTH_OVERSHOOT) * _SLOT_TZ
 
+STOP_LOCAL_Z = -105.0
+
+
+@dataclass(frozen=True, slots=True)
+class SwingHardwareGeometry:
+    """Shared machine-frame stations for the base-fixed lock and travel stop."""
+
+    lock_xz: tuple[float, float]
+    disengage_deg: float
+    stop_contact_xz: tuple[float, float]
+    stop_xz: tuple[float, float]
+    stop_engaged_gap: float
+
+
+def swing_hardware_geometry(
+    pivot_xz: tuple[float, float],
+    *,
+    lock_collar_dia: float,
+    stop_shank_dia: float,
+) -> SwingHardwareGeometry:
+    """Derive the lock seat and stop contact once from the platform outline."""
+    if lock_collar_dia <= 0.0 or stop_shank_dia <= 0.0:
+        raise ValueError("swing hardware diameters must be positive")
+
+    def placed(x_local: float, z_local: float, angle_rad: float) -> tuple[float, float]:
+        c, s = math.cos(angle_rad), math.sin(angle_rad)
+        return (
+            pivot_xz[0] + x_local * c + z_local * s,
+            pivot_xz[1] - x_local * s + z_local * c,
+        )
+
+    incline_rad = math.radians(INCLINE_DEG)
+    lock_xz = placed(SLOT_E_X, SLOT_E_Z, incline_rad)
+    disengage_deg = math.degrees(
+        (NOTCH_EXIT_TRAVEL + lock_collar_dia / 2.0 + 2.0) / SLOT_R
+    )
+    disengaged_rad = incline_rad + math.radians(disengage_deg)
+
+    east_slope = (EAST_HALF_S - HALF_WIDTH_N) / PLATE_LEN
+    stop_local_x = -(HALF_WIDTH_N + east_slope * (NORTH_OVERHANG - STOP_LOCAL_Z))
+    edge_out_local = (-1.0, east_slope)
+    edge_norm = math.hypot(*edge_out_local)
+    edge_out_local = (
+        edge_out_local[0] / edge_norm,
+        edge_out_local[1] / edge_norm,
+    )
+
+    contact_xz = placed(stop_local_x, STOP_LOCAL_Z, disengaged_rad)
+    c_dis, s_dis = math.cos(disengaged_rad), math.sin(disengaged_rad)
+    edge_out_disengaged = (
+        edge_out_local[0] * c_dis + edge_out_local[1] * s_dis,
+        -edge_out_local[0] * s_dis + edge_out_local[1] * c_dis,
+    )
+    stop_xz = (
+        contact_xz[0] + edge_out_disengaged[0] * stop_shank_dia / 2.0,
+        contact_xz[1] + edge_out_disengaged[1] * stop_shank_dia / 2.0,
+    )
+
+    engaged_edge_xz = placed(stop_local_x, STOP_LOCAL_Z, incline_rad)
+    edge_out_engaged = (
+        edge_out_local[0] * _COS_I + edge_out_local[1] * _SIN_I,
+        -edge_out_local[0] * _SIN_I + edge_out_local[1] * _COS_I,
+    )
+    stop_delta = (
+        stop_xz[0] - engaged_edge_xz[0],
+        stop_xz[1] - engaged_edge_xz[1],
+    )
+    engaged_gap = (
+        stop_delta[0] * edge_out_engaged[0]
+        + stop_delta[1] * edge_out_engaged[1]
+        - stop_shank_dia / 2.0
+    )
+    return SwingHardwareGeometry(
+        lock_xz=lock_xz,
+        disengage_deg=disengage_deg,
+        stop_contact_xz=contact_xz,
+        stop_xz=stop_xz,
+        stop_engaged_gap=engaged_gap,
+    )
+
+
 # --- rounded plan corners (item: they echo the neighbouring hardware) --------
 # (authored x, local z, radius): north pair ~ the pivot screw head, south-east
-# ~ the green column foot, south-west ~ the knob washer. Sharp-corner plan
-# points; the fillets are cut on the vertical edges after all through-cuts.
+# ~ the green column foot.  The south-west fillet is reduced around the
+# relocated lock notch so the corner round and the closed seat do not overlap.
 _CORNERS = (
     ("NE", -HALF_WIDTH_N, NORTH_OVERHANG, 10.0),
     ("NW", WEST_HALF_N, NORTH_OVERHANG, 8.0),
-    ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 10.0),
+    ("SW", WEST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 5.0),
     ("SE", -EAST_HALF_S, NORTH_OVERHANG - PLATE_LEN, 12.0),
 )
 
@@ -274,6 +370,12 @@ async def build(adapter) -> dict[str, str]:
     # is an INCH document and the equation manager reads BARE numbers in
     # document units (an unsuffixed 214 = 214 in).
     await set_global(adapter, "PlateT", f"{PLATE_T}mm")
+    await set_global(
+        adapter, "PivotBearingReliefDia", f"{PIVOT_BEARING_RELIEF_DIAMETER}mm"
+    )
+    await set_global(
+        adapter, "PivotBearingReliefDepth", f"{PIVOT_BEARING_RELIEF_DEPTH}mm"
+    )
     await set_global(adapter, "HalfWidthN", f"{HALF_WIDTH_N}mm")
     await set_global(adapter, "WestHalfN", f"{WEST_HALF_N}mm")
     await set_global(adapter, "EastHalfS", f"{EAST_HALF_S}mm")
@@ -305,13 +407,27 @@ async def build(adapter) -> dict[str, str]:
     lines = await add_line_chain(adapter, plan_pts)
     set_sketch_direct_db(adapter, False)
     await define_polygon_chain(
-        adapter, lines, plan_pts, label="plate plan", dims=plate,
-        names=["NorthHalfW", "NorthOverhangDim", "NorthEdge",
-               "WestTaperDx", "PlateLenDim", "SouthEdge"],
-        drives=['"HalfWidthN"', '"NorthOverhang"',
-                '"HalfWidthN" + "WestHalfN"',
-                '"WestHalfS" - "WestHalfN"', '"PlateLen"',
-                '"WestHalfS" + "EastHalfS"'],
+        adapter,
+        lines,
+        plan_pts,
+        label="plate plan",
+        dims=plate,
+        names=[
+            "NorthHalfW",
+            "NorthOverhangDim",
+            "NorthEdge",
+            "WestTaperDx",
+            "PlateLenDim",
+            "SouthEdge",
+        ],
+        drives=[
+            '"HalfWidthN"',
+            '"NorthOverhang"',
+            '"HalfWidthN" + "WestHalfN"',
+            '"WestHalfS" - "WestHalfN"',
+            '"PlateLen"',
+            '"WestHalfS" + "EastHalfS"',
+        ],
     )
     await ensure_fully_defined(adapter, "plate plan")
     check("exit_sketch plate", await adapter.exit_sketch())
@@ -322,8 +438,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_T)),
     )
     name_last_feature(adapter, "Plate")
-    v_plate = ((HALF_WIDTH_N + WEST_HALF_N) + (WEST_HALF_S + EAST_HALF_S)) / 2.0 \
-        * PLATE_LEN * PLATE_T
+    v_plate = (
+        ((HALF_WIDTH_N + WEST_HALF_N) + (WEST_HALF_S + EAST_HALF_S))
+        / 2.0
+        * PLATE_LEN
+        * PLATE_T
+    )
     volume = await volume_check(adapter, "plate", v_plate, 0.005 * v_plate)
 
     # Pivot screw clearance hole at the origin: ONE native Hole Wizard 1/4
@@ -333,13 +453,65 @@ async def build(adapter) -> dict[str, str]:
     # ON the Ø6.35 pivot-screw shoulder, so a close 1/4 clearance (Ø6.756).
     pivot_dia = PIVOT_HOLE_DIA
     wizard_holes(
-        adapter, PIVOT_HOLE_SPEC,
+        adapter,
+        PIVOT_HOLE_SPEC,
         [[0.0, 0.0, 0.0]],
-        (0.0, -1.0, 0.0), "pivot screw hole (1/4 clearance)", name="PivotHole",
+        (0.0, -1.0, 0.0),
+        "pivot screw hole (1/4 clearance)",
+        name="PivotHole",
         dia_tolerance_mm=(0.0, 0.10),
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = await volume_check(adapter, "pivot hole", volume - v_hole, 0.01 * v_hole)
+
+    # The stock 1/4-in shoulder is exactly as long as the nominal plate is
+    # thick. A shallow top relief preserves the established 0.25 mm running
+    # clearance without lowering the plate or any hardware mounted on it.
+    check(
+        "create_plane PivotBearingTop",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=PLATE_T)
+        ),
+    )
+    name_last_feature(adapter, "PivotBearingTop")
+    bearing_relief = SketchDims()
+    check(
+        "create_sketch pivot bearing relief",
+        await adapter.create_sketch("PivotBearingTop"),
+    )
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        PIVOT_BEARING_RELIEF_DIAMETER / 2.0,
+        "pivot bearing relief",
+        dims=bearing_relief,
+        names=("PivotBearingReliefCx", "PivotBearingReliefCz", "PivotBearingReliefDia"),
+        drives=(None, None, '"PivotBearingReliefDia"'),
+    )
+    await ensure_fully_defined(adapter, "pivot bearing relief sketch")
+    check("exit_sketch pivot bearing relief", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotBearingReliefProfile")
+    drive_jobs += bearing_relief.apply(adapter, "PivotBearingReliefProfile")
+    check(
+        "cut pivot bearing relief",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=PIVOT_BEARING_RELIEF_DEPTH)
+        ),
+    )
+    name_last_feature(adapter, "PivotBearingRelief")
+    relief_depth_dim = name_dimensions(
+        adapter, "PivotBearingRelief", ["PivotBearingReliefDepth"]
+    )
+    drive_jobs += [(relief_depth_dim[0], '"PivotBearingReliefDepth"')]
+    v_relief = (
+        math.pi
+        * ((PIVOT_BEARING_RELIEF_DIAMETER / 2.0) ** 2 - (pivot_dia / 2.0) ** 2)
+        * PIVOT_BEARING_RELIEF_DEPTH
+    )
+    volume = await volume_check(
+        adapter, "pivot bearing relief", volume - v_relief, 0.01 * v_relief
+    )
 
     # The v2 casting's two Fillister-head attachment bores land on matching
     # native 1/4-20 UNC-2B through taps in the platform.  One Hole Wizard
@@ -397,9 +569,21 @@ async def build(adapter) -> dict[str, str]:
     slot_lines = await add_line_chain(adapter, slot_pts)
     set_sketch_direct_db(adapter, False)
     await define_polygon_chain(
-        adapter, slot_lines, slot_pts, label="lock notch", dims=slot,
-        names=["SlotAnchorX", "SlotAnchorZ", "SlotRunDx", "SlotRunDy",
-               "SlotEndDx", "SlotEndDy", "SlotBackDx", "SlotBackDy"],
+        adapter,
+        slot_lines,
+        slot_pts,
+        label="lock notch",
+        dims=slot,
+        names=[
+            "SlotAnchorX",
+            "SlotAnchorZ",
+            "SlotRunDx",
+            "SlotRunDy",
+            "SlotEndDx",
+            "SlotEndDy",
+            "SlotBackDx",
+            "SlotBackDy",
+        ],
         drives=[None] * 8,
     )
     await ensure_fully_defined(adapter, "lock notch sketch")
@@ -426,7 +610,12 @@ async def build(adapter) -> dict[str, str]:
     cap = SketchDims()
     check("create_sketch notch cap E", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, _e[0], _e[1], SLOT_W / 2.0, "notch cap E", dims=cap,
+        adapter,
+        _e[0],
+        _e[1],
+        SLOT_W / 2.0,
+        "notch cap E",
+        dims=cap,
         names=("CapECx", "CapECz", "CapEDia"),
         drives=(None, None, '"SlotW"'),
     )
@@ -452,22 +641,34 @@ async def build(adapter) -> dict[str, str]:
     # AXIS through CRANK_SEAT_ANCHOR (name-selected pivot, view-independent),
     # then the two angled planes rotated about it.
     anchor_axis = await name_bore_axis(
-        adapter, "Front Plane", CRANK_SEAT_ANCHOR[1],
-        "Right Plane", CRANK_SEAT_ANCHOR[0], "crank anchor (vertical)",
+        adapter,
+        "Front Plane",
+        CRANK_SEAT_ANCHOR[1],
+        "Right Plane",
+        CRANK_SEAT_ANCHOR[0],
+        "crank anchor (vertical)",
     )
     check(
         "create_plane CrankAxisVert (angled about the anchor axis)",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="angle", base_plane="Right Plane", angle=CRANK_PLANE_ANGLE,
-            pivot_axis=anchor_axis,
-        )),
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="angle",
+                base_plane="Right Plane",
+                angle=CRANK_PLANE_ANGLE,
+                pivot_axis=anchor_axis,
+            )
+        ),
     )
     name_last_feature(adapter, "CrankAxisVert")
     check(
         "create_plane CrankAxisHigh (Top + crank height)",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Top Plane", offset=CRANK_AXIS_Y,
-        )),
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Top Plane",
+                offset=CRANK_AXIS_Y,
+            )
+        ),
     )
     name_last_feature(adapter, "CrankAxisHigh")
     # Seat plane PERPENDICULAR to the crank axis (Front rotated the same way
@@ -476,18 +677,25 @@ async def build(adapter) -> dict[str, str]:
     # plate instead of a world datum.
     check(
         "create_plane CrankAxisSeat (angled, perpendicular to the axis)",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="angle", base_plane="Front Plane", angle=CRANK_PLANE_ANGLE,
-            pivot_axis=anchor_axis,
-        )),
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="angle",
+                base_plane="Front Plane",
+                angle=CRANK_PLANE_ANGLE,
+                pivot_axis=anchor_axis,
+            )
+        ),
     )
     name_last_feature(adapter, "CrankAxisSeat")
     # Crank axis: the machine-z crank line, in plate coordinates.
     check(
         "create_axis crank axis",
-        await adapter.create_axis(CreateAxisParameters(
-            mode="two_planes", planes=["CrankAxisVert", "CrankAxisHigh"],
-        )),
+        await adapter.create_axis(
+            CreateAxisParameters(
+                mode="two_planes",
+                planes=["CrankAxisVert", "CrankAxisHigh"],
+            )
+        ),
     )
     name_last_feature(adapter, "crank axis")
 
@@ -563,17 +771,18 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(
         adapter,
         (
-            # Unnamed offset planes created inside name_bore_axis. Removing
-            # CrankGearReliefPlane shifts these generated ordinals down by one.
-            ("Plane1", "PLANE"),
+            # Unnamed offset planes created inside name_bore_axis. The named
+            # PivotBearingTop plane occupies the first generated plane ordinal.
+            ("PivotBearingTop", "PLANE"),
             ("Plane2", "PLANE"),
+            ("Plane3", "PLANE"),
             ("CrankAxisVert", "PLANE"),
             ("CrankAxisHigh", "PLANE"),
             ("CrankAxisSeat", "PLANE"),
-            ("Plane6", "PLANE"),
             ("Plane7", "PLANE"),
             ("Plane8", "PLANE"),
             ("Plane9", "PLANE"),
+            ("Plane10", "PLANE"),
             ("PlateTop", "PLANE"),
             (swing_axis, "AXIS"),
             (anchor_axis, "AXIS"),

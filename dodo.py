@@ -2090,10 +2090,8 @@ def task_check():
         # One offline contract file per manufacturing drawing (test_*_drawing.py),
         # so registering a drawing auto-enrolls its contracts here.
         *sorted(SCRIPTS_DIR.glob("test_*_drawing.py")),
-        # Cross-sheet ownership checks whose filename intentionally does not match
+        # Cross-sheet ownership checks whose filenames intentionally do not match
         # the one-file-per-drawing discovery pattern above.
-        SCRIPTS_DIR / "test_fastener_drawing_metadata.py",
-        SCRIPTS_DIR / "test_remaining_fastener_drawings.py",
         SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
         # Was omitted while its two siblings above were enrolled, so NO gate ran
         # it: converting channel to a three-view diagram left it reading

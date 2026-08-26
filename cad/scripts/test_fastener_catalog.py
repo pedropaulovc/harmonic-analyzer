@@ -1,82 +1,59 @@
 from __future__ import annotations
 
-import re
-from pathlib import Path
-
-from _fastener_catalog import DriveStyle, FASTENERS, Finish, HeadStyle
-from _holes import HoleSpec, blind_cut_dia_mm
+import _config
+from _fastener_catalog import FASTENERS
 
 
-_THREADED_BUILDERS = {
-    "bracket-screw",
-    "clamp-screw",
-    "cone-lock-knob",
-    "cone-pivot-screw",
-    "cone-tip-adjuster",
-    "cone-tip-pinch-screw",
-    "fillister-screw",
-    "foot-screw",
-    "frame-side-screw",
-    "gooseneck-set-screw",
-    "hanger-screw",
-    "hex-bolt",
-    "knife-hanger-stud",
-    "lag-screw",
-    "pen-set-screw",
-    "slotted-screw",
-    "swing-stop-screw",
-    "thumb-screw",
+_EXPECTED = {
+    # Stable production stem: (McMaster SKU(s), MHA number, fleet quantity).
+    "bracket-screw": (("90280A194",), "MHA-108", 2),
+    "clamp-screw": (("90280A201",), "MHA-107", 6),
+    "cone-lock-knob": (("91882A412",), "MHA-093", 1),
+    "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
+    "cone-tip-adjuster": (("94025A150",), "MHA-097", 1),
+    "cone-tip-pinch-screw": (("90280A108",), "MHA-098", 1),
+    "fillister-screw": (("90114A511",), "MHA-030", 22),
+    "foot-screw": (("90280A108",), "MHA-103", 3),
+    "frame-side-screw": (("90280A194",), "MHA-117", 6),
+    "gooseneck-set-screw": (("91410A538",), "MHA-118", 1),
+    "hanger-screw": (("93075A194",), "MHA-034", 1),
+    "hex-bolt": (("92865A585",), "MHA-036", None),
+    "knife-hanger-stud": (("91247A720",), "MHA-119", 2),
+    "lag-screw": (("91783A722",), "MHA-039", 4),
+    "pen-set-screw": (("99607A213",), "MHA-052", 1),
+    "slotted-screw": (("90280A199",), "MHA-101", 4),
+    "swing-stop-screw": (("90280A196",), "MHA-095", 1),
+    "thumb-screw": (("91882A221",), "MHA-075", 2),
+    "knife-hanger-washer": (("90126A211",), "MHA-121", 2),
 }
 
 
-def test_catalog_covers_every_threaded_fastener_builder() -> None:
-    scripts = Path(__file__).parent
-    missing_scripts = {
-        stem for stem in _THREADED_BUILDERS
-        if not (scripts / f"build_{stem.replace('-', '_')}.py").is_file()
-    }
-    assert not missing_scripts
-    assert set(FASTENERS) == _THREADED_BUILDERS
+def test_catalog_carries_only_purchased_mcmaster_identities() -> None:
+    assert set(FASTENERS) == set(_EXPECTED)
+    for stem, (skus, _number, _quantity) in _EXPECTED.items():
+        spec = FASTENERS[stem]
+        assert spec.part_name == stem
+        assert spec.supplier == "McMaster-Carr"
+        assert spec.skus == skus
+        assert spec.stock_name.strip()
+        assert spec.material in {"Plain Carbon Steel", "AISI 304", "Brass"}
 
 
-def test_catalog_uses_us_customary_unc_threads() -> None:
-    designation = re.compile(r"^(?:#[0-9]+|[0-9]+/[0-9]+)-[0-9]+$")
-    assert all(designation.fullmatch(spec.thread) for spec in FASTENERS.values())
+def test_purchased_config_preserves_bom_identity_and_quantity() -> None:
+    for stem, (skus, number, quantity) in _EXPECTED.items():
+        row = _config.parts(stem)
+        assert row["number"] == number
+        assert tuple(row["supplier_skus"]) == skus
+        assert row["supplier"] == "McMaster-Carr"
+        assert row["stock_name"] == FASTENERS[stem].stock_name
+        assert row["process"] == "purchased"
+        if quantity is None:
+            assert "quantity" not in row
+        else:
+            assert int(row["quantity"]) == quantity
 
 
-def test_catalog_material_and_finish_are_consistent() -> None:
-    for spec in FASTENERS.values():
-        assert spec.length_mm > 0
-        assert spec.model_diameter_mm > 0
-        if spec.material == "Brass":
-            assert spec.finish is Finish.BRASS
-        if spec.finish is Finish.BRASS:
-            assert spec.material == "Brass"
-
-
-def test_period_fasteners_keep_their_visible_drive_style() -> None:
-    slotted = {
-        "bracket-screw",
-        "clamp-screw",
-        "cone-pivot-screw",
-        "cone-tip-adjuster",
-        "cone-tip-pinch-screw",
-        "fillister-screw",
-        "foot-screw",
-        "frame-side-screw",
-        "lag-screw",
-        "slotted-screw",
-        "swing-stop-screw",
-    }
-    assert {name for name, spec in FASTENERS.items() if spec.drive is DriveStyle.SLOT} == slotted
-    assert FASTENERS["hanger-screw"].head is HeadStyle.HEX
-
-
-def test_cone_tip_adjuster_cosmetic_envelope_clears_its_tap_drill() -> None:
-    adjuster = FASTENERS["cone-tip-adjuster"]
-    tap_drill = blind_cut_dia_mm(
-        HoleSpec("tapped", adjuster.thread, end="blind", depth_mm=8.0)
-    )
-    assert adjuster.model_diameter_mm == 6.2
-    assert tap_drill == 6.528
-    assert tap_drill - adjuster.model_diameter_mm >= 0.25
+def test_special_bom_titles_remain_machine_specific() -> None:
+    assert _config.parts("knife-hanger-stud")["title"] == "Knife-Hanger Bolt"
+    assert _config.parts("knife-hanger-washer")["title"] == "Knife-Hanger Washer"
+    assert _config.parts("lag-screw")["title"] == "Rocker-Support Hold-Down Screw"

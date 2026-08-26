@@ -11,8 +11,8 @@ fall off. 10 deep so the lock plates clear the 9-deep bar.
 Layout: length along +X, height along +Y from the origin corner, depth
 extruded -Z so native Front looks directly at the hole-entry face. The
 assembly seats local z 0 on the platen back and rotates the part 180 about Y
-to preserve the machine-space rail envelope. The 4 lock
-screw holes run through along Z at the two proportional lock stations.
+to preserve the machine-space rail envelope. Four blind #4-40 receivers enter
+from the rear face at the two proportional lock stations.
 
 Run (SolidWorks already open)::
 
@@ -49,12 +49,15 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _holes import (
-    CLEARANCE_MM,
+    DRILL_POINT_H,
     HoleSpec,
     blind_cut_dia_mm,
     blind_hole_volume_mm3,
     wizard_holes,
 )
+from build_fillister_screw import SHANK_LEN as FILLISTER_SHANK_LEN
+from build_platen import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS
+from build_guide_lock import LOCK_THICK
 
 PART_NAME = "platen-guide"
 MATERIAL = "Plain Carbon Steel"
@@ -67,15 +70,33 @@ LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
 
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))
 
-# Blind holes on the FRONT face (mid-height) where the row of 5 fastening
-# screws threads in: the platen counterbores its heads (build_platen), so the
-# fillister shanks reach 2.4 past the platen back into the rail. These become
-# #4-40 bottoming-tapped Hole Wizard holes (tap drill Ø2.261; was plain Ø3.0).
-# Stations = the platen's GUIDE_HOLE_X (pinned by an assert in the assembly
-# module). The lock-screw LockHoles above become #4 clearance (the fillister
-# lock screws pass through) -- memory/fastener-policy-us-customary.
+# The front row receives the ten guide screws after each shank passes through
+# the platen material left below its stock-head counterbore. The rear row
+# receives the eight lock screws after each shank passes through a 2-mm lock
+# plate. Both are #4-40 bottoming taps with positive clearance between the
+# screw tip and cylindrical blind-hole bottom.
 SCREW_STATION_X = (26.964, 80.892, 134.82, 188.748, 242.676)
-SCREW_HOLE_DEPTH = 4.0
+GUIDE_SCREW_PASSAGE = PLATE_THICKNESS - PLATEN_CBORE_DEPTH
+GUIDE_SCREW_THREAD_ENGAGEMENT = FILLISTER_SHANK_LEN - GUIDE_SCREW_PASSAGE
+SCREW_HOLE_DEPTH = 5.52
+GUIDE_SCREW_BOTTOM_CLEARANCE = SCREW_HOLE_DEPTH - GUIDE_SCREW_THREAD_ENGAGEMENT
+
+LOCK_SCREW_PASSAGE = LOCK_THICK
+LOCK_SCREW_THREAD_ENGAGEMENT = FILLISTER_SHANK_LEN - LOCK_SCREW_PASSAGE
+LOCK_SCREW_BOTTOM_CLEARANCE = 0.25
+LOCK_SCREW_HOLE_DEPTH = LOCK_SCREW_THREAD_ENGAGEMENT + LOCK_SCREW_BOTTOM_CLEARANCE
+_TAP_DRILL_DIA = blind_cut_dia_mm(HoleSpec("tapped_bottoming", "#4-40"))
+_DRILL_POINT_REACH = (_TAP_DRILL_DIA / 2.0) * DRILL_POINT_H
+_MIN_OPPOSED_RECEIVER_C2C = min(
+    abs(lock_x - guide_x) for lock_x in HOLE_X for guide_x in SCREW_STATION_X
+)
+
+if min(GUIDE_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_THREAD_ENGAGEMENT) <= 0.0:
+    raise AssertionError("fillister screw stack has no #4-40 thread engagement")
+if max(SCREW_HOLE_DEPTH, LOCK_SCREW_HOLE_DEPTH) + _DRILL_POINT_REACH >= GUIDE_DEPTH:
+    raise AssertionError("fillister receiver drill point breaks through the platen guide")
+if _MIN_OPPOSED_RECEIVER_C2C < _TAP_DRILL_DIA + 0.2:
+    raise AssertionError("front and rear #4-40 guide receivers intersect")
 
 DRAWING_NOTES = "HOLE POSITION PER FCF."
 
@@ -96,8 +117,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "GuideLength", f"{GUIDE_LENGTH}mm")
     await set_global(adapter, "GuideHeight", f"{GUIDE_HEIGHT}mm")
     await set_global(adapter, "GuideDepth", f"{GUIDE_DEPTH}mm")
-    # (The old HoleDia knob is gone: the holes are now native Hole Wizard
-    # features whose diameters come from the #4 clearance / #4-40 tap standards.)
+    # Both hole families are native #4-40 bottoming taps; their diameters come
+    # from the ANSI-inch table rather than equation-driven sketch dimensions.
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -132,43 +153,47 @@ async def build(adapter) -> dict[str, str]:
     v_rail = GUIDE_LENGTH * GUIDE_HEIGHT * GUIDE_DEPTH
     await volume_check(adapter, "guide rail", v_rail, 0.005 * v_rail)
 
-    # Lock-screw holes: ONE native Hole Wizard #4 clearance feature (4 points)
-    # through along Z at the mid-height line, from the native Front face
-    # (local z 0, outward normal +Z) -- the fillister lock screws pass through.
-    lock_dia = CLEARANCE_MM[("#4", "normal")]
+    # Lock-screw receivers: ONE native Hole Wizard #4-40 BOTTOMING-TAPPED
+    # blind feature (4 points) from the guide's REAR face (local z=-10,
+    # outward normal -Z). The stock 6.35-mm shanks pass through the 2-mm lock
+    # plates, engage 4.35 mm here, and retain 0.25 mm bottom clearance.
+    lock_spec = HoleSpec(
+        "tapped_bottoming", "#4-40", end="blind", depth_mm=LOCK_SCREW_HOLE_DEPTH,
+        overrides_mm={"ThreadDepth": LOCK_SCREW_THREAD_ENGAGEMENT},
+    )
     wizard_holes(
         adapter,
-        HoleSpec("clearance", "#4"),
-        [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in HOLE_X],
-        (0.0, 0.0, 1.0),
-        "lock-screw holes (#4 clearance)", name="LockHoles",
+        lock_spec,
+        [[x, GUIDE_HEIGHT / 2.0, -GUIDE_DEPTH] for x in HOLE_X],
+        (0.0, 0.0, -1.0),
+        "lock-screw tapped receivers (#4-40)", name="LockHoles",
     )
-    v_holes = len(HOLE_X) * math.pi * (lock_dia / 2.0) ** 2 * GUIDE_DEPTH
-    await volume_check(adapter, "guide with holes", v_rail - v_holes, 0.02 * v_holes)
+    v_holes = len(HOLE_X) * blind_hole_volume_mm3(
+        blind_cut_dia_mm(lock_spec), LOCK_SCREW_HOLE_DEPTH
+    )
+    await volume_check(adapter, "guide with lock receivers", v_rail - v_holes, 0.05 * v_holes)
 
-    # Fastening-screw holes: ONE native Hole Wizard #4-40 BOTTOMING-TAPPED blind
-    # feature (5 points) from the front face (outward normal +Z) -- the platen
-    # guide screws thread INTO these. A wizard blind hole ends in a 118° drill
-    # point, so the analytic expectation is blind_hole_volume_mm3.
+    # Fastening-screw receivers: ONE native Hole Wizard #4-40 BOTTOMING-TAPPED
+    # blind feature (5 points) from the front face. The deeper stock-head
+    # counterbore leaves 1.0822 mm of platen passage, so the 6.35-mm shank
+    # engages 5.2678 mm here with positive bottom clearance.
     screw_spec = HoleSpec(
         "tapped_bottoming", "#4-40", end="blind", depth_mm=SCREW_HOLE_DEPTH,
-        overrides_mm={"ThreadDepth": 2.4},
+        overrides_mm={"ThreadDepth": GUIDE_SCREW_THREAD_ENGAGEMENT},
     )
     wizard_holes(
         adapter, screw_spec,
         [[x, GUIDE_HEIGHT / 2.0, 0.0] for x in SCREW_STATION_X],
         (0.0, 0.0, 1.0),
-        "fastening-screw tapped holes (#4-40)", name="ScrewHoles",
+        "fastening-screw tapped receivers (#4-40)", name="ScrewHoles",
     )
     v_screws = len(SCREW_STATION_X) * blind_hole_volume_mm3(
         blind_cut_dia_mm(screw_spec), SCREW_HOLE_DEPTH
     )
     v_final = v_rail - v_holes - v_screws
-    # The short bottoming-tap table profile differs slightly from the ideal
-    # cylinder-plus-118-degree point (about 0.54 mm^3 per hole on SW 2026).
-    # Keep the gate tight enough to catch a missing/extra station while covering
-    # that native table/profile variation.
-    await volume_check(adapter, "guide with screw holes", v_final, 0.05 * v_screws)
+    # Native bottoming-tap profiles differ slightly from the ideal
+    # cylinder-plus-118-degree point. This still catches a missing station.
+    await volume_check(adapter, "guide with screw receivers", v_final, 0.05 * (v_holes + v_screws))
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).

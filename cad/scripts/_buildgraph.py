@@ -143,21 +143,24 @@ def references_of(asm_stem: str) -> list[str]:
 
 @functools.lru_cache(maxsize=1)
 def _local_modules() -> dict[str, Path]:
-    """Every local importable module a build script may pull in transitively, by
-    module name: the ``_*.py`` helpers, sibling ``build_*.py`` scripts, AND any
-    other sibling module a build script imports (e.g. ``pen_driver`` ->
-    ``truth_model``, which ``build_pen_assembly`` pulls in and which read
-    ``_config``).
+    """Every local importable module a build script may pull in transitively,
+    keyed by its dotted module path.
+
+    This includes top-level modules (the ``_*.py`` helpers, sibling
+    ``build_*.py`` scripts, and ordinary siblings) plus modules recursively
+    contained in real Python packages below :data:`SCRIPTS_DIR`.  A package's
+    ``__init__.py`` is keyed by the package name itself, while its children use
+    names such as ``diagnostics.diag_mcmaster_fillister``.  Directories without
+    ``__init__.py`` are not searched as namespace packages, and ``tests`` and
+    ``__pycache__`` trees are never build inputs.
 
     A part/assembly can reuse another module -- e.g.
     ``build_channel_spring_installed`` imports ``build_channel_spring.build_spring``,
     or ``build_pen_assembly`` imports ``pen_driver.install`` -- so the closure must
     follow those edges, or an edit to that reused module (or the config IT reads)
     would leave the dependent target reported up to date (codex review). Following
-    ALL sibling modules (not just ``_*``/``build_*``) closes a config
-    under-invalidation: ``pen_driver``/``truth_model`` embed machine/output +
-    channels values into the saved pen assembly, but were previously invisible to
-    ``module_deps_of``/``config_files_of``.
+    ALL local modules (not just ``_*``/``build_*``) closes config and recipe
+    under-invalidation.
 
     Excludes the build-GRAPH tooling (``_buildgraph`` + one-shot extraction
     scripts) and the test modules, which are never a geometry input. Standalone CLI
@@ -182,49 +185,124 @@ def _local_modules() -> dict[str, Path]:
         "_watchdog.py",
     }
     out: dict[str, Path] = {}
-    for p in sorted(SCRIPTS_DIR.glob("*.py")):
-        if p.name not in skip and not p.name.startswith("test_"):
-            out[p.stem] = p
+    for path in sorted(SCRIPTS_DIR.rglob("*.py")):
+        relative = path.relative_to(SCRIPTS_DIR)
+        directories = relative.parts[:-1]
+        if (
+            path.name in skip
+            or path.name.startswith("test_")
+            or any(part in {"tests", "__pycache__"} for part in directories)
+        ):
+            continue
+
+        # Descendants are importable only through actual packages.  Deliberately
+        # do not treat arbitrary folders as namespace packages: that would make
+        # external/tooling trees appear to be geometry dependencies.
+        if any(
+            not (
+                SCRIPTS_DIR.joinpath(*directories[:depth]) / "__init__.py"
+            ).is_file()
+            for depth in range(1, len(directories) + 1)
+        ):
+            continue
+
+        module_parts = (
+            relative.parent.parts
+            if path.name == "__init__.py"
+            else relative.with_suffix("").parts
+        )
+        if module_parts:
+            out[".".join(module_parts)] = path
     return out
+
+@functools.lru_cache(maxsize=None)
+def _module_by_path() -> dict[Path, str]:
+    """Reverse of :func:`_local_modules`, keyed by resolved path."""
+    return {path.resolve(): name for name, path in _local_modules().items()}
 
 
 @functools.lru_cache(maxsize=None)
 def _direct_local_imports(path: Path) -> frozenset[str]:
-    """Local module names (helpers + build scripts) imported ANYWHERE in ``path``
-    -- top-level or lazily inside a function, e.g. ``_common``'s ``import
-    _config`` or ``build_channel_spring_installed``'s ``from build_channel_spring
-    import ...``. A dotted import keeps only its leading segment so ``import
-    _common`` and ``from _common import x`` both resolve to ``_common``.
+    """Local dotted module names imported ANYWHERE in ``path``.
 
-    Only the import MODULE is matched against the local set; imported NAMES are
-    ignored, so ``from _gear import build_fixed_gear`` resolves to ``_gear`` (a
-    helper) and never mistakes the ``build_fixed_gear`` function for a module.
+    Imports may be top-level or lazy inside a function.  Each import is resolved
+    against the local module map only, choosing its most specific local dotted
+    prefix: ``import diagnostics.recipe`` and ``from diagnostics.recipe import
+    build`` therefore select ``diagnostics.recipe``, not merely
+    ``diagnostics``.  Package ``__init__.py`` ancestors are included because
+    Python executes them while importing a child.  For ``from package import
+    child``, a local ``package.child`` module is included conservatively as well.
+    Absolute and package-relative imports are supported; site/external packages
+    cannot enter the closure because no filesystem/import-system lookup occurs.
     """
     mods = _local_modules()
     found: set[str] = set()
+
+    def resolve(name: str) -> str | None:
+        candidate = name
+        while candidate:
+            if candidate in mods:
+                return candidate
+            candidate = candidate.rpartition(".")[0]
+        return None
+
+    def add(name: str) -> None:
+        module = resolve(name)
+        if module is None:
+            return
+        found.add(module)
+        parent = module.rpartition(".")[0]
+        while parent:
+            package_path = mods.get(parent)
+            if package_path is not None and package_path.name == "__init__.py":
+                found.add(parent)
+            parent = parent.rpartition(".")[0]
+
+    current_module = _module_by_path().get(path.resolve())
     tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            for a in node.names:
-                found.add(a.name.split(".")[0])
+            for alias in node.names:
+                add(alias.name)
         elif isinstance(node, ast.ImportFrom):
-            if node.level == 0 and node.module:
-                found.add(node.module.split(".")[0])
-    return frozenset(found & mods.keys())
+            if node.level == 0:
+                base = node.module
+            elif current_module is not None:
+                package = (
+                    current_module.split(".")
+                    if path.name == "__init__.py"
+                    else current_module.split(".")[:-1]
+                )
+                keep = len(package) - node.level + 1
+                if keep < 1:
+                    continue
+                base_parts = package[:keep]
+                if node.module:
+                    base_parts.extend(node.module.split("."))
+                base = ".".join(base_parts)
+            else:
+                continue
+
+            if not base:
+                continue
+            add(base)
+            for alias in node.names:
+                if alias.name != "*":
+                    add(f"{base}.{alias.name}")
+    return frozenset(found)
 
 
 def module_deps_of(script: Path) -> list[str]:
-    """Resolved paths of every local module (``_*.py`` helper or sibling
-    ``build_*.py`` script) ``script`` transitively imports -- the EXACT
-    geometry-input edges for doit's ``file_dep``.
+    """Resolved paths of every local Python module ``script`` transitively
+    imports -- the exact geometry-input edges for doit's ``file_dep``.
 
-    This replaces the old blanket "every ``_*.py`` is a dep of every build"
-    rule: a leaf part that imports only ``_common`` no longer rebuilds when an
-    assembly-only helper (``_assembly``) or an unrelated one (``_gear``) changes.
-    Because it follows REAL Python imports transitively (``_chain_link -> _chain
-    -> _common``; ``_common -> _config``; ``build_channel_spring_installed ->
-    _spring -> _features``), it can never under-invalidate so long as
-    a script imports what it uses -- which Python enforces at run time. The BFS is
+    Local modules include top-level helpers/build recipes and recursively
+    discovered package modules.  This replaces the old blanket "every ``_*.py``
+    is a dep of every build" rule: a leaf importing only ``_common`` no longer
+    rebuilds for unrelated helpers, while dotted imports such as
+    ``diagnostics.diag_build_90280A194`` retain their exact recipe chain.
+    Following real imports transitively prevents under-invalidation so long as a
+    script imports what it uses, which Python enforces at run time.  The BFS is
     cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).
     """
     mods = _local_modules()

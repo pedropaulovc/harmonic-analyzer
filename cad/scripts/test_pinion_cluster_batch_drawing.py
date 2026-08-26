@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -84,7 +86,10 @@ def test_new_pin_and_spring_numbers_use_reserved_unique_allocations() -> None:
 
 def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
     scripts = Path(__file__).resolve().parent
-    deps = {Path(path).name for path in module_deps_of(scripts / "build_drive_train_assembly.py")}
+    deps = {
+        Path(path).name
+        for path in module_deps_of(scripts / "build_drive_train_assembly.py")
+    }
     drawing_only = {
         "pinion_cam_spec.py",
         "pinion_cam_pin_spec.py",
@@ -103,9 +108,9 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
 
 
 def test_drive_train_does_not_duplicate_bracket_geometry_constants() -> None:
-    source = (Path(__file__).resolve().parent / "build_drive_train_assembly.py").read_text(
-        encoding="utf-8"
-    )
+    source = (
+        Path(__file__).resolve().parent / "build_drive_train_assembly.py"
+    ).read_text(encoding="utf-8")
     for name in ("STRAP_T", "STRAP_R_END", "STRAP_C2C"):
         assert re.search(rf"^\s*{name}\s*=", source, re.MULTILINE) is None
 
@@ -119,9 +124,7 @@ def test_make_critical_free_text_is_formatted_from_geometry_constants() -> None:
         ),
         pinion_cam_spec: ("{ECC:.2f}", "{CAM_OD:.2f}"),
         draw_pinion_cam_pin: ("{CAP_SAG:.2f}",),
-        pinion_handle_spec: (
-            "{CAP_SAG:.2f}",
-        ),
+        pinion_handle_spec: ("{CAP_SAG:.2f}",),
         draw_pinion_handle: ("z_max / 1000.0",),
         pinion_lever_spec: ("{HUB_LEN:.2f}", "{HUB_LEN / 2.0:.2f}"),
         pinion_pivot_shaft_spec: ("{CAP_SAG:.2f}",),
@@ -206,35 +209,314 @@ def test_intentional_fit_allowance_is_pair_and_volume_bounded(monkeypatch) -> No
         )
 
 
-def test_drive_train_allows_only_the_two_modeled_cam_pin_press_fits() -> None:
-    allowed = _interference_contracts.allowed_interference_pairs("drive-train")
-    assert set(allowed) == {
+def _annulus_limit(major_d: float, tap_d: float, length: float) -> float:
+    return 1.10 * math.pi * (major_d**2 - tap_d**2) * length / 4.0
+
+
+def _expected_numbered_pairs(
+    first_stem: str,
+    numbers: Iterable[int],
+    second_stem: str,
+    major_d: float,
+    tap_d: float,
+    length: float,
+    *,
+    second_number: int | None = 1,
+) -> dict[frozenset[str], float]:
+    limit = _annulus_limit(major_d, tap_d, length)
+    return {
+        frozenset(
+            (
+                f"{first_stem}-{number}",
+                f"{second_stem}-{number if second_number is None else second_number}",
+            )
+        ): limit
+        for number in numbers
+    }
+
+
+def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
+    paper_drive = _interference_contracts.allowed_interference_pairs("paper-drive")
+    clamp_receivers = {1: 2, 2: 2, 3: 1, 4: 1}
+    for screw_number, back_number in clamp_receivers.items():
+        pair = frozenset(
+            (f"clamp-screw-{screw_number}", f"column-clamp-back-{back_number}")
+        )
+        assert paper_drive[pair] == pytest.approx(42.217366426182714)
+
+    guide_receivers_and_limits = {
+        5: (1, 13.56562270743475),
+        6: (2, 13.56562270743475),
+        7: (1, 13.56562270743475),
+        8: (2, 13.56562270743475),
+        9: (1, 13.56562270743475),
+        10: (2, 13.56562270743475),
+        11: (1, 13.56562270743475),
+        12: (2, 13.56562270743475),
+        13: (1, 13.56562270743475),
+        14: (2, 13.56562270743475),
+        15: (1, 11.20210690940073),
+        16: (1, 11.20210690940073),
+        17: (2, 11.20210690940073),
+        18: (1, 11.20210690940073),
+        19: (2, 11.20210690940073),
+        20: (2, 11.20210690940073),
+        21: (1, 11.20210690940073),
+        22: (2, 11.20210690940073),
+    }
+    for screw_number, (guide_number, limit) in guide_receivers_and_limits.items():
+        pair = frozenset(
+            (f"fillister-screw-{screw_number}", f"platen-guide-{guide_number}")
+        )
+        assert paper_drive[pair] == pytest.approx(limit)
+
+    summing = _interference_contracts.allowed_interference_pairs("summing")
+    assert summing == pytest.approx(
+        {
+            frozenset(("knife-hanger-stud-1", "knife-mount-1")): 456.48979768633853,
+            frozenset(("knife-hanger-stud-2", "knife-mount-2")): 456.48979768633853,
+        }
+    )
+
+
+def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
+    threaded_by_assembly = {
+        "drive-train": {
+            frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _annulus_limit(
+                7.9502, 6.528, 6.0
+            ),
+            frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): 7.117,
+            frozenset(("cone-tip-adjuster-1", "cone-gear-shaft-1")): 0.143,
+        },
+        "frame": {
+            **_expected_numbered_pairs(
+                "lag-screw",
+                range(1, 5),
+                "rocker-arm-support",
+                12.7,
+                12.30376,
+                6.35,
+            ),
+            **_expected_numbered_pairs(
+                "frame-side-screw",
+                range(1, 5),
+                "top-frame",
+                4.1656,
+                3.454,
+                12.7,
+            ),
+            frozenset(("gooseneck-set-screw-1", "top-frame-1")): _annulus_limit(
+                6.35, 5.105, 6.95
+            ),
+        },
+        "magnifier": {
+            **_expected_numbered_pairs(
+                "clamp-screw",
+                range(1, 3),
+                "column-clamp-back",
+                4.1656,
+                3.454,
+                4.85,
+            ),
+            frozenset(("thumb-screw-1", "magnifying-clamp-1")): _annulus_limit(
+                2.8448, 2.261, 3.9
+            ),
+        },
+        "summing": _expected_numbered_pairs(
+            "knife-hanger-stud",
+            range(1, 3),
+            "knife-mount",
+            12.7,
+            10.716,
+            11.3735,
+            second_number=None,
+        ),
+        "pen": {
+            frozenset(("pen-set-screw-1", "pen-frame-1")): _annulus_limit(
+                2.8448, 2.261, 5.0
+            ),
+            frozenset(("hanger-screw-1", "pen-hanger-1")): _annulus_limit(
+                4.1656, 3.454, 3.0
+            ),
+        },
+        "paper-drive": {
+            **_expected_numbered_pairs(
+                "clamp-screw",
+                range(1, 3),
+                "column-clamp-back",
+                4.1656,
+                3.454,
+                9.0124,
+                second_number=2,
+            ),
+            **_expected_numbered_pairs(
+                "clamp-screw",
+                range(3, 5),
+                "column-clamp-back",
+                4.1656,
+                3.454,
+                9.0124,
+            ),
+            **_expected_numbered_pairs(
+                "fillister-screw",
+                range(1, 5),
+                "platen",
+                2.8448,
+                2.261,
+                4.0,
+            ),
+            **_expected_numbered_pairs(
+                "fillister-screw",
+                range(5, 15, 2),
+                "platen-guide",
+                2.8448,
+                2.261,
+                5.2678,
+            ),
+            **_expected_numbered_pairs(
+                "fillister-screw",
+                range(6, 15, 2),
+                "platen-guide",
+                2.8448,
+                2.261,
+                5.2678,
+                second_number=2,
+            ),
+            **_expected_numbered_pairs(
+                "fillister-screw",
+                (15, 16, 18, 21),
+                "platen-guide",
+                2.8448,
+                2.261,
+                4.35,
+            ),
+            **_expected_numbered_pairs(
+                "fillister-screw",
+                (17, 19, 20, 22),
+                "platen-guide",
+                2.8448,
+                2.261,
+                4.35,
+                second_number=2,
+            ),
+            **_expected_numbered_pairs(
+                "bracket-screw",
+                range(1, 3),
+                "support-bar",
+                4.1656,
+                3.454,
+                8.7,
+            ),
+        },
+        "harmonic-analyzer": {
+            frozenset(
+                (
+                    "frame-1/harmonic-base-1",
+                    "drive-train-1/cone-pivot-screw-1",
+                )
+            ): _annulus_limit(4.826, 3.797, 9.525),
+            **_expected_numbered_pairs(
+                "drive-train-1/cone-lock-knob",
+                range(1, 2),
+                "frame-1/harmonic-base",
+                6.35,
+                5.105,
+                1.5875,
+            ),
+            **_expected_numbered_pairs(
+                "drive-train-1/swing-stop-screw",
+                range(1, 2),
+                "frame-1/harmonic-base",
+                4.1656,
+                3.454,
+                6.0,
+            ),
+            **_expected_numbered_pairs(
+                "drive-train-1/slotted-screw",
+                range(1, 5),
+                "frame-1/harmonic-base",
+                4.1656,
+                3.454,
+                6.65,
+            ),
+            **_expected_numbered_pairs(
+                "drive-train-1/foot-screw",
+                range(1, 2),
+                "frame-1/harmonic-base",
+                2.8448,
+                2.261,
+                8.725,
+            ),
+            **_expected_numbered_pairs(
+                "drive-train-1/foot-screw",
+                range(2, 4),
+                "frame-1/harmonic-base",
+                2.8448,
+                2.261,
+                4.525,
+            ),
+            **_expected_numbered_pairs(
+                "channel-1/frame-side-screw",
+                range(1, 3),
+                "frame-1/top-frame",
+                4.1656,
+                3.454,
+                8.6624,
+            ),
+        },
+    }
+    cam_pairs = {
         frozenset(("pinion-bracket-1", "pinion-cam-pin-1")),
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
     }
-    assert 0.40 < set(allowed.values()).pop() < 0.45
-    assert _interference_contracts.allowed_interference_pairs("channel") == {}
-    assert _interference_contracts.allowed_interference_pairs(
-        "harmonic-analyzer"
-    ) == {
-        frozenset((
-            "frame-1/harmonic-base-1",
-            "drive-train-1/cone-pivot-screw-1",
-        )): 0.10,
+    special_pairs = {
+        "drive-train": cam_pairs,
+    }
+    expected_counts = {
+        "drive-train": 5,
+        "frame": 9,
+        "magnifier": 3,
+        "summing": 2,
+        "pen": 2,
+        "paper-drive": 28,
+        "harmonic-analyzer": 12,
     }
 
+    assert sum(len(pairs) for pairs in threaded_by_assembly.values()) == 59
+    assert sum(expected_counts.values()) == 61
+    for name, expected_threaded in threaded_by_assembly.items():
+        allowed = _interference_contracts.allowed_interference_pairs(name)
+        assert len(allowed) == expected_counts[name]
+        assert set(allowed) == set(expected_threaded) | special_pairs.get(name, set())
+        for pair, expected_limit in expected_threaded.items():
+            assert allowed[pair] == pytest.approx(expected_limit)
+        assert all(limit > 0.0 and math.isfinite(limit) for limit in allowed.values())
+
+    cam_limits = {
+        _interference_contracts.allowed_interference_pairs("drive-train")[pair]
+        for pair in cam_pairs
+    }
+    assert len(cam_limits) == 1
+    assert 0.40 < cam_limits.pop() < 0.45
+    assert _interference_contracts.allowed_interference_pairs("channel") == {}
+    assert _interference_contracts.allowed_interference_pairs("unknown") == {}
+
     scripts = Path(_assembly.__file__).parent
-    build_source = (scripts / "build_drive_train_assembly.py").read_text(
-        encoding="utf-8"
+    contracted_builds = (
+        "build_drive_train_assembly.py",
+        "build_frame_assembly.py",
+        "build_magnifier_assembly.py",
+        "build_paper_drive_assembly.py",
+        "build_pen_assembly.py",
+        "build_summing_assembly.py",
+        "build_harmonic_analyzer_assembly.py",
     )
+    for filename in contracted_builds:
+        build_source = (scripts / filename).read_text(encoding="utf-8")
+        assert "allowed_pairs=allowed_interference_pairs(ASM_NAME)" in build_source
     verify_source = (scripts / "verify.py").read_text(encoding="utf-8")
     assembly_source = (scripts / "_assembly.py").read_text(encoding="utf-8")
     refresh_source = (scripts / "refresh_assembly.py").read_text(encoding="utf-8")
-    top_build_source = (scripts / "build_harmonic_analyzer_assembly.py").read_text(
-        encoding="utf-8"
-    )
-    assert "allowed_pairs=allowed_interference_pairs(ASM_NAME)" in build_source
-    assert "allowed_pairs=allowed_interference_pairs(ASM_NAME)" in top_build_source
     assert "allowed_pairs=allowed_interference_pairs(name)" in verify_source
     # The refresh gate gets the allowance from its ENTRYPOINT: the lookup lives
     # in refresh_assembly.py (outside every assembly's recipe closure) and is

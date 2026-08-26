@@ -311,15 +311,15 @@ sections:
         - derived
         - low
       - - Cone shaft length
-        - 208.1791869456 mm overall
-        - '~9.92'
-        - 'The legacy stack still ends 190 mm past its pivot-origin datum, but the final coupled layout moves the shaft front end to cone station −61.9068609979: post centre −39.90136099793, 42.011 axial body, plus 1.0 proud. Adding the 49.6068609979 stub delta to every downstream local station preserves every gear world station.'
+        - 205.1667369456 mm overall
+        - '~8.08'
+        - 'The final coupled layout puts the shaft front end at cone station −61.9068609979: post centre −39.90136099793, 42.011 axial body, plus 1.0 proud. Adding the 49.6068609979 stub delta preserves the journal and every gear-seat world station; only the terminal 1/32" endpoint is shortened 3.01245 mm to local station 205.1667369456 / machine station 143.2598759477 for exact contact with the McMaster 94025A150 cup apex.'
         - derived
         - high
       - - Cone shaft diameter
-        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø9.525 (3/8") to 170.6922184176; Ø6.35 (1/4") to 177.5922184176; Ø3.175 (1/8") to 184.4922184176; Ø0.79375 (1/32") to 208.1791869456'
+        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø9.525 (3/8") to 170.6922184176; Ø6.35 (1/4") to 177.5922184176; Ø3.175 (1/8") to 184.4922184176; Ø0.79375 (1/32") to 205.1667369456'
         - 12.2308/9.525/6.35/3.175/0.79375
-        - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. All downstream gear-seat diameters and world stations are unchanged; the 1/32" (0.79 mm) tip remains mechanically marginal — `build_cone_gear_shaft.py`.'
+        - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. All earlier section endpoints, gear seats, and world stations are unchanged; only the terminal 1/32" endpoint is shortened 3.01245 mm to machine station 143.2598759477, the McMaster 94025A150 conical cup apex at 6 mm thread engagement. The 20.6745185280 mm tip stub still spans the bushing; its 0.79 mm diameter remains mechanically marginal — `build_cone_gear_shaft.py`.'
         - legacy + derived
         - high
       - - Gear bores (configured `BoreDia`)
@@ -569,8 +569,8 @@ sections:
         - ch30 GT (cyl_front); shape from still t00393 / v4_pinion_008 (base:top taper ~1.2, scaled off the 120T OD 62.2)
         - med (GT height; shape photo-scaled)
       - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
-        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 east / 8 west (north, pivot) → east 24 / west 37 (south, big end) over 223.354 along the cone axis; south edge leaves 3.175 mm (1/8 in) beyond the Ø42.011 cone-pivot-post south rim; two native 1/4-20 UNC-2B through taps match the post''s 26.887 attachment pitch; the north-west trim leaves 0.370 mm exact plan clearance to the recentered north arbor pedestal; plan corners remain NE R10 / NW R8 / SW R10 / SE R12; Ø6.756 close-clearance pivot hole rides the pivot screw''s Ø6.35 shoulder; 8-wide OPEN lock notch remains at the R175.2 swing chord; carries the part-local crank-axis reference 41.654 east of the pivot and 79.05 above the plate bottom (installed X_CRANK −129.336, Y_CRANK 129.85); plate top remains y 57.15'
-        - 'FLOATED, pivot at cone station 196 = (−78.205, +138.708) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft, tip block and crank rig all ride it. The p1 disengage DOF remains FREE by default and sweeps 3.871°. The post and carrier retain their rederived world placement; only the working cone/cylinder/channel family is recentered along the unchanged cone-bore line. The base preserves its front edge and extends only at the rear.'
+        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 12 east / 8 west (north, pivot) → east 24 / west 37 (south, big end) over 223.354 along the cone axis; south edge leaves 3.175 mm (1/8 in) beyond the Ø42.011 cone-pivot-post south rim; two native 1/4-20 UNC-2B through taps match the post''s 26.887 attachment pitch; the north-west trim leaves 0.370 mm exact plan clearance to the recentered north arbor pedestal; plan corners are NE R10 / NW R8 / SW R5 / SE R12; Ø6.756 close-clearance pivot hole rides the pivot screw''s Ø6.35 shoulder; Ø10.50 × 0.25-deep top relief leaves 6.10 local pivot-bearing thickness; 8-wide OPEN lock notch follows the R208.436 swing chord from its closed centre 33.00 west / 205.808 south of the pivot; carries the part-local crank-axis reference 41.654 east of the pivot and 79.05 above the plate bottom (installed X_CRANK −129.336, Y_CRANK 129.85); plate top remains y 57.15'
+        - 'FLOATED, pivot at cone station 152.272 = (−87.683, +96.019) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft, tip block and crank rig all ride it. The p1 disengage DOF remains FREE by default and sweeps 3.013°. The post and carrier retain their rederived world placement; only the working cone/cylinder/channel family is recentered along the unchanged cone-bore line. The base preserves its front edge and extends only at the rear.'
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; v2 envelope/mount cascade from cone-pivot-post-v2.SLDPRT, whose height was manually rederived from ch30 Eight Views image 2 (page003_img01.png) and whose proportions follow ch11 page002_img05.jpeg / page002_img06.jpeg
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
@@ -579,40 +579,40 @@ sections:
         - 'manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png); proportions from ch11 references/albert-michelsons-harmonic-analyzer/ch11_images/page002_img05.jpeg and page002_img06.jpeg; exact feature dimensions harvested from cone-pivot-post-v2.SLDPRT'
         - 'med (86 mm height and proportions photo-derived; v2 feature dimensions exact)'
       - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
-        - 'black steel block 14 × 12 × 40.718 tall; north-face 5/16-18 UNC-2B blind tapped bore on the cone axis 33.368 above the plate top (abs y 90.518), 8 deep, carrying the cup-ended cone-tip-adjuster; 1.2-wide top slit down to 32.718 crossed by a #3-48 pinch joint at 38.918. The v2 post lowers this rider as a rigid coaxial cascade.'
-        - 'centre (−90.067, +85.281) = cone shaft station 141.272, standing ON the swing platform beside T006; the shaft tip remains in the adjuster''s blind cup.'
+        - 'black steel block 14 × 12 × 40.718 tall; north-face 5/16-18 UNC-2B blind tapped bore on the cone axis 33.368 above the plate top (abs y 90.518), 8 deep, carrying the cup-ended cone-tip-adjuster; 1.2-wide top slit down to 32.718 crossed at 38.918 by a #4-40 pinch joint with an Ø3.264 normal-clearance near jaw. The v2 post lowers this rider as a rigid coaxial cascade.'
+        - 'centre (−90.067, +85.281) = cone shaft station 141.272, standing ON the swing platform beside T006; at 6 mm adjuster engagement, the shaft tip contacts the McMaster 94025A150 conical cup apex at station 143.2598759477.'
         - ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry)
         - med (GT-anchored)
       - - '`cone-lock-knob` (clamps the swing plate engaged/disengaged)'
-        - chromed steel thumb knob — washer flange Ø18 × 1.5 seating on the plate top, one straight body Ø13 to 13.5 crowned by an R5 dome fillet (Ø3 apex flat), Ø6.35 clamp stud dropping through the plate's lock notch, ending FLUSH with the base top (thread engagement into the base unmodeled — the pedestal-bolt precedent)
-        - 'base-bolted STATIC at (−92.563, −52.834), washer seat y 57.15 — the video''s gap between the pivot post and the arbor pedestal; the PLATE is the mover: loosen and its open notch sweeps the stationary stud 1.978 to the mouth, then swings clear (3.871° total after the outward 27.5-mm notch-seat cascade — the bolt stands past the plate edge, v4_t00417); screwed down with no plate under it the washer fences the mouth = locked DISENGAGED ("Unscrewing this knob allows the cone gear set to swing away", v4 6:48)'
-        - v4_t00411 ("knob" label) + v4_t00417 top view; ch12 p.16 text; dims photo-scaled vs the Ø24 post foot
-        - med (role high, dims low)
+        - 'McMaster-Carr 91882A412 steel raised knurled-head thumb screw: Ø25.4 head over an Ø12.7 × 9.525 collar, with a 1/4-20 stud (Ø6.35) 7.9375 long; the collar seats on the plate top and the stud passes through the open notch into the base tap.'
+        - 'base-bolted STATIC at (−100.076, −112.048), collar seat y 57.15; the PLATE is the mover. Loosen the knob and its open notch sweeps past the stationary stud 2.610 mm to the mouth, then swings clear (3.013° total from the southern 33-mm notch-seat cascade). The exact Ø25.4 head clears the pivot post and the T120/64T gear row; tightened with no plate under it, the collar fences the mouth and locks the plate DISENGAGED ("Unscrewing this knob allows the cone gear set to swing away", v4 6:48).'
+        - McMaster-Carr 91882A412 recipe + v4_t00411 ("knob" label) + v4_t00417 top view; ch12 p.16 text
+        - high (stock dimensions exact; function and placement derived)
       - - '`cone-pivot-screw` (the physical p1 pivot pin)'
-        - slotted shoulder screw — head Ø9.5 × 3 (1.6 × 1.2 driver slot; sized to clear the tip block's north face 0.25, assembly-asserted), ground Ø6.35 shoulder × 6.60 (6.35 plate + 0.25 axial running clearance), followed by an 8.00-long #10-24 UNC-2A threaded tail; 14.60 total under-head length; tail engages a matching blind #10-24 UNC-2B base tap 10.00 deep (2.00 bottom clearance)
-        - 'base-threaded STATIC at the swing pivot (−87.683, 96.019); shoulder bottoms on the base top and holds the head 0.25 above the plate top, so the plate''s Ø6.5 hole rotates freely on the shoulder; the harmonic base carries the matching blind #10-24 UNC-2B tap (agreement asserted in the drive-train assembly)'
-        - v4 top stills (slotted head at the plate tip); dims sized to the plate/pivot geometry
+        - 'McMaster-Carr 91829A560 slotted 18-8 stainless precision shoulder screw — head Ø9.525 × 4.7625, ground Ø6.35 shoulder × 6.35, followed by a 9.525-long #10-24 UNC-2A threaded tail; 15.875 total under-head length; tail engages a matching blind #10-24 UNC-2B base tap 11.525 deep (2.00 bottom clearance)'
+        - 'base-threaded STATIC at the swing pivot (−87.683, 96.019); shoulder bottoms on the base top while the platform''s Ø10.50 × 0.25-deep relief leaves 6.10 local bearing thickness and 0.25 axial running clearance below the head; the harmonic base carries the matching blind #10-24 UNC-2B tap (agreement asserted in the drive-train assembly)'
+        - McMaster-Carr 91829A560 model + v4 top stills (slotted head at the plate tip)
         - med (role high, dims low)
       - - '`swing-stop-screw` (p1 travel limit)'
-        - slotted screw — Ø4 shank, 6 embedded into the base + 8 proud (covering the 6.35 plate band), head Ø8 × 2.5 on top
-        - 'base-threaded STATIC at (−139.665, +2.334), derived so the 223.354-long plate''s EAST taper edge just touches the shank flank at the 4.883° disengaged swing — the disengage swing sweeps the plate EAST (the sense that walks the knob stud out the notch mouth), so the east edge is the one that advances onto the stop; 8.929 mm signed clearance to the ENGAGED edge (offline-derived and asserted against the base hole)'
-        - user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry
-        - med (role high, dims low)
+        - 'McMaster-Carr 90280A196 steel narrow fillister-head slotted screw: head Ø6.858 × 3.9624, #8-32 shank Ø4.1656 × 15.875; 6.0 embedded in the base leaves 9.875 proud above it.'
+        - 'base-threaded STATIC at (−137.064, +0.841), derived so the 223.354-long plate''s EAST taper edge just touches the shank flank at the 3.013° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 5.527 mm signed clearance (derived and asserted against the base hole).'
+        - McMaster-Carr 90280A196 recipe + user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry
+        - high (stock dimensions exact; function and placement derived)
       - - '`cone-tip-bushing` (T006 spacer on the tip stub)'
         - brass sleeve Ø6 × 4, Ø0.79 (1/32") bore
         - 'on the shaft''s tip stub at stations 129.2723..133.2723, directly north of T006 and 2 mm south of the tip block — the axial spacer the adjuster loads the shaft stack against'
         - v4_t00471 / 7:49 (brass collar between the smallest gear and the tip block)
         - med (role high, dims low)
       - - '`cone-tip-adjuster` (axial end-play screw, partially hollow)'
-        - slotted steel screw Ø7.9 × 14, blind cup Ø2 × 6 in the far end, 1.5 × 1.5 driver slot across the head
-        - 'threaded into the tip block''s north counterbore, head proud 8 to station 155.272; its blind cup (mouth station 141.272, floor 147.272) holds the shaft''s tip end (146.272) — turning it takes up the cone stack''s axial end play so the 20 gears stay registered against the cylinder set; the block''s slit + pinch screw lock the setting'
+        - McMaster-Carr 94025A150 slotted 18-8 stainless 5/16-18 × 1/2 cup-tip set screw; vendor conical cup depth 1.98755 from the cup rim to its apex
+        - 'threaded 6 mm into the tip block''s north counterbore, placing the stock cup rim at station 141.2723259477 and its apex at 143.2598759477, exactly coincident with the shaft tip — turning it takes up the cone stack''s axial end play so the 20 gears stay registered against the cylinder set; the block''s slit + pinch screw lock the setting'
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
       - - '`cone-tip-pinch-screw` (locks the adjuster)'
-        - slotted steel screw — head Ø4.8 × 2, Ø2.4 shank × 8, 0.8 × 0.8 driver slot
-        - 'across the tip block''s top slit (head on the east face, y 110.35): tightening it pinches the slit closed, clamping the block''s threads around the adjuster so the end-play setting can''t back off — the 61815K41 clamp pattern applied to a screw instead of a shaft'
-        - v4_t00471 / 7:49 (small perpendicular screw at the block top)
-        - med (role high, dims low)
+        - 'McMaster-Carr 90280A108 steel narrow fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 9.525.'
+        - 'across the tip block''s top slit (head on the east face, y 110.35): the near jaw is normal-clearance and the far jaw is native #4-40 UNC-2B; tightening pinches the slit closed around the 5/16-18 adjuster so its end-play setting cannot back off.'
+        - McMaster-Carr 90280A108 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
+        - high (stock dimensions exact; function photo-derived)
   - prose: |2
 
       ### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)

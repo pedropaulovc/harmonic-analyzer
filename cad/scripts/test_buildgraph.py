@@ -327,6 +327,52 @@ def test_module_deps_follow_non_helper_siblings():
     assert "channels.yaml" in cfg, cfg
 
 
+def test_module_deps_follow_dotted_package_recipe_chain(tmp_path, monkeypatch):
+    """A production-style dotted wrapper import reaches the exact recipe module
+    and its transitive package helper, rather than stopping at ``diagnostics``.
+
+    The temporary scripts root keeps this independent of fastener-wrapper rollout
+    order while exercising real package files and both supported dotted-import
+    forms.  An external import must not be traversed.
+    """
+    scripts = tmp_path / "scripts"
+    diagnostics = scripts / "diagnostics"
+    diagnostics.mkdir(parents=True)
+    wrapper = scripts / "build_bracket_screw.py"
+    package_init = diagnostics / "__init__.py"
+    entry = diagnostics / "diag_build_90280A194.py"
+    helper = diagnostics / "diag_mcmaster_fillister.py"
+
+    wrapper.write_text(
+        "from diagnostics.diag_build_90280A194 import build_90280A194\n",
+        encoding="utf-8",
+    )
+    package_init.write_text("", encoding="utf-8")
+    entry.write_text(
+        "import diagnostics.diag_mcmaster_fillister\n",
+        encoding="utf-8",
+    )
+    helper.write_text("import external_site_package\n", encoding="utf-8")
+
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+    bg._local_modules.cache_clear()
+    bg._module_by_path.cache_clear()
+    bg._direct_local_imports.cache_clear()
+    try:
+        deps = {Path(dep) for dep in module_deps_of(wrapper)}
+    finally:
+        # Do not leave cached temporary paths behind after monkeypatch restores
+        # the production scripts root.
+        bg._direct_local_imports.cache_clear()
+        bg._module_by_path.cache_clear()
+        bg._local_modules.cache_clear()
+
+    assert entry.resolve() in deps
+    assert helper.resolve() in deps
+    assert package_init.resolve() in deps
+    assert all(path.is_relative_to(scripts) for path in deps)
+
+
 def test_part_and_title_property_stampers_are_distinct():
     """Assembly identity must not masquerade as in-script part generation."""
     title_stampers = {

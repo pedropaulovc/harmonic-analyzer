@@ -70,9 +70,9 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 
 # Nominal geometry lives in magnifying_clamp_geom (imported above): the two rod
 # bores are engineered running/slip fits (0.2 mm clearance over their rods), NOT
-# drilled fastener holes, so they stay plain dimensioned cuts.  The thumb-screw
-# hole threads IN, so it IS a native #4-40 tapped Hole Wizard hole (tap drill
-# Ø2.261; the mating thumb screw's Ø2.0 shank fits it).
+# drilled fastener holes, so they stay plain dimensioned cuts. The thumb-screw
+# hole threads IN, so it IS a native #4-40 tapped Hole Wizard hole matching
+# the stock thumb screw's #4-40 external thread.
 
 THROUGH_CUT_DEPTH = 80.0  # mid-plane total; > any extent crossed
 
@@ -180,9 +180,9 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "RodBore")
 
     # Thumb-screw hole: ONE native Hole Wizard #4-40 tapped feature along Y
-    # (through_all) from the top face (Y=BLOCK_HEIGHT, outward normal +Y) -- the
-    # thumb screw threads in; its Ø2.0 shank fits the Ø2.261 tap drill. On the X
-    # axis, crossing the lever bore.
+    # (through_all) from the top face (Y=BLOCK_HEIGHT, outward normal +Y).
+    # The stock screw's matching #4-40 external thread enters on the X axis,
+    # crossing the lever bore.
     screw_cut = wizard_holes(
         adapter,
         HoleSpec("tapped", "#4-40"),

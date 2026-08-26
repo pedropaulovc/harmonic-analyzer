@@ -26,9 +26,29 @@ JOURNAL_END = 43.011
 # stations below are measured from it.
 FRONT_STUB = 61.9068609979
 
-# T006's north face is followed by the 4 mm bushing, a 2 mm half-bushing
-# clearance, and the 12 mm tip block. Keep 5 mm of the tip in the adjuster cup.
-T006_TIP_STATION = 126.02232594770454 + 6.5 / 2.0 + 4.0 + 2.0 + 12.0 / 2.0 + 5.0
+# T006's north face starts the 4 mm bushing, followed by 2 mm clearance and
+# the 12 mm tip block.  McMaster 94025A150 is threaded 6 mm into the block's
+# north face, placing its stock cup rim at station 141.27232594770454.  The
+# vendor Sketch2 profile puts the conical cup apex 1.98755 mm beyond that rim
+# (6.35 - 4.36245), so the terminal shaft endpoint contacts that apex rather
+# than extending through it as the former nominal 5 mm insertion did.
+T006_CENTER_STATION = 126.02232594770454
+T006_FACE_WIDTH = 6.5
+TIP_BUSHING_LENGTH = 4.0
+TIP_BLOCK_CLEARANCE = 2.0
+TIP_BLOCK_LENGTH = 12.0
+T006_NORTH_FACE_STATION = T006_CENTER_STATION + T006_FACE_WIDTH / 2.0
+TIP_BUSHING_START_STATION = T006_NORTH_FACE_STATION
+TIP_BUSHING_END_STATION = TIP_BUSHING_START_STATION + TIP_BUSHING_LENGTH
+TIP_BLOCK_NORTH_FACE_STATION = (
+    TIP_BUSHING_END_STATION + TIP_BLOCK_CLEARANCE + TIP_BLOCK_LENGTH
+)
+ADJUSTER_EMBED = 6.0
+ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED
+MCM_94025A150_CUP_DEPTH = 1.98755
+T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + MCM_94025A150_CUP_DEPTH
+TIP_STUB_START_STATION = 155.7 + GEAR_AXIS_SHIFT
+TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 
 # (diameter in inches, section end station in mm from the front stub end).
 # Diameters mirror build_cone_gear.bore_dia_in (snug perpendicular gear seats).

@@ -39,11 +39,12 @@ def test_geometry_matches_the_top_frame_contract() -> None:
 
 
 def test_screw_hole_seats_the_frame_side_screw() -> None:
-    # The foot screw is the MHA-117 #10-24 slotted cheese head (Ø7 x 3): the
-    # counterbore must swallow the head, the drill must clear the #10 major.
-    assert fulcrum_keeper_spec.CBORE_DIA_MM > 7.0
-    assert fulcrum_keeper_spec.CBORE_DEPTH_MM >= 3.0
-    assert fulcrum_keeper_spec.HOLE_DIA_MM > 4.826
+    # The counterbore must clear the exact migrated stock head, and the native
+    # #8 close-clearance drill must clear its full modeled thread envelope.
+    assert fulcrum_keeper_spec.CBORE_DIA_MM > part.FRAME_SIDE_HEAD_DIA
+    assert fulcrum_keeper_spec.CBORE_DEPTH_MM == part.CBORE_DEPTH_MM
+    assert fulcrum_keeper_spec.HOLE_DIA_MM == part.SCREW_HOLE_DIA_MM
+    assert part.SCREW_HOLE_DIA_MM > part.FRAME_SIDE_SHANK_DIA
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"counterbore_fillister"' in source
     assert 'name="FootScrewHole"' in source

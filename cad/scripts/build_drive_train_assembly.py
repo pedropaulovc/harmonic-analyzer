@@ -557,58 +557,68 @@ from build_cone_swing_platform import (  # noqa: E402
     # trim; feeds ONLY the west-edge pedestal scan. Aliasing it into the east
     # math shifted the derived stop point -- Codex catch, 2026-07-05)
     NORTH_OVERHANG as PLAT_OVERHANG,
+    LOCK_HEAD_POST_CLEARANCE as PLAT_LOCK_HEAD_POST_CLEARANCE,
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
-    NOTCH_EXIT_TRAVEL as PLAT_NOTCH_EXIT,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
+    PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
+    PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
+    PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
     PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
     SLOT_E_X as PLAT_SLOT_E_X,
     SLOT_E_Z as PLAT_SLOT_E_Z,
-    SLOT_R as PLAT_SLOT_R,
     SLOT_W as PLAT_SLOT_W,
     WEST_HALF_S as PLAT_WEST_S,
 )
 from build_cone_lock_knob import (  # noqa: E402
+    HEAD_DIA as KNOB_HEAD_DIA,
+    WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
     STUD_DIA as KNOB_STUD_DIA,
-    WASHER_DIA as KNOB_WASHER_DIA,
+    STUD_LEN as KNOB_STUD_LEN,
+    THREAD as KNOB_THREAD,
 )
 from build_cone_pivot_screw import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
+    THREAD as PSCREW_THREAD,
     THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
 )
-from cone_pivot_screw_spec import (  # noqa: E402
-    THREAD as PSCREW_THREAD,
-    THREAD_SOLID_DIA as PSCREW_THREAD_SOLID_DIA,
-    THREAD_TAP_DRILL_DIA as PSCREW_THREAD_TAP_DRILL_DIA,
-)
 from build_swing_stop_screw import (  # noqa: E402
-    SHANK_DIA as STOP_SHANK_DIA,
+    EMBED_LEN as STOP_EMBED_LEN,
+    HEAD_DIA as STOP_HEAD_DIA,
+    PROUD_LEN as STOP_PROUD_LEN,
+    SHANK_LEN as STOP_SHANK_LEN,
+    THREAD as STOP_THREAD,
 )
 from build_harmonic_base import (  # noqa: E402
     BLOCK_SCREW_HOLE_DEPTH as BASE_BLOCK_HOLE_DEPTH,
-    BLOCK_SCREW_HOLE_DIA as BASE_BLOCK_HOLE_DIA,
+    BLOCK_SEAT_SPEC as BASE_BLOCK_SEAT_SPEC,
     BLOCK_SCREW_XZ as BASE_BLOCK_XZ,
     FOOT_SCREW_HOLE_DEPTH as BASE_FOOT_HOLE_DEPTH,
-    FOOT_SCREW_HOLE_DIA as BASE_FOOT_HOLE_DIA,
+    FOOT_SEAT_SPEC as BASE_FOOT_SEAT_SPEC,
     FOOT_SCREW_XZ as BASE_FOOT_XZ,
-    PIVOT_SCREW_HOLE_DIA as BASE_PIVOT_HOLE_DIA,
+    LOCK_KNOB_XZ as BASE_LOCK_XZ,
+    LOCK_SEAT_SPEC as BASE_LOCK_SEAT_SPEC,
+    LOCK_SCREW_HOLE_DEPTH as BASE_LOCK_HOLE_DEPTH,
+    LOCK_STUD_ENGAGEMENT as BASE_LOCK_ENGAGEMENT,
     PIVOT_HOLE_DEPTH as BASE_PIVOT_HOLE_DEPTH,
     PIVOT_SEAT_SPEC as BASE_PIVOT_SEAT_SPEC,
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
-    STOP_SCREW_HOLE_DIA as BASE_STOP_HOLE_DIA,
+    STOP_SCREW_HOLE_DEPTH as BASE_STOP_HOLE_DEPTH,
+    STOP_SEAT_SPEC as BASE_STOP_SEAT_SPEC,
     STOP_SCREW_XZ as BASE_STOP_XZ,
+    SWING_HARDWARE_GEOMETRY as BASE_SWING_HARDWARE,
 )
 from harmonic_base_spec import (  # noqa: E402
     TOP_LENGTH as BASE_TOP_LENGTH,
     TOP_WIDTH as BASE_TOP_WIDTH,
 )
 from build_arbor_pedestal import (  # noqa: E402
-    FOOT_DEPTH as ARBOR_PED_DEPTH,  # PR3 reshaped the pedestal; its foot
-    FOOT_HEIGHT as ARBOR_PED_FLANGE_T,  # the exposed flange the foot screw clamps
-    FOOT_WIDTH as ARBOR_PED_WIDTH,  # flange keeps the old block's 24x16 plan
-    SCREW_HOLE_DIA as ARBOR_PED_HOLE_DIA,
+    FOOT_DEPTH as ARBOR_PED_DEPTH,
+    FOOT_HEIGHT as ARBOR_PED_FLANGE_T,
+    FOOT_WIDTH as ARBOR_PED_WIDTH,
+    SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC,
     SCREW_Z as ARBOR_PED_SCREW_Z,
     STRAP_T as ARBOR_PED_STRAP_T,
 )
@@ -643,7 +653,7 @@ from build_pinion_pivot_block import (  # noqa: E402
     BORE_UP as BLOCK_BORE_UP,
     LIFT_BORE_RISE,
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
-    SCREW_HOLE_DIA as BLOCK_SCREW_HOLE_DIA,
+    SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC,
 )
 from pinion_cam_geometry import (  # noqa: E402
     BORE as CAM_BORE_DIA,
@@ -682,8 +692,8 @@ from pinion_spring_geometry import (  # noqa: E402
     BLADE_TILT_DEG as SPR_BLADE_TILT_DEG,
     FLAT_TIP as SPR_FLAT_TIP_L,
     FOOT_END as SPR_FOOT_END_L,
-    HOLE_DIA as SPR_HOLE_DIA,
     HOLE_FROM_END as SPR_HOLE_FROM_END,
+    HOLE_SPEC as SPR_HOLE_SPEC,
     KINK_START as SPR_CREST_L,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
@@ -692,13 +702,14 @@ from pinion_spring_geometry import (  # noqa: E402
 )
 from build_slotted_screw import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
-    SHANK_DIA as BSCREW_SHANK_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
+    THREAD as BSCREW_THREAD,
 )
+
 from build_foot_screw import (  # noqa: E402
     HEAD_DIA as FSCREW_HEAD_DIA,
-    SHANK_DIA as FSCREW_SHANK_DIA,
     SHANK_LEN as FSCREW_SHANK_LEN,
+    THREAD as FSCREW_THREAD,
 )
 from build_cone_pivot_post import (  # noqa: E402
     BLOCK_DIA as POST_BLOCK_DIA,
@@ -709,33 +720,58 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
 from build_cone_tip_block import (  # noqa: E402
-    ADJUSTER_BORE_DIA as TIP_ADJ_BORE_DIA,
     ADJUSTER_BORE_DEPTH as TIP_ADJ_BORE_DEPTH,
+    ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
-    PINCH_BORE_DIA as TIP_PINCH_BORE_DIA,
+    PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_BORE_Y as TIP_PINCH_Y,
+    PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
     SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
+    SLIT_W as TIP_SLIT_W,
 )
 from build_cone_tip_bushing import (  # noqa: E402
     BORE_DIA as BUSH_BORE_DIA,
     LENGTH as BUSH_LEN,
 )
 from build_cone_tip_adjuster import (  # noqa: E402
-    BODY_DIA as ADJ_BODY_DIA,
     BODY_LEN as ADJ_LEN,
     CUP_DEPTH as ADJ_CUP_DEPTH,
     CUP_DIA as ADJ_CUP_DIA,
+    THREAD as ADJ_THREAD,
 )
 from build_cone_tip_pinch_screw import (  # noqa: E402
-    SHANK_DIA as PINCH_SHANK_DIA,
     SHANK_LEN as PINCH_SHANK_LEN,
+    THREAD as PINCH_THREAD,
 )
 from cone_gear_shaft_spec import (  # noqa: E402
+    ADJUSTER_EMBED as ADJ_EMBED,
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
 )
+
+
+def _require_tapped_thread(label: str, screw_thread: str, hole_spec) -> None:
+    """Require a native tapped Hole Wizard seat for the exact screw thread."""
+    if hole_spec.kind != "tapped" or hole_spec.size != screw_thread:
+        raise AssertionError(
+            f"{label}: screw {screw_thread} does not match "
+            f"{hole_spec.kind} hole {hole_spec.size}"
+        )
+    if hole_spec.thread_class not in (None, "2B"):
+        raise AssertionError(f"{label}: mating thread class is not UNC-2B")
+
+
+def _require_clearance_size(label: str, screw_thread: str, hole_spec) -> None:
+    """Require a native clearance hole for the thread's nominal screw size."""
+    nominal_size = screw_thread.split("-", 1)[0]
+    if hole_spec.kind != "clearance" or hole_spec.size != nominal_size:
+        raise AssertionError(
+            f"{label}: {screw_thread} screw does not match "
+            f"{hole_spec.kind} hole {hole_spec.size}"
+        )
+
 
 TIP_BLOCK_STATION = T006_NORTH_FACE + BUSH_LEN + BUSH_LEN / 2.0 + TIP_BLOCK_Z / 2.0
 PIVOT_STATION = TIP_BLOCK_STATION + 11.0
@@ -798,40 +834,43 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
         f"flank {_POST_SOUTH_Z:.2f}"
     )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
-# Along the axis, south to north: T006 gear | brass bushing (spacer) | block
-# south face | short unsupported tip span | adjuster screw in the tapped bore, its blind cup
-# holding the shaft's tip end; the block's top slit + pinch screw lock it.
+# Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
+# | the 94025A150 adjuster's conical cup. The adjusted 1/32-in shaft terminal
+# meets the vendor cup apex while the full 6 mm of 5/16-18 thread remains in
+# the block; the top slit and 90280A108 pinch screw lock that setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
 BUSH_STATION = T006_NORTH_FACE
-ADJ_EMBED = 6.0  # adjuster thread engagement into the counterbore (8 deep)
 ADJ_HEAD_STATION = TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_EMBED)
-_ADJ_MOUTH = ADJ_HEAD_STATION - ADJ_LEN
-_STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4  # 0.794: the 1/32" tip stub
-_STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]  # 155.7
+_ADJ_CUP_RIM = ADJ_HEAD_STATION - ADJ_LEN
+_ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
+_STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
+_STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
 if BUSH_STATION < _STUB_START + 1.0:
     raise AssertionError("tip bushing rides off the 1/32in stub section")
 if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
+_require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
 if ADJ_EMBED > TIP_ADJ_BORE_DEPTH - 0.5:
-    raise AssertionError("adjuster bottoms out in the block counterbore")
-if TIP_ADJ_BORE_DIA - ADJ_BODY_DIA < 0.25:
-    raise AssertionError("modeled adjuster envelope interferes with its tap drill")
-if not (_ADJ_MOUTH + 0.5 <= _TIP_END_STATION <= _ADJ_MOUTH + ADJ_CUP_DEPTH - 0.5):
-    raise AssertionError("shaft tip end does not rest inside the adjuster cup")
+    raise AssertionError("adjuster bottoms out in the block tapped hole")
+if not 0.0 < ADJ_CUP_DEPTH < ADJ_LEN:
+    raise AssertionError("adjuster cup depth is outside the stock body")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:
-    raise AssertionError("adjuster cup too tight around the tip stub")
+    raise AssertionError("adjuster cup rim is too tight around the tip stub")
+if abs(_TIP_END_STATION - _ADJ_CUP_APEX) > 1e-6:
+    raise AssertionError(
+        f"shaft tip {_TIP_END_STATION:.6f} does not contact vendor cup apex "
+        f"{_ADJ_CUP_APEX:.6f}"
+    )
 if TIP_SHAFT_PASSAGE_DIA < _STUB_DIA + 0.25:
     raise AssertionError("tip-block passage too tight around the shaft tip")
-# The pinch screw THREADS INTO the block's tapped #3-48 cross-bore: the
-# modeled shank rides at tap-drill - ~0.3 (memory/fastener-policy lag
-# precedent), so the fit is an engagement band, not the old equality.
-if not (0.15 <= TIP_PINCH_BORE_DIA - PINCH_SHANK_DIA <= 0.45):
-    raise AssertionError(
-        f"pinch-screw shank {PINCH_SHANK_DIA} does not thread-fit the block "
-        f"cross-bore {TIP_PINCH_BORE_DIA} (want bore - shank in [0.15, 0.45])"
-    )
-if PINCH_SHANK_LEN < TIP_BLOCK_X / 2.0 + 0.5:
-    raise AssertionError("pinch screw too short to cross the top slit")
+
+_require_tapped_thread("cone-tip pinch far jaw", PINCH_THREAD, TIP_PINCH_BORE_SPEC)
+_require_clearance_size(
+    "cone-tip pinch near jaw", PINCH_THREAD, TIP_PINCH_CLEARANCE_SPEC
+)
+_PINCH_NEAR_JAW = (TIP_BLOCK_X - TIP_SLIT_W) / 2.0
+if PINCH_SHANK_LEN - _PINCH_NEAR_JAW < 1.5:
+    raise AssertionError("pinch screw lacks 1.5 mm far-jaw thread engagement")
 # The crank pedestal is GONE as a separate base-mounted part: the cone pivot
 # post and the crank pedestal are ONE green column riding the swing platform
 # (user-confirmed vs v4_t00411/t00417), so the crank rig swings with the cone
@@ -943,58 +982,71 @@ if (
     )
 if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
     raise AssertionError("platform pivot hole does not clear the screw shoulder")
-if abs(PSCREW_SHOULDER_LEN - PLAT_T - 0.25) > 1e-9:
+if abs(PSCREW_SHOULDER_LEN - PLAT_PIVOT_BEARING_T - 0.25) > 1e-9:
     raise AssertionError("pivot screw no longer provides 0.25 axial plate clearance")
-if BASE_PIVOT_SEAT_SPEC.kind != "tapped":
-    raise AssertionError("base pivot seat is not tapped")
-if BASE_PIVOT_SEAT_SPEC.size != PSCREW_THREAD:
-    raise AssertionError("base pivot thread does not match the pivot screw")
-if BASE_PIVOT_SEAT_SPEC.thread_class != "2B":
-    raise AssertionError("base pivot thread is not UNC-2B")
-if abs(PSCREW_THREAD_SOLID_DIA - PSCREW_THREAD_TAP_DRILL_DIA) > 1e-9:
-    raise AssertionError("pivot screw solid envelope does not match the tap drill")
-if abs(BASE_PIVOT_HOLE_DIA - PSCREW_THREAD_SOLID_DIA) > 1e-9:
-    raise AssertionError("pivot screw solid envelope does not match the mating hole")
+if (
+    PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA
+) / 2.0 + 1e-9 < PLAT_PIVOT_HEAD_RADIAL_CLEARANCE:
+    raise AssertionError("platform pivot relief lacks required radial head clearance")
+_require_tapped_thread("cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC)
 if BASE_PIVOT_HOLE_DEPTH - PSCREW_THREAD_TAIL_LEN < 1.5:
     raise AssertionError("base pivot tap lacks blind-hole bottom clearance")
 # The pivot-screw head sits on the plate top at station PIVOT_STATION; the
-# tip block (also on the plate) ends at station 191 -- the head radius must
-# clear its north face (the first O12 head clipped the corner 13.5 mm^3).
+# tip block (also on the plate) ends at station 191.  The stock 3/8-in head
+# retains at least 0.20 mm air to its north face.
 if (
     PSCREW_HEAD_DIA / 2.0
-    > (PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)) - 0.25
+    > (PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)) - 0.20
 ):
     raise AssertionError("pivot-screw head reaches the tip block's north face")
 
 
-# --- cone lock knob (v4_t00411; clamps the swing plate through its notch) ----
-# The knob is a base-bolted STATIC (pedestal pattern: locked to the static
-# datums); the plate's open lock notch sweeps around its stationary stud and,
-# past the mouth, clear of it (t00417: the bolt stands past the plate edge
-# when disengaged). Its machine position is DERIVED from the platform's
-# engaged notch-seat in the plate's local frame, so the two scripts cannot
-# drift apart.
+# --- cone lock knob and swing stop -------------------------------------------
+# Both fasteners are static to the base. build_cone_swing_platform owns the
+# single outline/contact calculation; build_harmonic_base supplies the
+# installed pivot and exports the resulting lock/stop stations for this
+# assembly and its native Hole Wizard seats.
 def _plate_local_to_machine(x_l: float, z_l: float) -> tuple[float, float]:
-    """Plan point of the ENGAGED plate's local (x, z) in machine coords.
-
-    The engaged plate sits at Ry(+INCLINE) (its local +z runs up-station along
-    the inclined shaft line), so local +x tips toward machine +x/-z."""
+    """Plan point of the engaged plate's local (x, z) in machine coordinates."""
     return (
         _PPIVOT[0] + x_l * COS_I + z_l * SIN_I,
         _PPIVOT[2] - x_l * SIN_I + z_l * COS_I,
     )
 
 
-# The platform is authored machine-handed (it was the "x0" pre-mirrored part
-# of the retired M6.8 scheme), so its exported local-x constants feed straight
-# through; z is untouched.
-KNOB_X, KNOB_Z = _plate_local_to_machine(PLAT_SLOT_E_X, PLAT_SLOT_E_Z)
-# (-92.563, -52.834): the video's gap between the pivot post and pedestal
+KNOB_X, KNOB_Z = BASE_LOCK_XZ
+_require_tapped_thread("cone lock knob", KNOB_THREAD, BASE_LOCK_SEAT_SPEC)
 if PLAT_SLOT_W - KNOB_STUD_DIA < 0.5:
     raise AssertionError("lock stud has <0.5 clearance in the platform notch")
-# The plate's crank-anchor point (CrankAxisSeat's anchor, on the plate's
-# "crank axis") must land ON the machine crank axis at the engaged pose --
-# the SolidWorks-free proof of the platform's CRANK_SEAT_ANCHOR signs.
+if abs(BASE_LOCK_ENGAGEMENT - (KNOB_STUD_LEN - PLAT_T)) > 1e-9:
+    raise AssertionError("base lock engagement does not use the stock stud excess")
+if BASE_LOCK_HOLE_DEPTH - BASE_LOCK_ENGAGEMENT < 0.25 - 1e-9:
+    raise AssertionError("cone-lock base tap lacks 0.25 mm bottom clearance")
+
+# The stock knurled head is much wider than the former simplified knob.  Keep
+# its base seat outside a conservative plan-envelope of every adjacent gear;
+# the real solids must therefore have clearance at every tooth phase.
+_KNOB_GEAR_CLEARANCE = 0.25
+_KNOB_R = KNOB_HEAD_DIA / 2.0
+_GEAR64_TIP_R = R64 + 25.4 / DP_CRANK
+if (
+    math.hypot(KNOB_X - GEAR64_SEAT[0], KNOB_Z - GEAR64_SEAT[2])
+    - _KNOB_R
+    - _GEAR64_TIP_R
+    < _KNOB_GEAR_CLEARANCE
+):
+    raise AssertionError("cone-lock knob head crowds the 64T crank-drive gear")
+for _j in range(20):
+    _cone_tip_r = CONE_T120_PITCH_R - RADIUS_STEP * _j + ADDENDUM
+    _cone_x, _cone_z = cone_seat(_j)
+    if (
+        math.hypot(KNOB_X - _cone_x, KNOB_Z - _cone_z) - _KNOB_R - _cone_tip_r
+        < _KNOB_GEAR_CLEARANCE
+    ):
+        raise AssertionError(f"cone-lock knob head crowds cone gear {_j + 1}")
+
+# The plate's crank-axis datum remains on the machine crank axis in the
+# engaged pose.
 _SEAT_ANCHOR_M = _plate_local_to_machine(PLAT_SEAT_ANCHOR[0], PLAT_SEAT_ANCHOR[1])
 if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 0.05:
     raise AssertionError(
@@ -1002,90 +1054,40 @@ if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 0.05:
         f" != X_CRANK {X_CRANK} -- anchor sign convention broke"
     )
 
-# Disengaged pose: the plate swings (same sense as the incline) until its
-# lobe edge clears the knob's WASHER, so the screwed-down washer fences the
-# notch mouth -- the DISENGAGED lock (see the platform's constants block).
-# Angle = (stud travel to the mouth + washer radius + margin) / notch radius.
-DISENGAGE_DEG = math.degrees(
-    (PLAT_NOTCH_EXIT + KNOB_WASHER_DIA / 2.0 + 2.0) / PLAT_SLOT_R
-)  # 6.30
-# At that swing the big end separates ~18.4 at the T120 -- visibly and
-# mechanically out of mesh (the v4_t00417 pose, bolt past the plate edge).
-_DISENGAGE_RAD = math.radians(DISENGAGE_DEG)
-
-# --- swing-stop screw (item 6): bounds the free swing at the disengaged pose.
-# The DISENGAGE swing is + (the notch region sweeps machine EAST, -x -- the
-# same sense that walks the knob stud out the notch mouth), so the plate
-# VACATES its west side and it is the EAST taper edge that advances onto a
-# base screw. Contact point taken on the east edge at plate-local z -105 (mid
-# plate, on the base with margin); the screw centre sits one shank radius
-# outside the swung edge. The base part hardcodes the hole (CAM_ECC
-# pattern) -- assert agreement, and that the ENGAGED pose clears it on the
-# CORRECT side (signed, not |distance|: the first cut of this derivation
-# used the west edge + an abs() gap and buried the screw 19 mm INSIDE the
-# engaged plate -- caught by the interference gate).
-_K_E = (PLAT_EAST_S - PLAT_EAST_N) / PLAT_LEN
-_STOP_ZL = -105.0
-# The east half-width sits at plate-local -x (the machine-handed platform's
-# local +x tips machine-west at the engaged pose, see _plate_local_to_machine).
-_STOP_PL = (-(PLAT_EAST_N + _K_E * (PLAT_OVERHANG - _STOP_ZL)), _STOP_ZL)
-_EDGE_OUT = (-1.0, _K_E)  # outward (east) normal, plate frame
-_EDGE_N = math.hypot(*_EDGE_OUT)
-_EDGE_OUT = (_EDGE_OUT[0] / _EDGE_N, _EDGE_OUT[1] / _EDGE_N)
-
-
-def _swung_to_machine(x_l: float, z_l: float, ang: float) -> tuple[float, float]:
-    c, s = math.cos(ang), math.sin(ang)
-    return (_PPIVOT[0] + x_l * c + z_l * s, _PPIVOT[2] - x_l * s + z_l * c)
-
-
-_A_DIS = math.radians(INCLINE_DEG) + _DISENGAGE_RAD
-_CONTACT = _swung_to_machine(_STOP_PL[0], _STOP_PL[1], _A_DIS)
-_N_M = (
-    _EDGE_OUT[0] * math.cos(_A_DIS) + _EDGE_OUT[1] * math.sin(_A_DIS),
-    -_EDGE_OUT[0] * math.sin(_A_DIS) + _EDGE_OUT[1] * math.cos(_A_DIS),
-)
-STOP_X = _CONTACT[0] + _N_M[0] * STOP_SHANK_DIA / 2.0
-STOP_Z = _CONTACT[1] + _N_M[1] * STOP_SHANK_DIA / 2.0
-# The base part hardcodes the hole (CAM_ECC pattern) in the same machine
-# frame -- assert direct agreement.
-if abs(BASE_STOP_XZ[0] - STOP_X) > 0.05 or abs(BASE_STOP_XZ[1] - STOP_Z) > 0.05:
-    raise AssertionError(
-        f"harmonic-base stop-screw hole {BASE_STOP_XZ} != machine derived stop "
-        f"({STOP_X:.3f}, {STOP_Z:.3f})"
-    )
-if BASE_STOP_HOLE_DIA < STOP_SHANK_DIA:
-    raise AssertionError("base stop hole under the stop-screw shank dia")
-# Engaged pose clears the stop screw on the OUTSIDE (signed distance along
-# the engaged east edge's outward normal, minus the shank radius).
-_EP = _swung_to_machine(_STOP_PL[0], _STOP_PL[1], math.radians(INCLINE_DEG))
-_N_ENG = (
-    _EDGE_OUT[0] * COS_I + _EDGE_OUT[1] * SIN_I,
-    -_EDGE_OUT[0] * SIN_I + _EDGE_OUT[1] * COS_I,
-)
-_W = (STOP_X - _EP[0], STOP_Z - _EP[1])
-_STOP_ENGAGED_GAP = (_W[0] * _N_ENG[0] + _W[1] * _N_ENG[1]) - STOP_SHANK_DIA / 2.0
+# The collar controls notch-exit travel; the larger knurled head controls
+# external clearance. The stock stop keeps 6 mm embedded and therefore stands
+# 9.875 mm proud without changing its base-top production placement frame.
+DISENGAGE_DEG = BASE_SWING_HARDWARE.disengage_deg
+STOP_X, STOP_Z = BASE_SWING_HARDWARE.stop_xz
+_STOP_CONTACT = BASE_SWING_HARDWARE.stop_contact_xz
+_STOP_ENGAGED_GAP = BASE_SWING_HARDWARE.stop_engaged_gap
+if math.dist((STOP_X, STOP_Z), BASE_STOP_XZ) > 1e-9:
+    raise AssertionError("shared swing-stop station drifted from the base seat")
+_require_tapped_thread("swing stop", STOP_THREAD, BASE_STOP_SEAT_SPEC)
+if abs(STOP_PROUD_LEN - (STOP_SHANK_LEN - STOP_EMBED_LEN)) > 1e-9:
+    raise AssertionError("swing-stop proud length is not stock length minus embed")
+if abs(BASE_STOP_HOLE_DEPTH - STOP_EMBED_LEN) > 1e-9:
+    raise AssertionError("base stop thread depth does not retain the 6 mm embed")
 if _STOP_ENGAGED_GAP < 2.0:
     raise AssertionError(
-        f"stop screw within {_STOP_ENGAGED_GAP:.2f} of the ENGAGED plate edge "
-        f"(needs >= 2.0, signed: negative = inside the plate)"
+        f"stop screw within {_STOP_ENGAGED_GAP:.2f} of the engaged plate edge "
+        f"(needs >= 2.0)"
     )
-# ... and it must stand clear of the OTHER swing hardware and on the base.
 if (
     math.hypot(STOP_X - KNOB_X, STOP_Z - KNOB_Z)
-    < (KNOB_WASHER_DIA + STOP_SHANK_DIA) / 2.0 + 0.25
+    < (KNOB_HEAD_DIA + STOP_HEAD_DIA) / 2.0 + 0.25
 ):
-    raise AssertionError("stop screw fouls the lock-knob washer")
-_POST_LOCAL_Z = POST_STATION - PIVOT_STATION  # -194.5
-_WASHER_POST_GAP = (
+    raise AssertionError("swing-stop head envelope fouls the lock-knob head")
+_POST_LOCAL_Z = POST_STATION - PIVOT_STATION
+_KNOB_HEAD_POST_GAP = (
     math.hypot(PLAT_SLOT_E_X, PLAT_SLOT_E_Z - _POST_LOCAL_Z)
-    - KNOB_WASHER_DIA / 2.0
+    - KNOB_HEAD_DIA / 2.0
     - POST_BLOCK_DIA / 2.0
 )
-if _WASHER_POST_GAP < 2.0:
+if _KNOB_HEAD_POST_GAP < PLAT_LOCK_HEAD_POST_CLEARANCE - 1e-9:
     raise AssertionError(
-        f"lock knob washer within {_WASHER_POST_GAP:.2f} of the pivot post "
-        f"foot (needs >= 2.0)"
+        f"lock-knob head within {_KNOB_HEAD_POST_GAP:.2f} of the pivot-post "
+        f"foot (needs >= {PLAT_LOCK_HEAD_POST_CLEARANCE:.2f})"
     )
 # Plate WEST edge (the flare) vs BOTH arbor-pedestal blocks.  The edge and its
 # engaged placement are linear, so solve the exact local interval crossing
@@ -1633,17 +1635,16 @@ if not (ARBOR_DIA == DRUM_BORE_DIA == HANDLE_TUBE_ID == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum bore/handle tube/strap bore")
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
-# Block screws (item 12): two bright slotted heads per block, seated on the
-# block top, shanks dropping through the O4.2 block holes into the base.
-BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)  # 66.8
-if BSCREW_SHANK_DIA > BLOCK_SCREW_HOLE_DIA - 0.1:
-    raise AssertionError("block screw shank binds in the block hole")
-if BSCREW_SHANK_DIA > BASE_BLOCK_HOLE_DIA - 0.1:
-    raise AssertionError("block screw shank binds in the base hole")
-if BSCREW_SHANK_LEN - BLOCK_HEIGHT < 1.0:
+# Block screws: exact 90280A199 #8-32 x 25.4 stock screws pass through normal
+# #8 clearance holes and engage 6.65 mm in the base's #8-32 UNC-2B seats.
+BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)
+_require_clearance_size("pinion block", BSCREW_THREAD, BLOCK_SCREW_HOLE_SPEC)
+_require_tapped_thread("pinion block base seat", BSCREW_THREAD, BASE_BLOCK_SEAT_SPEC)
+_BLOCK_SCREW_ENGAGEMENT = BSCREW_SHANK_LEN - BLOCK_HEIGHT
+if _BLOCK_SCREW_ENGAGEMENT < 1.0:
     raise AssertionError("block screw barely engages the base")
-if BSCREW_SHANK_LEN - BLOCK_HEIGHT > BASE_BLOCK_HOLE_DEPTH - 0.25:
-    raise AssertionError("block screw bottoms out in the base hole")
+if _BLOCK_SCREW_ENGAGEMENT > BASE_BLOCK_HOLE_DEPTH - 0.25:
+    raise AssertionError("block screw bottoms out in the base tapped seat")
 if BLOCK_SCREW_HALF + BSCREW_HEAD_DIA / 2.0 > BLOCK_WIDTH / 2.0 - 0.25:
     raise AssertionError("block screw head overhangs the block end")
 _BLOCK_SCREW_XZ = tuple(
@@ -1659,14 +1660,15 @@ for _want, _have in zip(_BLOCK_SCREW_XZ, BASE_BLOCK_XZ, strict=True):
             f"harmonic-base block-screw hole {_have} != machine derived "
             f"({_want[0]:.3f}, {_want[1]:.3f})"
         )
-# Foot screws (items 2 + 11): the black O2.9 hold-down at the spring foot
-# and on the pedestal's exposed flange.
-if FSCREW_SHANK_DIA > min(SPR_HOLE_DIA, ARBOR_PED_HOLE_DIA, BASE_FOOT_HOLE_DIA) - 0.1:
-    raise AssertionError("foot screw shank binds in a foot hole")
+# Exact 90280A108 #4-40 x 9.525 stock screws pass through the spring and
+# pedestal's normal #4 clearances into the base's #4-40 UNC-2B seats.
+_require_clearance_size("pinion spring foot", FSCREW_THREAD, SPR_HOLE_SPEC)
+_require_clearance_size("arbor pedestal foot", FSCREW_THREAD, ARBOR_PED_HOLE_SPEC)
+_require_tapped_thread("foot-screw base seat", FSCREW_THREAD, BASE_FOOT_SEAT_SPEC)
 if FSCREW_SHANK_LEN - ARBOR_PED_FLANGE_T < 2.0:
     raise AssertionError("foot screw barely engages the base at the pedestal")
 if FSCREW_SHANK_LEN - SPRING_T > BASE_FOOT_HOLE_DEPTH - 0.25:
-    raise AssertionError("foot screw bottoms out in the base hole (spring seat)")
+    raise AssertionError("foot screw bottoms out in the base spring seat")
 # Head fits the pedestal's exposed flange strip (local z -8..-2, centre -5).
 if FSCREW_HEAD_DIA / 2.0 > min(
     abs(ARBOR_PED_SCREW_Z + ARBOR_PED_DEPTH / 2.0),
@@ -1995,11 +1997,10 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-tip-pinch-screw (slit clamp, head east)",
     )
-    # The lock knob (v4_t00411) is a base-bolted static like the pedestals: its
-    # washer seat lands on the plate top, its stud drops through the plate's
-    # lock slot (engaged end -- the as-built pose). The plate is the mover: on
-    # disengage its slot sweeps around this stationary stud. No rotation: the
-    # knob is axisymmetric and belongs to the BASE, not the inclined plate.
+    # The lock knob is a base-bolted static: its collar underside lands on the
+    # plate top and its longer stud passes through the slot into the new 1/4-20
+    # base seat. The plate remains the mover, sweeping around the stationary
+    # stud without changing the assembly's operational swing DOF.
     lock_knob = await place_component(
         adapter,
         "cone-lock-knob",
@@ -2024,10 +2025,9 @@ async def build(adapter) -> dict[str, str]:
         label="cone-pivot-screw (p1 pivot pin)",
     )
     await _lock_static(adapter, pivot_screw, arbor)
-    # The swing-stop screw (item 6): a base-threaded STATIC just past the
-    # DISENGAGED pose -- the plate's west edge bumps its proud shank, limiting
-    # the p1 swing to exactly the knob-clear travel (STOP_X/STOP_Z derived at
-    # import and asserted against the base's hardcoded hole).
+    # The base-threaded swing stop remains a static at the base-top production
+    # frame. Its 9.875-mm proud shank meets the disengaged platform's east edge
+    # at the one shared contact station exported with the base hole.
     stop_screw = await place_component(
         adapter,
         "swing-stop-screw",
@@ -2609,7 +2609,7 @@ async def build(adapter) -> dict[str, str]:
     adj_axial = sum((adj_o[k] - tb_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
-        named_ref(f"Axis1@{tip_adjuster}", "AXIS"),
+        named_ref(f"ScrewAxis@{tip_adjuster}", "AXIS"),
         named_ref(f"Axis1@{tip_block}", "AXIS"),
         label="adjuster in the block counterbore",
         verify=(tip_adjuster, adj_o),
@@ -2635,7 +2635,7 @@ async def build(adapter) -> dict[str, str]:
     pin_o = _org(adapter, pinch_screw)
     await coincident_mate(
         adapter,
-        named_ref(f"Axis1@{pinch_screw}", "AXIS"),
+        named_ref(f"ScrewAxis@{pinch_screw}", "AXIS"),
         named_ref(f"Axis2@{tip_block}", "AXIS"),
         label="pinch screw in the cross-bore",
         verify=(pinch_screw, pin_o),

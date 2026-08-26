@@ -1,9 +1,13 @@
 lag-screw:
+  title: Rocker-Support Hold-Down Screw
   number: MHA-039
-  material: 12L14 (UNS G12144) per ASTM A108-24
-  material_specification: 12L14 (UNS G12144) per ASTM A108-24
-  finish: black oxide per MIL-DTL-13924, Class 1; oil sealed
+  stock_name: 18-8 Stainless Steel Round Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91783A722]
+  material: 18-8 stainless steel
+  material_specification: 18-8 stainless steel, McMaster-Carr 91783A722
+  finish: plain
   quantity: 4
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "machined (steel)"
+  process: purchased

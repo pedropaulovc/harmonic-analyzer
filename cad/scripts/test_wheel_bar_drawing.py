@@ -36,8 +36,10 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
     assert (geom.BAR_SIDE, geom.BAR_DEPTH, geom.BAR_LENGTH) == (10.0, 9.0, 234.0)
     assert geom.CLAMP_HOLE_X == (70.5, 105.5)
-    assembly = Path(part.__file__).with_name("build_magnifier_assembly.py").read_text(
-        encoding="utf-8"
+    assembly = (
+        Path(part.__file__)
+        .with_name("build_magnifier_assembly.py")
+        .read_text(encoding="utf-8")
     )
     assert "from wheel_bar_geom import" in assembly
     assert "from build_wheel_bar import" not in assembly
@@ -46,9 +48,13 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 def test_linked_notes_specify_the_bores_and_stock() -> None:
     notes = wheel_bar_spec.DRAWING_NOTES
     assert "#8 NORMAL CLEARANCE Ø4.978" in notes
-    assert "#6 CLOSE CLEARANCE Ø3.912" in notes
+    assert "#8 CLOSE CLEARANCE Ø4.572" in notes
+    assert (
+        "HOLE STATIONS FROM THE LEFT END: PEN-HANGER #8 CLOSE AT 2.5; "
+        "COLUMN-CLAMP #8 NORMAL PAIR AT 187.5 AND 222.5."
+    ) in notes
     assert wheel_bar_spec.CLAMP_HOLE_DIA == 4.978
-    assert wheel_bar_spec.PEN_HANGER_HOLE_DIA == 3.912
+    assert wheel_bar_spec.PEN_HANGER_HOLE_DIA == 4.572
     assert part.blind_cut_dia_mm(part.CLAMP_HOLE_SPEC) == wheel_bar_spec.CLAMP_HOLE_DIA
     assert (
         part.blind_cut_dia_mm(part.SCREW_HOLE_SPEC)

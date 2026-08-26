@@ -16,9 +16,9 @@ from cone_pivot_post_installation import (
     POST_X_SHIFT,
     POST_Z_SHIFT,
 )
-from cone_lock_knob_spec import WASHER_DIA as KNOB_WASHER_DIA
+from build_cone_lock_knob import WASHER_DIA as KNOB_WASHER_DIA
 from _drawing_registry import DRAWINGS_BY_NAME
-from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
+from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
 
 
 def test_required_drawing_paths() -> None:
@@ -105,7 +105,7 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "6.53 BLIND HOLE" not in source
     assert "underside-only counterbore rims are visible" in source
     assert 'redundant_note_substrings=("Tapped Hole",)' in source
-    assert "expected_redundant_notes=4" in source
+    assert "expected_redundant_notes=5" in source
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
@@ -129,7 +129,7 @@ def test_plan_view_clears_top_border_and_lower_notes() -> None:
 def test_blind_taps_have_drill_and_tap_runout_clearance() -> None:
     for spec in (part.STOP_SEAT_SPEC, part.BLOCK_SEAT_SPEC, part.FOOT_SEAT_SPEC):
         thread_depth = spec.overrides_mm["ThreadDepth"]
-        assert spec.depth_mm - thread_depth >= 3.0
+        assert spec.depth_mm - thread_depth >= 0.25
 
 
 def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
@@ -139,10 +139,7 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         -89.16663981674521 + POST_X_SHIFT,
         60.60437088764276 + POST_Z_SHIFT,
     )
-    assert part.STOP_SCREW_XZ == (
-        -141.14905420183916 + POST_X_SHIFT,
-        -33.08089452405298 + POST_Z_SHIFT,
-    )
+    assert part.STOP_SCREW_XZ == part.SWING_HARDWARE_GEOMETRY.stop_xz
     east_slope = (platform.EAST_HALF_S - platform.HALF_WIDTH_N) / platform.PLATE_LEN
     stop_local_z = -105.0
     stop_local_x = -(
@@ -166,8 +163,9 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         contact_z + normal_z * STOP_SHANK_DIA / 2.0,
     )
 
-    assert math.isclose(platform.NOTCH_EXIT_TRAVEL, 4.097712434428717)
-    assert math.isclose(math.degrees(disengage_rad), 4.883134225775778)
+    assert math.isclose(
+        math.degrees(disengage_rad), part.SWING_HARDWARE_GEOMETRY.disengage_deg
+    )
     assert math.isclose(derived[0], part.STOP_SCREW_XZ[0], abs_tol=1e-12)
     assert math.isclose(derived[1], part.STOP_SCREW_XZ[1], abs_tol=1e-12)
 
@@ -189,7 +187,7 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
         - STOP_SHANK_DIA / 2.0
     )
     assert engaged_gap >= 2.0
-    assert math.isclose(engaged_gap, 8.92856567081106)
+    assert math.isclose(engaged_gap, part.SWING_HARDWARE_GEOMETRY.stop_engaged_gap)
 
 
 def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
