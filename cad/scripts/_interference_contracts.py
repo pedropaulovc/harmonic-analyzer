@@ -81,6 +81,14 @@ _CS_S1 = _CS_S0 + _CS_DIA
 _CRANK_PIN_ARM_MM3 = _pin_overlap(_ARM_S0, _BORE_S0, _ARM_PILOT) + _pin_overlap(_BORE_S1, _ARM_S1, _ARM_PILOT)
 _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 
+# Independent SolidWorks-kernel observations for the exact stock bodies in
+# their production receivers.  The 90280A108's modeled helical thread and
+# under-head runout overlap the native #4-40 far jaw by 6.47 mm3; the cup-tip
+# adjuster makes its intended thrust contact with the shaft end at 0.13 mm3.
+# Ten-percent bounded headroom still fails any materially deeper insertion.
+_TIP_PINCH_GATE_LIMIT_MM3 = 6.47 * 1.10
+_ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 1.10
+
 _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("crank-pin-1", "crank-arm-1")): 1.10 * _CRANK_PIN_ARM_MM3,
     frozenset(("crank-pin-1", "crankshaft-1")): 1.10 * _CRANK_PIN_SHAFT_MM3,
@@ -91,7 +99,10 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     ),
     frozenset(
         ("cone-tip-pinch-screw-1", "cone-tip-block-1")
-    ): _smooth_annulus_limit_mm3(2.8448, 2.261, 1.925),
+    ): _TIP_PINCH_GATE_LIMIT_MM3,
+    frozenset(
+        ("cone-tip-adjuster-1", "cone-gear-shaft-1")
+    ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
 }
 
 _FRAME_ALLOWED_PAIRS = {
