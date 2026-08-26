@@ -30,6 +30,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
+        screw_axis_planes=("Front Plane", "Right Plane"),
     )
 
 
