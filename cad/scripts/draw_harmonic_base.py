@@ -281,9 +281,7 @@ def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
 
     # The side silhouette's top edge is the raised rim's top (RIM_TOP), not the
     # deck: the deck sits LIP_H below it inside the rim.
-    return _at_height(0.0, "underside datum A"), _at_height(
-        RIM_TOP / 1000.0, "rim top"
-    )
+    return _at_height(0.0, "underside datum A"), _at_height(RIM_TOP / 1000.0, "rim top")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -464,10 +462,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
-        # Five Hole Wizard tapped groups (pivot, stop, block, foot, nameplate
-        # seats); all five imported generic notes are replaced by the native
-        # hole table.
-        expected_redundant_notes=5,
+        # Pivot, lock, stop, block, foot, and nameplate seats are six Hole
+        # Wizard tapped groups; the native table replaces their generic notes.
+        expected_redundant_notes=6,
     )
 
 
