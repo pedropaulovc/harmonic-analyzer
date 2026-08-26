@@ -985,9 +985,8 @@ if PLAT_PIVOT_HOLE_DIA <= PSCREW_SHOULDER_DIA:
 if abs(PSCREW_SHOULDER_LEN - PLAT_PIVOT_BEARING_T - 0.25) > 1e-9:
     raise AssertionError("pivot screw no longer provides 0.25 axial plate clearance")
 if (
-        (PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA) / 2.0 + 1e-9
-        < PLAT_PIVOT_HEAD_RADIAL_CLEARANCE
-):
+    PLAT_PIVOT_RELIEF_DIA - PSCREW_HEAD_DIA
+) / 2.0 + 1e-9 < PLAT_PIVOT_HEAD_RADIAL_CLEARANCE:
     raise AssertionError("platform pivot relief lacks required radial head clearance")
 _require_tapped_thread("cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC)
 if BASE_PIVOT_HOLE_DEPTH - PSCREW_THREAD_TAIL_LEN < 1.5:
@@ -1023,6 +1022,28 @@ if abs(BASE_LOCK_ENGAGEMENT - (KNOB_STUD_LEN - PLAT_T)) > 1e-9:
     raise AssertionError("base lock engagement does not use the stock stud excess")
 if BASE_LOCK_HOLE_DEPTH - BASE_LOCK_ENGAGEMENT < 0.25 - 1e-9:
     raise AssertionError("cone-lock base tap lacks 0.25 mm bottom clearance")
+
+# The stock knurled head is much wider than the former simplified knob.  Keep
+# its base seat outside a conservative plan-envelope of every adjacent gear;
+# the real solids must therefore have clearance at every tooth phase.
+_KNOB_GEAR_CLEARANCE = 0.25
+_KNOB_R = KNOB_HEAD_DIA / 2.0
+_GEAR64_TIP_R = R64 + 25.4 / DP_CRANK
+if (
+    math.hypot(KNOB_X - GEAR64_SEAT[0], KNOB_Z - GEAR64_SEAT[2])
+    - _KNOB_R
+    - _GEAR64_TIP_R
+    < _KNOB_GEAR_CLEARANCE
+):
+    raise AssertionError("cone-lock knob head crowds the 64T crank-drive gear")
+for _j in range(20):
+    _cone_tip_r = CONE_T120_PITCH_R - RADIUS_STEP * _j + ADDENDUM
+    _cone_x, _cone_z = cone_seat(_j)
+    if (
+        math.hypot(KNOB_X - _cone_x, KNOB_Z - _cone_z) - _KNOB_R - _cone_tip_r
+        < _KNOB_GEAR_CLEARANCE
+    ):
+        raise AssertionError(f"cone-lock knob head crowds cone gear {_j + 1}")
 
 # The plate's crank-axis datum remains on the machine crank axis in the
 # engaged pose.

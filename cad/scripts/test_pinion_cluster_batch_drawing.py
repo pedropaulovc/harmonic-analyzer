@@ -279,15 +279,14 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     )
 
 
-def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
+def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     threaded_by_assembly = {
         "drive-train": {
             frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _annulus_limit(
                 7.9502, 6.528, 6.0
             ),
-            frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): _annulus_limit(
-                2.8448, 2.261, 1.925
-            ),
+            frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): 7.117,
+            frozenset(("cone-tip-adjuster-1", "cone-gear-shaft-1")): 0.143,
         },
         "frame": {
             **_expected_numbered_pairs(
@@ -474,7 +473,7 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
         "drive-train": cam_pairs,
     }
     expected_counts = {
-        "drive-train": 4,
+        "drive-train": 5,
         "frame": 9,
         "magnifier": 3,
         "summing": 2,
@@ -483,8 +482,8 @@ def test_threaded_interference_contracts_are_exact_and_volume_bounded() -> None:
         "harmonic-analyzer": 12,
     }
 
-    assert sum(len(pairs) for pairs in threaded_by_assembly.values()) == 58
-    assert sum(expected_counts.values()) == 60
+    assert sum(len(pairs) for pairs in threaded_by_assembly.values()) == 59
+    assert sum(expected_counts.values()) == 61
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
         assert len(allowed) == expected_counts[name]

@@ -104,10 +104,11 @@ def test_v2_post_foot_and_mount_pattern_cascade() -> None:
     assert part.PLATE_SOUTH_Z == pytest.approx(-216.3541869456341)
     assert part.WEST_HALF_N == 8.0
     assert part.EAST_HALF_S == 24.0
-    assert part.SLOT_E_X == 27.5
+    assert part.SLOT_E_X == 33.0
     assert part.POST_STATION == -39.90136099793
     assert part.PIVOT_STATION == 152.27232594770453
     assert math.isclose(part.POST_LOCAL_Z, -192.17368694563453, abs_tol=1e-12)
+    assert part.SLOT_E_Z < part.POST_LOCAL_Z
     assert part.POST_MAIN_DIA == 42.011
     assert part.POST_FOOT_CONTAINMENT >= 0.25
     assert part.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
