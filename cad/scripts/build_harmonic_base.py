@@ -63,6 +63,8 @@ from harmonic_base_spec import (
     BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
     DRAWING_DIMENSIONS,
+    LIP_H,
+    LIP_W,
     DRAWING_NOTES,
     SIDE_VIEW_NOTE,
     TOP_FRONT_Z,
@@ -133,8 +135,8 @@ PAD_ROOT_R = 0.5  # pad-to-flange root fillet (note 1: R0.50 MAX)
 # body stay casting green); the lip's inner edge clears the closest deck
 # occupants -- tube-frame columns (|z| 124.7) and the nameplate (x 214.25) --
 # by >= 1.0.
-LIP_W = 7.0  # rim width, in from the pad outline
-LIP_H = 2.5  # rim height above the deck
+# LIP_W / LIP_H live in harmonic_base_spec (the drawing's side view needs the
+# rim top for its silhouette pick).
 RIM_INNER_R = PAD_CORNER_R - LIP_W  # 8.875: the deck pocket's plan corners
 RIM_OVERLAP = 1.0  # the ring starts this far below the pad top so it merges
 

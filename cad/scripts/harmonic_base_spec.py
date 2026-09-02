@@ -27,7 +27,10 @@ TOP_REAR_Z = FORMER_TOP_WIDTH / 2.0
 TOP_WIDTH = TOP_REAR_Z - TOP_FRONT_Z
 TOP_CENTER_Z = (TOP_FRONT_Z + TOP_REAR_Z) / 2.0
 TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
-STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8
+STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8: the deck (pad top)
+LIP_W = 7.0  # raised rim width, in from the pad outline (2026-09 photo re-derive)
+LIP_H = 2.5  # raised rim height above the deck
+RIM_TOP = STACK_HEIGHT + LIP_H  # 53.3: the casting's overall height
 
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
@@ -50,7 +53,7 @@ DRAWING_NOTES = "\n".join(
     (
         "1. MACHINE FROM SOLID STOCK TO THE FINISHED PROFILE SHOWN; NO DRAFT.",
         "   PAD-TO-FLANGE ROOT R0.50 MAX; LOWER FLANGE 12.70 THICK;",
-        "   TOTAL HEIGHT 50.80.",
+        "   DECK 50.80, TOTAL HEIGHT 53.30 OVER THE RIM.",
         "2. UPPER PAD 444.50 X 266.70;",
         "   NEAR LONG SIDE 6.35 +/-0.10 FROM B;",
         "   NEAR LEFT END 6.35 +/-0.10 FROM C.",

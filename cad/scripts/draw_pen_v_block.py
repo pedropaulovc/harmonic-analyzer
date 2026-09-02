@@ -222,11 +222,14 @@ async def build(adapter: Any) -> dict[str, str]:
         set_basic_dimension(adapter, display, label=f"{station} basic bore station")
     # Block height (18): dimension the right view's flat top/bottom silhouette
     # edges.  At 4:1 the 16 x 18 section spans +/-0.032 (Z) x +/-0.036 (Y)
-    # around the view center.
+    # around the view center. The bottom edge is interrupted by the marker
+    # groove (GROOVE_Z0..GROOVE_Z0 + GROOVE_WIDTH across the depth), so pick
+    # it on the remaining land beside the groove, not at mid-depth.
+    _bottom_land_x = RIGHT_CENTER[0] - RIGHT_HALF_Z + GROOVE_Z0 / 2.0 * SHEET_SCALE[0] / 1000.0
     add_edge_dimension(
         adapter,
         right,
-        p0=(RIGHT_CENTER[0], RIGHT_CENTER[1] - RIGHT_HALF_Y),
+        p0=(_bottom_land_x, RIGHT_CENTER[1] - RIGHT_HALF_Y),
         p1=(RIGHT_CENTER[0], RIGHT_CENTER[1] + RIGHT_HALF_Y),
         text_xy=(RIGHT_CENTER[0] + RIGHT_HALF_Z + 0.014, RIGHT_CENTER[1]),
         label="block-height overall",
