@@ -21,9 +21,14 @@ def test_prompts_exist_and_are_calibrated_to_the_policy() -> None:
     assert "Decimal places" in part
     assert "Hidden lines" in part
     assert "DRILL or REAM" in part
-    # Assembly sheets are orientation sheets by recipe; the prompt must not
-    # ask for the package the old assembly prompt demanded.
-    assert "No BOM, balloons" in assembly
+    assert "granite surface plate" in part and "No CMM" in part
+    assert "never call a geometric control uninspectable" in part
+    assert "datum feature symbols on real, reachable surfaces" in part
+    # Assembly packages are judged as real assembly drawings: exploded view,
+    # parts list, balloons, ordered steps -- the current three-view sheets are
+    # expected to FAIL this until they are built out.
+    for item in ("exploded view", "parts list (BOM)", "Assembly steps in order"):
+        assert item in assembly, item
 
 
 def test_schema_is_strict_structured_output() -> None:
