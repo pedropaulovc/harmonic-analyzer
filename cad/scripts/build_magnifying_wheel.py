@@ -106,6 +106,14 @@ YOKE_LOCAL_X = _YOKE_POINT[0] - _YOKE_WHEEL_X  # +10.099 (pitch r 10.4 @ tangenc
 YOKE_LOCAL_Y = _YOKE_POINT[1] - _YOKE_WHEEL_Y  # -2.485
 
 
+def _com_get(obj, name: str):
+    """Read a zero-argument COM member that pywin32's late-bound dispatch may
+    expose either as a method (``GetBox()``) or as a property value (the
+    ``'tuple' object is not callable`` trap seen on IFace2.GetBox)."""
+    value = getattr(obj, name)
+    return value() if callable(value) else value
+
+
 BRASS_DRUM = (0.72, 0.56, 0.24)  # ch21 p.53 hub drum
 
 
@@ -123,8 +131,8 @@ async def _paint_bright_faces(adapter) -> None:
     part_h = _early_bound(adapter.currentModel, "IPartDoc")
     n_rim = n_hub = 0
     for body in part_h.GetBodies2(0, True) or []:
-        for face in body.GetFaces() or []:
-            box = face.GetBox()
+        for face in _com_get(body, "GetFaces") or []:
+            box = _com_get(face, "GetBox")
             if not box:
                 continue
             xs = (float(box[3]) - float(box[0])) * 1000.0

@@ -118,6 +118,14 @@ REAR_CY = PEAK_R - REAR_R
 assert abs(abs(FRONT_CY - REAR_CY) - abs(FRONT_R - REAR_R)) < 1e-6
 
 
+def _com_get(obj, name: str):
+    """Read a zero-argument COM member that pywin32's late-bound dispatch may
+    expose either as a method (``GetBox()``) or as a property value (the
+    ``'tuple' object is not callable`` trap seen on IFace2.GetBox)."""
+    value = getattr(obj, name)
+    return value() if callable(value) else value
+
+
 COLLAR_BRASS = (0.72, 0.56, 0.24)  # ch11 pp.20-21: the bright brass collar
 
 
@@ -133,8 +141,8 @@ async def _paint_collar_brass(adapter) -> None:
     part_h = _early_bound(adapter.currentModel, "IPartDoc")
     n = 0
     for body in part_h.GetBodies2(0, True) or []:
-        for face in body.GetFaces() or []:
-            box = face.GetBox()
+        for face in _com_get(body, "GetFaces") or []:
+            box = _com_get(face, "GetBox")
             if not box:
                 continue
             ys = (float(box[4]) - float(box[1])) * 1000.0

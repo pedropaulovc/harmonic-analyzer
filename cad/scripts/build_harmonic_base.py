@@ -307,6 +307,14 @@ async def _define_fixed_edge_rectangle(
     )
 
 
+def _com_get(obj, name: str):
+    """Read a zero-argument COM member that pywin32's late-bound dispatch may
+    expose either as a method (``GetBox()``) or as a property value (the
+    ``'tuple' object is not callable`` trap seen on IFace2.GetBox)."""
+    value = getattr(obj, name)
+    return value() if callable(value) else value
+
+
 async def _paint_deck_black(adapter, deck_y_mm: float) -> None:
     """Face-level PANEL_BLACK on the deck the rim frames: the largest planar
     +Y face lying at ``deck_y_mm`` (the pad top inside the lip; the lip's own
@@ -323,14 +331,14 @@ async def _paint_deck_black(adapter, deck_y_mm: float) -> None:
     target_area = 0.0
     y_m = deck_y_mm / 1000.0
     for body in bodies:
-        for face in body.GetFaces() or []:
+        for face in _com_get(body, "GetFaces") or []:
             normal = face.Normal
             if not normal or float(normal[1]) < 0.99:
                 continue
-            box = face.GetBox()
+            box = _com_get(face, "GetBox")
             if not box or abs(float(box[4]) - y_m) > 1e-6 or abs(float(box[1]) - y_m) > 1e-6:
                 continue
-            area = float(face.GetArea())
+            area = float(_com_get(face, "GetArea"))
             if area > target_area:
                 target, target_area = face, area
     if target is None:
