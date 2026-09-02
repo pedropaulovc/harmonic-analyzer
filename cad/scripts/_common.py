@@ -1170,10 +1170,17 @@ def part_properties(part_name: str) -> dict[str, str]:
     # Title-block general tolerances (title_block.yaml) — read by the drawing
     # template's title block via $PRPSHEET, so EVERY part carries them,
     # registered in the parts registry or not.
+    props["TOL_LIN_X"] = str(_config.title_block("linear_1pl")["display"])
     props["TOL_LIN_XX"] = str(_config.title_block("linear_2pl")["display"])
     props["TOL_LIN_XXX"] = str(_config.title_block("linear_3pl")["display"])
     props["TOL_ANG"] = str(_config.title_block("angular")["display"])
     props["TOL_SURFACE"] = str(_config.title_block("surface")["display"])
+    # Edge-break and thread-class rows (2026-09 template): the sheet-format
+    # notes are $PRPSHEET links, so the numbers live here, not in the DRWDOT.
+    props["TOL_EDGE_BREAK_R"] = str(_config.title_block("edge_break")["display_r"])
+    props["TOL_CHAMFER_MAX"] = str(_config.title_block("edge_break")["display_chamfer"])
+    props["THREAD_TYPE"] = str(_config.title_block("thread")["type"])
+    props["THREAD_CLASS"] = str(_config.title_block("thread")["class"])
     # DRILLED HOLES general tolerance (unilateral); the title block's DRILLED
     # HOLES row reads these via $PRPSHEET and supplies the +/- around them.
     props["TOL_HOLE_MINUS"] = str(_config.title_block("drilled_hole")["display_minus"])

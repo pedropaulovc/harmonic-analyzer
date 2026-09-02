@@ -137,3 +137,4 @@
 - [Rocker arms fan in plan](rocker-arms-fan-in-plan.md) — photos: the 20 arms radiate from the pedestal pivot (140 mm at the tips, tight at the pivot); model has them parallel; deferred re-architecture, the top residual after the 2026-09 photo pass
 - [No script edits during a seat run](no-script-edits-during-seat-run.md) — mid-run edits make later assemblies mate against old parts (the 9 mm crank 'flip miss') and turn verify into STALE failures; batch edits, then one `doit --continue build`; `build` excludes `export`
 - [Photo re-derive pass 2 audit](photo-rederive-2-audit.md) — chapter-by-chapter delta list of PR #651 (10 fixed, 7 open); the rocker-arm fan is the big remaining item
+- [git stash vs SolidWorks-locked template](git-stash-solidworks-locked-template.md) — `git stash` with a DRWDOT/SLDPRT open in SolidWorks commits the stash then fails the reset on the locked file, leaving the tree half-reverted; bisect with a worktree instead; recovery recipe inside
