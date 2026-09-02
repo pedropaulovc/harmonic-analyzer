@@ -50,7 +50,10 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     pivot_min = channel.PIVOT_SHAFT_Z - pivot_shaft_spec.SHAFT_LENGTH / 2.0
     pivot_max = channel.PIVOT_SHAFT_Z + pivot_shaft_spec.SHAFT_LENGTH / 2.0
     assert pivot_min < row_min < row_max < pivot_max
-    assert pivot_min < channel.AFRAME_MOUNT_Z < channel.SUPPORT_Z < pivot_max
+    # 481ec429 (2026-09 pivot-bracket re-derive): the asymmetric A-frame/
+    # support mounts became a symmetric pivot-bracket pair on the 170 shaft.
+    bracket_lo, bracket_hi = channel.PIVOT_BRACKET_Z
+    assert pivot_min < bracket_lo < row_min < row_max < bracket_hi < pivot_max
 
     fulcrum_min = channel.FULCRUM_SHAFT_Z - fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
     fulcrum_max = channel.FULCRUM_SHAFT_Z + fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
