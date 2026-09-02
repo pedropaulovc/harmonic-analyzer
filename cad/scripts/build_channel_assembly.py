@@ -978,8 +978,6 @@ from _pose_configs import (  # noqa: E402
     author_pose_mates,
     install_pose_configurations,
     repose_fixed_component,
-    wrap_deg,
-    yaw_deg,
 )
 
 
@@ -1044,18 +1042,22 @@ async def _install_pose_configurations(
         expect[j] = st
 
     def sin_verify(adapter) -> None:
+        # Sign-safe readback: the rocker's rod-pin bore must sit at the solved
+        # pin point and the rod's ring at the turned cam centre (a yaw read of
+        # the Rz(tilt).Ry180 rows is sign-ambiguous; the first seat run read
+        # +7.43 for an arm posed at -7.43 with its rod exactly on the cam).
         bad = []
         for j, st in expect.items():
-            t = component_transform(adapter, f"rocker-arm-{j + 1}")
-            tilt = wrap_deg(yaw_deg(t) - 180.0)  # arm rows = Rz(tilt) . Ry180
+            pin = world_point(adapter, f"rocker-arm-{j + 1}", ROCKER_ROD_BORE_LOCAL)
             rod = component_transform(adapter, f"connecting-rod-{j + 1}")
             rx, ry = rod[9] * 1000.0, rod[10] * 1000.0
-            if not (_pose_tolerance_ok(tilt, st["arm_tilt"], 0.05)
+            if not (_pose_tolerance_ok(pin[0], st["pin_x"], 0.05)
+                    and _pose_tolerance_ok(pin[1], st["pin_y"], 0.05)
                     and _pose_tolerance_ok(rx, st["ring_x"], 0.05)
                     and _pose_tolerance_ok(ry, st["ring_y"], 0.05)):
-                bad.append((j, round(tilt, 3), round(st["arm_tilt"], 3), round(rx, 2), round(st["ring_x"], 2), round(ry, 2), round(st["ring_y"], 2)))
+                bad.append((j, round(pin[0], 2), round(st["pin_x"], 2), round(pin[1], 2), round(st["pin_y"], 2), round(rx, 2), round(st["ring_x"], 2), round(ry, 2), round(st["ring_y"], 2)))
         if bad:
-            raise RuntimeError(f"{sinus['configuration']}: rockers/rods off their cams (j, tilt, want, rx, want, ry, want): {bad[:5]}")
+            raise RuntimeError(f"{sinus['configuration']}: rockers/rods off their cams (j, pin x, want, pin y, want, ring x, want, ring y, want): {bad[:5]}")
         log(f"{sinus['configuration']}: {CHANNELS} rockers on their cams after {crank_turns:g} cranks")
 
     await install_pose_configurations(
