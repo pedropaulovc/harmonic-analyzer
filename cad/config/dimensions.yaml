@@ -177,7 +177,7 @@ sections:
       - - Taper pin + keeper ring (placed 2026-09-02)
         - 'the 45-long 1:48 pin (MHA-024) now sits through the arm hub + crankshaft cross-hole along machine X, big end 3 proud of the hub''s outer face; a Ø9 brass wire ring (Ø1.2 wire, `crank-pin-ring` MHA-128) hangs from a Ø1.5 cross-hole 3 from the big end'
         - —
-        - 'ch11 p.14 page002_img01 (pin head with its brass ring) + ch30 p002; the ring''s anchor screw + chain on the arm face are NOT modelled'
+        - 'ch11 p.14 page002_img01 (pin head with its brass ring) + ch30 p002; the ring''s anchor screw + chain on the arm face are NOT modelled' -- 2026-09-02: the anchor screw (a brass fillister-screw in a #4-40 tap on the arm''s front face, x 20 from the shaft) and its brass wire eye (`crank-pin-eye` MHA-130, Ø5 loop, Ø1 wire) are now placed; the chain stays lost. The dimple moved to that same front face
         - scaled
         - low
       - - Handle length

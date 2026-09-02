@@ -4,8 +4,9 @@ The metal crank arm that drives the machine: full-radius boss at the
 crankshaft end (bored for the shaft and cross-drilled for the removable
 tapered pin), straight arm, square end carrying the handle pivot, and a
 fiducial dimple for alignment. The wooden handle and the tapered pin are
-separate parts (build_crank_handle.py / build_crank_pin.py); the chain
-eyelet (chain lost) is omitted.
+separate parts (build_crank_handle.py / build_crank_pin.py); the keeper
+ring's anchor screw (fillister-screw) and brass eyelet (crank-pin-eye) sit
+in the front-face tap authored here (the chain itself is lost).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 11" — all photo-scaled (low) except
 the legacy 3/8" crankshaft bore (med).
@@ -58,6 +59,10 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from crank_arm_spec import (
+    ANCHOR_DRILL_DEPTH,
+    ANCHOR_SCREW_X,
+    ANCHOR_SCREW_Y,
+    ANCHOR_THREAD_DEPTH,
     ARM_C2C,
     ARM_END_X,
     ARM_THICKNESS,
@@ -111,6 +116,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "DimpleDia", f"{DIMPLE_DIA}mm")
     await set_global(adapter, "DimpleDepth", f"{DIMPLE_DEPTH}mm")
     await set_global(adapter, "DimpleX", f"{DIMPLE_X}mm")
+    await set_global(adapter, "AnchorScrewX", f"{ANCHOR_SCREW_X}mm")
+    await set_global(adapter, "AnchorScrewY", f"{ANCHOR_SCREW_Y}mm")
     await set_global(adapter, "ArmEndX", '"ArmC2C" + "SquareEndOverhang"')
 
     # Each sketch declares its dim names + drive equations as it is built; a
@@ -212,11 +219,24 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after bores: {vol:.1f} mm^3")
 
-    # Fiducial dimple on the Z=0 face (which face carries it is arbitrary
-    # until assembly). Mid-plane cut of 2x depth: only the +Z half removes
-    # material, so the result is DIMPLE_DEPTH regardless of cut direction.
+    # HandleSeat = the z = ARM_THICKNESS face: the arm's FRONT face once
+    # placed (the composed Ry(180) turns local +z to machine -z, so this face
+    # looks south at the operator). 2026-09-02, ch11 p.14: the dimple and the
+    # keeper-ring anchor screw sit on THIS face, not the z = 0 one (which the
+    # earlier build carried the dimple on -- hidden against the chain wheel).
+    check(
+        f"create_plane HandleSeat (Front Plane, +{ARM_THICKNESS})",
+        await adapter.create_plane(CreatePlaneParameters(
+            mode="offset", base_plane="Front Plane", offset=ARM_THICKNESS,
+        )),
+    )
+    name_last_feature(adapter, "HandleSeat")
+
+    # Fiducial dimple on the front face. Mid-plane cut of 2x depth: only the
+    # in-material half removes anything, so the result is DIMPLE_DEPTH
+    # regardless of cut direction.
     dimple = SketchDims()
-    check("create_sketch dimple", await adapter.create_sketch("Front"))
+    check("create_sketch dimple", await adapter.create_sketch("HandleSeat"))
     await define_circle(
         adapter, DIMPLE_X, 0.0, DIMPLE_DIA / 2.0, "dimple", dims=dimple,
         names=("DimpleX", "DimpleZ", "DimpleDia"),
@@ -235,6 +255,24 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Dimple")
     vol = await _volume(adapter)
     _telemetry.info(f"volume after dimple: {vol:.1f} mm^3")
+
+    # Keeper-ring anchor: a blind #4-40 tap in the front face (ch11 p.14), the
+    # brass fillister-screw clamps the wire eyelet's tail under its head.
+    anchor_cut = wizard_holes(
+        adapter,
+        HoleSpec(
+            "tapped", "#4-40", end="blind", depth_mm=ANCHOR_DRILL_DEPTH,
+            overrides_mm={"ThreadDepth": ANCHOR_THREAD_DEPTH},
+        ),
+        [[ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ARM_THICKNESS]],
+        (0.0, 0.0, 1.0),
+        "keeper-ring anchor tap (#4-40)",
+        name="AnchorTap",
+        placement_dims=[(("AnchorX", '"AnchorScrewX"'), ("AnchorY", '"AnchorScrewY"'))],
+    )
+    drive_jobs += anchor_cut.placement_drive_jobs
+    vol = await _volume(adapter)
+    _telemetry.info(f"volume after anchor tap: {vol:.1f} mm^3")
 
     # Tapered-pin cross-hole: pilot below the No. 2 taper pin's small end, then
     # taper-reamed with the shaft at assembly.
@@ -297,14 +335,6 @@ async def build(adapter) -> dict[str, str]:
     # here, the flip-free seat idiom; seating on Front@arm instead buried the
     # collar inside the plate, 502 mm^3, 2026-07-05).
     from solidworks_mcp.adapters.base import CreatePlaneParameters
-
-    check(
-        f"create_plane HandleSeat (Front Plane, +{ARM_THICKNESS})",
-        await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Front Plane", offset=ARM_THICKNESS,
-        )),
-    )
-    name_last_feature(adapter, "HandleSeat")
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),

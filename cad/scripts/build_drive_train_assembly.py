@@ -557,6 +557,9 @@ from crank_pin_spec import (  # noqa: E402
     RING_HOLE_X as PIN_RING_HOLE_X,
 )
 from build_crank_pin_ring import RING_INNER_R as CRANK_RING_INNER_R  # noqa: E402
+from build_crank_pin_eye import LOOP_R as EYE_LOOP_R, TAIL_LEN as EYE_TAIL_LEN, WIRE_DIA as EYE_WIRE_DIA  # noqa: E402
+from crank_arm_spec import ANCHOR_SCREW_X, ANCHOR_SCREW_Y, ANCHOR_THREAD_DEPTH  # noqa: E402
+from fillister_screw_spec import SHANK_DIA as ANCHOR_SCREW_SHANK_DIA, SHANK_LEN as ANCHOR_SCREW_SHANK_LEN  # noqa: E402
 
 PIN_PROUD = 3.0
 CRANK_PIN_Z = CRANK_ARM_Z0 + ARM_THICKNESS / 2.0  # -171: hub mid-thickness
@@ -566,6 +569,24 @@ if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
     raise AssertionError("crankshaft cross-hole is not at the arm hub's mid-thickness")
 if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + ARM_WIDTH / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
+# Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
+# CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
+# placed rows: local +x -> -Y, local +y -> -X). The brass eyelet lies flat on
+# that face (wire centre a wire radius + air south of it), its tail pointing
+# UP the arm at the screw and ending at the shank; the fillister-screw's
+# under-head plane rides on the wire (one wire diameter + air off the face),
+# shank pointing +z into the arm's #4-40 tap.
+ANCHOR_AIR = 0.02
+ANCHOR_SCREW_XY = (X_CRANK - ANCHOR_SCREW_Y, Y_CRANK - ANCHOR_SCREW_X)
+ANCHOR_HEAD_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA - ANCHOR_AIR
+EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
+# the tail's end touches the shank: loop centre (tail root) sits LOOP_R + TAIL_LEN
+# + shank radius + air below the screw axis
+EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R)
+if ANCHOR_SCREW_SHANK_LEN - EYE_WIRE_DIA - ANCHOR_AIR > ANCHOR_THREAD_DEPTH:
+    raise AssertionError("anchor screw bottoms in the crank arm's tap")
+if ANCHOR_SCREW_SHANK_LEN - EYE_WIRE_DIA - ANCHOR_AIR < 2.0:
+    raise AssertionError("anchor screw has under 2.0 thread engagement in the arm")
 # = the plate's NORTH face (-167): the placed rows compose a Ry(180), so the
 # +z-extruded plate fills CRANK_ARM_Z0..here running machine -z from the
 # origin. Both the place_component z and the crankshaft's SeatArm datum
@@ -2438,6 +2459,38 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{ring}", "PLANE"),
         named_ref(f"Front Plane@{pin}", "PLANE"),
         label="keeper ring locked to the pin",
+    )
+    # Keeper-ring anchor screw + brass eyelet on the arm's front face (ch11
+    # p.14); both lock to the arm so they turn with the crank.
+    eye = await place_component(
+        adapter,
+        "crank-pin-eye",
+        [ANCHOR_SCREW_XY[0], EYE_CENTER_Y, EYE_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="keeper-ring anchor eyelet",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{eye}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="anchor eyelet locked to the arm",
+    )
+    anchor = await place_component(
+        adapter,
+        "fillister-screw",
+        [ANCHOR_SCREW_XY[0], ANCHOR_SCREW_XY[1], ANCHOR_HEAD_Z],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="keeper-ring anchor screw",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{anchor}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="anchor screw locked to the arm",
     )
     # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
     # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).

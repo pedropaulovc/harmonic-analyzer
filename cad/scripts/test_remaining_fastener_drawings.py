@@ -136,7 +136,7 @@ def test_assembly_fastener_quantities_are_pinned() -> None:
     assert int(_config.parts("foot-screw")["quantity"]) == 3
     # 22 on the paper-drive platen (4 clip + 10 guide + 8 lock) + 4 holding the
     # maker's nameplate to the base (build_frame_assembly).
-    assert int(_config.parts("fillister-screw")["quantity"]) == 26
+    assert int(_config.parts("fillister-screw")["quantity"]) == 27  # 22 paper-drive + 4 nameplate + 1 crank anchor
 
 
 @pytest.mark.parametrize(

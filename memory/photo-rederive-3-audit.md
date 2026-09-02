@@ -55,5 +55,8 @@ p.31: each bar ends in a tab wider than the bar, offset to alternating sides
 so neighbours clear) -- the tab is the bar's bearing surface on the arm, so
 it changes `solve_state`'s foot contact and needs a left/right part
 configuration selected per channel through the CopyWithMates slice;
-the summing-lever hub diameter (unverified read); the keeper ring's anchor
-screw + chain on the crank arm.
+the summing-lever hub diameter -- CHECKED 2026-09-02 against ch18 p.42
+page001_img01: the CAD's Ø25.4 pivot cylinder on the 5 plate matches the
+cast boss proportion, no change; the keeper ring's anchor screw + eye --
+DONE 2026-09-02 (fillister-screw in a front-face #4-40 tap + `crank-pin-eye`
+MHA-130; the dimple moved to the same front face, it faced the chain wheel).
