@@ -1220,7 +1220,10 @@ LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 LEVER_Z = -111.0 + MECHANISM_Z_SHIFT
 # seats on the translated lift-rod front end; north face stays 2 off the block.
 HANDLE_TILT_DEG = 65.0  # cross rod from vertical
-HANDLE_Z = -144.0 + MECHANISM_Z_SHIFT
+HANDLE_Z = (-135.0 + MECHANISM_Z_SHIFT) - (HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T)
+# = ARBOR_Z0 - (hub bore floor station): the blind hub's floor seats on the
+# arbor's flat front tip (asserted below), so the grip station follows the
+# grip length (2026-09: the O23 x 14 drum became a O15 x 9 ball-crowned grip).
 # translated with the p2 arbor. The hub is a blind tubular cap
 # (PR7 item 14): its bore floor at local +9 lands on -99.585, where the
 # steel arbor's flat front tip seats flush (build_pinion_arbor)
