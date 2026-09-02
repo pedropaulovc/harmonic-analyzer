@@ -59,3 +59,12 @@ shape: a ~5-wide block with a flat bright top, ~15 tall, thicker than the
 2.5 shank -- not the 10-wide x 2.5 tombstone (PR E: rod head reshape; the
 arm-to-arm gap of 4.56 bounds the thickness at 2.9 symmetric). The bars'
 feet are plain (page001_img02: the notch in the bar itself straddles the arm).
+
+Open after PR #658 (2026-09-02): the ROCKER-ARM ROD-END TIP. ch14 page002_img02
+(the 16 mm callout photo) and page002_img10 (cos(10x)) show each arm's rod
+end STEPPED: the top edge drops a few mm a short way before the tip, and the
+rod's head sits in/at that step (a bright small block at every tip). The CAD
+arm ends in a plain radial land with the head beside it. Read the step
+depth/length off page002_img02 at the 16 mm scale (~4 x 5) before modelling;
+it changes the strap outline (rocker_arm_spec TIP_FACE region) and the
+rod-head seat.
