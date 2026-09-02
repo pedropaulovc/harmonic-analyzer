@@ -25,9 +25,11 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_text,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from fillister_screw_spec import THREAD_DESIGNATION
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -54,14 +56,20 @@ SIDE_CENTER = (0.185, 0.190)
 ISO_CENTER = (0.300, 0.170)
 
 # Head-end view: the two concentric marked diameters, leadered clear to the left.
+# Head diameter text sits in the gap between the end view and the side view:
+# straight above the circle it shared the corridor with the DRIVER-FACE VIEW
+# label and its leader crossed the label (2026-09-02 render).
 END_KEEP = {
-    "HeadDia": (END_CENTER[0], END_CENTER[1] + 0.050),
+    "HeadDia": (END_CENTER[0] + 0.050, END_CENTER[1] + 0.042),
 }
 DIMENSION_CALLOUTS: dict[str, str] = {}
 SIDE_DIMENSION_CALLOUTS = {"ShankLg": "UNDERHEAD LENGTH"}
 SIDE_KEEP = {
     "HeadHt": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.034),
-    "ShankLg": (SIDE_CENTER[0] - 0.024, SIDE_CENTER[1] - 0.034),
+    # The two-line "UNDERHEAD LENGTH" callout is wider than the 32 mm shank
+    # span, so it goes wholly LEFT of the span rather than between the
+    # extension lines (where the left one struck through it).
+    "ShankLg": (SIDE_CENTER[0] - 0.065, SIDE_CENTER[1] - 0.040),
     "ShankDia": (SIDE_CENTER[0] - 0.050, SIDE_CENTER[1] + 0.016),
 }
 
@@ -110,10 +118,11 @@ async def build(adapter: Any) -> dict[str, str]:
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(8, 1))
     end = place_view(adapter, str(SOURCE), "*Back", *END_CENTER, scale=(8, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(8, 1))
-    set_hidden_lines_removed(adapter, side)
+    # Hidden lines ON in the profile (policy rule 7): the slot floor reads
+    # through the head.  The tiny end view keeps HLR -- the shank-behind-head
+    # circle would read as a hole.
+    set_hidden_lines_visible(adapter, side)
     set_hidden_lines_removed(adapter, iso)
-    # The open driver slot and head OD remain visible in HLR.  Suppress the
-    # shank-behind-head circle so the end view cannot be misread as a hole.
     set_hidden_lines_removed(adapter, end)
 
     end_annotations = curate_view_dimensions(
@@ -125,9 +134,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, side, keep=SIDE_KEEP, view_label="side"
     )
     set_dimension_callouts(adapter, side_annotations, SIDE_DIMENSION_CALLOUTS)
-    set_dimension_text(
-        adapter, side_annotations, {"ShankDia": "#4-40 UNC-2A"}
-    )
+    set_dimension_text(adapter, side_annotations, {"ShankDia": THREAD_DESIGNATION})
 
     # 0.020: the note is left-aligned on its anchor, clearing the 12.7 mm zone
     # margin / re-centred frame rule (~0.0126), which the layout audit enforces.
