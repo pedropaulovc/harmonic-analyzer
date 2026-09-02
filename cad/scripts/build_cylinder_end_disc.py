@@ -41,7 +41,9 @@ from _common import (
 PART_NAME = "cylinder-end-disc"
 MATERIAL = "Brass"  # ch13 p.23/25: same bright brass as the gears
 
-DISC_DIA = 60.0  # ch13 page002_img01: ~0.96 of the 62.2 gear OD (photo-scaled, med)
+DISC_DIA = 55.0  # ch13 page002_img01 reads ~0.9 of the 62.2 gear OD (photo-scaled,
+# low); capped so the north disc clears the cone-tip bushing beside gear 19 by
+# 1.0 (a O60 disc grazed it -- drive-train interference gate, 2026-09)
 DISC_THICK = 3.0  # ch25 page001_img02 edge-on: a gear-face-thick washer (low)
 BORE_DIA = 9.6  # slips on the O9.525 (3/8 in) cylinder arbor
 
