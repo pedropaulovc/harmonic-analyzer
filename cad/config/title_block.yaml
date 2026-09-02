@@ -23,10 +23,23 @@
 # drawings to inch, restore the inch strings: "±.02" / "±.005" / "±1°" /
 # "Ra 125" (µin). The numeric value_in/value_deg/value_uin fields are
 # unit-explicit and stay put.
+linear_1pl: { value_in: 0.03,  display: "±0.8" }    # .X   (= ±1/32 in, "loose")
 linear_2pl: { value_in: 0.02,  display: "±0.51" }   # .XX  (= ±.02 in)
 linear_3pl: { value_in: 0.005, display: "±0.13" }   # .XXX (= ±.005 in)
 angular:    { value_deg: 1.0,  display: "±1°" }
-surface:    { value_uin: 125,  display: "Ra 3.2" }  # µm (= 125 µin), machined finish; text sits above the finish symbol's arm (ASME Y14.36)
+# MACHINED qualifies the default: as-received stock faces are exempt by
+# definition (drawing-simplicity-policy.md rule 5), so a sheet never needs a
+# "faces OK as received" note to escape the block roughness.
+surface:    { value_uin: 125,  display: "Ra 3.2 MACHINED" }  # µm (= 125 µin); text sits above the finish symbol's arm (ASME Y14.36)
+
+# Edge-break row: "REMOVE BURRS AND BREAK SHARP EDGES <R> OR CHAMFER <C> MAX",
+# read via $PRPSHEET:{TOL_EDGE_BREAK_R} / {TOL_CHAMFER_MAX} (2026-09 template).
+edge_break: { radius_mm: 0.25, chamfer_max_mm: 0.25, display_r: "R0.25", display_chamfer: "0.25" }
+
+# Thread row: "THREADS <TYPE> CLASS <CLASS>" via $PRPSHEET:{THREAD_TYPE} /
+# {THREAD_CLASS} -- the US-customary fastener policy's default fit class, so
+# no per-sheet thread callout needs "-2A"/"-2B" unless it deviates.
+thread: { type: "UNC/UNF", class: "2A/2B" }
 
 # DRILLED HOLES general tolerance — UNILATERAL, not the symmetric ± linear
 # block. A twist drill cuts on-size to oversize and never under, and a clearance

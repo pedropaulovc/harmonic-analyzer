@@ -352,12 +352,17 @@ def test_assembly_title_properties_never_read_part_registry_fields():
         "Title",
         "Revision",
         "Generator",
+        "TOL_LIN_X",
         "TOL_LIN_XX",
         "TOL_LIN_XXX",
         "TOL_ANG",
         "TOL_SURFACE",
         "TOL_HOLE_MINUS",
         "TOL_HOLE_PLUS",
+        "TOL_EDGE_BREAK_R",
+        "TOL_CHAMFER_MAX",
+        "THREAD_TYPE",
+        "THREAD_CLASS",
     }
     assert props["Title"] == "frame"
     import _config
