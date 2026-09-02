@@ -89,15 +89,17 @@ MATERIAL = "Brass"  # registry + DFM assessment; the old cast-iron constant was 
 RIDGE_Y = HEX_H / 2.0  # hex top vertex above the pivot/cylinder centreline (5.134)
 
 # --- bore: "much larger than the hex trunnion", top-edge contact only -------
-R_BORE = 12.7  # Ø25.4 bore; hex is only ~Ø10.3 across-corners -> much larger
+R_BORE = 8.0  # Ø16 bore (2026-09, ch18 page001_img01: the block is ~24 wide,
+# so the bore shrank from Ø25.4); the hex is ~Ø10.3 across-corners -> still
+# 2.9 clear everywhere but the top vertex line
 TOP_CLEAR = 0.25  # hex top vertex hangs this far below the bore upper inner wall
 # Bore centre BELOW the origin so only the upper wall reaches the ridge:
 BORE_CY = TOP_CLEAR - R_BORE  # -12.45 (bore top inner wall at local y +TOP_CLEAR)
 
 # --- block (bearing body, held to the crossbar) ----------------------------
 SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
-BLK_HALF_X = 17.0  # bore wall + flank
-WALL = 4.0  # material below the bore
+BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
+WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -29.15
 
 # Mount: the block top seat hangs MOUNT_GAP below the top-frame casting

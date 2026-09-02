@@ -498,6 +498,17 @@ from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 # foot, arbor_pedestal_spec); the north casting is turned 180 about Y, so its
 # strap's inboard face is the foot centre - FOOT_DEPTH/2.
 END_DISC_AIR = 0.5
+# Dome cap screws (2026-09, ch13 page002_img01/img03, ch25 page002_img03): the
+# bright crown head on each pedestal's OUTER strap face, on the arbor axis --
+# it closes the blind arbor bore (the arbor ends 2.5 inside the strap; the
+# cap's 2.0 spigot stops 0.5 short of it). South strap face = foot centre
+# - 2 (band -2..+8 of the 16 foot); north casting turned 180 -> + 2.
+from build_dome_cap_screw import STUB_LEN as CAP_STUB_LEN  # noqa: E402
+
+CAP_SOUTH_Z = -ARBOR_PEDESTAL_Z - 2.0  # crown base on the south face, +Y -> -Z
+CAP_NORTH_Z = ARBOR_PEDESTAL_NORTH_Z + 2.0  # crown base on the north face, +Y -> +Z
+if (ARBOR_SOUTH_Z - CAP_SOUTH_Z) - CAP_STUB_LEN < 0.25:
+    raise AssertionError("south dome cap spigot reaches the arbor end")
 END_DISC_SOUTH_Z0 = -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0 + END_DISC_AIR
 END_DISC_NORTH_Z0 = (
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - END_DISC_AIR - END_DISC_THICK
@@ -1958,6 +1969,22 @@ async def build(adapter) -> dict[str, str]:
             label=f"cylinder end disc {_end} z0={_disc_z0:.3f}",
         )
         await _lock_static(adapter, end_disc, arbor)
+    # Dome cap screws: crown base on each strap's outer face, spigot into the
+    # blind bore (+Y turned outward: -Z south, +Z north).
+    for _cap_z, _euler, _rows, _end in (
+        (CAP_SOUTH_Z, [-90.0, 0.0, 0.0], [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]], "south"),
+        (CAP_NORTH_Z, [90.0, 0.0, 0.0], ROT_X_POS90, "north"),
+    ):
+        cap = await place_component(
+            adapter,
+            "dome-cap-screw",
+            [X_DRUM, Y_DRIVE, _cap_z],
+            _euler,
+            _rows,
+            ground=False,
+            label=f"dome cap screw {_end} z={_cap_z:.3f}",
+        )
+        await _lock_static(adapter, cap, arbor)
     # The cone SWING PLATFORM is the swing bracket (ch.12, p.18 "pivot"):
     # floated so the whole cone set can swing horizontally out of mesh about
     # its tip-end vertical pivot (p1). Pinned at the engaged rest pose by a

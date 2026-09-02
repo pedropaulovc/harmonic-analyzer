@@ -23,12 +23,12 @@ from _gtol_spec import CylinderFace
 from _surface_finish import GROUND_UM, SurfaceFinishControl
 
 # --- fixed geometry for the drawing's view math (mirrors build_knife_mount) ----
-R_BORE = 12.7  # Ø25.4 knife-bearing bore
-BLK_HALF_X = 17.0  # block half-width (34 across)
+R_BORE = 8.0  # Ø16 knife-bearing bore (2026-09 photo re-derive)
+BLK_HALF_X = 12.0  # block half-width (24 across)
 SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
 BLK_TOP = 14.62  # local block top (hangs 0.25 under the top-frame casting underside)
-BLK_BOT = -29.15  # local block bottom
-BORE_CY = -12.45  # bore centre below the ridge origin (TopClear - R_BORE)
+BLK_BOT = -18.75  # local block bottom
+BORE_CY = -7.75  # bore centre below the ridge origin (TopClear - R_BORE)
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("knife_bore", GROUND_UM, CylinderFace(2.0 * R_BORE)),
