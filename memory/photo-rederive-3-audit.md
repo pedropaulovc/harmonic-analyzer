@@ -31,7 +31,7 @@ gear") and keyframes `v4_transgear_001..013`.
 | 14 | lever bushings do not exist | ch17 p.40: levers stack with their own spacers | PR B: retire `lever-bushing` |
 | 15 | gooseneck attaches the spring via an end screw | ch19 p.45 `page001_img02`: slotted screw axially in the arm end, eye on the shank | lug + X-pin -> end screw |
 | 16 | stop block | ch16 p.34: square block, knurled thumbscrew UNDERNEATH | `build_measuring_stick_stop` rework |
-| 17 | amplitude-bar fan / rocker sinusoidal setup as configurations | ch14 p.28-29 fan; end views at 0/6/14/40 cranks | PR C |
+| 17 | amplitude-bar fan / rocker sinusoidal setup as configurations | ch14 p.28-29 fan; end views at 0/6/14/40 cranks | PR C -- user decision 2026-09-02: DEFAULT = fanned arms + level bars (matches the ch30 eight views); a second config poses the sinusoidal setup (ch14 end views at a chosen crank count); a third keeps today's parallel bank for comparison |
 
 Also seen, not yet listed by the user: the crank taper pin's brass keeper
 ring hanging from a screw on the crank arm (ch11 p.14); the transgear stud's
