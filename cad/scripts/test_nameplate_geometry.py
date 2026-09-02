@@ -164,3 +164,40 @@ if __name__ == "__main__":
     _telemetry.info(f"closed regions : {sum(f & 1 for f in flags)} / {len(flags)}  (min {MIN_CLOSED_REGIONS})")
     _telemetry.info(f"coord width    : {w:9.3f}  golden {GOLDEN_COORD_WIDTH:9.3f}  -> {_pct(w, GOLDEN_COORD_WIDTH):7.3f}%")
     _telemetry.info(f"coord height   : {h:9.3f}  golden {GOLDEN_COORD_HEIGHT:9.3f}  -> {_pct(h, GOLDEN_COORD_HEIGHT):7.3f}%")
+
+
+def test_corner_screw_holes_stay_inside_the_rounded_plate_outline():
+    """Each #4 clearance hole must be fully enclosed by the plate outline,
+    rounded corners included (CodeRabbit #652: a hole that breaks out of a
+    corner arc would leave an open slot the screw head cannot clamp)."""
+    import math
+
+    import build_nameplate as bn
+    import nameplate_spec as spec
+
+    w, h, rc = spec.PLATE_WIDTH, spec.PLATE_HEIGHT, bn.CORNER_R
+    r = bn.SCREW_HOLE_DIA / 2.0
+
+    def inside(x: float, y: float) -> bool:
+        if not (0.0 <= x <= w and 0.0 <= y <= h):
+            return False
+        # corner squares beyond each arc centre: the point must lie within the arc
+        corners = (
+            (x < rc and y < rc, rc, rc),
+            (x > w - rc and y < rc, w - rc, rc),
+            (x < rc and y > h - rc, rc, h - rc),
+            (x > w - rc and y > h - rc, w - rc, h - rc),
+        )
+        for in_square, cx, cy in corners:
+            if in_square and (x - cx) ** 2 + (y - cy) ** 2 > rc**2 + 1e-9:
+                return False
+        return True
+
+    for hx, hy in spec.SCREW_XY:
+        for i in range(360):
+            a = math.radians(i)
+            px, py = hx + r * math.cos(a), hy + r * math.sin(a)
+            assert inside(px, py), f"hole at ({hx}, {hy}) breaks the outline at ({px:.3f}, {py:.3f})"
+        # and a real ligament to the nearest straight edge
+        lig = min(hx, w - hx, hy, h - hy) - r
+        assert lig >= 1.0, f"ligament {lig:.2f} at ({hx}, {hy})"

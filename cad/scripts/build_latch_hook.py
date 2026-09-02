@@ -122,7 +122,7 @@ def _outline(n: int = 2000) -> list[tuple[float, float]]:
 
 def _area(pts: list[tuple[float, float]]) -> float:
     s = 0.0
-    for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1]):
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1], strict=True):
         s += x0 * y1 - x1 * y0
     return abs(s) / 2.0
 

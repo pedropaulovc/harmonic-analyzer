@@ -73,9 +73,9 @@ def test_dxf_round_trips_the_generator_rings():
     parsed = [ring for ring, _ in dxf.read_lwpolylines(_read())]
     generated = gen.all_rings()
     assert len(parsed) == len(generated)
-    for a, b in zip(parsed, generated):
+    for a, b in zip(parsed, generated, strict=True):
         assert len(a) == len(b)
-        assert all(abs(pa[0] - pb[0]) < 1e-6 and abs(pa[1] - pb[1]) < 1e-6 for pa, pb in zip(a, b))
+        assert all(abs(pa[0] - pb[0]) < 1e-6 and abs(pa[1] - pb[1]) < 1e-6 for pa, pb in zip(a, b, strict=True))
 
 
 def test_numerals_sit_in_the_ruled_band_clear_of_every_tick():
@@ -101,7 +101,7 @@ def test_numerals_sit_in_the_ruled_band_clear_of_every_tick():
 def test_numeral_height_matches_the_knob():
     # Rotation 90 puts the glyph height along x; 0 puts it along y.
     heights = []
-    for k, numeral in enumerate(gen.numeral_rings()):
+    for numeral in gen.numeral_rings():
         x0, y0, x1, y1 = dxf.bbox(numeral)
         heights.append((x1 - x0) if part.NUMERAL_ROTATION_DEG == 90 else (y1 - y0))
     assert abs(heights[1] - part.NUMERAL_HEIGHT_MM) < 1e-6, heights[1]  # the flat "1" is exact
@@ -112,7 +112,7 @@ def test_pinned_area_and_bbox_match_the_generator():
     s = gen.summary()
     assert abs(s["area_mm2"] - part.NUMERAL_AREA_MM2) <= 0.01 * part.NUMERAL_AREA_MM2, s
     pinned = part.NUMERALS_BBOX
-    for got, want in zip((s["x0"], s["y0"], s["x1"], s["y1"]), pinned):
+    for got, want in zip((s["x0"], s["y0"], s["x1"], s["y1"]), pinned, strict=True):
         assert abs(got - want) < 0.001, (s, pinned)
     assert s["loops"] == EXPECTED_OUTER_LOOPS + EXPECTED_INNER_LOOPS
 
