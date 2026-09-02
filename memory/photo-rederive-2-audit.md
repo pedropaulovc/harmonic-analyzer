@@ -22,7 +22,7 @@ release comparison gallery. Colour/texture deltas were deliberately skipped
 | 5 | measuring stick | ch16 p.34-37 | 80 mm / 11-tick scale vs 142 mm with tenths; no stop block | `build_measuring_stick` 14.2/division + tenths; `build_measuring_stick_stop` |
 | 6 | pinion rig | ch25 p.68 | straps 43 x 18 leaning 50 deg with the blocks 33 mm east vs ~28 x 15 near-vertical straps with the blocks under the drum | `pinion_bracket_geometry` C2C 28 / W 15 / stud 6 above the pivot; block, spring, base taps re-solved |
 | 7 | pinion T-handle | ch25 p.68 | O23 x 14 drum vs ~O15 ball, cross rod 85 vs ~65 | `pinion_handle_geometry` |
-| 8 | transgear latch | ch23 p.58, 4/4 video | no spring latch on the swing cluster | `build_latch_strip` on the bar's front face, eye over the knob-shaft seat |
+| 8 | transgear latch | ch23 p.58, 4/4 video | no spring latch on the swing cluster | `build_latch_strip` on the bar's front face (SUPERSEDED in pass 3 by `build_latch_hook`, the curved leaf the keyframes show) |
 | 9 | pedestal arbor ends | ch13 p.23 | bare bore vs a domed cap screw | `build_dome_cap_screw` x2 |
 | 10 | knife bearing block | ch18 p.42 | 34 x 44 block vs ~24 x 33 | `build_knife_mount` bore O16, 24 wide |
 

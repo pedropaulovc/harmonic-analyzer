@@ -1222,15 +1222,20 @@ async def build(adapter) -> dict[str, str]:
     # Pivot brackets. Free-space structure with no contact partner inside
     # this subassembly, so each is datum-located (three orthogonal plane
     # distances), not fixed -- the #110 idiom. Both seat on the rocker-arm-
-    # support's top (y 228.6), symmetric about the stack (the part is
-    # symmetric, so one IDENTITY pose serves both ends).
+    # support's top (y 228.6). The part is an L (2026-09-02, ch14 p.27/28):
+    # its foot runs from the ear toward local +Z, INBOARD under the outer
+    # arms (the support leaves only 4 mm of apex outboard of the north ear),
+    # so the south bracket (inboard = +Z) is IDENTITY and the north one is
+    # turned Ry180 about its own origin -- the bore stays on the pivot axis
+    # at (PIVOT[0], 253.8, mount_z) exactly, the foot flips to -Z.
     for mount_z in PIVOT_BRACKET_Z:
+        inboard_pos_z = mount_z < _STACK_MID_Z
         mount = await place_component(
             adapter,
             "pivot-bracket",
             [PIVOT[0], SUPPORT_APEX_Y, mount_z],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
+            [0.0, 0.0, 0.0] if inboard_pos_z else [0.0, 180.0, 0.0],
+            IDENTITY if inboard_pos_z else ROT_Y_180,
             ground=False,
             label=f"pivot-bracket rocker z{mount_z:+.0f}",
         )

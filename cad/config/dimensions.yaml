@@ -767,7 +767,7 @@ sections:
         - the support's 63.5 mounting-hole pitch (`build_rocker_arm_support.py`); placed in frame.SLDASM (`build_lag_screw.py`)
         - low
       - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
-        - black foot-and-ear bracket — foot 24 × 6 × 12 with two Ø4.2 screw holes at ±9, ear 14 wide × 6 thick with a full-round top, Ø6.5 shaft bore 25.2 above the foot
+        - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear stub 14 × 6 carrying a Ø16 chrome ball at 25.2 above the foot with the Ø6.5 shaft bore through the ball; north bracket turned Ry180 in channel.SLDASM'
         - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at stack-mid z ±78 so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
         - scaled
         - med
@@ -1643,12 +1643,18 @@ sections:
         - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −155 chain plane'
         - scaled + derived
         - low/med
-      - - Latch strip (2026-09)
-        - '12 × 1.0 polished steel strip with stadium ends on the support bar''s front face at z −144.15; Ø5.4 eye over the knob-shaft seat, Ø4.4 hole for a #8-32 screw into the bar at x −42.575 through a 4.25 spacer'
+      - - Latch hook (2026-09-02; replaces the 2026-09 latch strip)
+        - 'short curved spring-steel hook, 4.5 x 0.8 strip on an R45 centreline arc, 27 long (25.4 drop, 7.9 inward run), Ø8 eye screwed to the support bar''s front face with a #8-32 bracket screw; parked at x -50 (west of the platen edge) bending toward the disc'
         - —
-        - 'ch23 p.58 + video 4/4: the spring latch that locks the swing cluster — the model had none (`build_latch_strip.py`; the bar gains the tapped hole in `build_support_bar.py`)'
+        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released): the latch is a small curved leaf hanging from the bar between the pivot ball and the disc, at x ~ +52 in the video -- parked at -50 because the model''s bar front is hidden behind the platen there (see memory/photo-rederive-3-audit.md) (`build_latch_hook.py`, LATCH_HOOK_X)'
         - scaled
         - low
+      - - Transgear thumbnut (2026-09-02)
+        - 'knurled brass nut Ø26 x 7 with a Ø14 x 4 neck, outermost on the knob shaft in FRONT of the removable gear (z -156.45..-167.45); the shaft gains a 9.5 front stub; knurl not modelled'
+        - —
+        - 'ch23 p.58/59 (page002_img03/04) + video 4/4 "unscrew the nut that holds the other gear in place" (`build_transgear_thumbnut.py`)'
+        - scaled
+        - med
   - prose: |2
 
       Notes: speed combos — small driving + large driven = slowest platen (smallest

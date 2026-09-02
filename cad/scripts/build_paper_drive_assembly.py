@@ -36,7 +36,10 @@ verify:kinematics replay, never authored.
   the stepped stud; on the stud the 120T disc + 12T feed pinion (locked pair,
   O5 seat) and the latch arm's big hub; the arm carries the knob shaft with
   the mounted T24 removable CHAIN-WRAPPED at the z -155 chain plane, the 12T
-  DP38 third gear on the shaft's O5 seat, and the thumb knob.
+  DP38 third gear on the shaft's O5 seat, and the thumb knob; the knurled
+  thumbnut on the shaft's front stub retains the T24 (ch23 p.58/59).
+* Latch hook: the short curved spring-steel hook screwed to the bar's front
+  face (video 4/4), hanging beside the platen's -X edge toward the cluster.
 * The roller chain loops both removables (native connected-linkage chain
   component pattern); the sprocket face (2.4) now fits BETWEEN the chain's
   inner plates, so only the roller<->tooth seating is intended contact.
@@ -68,8 +71,10 @@ from _chain import (
     KNOB_CENTRE as CHAIN_KNOB_CENTRE,
     LINK_COUNT,
     LINK_PITCH,
+    PIN_HALF_LEN as CHAIN_PIN_HALF_LEN,
     PITCH_R_T12,
     PITCH_R_T24,
+    PLATE_HALF_H as CHAIN_PLATE_HALF_H,
     TIP_R_T12,
     TIP_R_T24,
     centreline_distance,
@@ -125,11 +130,13 @@ ROT_Y_180 = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]
 ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 
 # --- machine anchors ---------------------------------------------------------
-from build_latch_strip import (  # noqa: E402
-    EYE_DIA as LATCH_STRIP_EYE_DIA,
-    SCREW_Y as LATCH_STRIP_SCREW_Y,
-    STRIP_T as LATCH_STRIP_T,
+from build_latch_hook import (  # noqa: E402
+    STRIP_T as LATCH_HOOK_T,
+    X_MAX as LATCH_HOOK_X_MAX,
+    X_MIN as LATCH_HOOK_X_MIN,
+    Y_MIN as LATCH_HOOK_Y_MIN,
 )
+from bracket_screw_spec import SHANK_LEN as BRACKET_SCREW_SHANK_LEN  # noqa: E402
 from build_support_bar import (  # noqa: E402
     LATCH_HOLE_X as BAR_LATCH_HOLE_X,
     BAR_DEPTH,
@@ -257,35 +264,115 @@ ARM_Z = (RACK_BACK_Z + BAR_BACK_Z) / 2.0  # -131.4: the arm's 2.6 band fits the
 BRACKET_Z0 = BAR_BACK_Z  # plate -129.9..-125.9 on the bar's back face
 STUB_Z0 = BRACKET_Z0 + BRACKET_THICK  # -125.9 (Rx-90: local +Y -> -Z)
 KNOB_SHAFT_Z0 = -157.5  # Rx+90: local +Y -> +Z (stack runs to the knob at the back)
-# Latch strip (2026-09, ch23 p.58 / 4/4 video): the bright spring strip
-# screwed to the bar's front face at the knob-shaft line, hanging down to an
-# eye over the knob shaft's O5 third-gear seat -- in the 1.5 band between the
-# third gear's back face and the seat shoulder, 0.25 air each side. Its
-# integral spacer boss packs the top out to the bar face.
 from build_transgear_knob_shaft import (  # noqa: E402
-    FRONT_LEN as KNOB_FRONT_LEN,
-    SEAT_DIA as KNOB_SEAT_DIA,
-    SEAT_LEN as KNOB_SEAT_LEN,
+    FRONT_STUB as KNOB_FRONT_STUB,
+    SHAFT_DIA as KNOB_SHAFT_DIA,
 )
-
-LATCH_STRIP_AIR = 0.25
-LATCH_STRIP_Z0 = THIRD_Z0 + THIRD_FACE + LATCH_STRIP_AIR  # -144.15
-_SEAT_SHOULDER_Z = KNOB_SHAFT_Z0 + KNOB_FRONT_LEN + KNOB_SEAT_LEN  # -142.9
-if LATCH_STRIP_Z0 + LATCH_STRIP_T + LATCH_STRIP_AIR > _SEAT_SHOULDER_Z + 1e-9:
-    raise AssertionError("latch strip does not fit the knob-shaft seat band")
-if LATCH_STRIP_EYE_DIA < KNOB_SEAT_DIA + 0.3:
-    raise AssertionError("latch strip eye too tight on the O5 seat")
-if abs(BAR_LATCH_HOLE_X - KNOB_SHAFT_XY[0]) > 0.01:
-    raise AssertionError(
-        f"support-bar latch hole x {BAR_LATCH_HOLE_X} != knob shaft {KNOB_SHAFT_XY[0]:.3f}"
-    )
-if abs((KNOB_SHAFT_XY[1] + LATCH_STRIP_SCREW_Y) - BAR_CY) > 0.01:
-    raise AssertionError("latch strip screw hole misses the bar mid-height")
+from build_transgear_removable import (  # noqa: E402
+    BORE_DIAMETER as REMOVABLE_BORE_DIA,
+    FACE_WIDTH as REMOVABLE_FACE,
+    PIN_CIRCLE_RADIUS as REMOVABLE_PIN_R,
+    PIN_HOLE_DIAMETER as REMOVABLE_PIN_DIA,
+)
+from build_transgear_thumbnut import (  # noqa: E402
+    BORE_DIA as THUMBNUT_BORE_DIA,
+    DISC_DIA as THUMBNUT_DISC_DIA,
+    DISC_LEN as THUMBNUT_DISC_LEN,
+    NECK_DIA as THUMBNUT_NECK_DIA,
+    NECK_LEN as THUMBNUT_NECK_LEN,
+    TOTAL_LEN as THUMBNUT_LEN,
+)
 
 REMOVABLE_Z0 = -156.2  # mounted removables: face 2.4 about the -155 chain plane
 T24_MID_Z = REMOVABLE_Z0 + 1.2  # -155.0
 CHAIN_MID_Z = -155.0  # both wheels coplanar; the crank T12 matches (drive-train)
 REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
+
+# Thumbnut (2026-09-02, ch23 p.58/59 + video 4/4 "unscrew the nut that holds
+# the other gear in place"): the knurled brass nut OUTERMOST on the knob
+# shaft, its neck 0.25 in front of the mounted T24's front face, retaining
+# it; the shaft's front stub runs on into the nut. Rx(-90): local +Y -> -Z,
+# so the nut spans THUMBNUT_Z0 .. THUMBNUT_Z0 - 11 (disc at the front).
+THUMBNUT_AIR = 0.25
+THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -156.45 (neck's gear-side face)
+THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -167.45
+_THUMBNUT_DISC_MID_Z = THUMBNUT_Z0 - THUMBNUT_NECK_LEN - THUMBNUT_DISC_LEN / 2.0  # -163.95
+KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0 - KNOB_FRONT_STUB  # -167.0
+_nut_bore_gap = (THUMBNUT_BORE_DIA - KNOB_SHAFT_DIA) / 2.0  # 0.0375 radial
+if not (0.0 < _nut_bore_gap < 0.1):
+    raise AssertionError(f"thumbnut bore/shaft radial gap {_nut_bore_gap:.4f} not in (0, 0.1)")
+if abs((REMOVABLE_Z0 - THUMBNUT_Z0) - THUMBNUT_AIR) > 1e-9:
+    raise AssertionError("thumbnut neck must sit THUMBNUT_AIR in front of the T24 face")
+if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z <= _THUMBNUT_DISC_MID_Z):
+    raise AssertionError(
+        f"knob shaft front {KNOB_SHAFT_FRONT_Z} must end inside the thumbnut disc"
+        f" ({THUMBNUT_FRONT_Z} .. {_THUMBNUT_DISC_MID_Z})"
+    )
+# The neck must actually RETAIN the wheel: cover its O12 bore with a shoulder
+# and stay clear of the r 9.5 drive-pin holes.
+if THUMBNUT_NECK_DIA < REMOVABLE_BORE_DIA + 1.0:
+    raise AssertionError("thumbnut neck slips into the removable's bore -- retains nothing")
+if THUMBNUT_NECK_DIA / 2.0 + THUMBNUT_AIR > REMOVABLE_PIN_R - REMOVABLE_PIN_DIA / 2.0:
+    raise AssertionError("thumbnut neck overlaps the removable's drive-pin circle")
+# Front furniture: nothing in this sub sits in front of the T24 but the
+# chain, whose plates straddle the wheel (z CHAIN_MID_Z +- pin reach) and
+# wrap it at the pitch radius -- the nut's disc must clear that wrap radially.
+_chain_inner_wrap_r = PITCH_R_T24 - CHAIN_PLATE_HALF_H  # 21.6
+if THUMBNUT_DISC_DIA / 2.0 + THUMBNUT_AIR > _chain_inner_wrap_r:
+    raise AssertionError("thumbnut disc reaches the chain's inner plate wrap")
+
+# Latch hook (2026-09-02, ch23 p.58 / video 4/4 keyframes v4_transgear_001 +
+# _011): the short curved spring-steel hook screwed to the bar's FRONT face,
+# hanging down and curving toward the transgear cluster. The video shows it
+# between the rocker pivot ball and the disc (machine x ~ +52), hanging from
+# a bar front that is EXPOSED ~12 mm below the platen's bottom edge (the
+# rack). DISCREPANCY with this model: here the bar (y 295.7..317.7) sits
+# 22.5 ABOVE the platen bottom (PLATE_Y0 273.2), entirely hidden behind the
+# platen (x -33.2..236.4, its back face ON the bar front), and the space
+# behind the bar is taken by the platen guide rail + guide-lock station -- so
+# the +52 pose has no home until the bar/platen vertical relation is
+# re-derived. Until then the hook hangs where the bar front IS exposed at
+# rest: just west of the platen's -X edge, mirrored (Ry180) so it still
+# bends toward the disc (+X). Restoring the photo pose is three edits here
+# (LATCH_HOOK_X = 52.0; ROWS/EULER -> IDENTITY / [0, 0, 0]; the z pair
+# becomes back = BAR_FRONT_Z - AIR, front = back - T with the thickness then
+# running +Z, i.e. place at the FRONT z) plus LATCH_HOLE_X in
+# build_support_bar.py.
+LATCH_HOOK_X = -50.0
+LATCH_HOOK_AIR = 0.25
+LATCH_HOOK_ROWS = ROT_Y_180  # local -X -> machine +X (toward the disc), +Z -> -Z
+LATCH_HOOK_EULER = [0.0, 180.0, 0.0]
+LATCH_HOOK_Z_BACK = BAR_FRONT_Z - LATCH_HOOK_AIR  # -139.15: the hook's back face
+LATCH_HOOK_Z_FRONT = LATCH_HOOK_Z_BACK - LATCH_HOOK_T  # -139.95 (the Ry180 runs +Z to -Z)
+# Machine extents of the hook (the Ry180 mirrors x about LATCH_HOOK_X).
+LATCH_HOOK_X_SPAN = (LATCH_HOOK_X - LATCH_HOOK_X_MAX, LATCH_HOOK_X - LATCH_HOOK_X_MIN)
+LATCH_HOOK_Y_LOW = BAR_CY + LATCH_HOOK_Y_MIN  # ~279.1
+if abs(BAR_LATCH_HOLE_X - LATCH_HOOK_X) > 0.01:
+    raise AssertionError(
+        f"support-bar latch hole x {BAR_LATCH_HOLE_X} != latch hook {LATCH_HOOK_X}"
+    )
+# The hook lives in the platen's z slab, so it must be x-clear of the platen
+# (and of the rack on the platen back, which starts at the platen edge).
+if LATCH_HOOK_X_SPAN[1] > PLATE_X0 - LATCH_HOOK_AIR:
+    raise AssertionError(
+        f"latch hook reaches x {LATCH_HOOK_X_SPAN[1]:.2f}, platen edge {PLATE_X0}"
+    )
+# The latch arm (z ARM_Z +- LATCH_THICK/2) overlaps the hook in XY; it must
+# stay z-separated.
+if LATCH_HOOK_Z_BACK + LATCH_HOOK_AIR > ARM_Z - LATCH_THICK / 2.0:
+    raise AssertionError("latch hook reaches the latch arm's z band")
+# The knob cluster below: the hook's lowest point must clear the shaft top.
+if LATCH_HOOK_Y_LOW < KNOB_SHAFT_XY[1] + KNOB_SHAFT_DIA / 2.0 + 0.5:
+    raise AssertionError("latch hook hangs into the knob shaft")
+# Its bracket-screw (IDENTITY: shank +Z from the hook's front face into the
+# bar) is longer than hook + air + bar, so its tip exits the bar's back face
+# (logged in build(); nothing sits behind the bar at that x -- the bracket
+# plate spans stud +-15, the guide locks ride the platen).
+LATCH_SCREW_TIP_Z = LATCH_HOOK_Z_FRONT + BRACKET_SCREW_SHANK_LEN  # -127.95
+if LATCH_SCREW_TIP_Z < BAR_BACK_Z - 2.0:
+    raise AssertionError("latch-hook screw does not engage the bar's tapped hole depth")
+if abs(LATCH_HOOK_X - STUD_XY[0]) < 15.0 + 4.0 + LATCH_HOOK_AIR:
+    raise AssertionError("latch-hook screw tip would meet the transgear bracket plate")
 
 # Mesh phasing. build_fixed_gear seeds every gear with a TOOTH centred on
 # local +X (the seed gap spans +pi/(2N)..gamma-pi/(2N)), and teeth repeat
@@ -446,7 +533,7 @@ def _assert_knob_shaft_clearance() -> None:
     if t24_collar_gap < 0.5:
         raise RuntimeError(f"mounted T24 to stub-collar gap {t24_collar_gap:.2f} < 0.5")
     # The T24 overlaps the disc rim in XY -- they must stay z-separated.
-    t24_front = REMOVABLE_Z0 + 2.4
+    t24_front = REMOVABLE_Z0 + REMOVABLE_FACE  # the wheel's BACK face, -153.8
     z_gap = DISC_Z0 - t24_front  # -148.4 - (-153.8) = 5.4
     if z_gap < 2.0:
         raise RuntimeError(f"T24/disc z gap {z_gap:.2f} < 2.0")
@@ -1163,23 +1250,33 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{disc}", "PLANE"),
         label="feed pinion locked to the disc",
     )
-    # Latch strip on the bar's front face, eye over the knob-shaft seat; its
-    # bracket-screw (identity: shank +Z into the bar, head in front).
+    # Latch hook on the bar's front face (0.25 air), hanging from its screw
+    # hole at the bar mid-height and bending toward the disc (Ry180 mirrors
+    # the -X-bending part); its bracket-screw (identity: shank +Z from the
+    # hook's front face into the bar's tapped hole, head in front).
     await place_component(
         adapter,
-        "latch-strip",
-        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], LATCH_STRIP_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
-        label="latch-strip (spring latch of the swing cluster)",
+        "latch-hook",
+        [LATCH_HOOK_X, BAR_CY, LATCH_HOOK_Z_BACK],
+        LATCH_HOOK_EULER,
+        LATCH_HOOK_ROWS,
+        label="latch-hook (spring latch of the swing cluster)",
     )
     await place_component(
         adapter,
         "bracket-screw",
-        [KNOB_SHAFT_XY[0], BAR_CY, LATCH_STRIP_Z0],
+        [LATCH_HOOK_X, BAR_CY, LATCH_HOOK_Z_FRONT],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        label="latch-strip screw",
+        label="latch-hook screw",
+    )
+    log(
+        f"latch hook at x {LATCH_HOOK_X} (span {LATCH_HOOK_X_SPAN[0]:.1f}.."
+        f"{LATCH_HOOK_X_SPAN[1]:.1f}), z {LATCH_HOOK_Z_FRONT:.2f}..{LATCH_HOOK_Z_BACK:.2f},"
+        f" tip y {LATCH_HOOK_Y_LOW:.1f}; platen edge gap"
+        f" {PLATE_X0 - LATCH_HOOK_X_SPAN[1]:.2f}, arm z gap"
+        f" {(ARM_Z - LATCH_THICK / 2.0) - LATCH_HOOK_Z_BACK:.2f}; screw tip z"
+        f" {LATCH_SCREW_TIP_Z:.2f} ({LATCH_SCREW_TIP_Z - BAR_BACK_Z:+.2f} past the bar back)"
     )
     # Knob shaft on the latch's small hub: Rx(+90) runs local +Y to machine +Z
     # (removable seat at the chain plane, O5 third-gear seat, hub ride, knob).
@@ -1233,6 +1330,34 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{third}", "PLANE"),
         named_ref(f"Front Plane@{t24}", "PLANE"),
         label="knob cluster: third gear locked to T24",
+    )
+    # Knurled thumbnut OUTERMOST on the shaft's front stub, its neck 0.25 in
+    # front of the T24, retaining it (ch23 p.58/59). Rx(-90): local +Y -> -Z,
+    # disc at the machine front. Locked to the knob shaft, so it spins with
+    # the cluster (net DOF unchanged: +6 freed, -6 by the lock).
+    thumbnut = await place_component(
+        adapter,
+        "transgear-thumbnut",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], THUMBNUT_Z0],
+        [-90.0, 0.0, 0.0],
+        ROT_X_NEG90,
+        ground=False,
+        label="transgear-thumbnut (retains the mounted T24)",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{thumbnut}", "PLANE"),
+        named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
+        label="knob cluster: thumbnut locked to the knob shaft",
+    )
+    log(
+        f"thumbnut z {THUMBNUT_FRONT_Z:.2f}..{THUMBNUT_Z0:.2f} (neck {THUMBNUT_AIR}"
+        f" ahead of the T24 face {REMOVABLE_Z0}); shaft front {KNOB_SHAFT_FRONT_Z:.2f}"
+        f" ({KNOB_SHAFT_FRONT_Z - THUMBNUT_FRONT_Z:+.2f} inside the nut front,"
+        f" {_THUMBNUT_DISC_MID_Z - KNOB_SHAFT_FRONT_Z:+.2f} past the disc mid);"
+        f" bore/shaft radial gap {_nut_bore_gap:.4f}; front-most furniture near"
+        f" the knob axis: chain plates to z {CHAIN_MID_Z - CHAIN_PIN_HALF_LEN:.2f}"
+        f" (radial gap to the disc {_chain_inner_wrap_r - THUMBNUT_DISC_DIA / 2.0:.1f})"
     )
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
