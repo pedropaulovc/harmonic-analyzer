@@ -120,14 +120,7 @@ def _pin_bore_removed() -> float:
     def f(dy: float) -> float:
         y = -PIN_DROP + dy
         chord = 2.0 * math.sqrt(max(r * r - dy * dy, 0.0))
-        # Edge x at this y: the straight flank between the bores, else the
-        # end-cap arc about the nearer bore centre.
-        if 0.0 <= y <= C2C:
-            edge = -R_END
-        else:
-            off = min(abs(y), abs(y - C2C))
-            edge = -math.sqrt(max(R_END**2 - off * off, 0.0))
-        surface = max(edge, _cam_relief_right_x(y))
+        surface = _cam_relief_right_x(y)  # the true edge, or the scallop past it
         return chord * max(bottom - surface, 0.0)
 
     total = f(-r) + f(r)
@@ -192,13 +185,21 @@ def _cam_relief_area(centers) -> float:
     )
 
 
+def _edge_x(y: float) -> float:
+    """The strap's -X edge at *y*: the straight flank between the two bores,
+    else the end-cap arc about the nearer bore centre."""
+    if 0.0 <= y <= C2C:
+        return -R_END
+    off = min(abs(y), abs(y - C2C))
+    return -math.sqrt(max(R_END**2 - off * off, 0.0))
+
+
 def _cam_relief_right_x(y: float) -> float:
-    """Rightmost opened edge at *y*, or the original cap edge if untouched."""
-    cap_left = -math.sqrt(max(R_END**2 - y * y, 0.0))
+    """Rightmost opened edge at *y*, or the original edge if untouched."""
     intervals = _cam_relief_intervals(
         y, (CAM_RELIEF_PARK_CENTER, CAM_RELIEF_ENGAGED_CENTER)
     )
-    return max((hi for _, hi in intervals), default=cap_left)
+    return max((hi for _, hi in intervals), default=_edge_x(y))
 
 
 async def build(adapter) -> dict[str, str]:
