@@ -1213,8 +1213,15 @@ def add_native_hole_callout(
     callout_xy: tuple[float, float],
     label: str,
     edge: Any | None = None,
+    process: str | None = None,
 ) -> Any:
     """Insert an associative Hole Wizard callout on a selected drawing edge.
+
+    ``process`` is the shop instruction a machinist reads first -- ``"DRILL"``,
+    ``"15/64 DRILL"``, ``"REAM"`` -- written into the callout's PREFIX
+    compartment so the sheet reads ``15/64 DRILL <MOD-DIAM>5.95 THRU ALL``
+    (Harvey #13: say drill or ream; drawing-simplicity-policy.md rule 7).  The
+    size and depth stay native and associative; only the prefix is text.
 
     The callout DISPLAYS the part's hole tolerance; it does not own one. Set the
     fit on the hole feature in the SLDPRT (``_holes.wizard_holes``'s
@@ -1246,6 +1253,27 @@ def add_native_hole_callout(
     )
     if not annotation.SetPosition2(callout_xy[0], callout_xy[1], 0.0):
         raise RuntimeError(f"failed to position native hole callout ({label})")
+    if process:
+        # A Hole Wizard callout keeps its whole format string
+        # (``<MOD-DIAM><DIM> THRU ALL``) in the PREFIX compartment, so the
+        # process is PREPENDED to what is there -- replacing it silently drops
+        # the size and depth (measured 2026-09-02: the sheet read "#14 DRILL").
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+        if not existing.strip():
+            raise RuntimeError(
+                f"hole callout has no format text to prefix ({label})"
+            )
+        prefix = process.rstrip() + " " + existing.lstrip()
+        display.SetText(1, prefix)
+        if str(display.GetText(1) or "") != prefix:
+            raise RuntimeError(
+                f"hole callout process prefix did not persist ({label}): "
+                f"{display.GetText(1)!r}"
+            )
+        _telemetry.debug(f"hole callout {label}: prefix {prefix!r}")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     return display
@@ -1345,6 +1373,39 @@ def import_cosmetic_threads(adapter: Any, view: Any) -> tuple[int, int]:
     return seed_count, instance_count
 
 
+# swUserPreferenceIntegerValue_e system colours, read off swconst.tlb R2026x
+# (the docs print no integer).  A drawing-ADDED dimension or callout is a
+# "non-imported annotation" and SolidWorks draws it in a grey that exports at
+# ~level 128 -- the 75.00 / (93.00) / hole callouts read pale beside the black
+# model-imported dimensions (machinist review 2026-09-02: "plotted in very
+# pale gray ... reducing arm's-length readability"; Lipton: faint lines are
+# for accountants).  Both books want every line on the print pressed hard.
+_PREF_COLOR_NON_IMPORTED_ANNOTATION = 232
+_PREF_COLOR_IMPORTED_DRIVEN_ANNOTATION = 113
+_COLORREF_BLACK = 0
+
+
+def _pin_annotation_ink(adapter: Any) -> None:
+    """Pin the seat's driven / non-imported annotation colours to black.
+
+    System (seat) preferences, so every sheet the seat exports gets the same
+    ink; read back after each write so a rejected write fails loud instead of
+    shipping pale dimensions.
+    """
+    sw = _early_bound(adapter.swApp, "ISldWorks")
+    for pref in (
+        _PREF_COLOR_NON_IMPORTED_ANNOTATION,
+        _PREF_COLOR_IMPORTED_DRIVEN_ANNOTATION,
+    ):
+        if int(sw.GetUserPreferenceIntegerValue(pref)) == _COLORREF_BLACK:
+            continue
+        if not sw.SetUserPreferenceIntegerValue(pref, _COLORREF_BLACK):
+            raise RuntimeError(f"failed to set annotation colour pref {pref}")
+        if int(sw.GetUserPreferenceIntegerValue(pref)) != _COLORREF_BLACK:
+            raise RuntimeError(f"annotation colour pref {pref} did not persist")
+        _telemetry.debug(f"annotation colour pref {pref} pinned to black")
+
+
 def _pin_dimension_text_and_leader_style(draw: Any) -> None:
     """Force every dimension on ``draw`` to a bent leader with HORIZONTAL text.
 
@@ -1427,6 +1488,7 @@ def new_project_drawing(
     # display (an exact inch conversion like 9.525) can pass decimals=3.
     set_units_mm(adapter, decimals=decimals)
     _pin_dimension_text_and_leader_style(draw)
+    _pin_annotation_ink(adapter)
     if not sheet.SetScale(float(scale[0]), float(scale[1]), True, False):
         raise RuntimeError(f"failed to force ASME B sheet to {scale[0]:g}:{scale[1]:g}")
     assert_asme_b_sheet(adapter, sheet, phase="initial setup", scale=scale)
@@ -2338,15 +2400,13 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     return entities
 
 
-@_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
-def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
-    """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.
+_ARC_END_CENTER = 1  # swArcEndCondition_e.swArcEndConditionCenter
+_ARC_END_MAX = 3  # swArcEndCondition_e.swArcEndConditionMax (furthest point)
 
-    A line-to-circle dimension keeps SolidWorks' default tangent/min-max arc
-    condition, so the value locates the rim instead of the axis — off by the
-    hole radius. Verify each flipped endpoint sticks; fail loud when the
-    dimension has no circular endpoint at all.
-    """
+
+def _set_arc_endpoints(
+    adapter: Any, dimension: Any, *, condition: int, label: str
+) -> Any:
     display = _sw_type_info.early_bound_or_flag(
         dimension, "IDisplayDimension", "GetDimension"
     )
@@ -2356,21 +2416,46 @@ def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> 
     for index in (1, 2):
         if int(model_dimension.GetArcEndCondition(index)) == 0:
             continue
-        result = int(
-            model_dimension.SetArcEndCondition(index, 1)  # swArcEndConditionCenter
-        )
+        result = int(model_dimension.SetArcEndCondition(index, condition))
         if result != 0:
             raise RuntimeError(
-                f"failed to set {label} endpoint {index} to arc center "
-                f"(SolidWorks result {result})"
+                f"failed to set {label} endpoint {index} to arc condition "
+                f"{condition} (SolidWorks result {result})"
             )
         draw.GraphicsRedraw2()
-        if int(model_dimension.GetArcEndCondition(index)) != 1:
-            raise RuntimeError(f"{label} did not retain center arc condition")
+        if int(model_dimension.GetArcEndCondition(index)) != condition:
+            raise RuntimeError(f"{label} did not retain arc condition {condition}")
         arc_end_set = True
     if not arc_end_set:
         raise RuntimeError(f"{label} has no circular endpoint")
     return dimension
+
+
+@_telemetry.traced("drawing.arc_center_endpoints", label_param="label")
+def set_arc_endpoints_to_center(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Re-anchor a dimension's circular endpoint(s) to the arc CENTER.
+
+    A line-to-circle dimension keeps SolidWorks' default tangent/min-max arc
+    condition, so the value locates the rim instead of the axis — off by the
+    hole radius. Verify each flipped endpoint sticks; fail loud when the
+    dimension has no circular endpoint at all.
+    """
+    return _set_arc_endpoints(
+        adapter, dimension, condition=_ARC_END_CENTER, label=label
+    )
+
+
+@_telemetry.traced("drawing.arc_max_endpoints", label_param="label")
+def set_arc_endpoints_to_max(adapter: Any, dimension: Any, *, label: str) -> Any:
+    """Re-anchor a dimension's circular endpoint(s) to the arc's FURTHEST point.
+
+    The overall length of a part with a rounded end runs to the arc's extreme,
+    not its centre (a centre-anchored "overall" reads short by the radius and
+    gets the stock sawn short -- Harvey #25).  SolidWorks resolves a
+    line-to-arc pick to the centre by default, so the far-tangent condition is
+    set explicitly and verified.
+    """
+    return _set_arc_endpoints(adapter, dimension, condition=_ARC_END_MAX, label=label)
 
 
 def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:

@@ -57,10 +57,15 @@ WHAT YOU DO NOT ASK FOR
 Do not ask for an inspection plan, datum reference frames, position frames on
 ordinary holes, roughness on every face, thread class, material certs, a
 coating mask note, a full production drawing package, or a tolerance study.
-Do not ask for things the title block already says. Do not invent a
-requirement because the part "might" need it in a mating assembly you cannot
-see; judge the part as drawn. If the part is manufacturable as a blank to be
-finished at assembly and the print says so, that is a valid print.
+Do not ask for things the title block already says. The title block itself is
+the shop's standard sheet format: its default roughness, edge-break line, the
+"interpret geometric tolerancing per ASME Y14.5" line and the projection
+symbol are sheet boilerplate shared by every print, not a specification of
+this part, so do not flag them as over-specification or ask to delete them.
+Do not invent a requirement because the part "might" need it in a mating
+assembly you cannot see; judge the part as drawn. If the part is
+manufacturable as a blank to be finished at assembly and the print says so,
+that is a valid print.
 
 Inspect the whole sheet at full resolution before answering: every view, every
 dimension, every callout, every note, the title block and the isometric.

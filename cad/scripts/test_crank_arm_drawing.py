@@ -79,12 +79,15 @@ def test_hole_callouts_state_size_and_process() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["ShaftBoreDia"].startswith("REAM THRU")
     assert "3/8 IN" in callouts["ShaftBoreDia"]
-    assert callouts["DimpleDia"] == "FLAT-BOTTOM 0.5 DEEP"
+    assert callouts["DimpleDia"] == "FLAT-BOTTOM 0.50 DEEP"  # .XX -> block tol
     assert crank_arm_spec.PIN_HOLE_DIA == NUMBER_DRILL_MM["#14"]
     source = _source()
     assert source.count("add_native_hole_callout(") == 2
     assert 'label="crank-arm cross-hole"' in source
     assert 'label="handle pivot hole"' in source
+    # Harvey #13: the callout says DRILL; the drill number rides as its prefix.
+    assert 'process="#14 DRILL"' in source
+    assert 'process="15/64 DRILL"' in source
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -119,6 +122,27 @@ def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
     source = _source()
     assert "for view in (front, top, right):\n        set_hidden_lines_visible" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
+
+
+def test_dimple_is_shown_where_it_is_visible() -> None:
+    # The dimple is cut on the z=0 face, so the principal view is the *Back*
+    # face and the edge-on view is *Top turned by pi (third angle from a back
+    # principal); the side view is *Left.  A leader to a hidden circle was a
+    # machinist-review clarity finding.
+    source = _source()
+    assert 'place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER' in source
+    assert 'place_view(adapter, str(SOURCE), "*Left", *RIGHT_CENTER' in source
+    assert "top.Angle = math.pi" in source
+    # Model +X runs to the LEFT on a back view.
+    assert drawing._sheet_x(10.0) < drawing._sheet_x(0.0)
+
+
+def test_overall_length_is_a_conspicuous_reference() -> None:
+    source = _source()
+    assert 'label="overall length reference"' in source
+    assert 'set_arc_endpoints_to_max(adapter, overall, label="overall length reference")' in source
+    assert '_early_bound(overall, "IDisplayDimension").GetAnnotation()' in source
+    assert crank_arm_spec.ARM_END_X + crank_arm_spec.HALF_WIDTH == 93.0
 
 
 def test_one_origin_per_view_and_the_cross_hole_station() -> None:
