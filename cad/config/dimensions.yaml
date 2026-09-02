@@ -1632,7 +1632,7 @@ sections:
         - scaled
         - med
       - - Transgear stud (rework E8)
-        - 'stepped: Ø9.525 (3/8") base × 9.1 (bracket plug + latch big hub, z −125.9..−135) + Ø5 gear seat × 13.8 (feed pinion + disc, z −135..−148.8) + Ø14 × 4 retaining collar (to −152.8); the 12T DP30 feed pinion''s base circle (r 4.92) cannot take a 3/8" bore, hence the turned-down seat'
+        - 'stepped: Ø9.525 (3/8") base × 9.1 (bracket plug + latch big hub, z −125.9..−135) + Ø5 gear seat × 13.8 (feed pinion + disc, z −135..−148.8) + Ø14 × 4 retaining collar (to −152.8); the 12T DP30 feed pinion''s base circle (r 4.92) cannot take a 3/8" bore, hence the turned-down seat (2026-09-02: the Ø14 x 4 collar carries a Ø5 x 1.5 slotted cap screw in its face, collar + cap bright brass -- ch23 p.59 page002_img04)'
         - —
         - 'derived: carries the disc (z −148.4..−145.4), feed pinion (−145.4..−135.9) and latch big hub (−132.75..−130.15); end hardware collapsed to a collar'
         - derived

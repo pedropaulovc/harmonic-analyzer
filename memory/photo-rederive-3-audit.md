@@ -38,7 +38,9 @@ the drive-train and its brass keeper ring did not exist (ch11 p.14) -- both
 added 2026-09-02 (`crank-pin` through the arm hub + shaft cross-hole,
 `crank-pin-ring` MHA-128 hanging from a new hole in the pin's head; the ring's
 anchor screw + chain on the arm face stay unmodelled); the transgear stud's
-brass collar with a slotted cap (ch23 p.59). The support-bar vs platen
+brass collar with a slotted cap (ch23 p.59) -- added 2026-09-02 as a O5 x
+1.5 slotted cap on the collar face, collar + cap painted bright brass. The
+support-bar vs platen
 "mismatch" seen while placing the latch hook is NOT a geometry error: the
 platen slides vertically with the paper feed, so keyframe `v4_transgear_001`
 (platen fed UP, the bar's front exposed below its black band, latch at x ~

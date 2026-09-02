@@ -20,6 +20,12 @@ SEAT_DIA = 5.0  # turned-down gear seat (feed pinion + disc bores)
 SEAT_LEN = 13.8  # feed pinion 9.5 + disc 3 + slack (z -135..-148.8)
 COLLAR_DIA = 14.0
 COLLAR_LEN = 4.0
+# Slotted cap screw in the collar's face (ch23 p.59 page002_img04: a brass
+# collar with a small slotted round head in its centre; modelled integral).
+CAP_DIA = 5.0
+CAP_LEN = 1.5  # proud of the collar face
+CAP_SLOT_W = 0.8
+CAP_SLOT_D = 0.6
 
 # Fit bands, (upper, lower) deviations in mm off the nominal above.  These
 # tolerance the MODEL dimension (build_transgear_stub applies them via
@@ -69,5 +75,7 @@ DRAWING_NOTES = "\n".join(
     (
         "TURN FROM 16 MM (5/8 IN) BAR IN ONE SETUP; SEAT AND COLLAR "
         "CONCENTRIC WITH BASE.",
+        f"COLLAR AND CAP BRIGHT BRASS; CAP DIA {CAP_DIA:.2f} X {CAP_LEN:.2f} PROUD OF THE "
+        f"COLLAR FACE WITH A {CAP_SLOT_W:.2f} X {CAP_SLOT_D:.2f} SLOT (MODELLED INTEGRAL).",
     )
 )

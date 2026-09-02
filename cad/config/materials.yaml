@@ -18,6 +18,7 @@ palette:                              # name: [r, g, b]
   stained_oak:    [0.16, 0.10, 0.07]  # crank handle (dark-stained wood)
   paper_white:    [0.92, 0.92, 0.88]  # platen paper sheet
   bar_steel:      [0.42, 0.41, 0.39]  # amplitude-bar curtain
+  brass_bright:   [0.76, 0.60, 0.32]  # bright turned brass hardware (transgear stud collar + cap, ch23 p.59)
   muntz_yellow:   [0.72, 0.56, 0.18]  # the 4 hard yellow cone tip gears (T006-T024);
   # ESTIMATE (golder + more saturated than the brass default) -- NOT yet ch30-sampled,
   # refine against the p.21 macro during the Phase 3 rebuild
