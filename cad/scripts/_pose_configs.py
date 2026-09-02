@@ -297,7 +297,9 @@ async def install_pose_configurations(
     2. suppress every POSE mate in Default (the shipped free model);
     3. per configuration: all POSE mates live, ``suppress_mates`` off, the
        posed values set, rebuild, ``hook``, ``verify``, ``interference``;
-    4. Default active again, rebuild, transform snapshot must match exactly.
+    4. Default active again: re-pin every DOF at rest (POSE mates live at
+       their Default = rest values, rebuild, snapshot check), free them again,
+       rebuild; the transform snapshot must match exactly.
     """
     names = [m.name for m in pose_mates.values()]
     with _telemetry.span("pose.install", configurations=len(configs), pose_mates=len(names)):
@@ -324,4 +326,16 @@ async def install_pose_configurations(
                     interference(adapter)
                 _telemetry.info(f"pose configuration {cfg.name!r}: {len(cfg.values)} value(s) posed and verified")
         await activate_configuration(adapter, REST_CONFIGURATION)
+        # Re-pin the rest pose before trusting it: the free chain's stored
+        # positions can come back on another solver branch after the posed
+        # configurations (third seat run: rocker-arm-14 returned 128 mm away,
+        # the rocker/rod two-circle closure's mirror branch). Drive every DOF
+        # to its recorded rest value once more (the POSE mates were authored
+        # at rest, so their Default values ARE the rest pose), then free them.
+        with _telemetry.span("pose.repin_rest", pose_mates=len(names)):
+            await set_mates_suppressed_in(adapter, names, False, REST_CONFIGURATION)
+            _rebuild(adapter)
+            assert_transforms_unchanged(adapter, rest, f"{REST_CONFIGURATION} re-pinned at rest")
+            await set_mates_suppressed_in(adapter, names, True, REST_CONFIGURATION)
+            _rebuild(adapter)
         assert_transforms_unchanged(adapter, rest, f"{REST_CONFIGURATION} after pose configurations")
