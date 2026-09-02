@@ -17,7 +17,7 @@ release comparison gallery. Colour/texture deltas were deliberately skipped
 |---|---|---|---|---|
 | 1 | crank handle | ch11 p.14 | 90 mm baton vs a 44 mm egg, 25 across | `crank_handle_spec` |
 | 2 | crankshaft | ch12 p.19 | 34 mm bare stub out the column back vs a capped end just past the pinion | `crankshaft_spec` 150 -> 122 |
-| 3 | cylinder end discs | ch13 p.23/25, ch25 p.67 | plain brass washers at both ends of the gear sandwich missing | `build_cylinder_end_disc` x2 in drive-train |
+| 3 | cylinder end discs | ch13 p.23/25, ch25 p.67 | plain brass washers at both ends of the gear sandwich missing | `build_cylinder_end_disc` (O55: a O60 grazed the cone-tip bushing) x2 against gears 0 and 19 |
 | 4 | rocker pivot supports | ch14 p.27 | chrome ball pillars vs black foot-and-ear brackets; south pillar 19 mm past the support's end in mid-air | `build_pivot_bracket` x2 on the support, shaft 203 -> 170 centred |
 | 5 | measuring stick | ch16 p.34-37 | 80 mm / 11-tick scale vs 142 mm with tenths; no stop block | `build_measuring_stick` 14.2/division + tenths; `build_measuring_stick_stop` |
 | 6 | pinion rig | ch25 p.68 | straps 43 x 18 leaning 50 deg with the blocks 33 mm east vs ~28 x 15 near-vertical straps with the blocks under the drum | `pinion_bracket_geometry` C2C 28 / W 15 / stud 6 above the pivot; block, spring, base taps re-solved |
@@ -25,6 +25,9 @@ release comparison gallery. Colour/texture deltas were deliberately skipped
 | 8 | transgear latch | ch23 p.58, 4/4 video | no spring latch on the swing cluster | `build_latch_strip` on the bar's front face, eye over the knob-shaft seat |
 | 9 | pedestal arbor ends | ch13 p.23 | bare bore vs a domed cap screw | `build_dome_cap_screw` x2 |
 | 10 | knife bearing block | ch18 p.42 | 34 x 44 block vs ~24 x 33 | `build_knife_mount` bore O16, 24 wide |
+
+Gate result 2026-09-02: full build green on 620cdb70; ch30 p002/p004 and the
+ch25/ch13/ch23/ch14/ch16 close-ups re-rendered from the export match the plates.
 
 ## Seen, still open (ordered by visibility)
 
