@@ -34,14 +34,26 @@ ch25/ch13/ch23/ch14/ch16 close-ups re-rendered from the export match the plates.
 - Rocker arms radiate in plan from the pivot (ch14 p.26-27, 140 mm at the
   tips vs a tight stack at the pivot); model keeps them parallel. Needs the
   channel mate contract rewritten -- see `rocker-arms-fan-in-plan.md`.
-- Amplitude bar feet (ch15 p.31): a wide flat foot plate on each bar bottom,
-  alternating sides; model bars end in a narrow foot.
-- Summing lever knife clamp (ch18 p.42): the photo hangs the block by a black
-  bent strap with a hex bolt; model hangs it on a stud + nut through the beam.
+- Amplitude bar feet (ch15 p.31 `page002_img01`): each bar ends in a thin
+  foot tab wider than the bar, offset to alternating sides. Re-read 2026-09-02:
+  the tabs alternate BECAUSE the rocker arms fan in plan (the arm under each
+  foot sits off the bar's own plane by a growing z offset), so the feet are
+  part of the fan rewrite, not a standalone part -- do them together.
+- Summing lever knife mounts (ch18 p.42 crop, ch19 p.44/45 front views):
+  re-read 2026-09-02 -- the front views show the block UNDER the rail with the
+  stud's hex nut ON TOP of the rail, which is what the model builds. The black
+  bent strap in the crop is the channel-spring bank's anchor strip, not a
+  hanger. Remaining delta is only a hex-head screw on the block's front face
+  (small; not worth a part until the spring anchor itself is re-derived).
 - Magnifying wheel hub nut (ch21 p.51): hex nut on the axle tip vs a round
   collar (blocked on the axle drawing's CollarDia contract).
-- Crank column ~8 mm taller than the plate reads; pedestal foot bolts on top
+- Crank column ~8 mm taller than the plate reads (within the photo-scale
+  error band; the harvested `cone_pivot_post_spec` v2 post pins Y_CRANK, so
+  not worth the cascade without a better read); pedestal foot bolts on top
   of the rocker support; base top-edge round instead of a chamfer.
-- Summing-lever hub reads ~O30 in ch18 vs O25.4; wheel rim section.
+- Summing-lever hub: the ch18 crop reads anywhere from ~O13 to ~O30
+  depending on which block face is taken as the 24 mm scale -- UNVERIFIED,
+  leave `CYL_R` 12.7 until a calibrated plate (ch30 p008) is measured.
+- Wheel rim section.
 - Pen v-block groove: marker axis 0.25 below the roof by the clearance
   convention rather than resting on it.

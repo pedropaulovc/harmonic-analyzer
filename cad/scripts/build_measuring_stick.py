@@ -30,6 +30,7 @@ from _common import (
     apply_material,
     check,
     drive_dimension,
+    dump_dimensions,
     ensure_fully_defined,
     force_rebuild,
     measure_check,
@@ -276,8 +277,9 @@ async def build(adapter) -> dict[str, str]:
     # patterned as a group across the other nine divisions. (A pattern of the
     # minor pattern would need two nested pattern features; nine seed cuts +
     # one pattern keeps every feature a plain cut or pattern.) The pattern's
-    # own spacing dim is left static (as-built DIVISION_SPACING): its dim
-    # index is not verified the way TickPattern's D3 is.
+    # own spacing dim is driven from DivisionSpacing below, resolved by VALUE
+    # rather than by the D3 index (CodeRabbit #651: a static pitch would
+    # leave the patterned tenths at 14.2 after a GUI DivisionSpacing edit).
     minor_names = []
     for k in range(1, MINOR_PER_DIVISION):
         minor_names.append(
@@ -301,6 +303,19 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "MinorPattern")
+    # The pattern's dims are the direction-reference length (~11000 mm), the
+    # count and the pitch; the one reading the as-built pitch is unambiguous.
+    minor_pitch_dims = [
+        row["full_name"]
+        for row in dump_dimensions(adapter, "MinorPattern")
+        if abs(row["value_mm"] - DIVISION_SPACING) < 1e-3
+    ]
+    if len(minor_pitch_dims) != 1:
+        raise RuntimeError(
+            f"MinorPattern: expected one dim reading the {DIVISION_SPACING} pitch, "
+            f"found {minor_pitch_dims}"
+        )
+    drive_jobs.append((minor_pitch_dims[0], '"DivisionSpacing"'))
 
     # The hand-stamped artefact the book calls out: a longer 0.5 tick (it
     # overcuts the 0.5 tenth above).
