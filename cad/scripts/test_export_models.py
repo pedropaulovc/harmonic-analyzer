@@ -727,3 +727,64 @@ def test_sanitize_glb_keeps_textures_on_surviving_uv_sets(tmp_path: Path) -> Non
     assert clone["normalTexture"] == {"index": 2, "texCoord": 1}
     # the source material is untouched
     assert "metallicRoughnessTexture" in fixed["materials"][0]["pbrMetallicRoughness"]
+
+
+def test_sanitize_glb_honours_khr_texture_transform_tex_coord(tmp_path: Path) -> None:
+    """The extension's ``texCoord`` is the effective UV set, in both directions:
+    a slot whose top-level texCoord names the dropped set but whose transform
+    override names a surviving set keeps its texture; a slot whose top-level
+    texCoord names a surviving set but whose override names the dropped set
+    loses it."""
+    gltf = {
+        "asset": {"version": "2.0"},
+        "accessors": [
+            {"count": 100, "type": "VEC3", "componentType": 5126},  # POSITION
+            {"count": 96, "type": "VEC2", "componentType": 5126},  # TEXCOORD_0 (bad)
+            {"count": 100, "type": "VEC2", "componentType": 5126},  # TEXCOORD_1 (good)
+        ],
+        "materials": [
+            {
+                "name": "decal",
+                "pbrMetallicRoughness": {
+                    # top-level says 0 (dropped), override says 1 (survives) -> keep
+                    "baseColorTexture": {
+                        "index": 0,
+                        "texCoord": 0,
+                        "extensions": {"KHR_texture_transform": {"texCoord": 1}},
+                    },
+                },
+                # top-level says 1 (survives), override says 0 (dropped) -> remove
+                "normalTexture": {
+                    "index": 1,
+                    "texCoord": 1,
+                    "extensions": {"KHR_texture_transform": {"texCoord": 0, "scale": [2, 2]}},
+                },
+                # extension present WITHOUT texCoord -> top-level 1 rules -> keep
+                "occlusionTexture": {
+                    "index": 2,
+                    "texCoord": 1,
+                    "extensions": {"KHR_texture_transform": {"scale": [2, 2]}},
+                },
+            }
+        ],
+        "meshes": [
+            {
+                "primitives": [
+                    {
+                        "attributes": {"POSITION": 0, "TEXCOORD_0": 1, "TEXCOORD_1": 2},
+                        "material": 0,
+                    }
+                ]
+            }
+        ],
+    }
+    glb = tmp_path / "transform.glb"
+    glb.write_bytes(_glb_bytes(gltf))
+    assert [d["attribute"] for d in export_models.sanitize_glb(glb)] == ["TEXCOORD_0"]
+    fixed = _read_glb_json(glb)
+    prim = fixed["meshes"][0]["primitives"][0]
+    clone = fixed["materials"][prim["material"]]
+    assert clone["name"] == "decal-untextured"
+    assert clone["pbrMetallicRoughness"]["baseColorTexture"]["index"] == 0
+    assert "normalTexture" not in clone
+    assert clone["occlusionTexture"]["index"] == 2

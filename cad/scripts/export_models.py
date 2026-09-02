@@ -815,6 +815,19 @@ def _save_as(doc: Any, out: Path) -> int:
         return ok
 
 
+def _effective_tex_coord(info: dict[str, Any]) -> int:
+    """The UV set a ``textureInfo`` actually samples: the
+    ``KHR_texture_transform`` extension's ``texCoord`` overrides the slot's own
+    ``texCoord`` (default 0) on every consumer that supports the extension, and
+    the exporter writes the same set in both places when it has no separate
+    pre-transform UV set -- so the override, when present, is the one that
+    decides whether a dropped ``TEXCOORD_N`` orphans the slot."""
+    transform = info.get("extensions", {}).get("KHR_texture_transform", {})
+    if isinstance(transform, dict) and "texCoord" in transform:
+        return int(transform["texCoord"])
+    return int(info.get("texCoord", 0))
+
+
 def sanitize_glb(path: Path) -> list[dict[str, Any]]:
     """Repair a SolidWorks-exported glTF binary in place so Blender can import it.
 
@@ -827,9 +840,10 @@ def sanitize_glb(path: Path) -> list[dict[str, Any]]:
     which meshprobe then surfaced as a worker timeout. The spec requires every
     attribute accessor of a primitive to share one count, so the mismatched
     attribute is dropped (its buffer bytes stay, unreferenced); a texture slot
-    whose ``texCoord`` selected a dropped UV set is removed on a clone of the
-    material (slots on surviving sets keep their textures) so the file stays
-    valid. Returns one record per dropped attribute (empty when the
+    whose EFFECTIVE UV set (``KHR_texture_transform.texCoord`` when the slot
+    carries that extension, else ``textureInfo.texCoord``) was dropped is
+    removed on a clone of the material (slots on surviving sets keep their
+    textures) so the file stays valid. Returns one record per dropped attribute (empty when the
     file was already clean) -- the caller logs them; a clean file is not
     rewritten at all."""
     with path.open("rb") as fh:
@@ -871,9 +885,9 @@ def sanitize_glb(path: Path) -> list[dict[str, Any]]:
                     removed_uv_sets.add(int(key.split("_", 1)[1]))
             if not removed_uv_sets or "material" not in prim:
                 continue
-            # Only the texture slots whose ``texCoord`` selects a removed UV set
-            # lose their texture; a slot on a surviving set (e.g. texCoord 1
-            # when only TEXCOORD_0 was dropped) keeps it.
+            # Only the texture slots whose EFFECTIVE UV set was removed lose
+            # their texture; a slot on a surviving set (e.g. texCoord 1 when
+            # only TEXCOORD_0 was dropped) keeps it.
             src = prim["material"]
             source = materials[src]
             pbr_src = source.get("pbrMetallicRoughness", {})
@@ -888,7 +902,7 @@ def sanitize_glb(path: Path) -> list[dict[str, Any]]:
                 name
                 for name, holder in slots.items()
                 if isinstance(holder.get(name), dict)
-                and int(holder[name].get("texCoord", 0)) in removed_uv_sets
+                and _effective_tex_coord(holder[name]) in removed_uv_sets
             )
             if not doomed:
                 continue
