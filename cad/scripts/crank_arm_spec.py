@@ -61,7 +61,8 @@ DIMPLE_X = 30.0  # on the arm near the boss (low)
 # (the chain to the pin's ring is lost -- only the eye remains). The dimple
 # is on that same face in the photo.
 ANCHOR_SCREW_X = 20.0  # along the arm from the shaft axis (low)
-ANCHOR_SCREW_Y = -4.5  # off the arm centreline, toward one edge (low)
+ANCHOR_SCREW_Y = 4.5  # off the arm centreline toward the local +y edge (machine -X
+# once placed; low). Kept POSITIVE: a driven placement dim is a magnitude.
 ANCHOR_THREAD_DEPTH = 5.0  # #4-40 tap thread in the 8 plate
 ANCHOR_DRILL_DEPTH = 6.5  # tap-drill depth: 1.5 wall left on the back face
 
