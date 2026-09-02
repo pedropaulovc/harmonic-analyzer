@@ -2,4 +2,4 @@ platen-clip:
   number: MHA-067
   material: Brass
   tolerance_class: machined_block
-  process: "machined (brass)"
+  process: "sheet brass, two strips silver-soldered at the lip end (modelled merged)"

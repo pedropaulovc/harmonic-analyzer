@@ -1,17 +1,33 @@
-r"""Reproduction script: platen paper clip strip (book ch. 22, p. 55).
+r"""Reproduction script: platen paper clip (book ch. 22, pp. 54-55).
 
-One of the two thin BRIGHT BRASS strips hugging the platen front's extreme
-left/right edges, running from the TOP edge down ~112 (ch22 front photo);
-the recording paper slides under them and a screw holds each end. Used
-twice in the assembly (vertical, so the assembly rotates the +X-authored
-strip 90 about Z). Natural brass -- no paint (they read bright against the
-blackened platen; the old PANEL_BLACK made them invisible).
+One of the two bright brass paper holders hugging the platen front's extreme
+left/right edges, running from the TOP edge down ~84. 2026-09-02 photo
+re-derive (ch22 page001_img02 -- both holders on the platen back plate --
+and page001_img03, the end close-up): each holder is TWO strips, not one:
 
-Dimensions: cad/DIMENSIONS.md "Chapter 22" — ch30-p002 Pose Studio fit,
-scaled 0.8988 in the visible plane (low).
+* a BASE strip screwed to the platen at both ends (the two #4 fillister
+  clip screws through its end holes, unchanged from the first pass);
+* a thinner SLOTTED strip riding ON the base strip, the same screws passing
+  through its long central slot so it can slide along the edge; its top end
+  is bent up into a short LIP that flares away from the platen -- the paper's
+  edge tucks under the strip through that mouth.
 
-Layout: length along +X, width along +Y from the origin corner,
-thickness extruded +Z; screw holes inset from the ends.
+Modelled as ONE merged part (the two strips never come apart in use; the
+sliding freedom is not a modelled DOF). Natural brass, no paint (they read
+bright against the blackened platen). Used twice in paper-drive.SLDASM
+(vertical: the assembly turns the +X-authored holder -90 about Z, origin at
+the platen's top edge, so local +X runs DOWN the platen).
+
+Layout: length along +X, width along +Y from the origin corner; thickness
+along +Z with the FRONT face at z 0 (the screw heads seat there) and the
+platen face at z CLIP_THICKNESS: base strip z BASE_T..CLIP_THICKNESS
+(against the platen), slotted strip z 0..UPPER_T in front of it, lip rising
+from the slotted strip's top end to z -LIP_H (away from the platen).
+
+Dimensions: base strip as before (ch30-p002 Pose Studio fit, 0.8988 scale,
+low); the upper strip, slot and lip are photo proportions off page001_img03
+(strip width ~1:1 with the base, slot ~2/3 of the strip length and ~1/3 of
+its width, lip ~1.5 high) -- low.
 
 Run (SolidWorks already open)::
 
@@ -31,6 +47,7 @@ from _common import (
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
+    extrude_at_offset,
     force_rebuild,
     name_last_feature,
     report_mass_properties,
@@ -46,11 +63,47 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 
 CLIP_LENGTH = 83.5  # ch22 p.55 rear photo: 86.7 of the 140 mm plate (0.619) x PLATE_HEIGHT 134.82
 CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
-CLIP_THICKNESS = 1.2  # DIMENSIONS.md ch22: thin spring strip (low)
+BASE_T = 1.0  # base strip thickness (against the platen)
+UPPER_T = 0.8  # slotted strip thickness (in front of the base strip)
+CLIP_THICKNESS = BASE_T + UPPER_T  # 1.8: the assembly's front-face stand-off from the platen
 # End screws: the brass fillister clip screws (Ø2.9 shank) pass THROUGH, so
 # each end hole is a #4 clearance Hole Wizard hole (normal fit Ø3.251; was a
 # plain Ø3.0 cut) -- memory/fastener-policy-us-customary.
 HOLE_INSET = 7.1904  # ch30-p002 Pose Studio: 8 * 0.8988 from each end
+# Slotted upper strip (page001_img03): starts UPPER_X0 in from the top end
+# (local x 0) and stops the same short of the bottom; its slot spans both
+# screw stations with SLOT_MARGIN past each hole edge, SLOT_W wide (clears
+# the Ø2.9 shank, narrower than the ~Ø4.6 fillister head that clamps it).
+UPPER_X0 = 3.0
+UPPER_LENGTH = CLIP_LENGTH - 2.0 * UPPER_X0  # 77.5
+SLOT_W = 3.4
+SLOT_MARGIN = 0.5
+SLOT_X0 = HOLE_INSET - CLEARANCE_MM[("#4", "normal")] / 2.0 - SLOT_MARGIN  # 5.06
+SLOT_X1 = CLIP_LENGTH - SLOT_X0  # 78.44
+SLOT_LENGTH = SLOT_X1 - SLOT_X0
+# Lip: the upper strip's top end bent away from the platen (-Z), LIP_H high.
+LIP_H = 1.5
+
+V_BASE = CLIP_LENGTH * CLIP_WIDTH * BASE_T
+V_UPPER = UPPER_LENGTH * CLIP_WIDTH * UPPER_T
+V_SLOT = SLOT_LENGTH * SLOT_W * UPPER_T
+V_LIP = UPPER_T * CLIP_WIDTH * LIP_H
+V_HOLES = 2.0 * math.pi * (CLEARANCE_MM[("#4", "normal")] / 2.0) ** 2 * BASE_T  # the slot already opens the upper strip
+V_FINAL = V_BASE + V_UPPER - V_SLOT + V_LIP - V_HOLES
+
+if not (SLOT_X0 > UPPER_X0 + 1.0 and SLOT_X1 < UPPER_X0 + UPPER_LENGTH - 1.0):
+    raise AssertionError("platen clip slot must stay inside the upper strip with a 1 mm end land")
+if SLOT_W <= CLEARANCE_MM[("#4", "normal")]:
+    raise AssertionError("platen clip slot must be wider than the screw clearance hole")
+
+
+async def _rect(adapter, label: str, name: str, rect: list[tuple[float, float]], dims: SketchDims, names, drives):
+    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+    lines = await add_line_chain(adapter, rect)
+    await define_rectilinear_chain(adapter, lines, rect, label=label, dims=dims, names=names, drives=drives)
+    await ensure_fully_defined(adapter, label)
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    name_last_feature(adapter, name)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -58,59 +111,91 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): strip plan size, end-screw hole, and
-    # the inset that drives both hole stations. The mm suffix is load-bearing --
-    # this is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 112.35 would be read as inches, blowing the
-    # part up 25.4x in-plane). CLIP_THICKNESS is an extrude DEPTH (a feature
-    # parameter, not a sketch dim), so its global is an editable knob that drives
-    # nothing -- matching the exemplars.
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
+    # is an INCH document and the equation manager reads BARE numbers in
+    # document units. Thicknesses are extrude DEPTHS (feature parameters), so
+    # their globals are editable knobs that drive nothing -- matching the
+    # exemplars.
     await set_global(adapter, "ClipLength", f"{CLIP_LENGTH}mm")
     await set_global(adapter, "ClipWidth", f"{CLIP_WIDTH}mm")
-    await set_global(adapter, "ClipThickness", f"{CLIP_THICKNESS}mm")
+    await set_global(adapter, "BaseT", f"{BASE_T}mm")
+    await set_global(adapter, "UpperT", f"{UPPER_T}mm")
     await set_global(adapter, "HoleInset", f"{HOLE_INSET}mm")
     await set_global(adapter, "HoleY", '"ClipWidth" / 2')
     await set_global(adapter, "HoleFarX", '"ClipLength" - "HoleInset"')
-    # (The old HoleDia/HoleInset/HoleY/HoleFarX knobs are gone: the end holes
-    # are now a native Hole Wizard #4 clearance feature placed by point, not
-    # equation-driven sketch dims.)
+    await set_global(adapter, "UpperX0", f"{UPPER_X0}mm")
+    await set_global(adapter, "UpperLength", '"ClipLength" - 2 * "UpperX0"')
+    await set_global(adapter, "SlotX0", f"{SLOT_X0}mm")
+    await set_global(adapter, "SlotLength", '"ClipLength" - 2 * "SlotX0"')
+    await set_global(adapter, "SlotW", f"{SLOT_W}mm")
+    await set_global(adapter, "SlotY0", '("ClipWidth" - "SlotW") / 2')
+    await set_global(adapter, "LipH", f"{LIP_H}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Outline: corner-at-origin rectangle (NOT origin-centred), length along X,
-    # width along Y. A rectilinear chain in line order bottom/right/top/left:
-    # closure makes top + left redundant, so only the bottom length and the
-    # right-edge width are dims; the origin anchor adds no dims (corner at 0,0).
+    # 1. Base strip: corner-at-origin rectangle, length along X, width along Y,
+    # extruded BASE_T from z BASE_T (the front face stays at z 0 for the upper
+    # strip; the back face at CLIP_THICKNESS bears on the platen).
     outline = SketchDims()
-    check("create_sketch outline", await adapter.create_sketch("Front"))
-    clip_rect = [
-        (0.0, 0.0),
-        (CLIP_LENGTH, 0.0),
-        (CLIP_LENGTH, CLIP_WIDTH),
-        (0.0, CLIP_WIDTH),
-    ]
-    lines = await add_line_chain(adapter, clip_rect)
-    await define_rectilinear_chain(
-        adapter, lines, clip_rect, label="clip outline", dims=outline,
-        names=["Length", "Width"],
-        drives=['"ClipLength"', '"ClipWidth"'],
+    await _rect(
+        adapter, "base outline", "BaseProfile",
+        [(0.0, 0.0), (CLIP_LENGTH, 0.0), (CLIP_LENGTH, CLIP_WIDTH), (0.0, CLIP_WIDTH)],
+        outline, ["Length", "Width"], ['"ClipLength"', '"ClipWidth"'],
     )
-    await ensure_fully_defined(adapter, "clip outline")
-    check("exit_sketch outline", await adapter.exit_sketch())
-    name_last_feature(adapter, "ClipProfile")
-    drive_jobs += outline.apply(adapter, "ClipProfile")
-    check(
-        "extrude clip",
-        await adapter.create_extrusion(ExtrusionParameters(depth=CLIP_THICKNESS)),
-    )
-    name_last_feature(adapter, "ClipStrip")
-    v_strip = CLIP_LENGTH * CLIP_WIDTH * CLIP_THICKNESS
-    await volume_check(adapter, "clip strip", v_strip, 0.005 * v_strip)
+    drive_jobs += outline.apply(adapter, "BaseProfile")
+    extrude_at_offset(adapter, BASE_T, UPPER_T)
+    name_last_feature(adapter, "BaseStrip")
+    await volume_check(adapter, "base strip", V_BASE, 0.005 * V_BASE)
 
-    # End screw holes: ONE native Hole Wizard #4 clearance feature (2 points)
-    # from the front face (local z 0, outward normal -Z). Left hole at the near
-    # inset; right hole at length minus inset.
-    hole_dia = CLEARANCE_MM[("#4", "normal")]
+    # 2. Slotted upper strip in front of it (z 0..UPPER_T), inset UPPER_X0 from
+    # both ends. Its anchor corner is off the origin, so the chain emits the
+    # anchor x as a dim (y = 0 is a relation).
+    upper = SketchDims()
+    await _rect(
+        adapter, "upper outline", "UpperProfile",
+        [(UPPER_X0, 0.0), (UPPER_X0 + UPPER_LENGTH, 0.0), (UPPER_X0 + UPPER_LENGTH, CLIP_WIDTH), (UPPER_X0, CLIP_WIDTH)],
+        upper, ["UpperLength", "UpperWidth", "UpperX0"], ['"UpperLength"', '"ClipWidth"', '"UpperX0"'],
+    )
+    drive_jobs += upper.apply(adapter, "UpperProfile")
+    check("extrude upper strip", await adapter.create_extrusion(ExtrusionParameters(depth=UPPER_T)))
+    name_last_feature(adapter, "UpperStrip")
+    await volume_check(adapter, "base + upper strips", V_BASE + V_UPPER, 0.005 * V_BASE)
+
+    # 3. Slot through the upper strip only (mid-plane cut about z 0 reaching
+    # +-UPPER_T: the front half cuts air, the back half stops at the base strip).
+    slot = SketchDims()
+    slot_y0 = (CLIP_WIDTH - SLOT_W) / 2.0
+    await _rect(
+        adapter, "slot", "SlotProfile",
+        [(SLOT_X0, slot_y0), (SLOT_X1, slot_y0), (SLOT_X1, slot_y0 + SLOT_W), (SLOT_X0, slot_y0 + SLOT_W)],
+        slot, ["SlotLength", "SlotW", "SlotX0", "SlotY0"], ['"SlotLength"', '"SlotW"', '"SlotX0"', '"SlotY0"'],
+    )
+    drive_jobs += slot.apply(adapter, "SlotProfile")
+    check(
+        "cut slot",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=2.0 * UPPER_T, both_directions=True)),
+    )
+    name_last_feature(adapter, "Slot")
+    await volume_check(adapter, "slotted", V_BASE + V_UPPER - V_SLOT, 0.005 * V_BASE)
+
+    # 4. Lip: the upper strip's top end (x UPPER_X0..UPPER_X0 + UPPER_T) bent away
+    # from the platen: a UPPER_T x CLIP_WIDTH rectangle extruded LIP_H toward -Z
+    # from the front face (start offset -LIP_H, depth LIP_H, merging at z 0).
+    lip = SketchDims()
+    await _rect(
+        adapter, "lip", "LipProfile",
+        [(UPPER_X0, 0.0), (UPPER_X0 + UPPER_T, 0.0), (UPPER_X0 + UPPER_T, CLIP_WIDTH), (UPPER_X0, CLIP_WIDTH)],
+        lip, ["LipT", "LipWidth", "LipX0"], ['"UpperT"', '"ClipWidth"', '"UpperX0"'],
+    )
+    drive_jobs += lip.apply(adapter, "LipProfile")
+    extrude_at_offset(adapter, LIP_H, -LIP_H)
+    name_last_feature(adapter, "Lip")
+    await volume_check(adapter, "with lip", V_BASE + V_UPPER - V_SLOT + V_LIP, 0.005 * V_BASE)
+
+    # 5. End screw holes: ONE native Hole Wizard #4 clearance feature (2 points)
+    # from the front face (local z 0, outward normal -Z), through both strips;
+    # in the upper strip they land inside the slot, so only the base strip loses
+    # material.
     hole_cut = wizard_holes(
         adapter,
         HoleSpec("clearance", "#4"),
@@ -126,18 +211,15 @@ async def build(adapter) -> dict[str, str]:
         ],
     )
     drive_jobs += hole_cut.placement_drive_jobs
-    v_holes = 2.0 * math.pi * (hole_dia / 2.0) ** 2 * CLIP_THICKNESS
-    v_final = v_strip - v_holes
-    await volume_check(adapter, "clip with holes", v_final, 0.005 * v_strip)
+    await volume_check(adapter, "clip", V_FINAL, 0.005 * V_BASE)
 
-    # Apply the deferred drive equations after the model + a rebuild exists, then
-    # re-check: every equation evaluates to the value just built, so geometry
-    # must not move -- the re-check is the proof.
+    # Apply the deferred drive equations after the whole model exists, then
+    # re-check neutrality.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven clip (equations neutral)", v_final, 0.005 * v_strip)
+    await volume_check(adapter, "driven clip (equations neutral)", V_FINAL, 0.005 * V_BASE)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
