@@ -35,10 +35,12 @@ gear") and keyframes `v4_transgear_001..013`.
 
 Also seen, not yet listed by the user: the crank taper pin's brass keeper
 ring hanging from a screw on the crank arm (ch11 p.14); the transgear stud's
-brass collar with a slotted cap (ch23 p.59); and a support-bar vs platen
-vertical mismatch found while placing the latch hook -- keyframe
-`v4_transgear_001` shows the bar's front face exposed ~12 mm BELOW the
-platen's bottom edge (the latch pivots there at x ~ +52), while the model's
-bar band (y 295.7..317.7) sits 22.5 above the platen bottom (273.2), fully
-hidden. The hook is parked at LATCH_HOOK_X = -50 (west of the platen edge)
-until that relation is re-derived.
+brass collar with a slotted cap (ch23 p.59). The support-bar vs platen
+"mismatch" seen while placing the latch hook is NOT a geometry error: the
+platen slides vertically with the paper feed, so keyframe `v4_transgear_001`
+(platen fed UP, the bar's front exposed below its black band, latch at x ~
++52) and the ch30 p002 plate (platen DOWN, the band hiding the bar) are the
+same machine in two feed states; the model matches the ch30 rest state
+(checked 2026-09-02 on the p002 photo/render pair: bar top ~15 px under
+the paper's bottom edge in both). At rest a hook at +52 would sit behind
+the platen, so it stays at LATCH_HOOK_X = -50 where it is visible.
