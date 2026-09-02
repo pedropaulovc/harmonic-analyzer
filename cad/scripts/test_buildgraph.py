@@ -71,8 +71,9 @@ def test_output_subs_reference_their_parts_only():
 
 
 def test_top_references_subassemblies_and_loose_parts():
-    """harmonic-analyzer mates the seven subs plus the one loose top-level part:
-    the generic measuring-stick sits directly on the base. The spare
+    """harmonic-analyzer mates the seven subs plus the two loose top-level parts:
+    the generic measuring-stick and its sliding stop stand directly on the base
+    (the stick propped on the stop block, 2026-09-02). The spare
     transgear-removable rides inside paper-drive (a flat sibling of its mounted
     T24), not here -- at the top level its leaf name would collide with the
     T12/T24 instances nested in drive-train / paper-drive."""
@@ -86,7 +87,7 @@ def test_top_references_subassemblies_and_loose_parts():
         "pen",
         "paper_drive",
     }
-    loose = {"measuring_stick"}
+    loose = {"measuring_stick", "measuring_stick_stop"}
     assert refs == subs | loose, refs
 
 

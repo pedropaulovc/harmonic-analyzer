@@ -5,9 +5,11 @@ view, the overall envelope dimensions, and the graduation notes; every shared
 sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
 
 The stick is a half-hard brass bar (200 x 8 x 3) with a 0-10 scale engraved 0.5
-deep across an 80 mm span (8 mm pitch) and one longer 0.5 tick.  The bar lies
-along +X on the Front plane, so ``*Front`` shows the ruled face; the sheet runs
-1:1 and the isometric drops to 1:2.
+deep across a 142 mm span (14.2 mm pitch, ``build_measuring_stick``), one longer
+0.5 tick and the 0..10 numerals beside the full ticks.  The bar lies along +X on
+the Front plane and the graduations cut the z=0 BACK face, so ``*Back`` (rotated
+so tick 0 is at the left) shows the ruled face; the sheet runs 1:1 and the
+isometric drops to 1:2.
 
 Run with SolidWorks open::
 
@@ -22,6 +24,7 @@ import sys
 from typing import Any
 
 import _telemetry
+import build_measuring_stick as part
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -64,7 +67,10 @@ FRONT_KEEP = {
 }
 
 SCALE_LABEL_Y = 0.201
-SCALE_LABEL_X0 = FRONT_CENTER[0] - 0.040
+# Tick-value labels ride the part's own scale layout (1:1 view, mm -> m): tick 0
+# sits SCALE_START_X from the bar's left end, the rest at DIVISION_SPACING pitch.
+SCALE_LABEL_X0 = FRONT_CENTER[0] + (part.SCALE_START_X - part.BODY_LENGTH / 2.0) / 1000.0
+SCALE_LABEL_PITCH = part.DIVISION_SPACING / 1000.0
 
 
 def _rotate_ruled_face(adapter: Any, view: Any) -> None:
@@ -77,9 +83,10 @@ def _rotate_ruled_face(adapter: Any, view: Any) -> None:
 
 
 def _add_scale_labels(adapter: Any) -> None:
-    """Show the 0..10 numeral-to-tick association on the manufacturing view."""
-    for value in range(11):
-        x = SCALE_LABEL_X0 + value * 0.008
+    """Show the 0..10 tick values below the bar (the engraved numerals on the
+    face are turned 90 degrees and 2 mm tall, so they read poorly at 1:1)."""
+    for value in range(part.DIVISION_COUNT):
+        x = SCALE_LABEL_X0 + value * SCALE_LABEL_PITCH
         if add_note(adapter, str(value), x, SCALE_LABEL_Y) is None:
             raise RuntimeError(f"failed to add measuring-stick scale label {value}")
 

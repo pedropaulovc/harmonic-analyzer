@@ -98,14 +98,111 @@ HANGER_STUD_Y = CASTING_UNDERSIDE_Y - 0.25 - 12.0  # 987.45 (gap + engagement)
 from boss_hook_geom import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
 from counter_spring_spec import (  # noqa: E402
     BOTTOM_HOOK_LEAD as CS_BOTTOM_LEAD,
+    COIL_BODY_LENGTH as CS_BODY_LENGTH,
     COIL_OD as CS_COIL_OD,
+    HOOK_CL_RADIUS as CS_HOOK_R,
+    TOP_HOOK_LEAD as CS_TOP_LEAD,
     WIRE_DIA as CS_WIRE_DIA,
+)
+# gooseneck_geom, NOT build_gooseneck, for the same reason (gooseneck_spec's
+# DRAWING_NOTES would ride along in the closure).
+from gooseneck_geom import (  # noqa: E402
+    ARM_END_X as GN_ARM_END_X,
+    ARM_Y as GN_ARM_Y,
+    SCREW_HEAD_DIA as GN_HEAD_DIA,
+    SCREW_HEAD_T as GN_HEAD_T,
+    SCREW_SHANK_DIA as GN_SHANK_DIA,
+    SCREW_SHANK_LEN as GN_SHANK_LEN,
+    TUBE_DIA as GN_TUBE_DIA,
 )
 
 BOSS_HOOK_POS = (-90.5, 989.7, SUMMING_Z)  # rides the lever: Cascade A -10.3
 SPRING_POS = (-95.0, 1041.8, SUMMING_Z)  # coil-bottom origin; ring at y 1001.8
 # (the pre-shift 1052.0 hang left the hook rod poking 0.05 past the ring inner
 # top; the +0.1 air-gap correction is preserved through the -10.3 shift)
+GOOSENECK_POS = (COLUMN_X, 1210.0, SUMMING_Z)  # part origin = leg mid-height;
+# placed Ry(180), so a part-frame x lands at machine COLUMN_X - x
+SPRING_AIR_GAP_MIN = 0.25  # wire band / coil vs the screw head and the end face
+
+
+def _assert_counter_spring_top_hang() -> None:
+    """Top eye around the gooseneck's axial end screw, a hair of air above it.
+
+    The eye (a 270-degree loop of mean radius CS_HOOK_R on the coil axis,
+    CS_TOP_LEAD above the coil body, lying in the YZ plane after the Ry(+90)
+    placement) encircles the screw shank that runs along the tube axis
+    (machine -X after the Ry(180) placement). Three facts, all analytic:
+
+    * VERTICAL -- the shank top sits 0..0.5 below the eye's inner top (the
+      same air-gap convention as the bottom hang, so the interference gate
+      stays zero while the geometry reads as hanging).
+    * AXIAL -- the eye's wire band (+/- half a wire about the coil axis x)
+      lies on the EXPOSED shank, at least SPRING_AIR_GAP_MIN clear of both
+      the head shoulder and the arm end face.
+    * COIL -- the coil body hangs under the eye and its top rises above the
+      tube underside, so the coil's O.D. must also clear the end face in x
+      by SPRING_AIR_GAP_MIN (the ch19 p.45 photo shows exactly this: eye
+      pressed toward the head, coil partly under the tube end).
+    * HEAD -- the head is wider than the eye (it must retain a slack eye)
+      and sits INSIDE the coil's x band, above the coil: where the two
+      overlap in x its underside must clear the coil's top wire by
+      SPRING_AIR_GAP_MIN; were the head ever outside the coil band, the x
+      clearance would have to hold instead."""
+    eye_y = SPRING_POS[1] + CS_BODY_LENGTH + CS_TOP_LEAD  # 1370.7
+    eye_inner_r = CS_HOOK_R - CS_WIRE_DIA / 2.0  # 4.45
+    shank_y = GOOSENECK_POS[1] + GN_ARM_Y  # 1373.3
+    gap = (eye_y + eye_inner_r) - (shank_y + GN_SHANK_DIA / 2.0)
+    if not 0.0 < gap < 0.5:
+        raise RuntimeError(f"counter-spring eye/screw air gap {gap:.3f} not in (0, 0.5)")
+    if shank_y - GN_SHANK_DIA / 2.0 <= eye_y - eye_inner_r:
+        raise RuntimeError("counter-spring eye does not encircle the screw shank")
+
+    end_face_x = GOOSENECK_POS[0] - GN_ARM_END_X  # -101.75
+    head_x = GOOSENECK_POS[0] - (GN_ARM_END_X - GN_SHANK_LEN)  # -93.75
+    eye_x = SPRING_POS[0]  # -95: coil axis, the eye's plane
+    band = CS_WIRE_DIA / 2.0
+    to_head = head_x - (eye_x + band)
+    to_end_face = (eye_x - band) - end_face_x
+    if min(to_head, to_end_face) < SPRING_AIR_GAP_MIN:
+        raise RuntimeError(
+            f"counter-spring eye band off the exposed shank: head {to_head:.3f},"
+            f" end face {to_end_face:.3f} (min {SPRING_AIR_GAP_MIN})"
+        )
+
+    coil_top = SPRING_POS[1] + CS_BODY_LENGTH  # 1367.1 (helix centreline)
+    tube_bottom = shank_y - GN_TUBE_DIA / 2.0  # 1365.3
+    coil_x0, coil_x1 = eye_x - CS_COIL_OD / 2.0, eye_x + CS_COIL_OD / 2.0
+    coil_to_end_face = coil_x0 - end_face_x
+    if coil_top > tube_bottom and coil_to_end_face < SPRING_AIR_GAP_MIN:
+        raise RuntimeError(
+            f"counter-spring coil under the tube end: clearance {coil_to_end_face:.3f}"
+            f" (coil top {coil_top:.2f} above tube underside {tube_bottom:.2f})"
+        )
+
+    if GN_HEAD_DIA <= 2.0 * eye_inner_r:
+        raise RuntimeError(
+            f"screw head O{GN_HEAD_DIA} cannot retain the O{2.0 * eye_inner_r:.1f} eye"
+        )
+    head_x0, head_x1 = head_x, head_x + GN_HEAD_T  # -93.75..-91.75
+    head_bottom = shank_y - GN_HEAD_DIA / 2.0  # 1368.3
+    coil_wire_top = coil_top + band  # 1368.0
+    head_in_coil_band = head_x0 < coil_x1 and head_x1 > coil_x0
+    head_to_coil = (
+        head_bottom - coil_wire_top
+        if head_in_coil_band
+        else min(abs(head_x0 - coil_x1), abs(coil_x0 - head_x1))
+    )
+    if head_to_coil < SPRING_AIR_GAP_MIN:
+        raise RuntimeError(
+            f"screw head into the coil: clearance {head_to_coil:.3f}"
+            f" ({'vertical' if head_in_coil_band else 'axial'}, min {SPRING_AIR_GAP_MIN})"
+        )
+    log(
+        f"counter-spring top hang: eye inner top {eye_y + eye_inner_r:.2f}, shank top"
+        f" {shank_y + GN_SHANK_DIA / 2.0:.2f}, air gap {gap:.2f}; band to head"
+        f" {to_head:.2f}, to end face {to_end_face:.2f}; coil to end face"
+        f" {coil_to_end_face:.2f}; head underside to coil wire {head_to_coil:.2f}"
+    )
 
 
 def _assert_counter_spring_hang() -> None:
@@ -129,6 +226,7 @@ def _assert_counter_spring_hang() -> None:
 
 async def build(adapter) -> dict[str, str]:
     _assert_counter_spring_hang()
+    _assert_counter_spring_top_hang()
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -256,7 +354,8 @@ async def build(adapter) -> dict[str, str]:
         label="boss-hook keyed",
     )
     # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
-    # (bottom) and the gooseneck pin (top) nail-through-ring style.
+    # (bottom) and the gooseneck's axial end-screw shank (top)
+    # nail-through-ring style.
     await place_component(
         adapter, "counter-spring", list(SPRING_POS), [0.0, 90.0, 0.0], ROT_Y_POS90
     )
@@ -267,7 +366,7 @@ async def build(adapter) -> dict[str, str]:
     await place_component(
         adapter,
         "gooseneck",
-        [COLUMN_X, 1210.0, SUMMING_Z],
+        list(GOOSENECK_POS),
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )

@@ -17,7 +17,9 @@ one continuous curve; the only edges are the deliberate ones in the photo (the
 brass-collar shoulder and the butt cap rim). Circumferentially smooth after
 the revolve, as before.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 11" -- handle ~90 long x Ø22 max,
+Dimensions: crank_handle_spec (2026-09-02 user re-read of ch11 p.14 + the
+ch30 p002 front view) -- 58 long from the collar face x Ø21 max at the swell,
+a longer/slimmer grip than the 44 mm egg of the first photo re-derive;
 photo-scaled (low).
 
 Layout: handle axis along +X from the origin (collar face at x=0), profile

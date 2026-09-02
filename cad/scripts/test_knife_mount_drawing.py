@@ -48,14 +48,21 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert abs(knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
 
 
-def test_linked_notes_expose_the_stud_tap_and_unresolved_knife_seat() -> None:
+def test_linked_notes_expose_the_stud_tap_and_hardened_knife_seat() -> None:
     notes = knife_mount_spec.DRAWING_NOTES
     assert f"BORE Ø{2.0 * knife_mount_spec.R_BORE:.1f} THRU, CENTRED IN THE {2.0 * knife_mount_spec.BLK_HALF_X:.2f} WIDTH" in notes
+    assert "BORE Ø12.0 THRU" in notes
     assert "TAP 1/2-13 UNC-2B X 12.0 DEEP" in notes
     assert "KNIFE-HANGER STUD" in notes
     assert "TAP-DRILL POINT BREAKS INTO THE BORE CROWN" in notes
-    assert "NO HARDENED KNIFE SEAT" in notes
-    assert "DO NOT RELEASE" in notes
+    # ch18 p.42 (2026-09-02): the block IS the hardened knife seat -- the old
+    # "no hardened seat / do not release" hold is gone.
+    assert "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING" in notes
+    assert "LEAVE UNPAINTED" in notes
+    assert "NO HARDENED KNIFE SEAT" not in notes
+    assert "DO NOT RELEASE" not in notes
+    # Title block owns the alloy callout (test_magnifier_drawing_metadata).
+    assert "MATERIAL:" not in notes
     assert "Ra 0.8" not in notes
     assert "GRAY IRON" not in notes and "PAINT BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
@@ -80,6 +87,33 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("knife-mount")
-    assert config["material"] == config["material_specification"]
-    assert config["finish"]
+    # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.
+    assert part.MATERIAL == "Plain Carbon Steel"
+    assert config["material"] == "Plain Carbon Steel"
+    assert "O1 tool steel" in config["material_specification"]
+    assert "58-60 HRC" in config["material_specification"]
+    assert "Brass" not in config["material_specification"]
+    assert "unpainted" in str(config["finish"]).lower()
     assert int(config["quantity"]) == 2
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "apply_color(adapter, HARDENED_STEEL)" in source
+    assert part.HARDENED_STEEL == (0.30, 0.30, 0.31)
+
+
+def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
+    import math
+
+    from summing_lever_spec import HEX_H, HEX_W
+
+    assert part.R_BORE == 6.0
+    assert abs(part.BLK_BOT - (-14.75)) < 1e-9
+    assert abs(part.BORE_CY - (-5.75)) < 1e-9
+    # Top vertex hangs TOP_CLEAR under the crown; the across-corners bottom
+    # vertex and the two widest shoulders clear the bore wall.
+    hex_centre_y = -HEX_H / 2.0
+    assert abs((part.BORE_CY + part.R_BORE) - part.TOP_CLEAR) < 1e-9
+    bottom_clear = part.R_BORE - abs(hex_centre_y - HEX_H / 2.0 - part.BORE_CY)
+    assert bottom_clear > 0.5
+    for sy in (hex_centre_y + HEX_H / 4.0, hex_centre_y - HEX_H / 4.0):
+        d = math.hypot(HEX_W / 2.0, sy - part.BORE_CY)
+        assert d < part.R_BORE - 0.5

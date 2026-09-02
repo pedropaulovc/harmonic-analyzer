@@ -1,18 +1,21 @@
 r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
-The cast bearing block that suspends the summing lever's knife edge from the
+The hardened-steel bearing block that suspends the summing lever's knife edge from the
 top-frame casting's integral crossbar (hung by a 1/2-13 knife-hanger stud
 threaded into the block top). The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
 
 DESIGN (user direction, 2026-06-17, refs: ch30-p003, bore.png, ch18 p.43 photo):
-a **circular bore much larger than the hex trunnion**, so that *only the top
-knife edge of the trunnion* nears the bore -- the upper inner wall of the bore
-comes down to the hex's top vertex line while every other facet clears by
-millimetres. This is the true knife-edge suspension: line contact at the ridge,
-free to rock, replacing the M6.4 "diamond knife-bar in the lever tube bore"
-(which clashed with the lever's solid pivot cylinder once the bore was removed).
+a **circular bore around the hex trunnion**, so that *only the top knife edge
+of the trunnion* nears the bore -- the upper inner wall of the bore comes down
+to the hex's top vertex line while every other facet clears. This is the true
+knife-edge suspension: line contact at the ridge, free to rock, replacing the
+M6.4 "diamond knife-bar in the lever tube bore" (which clashed with the lever's
+solid pivot cylinder once the bore was removed). 2026-09-02 user re-read of
+ch18 p.42: the block is an UNPAINTED HEAT-TREATED STEEL block (not brass) with
+a CLOSE bore around the trunnion -- Ø12 over the 8.653 x 10.268 hex, so the
+across-corners diagonal clears by ~0.87 and the shoulders by ~0.6.
 
 There are TWO supports, one per trunnion (placed front/back in the assembly at
 |z| ~ 87). This single part is built once and placed twice.
@@ -45,6 +48,7 @@ import sys
 from _common import (
     SketchDims,
     add_line_chain,
+    apply_color,
     apply_material,
     check,
     define_circle,
@@ -83,24 +87,28 @@ from knife_mount_spec import (
 import _telemetry
 
 PART_NAME = "knife-mount"
-MATERIAL = "Brass"  # registry + DFM assessment; the old cast-iron constant was stale
+# ch18 p.42 (2026-09-02 user re-read): an unpainted HEAT-TREATED steel block,
+# not the brass of the earlier registry/DFM pass.
+MATERIAL = "Plain Carbon Steel"
+HARDENED_STEEL = (0.30, 0.30, 0.31)  # dark heat-treated grey, left unpainted
 
 # --- knife-edge geometry (kept in sync with the lever's hex trunnion) -------
 RIDGE_Y = HEX_H / 2.0  # hex top vertex above the pivot/cylinder centreline (5.134)
 
-# --- bore: "much larger than the hex trunnion", top-edge contact only -------
-R_BORE = 8.0  # Ø16 bore (2026-09, ch18 page001_img01: the block is ~24 wide,
-# so the bore shrank from Ø25.4); the hex is ~Ø10.3 across-corners -> still
-# 2.9 clear everywhere but the top vertex line
+# --- bore: close around the hex trunnion, top-edge contact only ------------
+R_BORE = 6.0  # Ø12 bore (2026-09-02 ch18 p.42 re-read: a CLOSE bore, down from
+# the Ø16 of the 2026-09 page001_img01 pass); the hex is 8.653 wide x 10.268
+# tall (~Ø10.3 across-corners) -> ~0.87 clear on the diagonal, ~0.6 at the
+# shoulders, everywhere but the top vertex line
 TOP_CLEAR = 0.25  # hex top vertex hangs this far below the bore upper inner wall
 # Bore centre BELOW the origin so only the upper wall reaches the ridge:
-BORE_CY = TOP_CLEAR - R_BORE  # -12.45 (bore top inner wall at local y +TOP_CLEAR)
+BORE_CY = TOP_CLEAR - R_BORE  # -5.75 (bore top inner wall at local y +TOP_CLEAR)
 
 # --- block (bearing body, held to the crossbar) ----------------------------
 SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
 BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
 WALL = 3.0  # material below the bore
-BLK_BOT = BORE_CY - R_BORE - WALL  # -29.15
+BLK_BOT = BORE_CY - R_BORE - WALL  # -14.75
 
 # Mount: the block top seat hangs MOUNT_GAP below the top-frame casting
 # underside (the integral crossbar's flush lower face); the knife-hanger stud
@@ -117,9 +125,10 @@ THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directi
 # On the trunnion-axis centreline (local x 0, z 0): the knife-hanger stud
 # threads STUD_TAP_DEPTH in and hangs the mount from the casting's integral
 # crossbar. Material above the bore crown is only BLK_TOP - TOP_CLEAR = 14.37,
-# so the 118-deg tap-drill point (r * 0.60086 = 3.22 tall) breaks into the bore
-# crown -- accepted: the bearing contact line is interrupted only over ~2 mm at
-# mid-length (called out in the drawing notes).
+# so the 118-deg tap-drill point (r * 0.60086 = 3.22 tall) breaks 0.85 into the
+# bore crown -- accepted: the bearing contact line is interrupted only over
+# ~3 mm (the cone's width at the crown) at mid-length (called out in the
+# drawing notes).
 STUD_TAP_DEPTH = 12.0
 STUD_TAP_SPEC = HoleSpec("tapped", "1/2-13", end="blind", depth_mm=STUD_TAP_DEPTH)
 STUD_TAP_DIA = blind_cut_dia_mm(STUD_TAP_SPEC)  # 10.716 tap drill (27/64)
@@ -251,8 +260,8 @@ async def build(adapter) -> dict[str, str]:
     # the block top, on the trunnion-axis centreline (both placement coords are
     # zero -> origin-axis relations, no placement dims). The analytic
     # expectation subtracts the full cylinder + drill-point volume; the point's
-    # break-in to the bore crown re-removes only ~1 mm^3 of already-void space,
-    # far inside the 1% gate.
+    # break-in to the bore crown re-removes only ~2 mm^3 of already-void space,
+    # far inside the 1% gate (~80 mm^3).
     wizard_holes(
         adapter,
         STUD_TAP_SPEC,
@@ -287,6 +296,9 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await apply_material(adapter, MATERIAL)
+    # ch18 p.42: heat-treated and left unpainted -- a dark grey, not the
+    # database steel's bright render nor the frame's green.
+    await apply_color(adapter, HARDENED_STEEL)
     await report_mass_properties(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and

@@ -199,7 +199,7 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 | `part:<stem>`, `assembly:<stem>` | yes | yes |
 | `verify:soundness`, `verify:kinematics` | yes | yes |
 | `export`, `release`, `preflight` | yes | yes |
-| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:recipe`, `check:cache`, `check:partiso` | **no** | no (parallel) |
+| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso` | **no** | no (parallel) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) |
 | `cache_status` | **no** | no (diagnostic) |
 | `build` (default), `build_bare` | meta | — |

@@ -14,8 +14,9 @@ rederive (Cascade A, 2026-08-02) dropped the bottom anchor 10.3 with the
 summing chain while the gooseneck top stayed put, so the modeled installed
 body is 325.3. The bottom wire is a LONG straight drop (40 mm) from the coil
 to the ring that hangs on the summing-lever boss J-hook (build_boss_hook.py,
-rod along X at (95, 1004.7)); the top hook hangs on the X-pin under the
-gooseneck tip lug at (95, 1373). Both loops lie in the YZ plane after the
+rod along X at (95, 1004.7)); the top hook hangs on the slotted end screw
+driven axially into the gooseneck arm's end face (shank along X at
+(95, 1373.3), build_gooseneck). Both loops lie in the YZ plane after the
 assembly's 90-degree Y-rotation, so each encircles its X-rod
 nail-through-ring style (the p.43 black hook + chrome ring chain collapsed
 to loop-on-hook -- simplification). See DIMENSIONS.md ch. 19.
@@ -23,7 +24,7 @@ to loop-on-hook -- simplification). See DIMENSIONS.md ch. 19.
 Layout: coil axis along +Y from the origin (helix base circle on the Top
 plane); the helix starts and ends on the +X side (whole number of coils).
 In the machine the origin lands at (95, 1041.8, 0): bottom ring centre at
-y 1001.8, top loop centre at y 1370.6 (unchanged by the rederive).
+y 1001.8, top loop centre at y 1370.7 (unchanged by the rederive).
 
 Run (SolidWorks already open)::
 

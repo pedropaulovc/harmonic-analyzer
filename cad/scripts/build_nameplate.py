@@ -40,6 +40,16 @@ Dimensions: cad/DIMENSIONS.md ch.26 -- 100 x 55 stated (high); thickness, corner
 radius, border, recess and screw inset are photo-plausible reads off the p.71
 macro (low). The engraving geometry IS the traced photo (the DXF).
 
+Mounting (2026-09-02 re-derive off ch26 p.71 ``page001_img01``): FOUR brass
+slotted round-head screws, one per corner, heads riding the pinstripe corners
+in the border band. They are the shared #4-40 brass ``fillister-screw``
+(``_fastener_catalog``; Ø2.0 modelled shank, Ø5.5 head), so the plate carries
+four #4 CLOSE clearance holes (wizard Ø3.048, the build_guide_lock idiom) and
+the harmonic base carries four blind #4-40 taps under them. The plate envelope,
+the screw stations and the mount transform live in ``nameplate_spec`` (pure
+data) so ``build_harmonic_base`` and ``build_frame_assembly`` derive the tap
+positions and the screw drops from ONE source without importing this build.
+
 Layout: width along +X, height along +Y from the origin corner, decorated face on
 the Front plane at z = 0. The body extrudes in -Z (``reverse_direction``) so the
 decorated z=0 face is the EXPOSED FRONT face (outward normal +Z): the traced
@@ -80,15 +90,22 @@ from _features import (
     sketch_rounded_rect,
 )
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
+from nameplate_spec import (
+    PLATE_HEIGHT,
+    PLATE_THICKNESS,
+    PLATE_WIDTH,
+    SCREW_INSET,
+    SCREW_XY,
+)
 
 import _telemetry
 
 PART_NAME = "nameplate"
 MATERIAL = "Brass"  # bright cast/engraved brass plate (see _common.apply_material)
 
-PLATE_WIDTH = 100.0  # DIMENSIONS.md ch26: stated 100 mm (p.70, high)
-PLATE_HEIGHT = 55.0  # DIMENSIONS.md ch26: stated 55 mm (p.70, high)
-PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
+# PLATE_WIDTH / PLATE_HEIGHT / PLATE_THICKNESS / SCREW_INSET / SCREW_XY live in
+# nameplate_spec (the pure-data contract the base taps and the frame screws
+# derive from); re-exported here for the equation knobs and the sketches.
 CORNER_R = 3.0  # rounded plate corners (p.71, low)
 
 # Raised border framing the recessed field; the imported pinstripe rides the border.
@@ -130,15 +147,15 @@ ENGRAVING_POSITION = (
     ENGRAVING_CENTER[1] - ENGRAVING_SCALE * ENGRAVING_RAW_CENTER[1],
 )
 
-# Four corner mounting screws (the shared brass fillister part), in the border band.
-# screw holes: #2-56 clearance, wizard normal fit O2.591 (was O2.6 artefact)
-SCREW_INSET = 4.5
-SCREW_XY = (
-    (SCREW_INSET, SCREW_INSET),
-    (PLATE_WIDTH - SCREW_INSET, SCREW_INSET),
-    (SCREW_INSET, PLATE_HEIGHT - SCREW_INSET),
-    (PLATE_WIDTH - SCREW_INSET, PLATE_HEIGHT - SCREW_INSET),
-)
+# Four corner mounting screws (the shared #4-40 brass fillister-screw, Ø2.0
+# modelled shank) at SCREW_XY in the border band: #4 clearance, CLOSE fit
+# (Ø3.048 -- the same HoleSpec build_guide_lock cuts for the same screw;
+# memory/fastener-policy-us-customary). History: the holes were #2-56 normal
+# fit Ø2.591 from a "#2 screw" guess; the 2026-09-02 p.71 re-read sized the
+# heads (~Ø5.5 on the 100 plate) to the catalog #4-40 fillister, whose Ø2.9
+# nominal / Ø2.845 major would not pass a Ø2.591 hole.
+SCREW_HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
+SCREW_HOLE_DIA = CLEARANCE_MM[(SCREW_HOLE_SPEC.size, SCREW_HOLE_SPEC.fit)]  # 3.048
 
 
 async def build(adapter) -> dict[str, str]:
@@ -245,9 +262,9 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"field recess removed {removed:.1f}, expected {v_field:.1f}")
 
     # Four corner screw through-holes: ONE native Hole Wizard clearance
-    # feature (4 placement points) for the #2-56 brass fillister mounting
-    # screws -- normal fit Ø2.591, the wizard-table twin of the old Ø2.6
-    # artefact dim (memory/fastener-policy-us-customary). Cut BEFORE the
+    # feature (4 placement points) for the #4-40 brass fillister mounting
+    # screws -- #4 CLOSE fit Ø3.048 (SCREW_HOLE_SPEC; memory/fastener-policy-
+    # us-customary). Cut BEFORE the
     # engraving import: wizard_holes locates its face by enumerating every
     # face of the body (COM roundtrips per face), and the engraving cut
     # explodes the body into thousands of groove wall/floor faces -- placing
@@ -264,19 +281,19 @@ async def build(adapter) -> dict[str, str]:
     )
     screw_cut = wizard_holes(
         adapter,
-        HoleSpec("clearance", "#2"),
+        SCREW_HOLE_SPEC,
         [[x, y, -PLATE_THICKNESS] for x, y in SCREW_XY],
         (0.0, 0.0, -1.0),
-        "mounting screw holes (#2 clearance)",
+        "mounting screw holes (#4 clearance, close)",
         name="ScrewHoles",
+        expect_dia_mm=SCREW_HOLE_DIA,
         placement_dims=[
             ((f"S{n}X", dx), (f"S{n}Z", dy))
             for n, (dx, dy) in enumerate(screw_drives)
         ],
     )
     drive_jobs += screw_cut.placement_drive_jobs
-    screw_dia = CLEARANCE_MM[("#2", "normal")]
-    v_holes = len(SCREW_XY) * math.pi * (screw_dia / 2.0) ** 2 * PLATE_THICKNESS
+    v_holes = len(SCREW_XY) * math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * PLATE_THICKNESS
     removed = float(pre.data.volume) - float((await adapter.get_mass_properties()).data.volume)
     _telemetry.info(f"screw holes removed {removed:.1f} mm^3 (analytic {v_holes:.1f})")
     if abs(removed - v_holes) > 0.02 * v_holes:

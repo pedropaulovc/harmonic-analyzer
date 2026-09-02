@@ -120,6 +120,37 @@ def test_engraving_dxf_coordinate_extent():
     assert _pct(h, GOLDEN_COORD_HEIGHT) >= 99.0, h
 
 
+def test_mount_contract_puts_the_plate_flat_on_the_deck():
+    """nameplate_spec (pure data): the four corner screw stations, the mount
+    transform, and their machine-frame image -- the base's tapped seats and the
+    frame's screw drops derive from these, so pin them (2026-09-02 ch26 p.71
+    re-derive: four corner screws)."""
+    import nameplate_spec as spec
+
+    assert (spec.PLATE_WIDTH, spec.PLATE_HEIGHT, spec.PLATE_THICKNESS) == (100.0, 55.0, 1.5)
+    assert len(spec.SCREW_XY) == 4
+    inset = spec.SCREW_INSET
+    assert set(spec.SCREW_XY) == {
+        (inset, inset),
+        (100.0 - inset, inset),
+        (inset, 55.0 - inset),
+        (100.0 - inset, 55.0 - inset),
+    }
+    # Rows: local +X -> -Z (text runs front-back), +Y -> -X, +Z (decorated
+    # front) -> +Y (face up).
+    assert spec.MOUNT_ROWS == [[0.0, 0.0, -1.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+    assert spec.MOUNT_NORMAL == (0.0, 1.0, 0.0)
+    assert spec.MOUNT_FRONT_Y == 52.3
+    assert abs(spec.MOUNT_BACK_Y - 50.8) < 1e-12  # the base deck (STACK_HEIGHT)
+    # Plate-local (x, y) -> machine (214.25 - y, 50 - x).
+    assert spec.mount_point((0.0, 0.0, 0.0)) == (214.25, 52.3, 50.0)
+    assert spec.mount_point((100.0, 55.0, -1.5)) == (159.25, 50.8, -50.0)
+    assert set(spec.MOUNT_HOLE_XZ) == {
+        (209.75, 45.5), (209.75, -45.5), (163.75, 45.5), (163.75, -45.5),
+    }
+    assert len(spec.MOUNT_HOLE_XZ) == 4
+
+
 if __name__ == "__main__":
     txt = _read()
     seg = _entities_section(txt)

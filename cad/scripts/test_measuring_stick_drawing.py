@@ -35,7 +35,14 @@ def test_notes_cover_the_scale_and_graduations() -> None:
     assert "NONCUMULATIVE" in notes
     assert "STROKE WIDTH 0.30" in notes
     assert "ASME Y14.2 VERTICAL GOTHIC" in notes
-    assert "DEPTH 0.20 +/-0.05" in notes
+    # Numeral note tracks the build (build_measuring_stick.NUMERAL_*): height,
+    # depth (== TICK_DEPTH), tick gap and the 90-degree turn read off the photo.
+    assert f"ENGRAVE {part.NUMERAL_HEIGHT_MM:.2f} +/-0.10 HIGH" in notes
+    assert f"DEPTH {part.TICK_DEPTH:.2f} +/-0.05" in notes
+    assert f"START {part.NUMERAL_GAP_MM:.2f} +/-0.10 PAST THEIR" in notes
+    assert part.NUMERAL_ROTATION_DEG == 90 and "TURNED\n   90 DEG" in notes
+    tick_side_end = part.TICK_LENGTH + part.NUMERAL_GAP_MM  # from the edge the ticks hang from
+    assert f"{tick_side_end:.2f} +/-0.10 ABOVE THE BOTTOM EDGE SHOWN" in notes
     assert "CDA" not in notes
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")

@@ -21,17 +21,18 @@ The M4 fluting (16 grooves, photogrammetry estimate) is retired: every
 ch30 plate shows plain reflective columns, and the groove edges also
 painted the columns black at capture scale.
 
-Length: 1014.0 OVERALL (dome apex included) so the column top lands at
-1064.8 = base top 50.8 + 1014.0 -- a +28.6 capped stub above the
-top-frame casting's top face 1036.2 (2026-08-02 top-frame rederive).
-The ch30 stub reads (+28 above the rail top) + the new user directive
-SUPERSEDE the old "no stub above (user-confirmed)" M6.8 reading, which
-belonged to the retired 1040.7 ring-top stack; the ch. 6 "107 cm"
-remains the overall frame height, not the bare column.
+Length: 994.0 OVERALL (dome apex included) so the column top lands at
+1044.8 = base top 50.8 + 994.0 -- a short capped stub 8.6 above the
+top-frame casting's rail top 1036.2 and 4.1 above its corner-boss tops
+1040.7. The 2026-09-02 user re-read of the ch30 p002 plate shows the
+columns ending JUST above the corner bosses, superseding the 2026-08-02
++28.6 stub (1014.0 / top 1064.8) and, before it, the M6.8 "no stub above"
+reading; the ch. 6 "107 cm" remains the overall frame height, not the
+bare column.
 
 Cap: the polished turned cap pressed into each tube mouth (top.png /
 ch30 p002 crops) is modeled INTEGRAL: a full-width spherical dome --
-base Ø25.4 at the tube mouth y 1010.7, rise 3.3 to the 1014.0 apex,
+base Ø25.4 at the tube mouth y 990.7, rise 3.3 to the 994.0 apex,
 SR 26.09 from the chord -- revolved about the column axis (the
 magnifying-lever dome-arc convention). Plain capped stub: NO nut and
 NO thread above the casting (user-corrected).
@@ -104,7 +105,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # Tube nominals (OUTER_DIA / WALL_THICKNESS / INNER_DIA / COLUMN_LENGTH /
 # CAP_*) live in tube_frame_spec -- the COM-free contract the drawing shares.
 # Ø25.4 OD rederived from the ch30 8-views (Ø23.8±1.0 -> 1 in stock); 0.12 in
-# wall -> Ø19.304 bore; 1014.0 overall = 1010.7 tube + 3.3 dome cap,
+# wall -> Ø19.304 bore; 994.0 overall = 990.7 tube + 3.3 dome cap,
 # photo-locked to the top-frame stack (see build docstring).
 
 
@@ -255,7 +256,7 @@ async def build(adapter) -> dict[str, str]:
     # Verify the photo-locked OVERALL column height (tube + dome cap) via the
     # solid bounding box (the end faces were screen-projected and collapsed).
     await bbox_extent_check(
-        adapter, "column length (capped stub top 1064.8)", "y", COLUMN_LENGTH
+        adapter, "column length (capped stub top 1044.8)", "y", COLUMN_LENGTH
     )
 
     await report_mass_properties(adapter)

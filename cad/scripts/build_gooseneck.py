@@ -3,12 +3,15 @@ r"""Reproduction script: gooseneck post (book ch. 19, pp. 44-45).
 The tall chrome tube that "towers above the machine" and anchors the top
 of the counter spring: a vertical O16 tube rising from the east column
 line, a 90-DEGREE bend (R 51) at the top, and a horizontal arm reaching
-west over the summing-lever boss, carrying the spring pin under its end.
-(M6.8 ch30 8-view pass: 90 degrees, not the earlier 180 candy-cane --
-user-confirmed against the ch. 19 photos; the ch30 plates crop below the
-bend.) Tension is set by sliding the tube through the top-frame casting's
-rail-hub bore, gripped by its 1/4-20 square-head set screw
-(build_top_frame).
+west over the summing-lever boss, carrying the spring's top eye on a
+SLOTTED SCREW driven axially into the arm's flat end face (ch. 19 p. 45
+close-up, page001_img02: tube horizontal, round slotted head at its end,
+the eye encircling the shank between head and end face, the spring
+hanging straight down). (M6.8 ch30 8-view pass: 90 degrees, not the
+earlier 180 candy-cane -- user-confirmed against the ch. 19 photos; the
+ch30 plates crop below the bend.) Tension is set by sliding the tube
+through the top-frame casting's rail-hub bore, gripped by its 1/4-20
+square-head set screw (build_top_frame).
 
 Geometry: vertical leg at machine x 197 (east column line), y 880 -- the
 post passes through a clearance bore in the east rail (build_top_frame
@@ -16,22 +19,43 @@ gooseneck bore) and drops ~120 below the rail underside (999.7), so the
 support extends well below the top plate. The free lower tip is visible,
 clear of the columns, in the ch. 7 back-left three-quarter view
 (page001_img17): tip at machine 880 by the frame-height vertical scale,
-cross-checked by the post's Ø16 silhouette. Up to the bend start 1335;
-quarter bend to the horizontal arm at centreline
-y 1386, running west to its end face at machine x 85; the spring lug
-hangs under the arm end so the pin stays at machine (95, 1373) --
-directly above the summing-lever boss hook, counter spring hanging
-plumb, loop top 1376.9 clearing the arm underside 1378. The book's tip
-"slotted screw" is modeled as a lug + O4 X-pin for the spring's top
-loop to encircle (simplification).
+cross-checked by the post's Ø16 silhouette. Up to the bend start 1322.3;
+quarter bend to the horizontal arm at centreline y 1373.3, running west
+to its end face at machine x 101.75. The end screw runs ON the tube axis,
+so the arm height IS the spring hang: the eye centre stays at machine
+(95, 1370.7) -- plumb above the summing-lever boss hook -- and the
+O3.6 shank (radius 1.8) hangs the eye's inner top (radius 4.45) with a
+0.05 air gap, which puts the axis at 1373.3 (the 2026-09-02 photo
+re-derive: the old 1386 only ever cleared a lug under the arm). Along the
+arm the eye sits 6.75 in from the end face on the 8.0 exposed shank --
+1.25 from the head shoulder, the wire band (0.9 half-width) 0.35 clear of
+the head and 5.85 clear of the end face -- because the coil's O12.5 body
+hangs under the eye and its top (1367.1) rises above the tube underside
+(1365.3): the coil clears the end face by 0.5 in x instead (the photo
+shows exactly this: the eye pressed up against the head, the coil
+partly under the tube end). ``build_summing_assembly`` proves both
+hangs analytically.
+
+The screw is modelled INTEGRAL to the post: this repo models small
+captive fasteners as part of their carrier when they never come apart in
+use, and this one is set once and carries the spring for life. Its
+modelled shank is the EXPOSED length (end face to head underside); the
+engaged thread sits inside a 6.0-deep end plug that caps the tube's O12
+bore (the end face is otherwise a 2 mm annulus with nothing on the axis
+for the shank to merge into), so plug + shank + head are ONE stepped
+revolve about the tube axis. The head slot is omitted (a 0.8 x 0.8 slot
+across the head face adds nothing the notes don't carry).
 
 Layout: part origin at the vertical leg's MID-height of the OLD 180 lay
-(machine (197, 1210, 0), placement preserved): leg y -330..+125, bend
-arc centre (-51, +125), arm centreline y +176 from x -51 to -112, lug
-x -109..-103.5 rising y 159..169.5 into the arm's 2 mm wall (underside
-min 168), pin along X at (y 163, z 0). The tube is HOLLOW -- O16 x 2.0
-wall, matching the drawing's tube stock -- so every profile is an
-annulus. Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
+(machine (197, 1210, 0), placement preserved): leg y -330..+112.3, bend
+arc centre (-51, +112.3), arm centreline y +163.3 from x -51 to -95.25,
+end plug x -95.25..-89.25 (mid-wall O14, so it overlaps the wall rather
+than sharing the bore face), shank x -95.25..-103.25 (O3.6), head
+x -103.25..-105.25 (O10 -- wider than the eye's 8.9 inner diameter, so it
+retains a slack eye; its underside at y 158.3 clears the coil's top wire
+at 158.0). The tube is HOLLOW -- O16 x 2.0 wall, matching
+the drawing's tube stock -- so every tube profile is an annulus.
+Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
 Run (SolidWorks already open)::
 
@@ -78,13 +102,28 @@ from gooseneck_spec import (
     ISOMETRIC_VIEW_NOTE,
 )
 
+# Geometry nominals the summing assembly reads live in gooseneck_geom (the
+# prose-free module assemblies import); re-imported here so the build and the
+# assembly's hang proof can never drift.
+from gooseneck_geom import (  # noqa: E402
+    ARM_END_X,
+    ARM_Y,
+    PLUG_T,
+    SCREW_HEAD_DIA,
+    SCREW_HEAD_T,
+    SCREW_SHANK_DIA,
+    SCREW_SHANK_LEN,
+    TUBE_DIA,
+    WALL_T,
+)
+
 PART_NAME = "gooseneck"
 MATERIAL = "Plain Carbon Steel"
 
-TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
-WALL_T = 2.0  # tube wall: the drawing ships O16 x 2.0 WALL tube stock, so the
-# native CAD is the same hollow tube, not solid bar (codex review #361)
-LEG_TOP = 125.0  # bend start = machine 1335 (derived: arm y - bend R)
+BEND_R = 51.0  # 90-degree bend (med)
+LEG_TOP = round(ARM_Y - BEND_R, 3)  # 112.3: bend start = machine 1322.3
+# (derived: the arm centreline is the spring hang, see gooseneck_geom.ARM_Y;
+# rounded so the equation-manager literal reads 112.3mm, not float noise)
 LEG_BOTTOM = -330.0  # leg bottom = machine 880: the post passes through a
 # clearance bore in the east rail (build_top_frame gooseneck bore) and drops
 # ~120 below the rail underside (999.7). Measured from the ch. 7 back-left
@@ -94,26 +133,19 @@ LEG_BOTTOM = -330.0  # leg bottom = machine 880: the post passes through a
 # 1.58 mm/px), cross-checked by the post's own Ø16 silhouette (10 px). Was
 # -169 (machine 1041, at the rail top), then -250 (a front-view guess while
 # the lower end was occluded by the coincident east column)
-BEND_R = 51.0  # 90-degree bend (med)
-ARM_Y = LEG_TOP + BEND_R  # 176: arm centreline = machine 1386; underside
-# 168 = machine 1378, 1.1 above the spring loop top 1376.9
-ARM_END_X = -112.0  # arm end face = machine 85: covers the lug with margin
-ARM_RUN = -ARM_END_X - BEND_R  # 61: straight run after the bend exit
-LUG_X = (-109.0, -103.5)  # lug plate, machine x 88..93.5 (derived: clear
-# of the spring loop's wire band x 94.1..95.9)
-LUG_Y = (159.0, 169.5)  # rises 1.5 past the arm underside (168) so the prism
-# merges into the round tube (a curved face needs real overlap) while staying
-# inside the 2 mm wall band (outer 168.0..168.14 over the lug's z, inner
-# 170.0..170.19) -- a taller lug would poke through into the hollow bore
-LUG_HALF_Z = 1.5
-PIN_DIA = 4.0  # spring-loop pin (low)
-PIN_Y = 163.0  # machine 1373: loop centre 1370.6 + (loop mean r 5.35
-# - wire r 0.9 - pin r 2.0) hanging contact (derived)
-PIN_X = (-109.0, -98.0)  # cantilevers past the loop band to machine x 99
+ARM_RUN = -ARM_END_X - BEND_R  # 44.25: straight run after the bend exit
 
 TUBE_R = TUBE_DIA / 2.0
 TUBE_IR = TUBE_R - WALL_T  # hollow bore radius (6.0)
 _RING_AREA = math.pi * (TUBE_R**2 - TUBE_IR**2)  # annular wall cross-section
+PLUG_DIA = TUBE_DIA - WALL_T  # 14: mid-wall, so the plug OVERLAPS the wall by
+# 1.0 instead of sharing the bore's cylindrical face (a curved face needs real
+# overlap to merge; the volume it adds is only the bore fill)
+PLUG_R = PLUG_DIA / 2.0
+SHANK_R = SCREW_SHANK_DIA / 2.0
+HEAD_R = SCREW_HEAD_DIA / 2.0
+HEAD_X = ARM_END_X - SCREW_SHANK_LEN  # -103.25: head underside (shoulder)
+SCREW_TIP_X = HEAD_X - SCREW_HEAD_T  # -105.25: head outer face
 
 
 async def _volume(adapter) -> float:
@@ -137,9 +169,9 @@ async def build(adapter) -> dict[str, str]:
     # 25.4x). Signed coordinates keep their sign in the global; the UNSIGNED
     # distance dims they drive negate them so the equation evaluates positive
     # (a centre/anchor dim at a negative coordinate displays as the magnitude).
-    # Derived spans (ArmY/ArmRun) reference other globals as equation strings.
-    # LegBottom and the LugY/extrude depths are feature parameters (start-offset
-    # extrudes), NOT sketch dims, so they are editable knobs that nothing drives.
+    # Derived spans (ArmY/ArmRun/PlugDia) reference other globals as equation
+    # strings. LegBottom is a feature parameter (start-offset extrude), NOT a
+    # sketch dim, so it is an editable knob that nothing drives.
     await set_global(adapter, "TubeDia", f"{TUBE_DIA}mm")
     await set_global(adapter, "WallT", f"{WALL_T}mm")
     await set_global(adapter, "LegTop", f"{LEG_TOP}mm")
@@ -148,15 +180,12 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmEndX", f"{ARM_END_X}mm")
     await set_global(adapter, "ArmY", '"LegTop" + "BendR"')
     await set_global(adapter, "ArmRun", '-"ArmEndX" - "BendR"')
-    await set_global(adapter, "LugX0", f"{LUG_X[0]}mm")
-    await set_global(adapter, "LugX1", f"{LUG_X[1]}mm")
-    await set_global(adapter, "LugY0", f"{LUG_Y[0]}mm")
-    await set_global(adapter, "LugY1", f"{LUG_Y[1]}mm")
-    await set_global(adapter, "LugHalfZ", f"{LUG_HALF_Z}mm")
-    await set_global(adapter, "PinDia", f"{PIN_DIA}mm")
-    await set_global(adapter, "PinY", f"{PIN_Y}mm")
-    await set_global(adapter, "PinX0", f"{PIN_X[0]}mm")
-    await set_global(adapter, "PinX1", f"{PIN_X[1]}mm")
+    await set_global(adapter, "PlugT", f"{PLUG_T}mm")
+    await set_global(adapter, "PlugDia", '"TubeDia" - "WallT"')
+    await set_global(adapter, "ScrewShankDia", f"{SCREW_SHANK_DIA}mm")
+    await set_global(adapter, "ScrewShankLen", f"{SCREW_SHANK_LEN}mm")
+    await set_global(adapter, "ScrewHeadDia", f"{SCREW_HEAD_DIA}mm")
+    await set_global(adapter, "ScrewHeadT", f"{SCREW_HEAD_T}mm")
 
     # Per-sketch dim names + drive equations are declared inline at each define_*
     # / record call; their drive jobs collect here and apply in one deferred batch
@@ -332,95 +361,87 @@ async def build(adapter) -> dict[str, str]:
     # the same absolute B-rep slack is ~2.3x larger relative to the expectation.
     if abs(vol - expected) > 0.02 * expected:
         raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
-    expected = vol  # rebase: keep the sweep's B-rep slack out of the lug delta
+    expected = vol  # rebase: keep the sweep's B-rep slack out of the screw delta
 
-    # 3. Pin lug rising into the arm underside. NOT origin-centred (offset in X),
-    # so it stays a rectilinear chain. Emission order = per-segment distance dims
-    # in line order skipping the last of each direction (closure supplies it):
-    # the width (line0, |X1-X0|=5.5) then the depth (line1, 2*half-Z=3.0), THEN
-    # the anchor dims at vertex 0 (LUG_X[0], -LUG_HALF_Z) -- both non-zero, so X
-    # then Z, driven by their magnitudes (vertex is at negative X and -Z).
-    lug_dims = SketchDims()
-    check("create_sketch lug", await adapter.create_sketch("Top"))
-    lug_rect = [
-        (LUG_X[0], -LUG_HALF_Z),
-        (LUG_X[1], -LUG_HALF_Z),
-        (LUG_X[1], LUG_HALF_Z),
-        (LUG_X[0], LUG_HALF_Z),
-    ]
-    lug = await add_line_chain(adapter, lug_rect)
-    await define_rectilinear_chain(
-        adapter, lug, lug_rect, label="lug", dims=lug_dims,
-        names=["LugWidth", "LugDepth", "LugAnchorX", "LugAnchorZ"],
-        drives=['"LugX1" - "LugX0"', '2 * "LugHalfZ"', '-"LugX0"', '"LugHalfZ"'],
-    )
-    await ensure_fully_defined(adapter, "lug sketch")
-    check("exit_sketch lug", await adapter.exit_sketch())
-    name_last_feature(adapter, "LugProfile")
-    drive_jobs += lug_dims.apply(adapter, "LugProfile")
-    extrude_at_offset(adapter, LUG_Y[1] - LUG_Y[0], LUG_Y[0])
-    name_last_feature(adapter, "Lug")
-    # Added material = the prism OUTSIDE the tube: height to the tube
-    # underside (~168 + z^2/16 over z +-1.5) ~ 9.05 mean, vs the 9-high
-    # solid reference -> ratio 1.005, inside the (0.95, 1.01) window. The
-    # prism's top (169.5) is buried in the 2 mm wall band, so nothing lands
-    # inside the hollow bore and the overlap adds no volume.
-    v_lug = (LUG_X[1] - LUG_X[0]) * 2.0 * LUG_HALF_Z * 9.0
-    before = expected
-    vol = await _volume(adapter)
-    added = vol - before
-    _telemetry.info(f"volume after lug: {vol:.1f} mm^3 (+{added:.1f}, solid {v_lug:.1f})")
-    if not (0.95 * v_lug <= added <= 1.01 * v_lug):
-        raise RuntimeError(f"lug: added {added:.1f}, expected ~{v_lug:.1f}")
-    expected = vol
-
-    # 4. Spring pin along X (revolved in the Front plane -- no Right-plane
-    # axis-mapping ambiguity). The centerline shares the profile's bottom corners
-    # (exact-coordinate merge), carries no dim of its own, so the four profile
-    # dims are the whole record. Emission order = width (line0, |X1-X0|=11), then
-    # depth (line1, PIN_DIA/2=2), THEN anchor at vertex 0 (PIN_X[0], PIN_Y): X is
-    # at negative X (driven by its magnitude) and Y is positive.
-    pin_dims = SketchDims()
-    check("create_sketch pin", await adapter.create_sketch("Front"))
+    # 3. End plug + spring screw: ONE stepped half-profile revolved 360 about
+    # the tube axis (a centreline along X at y = ARM_Y in the Front plane -- no
+    # Right-plane axis-mapping ambiguity). Read from the tube inward-out: the
+    # plug (mid-wall radius, PLUG_T deep INTO the arm from the end face), the
+    # exposed shank (SCREW_SHANK_LEN beyond the end face, toward more negative
+    # x), then the head. The centreline shares the profile's on-axis corners
+    # (exact-coordinate merge, the pin pattern proven live) and carries no dim
+    # of its own. Emission order = per-segment distance dims in line order,
+    # skipping the LAST segment of each direction (closure supplies it): the
+    # plug radius (line0, V), plug depth (line1, H), plug-to-shank step
+    # (line2, V), shank length (line3, H), shank-to-head step (line4, V), head
+    # thickness (line5, H); line6 (V, head radius) and line7 (H, on the axis)
+    # are the skipped closers. THEN the anchor at vertex 0 (the plug's inner
+    # on-axis corner at (ARM_END_X + PLUG_T, ARM_Y)) -- both non-zero, X then
+    # Y, the X driven by its magnitude (the vertex is at negative x).
+    y_axis = ARM_Y
+    y_plug = ARM_Y + PLUG_R
+    y_shank = ARM_Y + SHANK_R
+    y_head = ARM_Y + HEAD_R
+    x_plug_in = ARM_END_X + PLUG_T
+    screw_dims = SketchDims()
+    check("create_sketch end screw", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check(
-        "pin centerline",
-        await adapter.add_centerline(PIN_X[0], PIN_Y, PIN_X[1], PIN_Y),
+        "end screw centerline",
+        await adapter.add_centerline(SCREW_TIP_X, y_axis, x_plug_in, y_axis),
     )
-    pin_rect = [
-        (PIN_X[0], PIN_Y),
-        (PIN_X[1], PIN_Y),
-        (PIN_X[1], PIN_Y + PIN_DIA / 2.0),
-        (PIN_X[0], PIN_Y + PIN_DIA / 2.0),
+    screw_profile = [
+        (x_plug_in, y_axis),
+        (x_plug_in, y_plug),
+        (ARM_END_X, y_plug),
+        (ARM_END_X, y_shank),
+        (HEAD_X, y_shank),
+        (HEAD_X, y_head),
+        (SCREW_TIP_X, y_head),
+        (SCREW_TIP_X, y_axis),
     ]
-    profile = await add_line_chain(adapter, pin_rect)
+    profile = await add_line_chain(adapter, screw_profile)
     set_sketch_direct_db(adapter, False)
-    # The centerline shares the profile's bottom corners (exact-coordinate
-    # merge, proven live), so the dimensioned profile defines it too.
     await define_rectilinear_chain(
-        adapter, profile, pin_rect, label="pin", dims=pin_dims,
-        names=["PinLen", "PinRadius", "PinAnchorX", "PinAnchorY"],
-        drives=['"PinX1" - "PinX0"', '"PinDia" / 2', '-"PinX0"', '"PinY"'],
+        adapter, profile, screw_profile, label="end screw", dims=screw_dims,
+        names=[
+            "PlugRadius", "PlugDepth", "PlugShankStep", "ShankLen",
+            "ShankHeadStep", "HeadThick", "ScrewAnchorX", "ScrewAnchorY",
+        ],
+        drives=[
+            '"PlugDia" / 2',
+            '"PlugT"',
+            '"PlugDia" / 2 - "ScrewShankDia" / 2',
+            '"ScrewShankLen"',
+            '"ScrewHeadDia" / 2 - "ScrewShankDia" / 2',
+            '"ScrewHeadT"',
+            '-"ArmEndX" - "PlugT"',
+            '"ArmY"',
+        ],
     )
-    await ensure_fully_defined(adapter, "pin sketch")
-    check("exit_sketch pin", await adapter.exit_sketch())
-    name_last_feature(adapter, "PinProfile")
-    drive_jobs += pin_dims.apply(adapter, "PinProfile")
-    check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
-    name_last_feature(adapter, "Pin")
-    pin_len = PIN_X[1] - PIN_X[0]
-    v_pin = math.pi * (PIN_DIA / 2.0) ** 2 * pin_len
-    # The pin passes through the lug: subtract the lens-clipped overlap.
-    r, h = PIN_DIA / 2.0, LUG_HALF_Z
-    a_clip = 2.0 * (h * math.sqrt(r * r - h * h) + r * r * math.asin(h / r))
-    v_overlap = a_clip * (LUG_X[1] - LUG_X[0])
+    await ensure_fully_defined(adapter, "end screw sketch")
+    check("exit_sketch end screw", await adapter.exit_sketch())
+    name_last_feature(adapter, "EndScrewProfile")
+    drive_jobs += screw_dims.apply(adapter, "EndScrewProfile")
+    check("revolve end screw", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "EndScrew")
+    # Added material: the plug fills only the BORE (its mid-wall overlap band
+    # r 6..7 is already tube wall), then the solid shank and head outside the
+    # end face. The plug/end-face boundary is coplanar with the tube's annular
+    # end face over r 6..7 -- a planar coincidence the union merges cleanly.
+    v_plug = math.pi * TUBE_IR**2 * PLUG_T
+    v_shank = math.pi * SHANK_R**2 * SCREW_SHANK_LEN
+    v_head = math.pi * HEAD_R**2 * SCREW_HEAD_T
+    v_screw = v_plug + v_shank + v_head
     before = expected
     vol = await _volume(adapter)
     added = vol - before
-    v_net = v_pin - v_overlap
-    _telemetry.info(f"volume after pin: {vol:.1f} mm^3 (+{added:.1f}, net {v_net:.1f})")
-    if not (0.9 * v_net <= added <= 1.1 * v_net):
-        raise RuntimeError(f"pin: added {added:.1f}, expected ~{v_net:.1f}")
+    _telemetry.info(
+        f"volume after end screw: {vol:.1f} mm^3 (+{added:.1f}, analytic {v_screw:.1f}:"
+        f" plug {v_plug:.1f} + shank {v_shank:.1f} + head {v_head:.1f})"
+    )
+    if abs(added - v_screw) > 0.02 * v_screw:
+        raise RuntimeError(f"end screw: added {added:.1f}, expected ~{v_screw:.1f}")
     final_vol = vol
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild

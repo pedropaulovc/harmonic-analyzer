@@ -14,7 +14,7 @@ from __future__ import annotations
 COIL_BODY_LENGTH = 325.3  # INSTALLED coil body length. The ch. 19 read was
 # ~315 at the pre-rederive hang; the top-frame rederive (Cascade A,
 # 2026-08-02) dropped the bottom anchor 10.3 with the summing chain while the
-# gooseneck top loop stayed at 1370.6, so the modeled installed body
+# gooseneck top loop stayed at 1370.7, so the modeled installed body
 # stretched +10.3. The part models the installed hang, as it always has.
 COIL_OD = 12.5  # coil outer diameter
 WIRE_DIA = 1.8  # music-wire diameter

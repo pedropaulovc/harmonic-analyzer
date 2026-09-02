@@ -19,17 +19,19 @@ OUTER_DIA = 1.0 * MM_PER_IN  # 25.4
 OUTER_DIA_BAND = (0.00, -0.05)  # (upper, lower) deviations
 WALL_THICKNESS = 0.12 * MM_PER_IN  # 3.048
 INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS  # 19.304
-COLUMN_LENGTH = 1014.0  # OVERALL, dome apex included: top at machine 1064.8,
-# a +28.6 capped stub above the top-frame casting's top face 1036.2
-# (2026-08-02 top-frame rederive, ch30 stub reads)
+COLUMN_LENGTH = 994.0  # OVERALL, dome apex included: top at machine 1044.8
+# (base top 50.8 + 994.0), a +8.6 capped stub above the top-frame casting's
+# rail top 1036.2 and 4.1 above its corner-boss tops 1040.7 -- the ch30 p002
+# plate shows the columns ending just above the bosses (2026-09-02 user
+# re-read; supersedes the 2026-08-02 +28.6 stub / 1064.8 top)
 COLUMN_LENGTH_TOLERANCE_MM = 0.25
 
 # --- Integral dome cap: the polished turned cap pressed into each column top
 # (top.png / ch30 p002), modeled integral. Full-width spherical cap: base
 # radius OUTER_DIA/2 at the tube mouth, CAP_HEIGHT proud, so the sphere
 # radius follows from the chord: R = (a^2 + h^2) / (2h). ---
-CAP_HEIGHT = 3.3  # cap rise above the tube mouth (y 1061.5 -> 1064.8)
-BODY_LENGTH = COLUMN_LENGTH - CAP_HEIGHT  # 1010.7 straight tube below the cap
+CAP_HEIGHT = 3.3  # cap rise above the tube mouth (y 1041.5 -> 1044.8)
+BODY_LENGTH = COLUMN_LENGTH - CAP_HEIGHT  # 990.7 straight tube below the cap
 CAP_SPHERE_RADIUS = (
     (OUTER_DIA / 2.0) ** 2 + CAP_HEIGHT**2
 ) / (2.0 * CAP_HEIGHT)  # 26.088: SR of the dome

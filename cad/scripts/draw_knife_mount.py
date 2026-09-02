@@ -1,8 +1,10 @@
 r"""Create the curated machinist drawing for the knife-mount bearing block.
 
-A machined brass block (24 wide x ~33.4 tall x 14 deep) with a single Ø16 bore.
-The bore is the knife-edge bearing: the summing-lever trunnion's top vertex rides
-its upper inner wall in line contact.  Every face and the bore are real edges, so
+A machined, heat-treated steel block (24 wide x ~29.4 tall x 14 deep) with a
+single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
+trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
+unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
+and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
 depth added across the right-view section.
 
@@ -128,7 +130,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Knife-Mount Bearing Block Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "knife mount; brass bearing block; knife-edge bore",
+            3: "knife mount; hardened steel bearing block; knife-edge bore",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

@@ -47,11 +47,19 @@ from build_motion_study import (
     _components, _entity_ref, _family, _find_one, _iter_mates, _k_helical,
     _lone_real, _read_member, _sub_model, _suppress_named,
 )
+import gooseneck_geom as _GN
 
 # Part-local points ON each eye hole's circular edge (mm) -> arc_center -> centre.
 CH_LEVER_EYE = [179.8, 0.0, 0.0]       # channel-lever tab hole Ø4.0 @ (177.8,0,0)
 SUM_LEVER_EYE = [39.35, 8.0, -69.05]   # summing-lever plate hole 0 Ø4.5, top face
-GOOSENECK_EYE = [-109.0, 165.0, 0.0]   # gooseneck counter-spring pin end-face
+# gooseneck: the end screw's head-shoulder circular edge (r = head/2 about the
+# tube axis at x = end face - exposed shank) -> arc_center = the shank axis the
+# spring's top eye hangs on (2026-09-02: replaced the lug + cross-pin end face).
+GOOSENECK_EYE = [
+    _GN.ARM_END_X - _GN.SCREW_SHANK_LEN,
+    _GN.ARM_Y + _GN.SCREW_HEAD_DIA / 2.0,
+    0.0,
+]  # [-103.25, 168.3, 0]
 BOSS_HOOK_EYE = [6.5, 16.5, 0.0]       # boss-hook rod end-face circle
 
 # Free length: None = start at assembled length with zero force (no pretension to
