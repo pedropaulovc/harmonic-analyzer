@@ -120,10 +120,14 @@ def _pin_bore_removed() -> float:
     def f(dy: float) -> float:
         y = -PIN_DROP + dy
         chord = 2.0 * math.sqrt(max(r * r - dy * dy, 0.0))
-        surface = max(
-            -math.sqrt(max(R_END**2 - y * y, 0.0)),
-            _cam_relief_right_x(y),
-        )
+        # Edge x at this y: the straight flank between the bores, else the
+        # end-cap arc about the nearer bore centre.
+        if 0.0 <= y <= C2C:
+            edge = -R_END
+        else:
+            off = min(abs(y), abs(y - C2C))
+            edge = -math.sqrt(max(R_END**2 - off * off, 0.0))
+        surface = max(edge, _cam_relief_right_x(y))
         return chord * max(bottom - surface, 0.0)
 
     total = f(-r) + f(r)

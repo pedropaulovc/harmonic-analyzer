@@ -110,6 +110,11 @@ async def build(adapter) -> dict[str, str]:
         ("left-bottom join", f"{left}.end", f"{bottom}.start"),
     ):
         check(label, await adapter.add_sketch_constraint(a, b, "coincident"))
+    # Tangency at the bottom joins pins each flank's x to +-END_R (a vertical
+    # line through a point free on the circle would otherwise leave the
+    # outline one DOF per side); the top joins then follow from the flanks.
+    for label, line, arc in (("right-bottom", right, bottom), ("left-bottom", left, bottom)):
+        check(f"{label} tangent", await adapter.add_sketch_constraint(line, arc, "tangent"))
     check(
         "eye centre on origin",
         await adapter.add_sketch_constraint(f"{bottom}.center", "origin", "coincident"),

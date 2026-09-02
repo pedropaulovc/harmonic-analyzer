@@ -1372,8 +1372,8 @@ if SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0 + 0.25 > SPRING_X - SPR_FOOT_END_L[0]:
     raise AssertionError("spring foot screw head overhangs the foot's free end")
 
 # --- cam engage path (ch. 25 + page001_img01; PR8) ---------------------------
-# Each strap carries a Ø4 follower STUD in a blind west-edge seat FPIN_DROP
-# below the pivot (build_pinion_bracket); it RESTS ON the eccentric cam collar
+# Each strap carries a Ø4 follower STUD in a blind edge seat FPIN_DROP
+# below the pivot (negative = above, 2026-09) (build_pinion_bracket); it RESTS ON the eccentric cam collar
 # (build_pinion_cam) pinned to the lift rod in the reclosed WEST bore
 # the pivot shaft in the blocks' reclosed west bores. Turning the lever spins rod +
 # collars as one; the rising OD lifts the pin -- an upward push ~15 west of
@@ -1532,7 +1532,13 @@ if STRAP_CAM_RELIEF_R < _RELIEF_REQUIRED_R:
         f"bracket cam relief R{STRAP_CAM_RELIEF_R:.3f} does not cover "
         f"R{_RELIEF_REQUIRED_R:.3f} moving envelope"
     )
-_PIN_SEAT_SURFACE_X = -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
+# Seat mouth: on the straight flank when the stud sits between the two bores
+# (0 <= -FPIN_DROP <= C2C), else on the end cap arc.
+_PIN_SEAT_SURFACE_X = (
+    -STRAP_R_END
+    if 0.0 <= -FPIN_DROP <= STRAP_C2C
+    else -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
+)
 _PIN_SEAT_BOTTOM_X = -(STRAP_R_END - FPIN_SEAT)
 _PIN_SEAT_OPEN_X = _PIN_SEAT_SURFACE_X
 for _cx, _cy in (STRAP_CAM_RELIEF_PARK, STRAP_CAM_RELIEF_ENGAGED):

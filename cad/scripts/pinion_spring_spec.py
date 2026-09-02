@@ -3,7 +3,7 @@ its manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  The pinion return spring is NOT a coil
 spring: it is a bent BRASS LEAF -- a 0.8 x 4.0 strip formed as a flat screw-down
-foot, an R2 bend up to a blade leaning 49.86 deg off vertical, then a
+foot, an R2 bend up to a blade leaning BLADE_TILT_DEG off vertical, then a
 subtle R1.5 kink (~20 deg back) to a short free flat.  The nominals drive the
 part's named equation globals AND the drawing's coordinate math; the marked-
 dimension map keeps the part marks and drawing keeps in lockstep

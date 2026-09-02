@@ -12,19 +12,19 @@ from _holes import HoleSpec, blind_cut_dia_mm
 
 THICK = 0.8
 WIDTH = 4.0
-FOOT_LEN = 25.4  # 1 in; keeps the screw-down foot clear of the fixed rocker casting
+FOOT_LEN = 28.0  # foot runs under the lift rod; its screw head clears the rod flank
 R_BEND = 2.0
 R_KINK = 1.5
 KINK_DEG = 20.0
 FLAT_LEN = 2.0
-BLADE_TILT_DEG = 49.86395995847213
+BLADE_TILT_DEG = 8.138574451932667  # = the parked strap lean (2026-09: near-vertical)
 
 # The spring part owns a convenient local frame; the assembly translates this
 # local pivot onto the live strap pivot.  These are not machine coordinates.
 PIVOT_LX = -7.88
 PIVOT_LY = 12.0
-AXIS_OFFSET = 10.1
-KINK_T = 32.0
+AXIS_OFFSET = 8.55  # strap half-width 7.5 + blade 0.8 + 0.25 air
+KINK_T = 18.0  # crest below the arbor cap; stays 0.9 clear of the drum tips
 FOOT_Y = 0.8
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
