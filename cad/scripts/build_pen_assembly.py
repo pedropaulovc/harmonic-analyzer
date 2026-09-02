@@ -201,8 +201,8 @@ MARKER_ROT = euler_from_rows(MARKER_ROWS)
 FRAME_TOP_GAP = 0.1
 FRAME_ROD_GAP = 1.0
 FRAME_X_CENTER_LOCAL = ROD_BORE_LOCAL[0] + ROD_SECTION / 2.0 + FRAME_ROD_GAP + FRAME_DEPTH / 2.0
-assert OUTER_WIDTH - 2 * RAIL_SIDE >= BLOCK_DEPTH + 2.0, "frame window must pass the block"
-assert FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0 < BLOCK_LENGTH, "frame off the block end"
+assert OUTER_WIDTH - 2 * RAIL_SIDE >= BLOCK_DEPTH + 2.0, "stirrup window must pass the block"
+assert FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0 < BLOCK_LENGTH, "stirrup off the block end"
 _FRAME_ORIGIN_LOCAL = (
     FRAME_X_CENTER_LOCAL + FRAME_DEPTH / 2.0,  # frame z 0 is its rear face
     BLOCK_HEIGHT + FRAME_TOP_GAP + RAIL_END - OUTER_HEIGHT,  # bottom outer face
@@ -222,7 +222,7 @@ SET_SCREW_POS = _block_to_machine(
     (FRAME_X_CENTER_LOCAL, _SCREW_TIP_LOCAL_Y - KNOB_LENGTH - SHANK_LEN, BLOCK_DEPTH / 2.0)
 )
 assert _SCREW_TIP_LOCAL_Y - KNOB_LENGTH - SHANK_LEN + KNOB_LENGTH < _FRAME_ORIGIN_LOCAL[1], (
-    "thumb-screw knob must stand below the frame's bottom rail"
+    "the knob must stand below the stirrup's bottom rail"
 )
 
 # --- amplification wire 2 (rim -> pen rod) -----------------------------------

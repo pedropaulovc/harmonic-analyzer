@@ -76,10 +76,12 @@ def test_notes_cover_the_top_plate_reveal_and_seats() -> None:
     assert "SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX" in notes
     assert "PROCESS DATA" not in notes
     assert "A1/B1/C1-C3/D1-D4 ARE BLIND TAPPED" in notes
-    assert "MASK DATUM A/B/C FACES, ALL BORES/THREADS" in notes
-    assert "PAD TOP; COAT PAD SIDES AND ROOTS" in notes
+    assert "MASK DATUM A/B/C FACES AND ALL BORES/THREADS" in notes
+    assert "COAT PAD SIDES, ROOTS AND RIM" in notes
+    assert "DECK INSIDE THE RIM: BLACK" in notes
     assert "VERTICAL PLAN CORNERS C3.18 X 45 DEG BOTH PLATES" in notes
-    assert "EXPOSED TOP RIMS" in notes
+    assert "FLANGE TOP RIM" in notes
+    assert "RAISED RIM 7.00 WIDE X 2.50 HIGH" in notes
     assert "AND UNDERSIDE RIM C1.59 X 45 DEG" in notes
     assert "A1-A4" not in notes
     assert "FOUR DIA 13.00 THRU / DIA 23.00 X 6.50 DEEP C'BORES" in notes

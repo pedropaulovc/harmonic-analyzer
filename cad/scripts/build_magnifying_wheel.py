@@ -25,7 +25,9 @@ import sys
 
 from _common import (
     PANEL_BLACK,
+    POLISHED_STEEL,
     SketchDims,
+    _early_bound,
     _read_member,
     add_line_chain,
     anchor_point_to_origin,
@@ -102,6 +104,47 @@ from lever_wire_geom import (  # noqa: E402
 # the same +10.1225 the machine-handed layout gives directly.)
 YOKE_LOCAL_X = _YOKE_POINT[0] - _YOKE_WHEEL_X  # +10.099 (pitch r 10.4 @ tangency)
 YOKE_LOCAL_Y = _YOKE_POINT[1] - _YOKE_WHEEL_Y  # -2.485
+
+
+BRASS_DRUM = (0.72, 0.56, 0.24)  # ch21 p.53 hub drum
+
+
+async def _paint_bright_faces(adapter) -> None:
+    """Face-level finishes over the black body: rim ring outer cylinder + both
+    annular sides -> POLISHED_STEEL; hub drum cylinder -> BRASS_DRUM. Faces are
+    classified by their bounding box (the wheel axis is Z): the rim faces span
+    the full RIM_OUTER_DIA in X and Y, the drum spans HUB_DIA and is
+    non-planar (``Normal`` is empty). Fails loud if the expected faces are not
+    found, so a geometry change here cannot silently drop the finish."""
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    steel = double_array([*POLISHED_STEEL, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
+    brass = double_array([*BRASS_DRUM, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
+    part_h = _early_bound(adapter.currentModel, "IPartDoc")
+    n_rim = n_hub = 0
+    for body in part_h.GetBodies2(0, True) or []:
+        for face in body.GetFaces() or []:
+            box = face.GetBox()
+            if not box:
+                continue
+            xs = (float(box[3]) - float(box[0])) * 1000.0
+            ys = (float(box[4]) - float(box[1])) * 1000.0
+            zs = (float(box[5]) - float(box[2])) * 1000.0
+            planar = bool(face.Normal)
+            if abs(xs - RIM_OUTER_DIA) < 0.5 and abs(ys - RIM_OUTER_DIA) < 0.5:
+                face.MaterialPropertyValues = steel
+                n_rim += 1
+            elif (
+                not planar
+                and abs(xs - HUB_DIA) < 0.5
+                and abs(ys - HUB_DIA) < 0.5
+                and zs > SPOKE_AXIAL
+            ):
+                face.MaterialPropertyValues = brass
+                n_hub += 1
+    if n_rim < 3 or n_hub < 1:
+        raise RuntimeError(f"wheel finish faces not found: rim {n_rim}, hub {n_hub}")
+    _telemetry.info(f"wheel finish: {n_rim} rim faces bright, {n_hub} hub faces brass")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -260,14 +303,17 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(f"volume after pattern: {v_built:.1f} mm^3")
 
     await apply_material(adapter, MATERIAL)
-    # Black-painted casting (p.51 photo). The photo's bright accents — the
-    # machined rim edge and the 20 mm brass hub drum — are deliberately NOT
-    # preserved: the comparison render pipeline carries ONE colour per part
-    # (export_models colors.json -> STL instancing -> Blender object colour),
-    # so a face-scoped highlight cannot reach the gallery, and the wheel reads
-    # black-dominant in every plate. Documented simplification; the honest fix
-    # would be splitting the brass hub into its own part.
+    # Black-painted casting (p.51 photo) with its bright accents restored at
+    # the FACE level (2026-09 photo re-derive): ch21 pp.50-53 show the rim
+    # ring's machined outer cylinder and both annular sides bright steel and
+    # the 20 mm hub drum brass, only the spokes and hub web black. Face
+    # appearances sit above the body colour in the display hierarchy, so the
+    # part/body override below still paints everything else black. (The
+    # offline gallery still instances ONE colour per part -- export_models
+    # colors.json -- so it keeps reading the wheel black-dominant; SolidWorks
+    # renders and the glTF export carry the faces.)
     await apply_color(adapter, PANEL_BLACK)
+    await _paint_bright_faces(adapter)
 
     # Verify the two annotated diameters (ch. 21: 100 mm rim, 20 mm hub
     # — they self-validate against the stated 5x magnification).

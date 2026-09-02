@@ -30,12 +30,15 @@ import sys
 
 from _common import (
     CASTING_GREEN,
+    PANEL_BLACK,
     SketchDims,
+    _early_bound,
     add_line_chain,
     apply_color,
     apply_material,
     bbox_extent_check,
     check,
+    define_polygon_chain,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
@@ -113,6 +116,19 @@ CBORE_XZ = HOLE_XZ  # all four heads counterbored
 CORNER_CHAMFER = 0.125 * IN  # 3.175 legs, vertical plan corners
 RIM_CHAMFER = 0.0625 * IN  # 1.5875 legs, top rims + underside rim
 PAD_ROOT_R = 0.5  # pad-to-flange root fillet (note 1: R0.50 MAX)
+
+# Raised rim + black deck (2026-09 photo re-derive). Every plate that shows
+# the base top -- ch11 p.21 (crank close-up), ch13 p.25 (cylinder-gear front),
+# ch30 p002/p003/p006 -- reads it as a BLACK panel framed by a green lip
+# standing a few mm proud of it, flush with the pad sides. The lip is a
+# LIP_H-tall ring LIP_W wide on the pad's chamfered outline; the deck it
+# frames stays at the pad top (STACK_HEIGHT), so nothing mounted on the base
+# moves. The deck face is painted PANEL_BLACK at the FACE level (part and
+# body stay casting green); the lip's inner edge clears the closest deck
+# occupants -- tube-frame columns (|z| 124.7) and the nameplate (x 214.25) --
+# by >= 1.0.
+LIP_W = 7.0  # rim width, in from the pad outline
+LIP_H = 2.5  # rim height above the deck
 
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords,
 # and since #151 the drive-train derivation is machine-handed too, so the
@@ -289,6 +305,47 @@ async def _define_fixed_edge_rectangle(
         names=[width_name, depth_name, f"{width_name}West", f"{depth_name}Rear"],
         drives=[width_drive, depth_drive, half_x_drive, rear_z_drive],
     )
+
+
+async def _paint_deck_black(adapter, deck_y_mm: float) -> None:
+    """Face-level PANEL_BLACK on the deck the rim frames: the largest planar
+    +Y face lying at ``deck_y_mm`` (the pad top inside the lip; the lip's own
+    top sits LIP_H higher, the seat floors face -Y or are conical). Walks the
+    body's faces instead of a coordinate pick -- ``SelectByID2`` face picks
+    are view-dependent. Face appearances sit above the body colour in the
+    display hierarchy, so the rest of the casting stays green."""
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    doc = adapter.currentModel
+    part_h = _early_bound(doc, "IPartDoc")
+    bodies = part_h.GetBodies2(0, True) or []
+    target = None
+    target_area = 0.0
+    y_m = deck_y_mm / 1000.0
+    for body in bodies:
+        for face in body.GetFaces() or []:
+            normal = face.Normal
+            if not normal or float(normal[1]) < 0.99:
+                continue
+            box = face.GetBox()
+            if not box or abs(float(box[4]) - y_m) > 1e-6 or abs(float(box[1]) - y_m) > 1e-6:
+                continue
+            area = float(face.GetArea())
+            if area > target_area:
+                target, target_area = face, area
+    if target is None:
+        raise RuntimeError(f"deck face at y {deck_y_mm} not found")
+    a_deck = (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W) * 1e-6
+    if abs(target_area - a_deck) > 0.05 * a_deck:
+        raise RuntimeError(
+            f"deck face area {target_area * 1e6:.0f} mm^2 != {a_deck * 1e6:.0f} (minus seats)"
+        )
+    values = double_array([*PANEL_BLACK, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
+    target.MaterialPropertyValues = values
+    back = tuple(float(v) for v in (target.MaterialPropertyValues or ())[:3])
+    if len(back) != 3 or any(abs(b - w) > 1 / 255 for b, w in zip(back, PANEL_BLACK)):
+        raise RuntimeError(f"deck face colour readback mismatch: {back}")
+    _telemetry.info(f"deck face painted black ({target_area * 1e6:.0f} mm^2)")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -568,6 +625,39 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pad root fillet", after + v_root, 0.05 * v_root + 3.0
     )
 
+    # Raised rim: one ring feature (outer octagon on the pad's chamfered plan
+    # outline + inner rectangle LIP_W in) boss-extruded from RIM_CHAMFER below
+    # the pad top up to LIP_H above it. Starting below the top fills the
+    # TopRimBreaks chamfer notch along the pad's outer edge (the lip's outer
+    # faces continue the pad sides), so the net material added is the ring
+    # over LIP_H plus that notch. Top-plane sketch: (x, y) -> (X, -Z).
+    half_x, half_z = TOP_LENGTH / 2.0, TOP_WIDTH / 2.0
+    cc = CORNER_CHAMFER
+    outer_pts = [
+        (-half_x + cc, -half_z), (half_x - cc, -half_z),
+        (half_x, -half_z + cc), (half_x, half_z - cc),
+        (half_x - cc, half_z), (-half_x + cc, half_z),
+        (-half_x, half_z - cc), (-half_x, -half_z + cc),
+    ]
+    inner_pts = [
+        (-half_x + LIP_W, -half_z + LIP_W), (half_x - LIP_W, -half_z + LIP_W),
+        (half_x - LIP_W, half_z - LIP_W), (-half_x + LIP_W, half_z - LIP_W),
+    ]
+    check("create_sketch rim", await adapter.create_sketch("Top"))
+    outer_lines = await add_line_chain(adapter, outer_pts)
+    inner_lines = await add_line_chain(adapter, inner_pts)
+    await define_polygon_chain(adapter, outer_lines, outer_pts, label="rim outer")
+    await define_rectilinear_chain(adapter, inner_lines, inner_pts, label="rim inner")
+    await ensure_fully_defined(adapter, "rim sketch")
+    check("exit_sketch rim", await adapter.exit_sketch())
+    name_last_feature(adapter, "RimProfile")
+    extrude_at_offset(adapter, RIM_CHAMFER + LIP_H, total - RIM_CHAMFER)
+    name_last_feature(adapter, "Rim")
+    a_outer = TOP_LENGTH * TOP_WIDTH - 2.0 * cc * cc
+    a_inner = (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W)
+    v_lip = (a_outer - a_inner) * LIP_H + rim_area * _plan_perimeter(TOP_LENGTH, TOP_WIDTH)
+    after = await volume_check(adapter, "raised rim", after + v_lip, 0.01 * v_lip + 5.0)
+
     # Apply the deferred drive equations after the whole model exists, then
     # re-check neutrality against the as-built volume. Frame components are
     # inserted at verified transforms and lock-mated, so the old DeckTop,
@@ -580,6 +670,7 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
+    await _paint_deck_black(adapter, total)
 
     # Verify the annotated footprint without view-dependent screen picks.
     await bbox_extent_check(
