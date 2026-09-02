@@ -461,8 +461,9 @@ ARBOR_LENGTH = 187.0  # north end at z +132.415: 7.5 seated in the NORTH
 # cylinder-gear-shaft SHAFT_LENGTH; the pedestal geometry is asserted below.
 CRANKSHAFT_Z0 = -175.0  # outboard (crank) end (was -160: the crank plane moved
 # south with the ch30 GT re-read -- arm hub -175..-167, GT axle bolt -189 +- 2.7)
-CRANKSHAFT_LENGTH = 150.0  # rederived contract: -175..-25 covers the moved
-# pinion's north face (-25.625) while retaining the photographed arm/T12 plane.
+CRANKSHAFT_LENGTH = 122.0  # 2026-09 re-derive: -175..-53 ends 6.2 past the
+# 16T pinion's north face (-59.2) -- ch12 page002_img02 shows a short capped
+# end right behind the pinion, not a 34 mm bare stub out the column's back.
 CRANK_ARM_Z0 = CRANKSHAFT_Z0  # arm PLATE south face: the hub band is
 # -175..-167 at the shaft's south end, in FRONT of (south of) the T12 chain
 # wheel (-157.5..-152.5): the arm + the handle (its grip extends -Z, further
@@ -488,6 +489,19 @@ ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
 # about Y so its strap looks SOUTH at the drum.  After the fixed-post recenter
 # its foot spans z 92.588..108.588, still north of the unchanged rocker support.
 from build_arbor_pedestal import FOOT_DEPTH as ARBOR_PED_DEPTH  # noqa: E402
+from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
+
+# Cylinder END DISCS (2026-09, ch13 page002_img01/img03, ch25 page001_img02):
+# the plain brass washer closing each end of the gear/rod sandwich, seated
+# END_DISC_AIR inboard of each pedestal strap on the arbor. The south strap's
+# inboard face is the foot centre + FOOT_DEPTH/2 (strap band -2..+8 of the
+# foot, arbor_pedestal_spec); the north casting is turned 180 about Y, so its
+# strap's inboard face is the foot centre - FOOT_DEPTH/2.
+END_DISC_AIR = 0.5
+END_DISC_SOUTH_Z0 = -ARBOR_PEDESTAL_Z + ARBOR_PED_DEPTH / 2.0 + END_DISC_AIR
+END_DISC_NORTH_Z0 = (
+    ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_DEPTH / 2.0 - END_DISC_AIR - END_DISC_THICK
+)
 # (also imported with the main block below; repeated here because these
 # asserts run before it)
 
@@ -1922,6 +1936,19 @@ async def build(adapter) -> dict[str, str]:
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
     await _lock_static(adapter, north_pedestal, arbor)
+    # Cylinder end discs: one against each pedestal strap (END_DISC_AIR off),
+    # riding the arbor; retained like the pedestals (they turn with nothing).
+    for _disc_z0, _end in ((END_DISC_SOUTH_Z0, "south"), (END_DISC_NORTH_Z0, "north")):
+        end_disc = await place_component(
+            adapter,
+            "cylinder-end-disc",
+            [X_DRUM, Y_DRIVE, _disc_z0],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
+            ground=False,
+            label=f"cylinder end disc {_end} z0={_disc_z0:.3f}",
+        )
+        await _lock_static(adapter, end_disc, arbor)
     # The cone SWING PLATFORM is the swing bracket (ch.12, p.18 "pivot"):
     # floated so the whole cone set can swing horizontally out of mesh about
     # its tip-end vertical pivot (p1). Pinned at the engaged rest pose by a

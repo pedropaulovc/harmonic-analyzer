@@ -17,13 +17,17 @@ from __future__ import annotations
 
 from _fit_limits import band_text
 
-HANDLE_LENGTH = 90.0  # overall length (collar face to butt cap)
-HANDLE_MAX_DIA = 22.0  # max diameter at the swell
-COLLAR_LENGTH = 6.0  # brass collar length
-COLLAR_DIA = 11.0  # brass collar OD
-NECK_R = 4.8  # waist just below the collar (neck Ø9.6)
-PEAK_X = 62.0  # axial station of the maximum diameter
-CAP_R = 3.5  # flat butt cap radius (Ø7)
+# 2026-09 photo re-derive (ch11 page002_img03 at 12.6 px/mm against the 75
+# mm arm c2c; page002_img05/06 agree): a SHORT egg, not the 90 mm baton of
+# the first pass -- overall 44 from the collar face, swell 25 across at
+# 0.64 of the length, brass collar 15 x 7, butt cap 11 with the screw.
+HANDLE_LENGTH = 44.0  # overall length (collar face to butt cap)
+HANDLE_MAX_DIA = 25.0  # max diameter at the swell
+COLLAR_LENGTH = 7.0  # brass collar length
+COLLAR_DIA = 15.0  # brass collar OD
+NECK_R = 6.0  # waist just below the collar (neck Ø12)
+PEAK_X = 28.0  # axial station of the maximum diameter
+CAP_R = 5.5  # flat butt cap radius (Ø11)
 PIVOT_BORE_DIA = 6.125  # final reamed bore limits 6.10-6.15
 # Symmetric ream band about the mid nominal: 6.15 MAX / 6.10 MIN.
 PIVOT_BORE_BAND = (0.025, -0.025)

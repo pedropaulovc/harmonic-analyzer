@@ -1,0 +1,6 @@
+cylinder-end-disc:
+  number: MHA-121
+  material: Brass
+  tolerance_class: machined_block
+  quantity: 2
+  process: "turned (brass)"

@@ -88,8 +88,11 @@ def test_pivot_interface_is_fully_released_for_manufacture() -> None:
     assert "NO BLEND, RADIUS, OR CHAMFER" in notes
     assert "FINAL BORE LIMITS APPLY FULL LENGTH" in notes
     assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
-    assert "X90.00" in notes
-    assert "ACTUAL BUTT FACE AT 90.00+0.00/-0.25 TRIMS" in notes
+    assert f"X{crank_handle_spec.HANDLE_LENGTH:.2f}" in notes
+    assert (
+        f"ACTUAL BUTT FACE AT {crank_handle_spec.HANDLE_LENGTH:.2f}+0.00/-0.25 TRIMS"
+        in notes
+    )
     assert "ACTUAL BUTT TRIM FACE" in notes
     assert "GENERAL Ra 3.2" not in notes
     assert "PROFILE 0.50 | A | B APPLIES" in notes

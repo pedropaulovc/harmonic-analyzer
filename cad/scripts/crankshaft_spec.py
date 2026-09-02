@@ -10,7 +10,9 @@ MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.375 * MM_PER_IN  # 9.525: ch11 legacy ShaftDiameter, uncontradicted
 SHAFT_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
-SHAFT_LENGTH = 150.0  # re-anchored v2 post: reaches the rear-shifted 16T seat
+SHAFT_LENGTH = 122.0  # 2026-09 re-derive: ends 6.2 past the 16T pinion's north
+# face (ch12 page002_img02 shows a short capped end right behind the pinion,
+# not the 34 mm bare stub the 150 left poking out the column's back)
 
 # The installed v2 pivot post is turned end-for-end and remains fixed at its
 # ch30-fitted world placement. Its Ø11.438 bore therefore spans world

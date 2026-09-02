@@ -10,7 +10,8 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.25 * MM_PER_IN
-SHAFT_LENGTH = 203.2
+SHAFT_LENGTH = 170.0  # 2026-09: was 203.2 (8 in); the shaft now ends 4 past
+# each pivot-bracket ear (ch14 page002_img07 shows a near-flush domed end)
 SHAFT_DIA_BAND = SHAFT_H
 LENGTH_TOLERANCE_MM = 0.25
 

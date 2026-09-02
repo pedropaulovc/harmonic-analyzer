@@ -8,7 +8,6 @@ import cone_gear_shaft_spec
 import cone_pivot_post_spec
 import cone_tip_adjuster_spec
 import cone_tip_block_spec
-import pivot_ball_mount_spec
 
 
 SHEETS = (
@@ -17,7 +16,6 @@ SHEETS = (
     ("cone-pivot-post", cone_pivot_post_spec),
     ("cone-tip-adjuster", cone_tip_adjuster_spec),
     ("cone-tip-block", cone_tip_block_spec),
-    ("pivot-ball-mount", pivot_ball_mount_spec),
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (
