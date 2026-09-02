@@ -329,7 +329,10 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_0"),
         label="pen bore finish (bore 0)",
     )
-    bore1_edge = (_sheet_x(BORE_X[1]) + 0.016, TOP_CENTER[1])
+    # Bore 1's RIGHT silhouette point (x 30) now coincides with the top chamfer's
+    # start line in the top view (BLOCK_LENGTH - CHAMFER = 30), so the pick
+    # grabbed that edge instead of the circle; pick the LEFT point (x 22).
+    bore1_edge = (_sheet_x(BORE_X[1]) - 0.016, TOP_CENTER[1])
     add_surface_finish(
         adapter,
         top,
