@@ -22,6 +22,7 @@ import math
 import sys
 from typing import Any
 
+from _gear_drawing_entities import visible_circle_edge
 from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
@@ -34,7 +35,6 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
-    visible_circle_edge,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
