@@ -34,6 +34,7 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    visible_circle_edge,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -244,10 +245,14 @@ async def build(adapter: Any) -> dict[str, str]:
         pivot_radius * math.cos(pivot_finish_angle),
         _PIVOT_MID_Y + pivot_radius * math.sin(pivot_finish_angle),
     )
+    # Pick the bore circle by DIAMETER (the visible-entity walk the cone-gear
+    # drawing uses): a coordinate pick on the concentric O6.5 / O10 rims
+    # resolves to the hub's outer circle within SolidWorks' tolerance.
+    pivot_bore_edge = visible_circle_edge(adapter, front, PIVOT_HOLE_DIA)
     add_surface_finish(
         adapter,
         front,
-        edge_xy=pivot_bottom,
+        edge_entity=pivot_bore_edge,
         symbol_xy=(pivot_bottom[0] - 0.012, pivot_bottom[1] - 0.020),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
