@@ -122,8 +122,8 @@ async def _paint_bright_faces(adapter) -> None:
     annular sides -> POLISHED_STEEL; hub drum cylinder -> BRASS_DRUM. Faces are
     classified by their bounding box (the wheel axis is Z): the rim faces span
     the full RIM_OUTER_DIA in X and Y; the drum's cylinder is split into arc
-    segments by the spokes, so it is picked by its HUB_AXIAL length and a
-    diameter cap (non-planar: ``Normal`` is empty). Fails loud if the expected faces are not
+    drum is the HUB_DIA x HUB_DIA x (<= HUB_AXIAL) boxes (cylinder + end
+    annuli). Box-only: ``IFace2.Normal`` is non-empty for curved faces too. Fails loud if the expected faces are not
     found, so a geometry change here cannot silently drop the finish."""
     from solidworks_mcp.adapters.com_variant import double_array
 
@@ -131,6 +131,7 @@ async def _paint_bright_faces(adapter) -> None:
     brass = double_array([*BRASS_DRUM, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
     part_h = _early_bound(adapter.currentModel, "IPartDoc")
     n_rim = n_hub = 0
+    census: list[str] = []
     for body in part_h.GetBodies2(0, True) or []:
         for face in _com_get(body, "GetFaces") or []:
             box = _com_get(face, "GetBox")
@@ -139,23 +140,22 @@ async def _paint_bright_faces(adapter) -> None:
             xs = (float(box[3]) - float(box[0])) * 1000.0
             ys = (float(box[4]) - float(box[1])) * 1000.0
             zs = (float(box[5]) - float(box[2])) * 1000.0
-            planar = bool(face.Normal)
+            census.append(f"{xs:.1f}x{ys:.1f}x{zs:.1f}")
             if abs(xs - RIM_OUTER_DIA) < 0.5 and abs(ys - RIM_OUTER_DIA) < 0.5:
                 face.MaterialPropertyValues = steel
                 n_rim += 1
-            elif (
-                not planar
-                and abs(zs - HUB_AXIAL) < 0.5
-                and BORE_DIA + 1.0 < max(xs, ys) <= HUB_DIA + 0.5
-            ):
-                # The six spokes bite into the drum, splitting its cylinder into
-                # arc segments whose boxes are narrower than the diameter -- so
-                # classify by the drum's axial length and a diameter CAP, and
-                # exclude the axle bore by its diameter.
+            elif abs(xs - HUB_DIA) < 0.5 and abs(ys - HUB_DIA) < 0.5 and zs <= HUB_AXIAL + 0.5:
+                # The drum: its cylinder (20 x 20 x 10) and its two end annuli
+                # (20 x 20 x 0). IFace2.Normal is non-empty for curved faces too,
+                # so the classification is by box alone; the axle bore (5 x 5)
+                # and the rim faces (100 / 88) never match.
                 face.MaterialPropertyValues = brass
                 n_hub += 1
     if n_rim < 3 or n_hub < 1:
-        raise RuntimeError(f"wheel finish faces not found: rim {n_rim}, hub {n_hub}")
+        raise RuntimeError(
+            f"wheel finish faces not found: rim {n_rim}, hub {n_hub}; face boxes "
+            f"(x*y*z mm): {' '.join(sorted(set(census)))}"
+        )
     _telemetry.info(f"wheel finish: {n_rim} rim faces bright, {n_hub} hub faces brass")
 
 

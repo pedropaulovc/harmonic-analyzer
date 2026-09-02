@@ -569,27 +569,15 @@ async def build(adapter) -> dict[str, str]:
     after = await volume_check(adapter, "raised rim", after + v_lip, 0.01 * v_lip + 5.0)
     deck_top = total + LIP_H
 
-    # Plan corners: one full-height radius per plate. The flange's four
-    # vertical corner edges at FLANGE_CORNER_R; the pad + rim (one merged
-    # side face, so one edge from the flange top to the rim top) at the
-    # concentric PAD_CORNER_R; then the rim's four reentrant inner corners at
-    # RIM_INNER_R so the lip stays LIP_W wide round the corner.
-    check(
-        "fillet flange plan corners",
-        await adapter.add_fillet(
-            FLANGE_CORNER_R,
-            [
-                [sx * BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS / 2.0, sz * BOTTOM_WIDTH / 2.0]
-                for sx in (-1.0, 1.0)
-                for sz in (-1.0, 1.0)
-            ],
-        ),
-    )
-    name_last_feature(adapter, "FlangeCorners")
-    v_flange_corners = _corner_removal(FLANGE_CORNER_R, BOTTOM_THICKNESS)
-    after = await volume_check(
-        adapter, "flange plan corners", after - v_flange_corners, 0.01 * v_flange_corners + 2.0
-    )
+    # Plan corners: one full-height radius per plate. The pad + rim FIRST (one
+    # merged side face, so one edge from the flange top to the rim top) at
+    # PAD_CORNER_R, then the flange's four vertical corner edges at the
+    # concentric FLANGE_CORNER_R -- in that order: the flange arc passes 0.19
+    # inside the pad's square corner, so filleting the flange while the pad
+    # corner is still square has to cut the pad and SolidWorks refuses
+    # ("Failed to create fillet", seat build); rounded first, the pad corner
+    # sits 6.35 inside the flange arc. Then the rim's four reentrant inner
+    # corners at RIM_INNER_R so the lip stays LIP_W wide round the corner.
     check(
         "fillet pad plan corners",
         await adapter.add_fillet(
@@ -605,6 +593,22 @@ async def build(adapter) -> dict[str, str]:
     v_pad_corners = _corner_removal(PAD_CORNER_R, deck_top - BOTTOM_THICKNESS)
     after = await volume_check(
         adapter, "pad plan corners", after - v_pad_corners, 0.01 * v_pad_corners + 2.0
+    )
+    check(
+        "fillet flange plan corners",
+        await adapter.add_fillet(
+            FLANGE_CORNER_R,
+            [
+                [sx * BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS / 2.0, sz * BOTTOM_WIDTH / 2.0]
+                for sx in (-1.0, 1.0)
+                for sz in (-1.0, 1.0)
+            ],
+        ),
+    )
+    name_last_feature(adapter, "FlangeCorners")
+    v_flange_corners = _corner_removal(FLANGE_CORNER_R, BOTTOM_THICKNESS)
+    after = await volume_check(
+        adapter, "flange plan corners", after - v_flange_corners, 0.01 * v_flange_corners + 2.0
     )
     check(
         "fillet rim inner corners",
