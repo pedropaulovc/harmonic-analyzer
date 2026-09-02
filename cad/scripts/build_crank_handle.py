@@ -32,7 +32,9 @@ from __future__ import annotations
 
 import sys
 
+import _telemetry
 from _common import (
+    _early_bound,
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
@@ -114,6 +116,36 @@ REAR_CY = PEAK_R - REAR_R
 # Both circles pass through the swell apex (their common top point) and share
 # x = PEAK_X centres -> they are internally tangent there (|ΔCY| == ΔR):
 assert abs(abs(FRONT_CY - REAR_CY) - abs(FRONT_R - REAR_R)) < 1e-6
+
+
+COLLAR_BRASS = (0.72, 0.56, 0.24)  # ch11 pp.20-21: the bright brass collar
+
+
+async def _paint_collar_brass(adapter) -> None:
+    """Face-level brass on the collar over the ebonized body: the collar's
+    cylinder (non-planar, O COLLAR_DIA across Y/Z, COLLAR_LENGTH along the +X
+    turning axis) and its outer end face (planar, O COLLAR_DIA). The pear
+    grip's swell is far wider, the neck narrower, so the bounding box picks
+    the collar alone. Fails loud if nothing matches."""
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    brass = double_array([*COLLAR_BRASS, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
+    part_h = _early_bound(adapter.currentModel, "IPartDoc")
+    n = 0
+    for body in part_h.GetBodies2(0, True) or []:
+        for face in body.GetFaces() or []:
+            box = face.GetBox()
+            if not box:
+                continue
+            ys = (float(box[4]) - float(box[1])) * 1000.0
+            zs = (float(box[5]) - float(box[2])) * 1000.0
+            xmax = float(box[3]) * 1000.0
+            if abs(ys - COLLAR_DIA) < 0.3 and abs(zs - COLLAR_DIA) < 0.3 and xmax <= COLLAR_LENGTH + 0.3:
+                face.MaterialPropertyValues = brass
+                n += 1
+    if n < 1:
+        raise RuntimeError("crank-handle collar faces not found for the brass finish")
+    _telemetry.info(f"crank-handle collar: {n} faces brass")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -354,6 +386,7 @@ async def build(adapter) -> dict[str, str]:
     # ch11 pp.20-21 + ch30 plates: the pear grip is EBONIZED (painted/stained
     # black, satin), not a brown oak tone -- only the collar reads brass.
     await apply_color(adapter, PANEL_BLACK)
+    await _paint_collar_brass(adapter)
     await report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,
