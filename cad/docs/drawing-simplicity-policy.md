@@ -86,9 +86,18 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    annotate, or a dimension line; no text sits on a line. The layout audit
    (`_drawing_layout_check`) fails the build on crossings it can see; the eye
    pass and the machinist review catch the rest.
-9. **Assembly drawings are orientation sheets.** Three views, template
-   display defaults, no BOM, balloons or notes
-   (`drawing_recipe_assembly.md`). They are reviewed as such.
+9. **Assembly drawings are judged as assembly packages.** The review asks
+   for what a fitter needs: assembled views, an exploded view, a parts list
+   with balloons, ordered assembly steps, the assembly-level fits and checks,
+   and the parked/engaged setup. The current three-view sheets
+   (`drawing_recipe_assembly.md`) are orientation placeholders and are
+   EXPECTED to fail that review until they are built out; part sheets are the
+   gate this policy enforces today.
+10. **Inspection assumes a hobby shop, not a CMM.** Surface plate, height
+   gauge, indicators, V-blocks, sine bar and gauge blocks are fair game, so a
+   geometric control is never rejected as uninspectable, only as
+   unnecessary. Where a frame is legitimate (rule 3) it is complete: datum
+   feature symbols on reachable surfaces and basics for what it locates.
 
 ## The gate
 
